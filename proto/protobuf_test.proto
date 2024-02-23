@@ -1,0 +1,8 @@
+syntax = "proto3";
+package cli;
+
+option go_package = "github.com/ginchuco/ginchu/codec";
+
+message Test {
+  int64 i = 1;
+}

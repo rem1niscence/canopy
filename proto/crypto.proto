@@ -1,0 +1,16 @@
+syntax = "proto3";
+package cli;
+
+option go_package = "github.com/ginchuco/ginchu/crypto";
+
+message ProtoAddress {
+  bytes address = 1;
+}
+
+message ProtoPubKey {
+  bytes pubkey = 1;
+}
+
+message ProtoPrivKey {
+  bytes privkey = 1;
+}
