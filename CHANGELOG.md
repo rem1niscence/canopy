@@ -8,3 +8,5 @@
 - Added codec functionality
 - Added protobuf generate file
 - Added log functionality
+- Added docker
+- Added github workflow

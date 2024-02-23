@@ -1,0 +1,39 @@
+version: '3.1'
+
+services:
+  node-1:
+    container_name: node-1
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_PATH: cmd
+    ports:
+      - 3000:3000
+    restart: always
+    environment:
+      LOG_LEVEL: -4 # Debug
+    env_file:
+      - .env
+    networks:
+      - ginchu
+
+  node-2:
+    container_name: node-2
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_PATH: cmd
+    ports:
+      - 3000:3001
+    restart: always
+    environment:
+      LOG_LEVEL: -4 # Debug
+    env_file:
+      - .env
+    networks:
+      - ginchu
+networks:
+  ginchu:
+    driver: bridge
