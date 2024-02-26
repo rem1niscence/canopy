@@ -1,0 +1,23 @@
+syntax = "proto3";
+package types;
+
+option go_package = "github.com/ginchuco/ginchu/types";
+
+message Validator {
+  string address = 1;
+  string public_key = 2;
+  string staked_amount = 3;
+  int64 paused_height = 4;
+  int64 unstaking_height = 5;
+  string output = 6;
+}
+
+enum PoolNames {
+  PoolNameUnspecified = 0;
+  DAO = 1;
+  FeeCollector = 2;
+  AppStakePool = 3;
+  ValidatorStakePool = 4;
+  ServiceNodeStakePool = 5;
+  FishermanStakePool = 7;
+}

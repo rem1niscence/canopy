@@ -1,0 +1,15 @@
+syntax = "proto3";
+package types;
+
+option go_package = "github.com/ginchuco/ginchu/types";
+
+import "account.proto";
+import "validator.proto";
+import "gov.proto";
+
+message GenesisState {
+  repeated Account pools = 1;
+  repeated Account accounts = 2;
+  repeated Validator validators = 3;
+  Params params = 4;
+}

@@ -20,6 +20,10 @@ const (
 	// to avoid consensus level issues
 
 	MainModule ErrorModule = "main"
+
+	StorageModule ErrorModule = "store"
+	NilKeyCode    ErrorCode   = 1
+	NilValueCode  ErrorCode   = 2
 )
 
 type ErrorI interface {

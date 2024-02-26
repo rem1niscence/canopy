@@ -20,6 +20,9 @@ type LoggerI interface {
 	// Error prints an error message.
 	Error(msg string)
 
+	// Fatal prints an fatal message and exits
+	Fatal(msg string)
+
 	// Print prints a message with no level.
 	Print(msg string)
 
@@ -34,6 +37,9 @@ type LoggerI interface {
 
 	// Errorf prints an error message with formatting.
 	Errorf(format string, args ...interface{})
+
+	// Fatalf prints a fatal message with formatting and exits
+	Fatalf(format string, args ...interface{})
 
 	// Printf prints a message with no level and formatting.
 	Printf(format string, args ...interface{})
@@ -81,6 +87,10 @@ func (l *Logger) Info(msg string)  { l.write(colorString(GREEN, "INFO: "+msg)) }
 func (l *Logger) Warn(msg string)  { l.write(colorString(YELLOW, "WARN: "+msg)) }
 func (l *Logger) Error(msg string) { l.write(colorString(RED, "ERROR: "+msg)) }
 func (l *Logger) Print(msg string) { l.write(msg) }
+func (l *Logger) Fatal(msg string) {
+	l.Error(msg)
+	os.Exit(1)
+}
 
 func (l *Logger) Debugf(format string, args ...interface{}) {
 	l.write(colorStringWithFormat(BLUE, "DEBUG: "+format, args...))
@@ -96,6 +106,11 @@ func (l *Logger) Warnf(format string, args ...interface{}) {
 
 func (l *Logger) Errorf(format string, args ...interface{}) {
 	l.write(colorStringWithFormat(RED, "ERROR: "+format, args...))
+}
+
+func (l *Logger) Fatalf(format string, args ...interface{}) {
+	l.Errorf(format, args)
+	os.Exit(1)
 }
 
 func (l *Logger) Printf(format string, args ...interface{}) {
