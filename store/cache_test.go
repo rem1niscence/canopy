@@ -2,9 +2,12 @@ package store
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"github.com/ginchuco/ginchu/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
+	math "math/rand"
 	"testing"
 )
 
@@ -35,7 +38,7 @@ func TestCacheStoreBasic(t *testing.T) {
 	getAndAssert(t, parent, key, nil)
 }
 
-func getAndAssert(t *testing.T, store types.KVStoreI, key, expectedValue []byte) {
+func getAndAssert(t *testing.T, store types.StoreI, key, expectedValue []byte) {
 	gotValue, err := store.Get(key)
 	if err != nil {
 		t.Fatal(err)
@@ -43,6 +46,48 @@ func getAndAssert(t *testing.T, store types.KVStoreI, key, expectedValue []byte)
 	if !bytes.Equal(gotValue, expectedValue) {
 		t.Fatalf("wanted %s got %s", string(expectedValue), string(gotValue))
 	}
+}
+
+func TestIteratorWithDelete(t *testing.T) {
+	expectedVals := []string{"a", "b", "c", "d", "e", "f", "g"}
+	parent := memoryLevelDB(t)
+	cache := NewStoreCache(parent)
+	bulkSetKV(t, cache, expectedVals...)
+	for i := 0; i < 10; i++ {
+		randomindex := math.Intn(len(expectedVals))
+		if err := cache.Delete([]byte(expectedVals[randomindex])); err != nil {
+			t.Fatal(err)
+		}
+		expectedVals = append(expectedVals[:randomindex], expectedVals[randomindex+1:]...)
+		cIt, err := cache.Iterator(nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		validateIterators(t, expectedVals, cIt)
+		add := make([]byte, 1)
+		if _, err = rand.Read(add); err != nil {
+			t.Fatal(err)
+		}
+		expectedVals = append(expectedVals, hex.EncodeToString(add))
+	}
+}
+
+func TestDoubleCacheWrap(t *testing.T) {
+	parent := memoryLevelDB(t)
+	child := NewStoreCache(parent)
+	grandchild := NewStoreCache(child)
+	bulkSetKV(t, grandchild, "a")
+	getAndAssert(t, grandchild, []byte("a"), []byte("a"))
+	getAndAssert(t, child, []byte("a"), nil)
+	getAndAssert(t, parent, []byte("a"), nil)
+	grandchild.Write()
+	getAndAssert(t, grandchild, []byte("a"), []byte("a"))
+	getAndAssert(t, child, []byte("a"), []byte("a"))
+	getAndAssert(t, parent, []byte("a"), nil)
+	child.Write()
+	getAndAssert(t, grandchild, []byte("a"), []byte("a"))
+	getAndAssert(t, child, []byte("a"), []byte("a"))
+	getAndAssert(t, parent, []byte("a"), []byte("a"))
 }
 
 func TestCacheIterator(t *testing.T) {
@@ -88,7 +133,7 @@ func validateIterators(t *testing.T, expectedVals []string, iterators ...types.I
 	}
 }
 
-func bulkSetKV(t *testing.T, store types.KVStoreI, keyValue ...string) {
+func bulkSetKV(t *testing.T, store types.StoreI, keyValue ...string) {
 	for _, kv := range keyValue {
 		if err := store.Set([]byte(kv), []byte(kv)); err != nil {
 			t.Fatal(err)

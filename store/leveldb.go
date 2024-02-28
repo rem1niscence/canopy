@@ -15,7 +15,7 @@ import (
 	A lot of the iterator code is from Tendermint's leveldb wrapper
 */
 
-var _ types.KVStoreI = &LevelDBWrapper{}
+var _ types.StoreI = &LevelDBWrapper{}
 
 type LevelDBWrapper struct {
 	db *leveldb.DB

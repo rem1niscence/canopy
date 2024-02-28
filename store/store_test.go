@@ -84,7 +84,7 @@ func TestProof(t *testing.T) {
 	testProof(t, store, nonInclusionKey, value, proof)
 }
 
-func testProof(t *testing.T, store types.StoreI, key, value, proof []byte) {
+func testProof(t *testing.T, store types.CommitStoreI, key, value, proof []byte) {
 	if !store.VerifyProof(key, value, proof) {
 		t.Fatal("expected valid proof")
 	}
@@ -96,7 +96,7 @@ func testProof(t *testing.T, store types.StoreI, key, value, proof []byte) {
 	}
 }
 
-func addRandomValues(t *testing.T, store types.StoreI) {
+func addRandomValues(t *testing.T, store types.CommitStoreI) {
 	for i := 0; i < math.Intn(1000); i++ {
 		key := make([]byte, 256)
 		if _, err := rand.Read(key); err != nil {

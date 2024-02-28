@@ -25,3 +25,5 @@
 - Sparse Merkle Tree
     - https://lisk.com/blog/posts/sparse-merkle-trees-and-new-state-model
 
+- Validators should be able to have the ability to lock parameters or unlock parameter changes
+

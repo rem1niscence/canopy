@@ -9,7 +9,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
-var _ types.StoreI = &Store{}
+var _ types.CommitStoreI = &Store{}
 
 type Store struct {
 	log   types.LoggerI
@@ -17,7 +17,7 @@ type Store struct {
 	smt   *smt.SMT
 }
 
-func NewStore(path string, log types.LoggerI, opts *opt.Options) types.StoreI {
+func NewStore(path string, log types.LoggerI, opts *opt.Options) types.CommitStoreI {
 	db, err := leveldb.OpenFile(path, opts)
 	if err != nil {
 		log.Fatal(newOpenStoreError(err).Error())
@@ -25,7 +25,7 @@ func NewStore(path string, log types.LoggerI, opts *opt.Options) types.StoreI {
 	return newStore(db, log)
 }
 
-func NewMemoryStore(log types.LoggerI) types.StoreI {
+func NewMemoryStore(log types.LoggerI) types.CommitStoreI {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	if err != nil {
 		log.Fatal(newOpenStoreError(err).Error())
@@ -33,9 +33,9 @@ func NewMemoryStore(log types.LoggerI) types.StoreI {
 	return newStore(db, log)
 }
 
-func newStore(db *leveldb.DB, log types.LoggerI) types.StoreI {
+func newStore(db *leveldb.DB, log types.LoggerI) types.CommitStoreI {
 	levelDB := NewStoreCache(&LevelDBWrapper{db})
-	return &Store{log, levelDB, smt.NewSMT(smt.NewCachedMap(levelDB, 100000), crypto.Hasher())}
+	return &Store{log, levelDB, smt.NewSMT(levelDB, crypto.Hasher())}
 }
 
 func (s *Store) Get(key []byte) ([]byte, error)                { return s.store.Get(key) }
@@ -48,7 +48,7 @@ func (s *Store) Set(key []byte, value []byte) error {
 	if err := s.store.Set(key, value); err != nil {
 		return err
 	}
-	if err := s.smt.Update(key, value); err != nil {
+	if err := s.smt.Update(crypto.Hash(key), value); err != nil {
 		return err
 	}
 	return nil
@@ -58,7 +58,7 @@ func (s *Store) Delete(key []byte) error {
 	if err := s.store.Delete(key); err != nil {
 		return err
 	}
-	if err := s.smt.Delete(key); err != nil {
+	if err := s.smt.Delete(crypto.Hash(key)); err != nil && err != smt.ErrKeyNotPresent {
 		return err
 	}
 	return nil
@@ -69,7 +69,7 @@ func (s *Store) GetProof(key []byte) (compact, value []byte, err error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	proof, err := s.smt.Prove(key)
+	proof, err := s.smt.Prove(crypto.Hash(key))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -107,14 +107,16 @@ func (s *Store) VerifyProof(key, value, proof []byte) bool {
 		s.log.Error(newDecompactProofError(err).Error())
 		return false
 	}
-	return smt.VerifyProof(sparseMerkleProof, s.smt.Root(), key, value, &s.smt.BaseSMT)
+	return smt.VerifyProof(sparseMerkleProof, s.smt.Root(), crypto.Hash(key), value, &s.smt.BaseSMT)
 }
 
 func (s *Store) Commit() (root []byte, err error) {
-	// TODO make atomic
+	// sm.Commit() writes the tree to the cachedStore
 	if err = s.smt.Commit(); err != nil {
 		return nil, err
 	}
+	// store.Write() writes the query data and the
+	// smt data to the persisted database
 	s.store.Write()
 	// return copy of root
 	rootCpy := make([]byte, len(s.smt.SavedRoot))
@@ -122,27 +124,8 @@ func (s *Store) Commit() (root []byte, err error) {
 	return rootCpy, err
 }
 
-func (s *Store) Close() error { return s.store.parent.Close() }
-
-func PrefixEndBytes(prefix []byte) []byte {
-	if len(prefix) == 0 {
-		return []byte{byte(255)}
-	}
-
-	end := make([]byte, len(prefix))
-	copy(end, prefix)
-
-	for {
-		if end[len(end)-1] != byte(255) {
-			end[len(end)-1]++
-			break
-		} else {
-			end = end[:len(end)-1]
-			if len(end) == 0 {
-				end = nil
-				break
-			}
-		}
-	}
-	return end
+func (s *Store) CacheWrap() types.StoreI {
+	return NewStoreCache(s)
 }
+
+func (s *Store) Close() error { return s.store.parent.Close() }
