@@ -17,6 +17,8 @@ const (
 var (
 	cdc        = codec.Protobuf{}
 	lastCIDKey = []byte("xl/")
+
+	_ types.StoreI = &Store{}
 )
 
 type Store struct {
@@ -28,7 +30,7 @@ type Store struct {
 	sc      *SMTWrapper
 }
 
-func NewStore(path string, log types.LoggerI) (*Store, error) {
+func NewStore(path string, log types.LoggerI) (types.StoreI, error) {
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).
 		WithLoggingLevel(badger.ERROR))
 	if err != nil {
@@ -37,7 +39,7 @@ func NewStore(path string, log types.LoggerI) (*Store, error) {
 	return newStore(db, log)
 }
 
-func NewStoreInMemory(log types.LoggerI) (*Store, error) {
+func NewStoreInMemory(log types.LoggerI) (types.StoreI, error) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").
 		WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	if err != nil {
@@ -59,7 +61,7 @@ func newStore(db *badger.DB, log types.LoggerI) (*Store, error) {
 	}, nil
 }
 
-func (s *Store) NewReadOnly(version uint64) (*Store, error) {
+func (s *Store) NewReadOnly(version uint64) (types.ReadOnlyStoreI, error) {
 	id, err := s.getCommitID(version)
 	if err != nil {
 		return nil, err
@@ -141,6 +143,9 @@ func (s *Store) setCommitID(version uint64, root []byte) error {
 		Height: uint32(version),
 		Root:   root,
 	})
+	if err != nil {
+		return err
+	}
 	if err = w.Set(lastCIDKey, value); err != nil {
 		return err
 	}

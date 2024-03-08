@@ -21,6 +21,34 @@ const (
 
 	MainModule ErrorModule = "main"
 
+	CodeStringToBigInt ErrorCode = 11
+
+	StateMachineModule ErrorModule = "state_machine"
+
+	CodeMarshal               ErrorCode = 9
+	CodeUnmarshal             ErrorCode = 10
+	CodeStoreGet              ErrorCode = 11
+	CodeStoreSet              ErrorCode = 12
+	CodeStoreDelete           ErrorCode = 13
+	CodeStoreIter             ErrorCode = 14
+	CodeAddressEmpty          ErrorCode = 15
+	CodeAddressSize           ErrorCode = 16
+	CodeRecipientAddressEmpty ErrorCode = 17
+	CodeRecipientAddressSize  ErrorCode = 18
+	CodeOutputAddressEmpty    ErrorCode = 19
+	CodeOutputAddressSize     ErrorCode = 20
+	CodeAddressFromString     ErrorCode = 21
+	CodeInvalidAmount         ErrorCode = 22
+	CodePubKeyEmpty           ErrorCode = 23
+	CodePubKeySize            ErrorCode = 24
+	CodeParamKeyEmpty         ErrorCode = 25
+	CodeParamValEmpty         ErrorCode = 26
+	CodeVoteEmpty             ErrorCode = 27
+	CodeHashEmpty             ErrorCode = 28
+	CodeHashSize              ErrorCode = 29
+	CodeUnknownMsg            ErrorCode = 30
+	CodeInsufficientFunds     ErrorCode = 31
+
 	StorageModule ErrorModule = "store"
 	NilKeyCode    ErrorCode   = 1
 	NilValueCode  ErrorCode   = 2
@@ -59,4 +87,8 @@ func (p *Error) Error() string {
 // error implementations below for the `types` package
 func newLogError(err error) ErrorI {
 	return NewError(NoCode, MainModule, err.Error())
+}
+
+func errStringToBigInt() ErrorI {
+	return NewError(CodeStringToBigInt, MainModule, "unable to convert string to big int")
 }

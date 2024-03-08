@@ -29,23 +29,23 @@ func TestFuzz(t *testing.T) {
 	keys := make([][]byte, 0)
 	compareStore2 := NewTxnWrapper(db.NewTransactionAt(1, true), types.NewDefaultLogger(), stateStorePrefix)
 	for i := 0; i < 1000; i++ {
-		doRandomOperation(t, store, compareStore2, keys)
+		doRandomOperation(t, store, compareStore2, &keys)
 	}
 }
 
-func doRandomOperation(t *testing.T, db types.KVStoreI, compare types.KVStoreI, keys [][]byte) {
+func doRandomOperation(t *testing.T, db types.KVStoreI, compare types.KVStoreI, keys *[][]byte) {
 	k, v := getRandomBytes(t), getRandomBytes(t)
 	switch getRandomOperation(t) {
 	case SetTesting:
 		testDBSet(t, db, k, v)
 		testDBSet(t, compare, k, v)
-		keys = append(keys, k)
+		*keys = append(*keys, k)
 	case DelTesting:
-		k = randomTestKey(t, k, keys)
+		k = randomTestKey(t, k, *keys)
 		testDBDelete(t, db, k)
 		testDBDelete(t, compare, k)
 	case GetTesting:
-		k = randomTestKey(t, k, keys)
+		k = randomTestKey(t, k, *keys)
 		v1, v2 := testDBGet(t, db, k), testDBGet(t, compare, k)
 		if !bytes.Equal(v1, v2) {
 			fmt.Printf("key=%s db.Get=%s compare.Get=%s\n", k, v1, v2)
@@ -62,9 +62,6 @@ func getRandomBytes(t *testing.T) []byte {
 	bz := make([]byte, math.Intn(999)+40)
 	if _, err := rand.Read(bz); err != nil {
 		t.Fatal(err)
-	}
-	if bz == nil {
-		t.Fatal("nil bz")
 	}
 	return bz
 }
@@ -101,7 +98,7 @@ func testCompareIterators(t *testing.T, db types.KVStoreI, compare types.KVStore
 		it1, it2 types.IteratorI
 		err      error
 	)
-	switch math.Intn(1) {
+	switch math.Intn(2) {
 	case 0:
 		it1, err = db.Iterator(nil)
 		require.NoError(t, err)

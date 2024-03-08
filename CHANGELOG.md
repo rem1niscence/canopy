@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [Unreleased] - 03/08/2024
+
+- Created `StateMachine` structure
+- Added `handler` functionality to `state_machine`
+- Added `check` functionality to `messages`
+- Added `account` functionality to `state_machine`
+- Added `pool` functionality to `state_machine`
+- Simplified `store` interfaces and utilized them in the `store` package
+- Updated proto package to reflect the proper directories
+- Added `account` to proto package
+- Added `pool` to proto package
+
 ## [Unreleased] - 02/28/2024
 
 - Added `SMT` tests to `store` package

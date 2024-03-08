@@ -16,11 +16,12 @@ func Test(t *testing.T) {
 	require.NoError(t, smt.Update([]byte("testKey"), []byte("testValue")))
 	require.NoError(t, smt.Update([]byte("foo"), []byte("testValue")))
 	fmt.Println(smn)
-	smt.Commit()
+	require.NoError(t, smt.Commit())
 	fmt.Println(smn)
 	value, err := smt.GetValue([]byte("testKey"))
 	fmt.Println(string(value), err)
 	value, err = lazy.Get([]byte("testKey"))
+	require.NoError(t, err)
 	fmt.Println(hex.EncodeToString(value))
 	fmt.Println(hex.EncodeToString(smt.base().digestValue([]byte("testValue"))))
 }

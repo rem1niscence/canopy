@@ -70,6 +70,7 @@ func TestIteratorCommitAndPrefixed(t *testing.T) {
 	validateIterators(t, []string{"test/c", "test/b", "test/a"}, it3)
 	it3.Close()
 	root2, err := store.Commit()
+	require.NoError(t, err)
 	require.Equal(t, root1, root2)
 	it4, err := store.RevIterator([]byte(prefix2))
 	require.NoError(t, err)

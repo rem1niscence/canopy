@@ -1,7 +1,7 @@
 syntax = "proto3";
 package types;
 
-option go_package = "github.com/ginchuco/ginchu/types";
+option go_package = "github.com/ginchuco/ginchu/state_machine/types";
 
 message Params {
   int32 block_size = 1;
