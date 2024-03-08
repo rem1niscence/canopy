@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [Unreleased] - 02/28/2024
+
+- Added `SMT` tests to `store` package
+- Changed store design to utilize `badgerdb` and `badger.txn`
+
 ## [Unreleased] - 02/25/2024
 
 - Added `store` tests

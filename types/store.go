@@ -13,20 +13,99 @@ package types
 	A cache layer over both must be implemented to allow rollbacks during transaction and block validation
 */
 
-type CommitStoreI interface {
-	StoreI
-	Commit() (root []byte, err error)                     // Commits the cached data to the underlying databases
+type MultiStoreI interface {
+	NewHistorical(height uint32) (HistoricalStoreI, error)
+	CommittableStoreI
+	ProvableStoreI
+	ReadableStoreI
+	WritableStoreI
+	ClosableStoreI
+}
+
+type StateStoreI interface {
+	NewHistorical(height uint32) StateStoreI
+	WritableStoreI
+	ReadableStoreI
+	CommittableStoreI
+	VersionedStoreI
+	ClosableStoreI
+}
+
+type StateCommitI interface {
+	NewHistorical(height uint32, root []byte) StateCommitI
+	WritableStoreI
+	CommittableStoreI
+	VersionedStoreI
+	ProvableStoreI
+}
+
+type HistoricalStoreI interface {
+	ProvableStoreI
+	ReadableStoreI
+}
+
+type KVStoreI interface {
+	ReadableStoreI
+	WritableStoreI
+}
+
+type BatchStoreI interface {
+	KVStoreI
+	BatchableStoreI
+}
+
+type PrefixStoreI interface {
+	ReadableStoreI
+	WritableStoreI
+	PrefixableStoreI
+}
+
+type CacheStoreI interface {
+	KVStoreI
+	WriteToBatch(b BatchI) error
+	Write() error
+}
+
+type VersionedStoreI interface {
+	GetHeight() uint32
+}
+
+type BatchableStoreI interface {
+	NewBatch() BatchI
+}
+
+type BatchI interface {
+	WritableStoreI
+	Write() error
+	ClosableStoreI
+}
+
+type WritableStoreI interface {
+	Set(key, value []byte) error
+	Delete(key []byte) error
+}
+
+type ReadableStoreI interface {
+	Get(key []byte) ([]byte, error)
+	Iterator(prefix []byte) (IteratorI, error)
+	RevIterator(prefix []byte) (IteratorI, error)
+}
+
+type ClosableStoreI interface {
+	Close() error
+}
+
+type CommittableStoreI interface {
+	Commit() (root []byte, err error)
+}
+
+type ProvableStoreI interface {
 	GetProof(key []byte) (proof, value []byte, err error) // Get gets the bytes for a compact merkle proof
 	VerifyProof(key, value, proof []byte) bool            // VerifyProof validates the merkle proof
 }
 
-type StoreI interface {
-	Get(key []byte) ([]byte, error)
-	Set(key, value []byte) error
-	Delete(key []byte) error
-	Iterator(start, end []byte) (IteratorI, error)
-	ReverseIterator(start, end []byte) (IteratorI, error)
-	Close() error // Closes the database
+type PrefixableStoreI interface {
+	UpdatePrefix(prefix []byte)
 }
 
 type IteratorI interface {
@@ -38,10 +117,23 @@ type IteratorI interface {
 	Close()
 }
 
-type StoreObjectI interface {
-	Key() []byte
-	Value() []byte
-	Bytes() []byte
-	HashKey() []byte
-	HashValue() []byte
+func PrefixEndBytes(prefix []byte) []byte {
+	if len(prefix) == 0 {
+		return []byte{byte(255)}
+	}
+	end := make([]byte, len(prefix))
+	copy(end, prefix)
+	for {
+		if end[len(end)-1] != byte(255) {
+			end[len(end)-1]++
+			break
+		} else {
+			end = end[:len(end)-1]
+			if len(end) == 0 {
+				end = nil
+				break
+			}
+		}
+	}
+	return end
 }

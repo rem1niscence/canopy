@@ -477,6 +477,10 @@ func (smt *SMT) Root() []byte {
 	return smt.hashNode(smt.tree)
 }
 
+func (smt *SMT) LastSavedRoot() []byte {
+	return smt.SavedRoot
+}
+
 func (smt *SMT) addOrphan(orphans *[][]byte, node treeNode) {
 	if node.Persisted() {
 		*orphans = append(*orphans, node.CachedDigest())

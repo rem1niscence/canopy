@@ -3,6 +3,11 @@ package types;
 
 option go_package = "github.com/ginchuco/ginchu/store";
 
+message CommitID {
+  uint32 height = 1;
+  bytes root = 2;
+}
+
 message StoreMerkleProof {
   bytes key = 1;
   bytes value = 2;
