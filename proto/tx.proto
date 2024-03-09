@@ -12,12 +12,12 @@ message Transaction {
 }
 
 message TransactionResult {
-  uint32 code = 1;
+  uint64 code = 1;
   bytes signer = 2;
   bytes recipient = 3;
   string message_type = 4;
-  int64 height = 5;
-  uint32 index = 6;
+  uint64 height = 5;
+  uint64 index = 6;
   Transaction transaction = 7;
 }
 

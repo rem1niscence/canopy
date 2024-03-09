@@ -3,6 +3,7 @@ package types
 type StoreI interface {
 	NewReadOnly(version uint64) (ReadOnlyStoreI, error)
 	Commit() (root []byte, err error)
+	Version() uint64
 	ProvableStoreI
 	ReadableStoreI
 	WritableStoreI

@@ -102,7 +102,7 @@ func (s *Store) GetProof(k []byte) ([]byte, []byte, error) {
 func (s *Store) VerifyProof(k, v, p []byte) bool               { return s.sc.VerifyProof(k, v, p) }
 func (s *Store) Iterator(p []byte) (types.IteratorI, error)    { return s.ss.Iterator(p) }
 func (s *Store) RevIterator(p []byte) (types.IteratorI, error) { return s.ss.RevIterator(p) }
-
+func (s *Store) Version() uint64                               { return s.version }
 func (s *Store) Commit() (root []byte, err error) {
 	s.version++
 	root, err = s.sc.Commit()
@@ -140,7 +140,7 @@ func (s *Store) getCommitID(version uint64) (id CommitID, err error) {
 func (s *Store) setCommitID(version uint64, root []byte) error {
 	w := NewTxnWrapper(s.writer, s.log, "")
 	value, err := cdc.Marshal(&CommitID{
-		Height: uint32(version),
+		Height: version,
 		Root:   root,
 	})
 	if err != nil {

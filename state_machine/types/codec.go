@@ -3,7 +3,7 @@ package types
 import (
 	"github.com/ginchuco/ginchu/codec"
 	lib "github.com/ginchuco/ginchu/types"
-	"github.com/gogo/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 var cdc = codec.Protobuf{}

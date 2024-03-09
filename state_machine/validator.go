@@ -7,19 +7,28 @@ import (
 )
 
 func (s *StateMachine) GetValidator(address crypto.AddressI) (*types.Validator, lib.ErrorI) {
-	store := s.Store()
-	bz, err := store.Get(types.KeyForValidator(address))
+	bz, err := s.Get(types.KeyForValidator(address))
 	if err != nil {
-		return nil, types.ErrStoreGet(err)
+		return nil, err
+	}
+	if bz == nil {
+		return nil, types.ErrValidatorNotExists()
 	}
 	return s.unmarshalValidator(bz)
 }
 
+func (s *StateMachine) GetValidatorExists(address crypto.AddressI) (bool, lib.ErrorI) {
+	bz, err := s.Get(types.KeyForValidator(address))
+	if err != nil {
+		return false, err
+	}
+	return bz == nil, nil
+}
+
 func (s *StateMachine) GetValidators() ([]*types.Validator, lib.ErrorI) {
-	store := s.Store()
-	it, er := store.Iterator(types.ValidatorPrefix())
-	if er != nil {
-		return nil, types.ErrStoreIter(er)
+	it, err := s.Iterator(types.ValidatorPrefix())
+	if err != nil {
+		return nil, err
 	}
 	defer it.Close()
 	var result []*types.Validator
@@ -34,7 +43,6 @@ func (s *StateMachine) GetValidators() ([]*types.Validator, lib.ErrorI) {
 }
 
 func (s *StateMachine) SetValidator(validator *types.Validator) lib.ErrorI {
-	store := s.Store()
 	bz, err := s.marshalValidator(validator)
 	if err != nil {
 		return err
@@ -43,16 +51,51 @@ func (s *StateMachine) SetValidator(validator *types.Validator) lib.ErrorI {
 	if er != nil {
 		return types.ErrAddressFromString(er)
 	}
-	if er = store.Set(types.KeyForValidator(address), bz); err != nil {
-		return types.ErrStoreSet(er)
+	if err = s.Set(types.KeyForValidator(address), bz); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, height uint64) lib.ErrorI {
+	if err := s.Set(types.KeyForUnstaking(height, address), nil); err != nil {
+		return err
+	}
+	validator.UnstakingHeight = height
+	return s.SetValidator(validator)
+}
+
+func (s *StateMachine) SetValidatorPaused(validator *types.Validator, height uint64) lib.ErrorI {
+	validator.PausedHeight = height
+	return s.SetValidator(validator)
+}
+
+func (s *StateMachine) SetValidatorUnpaused(validator *types.Validator) lib.ErrorI {
+	validator.PausedHeight = 0
+	return s.SetValidator(validator)
+}
+
+func (s *StateMachine) DeleteUnstaking(height uint64) lib.ErrorI {
+	it, err := s.Iterator(types.UnstakingPrefix(height))
+	if err != nil {
+		return err
+	}
+	defer it.Close()
+	var keysToDelete [][]byte
+	for ; it.Valid(); it.Next() {
+		keysToDelete = append(keysToDelete, it.Key())
+	}
+	for _, key := range keysToDelete {
+		if err = s.Delete(key); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (s *StateMachine) DeleteValidator(address crypto.AddressI) lib.ErrorI {
-	store := s.Store()
-	if err := store.Delete(types.KeyForValidator(address)); err != nil {
-		return types.ErrStoreDelete(err)
+	if err := s.Delete(types.KeyForValidator(address)); err != nil {
+		return err
 	}
 	return nil
 }

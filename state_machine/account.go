@@ -8,19 +8,17 @@ import (
 )
 
 func (s *StateMachine) GetAccount(address crypto.AddressI) (*types.Account, lib.ErrorI) {
-	store := s.Store()
-	bz, err := store.Get(types.KeyForAccount(address))
+	bz, err := s.Get(types.KeyForAccount(address))
 	if err != nil {
-		return nil, types.ErrStoreGet(err)
+		return nil, err
 	}
 	return s.unmarshalAccount(bz)
 }
 
 func (s *StateMachine) GetAccounts() ([]*types.Account, lib.ErrorI) {
-	store := s.Store()
-	it, er := store.Iterator(types.AccountPrefix())
-	if er != nil {
-		return nil, types.ErrStoreIter(er)
+	it, err := s.Iterator(types.AccountPrefix())
+	if err != nil {
+		return nil, err
 	}
 	defer it.Close()
 	var result []*types.Account
@@ -43,7 +41,6 @@ func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (*big.Int, lib
 }
 
 func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
-	store := s.Store()
 	bz, err := s.marshalAccount(account)
 	if err != nil {
 		return err
@@ -52,8 +49,8 @@ func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
 	if er != nil {
 		return types.ErrAddressFromString(er)
 	}
-	if er = store.Set(types.KeyForAccount(address), bz); err != nil {
-		return types.ErrStoreSet(er)
+	if err = s.Set(types.KeyForAccount(address), bz); err != nil {
+		return err
 	}
 	return nil
 }
@@ -104,10 +101,9 @@ func (s *StateMachine) marshalAccount(account *types.Account) ([]byte, lib.Error
 // Pool logic below
 
 func (s *StateMachine) GetPool(name string) (*types.Pool, lib.ErrorI) {
-	store := s.Store()
-	bz, err := store.Get(types.KeyForPool(name))
+	bz, err := s.Get(types.KeyForPool(name))
 	if err != nil {
-		return nil, types.ErrStoreGet(err)
+		return nil, err
 	}
 	return s.unmarshalPool(bz)
 }
@@ -121,13 +117,12 @@ func (s *StateMachine) GetPoolBalance(name string) (*big.Int, lib.ErrorI) {
 }
 
 func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
-	store := s.Store()
 	bz, err := s.marshalPool(pool)
 	if err != nil {
 		return err
 	}
-	if er := store.Set(types.KeyForPool(pool.Name), bz); err != nil {
-		return types.ErrStoreSet(er)
+	if err = s.Set(types.KeyForPool(pool.Name), bz); err != nil {
+		return err
 	}
 	return nil
 }

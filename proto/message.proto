@@ -43,9 +43,10 @@ message MessageUnpause {
 
 message MessageChangeParameter {
   bytes owner = 1;
-  string parameter_key = 2;
-  google.protobuf.Any parameter_value = 3;
-  optional bytes signer = 4;
+  string parameter_space = 2;
+  string parameter_key = 3;
+  google.protobuf.Any parameter_value = 4;
+  optional bytes signer = 5;
 }
 
 message MessageDoubleSign {
@@ -57,8 +58,8 @@ message MessageDoubleSign {
 
 message Vote {
   bytes public_key = 1;
-  uint32 height = 2;
-  uint32 round = 3;
-  uint32 type = 4;
+  uint64 height = 2;
+  uint64 round = 3;
+  uint64 type = 4;
   bytes block_hash = 5;
 }

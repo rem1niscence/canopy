@@ -4,7 +4,7 @@ package types;
 option go_package = "github.com/ginchuco/ginchu/store";
 
 message CommitID {
-  uint32 height = 1;
+  uint64 height = 1;
   bytes root = 2;
 }
 

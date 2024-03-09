@@ -29,6 +29,18 @@ func StringLTE(s string, b *big.Int) (bool, ErrorI) {
 	return BigLTE(a, b), nil
 }
 
+func StringsCmp(s, s2 string) (int, ErrorI) {
+	a, err := StringToBigInt(s)
+	if err != nil {
+		return 0, err
+	}
+	b, err := StringToBigInt(s2)
+	if err != nil {
+		return 0, err
+	}
+	return a.Cmp(b), nil
+}
+
 func StringBigAdd(s string, s2 string) (string, ErrorI) {
 	a, err := StringToBigInt(s)
 	if err != nil {
@@ -52,6 +64,19 @@ func StringSub(s string, s2 string) (string, ErrorI) {
 		return "", err
 	}
 	c := BigSub(a, b)
+	return BigIntToString(c), nil
+}
+
+func StringAdd(s string, s2 string) (string, ErrorI) {
+	a, err := StringToBigInt(s)
+	if err != nil {
+		return "", err
+	}
+	b, err := StringToBigInt(s2)
+	if err != nil {
+		return "", err
+	}
+	c := BigAdd(a, b)
 	return BigIntToString(c), nil
 }
 

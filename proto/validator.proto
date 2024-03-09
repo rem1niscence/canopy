@@ -7,8 +7,8 @@ message Validator {
   string address = 1;
   string public_key = 2;
   string staked_amount = 3;
-  int64 paused_height = 4;
-  int64 unstaking_height = 5;
+  uint64 paused_height = 4;
+  uint64 unstaking_height = 5;
   string output = 6;
 }
 

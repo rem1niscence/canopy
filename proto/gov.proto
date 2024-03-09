@@ -4,39 +4,49 @@ package types;
 option go_package = "github.com/ginchuco/ginchu/state_machine/types";
 
 message Params {
-  int32 block_size = 1;
-  string validator_minimum_stake = 2;
-  int32 validator_unstaking_blocks = 3;
-  int32 validator_minimum_pause_blocks = 4;
-  int32 validator_max_pause_blocks = 5;
-  int32 validator_maximum_missed_blocks = 6;
-  int32 validator_max_evidence_age_in_blocks = 7;
-  int32 proposer_percentage_of_fees = 8;
-  int32 missed_blocks_burn_percentage = 9;
-  int32 double_sign_burn_percentage = 10;
-  string message_double_sign_fee = 11;
-  string message_send_fee = 12;
-  string message_stake_validator_fee = 13;
-  string message_unstake_validator_fee = 14;
-  string message_pause_validator_fee = 15;
-  string message_unpause_validator_fee = 16;
-  string message_change_parameter_fee = 17;
-  string acl_owner = 18;
-  string param_block_size = 19;
-  string param_validator_minimum_stake_owner = 20;
-  string param_validator_unstaking_blocks_owner = 21;
-  string param_validator_minimum_pause_blocks_owner = 22;
-  string param_validator_max_pause_blocks_owner = 23;
-  string param_validator_maximum_missed_blocks_owner = 24;
-  string param_validator_max_evidence_age_in_blocks_owner = 25;
-  string param_proposer_percentage_of_fees_owner = 26;
-  string param_missed_blocks_burn_percentage_owner = 27;
-  string param_double_sign_burn_percentage_owner = 28;
-  string param_message_double_sign_fee_owner = 29;
-  string param_message_send_fee_owner = 30;
-  string param_message_stake_validator_fee_owner = 31;
-  string param_message_unstake_validator_fee_owner = 32;
-  string param_message_pause_validator_fee_owner = 33;
-  string param_message_unpause_validator_fee_owner = 34;
-  string param_message_change_parameter_fee_owner = 35;
+  ConsensusParams Consensus = 1;
+  ValidatorParams Validator = 2;
+  FeeParams Fee = 3;
+  GovernanceParams Governance = 4;
+}
+
+message ConsensusParams {
+  Uint64Param block_size = 1;
+}
+
+message ValidatorParams {
+  StringParam validator_minimum_stake = 1;
+  Uint64Param validator_unstaking_blocks = 2;
+  Uint64Param validator_minimum_pause_blocks = 3;
+  Uint64Param validator_max_pause_blocks = 4;
+  Uint64Param validator_maximum_missed_blocks = 5;
+  Uint64Param validator_max_evidence_age_in_blocks = 6;
+  Uint64Param validator_missed_blocks_burn_percentage = 7;
+  Uint64Param validator_double_sign_burn_percentage = 8;
+  Uint64Param validator_proposer_percentage_of_fees = 9;
+}
+
+message FeeParams {
+  StringParam message_send_fee = 1;
+  StringParam message_stake_fee = 2;
+  StringParam message_edit_stake_fee = 3;
+  StringParam message_unstake_fee = 4;
+  StringParam message_pause_fee = 5;
+  StringParam message_unpause_fee = 6;
+  StringParam message_change_parameter_fee = 7;
+  StringParam message_double_sign_fee = 8;
+}
+
+message GovernanceParams {
+  string acl_owner = 1;
+}
+
+message StringParam {
+  string value = 1;
+  string owner = 2;
+}
+
+message Uint64Param {
+  uint64 value = 1;
+  string owner = 2;
 }

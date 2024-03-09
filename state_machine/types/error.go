@@ -21,6 +21,10 @@ func ErrStoreIter(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeStoreIter, lib.StateMachineModule, fmt.Sprintf("store.Iter() failed with err: %s", err.Error()))
 }
 
+func ErrStoreRevIter(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeStoreRevIter, lib.StateMachineModule, fmt.Sprintf("store.RevIter() failed with err: %s", err.Error()))
+}
+
 func ErrStoreSet(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeStoreSet, lib.StateMachineModule, fmt.Sprintf("store.Set() failed with err: %s", err.Error()))
 }
@@ -95,4 +99,52 @@ func ErrUnknownMessage(x lib.MessageI) lib.ErrorI {
 
 func ErrInsufficientFunds() lib.ErrorI {
 	return lib.NewError(lib.CodeInsufficientFunds, lib.StateMachineModule, "insufficient funds")
+}
+
+func ErrValidatorExists() lib.ErrorI {
+	return lib.NewError(lib.CodeValidatorExists, lib.StateMachineModule, "validator exists")
+}
+
+func ErrValidatorNotExists() lib.ErrorI {
+	return lib.NewError(lib.CodeValidatorNotExists, lib.StateMachineModule, "validator does not exist")
+}
+
+func ErrValidatorUnstaking() lib.ErrorI {
+	return lib.NewError(lib.CodeValidatorUnstaking, lib.StateMachineModule, "validator is unstaking")
+}
+
+func ErrValidatorPaused() lib.ErrorI {
+	return lib.NewError(lib.CodeValidatorPaused, lib.StateMachineModule, "validator paused")
+}
+
+func ErrValidatorNotPaused() lib.ErrorI {
+	return lib.NewError(lib.CodeValidatorNotPaused, lib.StateMachineModule, "validator not paused")
+}
+
+func ErrEmptyConsParams() lib.ErrorI {
+	return lib.NewError(lib.CodeEmptyConsParams, lib.StateMachineModule, "consensus params empty")
+}
+
+func ErrEmptyValParams() lib.ErrorI {
+	return lib.NewError(lib.CodeEmptyValParams, lib.StateMachineModule, "validator params empty")
+}
+
+func ErrEmptyFeeParams() lib.ErrorI {
+	return lib.NewError(lib.CodeEmptyFeeParams, lib.StateMachineModule, "fee params empty")
+}
+
+func ErrEmptyGovParams() lib.ErrorI {
+	return lib.NewError(lib.CodeEmptyGovParams, lib.StateMachineModule, "governance params empty")
+}
+
+func ErrUnknownParam() lib.ErrorI {
+	return lib.NewError(lib.CodeUnknownParamType, lib.StateMachineModule, "unknown param")
+}
+
+func ErrUnknownParamSpace() lib.ErrorI {
+	return lib.NewError(lib.CodeUnknownParamSpace, lib.StateMachineModule, "unknown param space")
+}
+
+func ErrUnknownParamType(t any) lib.ErrorI {
+	return lib.NewError(lib.CodeUnknownParamType, lib.StateMachineModule, fmt.Sprintf("unknown param type %T", t))
 }
