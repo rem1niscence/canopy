@@ -21,12 +21,36 @@ func BigGTE(a *big.Int, b *big.Int) bool     { return a.Cmp(b) >= 0 }
 func BigLess(a *big.Int, b *big.Int) bool    { return a.Cmp(b) == -1 }
 func BigGreater(a *big.Int, b *big.Int) bool { return a.Cmp(b) == 1 }
 
-func StringLTE(s string, b *big.Int) (bool, ErrorI) {
+func StringReducePercentage(amount string, percent int8) (string, ErrorI) {
+	// convert amount to big.Int
+	a, err := StringToBigInt(amount)
+	if err != nil {
+		return "", err
+	}
+	// convert to a percent float: ex 1 - .05 = .95
+	percentFloat := big.NewFloat(float64(1) - float64(percent)/float64(100))
+	// amountBig.ToFloat() * percentFloat: ex 100 * .95 = 95 (reduced by 5%)
+	result := new(big.Float).Mul(new(big.Float).SetInt(a), percentFloat)
+	// truncate to big.Int
+	c, _ := result.Int(nil)
+	// convert back to string
+	return BigIntToString(c), nil
+}
+
+func StringBigLTE(s string, b *big.Int) (bool, ErrorI) {
 	a, err := StringToBigInt(s)
 	if err != nil {
 		return false, err
 	}
 	return BigLTE(a, b), nil
+}
+
+func StringsLess(s, s2 string) (bool, ErrorI) {
+	cmp, err := StringsCmp(s, s2)
+	if err != nil {
+		return false, err
+	}
+	return cmp == -1, nil
 }
 
 func StringsCmp(s, s2 string) (int, ErrorI) {

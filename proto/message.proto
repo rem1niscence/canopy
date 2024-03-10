@@ -52,7 +52,7 @@ message MessageChangeParameter {
 message MessageDoubleSign {
   Vote vote_a = 1;
   Vote vote_b = 2;
-  optional bytes reporter_address = 3;
+  bytes reporter_address = 3;
   optional bytes signer = 4;
 }
 
@@ -62,4 +62,11 @@ message Vote {
   uint64 round = 3;
   uint64 type = 4;
   bytes block_hash = 5;
+  bytes signature = 6;
+}
+
+// TODO
+message MessageInvalidBlock {
+  bytes proposer_address = 1;
+  optional bytes signer = 2;
 }

@@ -33,6 +33,10 @@ func ErrUnmarshal(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeUnmarshal, lib.StateMachineModule, fmt.Sprintf("unmarshal() failed with err: %s", err.Error()))
 }
 
+func ErrFromAny(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeFromAny, lib.StateMachineModule, fmt.Sprintf("fromAny() failed with err: %s", err.Error()))
+}
+
 func ErrMarshal(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeMarshal, lib.StateMachineModule, fmt.Sprintf("marshal() failed with err: %s", err.Error()))
 }
@@ -147,4 +151,44 @@ func ErrUnknownParamSpace() lib.ErrorI {
 
 func ErrUnknownParamType(t any) lib.ErrorI {
 	return lib.NewError(lib.CodeUnknownParamType, lib.StateMachineModule, fmt.Sprintf("unknown param type %T", t))
+}
+
+func ErrUnauthorizedParamChange() lib.ErrorI {
+	return lib.NewError(lib.CodeUnauthorizedParamChange, lib.StateMachineModule, "unauthorized")
+}
+
+func ErrBelowMinimumStake() lib.ErrorI {
+	return lib.NewError(lib.CodeBelowMinimumStake, lib.StateMachineModule, "less than minimum stake")
+}
+
+func ErrInvalidSlashPercentage() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidSlashPercentage, lib.StateMachineModule, "slash percent invalid")
+}
+
+func ErrPublicKeysNotEqual() lib.ErrorI {
+	return lib.NewError(lib.CodePublicKeysNotEqual, lib.StateMachineModule, "public keys not equal")
+}
+
+func ErrHeightsNotEqual() lib.ErrorI {
+	return lib.NewError(lib.CodeHeightsNotEqual, lib.StateMachineModule, "heights not equal")
+}
+
+func ErrRoundsNotEqual() lib.ErrorI {
+	return lib.NewError(lib.CodeRoundsNotEqual, lib.StateMachineModule, "rounds not equal")
+}
+
+func ErrVoteTypesNotEqual() lib.ErrorI {
+	return lib.NewError(lib.CodeVoteTypesNotEqual, lib.StateMachineModule, "vote types not equal")
+}
+
+func ErrIdenticalVotes() lib.ErrorI {
+	return lib.NewError(lib.CodeIdenticalVotes, lib.StateMachineModule, "identical votes")
+}
+
+func ErrInvalidSignature() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidSignature, lib.StateMachineModule, "invalid signature")
+}
+
+func ErrInvalidProtocolVersion() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidProtocolVersion, lib.StateMachineModule, "invalid protocol version")
 }

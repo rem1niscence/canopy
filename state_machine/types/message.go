@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"github.com/ginchuco/ginchu/crypto"
 	lib "github.com/ginchuco/ginchu/types"
 	"math/big"
@@ -124,11 +125,29 @@ func (x *MessageDoubleSign) Check() lib.ErrorI {
 	if err := checkAddress(x.ReporterAddress); err != nil {
 		return err
 	}
-	if err := checkVote(x.VoteA); err != nil {
+	pk1, err := checkVote(x.VoteA)
+	if err != nil {
 		return err
 	}
-	if err := checkVote(x.VoteB); err != nil {
+	pk2, err := checkVote(x.VoteB)
+	if err != nil {
 		return err
+	}
+	// compare votes
+	if !pk1.Equals(pk2) {
+		return ErrPublicKeysNotEqual()
+	}
+	if x.VoteA.Height != x.VoteB.Height {
+		return ErrHeightsNotEqual()
+	}
+	if x.VoteA.Round != x.VoteB.Round {
+		return ErrRoundsNotEqual()
+	}
+	if x.VoteA.Type != x.VoteB.Type {
+		return ErrVoteTypesNotEqual()
+	}
+	if bytes.Equal(x.VoteA.BlockHash, x.VoteB.BlockHash) {
+		return ErrIdenticalVotes()
 	}
 	return nil
 }
@@ -179,18 +198,34 @@ func checkPubKey(publicKey []byte) lib.ErrorI {
 	return nil
 }
 
-func checkVote(vote *Vote) lib.ErrorI {
+func checkVote(vote *Vote) (crypto.PublicKeyI, lib.ErrorI) {
 	if vote == nil {
-		return ErrVoteEmpty()
+		return nil, ErrVoteEmpty()
 	}
 	if err := checkPubKey(vote.PublicKey); err != nil {
-		return err
+		return nil, err
 	}
 	if vote.BlockHash == nil {
-		return ErrHashEmpty()
+		return nil, ErrHashEmpty()
 	}
 	if len(vote.BlockHash) != crypto.HashSize {
-		return ErrHashSize()
+		return nil, ErrHashSize()
 	}
-	return nil
+	pk := crypto.NewPublicKeyFromBytes(vote.PublicKey)
+	voteCpy := &Vote{
+		PublicKey: vote.PublicKey,
+		Height:    vote.Height,
+		Round:     vote.Round,
+		Type:      vote.Type,
+		BlockHash: vote.BlockHash,
+		Signature: nil,
+	}
+	msg, err := Marshal(voteCpy)
+	if err != nil {
+		return nil, err
+	}
+	if !pk.VerifyBytes(msg, vote.Signature) {
+		return nil, ErrInvalidSignature()
+	}
+	return pk, nil
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/ginchuco/ginchu/codec"
 	lib "github.com/ginchuco/ginchu/types"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 var cdc = codec.Protobuf{}
@@ -21,4 +22,12 @@ func Unmarshal(bz []byte, ptr any) lib.ErrorI {
 		return ErrUnmarshal(err)
 	}
 	return nil
+}
+
+func FromAny(a *anypb.Any) (proto.Message, lib.ErrorI) {
+	msg, err := cdc.FromAny(a)
+	if err != nil {
+		return nil, ErrFromAny(err)
+	}
+	return msg, nil
 }

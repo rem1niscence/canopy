@@ -47,14 +47,22 @@ func (s *StateMachine) SetValidator(validator *types.Validator) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	address, er := crypto.NewAddressFromString(validator.Address)
-	if er != nil {
-		return types.ErrAddressFromString(er)
-	}
+	address := crypto.NewAddressFromBytes(validator.Address)
 	if err = s.Set(types.KeyForValidator(address), bz); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (s *StateMachine) SlashValidator(validator *types.Validator, percent uint64) (err lib.ErrorI) {
+	if percent > 100 {
+		return types.ErrInvalidSlashPercentage()
+	}
+	validator.StakedAmount, err = lib.StringReducePercentage(validator.StakedAmount, int8(percent))
+	if err != nil {
+		return err
+	}
+	return s.SetValidator(validator)
 }
 
 func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, height uint64) lib.ErrorI {

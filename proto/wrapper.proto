@@ -1,0 +1,14 @@
+syntax = "proto3";
+package types;
+
+option go_package = "github.com/ginchuco/ginchu/types";
+
+message StringWrapper {
+  // The string value.
+  string value = 1;
+}
+
+message UInt64Wrapper {
+  // The uint64 value.
+  uint64 value = 1;
+}

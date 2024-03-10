@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [Unreleased] - 03/10/2024
+
+- Added handler for `change_param` 
+- Added handler for `double_sign`
+- Added `automatic.go` file
+
 ## [Unreleased] - 03/08/2024
 
 - Created `StateMachine` structure

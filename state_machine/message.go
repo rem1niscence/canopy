@@ -4,6 +4,7 @@ import (
 	"github.com/ginchuco/ginchu/crypto"
 	"github.com/ginchuco/ginchu/state_machine/types"
 	lib "github.com/ginchuco/ginchu/types"
+	"math/big"
 )
 
 func (s *StateMachine) HandleMessage(msg lib.MessageI) (err lib.ErrorI) {
@@ -22,6 +23,8 @@ func (s *StateMachine) HandleMessage(msg lib.MessageI) (err lib.ErrorI) {
 		return s.HandleMessageChangeParameter(x)
 	case *types.MessageDoubleSign:
 		return s.HandleMessageDoubleSign(x)
+	//case *types.MessageInvalidBlock: TODO
+	//	return s.HandleMessageInvalidBlock(x)
 	default:
 		return types.ErrUnknownMessage(x)
 	}
@@ -39,8 +42,20 @@ func (s *StateMachine) HandleMessageSend(msg *types.MessageSend) lib.ErrorI {
 func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	publicKey := crypto.NewPublicKeyFromBytes(msg.PublicKey)
 	address := publicKey.Address()
+	// check if below minimum stake
+	params, err := s.GetParamsVal()
+	if err != nil {
+		return err
+	}
+	lessThanMinimum, err := lib.StringsLess(msg.Amount, params.ValidatorMinimumStake.Value)
+	if err != nil {
+		return err
+	}
+	if lessThanMinimum {
+		return types.ErrBelowMinimumStake()
+	}
 	// subtract from sender
-	if err := s.AccountSub(address, msg.Amount); err != nil {
+	if err = s.AccountSub(address, msg.Amount); err != nil {
 		return err
 	}
 	// check if validator exists
@@ -54,12 +69,10 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	}
 	// set validator
 	return s.SetValidator(&types.Validator{
-		Address:         address.String(),
-		PublicKey:       publicKey.String(),
-		StakedAmount:    msg.Amount,
-		PausedHeight:    0,
-		UnstakingHeight: 0,
-		Output:          crypto.NewAddressFromBytes(msg.OutputAddress).String(),
+		Address:      address.Bytes(),
+		PublicKey:    publicKey.Bytes(),
+		StakedAmount: msg.Amount,
+		Output:       msg.OutputAddress,
 	})
 }
 
@@ -104,7 +117,7 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 		StakedAmount:    newStakedAmount,
 		PausedHeight:    val.PausedHeight,
 		UnstakingHeight: val.UnstakingHeight,
-		Output:          crypto.NewAddressFromBytes(msg.OutputAddress).String(),
+		Output:          msg.OutputAddress,
 	})
 }
 
@@ -161,11 +174,33 @@ func (s *StateMachine) HandleMessageUnpause(msg *types.MessageUnpause) lib.Error
 }
 
 func (s *StateMachine) HandleMessageChangeParameter(msg *types.MessageChangeParameter) lib.ErrorI {
-	//TODO implement me
-	panic("implement me")
+	address := crypto.NewAddressFromBytes(msg.Owner)
+	protoMsg, err := types.FromAny(msg.ParameterValue)
+	if err != nil {
+		return err
+	}
+	return s.UpdateParam(address.String(), msg.ParameterSpace, msg.ParameterKey, protoMsg)
 }
 
 func (s *StateMachine) HandleMessageDoubleSign(msg *types.MessageDoubleSign) lib.ErrorI {
-	//TODO implement me
-	panic("implement me")
+	doubleSignerPK := crypto.NewPublicKeyFromBytes(msg.VoteA.PublicKey)
+	doubleSignerAddr := doubleSignerPK.Address()
+	reporterAddr := crypto.NewAddressFromBytes(msg.ReporterAddress)
+	params, err := s.GetParamsVal()
+	if err != nil {
+		return err
+	}
+	doubleSigner, err := s.GetValidator(doubleSignerAddr)
+	if err != nil {
+		return err
+	}
+	reporter, err := s.GetValidator(reporterAddr)
+	if err != nil {
+		return err
+	}
+	reporterOutputAddr := crypto.NewAddressFromBytes(reporter.Output)
+	if err = s.SlashValidator(doubleSigner, params.ValidatorDoubleSignSlashPercentage.Value); err != nil {
+		return err
+	}
+	return s.MintToAccount(reporterOutputAddr, big.NewInt(int64(params.ValidatorDoubleSignReporterReward.Value)))
 }

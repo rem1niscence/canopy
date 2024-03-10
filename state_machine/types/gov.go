@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"github.com/ginchuco/ginchu/types"
 	"strings"
 )
@@ -46,14 +47,18 @@ func prefixForParamSpace(space string) string {
 // consensus param space
 
 const (
-	ParamBlockSize = "block_size"
+	ParamBlockSize       = "block_size"
+	ParamProtocolVersion = "protocol_version"
 )
 
 var _ types.ParamSpace = &ConsensusParams{}
 
-func (x *ConsensusParams) SetUint64(paramName string, value uint64) types.ErrorI {
+func (x *ConsensusParams) SetUint64(address string, paramName string, value uint64) types.ErrorI {
 	switch paramName {
 	case ParamBlockSize:
+		if address != x.BlockSize.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.BlockSize.Value = value
 	default:
 		return ErrUnknownParam()
@@ -66,14 +71,53 @@ func (x *ConsensusParams) SetOwner(paramName string, owner string) types.ErrorI 
 	switch name {
 	case ParamBlockSize:
 		x.BlockSize.Owner = owner
+	case ParamProtocolVersion:
+		x.ProtocolVersion.Owner = owner
 	default:
 		return ErrUnknownParam()
 	}
 	return nil
 }
 
-func (x *ConsensusParams) SetString(_ string, _ string) types.ErrorI {
-	return ErrUnknownParam()
+func (x *ConsensusParams) SetString(address string, paramName string, value string) types.ErrorI {
+	switch paramName {
+	case ParamProtocolVersion:
+		if address != x.ProtocolVersion.Owner {
+			return ErrUnauthorizedParamChange()
+		}
+		if err := CheckProtocolVersion(value); err != nil {
+			return err
+		}
+		x.ProtocolVersion.Value = value
+	default:
+		return ErrUnknownParam()
+	}
+	return nil
+}
+
+func (x *ConsensusParams) ParseProtocolVersion() (*ProtocolVersion, types.ErrorI) {
+	ptr := &ProtocolVersion{}
+	if err := json.Unmarshal([]byte(x.ProtocolVersion.Value), ptr); err != nil {
+		return nil, ErrUnmarshal(err)
+	}
+	return ptr, nil
+}
+
+func CheckProtocolVersion(v string) types.ErrorI {
+	ptr := &ProtocolVersion{}
+	if err := json.Unmarshal([]byte(v), ptr); err != nil {
+		return ErrUnmarshal(err)
+	}
+	// TODO more validation?
+	return nil
+}
+
+func NewProtocolVersion(height uint64, version uint64) (string, types.ErrorI) {
+	bz, err := json.Marshal(ProtocolVersion{Height: height, Version: version})
+	if err != nil {
+		return "", ErrMarshal(err)
+	}
+	return string(bz), nil
 }
 
 // validator param space
@@ -81,34 +125,64 @@ func (x *ConsensusParams) SetString(_ string, _ string) types.ErrorI {
 var _ types.ParamSpace = &ValidatorParams{}
 
 const (
-	ParamValidatorMinimumStake               = "validator_minimum_stake"
-	ParamValidatorUnstakingBlocks            = "validator_unstaking_blocks"
-	ParamValidatorMinimumPauseBlocks         = "validator_minimum_pause_blocks"
-	ParamValidatorMaximumPauseBlocks         = "validator_maximum_pause_blocks"
-	ParamValidatorMaximumMissedBlocks        = "validator_maximum_missed_blocks"
-	ParamValidatorMaxEvidenceAgeInBlocks     = "validator_maximum_evidence_age_in_blocks"
-	ParamValidatorMissedBlocksBurnPercentage = "validator_missed_blocks_burn_percentage"
-	ParamValidatorDoubleSignBurnPercentage   = "validator_double_sign_burn_percentage"
-	ParamValidatorProposerPercentageOfFees   = "validator_proposer_percentage_of_fees"
+	ParamValidatorMinimumStake                = "validator_minimum_stake"
+	ParamValidatorUnstakingBlocks             = "validator_unstaking_blocks"
+	ParamValidatorMinimumPauseBlocks          = "validator_minimum_pause_blocks"
+	ParamValidatorMaximumPauseBlocks          = "validator_maximum_pause_blocks"
+	ParamValidatorMaximumMissedBlocks         = "validator_maximum_missed_blocks"
+	ParamValidatorMaxEvidenceAgeInBlocks      = "validator_maximum_evidence_age_in_blocks"
+	ParamValidatorMissedBlocksSlashPercentage = "validator_missed_blocks_slash_percentage"
+	ParamValidatorDoubleSignSlashPercentage   = "validator_double_sign_slash_percentage"
+	ParamValidatorDoubleSignReporterReward    = "validator_double_sign_reporter_reward"
+	ParamValidatorProposerPercentageOfFees    = "validator_proposer_percentage_of_fees"
 )
 
-func (x *ValidatorParams) SetUint64(paramName string, value uint64) types.ErrorI {
+func (x *ValidatorParams) SetUint64(address string, paramName string, value uint64) types.ErrorI {
 	switch paramName {
 	case ParamValidatorUnstakingBlocks:
+		if address != x.ValidatorUnstakingBlocks.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.ValidatorUnstakingBlocks.Value = value
 	case ParamValidatorMinimumPauseBlocks:
+		if address != x.ValidatorMinimumPauseBlocks.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.ValidatorMinimumPauseBlocks.Value = value
 	case ParamValidatorMaximumPauseBlocks:
+		if address != x.ValidatorMaxPauseBlocks.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.ValidatorMaxPauseBlocks.Value = value
 	case ParamValidatorMaximumMissedBlocks:
+		if address != x.ValidatorMaximumMissedBlocks.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.ValidatorMaximumMissedBlocks.Value = value
 	case ParamValidatorMaxEvidenceAgeInBlocks:
+		if address != x.ValidatorMaxEvidenceAgeInBlocks.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.ValidatorMaxEvidenceAgeInBlocks.Value = value
-	case ParamValidatorMissedBlocksBurnPercentage:
-		x.ValidatorMissedBlocksBurnPercentage.Value = value
-	case ParamValidatorDoubleSignBurnPercentage:
-		x.ValidatorDoubleSignBurnPercentage.Value = value
+	case ParamValidatorMissedBlocksSlashPercentage:
+		if address != x.ValidatorMissedBlocksSlashPercentage.Owner {
+			return ErrUnauthorizedParamChange()
+		}
+		x.ValidatorMissedBlocksSlashPercentage.Value = value
+	case ParamValidatorDoubleSignSlashPercentage:
+		if address != x.ValidatorDoubleSignSlashPercentage.Owner {
+			return ErrUnauthorizedParamChange()
+		}
+		x.ValidatorDoubleSignSlashPercentage.Value = value
+	case ParamValidatorDoubleSignReporterReward:
+		if address != x.ValidatorDoubleSignReporterReward.Owner {
+			return ErrUnauthorizedParamChange()
+		}
+		x.ValidatorDoubleSignReporterReward.Value = value
 	case ParamValidatorProposerPercentageOfFees:
+		if address != x.ValidatorProposerPercentageOfFees.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.ValidatorProposerPercentageOfFees.Value = value
 	default:
 		return ErrUnknownParam()
@@ -116,9 +190,12 @@ func (x *ValidatorParams) SetUint64(paramName string, value uint64) types.ErrorI
 	return nil
 }
 
-func (x *ValidatorParams) SetString(paramName string, value string) types.ErrorI {
+func (x *ValidatorParams) SetString(address string, paramName string, value string) types.ErrorI {
 	switch paramName {
 	case ParamValidatorMinimumStake:
+		if address != x.ValidatorMinimumStake.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.ValidatorMinimumStake.Value = value
 	default:
 		return ErrUnknownParam()
@@ -141,10 +218,12 @@ func (x *ValidatorParams) SetOwner(paramName string, owner string) types.ErrorI 
 		x.ValidatorMaximumMissedBlocks.Owner = owner
 	case ParamValidatorMaxEvidenceAgeInBlocks:
 		x.ValidatorMaxEvidenceAgeInBlocks.Owner = owner
-	case ParamValidatorMissedBlocksBurnPercentage:
-		x.ValidatorMissedBlocksBurnPercentage.Owner = owner
-	case ParamValidatorDoubleSignBurnPercentage:
-		x.ValidatorDoubleSignBurnPercentage.Owner = owner
+	case ParamValidatorMissedBlocksSlashPercentage:
+		x.ValidatorMissedBlocksSlashPercentage.Owner = owner
+	case ParamValidatorDoubleSignSlashPercentage:
+		x.ValidatorDoubleSignSlashPercentage.Owner = owner
+	case ParamValidatorDoubleSignReporterReward:
+		x.ValidatorDoubleSignReporterReward.Owner = owner
 	case ParamValidatorProposerPercentageOfFees:
 		x.ValidatorProposerPercentageOfFees.Owner = owner
 	default:
@@ -168,23 +247,47 @@ const (
 	ParamMessageDoubleSignFee      = "message_double_sign_fee"
 )
 
-func (x *FeeParams) SetString(paramName string, value string) types.ErrorI {
+func (x *FeeParams) SetString(address string, paramName string, value string) types.ErrorI {
 	switch paramName {
 	case ParamMessageSendFee:
+		if address != x.MessageSendFee.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.MessageSendFee.Value = value
 	case ParamMessageStakeFee:
+		if address != x.MessageStakeFee.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.MessageStakeFee.Value = value
 	case ParamMessageEditStakeFee:
+		if address != x.MessageEditStakeFee.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.MessageEditStakeFee.Value = value
 	case ParamMessageUnstakeFee:
+		if address != x.MessageUnstakeFee.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.MessageUnstakeFee.Value = value
 	case ParamMessagePauseFee:
+		if address != x.MessagePauseFee.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.MessagePauseFee.Value = value
 	case ParamMessageUnpauseFee:
+		if address != x.MessageUnpauseFee.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.MessageUnpauseFee.Value = value
 	case ParamMessageChangeParameterFee:
+		if address != x.MessageChangeParameterFee.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.MessageChangeParameterFee.Value = value
 	case ParamMessageDoubleSignFee:
+		if address != x.MessageDoubleSignFee.Owner {
+			return ErrUnauthorizedParamChange()
+		}
 		x.MessageDoubleSignFee.Value = value
 	default:
 		return ErrUnknownParam()
@@ -217,7 +320,7 @@ func (x *FeeParams) SetOwner(paramName string, owner string) types.ErrorI {
 	return nil
 }
 
-func (x *FeeParams) SetUint64(_ string, _ uint64) types.ErrorI {
+func (x *FeeParams) SetUint64(address string, paramName string, value uint64) types.ErrorI {
 	return ErrUnknownParam()
 }
 
@@ -239,11 +342,11 @@ func (x *GovernanceParams) SetOwner(paramName string, owner string) types.ErrorI
 	return nil
 }
 
-func (x *GovernanceParams) SetUint64(_ string, _ uint64) types.ErrorI {
+func (x *GovernanceParams) SetUint64(address string, paramName string, value uint64) types.ErrorI {
 	return ErrUnknownParam()
 }
 
-func (x *GovernanceParams) SetString(paramName string, value string) types.ErrorI {
+func (x *GovernanceParams) SetString(address string, paramName string, value string) types.ErrorI {
 	return ErrUnknownParam()
 }
 

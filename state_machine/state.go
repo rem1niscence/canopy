@@ -6,7 +6,8 @@ import (
 )
 
 type StateMachine struct {
-	store lib.StoreI
+	protocolVersion int
+	store           lib.StoreI
 }
 
 func (s *StateMachine) Store() lib.StoreI { return s.store }

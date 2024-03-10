@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func (s *StateMachine) UpdateParam(space, paramName string, value interface{}) (err lib.ErrorI) {
+func (s *StateMachine) UpdateParam(address string, space, paramName string, value proto.Message) (err lib.ErrorI) {
 	var sp lib.ParamSpace
 	switch space {
 	case types.ParamSpaceCons:
@@ -24,17 +24,28 @@ func (s *StateMachine) UpdateParam(space, paramName string, value interface{}) (
 	if err != nil {
 		return err
 	}
-	switch t := value.(type) {
-	case int:
-		return sp.SetUint64(paramName, uint64(t))
-	case string:
+	switch v := value.(type) {
+	case *lib.UInt64Wrapper:
+		return sp.SetUint64(address, paramName, v.Value)
+	case *lib.StringWrapper:
 		if strings.Contains(paramName, types.ParamKeywordOwner) {
-			return sp.SetOwner(paramName, t)
+			return s.updateOwner(address, sp, paramName, v.Value)
 		}
-		return sp.SetString(paramName, t)
+		return sp.SetString(address, paramName, v.Value)
 	default:
 		return types.ErrUnknownParamType(value)
 	}
+}
+
+func (s *StateMachine) updateOwner(address string, sp lib.ParamSpace, paramName, newOwner string) lib.ErrorI {
+	gov, err := s.GetParamsGov()
+	if err != nil {
+		return err
+	}
+	if gov.AclOwner != address {
+		return types.ErrUnauthorizedParamChange()
+	}
+	return sp.SetOwner(paramName, newOwner)
 }
 
 func (s *StateMachine) SetParams(p *types.Params) lib.ErrorI {

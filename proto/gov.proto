@@ -10,8 +10,14 @@ message Params {
   GovernanceParams Governance = 4;
 }
 
+message ProtocolVersion {
+  uint64 height = 1;
+  uint64 version = 2;
+}
+
 message ConsensusParams {
   Uint64Param block_size = 1;
+  StringParam protocol_version = 2;
 }
 
 message ValidatorParams {
@@ -21,9 +27,10 @@ message ValidatorParams {
   Uint64Param validator_max_pause_blocks = 4;
   Uint64Param validator_maximum_missed_blocks = 5;
   Uint64Param validator_max_evidence_age_in_blocks = 6;
-  Uint64Param validator_missed_blocks_burn_percentage = 7;
-  Uint64Param validator_double_sign_burn_percentage = 8;
-  Uint64Param validator_proposer_percentage_of_fees = 9;
+  Uint64Param validator_missed_blocks_slash_percentage = 7;
+  Uint64Param validator_double_sign_slash_percentage = 8;
+  Uint64Param validator_double_sign_reporter_reward = 9;
+  Uint64Param validator_proposer_percentage_of_fees = 10;
 }
 
 message FeeParams {

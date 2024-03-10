@@ -45,14 +45,15 @@ func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	address, er := crypto.NewAddressFromString(account.Address)
-	if er != nil {
-		return types.ErrAddressFromString(er)
-	}
+	address := crypto.NewAddressFromBytes(account.Address)
 	if err = s.Set(types.KeyForAccount(address), bz); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (s *StateMachine) MintToAccount(address crypto.AddressI, amount *big.Int) lib.ErrorI {
+	return s.AccountAdd(address, lib.BigIntToString(amount))
 }
 
 func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd string) lib.ErrorI {
@@ -76,7 +77,7 @@ func (s *StateMachine) AccountSub(address crypto.AddressI, amountToSub string) l
 	if err != nil {
 		return err
 	}
-	isLessThanZero, err := lib.StringLTE(account.Amount, big.NewInt(0))
+	isLessThanZero, err := lib.StringBigLTE(account.Amount, big.NewInt(0))
 	if err != nil {
 		return err
 	}
@@ -101,7 +102,7 @@ func (s *StateMachine) marshalAccount(account *types.Account) ([]byte, lib.Error
 // Pool logic below
 
 func (s *StateMachine) GetPool(name string) (*types.Pool, lib.ErrorI) {
-	bz, err := s.Get(types.KeyForPool(name))
+	bz, err := s.Get(types.KeyForPool([]byte(name)))
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +128,10 @@ func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
 	return nil
 }
 
+func (s *StateMachine) MintToPool(name string, amount *big.Int) lib.ErrorI {
+	return s.PoolAdd(name, lib.BigIntToString(amount))
+}
+
 func (s *StateMachine) PoolAdd(name, amountToAdd string) lib.ErrorI {
 	pool, err := s.GetPool(name)
 	if err != nil {
@@ -148,7 +153,7 @@ func (s *StateMachine) PoolSub(name, amountToSub string) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	isLessThanZero, err := lib.StringLTE(pool.Amount, big.NewInt(0))
+	isLessThanZero, err := lib.StringBigLTE(pool.Amount, big.NewInt(0))
 	if err != nil {
 		return err
 	}

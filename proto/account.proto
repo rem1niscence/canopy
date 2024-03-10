@@ -4,11 +4,18 @@ package types;
 option go_package = "github.com/ginchuco/ginchu/state_machine/types";
 
 message Account {
-  string address = 1;
+  bytes address = 1;
   string amount = 2;
 }
 
 message Pool {
-  string Name = 1;
+  bytes Name = 1;
   string amount = 2;
+}
+
+enum PoolNames {
+  PoolNameUnspecified = 0;
+  DAO = 1;
+  FeeCollector = 2;
+  ValidatorStakePool = 3;
 }
