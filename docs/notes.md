@@ -27,9 +27,18 @@
 
 - Validators should be able to have the ability to lock parameters or unlock parameter changes
 
+State Machine Handling Byzantine Evidence:
+
+- Bad proposers, double signers, non signers and minority signers are proven via the finalized quorum certificate from
+  the majority
+- Bad proposers are easily retraced by seeing who were the proposers for all the rounds before the finalized round
+- Non signers are who didn't sign on the final QC
+- Minority signers are who signed faulty on the final QC
+- Double signers tracking is less straightforward, but likely can be included in the QC somehow
+
 ### Placeholder Name:
 
-- **MMBFT**
+- **Canopy**
 
 ### What is it?
 
@@ -37,18 +46,38 @@
 
 ### What's the value add?
 
-- **Incentivizing** validator participation in other BFT protocols by rewarding participants for Validating on 3rd party chains.
+- **Incentivizing** validator participation in other BFT protocols by rewarding participants for Validating on 3rd party
+  chains.
 - **Bootstrapping** security for small chains
 - **Sustaining** Validator participants during crisis events like Chain Halts or protocol downturn
 
 ### Summary
 
-MMBFT **Listeners** come to consensus on the `ValidatorSet` of external chains and **Members** of the `ValidatorSet` registered on MMBFT are rewarded with MMBFT token.
+CanopyValidator
 
-MMBFT **Listeners** set are split into `Committees` based on which external chain they are `listening` on and their VotingPower within the committee is proportional to their **StakeAmount**. These `Committees` vote on how the block reward is distributed for that chain. If **Listeners** cannot come to consensus, no reward is distributed for the chain.
+- Validates the canopy chain and only paid through block reward
 
-The block reward is static and equal for all supported external chains and is distributed to both **Members** proportional to `VotingPowerChainX` vs the `TotalVotingPowerChainX` that is registered on the MMBFT protocol and **Listeners'** proportional to `VotingPowerOnMMBFT` vs `TotalCommitteeVotingPower`.
+CommitteeMembers <Must be CanopyValidators)
 
-MMBFT **Members'** compensation increases dramatically when they are staked on the MMBFT protocol and **Members** may delegate the staking responsibility to an **Operator** within the **RegisterTxn**.
+- Reports the validator-set of the client chain and come to a consensus on the state of that chain with other committee
+  members
+- Multi-Committe-Membership is accepted but requires additional stake
 
+ClientValidator
 
+- No minimum stake, but payment is degraded based on bucket
+
+Features:
+
+- Auto-Compounding stake feature is needed
+- First transaction is free if you're a validator on a client chain
+- Donate transactions: donate to client chain reward pool with a drain height
+- 2 tiered Whitelisting of client chains based on Validator power + validator vote
+- Key algorithm agnostic protocol
+
+Attacks:
+To be listed
+
+Open question:
+
+- Staking process especially with multi-chain

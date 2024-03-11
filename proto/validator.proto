@@ -7,7 +7,7 @@ message Validator {
   bytes address = 1;
   bytes public_key = 2;
   string staked_amount = 3;
-  uint64 paused_height = 4;
+  uint64 max_paused_height = 4;
   uint64 unstaking_height = 5;
   bytes output = 6;
 }

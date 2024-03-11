@@ -192,3 +192,7 @@ func ErrInvalidSignature() lib.ErrorI {
 func ErrInvalidProtocolVersion() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidProtocolVersion, lib.StateMachineModule, "invalid protocol version")
 }
+
+func ErrInvalidAddressKey(key []byte) lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidAddressKey, lib.StateMachineModule, fmt.Sprintf("invalid address key: %s", key))
+}

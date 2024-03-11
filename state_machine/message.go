@@ -4,7 +4,6 @@ import (
 	"github.com/ginchuco/ginchu/crypto"
 	"github.com/ginchuco/ginchu/state_machine/types"
 	lib "github.com/ginchuco/ginchu/types"
-	"math/big"
 )
 
 func (s *StateMachine) HandleMessage(msg lib.MessageI) (err lib.ErrorI) {
@@ -21,9 +20,9 @@ func (s *StateMachine) HandleMessage(msg lib.MessageI) (err lib.ErrorI) {
 		return s.HandleMessageUnpause(x)
 	case *types.MessageChangeParameter:
 		return s.HandleMessageChangeParameter(x)
-	case *types.MessageDoubleSign:
+	case *types.MessageDoubleSign: // TODO likely remove and leave to QC in consensus layer
 		return s.HandleMessageDoubleSign(x)
-	//case *types.MessageInvalidBlock: TODO
+	//case *types.MessageInvalidBlock: TODO ^
 	//	return s.HandleMessageInvalidBlock(x)
 	default:
 		return types.ErrUnknownMessage(x)
@@ -115,7 +114,7 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 		Address:         val.Address,
 		PublicKey:       val.PublicKey,
 		StakedAmount:    newStakedAmount,
-		PausedHeight:    val.PausedHeight,
+		MaxPausedHeight: val.MaxPausedHeight,
 		UnstakingHeight: val.UnstakingHeight,
 		Output:          msg.OutputAddress,
 	})
@@ -151,11 +150,16 @@ func (s *StateMachine) HandleMessagePause(msg *types.MessagePause) lib.ErrorI {
 		return err
 	}
 	// ensure not already paused
-	if validator.PausedHeight != 0 {
+	if validator.MaxPausedHeight != 0 {
 		return types.ErrValidatorPaused()
 	}
+	params, err := s.GetParamsVal()
+	if err != nil {
+		return err
+	}
+	maxPausedHeight := s.Height() + params.ValidatorMaxPauseBlocks.Value
 	// set validator paused
-	return s.SetValidatorPaused(validator, s.Height())
+	return s.SetValidatorPaused(address, validator, maxPausedHeight)
 }
 
 func (s *StateMachine) HandleMessageUnpause(msg *types.MessageUnpause) lib.ErrorI {
@@ -166,11 +170,11 @@ func (s *StateMachine) HandleMessageUnpause(msg *types.MessageUnpause) lib.Error
 		return err
 	}
 	// ensure already paused
-	if validator.PausedHeight == 0 {
+	if validator.MaxPausedHeight == 0 {
 		return types.ErrValidatorNotPaused()
 	}
 	// set validator unpaused
-	return s.SetValidatorUnpaused(validator)
+	return s.SetValidatorUnpaused(address, validator)
 }
 
 func (s *StateMachine) HandleMessageChangeParameter(msg *types.MessageChangeParameter) lib.ErrorI {
@@ -202,5 +206,9 @@ func (s *StateMachine) HandleMessageDoubleSign(msg *types.MessageDoubleSign) lib
 	if err = s.SlashValidator(doubleSigner, params.ValidatorDoubleSignSlashPercentage.Value); err != nil {
 		return err
 	}
-	return s.MintToAccount(reporterOutputAddr, big.NewInt(int64(params.ValidatorDoubleSignReporterReward.Value)))
+	amount, err := lib.StringToBigInt(params.ValidatorDoubleSignReporterReward.Value)
+	if err != nil {
+		return err
+	}
+	return s.MintToAccount(reporterOutputAddr, amount)
 }

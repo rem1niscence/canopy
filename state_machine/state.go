@@ -38,6 +38,29 @@ func (s *StateMachine) Delete(key []byte) lib.ErrorI {
 	return nil
 }
 
+func (s *StateMachine) DeleteAllAtPrefix(prefix []byte, callback func(key []byte) lib.ErrorI) lib.ErrorI {
+	it, err := s.Iterator(prefix)
+	if err != nil {
+		return err
+	}
+	defer it.Close()
+	var keysToDelete [][]byte
+	for ; it.Valid(); it.Next() {
+		keysToDelete = append(keysToDelete, it.Key())
+	}
+	for _, key := range keysToDelete {
+		if err = s.Delete(key); err != nil {
+			return err
+		}
+		if callback != nil {
+			if err = callback(key); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (s *StateMachine) Iterator(key []byte) (lib.IteratorI, lib.ErrorI) {
 	store := s.Store()
 	it, err := store.Iterator(key)

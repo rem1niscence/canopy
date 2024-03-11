@@ -23,7 +23,8 @@ func (s *StateMachine) GetAccounts() ([]*types.Account, lib.ErrorI) {
 	defer it.Close()
 	var result []*types.Account
 	for ; it.Valid(); it.Next() {
-		acc, err := s.unmarshalAccount(it.Value())
+		var acc *types.Account
+		acc, err = s.unmarshalAccount(it.Value())
 		if err != nil {
 			return nil, err
 		}

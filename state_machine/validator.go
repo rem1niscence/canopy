@@ -73,32 +73,64 @@ func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator 
 	return s.SetValidator(validator)
 }
 
-func (s *StateMachine) SetValidatorPaused(validator *types.Validator, height uint64) lib.ErrorI {
-	validator.PausedHeight = height
+func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *types.Validator, maxPausedHeight uint64) lib.ErrorI {
+	if err := s.Set(types.KeyForPaused(maxPausedHeight, address), nil); err != nil {
+		return err
+	}
+	validator.MaxPausedHeight = maxPausedHeight
 	return s.SetValidator(validator)
 }
 
-func (s *StateMachine) SetValidatorUnpaused(validator *types.Validator) lib.ErrorI {
-	validator.PausedHeight = 0
+func (s *StateMachine) SetValidatorUnpaused(address crypto.AddressI, validator *types.Validator) lib.ErrorI {
+	if err := s.Delete(types.KeyForPaused(validator.MaxPausedHeight, address)); err != nil {
+		return err
+	}
+	validator.MaxPausedHeight = 0
 	return s.SetValidator(validator)
 }
 
-func (s *StateMachine) DeleteUnstaking(height uint64) lib.ErrorI {
-	it, err := s.Iterator(types.UnstakingPrefix(height))
+func (s *StateMachine) DeletePaused(height uint64) lib.ErrorI {
+	setValidatorUnstakingCallback := func(key []byte) lib.ErrorI {
+		addr, err := types.AddressFromKey(key)
+		if err != nil {
+			return err
+		}
+
+		return s.ForceUnstakeValidator(addr)
+	}
+	return s.DeleteAllAtPrefix(types.PausedPrefix(height), setValidatorUnstakingCallback)
+}
+
+func (s *StateMachine) ForceUnstakeValidator(address crypto.AddressI) lib.ErrorI {
+	// get validator
+	validator, err := s.GetValidator(address)
+	if err != nil {
+		return nil // TODO log only. Validator already deleted
+	}
+	// check if already unstaking
+	if validator.UnstakingHeight != 0 {
+		return nil // TODO log only. Validator already unstaking
+	}
+	// get params for unstaking blocks
+	p, err := s.GetParamsVal()
 	if err != nil {
 		return err
 	}
-	defer it.Close()
-	var keysToDelete [][]byte
-	for ; it.Valid(); it.Next() {
-		keysToDelete = append(keysToDelete, it.Key())
-	}
-	for _, key := range keysToDelete {
-		if err = s.Delete(key); err != nil {
+	unstakingBlocks := p.GetValidatorUnstakingBlocks().Value
+	unstakingHeight := s.Height() + unstakingBlocks
+	// set validator unstaking
+	return s.SetValidatorUnstaking(address, validator, unstakingHeight)
+}
+
+func (s *StateMachine) DeleteUnstaking(height uint64) lib.ErrorI {
+	deleteValidatorCallback := func(key []byte) lib.ErrorI {
+		addr, err := types.AddressFromKey(key)
+		if err != nil {
 			return err
 		}
+		return s.DeleteValidator(addr)
 	}
-	return nil
+	return s.DeleteAllAtPrefix(types.UnstakingPrefix(height), deleteValidatorCallback)
 }
 
 func (s *StateMachine) DeleteValidator(address crypto.AddressI) lib.ErrorI {

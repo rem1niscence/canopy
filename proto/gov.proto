@@ -29,8 +29,9 @@ message ValidatorParams {
   Uint64Param validator_max_evidence_age_in_blocks = 6;
   Uint64Param validator_missed_blocks_slash_percentage = 7;
   Uint64Param validator_double_sign_slash_percentage = 8;
-  Uint64Param validator_double_sign_reporter_reward = 9;
+  StringParam validator_double_sign_reporter_reward = 9;
   Uint64Param validator_proposer_percentage_of_fees = 10;
+  StringParam validator_proposer_block_reward = 11;
 }
 
 message FeeParams {

@@ -72,6 +72,7 @@ const (
 	CodeVoteTypesNotEqual       ErrorCode = 51
 	CodeIdenticalVotes          ErrorCode = 52
 	CodeInvalidProtocolVersion  ErrorCode = 53
+	CodeInvalidAddressKey       ErrorCode = 54
 
 	StorageModule ErrorModule = "store"
 	NilKeyCode    ErrorCode   = 1

@@ -135,6 +135,7 @@ const (
 	ParamValidatorDoubleSignSlashPercentage   = "validator_double_sign_slash_percentage"
 	ParamValidatorDoubleSignReporterReward    = "validator_double_sign_reporter_reward"
 	ParamValidatorProposerPercentageOfFees    = "validator_proposer_percentage_of_fees"
+	ParamValidatorProposerBlockReward         = "validator_proposer_block_reward"
 )
 
 func (x *ValidatorParams) SetUint64(address string, paramName string, value uint64) types.ErrorI {
@@ -174,11 +175,6 @@ func (x *ValidatorParams) SetUint64(address string, paramName string, value uint
 			return ErrUnauthorizedParamChange()
 		}
 		x.ValidatorDoubleSignSlashPercentage.Value = value
-	case ParamValidatorDoubleSignReporterReward:
-		if address != x.ValidatorDoubleSignReporterReward.Owner {
-			return ErrUnauthorizedParamChange()
-		}
-		x.ValidatorDoubleSignReporterReward.Value = value
 	case ParamValidatorProposerPercentageOfFees:
 		if address != x.ValidatorProposerPercentageOfFees.Owner {
 			return ErrUnauthorizedParamChange()
@@ -197,6 +193,16 @@ func (x *ValidatorParams) SetString(address string, paramName string, value stri
 			return ErrUnauthorizedParamChange()
 		}
 		x.ValidatorMinimumStake.Value = value
+	case ParamValidatorDoubleSignReporterReward:
+		if address != x.ValidatorDoubleSignReporterReward.Owner {
+			return ErrUnauthorizedParamChange()
+		}
+		x.ValidatorDoubleSignReporterReward.Value = value
+	case ParamValidatorProposerBlockReward:
+		if address != x.ValidatorProposerBlockReward.Owner {
+			return ErrUnauthorizedParamChange()
+		}
+		x.ValidatorProposerBlockReward.Value = value
 	default:
 		return ErrUnknownParam()
 	}
@@ -226,6 +232,8 @@ func (x *ValidatorParams) SetOwner(paramName string, owner string) types.ErrorI 
 		x.ValidatorDoubleSignReporterReward.Owner = owner
 	case ParamValidatorProposerPercentageOfFees:
 		x.ValidatorProposerPercentageOfFees.Owner = owner
+	case ParamValidatorProposerBlockReward:
+		x.ValidatorProposerBlockReward.Owner = owner
 	default:
 		return ErrUnknownParam()
 	}
