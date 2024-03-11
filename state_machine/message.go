@@ -46,7 +46,7 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	lessThanMinimum, err := lib.StringsLess(msg.Amount, params.ValidatorMinimumStake.Value)
+	lessThanMinimum, err := lib.StringsLess(msg.Amount, params.ValidatorMinStake.Value)
 	if err != nil {
 		return err
 	}

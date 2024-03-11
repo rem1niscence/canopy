@@ -2,7 +2,7 @@
 
 ## [Unreleased] - 03/11/2024
 
-- Started on `begin_block` logic
+- Added `begin_block` logic
 - Added funcs for `auto-unstaking` and `auto-max-paused`
 - Updated notes with `Canopy` details
 - Added `state machine` handling of `byzantine evidence` in notes

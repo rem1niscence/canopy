@@ -125,17 +125,20 @@ func NewProtocolVersion(height uint64, version uint64) (string, types.ErrorI) {
 var _ types.ParamSpace = &ValidatorParams{}
 
 const (
-	ParamValidatorMinimumStake                = "validator_minimum_stake"
-	ParamValidatorUnstakingBlocks             = "validator_unstaking_blocks"
-	ParamValidatorMinimumPauseBlocks          = "validator_minimum_pause_blocks"
-	ParamValidatorMaximumPauseBlocks          = "validator_maximum_pause_blocks"
-	ParamValidatorMaximumMissedBlocks         = "validator_maximum_missed_blocks"
-	ParamValidatorMaxEvidenceAgeInBlocks      = "validator_maximum_evidence_age_in_blocks"
-	ParamValidatorMissedBlocksSlashPercentage = "validator_missed_blocks_slash_percentage"
-	ParamValidatorDoubleSignSlashPercentage   = "validator_double_sign_slash_percentage"
-	ParamValidatorDoubleSignReporterReward    = "validator_double_sign_reporter_reward"
-	ParamValidatorProposerPercentageOfFees    = "validator_proposer_percentage_of_fees"
-	ParamValidatorProposerBlockReward         = "validator_proposer_block_reward"
+	ParamValidatorMinStake                  = "validator_min_stake"
+	ParamValidatorUnstakingBlocks           = "validator_unstaking_blocks"
+	ParamValidatorMinPauseBlocks            = "validator_min_pause_blocks"
+	ParamValidatorMaxPauseBlocks            = "validator_max_pause_blocks"
+	ParamValidatorMaxEvidenceAgeInBlocks    = "validator_max_evidence_age_in_blocks"
+	ParamValidatorBadProposeSlashPercentage = "validator_bad_propose_slash_percentage"
+	ParamValidatorFaultySignSlashPercentage = "validator_faulty_sign_slash_percentage"
+	ParamValidatorMissedSignSlashPercentage = "validator_missed_sign_slash_percentage"
+	ParamValidatorMaxNonSign                = "validator_max_missed_sign"
+	ParamValidatorNonSignWindow             = "validator_non_sign_window"
+	ParamValidatorDoubleSignSlashPercentage = "validator_double_sign_slash_percentage"
+	ParamValidatorDoubleSignReporterReward  = "validator_double_sign_reporter_reward"
+	ParamValidatorProposerPercentageOfFees  = "validator_proposer_percentage_of_fees"
+	ParamValidatorProposerBlockReward       = "validator_proposer_block_reward"
 )
 
 func (x *ValidatorParams) SetUint64(address string, paramName string, value uint64) types.ErrorI {
@@ -145,31 +148,46 @@ func (x *ValidatorParams) SetUint64(address string, paramName string, value uint
 			return ErrUnauthorizedParamChange()
 		}
 		x.ValidatorUnstakingBlocks.Value = value
-	case ParamValidatorMinimumPauseBlocks:
-		if address != x.ValidatorMinimumPauseBlocks.Owner {
+	case ParamValidatorMinPauseBlocks:
+		if address != x.ValidatorMinPauseBlocks.Owner {
 			return ErrUnauthorizedParamChange()
 		}
-		x.ValidatorMinimumPauseBlocks.Value = value
-	case ParamValidatorMaximumPauseBlocks:
+		x.ValidatorMinPauseBlocks.Value = value
+	case ParamValidatorMaxPauseBlocks:
 		if address != x.ValidatorMaxPauseBlocks.Owner {
 			return ErrUnauthorizedParamChange()
 		}
 		x.ValidatorMaxPauseBlocks.Value = value
-	case ParamValidatorMaximumMissedBlocks:
-		if address != x.ValidatorMaximumMissedBlocks.Owner {
-			return ErrUnauthorizedParamChange()
-		}
-		x.ValidatorMaximumMissedBlocks.Value = value
 	case ParamValidatorMaxEvidenceAgeInBlocks:
 		if address != x.ValidatorMaxEvidenceAgeInBlocks.Owner {
 			return ErrUnauthorizedParamChange()
 		}
 		x.ValidatorMaxEvidenceAgeInBlocks.Value = value
-	case ParamValidatorMissedBlocksSlashPercentage:
-		if address != x.ValidatorMissedBlocksSlashPercentage.Owner {
+	case ParamValidatorBadProposeSlashPercentage:
+		if address != x.ValidatorBadProposalSlashPercentage.Owner {
 			return ErrUnauthorizedParamChange()
 		}
-		x.ValidatorMissedBlocksSlashPercentage.Value = value
+		x.ValidatorBadProposalSlashPercentage.Value = value
+	case ParamValidatorFaultySignSlashPercentage:
+		if address != x.ValidatorFaultySignSlashPercentage.Owner {
+			return ErrUnauthorizedParamChange()
+		}
+		x.ValidatorFaultySignSlashPercentage.Value = value
+	case ParamValidatorNonSignWindow:
+		if address != x.ValidatorNonSignWindow.Owner {
+			return ErrUnauthorizedParamChange()
+		}
+		x.ValidatorNonSignWindow.Value = value
+	case ParamValidatorMaxNonSign:
+		if address != x.ValidatorMaxNonSign.Owner {
+			return ErrUnauthorizedParamChange()
+		}
+		x.ValidatorMaxNonSign.Value = value
+	case ParamValidatorMissedSignSlashPercentage:
+		if address != x.ValidatorNonSignSlashPercentage.Owner {
+			return ErrUnauthorizedParamChange()
+		}
+		x.ValidatorNonSignSlashPercentage.Value = value
 	case ParamValidatorDoubleSignSlashPercentage:
 		if address != x.ValidatorDoubleSignSlashPercentage.Owner {
 			return ErrUnauthorizedParamChange()
@@ -188,11 +206,11 @@ func (x *ValidatorParams) SetUint64(address string, paramName string, value uint
 
 func (x *ValidatorParams) SetString(address string, paramName string, value string) types.ErrorI {
 	switch paramName {
-	case ParamValidatorMinimumStake:
-		if address != x.ValidatorMinimumStake.Owner {
+	case ParamValidatorMinStake:
+		if address != x.ValidatorMinStake.Owner {
 			return ErrUnauthorizedParamChange()
 		}
-		x.ValidatorMinimumStake.Value = value
+		x.ValidatorMinStake.Value = value
 	case ParamValidatorDoubleSignReporterReward:
 		if address != x.ValidatorDoubleSignReporterReward.Owner {
 			return ErrUnauthorizedParamChange()
@@ -212,20 +230,26 @@ func (x *ValidatorParams) SetString(address string, paramName string, value stri
 func (x *ValidatorParams) SetOwner(paramName string, owner string) types.ErrorI {
 	name := stripKeywordOwnerFromParamName(paramName)
 	switch name {
-	case ParamValidatorMinimumStake:
-		x.ValidatorMinimumStake.Owner = owner
+	case ParamValidatorMinStake:
+		x.ValidatorMinStake.Owner = owner
 	case ParamValidatorUnstakingBlocks:
 		x.ValidatorUnstakingBlocks.Owner = owner
-	case ParamValidatorMinimumPauseBlocks:
-		x.ValidatorMinimumPauseBlocks.Owner = owner
-	case ParamValidatorMaximumPauseBlocks:
+	case ParamValidatorMinPauseBlocks:
+		x.ValidatorMinPauseBlocks.Owner = owner
+	case ParamValidatorMaxPauseBlocks:
 		x.ValidatorMaxPauseBlocks.Owner = owner
-	case ParamValidatorMaximumMissedBlocks:
-		x.ValidatorMaximumMissedBlocks.Owner = owner
 	case ParamValidatorMaxEvidenceAgeInBlocks:
 		x.ValidatorMaxEvidenceAgeInBlocks.Owner = owner
-	case ParamValidatorMissedBlocksSlashPercentage:
-		x.ValidatorMissedBlocksSlashPercentage.Owner = owner
+	case ParamValidatorNonSignWindow:
+		x.ValidatorNonSignWindow.Owner = owner
+	case ParamValidatorMaxNonSign:
+		x.ValidatorMaxNonSign.Owner = owner
+	case ParamValidatorBadProposeSlashPercentage:
+		x.ValidatorBadProposalSlashPercentage.Owner = owner
+	case ParamValidatorFaultySignSlashPercentage:
+		x.ValidatorFaultySignSlashPercentage.Owner = owner
+	case ParamValidatorMissedSignSlashPercentage:
+		x.ValidatorNonSignSlashPercentage.Owner = owner
 	case ParamValidatorDoubleSignSlashPercentage:
 		x.ValidatorDoubleSignSlashPercentage.Owner = owner
 	case ParamValidatorDoubleSignReporterReward:

@@ -11,3 +11,7 @@ message Validator {
   uint64 unstaking_height = 5;
   bytes output = 6;
 }
+
+message NonSignerInfo {
+  uint64 counter = 1;
+}
