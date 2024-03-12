@@ -4,6 +4,8 @@
 
 - Added `consensus_validator` keys logic and functionality
 - Added `end_block` logic
+- Added `genesis` logic
+- Added `params.validate()` logic
 
 ## [Unreleased] - 03/11/2024
 

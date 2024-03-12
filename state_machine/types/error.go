@@ -196,3 +196,15 @@ func ErrInvalidProtocolVersion() lib.ErrorI {
 func ErrInvalidAddressKey(key []byte) lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidAddressKey, lib.StateMachineModule, fmt.Sprintf("invalid address key: %s", key))
 }
+
+func ErrInvalidParam(paramName string) lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidParam, lib.StateMachineModule, fmt.Sprintf("invalid param: %s", paramName))
+}
+
+func ErrInvalidOwner(paramName string) lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidParamOwner, lib.StateMachineModule, fmt.Sprintf("invalid owner for %s", paramName))
+}
+
+func ErrInvalidPoolName() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidPoolName, lib.StateMachineModule, "invalid pool name")
+}

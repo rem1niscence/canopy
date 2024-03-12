@@ -42,6 +42,21 @@ func (s *StateMachine) GetValidators() ([]*types.Validator, lib.ErrorI) {
 	return result, nil
 }
 
+func (s *StateMachine) SetValidators(validators []*types.Validator) lib.ErrorI {
+	for _, val := range validators {
+		if err := s.SetValidator(val); err != nil {
+			return err
+		}
+		if val.MaxPausedHeight == 0 && val.UnstakingHeight == 0 {
+			address := crypto.NewAddressFromBytes(val.Address)
+			if err := s.SetConsensusValidator(address, val.StakedAmount); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (s *StateMachine) SetValidator(validator *types.Validator) lib.ErrorI {
 	bz, err := s.marshalValidator(validator)
 	if err != nil {

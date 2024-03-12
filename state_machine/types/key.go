@@ -37,6 +37,7 @@ func KeyForConsensus(address crypto.AddressI, stake *big.Int) []byte {
 }
 
 func AccountPrefix() []byte                { return accountPrefix }
+func PoolPrefix() []byte                   { return poolPrefix }
 func ValidatorPrefix() []byte              { return validatorPrefix }
 func ConsensusPrefix() []byte              { return consensusPrefix }
 func NonSignerPrefix() []byte              { return nonSignerPrefix }

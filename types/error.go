@@ -71,8 +71,11 @@ const (
 	CodeRoundsNotEqual          ErrorCode = 50
 	CodeVoteTypesNotEqual       ErrorCode = 51
 	CodeIdenticalVotes          ErrorCode = 52
-	CodeInvalidProtocolVersion  ErrorCode = 53
-	CodeInvalidAddressKey       ErrorCode = 54
+	CodeInvalidParamOwner       ErrorCode = 53
+	CodeInvalidParam            ErrorCode = 54
+	CodeInvalidPoolName         ErrorCode = 55
+	CodeInvalidProtocolVersion  ErrorCode = 56
+	CodeInvalidAddressKey       ErrorCode = 57
 
 	StorageModule ErrorModule = "store"
 	NilKeyCode    ErrorCode   = 1

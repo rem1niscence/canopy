@@ -24,7 +24,6 @@ message ValidatorParams {
   StringParam validator_min_stake = 1;
   Uint64Param validator_max_count = 2;
   Uint64Param validator_unstaking_blocks = 3;
-  Uint64Param validator_min_pause_blocks = 4;
   Uint64Param validator_max_pause_blocks = 5;
   Uint64Param validator_max_evidence_age_in_blocks = 6;
   Uint64Param validator_double_sign_slash_percentage = 7;
@@ -35,7 +34,7 @@ message ValidatorParams {
   Uint64Param validator_non_sign_window = 12;
   StringParam validator_double_sign_reporter_reward = 13; // TODO likely remove
   Uint64Param validator_proposer_percentage_of_fees = 14;
-  StringParam validator_proposer_block_reward = 15;
+  StringParam validator_block_reward = 15;
 }
 
 message FeeParams {

@@ -15,7 +15,5 @@ message Pool {
 
 enum PoolNames {
   PoolNameUnspecified = 0;
-  DAO = 1;
-  FeeCollector = 2;
-  ValidatorStakePool = 3;
+  FeeCollector = 1;
 }

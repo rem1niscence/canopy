@@ -87,7 +87,7 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	amount, err := lib.StringToBigInt(params.ValidatorProposerBlockReward.Value)
+	amount, err := lib.StringToBigInt(params.ValidatorBlockReward.Value)
 	if err != nil {
 		return err
 	}
