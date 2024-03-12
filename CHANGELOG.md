@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [Unreleased] - 03/12/2024
+
+- Added `consensus_validator` keys logic and functionality
+- Added `end_block` logic
+
 ## [Unreleased] - 03/11/2024
 
 - Added `begin_block` logic

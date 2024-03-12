@@ -5,7 +5,7 @@ option go_package = "github.com/ginchuco/ginchu/types";
 
 message ValidatorKeyAndPower {
   bytes public_key = 1;
-  uint64 voting_power = 2;
+  string voting_power = 2;
 }
 
 message ValidatorSet {

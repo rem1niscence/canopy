@@ -20,7 +20,47 @@ func (s *StateMachine) BeginBlock(proposerAddress crypto.AddressI, badProposal, 
 }
 
 func (s *StateMachine) EndBlock() (*lib.ValidatorSet, lib.ErrorI) {
-	return nil, nil // TODO max paused, finish unstaking, validator set
+	if err := s.DeletePaused(s.Height()); err != nil {
+		return nil, err
+	}
+	if err := s.DeleteUnstaking(s.Height()); err != nil {
+		return nil, err
+	}
+	return s.GetConsensusValidators()
+}
+
+func (s *StateMachine) GetConsensusValidators() (*lib.ValidatorSet, lib.ErrorI) {
+	set := new(lib.ValidatorSet)
+	params, err := s.GetParamsVal()
+	if err != nil {
+		return nil, err
+	}
+	it, err := s.RevIterator(types.ConsensusPrefix())
+	if err != nil {
+		return nil, err
+	}
+	defer it.Close()
+	for i := uint64(0); it.Valid() && i < params.ValidatorMaxCount.Value; it.Next() {
+		addr, err := types.AddressFromKey(it.Key())
+		if err != nil {
+			return nil, err
+		}
+		val, err := s.GetValidator(addr)
+		if err != nil {
+			return nil, err
+		}
+		if val.MaxPausedHeight != 0 {
+			return nil, types.ErrValidatorPaused()
+		}
+		if val.UnstakingHeight != 0 {
+			return nil, types.ErrValidatorUnstaking()
+		}
+		set.ValidatorSet = append(set.ValidatorSet, &lib.ValidatorKeyAndPower{
+			PublicKey:   val.PublicKey,
+			VotingPower: val.StakedAmount,
+		})
+	}
+	return set, nil
 }
 
 func (s *StateMachine) CheckProtocolVersion() lib.ErrorI {

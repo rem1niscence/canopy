@@ -66,6 +66,10 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	if exists {
 		return types.ErrValidatorExists()
 	}
+	// set validator sorted by stake
+	if err = s.SetConsensusValidator(address, msg.Amount); err != nil {
+		return err
+	}
 	// set validator
 	return s.SetValidator(&types.Validator{
 		Address:      address.Bytes(),
@@ -107,6 +111,10 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 	// update validator stake amount
 	newStakedAmount, err := lib.StringAdd(val.StakedAmount, amountToAdd)
 	if err != nil {
+		return err
+	}
+	// updated sorted validator set
+	if err = s.UpdateConsensusValidator(address, val.StakedAmount, newStakedAmount); err != nil {
 		return err
 	}
 	// set validator

@@ -126,6 +126,7 @@ var _ types.ParamSpace = &ValidatorParams{}
 
 const (
 	ParamValidatorMinStake                  = "validator_min_stake"
+	ParamValidatorMaxCount                  = "validator_max_count"
 	ParamValidatorUnstakingBlocks           = "validator_unstaking_blocks"
 	ParamValidatorMinPauseBlocks            = "validator_min_pause_blocks"
 	ParamValidatorMaxPauseBlocks            = "validator_max_pause_blocks"
@@ -148,6 +149,11 @@ func (x *ValidatorParams) SetUint64(address string, paramName string, value uint
 			return ErrUnauthorizedParamChange()
 		}
 		x.ValidatorUnstakingBlocks.Value = value
+	case ParamValidatorMaxCount:
+		if address != x.ValidatorMaxCount.Owner {
+			return ErrUnauthorizedParamChange()
+		}
+		x.ValidatorMaxCount.Value = value
 	case ParamValidatorMinPauseBlocks:
 		if address != x.ValidatorMinPauseBlocks.Owner {
 			return ErrUnauthorizedParamChange()
@@ -232,6 +238,8 @@ func (x *ValidatorParams) SetOwner(paramName string, owner string) types.ErrorI 
 	switch name {
 	case ParamValidatorMinStake:
 		x.ValidatorMinStake.Owner = owner
+	case ParamValidatorMaxCount:
+		x.ValidatorMaxCount.Owner = owner
 	case ParamValidatorUnstakingBlocks:
 		x.ValidatorUnstakingBlocks.Owner = owner
 	case ParamValidatorMinPauseBlocks:

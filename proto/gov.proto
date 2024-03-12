@@ -22,13 +22,14 @@ message ConsensusParams {
 
 message ValidatorParams {
   StringParam validator_min_stake = 1;
-  Uint64Param validator_unstaking_blocks = 2;
-  Uint64Param validator_min_pause_blocks = 3;
-  Uint64Param validator_max_pause_blocks = 4;
-  Uint64Param validator_max_evidence_age_in_blocks = 5;
-  Uint64Param validator_double_sign_slash_percentage = 6;
-  Uint64Param validator_faulty_sign_slash_percentage = 7;
-  Uint64Param validator_bad_proposal_slash_percentage = 8;
+  Uint64Param validator_max_count = 2;
+  Uint64Param validator_unstaking_blocks = 3;
+  Uint64Param validator_min_pause_blocks = 4;
+  Uint64Param validator_max_pause_blocks = 5;
+  Uint64Param validator_max_evidence_age_in_blocks = 6;
+  Uint64Param validator_double_sign_slash_percentage = 7;
+  Uint64Param validator_faulty_sign_slash_percentage = 8;
+  Uint64Param validator_bad_proposal_slash_percentage = 9;
   Uint64Param validator_non_sign_slash_percentage = 10;
   Uint64Param validator_max_non_sign = 11;
   Uint64Param validator_non_sign_window = 12;

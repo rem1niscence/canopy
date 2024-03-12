@@ -11,7 +11,8 @@ type StateMachine struct {
 }
 
 func (s *StateMachine) Store() lib.StoreI { return s.store }
-func (s *StateMachine) Height() uint64    { return s.Store().Version() }
+
+func (s *StateMachine) Height() uint64 { return s.Store().Version() }
 
 func (s *StateMachine) Set(k, v []byte) lib.ErrorI {
 	store := s.Store()
