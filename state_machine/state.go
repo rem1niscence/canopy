@@ -8,6 +8,7 @@ import (
 type StateMachine struct {
 	protocolVersion int
 	store           lib.StoreI
+	mempool         lib.Mempool
 }
 
 func (s *StateMachine) Store() lib.StoreI { return s.store }
@@ -78,4 +79,13 @@ func (s *StateMachine) RevIterator(key []byte) (lib.IteratorI, lib.ErrorI) {
 		return nil, types.ErrStoreRevIter(err)
 	}
 	return it, nil
+}
+
+func (s *StateMachine) GetTxByHash(hash []byte) (lib.TransactionResultI, lib.ErrorI) {
+	store := s.Store()
+	transaction, err := store.GetTxByHash(hash)
+	if err != nil {
+		return nil, types.ErrGetTransaction(err)
+	}
+	return transaction, nil
 }

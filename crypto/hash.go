@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"hash"
 )
 
@@ -16,4 +17,8 @@ func Hasher() hash.Hash {
 func Hash(bz []byte) []byte {
 	h := sha256.Sum256(bz)
 	return h[:]
+}
+
+func HashString(bz []byte) string {
+	return hex.EncodeToString(Hash(bz))
 }

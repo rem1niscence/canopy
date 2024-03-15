@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [Unreleased] - 03/15/2024
+
+- Added `TransactionIndexer` to store package
+- Added interfaces: `TransactionResultI`, `TransactionI`, `SignatureI`, `TransactionIndexerI`
+
 ## [Unreleased] - 03/12/2024
 
 - Added `consensus_validator` keys logic and functionality

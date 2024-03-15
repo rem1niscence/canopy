@@ -15,7 +15,7 @@ func NewSMTWrapper(db *TxnWrapper, root []byte, log types.LoggerI) *SMTWrapper {
 	store := &SMTWrapper{
 		log: log,
 	}
-	store.SetParent(db, root)
+	store.setDB(db, root)
 	return store
 }
 
@@ -35,8 +35,8 @@ func (s *SMTWrapper) Commit() (root []byte, err error) {
 	return
 }
 
-func (s *SMTWrapper) SetParent(db *TxnWrapper, root []byte) {
-	//parent := NewPrefixedMapStore(db, stateCommitmentPrefix)
+func (s *SMTWrapper) setDB(db *TxnWrapper, root []byte) {
+	//db := NewPrefixedMapStore(db, stateCommitmentPrefix)
 	if root == nil {
 		s.smt = smt.NewSMT(db, crypto.Hasher())
 	} else {

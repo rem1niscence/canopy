@@ -1,5 +1,7 @@
 package types
 
+import "github.com/ginchuco/ginchu/crypto"
+
 type StoreI interface {
 	NewReadOnly(version uint64) (ReadOnlyStoreI, error)
 	Commit() (root []byte, err error)
@@ -7,6 +9,7 @@ type StoreI interface {
 	ProvableStoreI
 	ReadableStoreI
 	WritableStoreI
+	TxIndexerI
 	Close() error
 }
 
@@ -18,6 +21,15 @@ type ReadOnlyStoreI interface {
 type KVStoreI interface {
 	ReadableStoreI
 	WritableStoreI
+}
+
+type TxIndexerI interface {
+	IndexTx(result TransactionResultI) error
+	GetTxByHash(hash []byte) (TransactionResultI, error)
+	GetTxByHeight(height uint64, newestToOldest bool) ([]TransactionResultI, error)
+	GetTxsBySender(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, error)
+	GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, error)
+	DeleteTxsByHeight(height uint64) error
 }
 
 type WritableStoreI interface {

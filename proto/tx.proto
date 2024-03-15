@@ -13,7 +13,7 @@ message Transaction {
 
 message TransactionResult {
   uint64 code = 1;
-  bytes signer = 2;
+  bytes sender = 2;
   bytes recipient = 3;
   string message_type = 4;
   uint64 height = 5;

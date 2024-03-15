@@ -8,20 +8,20 @@ import (
 
 type TxnWrapper struct {
 	logger types.LoggerI
-	parent *badger.Txn
+	db     *badger.Txn
 	prefix string
 }
 
-func NewTxnWrapper(parent *badger.Txn, logger types.LoggerI, prefix string) *TxnWrapper {
+func NewTxnWrapper(db *badger.Txn, logger types.LoggerI, prefix string) *TxnWrapper {
 	return &TxnWrapper{
 		logger: logger,
-		parent: parent,
+		db:     db,
 		prefix: prefix,
 	}
 }
 
 func (t *TxnWrapper) Get(k []byte) ([]byte, error) {
-	item, err := t.parent.Get(append([]byte(t.prefix), k...))
+	item, err := t.db.Get(append([]byte(t.prefix), k...))
 	if err != nil {
 		if err == badger.ErrKeyNotFound {
 			return nil, nil
@@ -31,13 +31,13 @@ func (t *TxnWrapper) Get(k []byte) ([]byte, error) {
 	return item.ValueCopy(nil)
 }
 
-func (t *TxnWrapper) Set(k, v []byte) error   { return t.parent.Set(append([]byte(t.prefix), k...), v) }
-func (t *TxnWrapper) Delete(k []byte) error   { return t.parent.Delete(append([]byte(t.prefix), k...)) }
-func (t *TxnWrapper) Close()                  { t.parent.Discard() }
-func (t *TxnWrapper) SetParent(p *badger.Txn) { t.parent = p }
+func (t *TxnWrapper) Set(k, v []byte) error { return t.db.Set(append([]byte(t.prefix), k...), v) }
+func (t *TxnWrapper) Delete(k []byte) error { return t.db.Delete(append([]byte(t.prefix), k...)) }
+func (t *TxnWrapper) Close()                { t.db.Discard() }
+func (t *TxnWrapper) setDB(p *badger.Txn)   { t.db = p }
 
 func (t *TxnWrapper) Iterator(prefix []byte) (types.IteratorI, error) {
-	parent := t.parent.NewIterator(badger.IteratorOptions{
+	parent := t.db.NewIterator(badger.IteratorOptions{
 		Prefix: append([]byte(t.prefix), prefix...),
 	})
 	parent.Rewind()
@@ -50,7 +50,7 @@ func (t *TxnWrapper) Iterator(prefix []byte) (types.IteratorI, error) {
 
 func (t *TxnWrapper) RevIterator(prefix []byte) (types.IteratorI, error) {
 	newPrefix := append([]byte(t.prefix), prefix...)
-	parent := t.parent.NewIterator(badger.IteratorOptions{
+	parent := t.db.NewIterator(badger.IteratorOptions{
 		Reverse: true,
 		Prefix:  newPrefix,
 	})

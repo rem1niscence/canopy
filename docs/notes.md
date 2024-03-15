@@ -9,7 +9,7 @@
     - Block Limit is important to prevent early on protocol attack where blocks get filled very cheaply
     - Variable block size (nice to have) 20% above the current block size
 
-- Pausing Txns
+- Pausing Txs
     - Manual Pause: Is necessary to allow Validator to do maintenance
     - Automatic Pause: Is necessary to allow Consensus to recover from a faulty / malicious Validator
 

@@ -5,6 +5,22 @@ import (
 	lib "github.com/ginchuco/ginchu/types"
 )
 
+func ErrInvalidNonce() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidNonce, lib.StateMachineModule, "invalid nonce")
+}
+
+func ErrDuplicateTx(hash string) lib.ErrorI {
+	return lib.NewError(lib.CodeDuplicateTransaction, lib.StateMachineModule, fmt.Sprintf("tx %s is a duplicate", hash))
+}
+
+func ErrTxFoundInMempool(hash string) lib.ErrorI {
+	return lib.NewError(lib.CodeTxFoundInMempool, lib.StateMachineModule, fmt.Sprintf("tx %s already found in mempool", hash))
+}
+
+func ErrGetTransaction(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeGetTransaction, lib.StateMachineModule, fmt.Sprintf("getTransaction() failed with err: %s", err.Error()))
+}
+
 func ErrAddressFromString(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeAddressFromString, lib.StateMachineModule, fmt.Sprintf("addressToString() failed with err: %s", err.Error()))
 }

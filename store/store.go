@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/ginchuco/ginchu/codec"
+	"github.com/ginchuco/ginchu/crypto"
 	"github.com/ginchuco/ginchu/types"
 	"math"
 )
@@ -12,6 +13,7 @@ const (
 	stateStorePrefix      = "s/"
 	stateCommitmentPrefix = "c/"
 	stateCommitIDPrefix   = "x/"
+	transactionPrefix     = "t/"
 )
 
 var (
@@ -28,6 +30,7 @@ type Store struct {
 	writer  *badger.Txn
 	ss      *TxnWrapper
 	sc      *SMTWrapper
+	tx      *TxIndexer
 }
 
 func NewStore(path string, log types.LoggerI) (types.StoreI, error) {
@@ -50,14 +53,15 @@ func NewStoreInMemory(log types.LoggerI) (types.StoreI, error) {
 
 func newStore(db *badger.DB, log types.LoggerI) (*Store, error) {
 	id := getLatestCommitID(db, log)
-	writer := db.NewTransactionAt(uint64(id.Height), true)
+	writer := db.NewTransactionAt(id.Height, true)
 	return &Store{
-		version: uint64(id.Height),
+		version: id.Height,
 		log:     log,
 		db:      db,
 		writer:  writer,
 		ss:      NewTxnWrapper(writer, log, stateStorePrefix),
 		sc:      NewSMTWrapper(NewTxnWrapper(writer, log, stateCommitmentPrefix), id.Root, log),
+		tx:      &TxIndexer{NewTxnWrapper(writer, log, transactionPrefix)},
 	}, nil
 }
 
@@ -116,8 +120,9 @@ func (s *Store) Commit() (root []byte, err error) {
 		return nil, err
 	}
 	s.writer = s.db.NewTransactionAt(s.version, true)
-	s.ss.parent = s.writer
-	s.sc.SetParent(NewTxnWrapper(s.writer, s.log, stateCommitmentPrefix), root)
+	s.ss.setDB(s.writer)
+	s.sc.setDB(NewTxnWrapper(s.writer, s.log, stateCommitmentPrefix), root)
+	s.tx.setDB(NewTxnWrapper(s.writer, s.log, transactionPrefix))
 	return
 }
 
@@ -168,6 +173,24 @@ func getLatestCommitID(db *badger.DB, log types.LoggerI) (id *CommitID) {
 		log.Fatalf("unmarshalCommitID() failed with err: %s", err.Error())
 	}
 	return
+}
+
+func (s *Store) IndexTx(result types.TransactionResultI) error { return s.tx.IndexTx(result) }
+func (s *Store) DeleteTxsByHeight(height uint64) error         { return s.tx.DeleteTxsByHeight(height) }
+func (s *Store) GetTxByHash(hash []byte) (types.TransactionResultI, error) {
+	return s.tx.GetTxByHash(hash)
+}
+
+func (s *Store) GetTxByHeight(height uint64, newestToOldest bool) ([]types.TransactionResultI, error) {
+	return s.tx.GetTxByHeight(height, newestToOldest)
+}
+
+func (s *Store) GetTxsBySender(address crypto.AddressI, newestToOldest bool) ([]types.TransactionResultI, error) {
+	return s.tx.GetTxsBySender(address, newestToOldest)
+}
+
+func (s *Store) GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]types.TransactionResultI, error) {
+	return s.tx.GetTxsByRecipient(address, newestToOldest)
 }
 
 func (s *Store) Close() error {
