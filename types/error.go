@@ -25,7 +25,11 @@ const (
 
 	StateMachineModule ErrorModule = "state_machine"
 
-	CodeInvalidNonce            ErrorCode = 3
+	CodeUnauthorizedTx          ErrorCode = 2
+	CodeEmptySignature          ErrorCode = 2
+	CodeTxSignBytes             ErrorCode = 2
+	CodeInvalidTxMessage        ErrorCode = 2
+	CodeInvalidTxSequence       ErrorCode = 3
 	CodeDuplicateTransaction    ErrorCode = 4
 	CodeGetTransaction          ErrorCode = 5
 	CodeTxFoundInMempool        ErrorCode = 6

@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [Unreleased] - 03/16/2024
+
+- Added `CheckTransaction` functionality
+- Added `ApplyTransaction` functionality
+
 ## [Unreleased] - 03/15/2024
 
 - Added `TransactionIndexer` to store package

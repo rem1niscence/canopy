@@ -6,7 +6,7 @@ import (
 	lib "github.com/ginchuco/ginchu/types"
 )
 
-func (s *StateMachine) HandleMessage(msg lib.MessageI) (err lib.ErrorI) {
+func (s *StateMachine) HandleMessage(msg lib.MessageI) lib.ErrorI {
 	switch x := msg.(type) {
 	case *types.MessageSend:
 		return s.HandleMessageSend(x)
@@ -27,6 +27,59 @@ func (s *StateMachine) HandleMessage(msg lib.MessageI) (err lib.ErrorI) {
 	default:
 		return types.ErrUnknownMessage(x)
 	}
+}
+
+func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee string, err lib.ErrorI) {
+	feeParams, err := s.GetParamsFee()
+	if err != nil {
+		return "", err
+	}
+	switch x := msg.(type) {
+	case *types.MessageSend:
+		return feeParams.MessageSendFee.Value, nil
+	case *types.MessageStake:
+		return feeParams.MessageStakeFee.Value, nil
+	case *types.MessageEditStake:
+		return feeParams.MessageEditStakeFee.Value, nil
+	case *types.MessageUnstake:
+		return feeParams.MessageUnstakeFee.Value, nil
+	case *types.MessageUnpause:
+		return feeParams.MessageUnpauseFee.Value, nil
+	case *types.MessageChangeParameter:
+		return feeParams.MessageChangeParameterFee.Value, nil
+	default:
+		return "", types.ErrUnknownMessage(x)
+	}
+}
+
+func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]byte, err lib.ErrorI) {
+	var validator *types.Validator
+	switch x := msg.(type) {
+	case *types.MessageSend:
+		return [][]byte{x.FromAddress}, nil
+	case *types.MessageChangeParameter:
+		return [][]byte{x.Owner}, nil // authenticated later
+	case *types.MessageStake:
+		validator, err = s.GetValidator(crypto.NewPublicKeyFromBytes(x.PublicKey).Address())
+		if err != nil {
+			return nil, err
+		}
+	case *types.MessageEditStake:
+		validator, err = s.GetValidator(crypto.NewAddressFromBytes(x.Address))
+	case *types.MessageUnstake:
+		validator, err = s.GetValidator(crypto.NewAddressFromBytes(x.Address))
+	case *types.MessageUnpause:
+		validator, err = s.GetValidator(crypto.NewAddressFromBytes(x.Address))
+	default:
+		return nil, types.ErrUnknownMessage(x)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if validator == nil {
+		return nil, types.ErrValidatorNotExists()
+	}
+	return [][]byte{validator.Address, validator.Output}, nil
 }
 
 func (s *StateMachine) HandleMessageSend(msg *types.MessageSend) lib.ErrorI {

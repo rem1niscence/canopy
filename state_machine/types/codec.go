@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/binary"
 	"github.com/ginchuco/ginchu/codec"
 	lib "github.com/ginchuco/ginchu/types"
 	"google.golang.org/protobuf/proto"
@@ -30,4 +31,10 @@ func FromAny(a *anypb.Any) (proto.Message, lib.ErrorI) {
 		return nil, ErrFromAny(err)
 	}
 	return msg, nil
+}
+
+func ProtoEnumToBytes(i uint32) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, uint64(i))
+	return b
 }

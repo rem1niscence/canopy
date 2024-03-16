@@ -9,5 +9,5 @@ type MessageI interface {
 	Check() ErrorI
 	Bytes() ([]byte, ErrorI)
 	Name() string
-	Recipient() string // for transaction indexing by recipient
+	Recipient() []byte // for transaction indexing by recipient
 }

@@ -12,8 +12,9 @@ type TransactionI interface {
 	proto.Message
 	GetMsg() *anypb.Any
 	GetSig() SignatureI
-	GetNonce() string
+	GetSequence() uint64
 	GetBytes() ([]byte, error)
+	GetSignBytes() ([]byte, error)
 	GetHash() ([]byte, error)
 }
 
@@ -31,6 +32,14 @@ func (x *Transaction) GetBytes() ([]byte, error) {
 
 func (x *Transaction) GetSig() SignatureI {
 	return x.Signature
+}
+
+func (x *Transaction) GetSignBytes() ([]byte, error) {
+	return cdc.Marshal(Transaction{
+		Msg:       x.Msg,
+		Signature: nil,
+		Sequence:  x.Sequence,
+	})
 }
 
 var _ SignatureI = &Signature{}
@@ -56,7 +65,6 @@ func (x *TransactionResult) GetTxHash() ([]byte, error) {
 
 type TransactionResultI interface {
 	proto.Message
-	GetCode() uint64
 	GetSender() []byte
 	GetRecipient() []byte
 	GetMessageType() string

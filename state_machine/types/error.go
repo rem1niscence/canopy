@@ -1,16 +1,25 @@
 package types
 
 import (
+	"encoding/hex"
 	"fmt"
 	lib "github.com/ginchuco/ginchu/types"
 )
 
-func ErrInvalidNonce() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidNonce, lib.StateMachineModule, "invalid nonce")
+func ErrUnauthorizedTx() lib.ErrorI {
+	return lib.NewError(lib.CodeUnauthorizedTx, lib.StateMachineModule, "unauthorized tx")
 }
 
-func ErrDuplicateTx(hash string) lib.ErrorI {
-	return lib.NewError(lib.CodeDuplicateTransaction, lib.StateMachineModule, fmt.Sprintf("tx %s is a duplicate", hash))
+func ErrInvalidTxSequence() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidTxSequence, lib.StateMachineModule, "invalid sequence")
+}
+
+func ErrInvalidTxMessage() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidTxMessage, lib.StateMachineModule, "invalid transaction message")
+}
+
+func ErrDuplicateTx(hash []byte) lib.ErrorI {
+	return lib.NewError(lib.CodeDuplicateTransaction, lib.StateMachineModule, fmt.Sprintf("tx %s is a duplicate", hex.EncodeToString(hash)))
 }
 
 func ErrTxFoundInMempool(hash string) lib.ErrorI {
@@ -170,7 +179,7 @@ func ErrUnknownParamType(t any) lib.ErrorI {
 }
 
 func ErrUnauthorizedParamChange() lib.ErrorI {
-	return lib.NewError(lib.CodeUnauthorizedParamChange, lib.StateMachineModule, "unauthorized")
+	return lib.NewError(lib.CodeUnauthorizedParamChange, lib.StateMachineModule, "unauthorized param change")
 }
 
 func ErrBelowMinimumStake() lib.ErrorI {
@@ -203,6 +212,14 @@ func ErrIdenticalVotes() lib.ErrorI {
 
 func ErrInvalidSignature() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidSignature, lib.StateMachineModule, "invalid signature")
+}
+
+func ErrEmptySignature() lib.ErrorI {
+	return lib.NewError(lib.CodeEmptySignature, lib.StateMachineModule, "empty signature")
+}
+
+func ErrTxSignBytes(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeTxSignBytes, lib.StateMachineModule, fmt.Sprintf("tx.SignBytes() failed with err: %s", err.Error()))
 }
 
 func ErrInvalidProtocolVersion() lib.ErrorI {

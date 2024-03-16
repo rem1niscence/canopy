@@ -19,7 +19,7 @@ var (
 )
 
 func KeyForAccount(address crypto.AddressI) []byte { return append(accountPrefix, address.Bytes()...) }
-func KeyForPool(name []byte) []byte                { return append(poolPrefix, name...) }
+func KeyForPool(name PoolName) []byte              { return append(poolPrefix, ProtoEnumToBytes(uint32(name))...) }
 func KeyForValidator(addr crypto.AddressI) []byte  { return append(validatorPrefix, addr.Bytes()...) }
 func KeyForParams(s string) []byte                 { return append(paramsPrefix, []byte(prefixForParamSpace(s))...) }
 func KeyForNonSigner(a crypto.AddressI) []byte     { return append(nonSignerPrefix, a.Bytes()...) }

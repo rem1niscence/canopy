@@ -50,7 +50,7 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.Err
 		}
 	}
 	for _, pool := range genesis.Pools {
-		if len(pool.Name) < 1 {
+		if pool.Name < 0 {
 			return types.ErrInvalidPoolName()
 		}
 		if _, err := lib.StringToBigInt(pool.Amount); err != nil {

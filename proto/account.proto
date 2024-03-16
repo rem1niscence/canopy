@@ -6,14 +6,15 @@ option go_package = "github.com/ginchuco/ginchu/state_machine/types";
 message Account {
   bytes address = 1;
   string amount = 2;
+  uint64 sequence = 3;
 }
 
 message Pool {
-  bytes Name = 1;
+  PoolName name = 1;
   string amount = 2;
 }
 
-enum PoolNames {
+enum PoolName {
   PoolNameUnspecified = 0;
   FeeCollector = 1;
 }

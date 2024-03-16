@@ -33,12 +33,20 @@ func (s *StateMachine) GetAccounts() ([]*types.Account, lib.ErrorI) {
 	return result, nil
 }
 
-func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (*big.Int, lib.ErrorI) {
+func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (string, lib.ErrorI) {
 	account, err := s.GetAccount(address)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return lib.StringToBigInt(account.Amount)
+	return account.Amount, nil
+}
+
+func (s *StateMachine) GetAccountSequence(address crypto.AddressI) (uint64, lib.ErrorI) {
+	account, err := s.GetAccount(address)
+	if err != nil {
+		return 0, err
+	}
+	return account.Sequence, nil
 }
 
 func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
@@ -62,8 +70,27 @@ func (s *StateMachine) SetAccounts(accounts []*types.Account) lib.ErrorI {
 	return nil
 }
 
+func (s *StateMachine) AccountDeductFees(address crypto.AddressI, fee string) lib.ErrorI {
+	if err := s.AccountSub(address, fee); err != nil {
+		return err
+	}
+	return s.PoolAdd(types.PoolName_FeeCollector, fee)
+}
+
 func (s *StateMachine) MintToAccount(address crypto.AddressI, amount *big.Int) lib.ErrorI {
 	return s.AccountAdd(address, lib.BigIntToString(amount))
+}
+
+func (s *StateMachine) AccountSetSequence(address crypto.AddressI, sequence uint64) lib.ErrorI {
+	acc, err := s.GetAccount(address)
+	if err != nil {
+		return err
+	}
+	if acc.Sequence >= sequence {
+		return types.ErrInvalidTxSequence()
+	}
+	acc.Sequence = sequence
+	return s.SetAccount(acc)
 }
 
 func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd string) lib.ErrorI {
@@ -111,8 +138,8 @@ func (s *StateMachine) marshalAccount(account *types.Account) ([]byte, lib.Error
 
 // Pool logic below
 
-func (s *StateMachine) GetPool(name string) (*types.Pool, lib.ErrorI) {
-	bz, err := s.Get(types.KeyForPool([]byte(name)))
+func (s *StateMachine) GetPool(name types.PoolName) (*types.Pool, lib.ErrorI) {
+	bz, err := s.Get(types.KeyForPool(name))
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +164,7 @@ func (s *StateMachine) GetPools() ([]*types.Pool, lib.ErrorI) {
 	return result, nil
 }
 
-func (s *StateMachine) GetPoolBalance(name string) (*big.Int, lib.ErrorI) {
+func (s *StateMachine) GetPoolBalance(name types.PoolName) (*big.Int, lib.ErrorI) {
 	pool, err := s.GetPool(name)
 	if err != nil {
 		return nil, err
@@ -165,11 +192,11 @@ func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) MintToPool(name string, amount *big.Int) lib.ErrorI {
+func (s *StateMachine) MintToPool(name types.PoolName, amount *big.Int) lib.ErrorI {
 	return s.PoolAdd(name, lib.BigIntToString(amount))
 }
 
-func (s *StateMachine) PoolAdd(name, amountToAdd string) lib.ErrorI {
+func (s *StateMachine) PoolAdd(name types.PoolName, amountToAdd string) lib.ErrorI {
 	pool, err := s.GetPool(name)
 	if err != nil {
 		return err
@@ -181,7 +208,7 @@ func (s *StateMachine) PoolAdd(name, amountToAdd string) lib.ErrorI {
 	return s.SetPool(pool)
 }
 
-func (s *StateMachine) PoolSub(name, amountToSub string) lib.ErrorI {
+func (s *StateMachine) PoolSub(name types.PoolName, amountToSub string) lib.ErrorI {
 	pool, err := s.GetPool(name)
 	if err != nil {
 		return err

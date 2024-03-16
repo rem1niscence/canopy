@@ -8,17 +8,16 @@ import "google/protobuf/any.proto";
 message Transaction {
   google.protobuf.Any msg = 1;
   Signature signature = 2;
-  string nonce = 3;
+  uint64 sequence = 3;
 }
 
 message TransactionResult {
-  uint64 code = 1;
-  bytes sender = 2;
-  bytes recipient = 3;
-  string message_type = 4;
-  uint64 height = 5;
-  uint64 index = 6;
-  Transaction transaction = 7;
+  bytes sender = 1;
+  bytes recipient = 2;
+  string message_type = 3;
+  uint64 height = 4;
+  uint64 index = 5;
+  Transaction transaction = 6;
 }
 
 message Signature {

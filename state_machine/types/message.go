@@ -36,7 +36,7 @@ func (x *MessageSend) Check() lib.ErrorI {
 func (x *MessageSend) SetSigner(signer []byte)     { x.Signer = signer }
 func (x *MessageSend) Bytes() ([]byte, lib.ErrorI) { return Marshal(x) }
 func (x *MessageSend) Name() string                { return MessageSendName }
-func (x *MessageSend) Recipient() string           { return crypto.NewAddressFromBytes(x.ToAddress).String() }
+func (x *MessageSend) Recipient() []byte           { return crypto.NewAddressFromBytes(x.ToAddress).Bytes() }
 
 var _ lib.MessageI = &MessageStake{}
 
@@ -53,7 +53,7 @@ func (x *MessageStake) Check() lib.ErrorI {
 func (x *MessageStake) SetSigner(signer []byte)     { x.Signer = signer }
 func (x *MessageStake) Bytes() ([]byte, lib.ErrorI) { return Marshal(x) }
 func (x *MessageStake) Name() string                { return MessageStakeName }
-func (x *MessageStake) Recipient() string           { return "" }
+func (x *MessageStake) Recipient() []byte           { return nil }
 
 var _ lib.MessageI = &MessageEditStake{}
 
@@ -73,7 +73,7 @@ func (x *MessageEditStake) Check() lib.ErrorI {
 func (x *MessageEditStake) SetSigner(signer []byte)     { x.Signer = signer }
 func (x *MessageEditStake) Bytes() ([]byte, lib.ErrorI) { return Marshal(x) }
 func (x *MessageEditStake) Name() string                { return MessageEditStakeName }
-func (x *MessageEditStake) Recipient() string           { return "" }
+func (x *MessageEditStake) Recipient() []byte           { return nil }
 
 var _ lib.MessageI = &MessageUnstake{}
 
@@ -81,7 +81,7 @@ func (x *MessageUnstake) Check() lib.ErrorI           { return checkAddress(x.Ad
 func (x *MessageUnstake) SetSigner(signer []byte)     { x.Signer = signer }
 func (x *MessageUnstake) Bytes() ([]byte, lib.ErrorI) { return Marshal(x) }
 func (x *MessageUnstake) Name() string                { return MessageUnstakeName }
-func (x *MessageUnstake) Recipient() string           { return "" }
+func (x *MessageUnstake) Recipient() []byte           { return nil }
 
 var _ lib.MessageI = &MessagePause{}
 
@@ -89,7 +89,7 @@ func (x *MessagePause) Check() lib.ErrorI           { return checkAddress(x.Addr
 func (x *MessagePause) SetSigner(signer []byte)     { x.Signer = signer }
 func (x *MessagePause) Bytes() ([]byte, lib.ErrorI) { return Marshal(x) }
 func (x *MessagePause) Name() string                { return MessagePauseName }
-func (x *MessagePause) Recipient() string           { return "" }
+func (x *MessagePause) Recipient() []byte           { return nil }
 
 var _ lib.MessageI = &MessageUnpause{}
 
@@ -97,7 +97,7 @@ func (x *MessageUnpause) Check() lib.ErrorI           { return checkAddress(x.Ad
 func (x *MessageUnpause) SetSigner(signer []byte)     { x.Signer = signer }
 func (x *MessageUnpause) Bytes() ([]byte, lib.ErrorI) { return Marshal(x) }
 func (x *MessageUnpause) Name() string                { return MessageUnpauseName }
-func (x *MessageUnpause) Recipient() string           { return "" }
+func (x *MessageUnpause) Recipient() []byte           { return nil }
 
 var _ lib.MessageI = &MessageChangeParameter{}
 
@@ -117,7 +117,7 @@ func (x *MessageChangeParameter) Check() lib.ErrorI {
 func (x *MessageChangeParameter) SetSigner(signer []byte)     { x.Signer = signer }
 func (x *MessageChangeParameter) Bytes() ([]byte, lib.ErrorI) { return Marshal(x) }
 func (x *MessageChangeParameter) Name() string                { return MessageChangeParameterName }
-func (x *MessageChangeParameter) Recipient() string           { return "" }
+func (x *MessageChangeParameter) Recipient() []byte           { return nil }
 
 var _ lib.MessageI = &MessageDoubleSign{}
 
@@ -155,7 +155,7 @@ func (x *MessageDoubleSign) Check() lib.ErrorI {
 func (x *MessageDoubleSign) SetSigner(signer []byte)     { x.Signer = signer }
 func (x *MessageDoubleSign) Bytes() ([]byte, lib.ErrorI) { return Marshal(x) }
 func (x *MessageDoubleSign) Name() string                { return MessageDoubleSignName }
-func (x *MessageDoubleSign) Recipient() string           { return "" }
+func (x *MessageDoubleSign) Recipient() []byte           { return nil }
 
 func checkAmount(amount string) lib.ErrorI {
 	am, err := lib.StringToBigInt(amount)
