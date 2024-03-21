@@ -17,5 +17,5 @@ func (a *App) HandleBlock(block []byte) lib.ErrorI {
 }
 
 func (a *App) ProduceBlock() (lib.Block, lib.ErrorI) {
-	return nil
+	return lib.Block{}, nil
 }

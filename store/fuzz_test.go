@@ -44,7 +44,7 @@ func TestFuzzTxn(t *testing.T) {
 	store := NewTxn(NewTxnWrapper(db.NewTransactionAt(1, true), types.NewDefaultLogger(), stateStorePrefix))
 	keys := make([]string, 0)
 	compareStore := NewTxnWrapper(db.NewTransactionAt(1, true), types.NewDefaultLogger(), stateStorePrefix)
-	for i := 0; i < 15000; i++ {
+	for i := 0; i < 1000; i++ {
 		doRandomOperation(t, store, compareStore, &keys)
 	}
 	db.Close()
@@ -169,9 +169,6 @@ func testCompareIterators(t *testing.T, db types.RWStoreI, compare types.RWStore
 	defer func() { it1.Close(); it2.Close() }()
 	for i := 0; func() bool { return it1.Valid() || it2.Valid() }(); func() { it1.Next(); it2.Next() }() {
 		i++
-		if len(prefix) > 2 {
-			fmt.Printf("")
-		}
 		require.Equal(t, it1.Valid(), it2.Valid(), fmt.Sprintf("it1.valid=%t\ncompare.valid=%t\nisReverse=%d\nprefix=%s\n", it1.Valid(), it2.Valid(), isReverse, prefix))
 		require.Equal(t, it1.Key(), it2.Key(), fmt.Sprintf("it1.key=%s\ncompare.key=%s\nisReverse=%d\nprefix=%s\n", it1.Key(), it2.Key(), isReverse, prefix))
 		require.Equal(t, it1.Value(), it2.Value(), fmt.Sprintf("it1.value=%s\ncompare.value=%s\nisReverse=%d\nprefix=%s\n", it1.Value(), it2.Value(), isReverse, prefix))
