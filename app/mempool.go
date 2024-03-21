@@ -21,7 +21,7 @@ type Mempool struct {
 // It alone decides if the transaction is valid based on the mempool state
 //
 // Mempool gracefully handles
-// - If mempool is full it will drop
+// - If mempool is full it will drop TODO
 func (m *Mempool) HandleTransaction(tx []byte) lib.ErrorI {
 	hash := crypto.Hash(tx)
 	hashString := hex.EncodeToString(hash)
@@ -52,7 +52,7 @@ func (m *Mempool) HandleTransaction(tx []byte) lib.ErrorI {
 }
 
 func (m *Mempool) HandleFullMempool() lib.ErrorI {
-
+	return nil
 }
 
 func (m *Mempool) SetStore(store lib.StoreI) { m.mempoolStore = store }

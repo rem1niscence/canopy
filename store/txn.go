@@ -175,7 +175,6 @@ func (c *TxnIterator) Valid() bool {
 		switch c.compare(cKey, pKey) {
 		case 1: // use parent
 			c.useTxn = false
-			break
 		case 0: // when equal txn shadows parent
 			if c.txnValue().delete {
 				c.parent.Next()
@@ -183,7 +182,6 @@ func (c *TxnIterator) Valid() bool {
 				continue
 			}
 			c.useTxn = true
-			break
 		case -1: // use txn
 			if c.txnValue().delete {
 				c.txnNext()
