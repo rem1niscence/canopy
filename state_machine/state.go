@@ -7,13 +7,14 @@ import (
 
 type StateMachine struct {
 	protocolVersion int
-	store           lib.StoreI
-	mempool         lib.Mempool
+	height          uint64
+	store           lib.RWStoreI
 }
 
-func (s *StateMachine) Store() lib.StoreI { return s.store }
-
-func (s *StateMachine) Height() uint64 { return s.Store().Version() }
+func (s *StateMachine) Store() lib.RWStoreI         { return s.store }
+func (s *StateMachine) SetStore(store lib.RWStoreI) { s.store = store }
+func (s *StateMachine) Height() uint64              { return s.height }
+func (s *StateMachine) SetHeight(height uint64)     { s.height = height }
 
 func (s *StateMachine) Set(k, v []byte) lib.ErrorI {
 	store := s.Store()
@@ -79,13 +80,4 @@ func (s *StateMachine) RevIterator(key []byte) (lib.IteratorI, lib.ErrorI) {
 		return nil, types.ErrStoreRevIter(err)
 	}
 	return it, nil
-}
-
-func (s *StateMachine) GetTxByHash(hash []byte) (lib.TransactionResultI, lib.ErrorI) {
-	store := s.Store()
-	transaction, err := store.GetTxByHash(hash)
-	if err != nil {
-		return nil, types.ErrGetTransaction(err)
-	}
-	return transaction, nil
 }

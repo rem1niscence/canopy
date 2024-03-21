@@ -3,13 +3,16 @@ package types
 import "github.com/ginchuco/ginchu/crypto"
 
 type StoreI interface {
+	Copy() (StoreI, error)
 	NewReadOnly(version uint64) (ReadOnlyStoreI, error)
 	Commit() (root []byte, err error)
 	Version() uint64
+	NewTxn() StoreTxnI
+	Discard()
+	Reset() error
 	ProvableStoreI
-	ReadableStoreI
-	WritableStoreI
-	TxIndexerI
+	RWStoreI
+	IndexerI
 	Close() error
 }
 
@@ -18,23 +21,34 @@ type ReadOnlyStoreI interface {
 	ReadableStoreI
 }
 
-type KVStoreI interface {
+type RWStoreI interface {
 	ReadableStoreI
 	WritableStoreI
 }
 
-type TxIndexerI interface {
-	IndexTx(result TransactionResultI) error
-	GetTxByHash(hash []byte) (TransactionResultI, error)
-	GetTxByHeight(height uint64, newestToOldest bool) ([]TransactionResultI, error)
-	GetTxsBySender(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, error)
-	GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, error)
-	DeleteTxsByHeight(height uint64) error
+type IndexerI interface {
+	Index(result TransactionResultI) error
+	DeleteForHeight(height uint64) error
+	RIndexerI
+}
+
+type RIndexerI interface {
+	GetByHash(hash []byte) (TransactionResultI, error)
+	GetByHeight(height uint64, newestToOldest bool) ([]TransactionResultI, error)
+	GetBySender(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, error)
+	GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, error)
 }
 
 type WritableStoreI interface {
 	Set(key, value []byte) error
 	Delete(key []byte) error
+}
+
+type StoreTxnI interface {
+	WritableStoreI
+	ReadableStoreI
+	Write() error
+	Discard()
 }
 
 type ReadableStoreI interface {

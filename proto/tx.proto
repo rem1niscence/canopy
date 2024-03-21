@@ -9,6 +9,7 @@ message Transaction {
   google.protobuf.Any msg = 1;
   Signature signature = 2;
   uint64 sequence = 3;
+  string fee = 4;
 }
 
 message TransactionResult {
@@ -18,6 +19,7 @@ message TransactionResult {
   uint64 height = 4;
   uint64 index = 5;
   Transaction transaction = 6;
+  string tx_hash = 7;
 }
 
 message Signature {

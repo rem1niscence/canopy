@@ -1,81 +1,74 @@
 package state_machine
 
 import (
-	"encoding/hex"
 	"github.com/ginchuco/ginchu/crypto"
 	"github.com/ginchuco/ginchu/state_machine/types"
 	lib "github.com/ginchuco/ginchu/types"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// TODO should have a mempool state?
-func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte) (*lib.TransactionResult, lib.ErrorI) {
-	sender, tx, msg, err := s.checkTransaction(crypto.Hash(transaction), transaction)
+func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash, mempoolFeeLimit string) (*lib.TransactionResult, lib.ErrorI) {
+	result, err := s.CheckTx(transaction, mempoolFeeLimit)
 	if err != nil {
 		return nil, err
 	}
-	if err = s.AccountSetSequence(sender, tx.Sequence); err != nil {
+	if err = s.AccountSetSequence(result.sender, result.tx.Sequence); err != nil {
 		return nil, err
 	}
-	fee, err := s.GetFeeForMessage(msg)
-	if err != nil {
+	if err = s.AccountDeductFees(result.sender, result.tx.Fee); err != nil {
 		return nil, err
 	}
-	if err = s.AccountDeductFees(sender, fee); err != nil {
-		return nil, err
-	}
-	if err = s.HandleMessage(msg); err != nil {
+	if err = s.HandleMessage(result.msg); err != nil {
 		return nil, err
 	}
 	return &lib.TransactionResult{
-		Sender:      sender.Bytes(),
-		Recipient:   msg.Recipient(),
-		MessageType: msg.Name(),
+		Sender:      result.sender.Bytes(),
+		Recipient:   result.msg.Recipient(),
+		MessageType: result.msg.Name(),
 		Height:      s.Height(),
 		Index:       index,
-		Transaction: tx,
+		Transaction: result.tx,
+		TxHash:      txHash,
 	}, nil
 }
 
-func (s *StateMachine) CheckTransaction(transaction []byte) error {
-	hash := crypto.Hash(transaction)
-	hashString := hex.EncodeToString(hash)
-	if s.mempool.Contains(hashString) {
-		return types.ErrTxFoundInMempool(hashString)
-	}
-	if _, _, _, err := s.checkTransaction(hash, transaction); err != nil {
-		return err
-	}
-	return s.mempool.AddTransaction(transaction)
-}
-
-func (s *StateMachine) checkTransaction(hash []byte, transaction []byte) (a crypto.AddressI, tx *lib.Transaction, msg lib.MessageI, err lib.ErrorI) {
-	txResult, err := s.GetTxByHash(hash)
-	if err != nil {
-		return
-	}
-	if txResult != nil {
-		err = types.ErrDuplicateTx(hash)
-		return
-	}
-	tx = new(lib.Transaction)
+func (s *StateMachine) CheckTx(transaction []byte, mempoolFeeLimit string) (result *CheckTxResult, err lib.ErrorI) {
+	tx := new(lib.Transaction)
 	if err = types.Unmarshal(transaction, tx); err != nil {
 		return
 	}
-	if err = s.checkAccount(tx); err != nil {
+	if err = s.CheckAccount(tx); err != nil {
 		return
 	}
-	msg, err = s.castMessage(tx.Msg)
+	msg, err := s.CheckMessage(tx.Msg)
 	if err != nil {
 		return
 	}
-	if a, err = s.checkSignature(msg, tx); err != nil {
+	sender, err := s.CheckSignature(msg, tx)
+	if err != nil {
 		return
 	}
-	return
+	stateLimitFee, err := s.GetFeeForMessage(msg)
+	if err != nil {
+		return
+	}
+	if err = s.CheckFee(tx.Fee, mempoolFeeLimit, stateLimitFee); err != nil {
+		return
+	}
+	return &CheckTxResult{
+		tx:     tx,
+		msg:    msg,
+		sender: sender,
+	}, nil
 }
 
-func (s *StateMachine) checkSignature(msg lib.MessageI, tx *lib.Transaction) (crypto.AddressI, lib.ErrorI) {
+type CheckTxResult struct {
+	tx     *lib.Transaction
+	msg    lib.MessageI
+	sender crypto.AddressI
+}
+
+func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (crypto.AddressI, lib.ErrorI) {
 	if tx.Signature == nil {
 		return nil, types.ErrEmptySignature()
 	}
@@ -103,7 +96,7 @@ func (s *StateMachine) checkSignature(msg lib.MessageI, tx *lib.Transaction) (cr
 	return nil, types.ErrUnauthorizedTx()
 }
 
-func (s *StateMachine) checkAccount(tx *lib.Transaction) lib.ErrorI {
+func (s *StateMachine) CheckAccount(tx *lib.Transaction) lib.ErrorI {
 	txCount, err := s.GetAccountSequence(crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey).Address())
 	if err != nil {
 		return err
@@ -114,7 +107,7 @@ func (s *StateMachine) checkAccount(tx *lib.Transaction) lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) castMessage(msg *anypb.Any) (message lib.MessageI, err lib.ErrorI) {
+func (s *StateMachine) CheckMessage(msg *anypb.Any) (message lib.MessageI, err lib.ErrorI) {
 	proto, err := types.FromAny(msg)
 	if err != nil {
 		return nil, err
@@ -123,5 +116,26 @@ func (s *StateMachine) castMessage(msg *anypb.Any) (message lib.MessageI, err li
 	if !ok {
 		return nil, types.ErrInvalidTxMessage()
 	}
+	if err = message.Check(); err != nil {
+		return nil, err
+	}
 	return message, nil
+}
+
+func (s *StateMachine) CheckFee(fee, mempoolLimit, stateLimit string) lib.ErrorI {
+	less, err := lib.StringsLess(fee, mempoolLimit)
+	if err != nil {
+		return err
+	}
+	if less {
+		return types.ErrTxFeeBelowMempoolLimit()
+	}
+	less, err = lib.StringsLess(fee, stateLimit)
+	if err != nil {
+		return err
+	}
+	if less {
+		return types.ErrTxFeeBelowStateLimit()
+	}
+	return nil
 }

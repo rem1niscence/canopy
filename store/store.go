@@ -14,6 +14,8 @@ const (
 	stateCommitmentPrefix = "c/"
 	stateCommitIDPrefix   = "x/"
 	transactionPrefix     = "t/"
+
+	maxKeyBytes = 128
 )
 
 var (
@@ -30,12 +32,13 @@ type Store struct {
 	writer  *badger.Txn
 	ss      *TxnWrapper
 	sc      *SMTWrapper
-	tx      *TxIndexer
+	tx      *Indexer
+	root    []byte
 }
 
 func NewStore(path string, log types.LoggerI) (types.StoreI, error) {
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).
-		WithLoggingLevel(badger.ERROR))
+		WithLoggingLevel(badger.ERROR).WithMemTableSize(1000000000))
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +64,8 @@ func newStore(db *badger.DB, log types.LoggerI) (*Store, error) {
 		writer:  writer,
 		ss:      NewTxnWrapper(writer, log, stateStorePrefix),
 		sc:      NewSMTWrapper(NewTxnWrapper(writer, log, stateCommitmentPrefix), id.Root, log),
-		tx:      &TxIndexer{NewTxnWrapper(writer, log, transactionPrefix)},
+		tx:      &Indexer{NewTxnWrapper(writer, log, transactionPrefix)},
+		root:    id.Root,
 	}, nil
 }
 
@@ -76,6 +80,20 @@ func (s *Store) NewReadOnly(version uint64) (types.ReadOnlyStoreI, error) {
 		log:     nil,
 		ss:      NewTxnWrapper(reader, s.log, stateStorePrefix),
 		sc:      NewSMTWrapper(NewTxnWrapper(reader, s.log, stateCommitmentPrefix), id.Root, s.log),
+	}, nil
+}
+
+func (s *Store) Copy() (types.StoreI, error) {
+	writer := s.db.NewTransactionAt(s.version, true)
+	return &Store{
+		version: s.version,
+		log:     s.log,
+		db:      s.db,
+		writer:  writer,
+		ss:      NewTxnWrapper(writer, s.log, stateStorePrefix),
+		sc:      NewSMTWrapper(NewTxnWrapper(writer, s.log, stateCommitmentPrefix), s.root, s.log),
+		tx:      &Indexer{NewTxnWrapper(writer, s.log, transactionPrefix)},
+		root:    s.root,
 	}, nil
 }
 
@@ -107,23 +125,36 @@ func (s *Store) VerifyProof(k, v, p []byte) bool               { return s.sc.Ver
 func (s *Store) Iterator(p []byte) (types.IteratorI, error)    { return s.ss.Iterator(p) }
 func (s *Store) RevIterator(p []byte) (types.IteratorI, error) { return s.ss.RevIterator(p) }
 func (s *Store) Version() uint64                               { return s.version }
+func (s *Store) NewTxn() types.StoreTxnI                       { return NewTxn(s) }
 func (s *Store) Commit() (root []byte, err error) {
 	s.version++
-	root, err = s.sc.Commit()
+	s.root, err = s.sc.Commit()
 	if err != nil {
 		return nil, err
 	}
-	if err = s.setCommitID(s.version, root); err != nil {
+	if err = s.setCommitID(s.version, s.root); err != nil {
 		return nil, err
 	}
 	if err = s.writer.CommitAt(s.version, nil); err != nil {
 		return nil, err
 	}
+	return types.CopyBytes(s.root), s.resetWriter(s.root)
+}
+
+func (s *Store) Reset() error {
+	return s.resetWriter(s.root)
+}
+
+func (s *Store) Discard() {
+	s.writer.Discard()
+}
+
+func (s *Store) resetWriter(root []byte) error {
 	s.writer = s.db.NewTransactionAt(s.version, true)
 	s.ss.setDB(s.writer)
 	s.sc.setDB(NewTxnWrapper(s.writer, s.log, stateCommitmentPrefix), root)
 	s.tx.setDB(NewTxnWrapper(s.writer, s.log, transactionPrefix))
-	return
+	return nil
 }
 
 func (s *Store) commitIDKey(version uint64) []byte {
@@ -175,25 +206,25 @@ func getLatestCommitID(db *badger.DB, log types.LoggerI) (id *CommitID) {
 	return
 }
 
-func (s *Store) IndexTx(result types.TransactionResultI) error { return s.tx.IndexTx(result) }
-func (s *Store) DeleteTxsByHeight(height uint64) error         { return s.tx.DeleteTxsByHeight(height) }
-func (s *Store) GetTxByHash(hash []byte) (types.TransactionResultI, error) {
-	return s.tx.GetTxByHash(hash)
+func (s *Store) Index(result types.TransactionResultI) error { return s.tx.Index(result) }
+func (s *Store) DeleteForHeight(height uint64) error         { return s.tx.DeleteForHeight(height) }
+func (s *Store) GetByHash(hash []byte) (types.TransactionResultI, error) {
+	return s.tx.GetByHash(hash)
 }
 
-func (s *Store) GetTxByHeight(height uint64, newestToOldest bool) ([]types.TransactionResultI, error) {
-	return s.tx.GetTxByHeight(height, newestToOldest)
+func (s *Store) GetByHeight(height uint64, newestToOldest bool) ([]types.TransactionResultI, error) {
+	return s.tx.GetByHeight(height, newestToOldest)
 }
 
-func (s *Store) GetTxsBySender(address crypto.AddressI, newestToOldest bool) ([]types.TransactionResultI, error) {
-	return s.tx.GetTxsBySender(address, newestToOldest)
+func (s *Store) GetBySender(address crypto.AddressI, newestToOldest bool) ([]types.TransactionResultI, error) {
+	return s.tx.GetBySender(address, newestToOldest)
 }
 
-func (s *Store) GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]types.TransactionResultI, error) {
-	return s.tx.GetTxsByRecipient(address, newestToOldest)
+func (s *Store) GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]types.TransactionResultI, error) {
+	return s.tx.GetByRecipient(address, newestToOldest)
 }
 
 func (s *Store) Close() error {
-	s.writer.Discard()
+	s.Discard()
 	return s.db.Close()
 }

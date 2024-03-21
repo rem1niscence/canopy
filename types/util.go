@@ -4,12 +4,6 @@ import (
 	"math/big"
 )
 
-func MapCopy[M1 ~map[K]V, M2 ~map[K]V, K comparable, V any](dst M1, src M2) {
-	for k, v := range src {
-		dst[k] = v
-	}
-}
-
 func BigAdd(a, b *big.Int) *big.Int          { return new(big.Int).Add(a, b) }
 func BigSub(a, b *big.Int) *big.Int          { return new(big.Int).Sub(a, b) }
 func BigMul(a, b *big.Int) *big.Int          { return new(big.Int).Mul(a, b) }
@@ -121,4 +115,10 @@ func CopyBytes(bz []byte) (dst []byte) {
 	dst = make([]byte, len(bz))
 	copy(dst, bz)
 	return
+}
+
+func MapCopy[M1 ~map[K]V, M2 ~map[K]V, K comparable, V any](dst M1, src M2) {
+	for k, v := range src {
+		dst[k] = v
+	}
 }

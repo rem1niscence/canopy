@@ -63,22 +63,7 @@ func (t *TxnWrapper) RevIterator(prefix []byte) (types.IteratorI, error) {
 }
 
 func seekLast(it *badger.Iterator, prefix []byte) {
-	incPrefix := incrementPrefix(prefix)
-	if len(incPrefix) > 0 {
-		it.Seek(incPrefix) // Point to the first key <= the range prefix
-		if !it.Valid() {
-			return
-		}
-		if it.Item() != nil && bytes.Equal(it.Item().Key(), incPrefix) {
-			// Exact match on incremented range prefix, need to move back one key for the last key matching the prefix
-			it.Next()
-		}
-	} else {
-		// Entire range prefix was just [0xFF, 0xFF, 0xFF, ..., 0xFF], use the last key in the database
-		// There's currently a bug with it.Rewind() when in reverse and with a prefix, it does not correctly find the largest key
-		// https://discuss.dgraph.io/t/iterator-rewind-invalid-with-reverse-true-and-prefix-option-set/15518
-		it.Seek(bytes.Repeat([]byte{0xFF}, len(prefix)+1))
-	}
+	it.Seek(prefixEnd(prefix))
 }
 
 type Iterator struct {
@@ -105,17 +90,10 @@ func (i *Iterator) Value() (value []byte) {
 	return
 }
 
-func incrementPrefix(prefix []byte) []byte {
-	result := make([]byte, len(prefix))
-	copy(result, prefix)
-	var len = len(prefix)
-	for len > 0 {
-		if result[len-1] == 0xFF {
-			len -= 1
-		} else {
-			result[len-1] += 1
-			break
-		}
-	}
-	return result[0:len]
+var (
+	endBytes = bytes.Repeat([]byte{0xFF}, maxKeyBytes+1)
+)
+
+func prefixEnd(prefix []byte) []byte {
+	return append(prefix, endBytes...)
 }

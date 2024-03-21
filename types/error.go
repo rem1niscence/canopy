@@ -25,6 +25,8 @@ const (
 
 	StateMachineModule ErrorModule = "state_machine"
 
+	CodeFeeBelowMempool         ErrorCode = 2
+	CodeFeeBelowState           ErrorCode = 2
 	CodeUnauthorizedTx          ErrorCode = 2
 	CodeEmptySignature          ErrorCode = 2
 	CodeTxSignBytes             ErrorCode = 2
@@ -87,7 +89,7 @@ const (
 
 	StorageModule ErrorModule = "store"
 	NilKeyCode    ErrorCode   = 1
-	NilValueCode  ErrorCode   = 2
+	TxWriteCode   ErrorCode   = 2
 )
 
 type ErrorI interface {

@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [Unreleased] - 03/21/2024
+- Added `txn` to store package
+- Added `NewTxn()` to `StoreI`
+- Began `Mempool` and `App` logic
+
 ## [Unreleased] - 03/16/2024
 
 - Added `CheckTransaction` functionality

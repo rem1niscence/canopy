@@ -21,7 +21,7 @@ func TestStoreSetGetDelete(t *testing.T) {
 	require.NoError(t, store.Delete(key))
 	gotVal, err = store.Get(key)
 	require.NoError(t, err)
-	require.NotEqualf(t, gotVal, val, fmt.Sprintf("%s should be deleted", string(val)))
+	require.NotEqualf(t, gotVal, val, fmt.Sprintf("%s should be delete", string(val)))
 	require.NoError(t, store.Close())
 }
 

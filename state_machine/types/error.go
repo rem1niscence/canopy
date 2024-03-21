@@ -18,6 +18,14 @@ func ErrInvalidTxMessage() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidTxMessage, lib.StateMachineModule, "invalid transaction message")
 }
 
+func ErrTxFeeBelowMempoolLimit() lib.ErrorI {
+	return lib.NewError(lib.CodeFeeBelowMempool, lib.StateMachineModule, "tx.fee is below mempool limit")
+}
+
+func ErrTxFeeBelowStateLimit() lib.ErrorI {
+	return lib.NewError(lib.CodeFeeBelowMempool, lib.StateMachineModule, "tx.fee is below state limit")
+}
+
 func ErrDuplicateTx(hash []byte) lib.ErrorI {
 	return lib.NewError(lib.CodeDuplicateTransaction, lib.StateMachineModule, fmt.Sprintf("tx %s is a duplicate", hex.EncodeToString(hash)))
 }

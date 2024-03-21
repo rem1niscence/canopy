@@ -59,10 +59,6 @@ func (x *TransactionResult) GetBytes() ([]byte, error) {
 	return cdc.Marshal(x)
 }
 
-func (x *TransactionResult) GetTxHash() ([]byte, error) {
-	return x.GetTx().GetHash()
-}
-
 type TransactionResultI interface {
 	proto.Message
 	GetSender() []byte
@@ -71,6 +67,6 @@ type TransactionResultI interface {
 	GetHeight() uint64
 	GetIndex() uint64
 	GetBytes() ([]byte, error)
-	GetTxHash() ([]byte, error)
+	GetTxHash() string
 	GetTx() TransactionI
 }

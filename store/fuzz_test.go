@@ -8,6 +8,7 @@ import (
 	"github.com/ginchuco/ginchu/types"
 	"github.com/stretchr/testify/require"
 	math "math/rand"
+	"sort"
 	"testing"
 )
 
@@ -18,6 +19,8 @@ const (
 	DelTesting
 	GetTesting
 	IterateTesting
+	WriteTesting
+	CommitTesting
 )
 
 func TestFuzz(t *testing.T) {
@@ -26,20 +29,36 @@ func TestFuzz(t *testing.T) {
 	require.NoError(t, err)
 	store, _, cleanup := testStore(t)
 	defer cleanup()
-	keys := make([][]byte, 0)
-	compareStore2 := NewTxnWrapper(db.NewTransactionAt(1, true), types.NewDefaultLogger(), stateStorePrefix)
+	defer db.Close()
+	keys := make([]string, 0)
+	compareStore := NewTxnWrapper(db.NewTransactionAt(1, true), types.NewDefaultLogger(), stateStorePrefix)
 	for i := 0; i < 1000; i++ {
-		doRandomOperation(t, store, compareStore2, &keys)
+		doRandomOperation(t, store, compareStore, &keys)
 	}
 }
 
-func doRandomOperation(t *testing.T, db types.KVStoreI, compare types.KVStoreI, keys *[][]byte) {
-	k, v := getRandomBytes(t), getRandomBytes(t)
+func TestFuzzTxn(t *testing.T) {
+	db, err := badger.OpenManaged(badger.DefaultOptions("").
+		WithInMemory(true).WithLoggingLevel(badger.ERROR))
+	require.NoError(t, err)
+	store := NewTxn(NewTxnWrapper(db.NewTransactionAt(1, true), types.NewDefaultLogger(), stateStorePrefix))
+	keys := make([]string, 0)
+	compareStore := NewTxnWrapper(db.NewTransactionAt(1, true), types.NewDefaultLogger(), stateStorePrefix)
+	for i := 0; i < 15000; i++ {
+		doRandomOperation(t, store, compareStore, &keys)
+	}
+	db.Close()
+}
+
+func doRandomOperation(t *testing.T, db types.RWStoreI, compare types.RWStoreI, keys *[]string) {
+	k, v := getRandomBytes(t, math.Intn(4)), getRandomBytes(t, 3)
 	switch getRandomOperation(t) {
 	case SetTesting:
 		testDBSet(t, db, k, v)
 		testDBSet(t, compare, k, v)
-		*keys = append(*keys, k)
+		*keys = append(*keys, string(k))
+		sort.Strings(*keys)
+		*keys = deDuplicate(*keys)
 	case DelTesting:
 		k = randomTestKey(t, k, *keys)
 		testDBDelete(t, db, k)
@@ -52,29 +71,63 @@ func doRandomOperation(t *testing.T, db types.KVStoreI, compare types.KVStoreI, 
 		}
 		require.Equalf(t, v1, v2, "key=%s db.Get=%s compare.Get=%s", k, v1, v2)
 	case IterateTesting:
-		testCompareIterators(t, db, compare)
+		testCompareIterators(t, db, compare, *keys)
+	case WriteTesting:
+		if x, ok := db.(types.StoreTxnI); ok {
+			switch math.Intn(10) {
+			case 0:
+				require.NoError(t, x.Write())
+			}
+		}
+	case CommitTesting:
+		if x, ok := db.(types.StoreI); ok {
+			_, err := x.Commit()
+			require.NoError(t, err)
+		}
 	default:
 		t.Fatal("invalid op")
 	}
 }
 
-func getRandomBytes(t *testing.T) []byte {
-	bz := make([]byte, math.Intn(999)+40)
+func deDuplicate(s []string) []string {
+	allKeys := make(map[string]bool)
+	var list []string
+	for _, i := range s {
+		if _, value := allKeys[i]; !value {
+			allKeys[i] = true
+			list = append(list, i)
+		}
+	}
+	return list
+}
+
+func getRandomBytes(t *testing.T, n int) []byte {
+	bz := make([]byte, n)
 	if _, err := rand.Read(bz); err != nil {
 		t.Fatal(err)
 	}
 	return bz
 }
 
+//var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
+//
+//func getRandomBytes(t *testing.T, n int) []byte {
+//	b := make([]rune, n)
+//	for i := range b {
+//		b[i] = letterRunes[math.Intn(len(letterRunes))]
+//	}
+//	return []byte(string(b))
+//}
+
 func getRandomOperation(_ *testing.T) TestingOp {
-	return TestingOp(math.Intn(4))
+	return TestingOp(math.Intn(6))
 }
 
-func randomTestKey(_ *testing.T, k []byte, keys [][]byte) []byte {
+func randomTestKey(_ *testing.T, k []byte, keys []string) []byte {
 	if len(keys) != 0 && math.Intn(100) < 85 {
 		// 85% of time use key already found
 		// else default to the random value
-		k = keys[math.Intn(len(keys))]
+		k = []byte(keys[math.Intn(len(keys))])
 	}
 	return k
 }
@@ -87,33 +140,40 @@ func testDBDelete(t *testing.T, db types.WritableStoreI, k []byte) {
 	require.NoError(t, db.Delete(k))
 }
 
-func testDBGet(t *testing.T, db types.KVStoreI, k []byte) (value []byte) {
+func testDBGet(t *testing.T, db types.RWStoreI, k []byte) (value []byte) {
 	value, err := db.Get(k)
 	require.NoError(t, err)
 	return
 }
 
-func testCompareIterators(t *testing.T, db types.KVStoreI, compare types.KVStoreI) {
+func testCompareIterators(t *testing.T, db types.RWStoreI, compare types.RWStoreI, keys []string) {
 	var (
 		it1, it2 types.IteratorI
 		err      error
 	)
-	switch math.Intn(2) {
+	isReverse := math.Intn(2)
+	prefix := getRandomBytes(t, math.Intn(4))
+	require.NoError(t, err)
+	switch isReverse {
 	case 0:
-		it1, err = db.Iterator(nil)
+		it1, err = db.Iterator(prefix)
 		require.NoError(t, err)
-		it2, err = compare.Iterator(nil)
+		it2, err = compare.Iterator(prefix)
 		require.NoError(t, err)
 	case 1:
-		it1, err = db.RevIterator(nil)
+		it1, err = db.RevIterator(prefix)
 		require.NoError(t, err)
-		it2, err = compare.RevIterator(nil)
+		it2, err = compare.RevIterator(prefix)
 		require.NoError(t, err)
 	}
 	defer func() { it1.Close(); it2.Close() }()
-	for ; func() bool { return it1.Valid() || it2.Valid() }(); func() { it1.Next(); it2.Next() }() {
-		require.Equal(t, it1.Valid(), it2.Valid(), fmt.Sprintf("it1.valid=%t it2.valid=%t ", it1.Valid(), it2.Valid()))
-		require.Equal(t, it1.Key(), it2.Key(), fmt.Sprintf("it1.key=%s it2.key=%s ", it1.Key(), it2.Key()))
-		require.Equal(t, it1.Value(), it2.Value(), fmt.Sprintf("it1.value=%s it2.value=%s ", it1.Value(), it2.Value()))
+	for i := 0; func() bool { return it1.Valid() || it2.Valid() }(); func() { it1.Next(); it2.Next() }() {
+		i++
+		if len(prefix) > 2 {
+			fmt.Printf("")
+		}
+		require.Equal(t, it1.Valid(), it2.Valid(), fmt.Sprintf("it1.valid=%t\ncompare.valid=%t\nisReverse=%d\nprefix=%s\n", it1.Valid(), it2.Valid(), isReverse, prefix))
+		require.Equal(t, it1.Key(), it2.Key(), fmt.Sprintf("it1.key=%s\ncompare.key=%s\nisReverse=%d\nprefix=%s\n", it1.Key(), it2.Key(), isReverse, prefix))
+		require.Equal(t, it1.Value(), it2.Value(), fmt.Sprintf("it1.value=%s\ncompare.value=%s\nisReverse=%d\nprefix=%s\n", it1.Value(), it2.Value(), isReverse, prefix))
 	}
 }
