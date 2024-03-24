@@ -1,10 +1,15 @@
 # CHANGELOG
 
 ## [Unreleased] - 03/24/2024
+
 - Converted `store` `errors` to `ErrorI`
 - Fixed `valid->invalid` store bug
+- Added `Mempool` functionality
+- Added `Block` functionality
+- Added `State` functionality
 
 ## [Unreleased] - 03/21/2024
+
 - Added `txn` to store package
 - Added `NewTxn()` to `StoreI`
 - Began `Mempool` and `App` logic

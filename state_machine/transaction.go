@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash string) (*lib.TransactionResult, lib.ErrorI) {
+func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash string) (*lib.TxResult, lib.ErrorI) {
 	result, err := s.CheckTx(transaction)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,7 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 	if err = s.HandleMessage(result.msg); err != nil {
 		return nil, err
 	}
-	return &lib.TransactionResult{
+	return &lib.TxResult{
 		Sender:      result.sender.Bytes(),
 		Recipient:   result.msg.Recipient(),
 		MessageType: result.msg.Name(),

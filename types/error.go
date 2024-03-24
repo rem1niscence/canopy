@@ -21,12 +21,22 @@ const (
 
 	MainModule ErrorModule = "main"
 
-	CodeUnmarshal      ErrorCode = 9
-	CodeMarshal        ErrorCode = 10
-	CodeFromAny        ErrorCode = 11
-	CodeToAny          ErrorCode = 12
-	CodeStringToBigInt ErrorCode = 13
-	CodeStringToBytes  ErrorCode = 14
+	CodeUnmarshal            ErrorCode = 9
+	CodeMarshal              ErrorCode = 10
+	CodeFromAny              ErrorCode = 11
+	CodeToAny                ErrorCode = 12
+	CodeStringToBigInt       ErrorCode = 13
+	CodeStringToBytes        ErrorCode = 14
+	CodeNilBlock             ErrorCode = 15
+	CodeNilBlockHeader       ErrorCode = 16
+	CodeNilBlockProposer     ErrorCode = 17
+	CodeNilQuorumCertificate ErrorCode = 18
+	CodeNilBlockHash         ErrorCode = 19
+	CodeNilBlockTime         ErrorCode = 20
+	CodeNilLastBlockHash     ErrorCode = 21
+	CodeNilNetworkID         ErrorCode = 22
+	CodeNilStateRoot         ErrorCode = 23
+	CodeNilTxRoot            ErrorCode = 24
 
 	StateMachineModule ErrorModule = "state_machine"
 
@@ -156,4 +166,44 @@ func ErrMarshal(err error) ErrorI {
 
 func ErrStringToBytes(err error) ErrorI {
 	return NewError(CodeStringToBytes, MainModule, fmt.Sprintf("stringToBytes() failed with err: %s", err.Error()))
+}
+
+func ErrNilBlock() ErrorI {
+	return NewError(CodeNilBlock, MainModule, "block is nil")
+}
+
+func ErrNilBlockHeader() ErrorI {
+	return NewError(CodeNilBlockHeader, MainModule, "block.header is nil")
+}
+
+func ErrNilBlockProposer() ErrorI {
+	return NewError(CodeNilBlockProposer, MainModule, "block proposer is nil")
+}
+
+func ErrNilQuorumCertificate() ErrorI {
+	return NewError(CodeNilQuorumCertificate, MainModule, "nil quorum certificate")
+}
+
+func ErrNilBlockHash() ErrorI {
+	return NewError(CodeNilBlockHash, MainModule, "nil block hash")
+}
+
+func ErrNilBlockTime() ErrorI {
+	return NewError(CodeNilBlockTime, MainModule, "nil block time")
+}
+
+func ErrNilLastBlockHash() ErrorI {
+	return NewError(CodeNilLastBlockHash, MainModule, "nil last block hash")
+}
+
+func ErrNilNetworkID() ErrorI {
+	return NewError(CodeNilNetworkID, MainModule, "nil network id")
+}
+
+func ErrNilTransactionRoot() ErrorI {
+	return NewError(CodeNilTxRoot, MainModule, "nil transaction root")
+}
+
+func ErrNilStateRoot() ErrorI {
+	return NewError(CodeNilStateRoot, MainModule, "nil state root")
 }

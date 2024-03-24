@@ -136,24 +136,24 @@ func (s *Store) Commit() (root []byte, err types.ErrorI) {
 	if err := s.writer.CommitAt(s.version, nil); err != nil {
 		return nil, ErrCommitDB(err)
 	}
-	return types.CopyBytes(s.root), s.resetWriter(s.root)
+	s.resetWriter(s.root)
+	return types.CopyBytes(s.root), nil
 }
 
-func (s *Store) Reset() types.ErrorI {
-	return s.resetWriter(s.root)
+func (s *Store) Reset() {
+	s.resetWriter(s.root)
 }
 
 func (s *Store) Discard() {
 	s.writer.Discard()
 }
 
-func (s *Store) resetWriter(root []byte) types.ErrorI {
+func (s *Store) resetWriter(root []byte) {
 	s.writer.Discard()
 	s.writer = s.db.NewTransactionAt(s.version, true)
 	s.ss.setDB(s.writer)
 	s.sc.setDB(NewTxnWrapper(s.writer, s.log, stateCommitmentPrefix), root)
 	s.tx.setDB(NewTxnWrapper(s.writer, s.log, transactionPrefix))
-	return nil
 }
 
 func (s *Store) commitIDKey(version uint64) []byte {
@@ -205,21 +205,19 @@ func getLatestCommitID(db *badger.DB, log types.LoggerI) (id *CommitID) {
 	return
 }
 
-func (s *Store) Index(result types.TransactionResultI) types.ErrorI { return s.tx.Index(result) }
+func (s *Store) Index(result types.TxResultI) types.ErrorI          { return s.tx.Index(result) }
 func (s *Store) DeleteForHeight(height uint64) types.ErrorI         { return s.tx.DeleteForHeight(height) }
-func (s *Store) GetByHash(hash []byte) (types.TransactionResultI, types.ErrorI) {
-	return s.tx.GetByHash(hash)
-}
+func (s *Store) GetByHash(h []byte) (types.TxResultI, types.ErrorI) { return s.tx.GetByHash(h) }
 
-func (s *Store) GetByHeight(height uint64, newestToOldest bool) ([]types.TransactionResultI, types.ErrorI) {
+func (s *Store) GetByHeight(height uint64, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
 	return s.tx.GetByHeight(height, newestToOldest)
 }
 
-func (s *Store) GetBySender(address crypto.AddressI, newestToOldest bool) ([]types.TransactionResultI, types.ErrorI) {
+func (s *Store) GetBySender(address crypto.AddressI, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
 	return s.tx.GetBySender(address, newestToOldest)
 }
 
-func (s *Store) GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]types.TransactionResultI, types.ErrorI) {
+func (s *Store) GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
 	return s.tx.GetByRecipient(address, newestToOldest)
 }
 

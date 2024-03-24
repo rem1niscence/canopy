@@ -12,7 +12,7 @@ message Transaction {
   string fee = 4;
 }
 
-message TransactionResult {
+message TxResult {
   bytes sender = 1;
   bytes recipient = 2;
   string message_type = 3;

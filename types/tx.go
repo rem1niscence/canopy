@@ -50,12 +50,12 @@ type SignatureI interface {
 	GetSignature() []byte
 }
 
-var _ TransactionResultI = &TransactionResult{}
+var _ TxResultI = &TxResult{}
 
-func (x *TransactionResult) GetTx() TransactionI        { return x.Transaction }
-func (x *TransactionResult) GetBytes() ([]byte, ErrorI) { return Marshal(x) }
+func (x *TxResult) GetTx() TransactionI        { return x.Transaction }
+func (x *TxResult) GetBytes() ([]byte, ErrorI) { return Marshal(x) }
 
-type TransactionResultI interface {
+type TxResultI interface {
 	proto.Message
 	GetSender() []byte
 	GetRecipient() []byte

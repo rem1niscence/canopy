@@ -6,27 +6,29 @@ import (
 	lib "github.com/ginchuco/ginchu/types"
 )
 
-func (s *StateMachine) BeginBlock(proposerAddress crypto.AddressI, badProposal, nonSign, faultySign, doubleSign []crypto.AddressI) lib.ErrorI {
+func (s *StateMachine) BeginBlock(beginBlock *lib.BeginBlockParams) lib.ErrorI {
 	if err := s.CheckProtocolVersion(); err != nil {
 		return err
 	}
-	if err := s.RewardProposer(proposerAddress); err != nil {
+	if err := s.RewardProposer(crypto.NewAddressFromBytes(beginBlock.ProposerAddress)); err != nil {
 		return err
 	}
-	if err := s.HandleByzantine(badProposal, nonSign, faultySign, doubleSign); err != nil {
+	if err := s.HandleByzantine(beginBlock); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *StateMachine) EndBlock() (*lib.ValidatorSet, lib.ErrorI) {
-	if err := s.DeletePaused(s.Height()); err != nil {
-		return nil, err
+func (s *StateMachine) EndBlock() (endBlock *lib.EndBlockParams, err lib.ErrorI) {
+	endBlock = new(lib.EndBlockParams)
+	if err = s.DeletePaused(s.Height()); err != nil {
+		return
 	}
-	if err := s.DeleteUnstaking(s.Height()); err != nil {
-		return nil, err
+	if err = s.DeleteUnstaking(s.Height()); err != nil {
+		return
 	}
-	return s.GetConsensusValidators()
+	endBlock.ValidatorSet, err = s.GetConsensusValidators()
+	return
 }
 
 func (s *StateMachine) GetConsensusValidators() (*lib.ValidatorSet, lib.ErrorI) {
@@ -94,7 +96,7 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI) lib.ErrorI {
 	return s.MintToAccount(crypto.NewAddressFromBytes(validator.Output), amount)
 }
 
-func (s *StateMachine) HandleByzantine(badProposal, nonSign, faultySign, doubleSign []crypto.AddressI) (err lib.ErrorI) {
+func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams) (err lib.ErrorI) {
 	params, err := s.GetParamsVal()
 	if err != nil {
 		return err
@@ -104,14 +106,14 @@ func (s *StateMachine) HandleByzantine(badProposal, nonSign, faultySign, doubleS
 			return err
 		}
 	}
-	if err = s.SlashBadProposers(params, badProposal); err != nil {
+	if err = s.SlashBadProposers(params, beginBlock.BadProposers); err != nil {
 		return err
 	}
-	if err = s.SlashFaultySigners(params, faultySign); err != nil {
+	if err = s.SlashFaultySigners(params, beginBlock.FaultySigners); err != nil {
 		return err
 	}
-	if err = s.SlashDoubleSigners(params, doubleSign); err != nil {
+	if err = s.SlashDoubleSigners(params, beginBlock.DoubleSigners); err != nil {
 		return err
 	}
-	return s.IncrementNonSigners(nonSign)
+	return s.IncrementNonSigners(beginBlock.NonSigners)
 }

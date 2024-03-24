@@ -19,7 +19,7 @@ type Indexer struct {
 	db *TxnWrapper
 }
 
-func (t *Indexer) Index(result types.TransactionResultI) types.ErrorI {
+func (t *Indexer) Index(result types.TxResultI) types.ErrorI {
 	bz, err := result.GetBytes()
 	if err != nil {
 		return err
@@ -42,19 +42,19 @@ func (t *Indexer) Index(result types.TransactionResultI) types.ErrorI {
 	return t.indexByRecipient(result.GetRecipient(), heightAndIndexKey, hashKey)
 }
 
-func (t *Indexer) GetByHash(hash []byte) (types.TransactionResultI, types.ErrorI) {
+func (t *Indexer) GetByHash(hash []byte) (types.TxResultI, types.ErrorI) {
 	return t.get(t.hashKey(hash))
 }
 
-func (t *Indexer) GetByHeight(height uint64, newestToOldest bool) ([]types.TransactionResultI, types.ErrorI) {
+func (t *Indexer) GetByHeight(height uint64, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
 	return t.getAll(t.heightKey(height), newestToOldest)
 }
 
-func (t *Indexer) GetBySender(address crypto.AddressI, newestToOldest bool) ([]types.TransactionResultI, types.ErrorI) {
+func (t *Indexer) GetBySender(address crypto.AddressI, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
 	return t.getAll(t.senderKey(address.Bytes(), nil), newestToOldest)
 }
 
-func (t *Indexer) GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]types.TransactionResultI, types.ErrorI) {
+func (t *Indexer) GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
 	return t.getAll(t.senderKey(address.Bytes(), nil), newestToOldest)
 }
 
@@ -62,19 +62,19 @@ func (t *Indexer) DeleteForHeight(height uint64) types.ErrorI {
 	return t.deleteAll(t.heightKey(height))
 }
 
-func (t *Indexer) get(key []byte) (types.TransactionResultI, types.ErrorI) {
+func (t *Indexer) get(key []byte) (types.TxResultI, types.ErrorI) {
 	bz, err := t.db.Get(key)
 	if err != nil {
 		return nil, err
 	}
-	ptr := new(types.TransactionResult)
+	ptr := new(types.TxResult)
 	if err = types.Unmarshal(bz, ptr); err != nil {
 		return nil, err
 	}
 	return ptr, nil
 }
 
-func (t *Indexer) getAll(prefix []byte, newestToOldest bool) (result []types.TransactionResultI, err types.ErrorI) {
+func (t *Indexer) getAll(prefix []byte, newestToOldest bool) (result []types.TxResultI, err types.ErrorI) {
 	var it types.IteratorI
 	switch newestToOldest {
 	case true:

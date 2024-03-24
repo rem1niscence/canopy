@@ -4,20 +4,35 @@ package types;
 option go_package = "github.com/ginchuco/ginchu/types";
 
 import "google/protobuf/timestamp.proto";
+import "validator_set.proto";
 
 message BlockHeader {
   uint64 height = 1;
-  string hash = 2;
-  string networkId = 3;
+  bytes hash = 2;
+  bytes network_id = 3;
   google.protobuf.Timestamp time = 4;
-  uint64 numTxs = 5;
-  uint64 totalTxs = 6;
-  string lastBlockHash = 7;
-  bytes proposerAddress = 8;
-  bytes QuorumCertificate = 9;
+  uint64 num_txs = 5;
+  uint64 total_txs = 6;
+  bytes last_block_hash = 7;
+  bytes state_root = 8;
+  bytes transaction_root = 9;
+  bytes proposer_address = 10;
+  bytes quorum_certificate = 11;
 }
 
 message Block {
   BlockHeader blockHeader = 1;
   repeated bytes transactions = 2;
+}
+
+message BeginBlockParams {
+  bytes proposerAddress = 1;
+  repeated bytes badProposers = 2;
+  repeated bytes nonSigners = 3;
+  repeated bytes faultySigners = 4;
+  repeated bytes doubleSigners = 5;
+}
+
+message EndBlockParams {
+  ValidatorSet ValidatorSet = 1;
 }

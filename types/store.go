@@ -12,7 +12,7 @@ type StoreI interface {
 	NewReadOnly(version uint64) (ReadOnlyStoreI, ErrorI)
 	Commit() (root []byte, err ErrorI)
 	Discard()
-	Reset() ErrorI
+	Reset()
 	Close() ErrorI
 }
 
@@ -33,15 +33,15 @@ type RWIndexerI interface {
 }
 
 type WIndexerI interface {
-	Index(result TransactionResultI) ErrorI
+	Index(result TxResultI) ErrorI
 	DeleteForHeight(height uint64) ErrorI
 }
 
 type RIndexerI interface {
-	GetByHash(hash []byte) (TransactionResultI, ErrorI)
-	GetByHeight(height uint64, newestToOldest bool) ([]TransactionResultI, ErrorI)
-	GetBySender(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, ErrorI)
-	GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, ErrorI)
+	GetByHash(hash []byte) (TxResultI, ErrorI)
+	GetByHeight(height uint64, newestToOldest bool) ([]TxResultI, ErrorI)
+	GetBySender(address crypto.AddressI, newestToOldest bool) ([]TxResultI, ErrorI)
+	GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]TxResultI, ErrorI)
 }
 
 type StoreTxnI interface {

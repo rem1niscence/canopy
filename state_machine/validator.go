@@ -106,9 +106,10 @@ func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator 
 	return s.SetValidator(validator)
 }
 
-func (s *StateMachine) SetValidatorsPaused(params *types.ValidatorParams, addresses []crypto.AddressI) lib.ErrorI {
+func (s *StateMachine) SetValidatorsPaused(params *types.ValidatorParams, addresses [][]byte) lib.ErrorI {
 	maxPausedHeight := s.Height() + params.ValidatorMaxPauseBlocks.Value
-	for _, address := range addresses {
+	for _, addr := range addresses {
+		address := crypto.NewAddressFromBytes(addr)
 		validator, err := s.GetValidator(address)
 		if err != nil {
 			return err

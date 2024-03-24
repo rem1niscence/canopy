@@ -26,16 +26,30 @@ type Transaction struct {
 	Fee string
 }
 
-func NewMempool(maxTransactionBytes uint64, maxTransactions uint32, dropPercentage int) lib.Mempool {
+func NewMempool(config MempoolConfig) lib.Mempool {
 	return &FeeMempool{
 		l:                    sync.RWMutex{},
 		hashMap:              make(map[string]struct{}),
 		pool:                 Transactions{s: make([]Transaction, 0)},
 		size:                 0,
 		transactionBytes:     0,
-		dropPercentage:       dropPercentage,
-		maxTransactionsBytes: maxTransactionBytes,
-		maxTransactions:      maxTransactions,
+		dropPercentage:       config.DropPercentage,
+		maxTransactionsBytes: config.MaxTransactionBytes,
+		maxTransactions:      config.MaxTransactions,
+	}
+}
+
+type MempoolConfig struct {
+	MaxTransactionBytes uint64
+	MaxTransactions     uint32
+	DropPercentage      int
+}
+
+func DefaultMempoolConfig() MempoolConfig {
+	return MempoolConfig{
+		MaxTransactionBytes: 512000000,
+		MaxTransactions:     1000000,
+		DropPercentage:      35,
 	}
 }
 
@@ -46,7 +60,7 @@ func (f *FeeMempool) AddTransaction(tx []byte, fee string) (recheck bool, err li
 	if _, ok := f.hashMap[hash]; ok {
 		return false, ErrTxFoundInMempool(hash)
 	}
-	f.pool.Insert(Transaction{
+	recheck = f.pool.Insert(Transaction{
 		Tx:  tx,
 		Fee: fee,
 	})
@@ -57,7 +71,23 @@ func (f *FeeMempool) AddTransaction(tx []byte, fee string) (recheck bool, err li
 	if uint32(f.size) >= f.maxTransactions || uint64(f.transactionBytes) >= f.maxTransactionsBytes {
 		dropped = f.pool.Drop(f.dropPercentage)
 	}
-	return len(dropped) != 0, nil
+	return len(dropped) != 0 || recheck, nil
+}
+
+func (f *FeeMempool) GetTransactions(maxBytes uint64) (totalTxs int, txs [][]byte) {
+	totalBytes := uint64(0)
+	for _, tx := range f.pool.s {
+		txLen := len(tx.Tx)
+		if totalBytes+uint64(txLen) > maxBytes {
+			return
+		}
+		bz := make([]byte, txLen)
+		copy(bz, tx.Tx)
+		txs = append(txs, bz)
+		totalBytes += uint64(txLen)
+		totalTxs++
+	}
+	return
 }
 
 func (f *FeeMempool) Contains(hash string) bool {
@@ -69,14 +99,13 @@ func (f *FeeMempool) Contains(hash string) bool {
 	return false
 }
 
-func (f *FeeMempool) DeleteTransaction(tx []byte) lib.ErrorI {
+func (f *FeeMempool) DeleteTransaction(tx []byte) {
 	f.l.Lock()
 	defer f.l.Unlock()
 	deleted := f.pool.Delete(tx)
 	delete(f.hashMap, crypto.HashString(deleted.Tx))
 	f.size--
 	f.transactionBytes -= len(deleted.Tx)
-	return nil
 }
 
 func (f *FeeMempool) Clear() {
@@ -129,15 +158,19 @@ type Transactions struct {
 	s []Transaction
 }
 
-func (t *Transactions) Insert(tr Transaction) {
+func (t *Transactions) Insert(tr Transaction) (recheck bool) {
 	i := sort.Search(t.n, func(i int) bool {
-		less, _ := lib.StringsLess(tr.Fee, t.s[i].Fee)
-		return !less
+		less, _ := lib.StringsLess(t.s[i].Fee, tr.Fee)
+		return less
 	})
+	if i != t.n {
+		recheck = true
+	}
 	t.s = append(t.s, Transaction{})
 	copy(t.s[i+1:], t.s[i:])
 	t.s[i] = tr
 	t.n++
+	return
 }
 
 func (t *Transactions) Delete(tx []byte) (deleted Transaction) {
