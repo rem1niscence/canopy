@@ -73,7 +73,7 @@ func (a *App) ProduceBlock() (*lib.Block, lib.ErrorI) {
 
 func (a *App) checkForDuplicateTx(hash []byte) lib.ErrorI {
 	// indexer
-	txResult, err := a.store.GetByHash(hash)
+	txResult, err := a.store.GetTxByHash(hash)
 	if err != nil {
 		return err
 	}

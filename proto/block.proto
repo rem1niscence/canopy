@@ -5,6 +5,7 @@ option go_package = "github.com/ginchuco/ginchu/types";
 
 import "google/protobuf/timestamp.proto";
 import "validator_set.proto";
+import "tx.proto";
 
 message BlockHeader {
   uint64 height = 1;
@@ -23,6 +24,11 @@ message BlockHeader {
 message Block {
   BlockHeader blockHeader = 1;
   repeated bytes transactions = 2;
+}
+
+message BlockResult {
+  BlockHeader blockHeader = 1;
+  repeated TxResult transactions = 2;
 }
 
 message BeginBlockParams {

@@ -30,7 +30,7 @@ type Store struct {
 	writer  *badger.Txn
 	ss      *TxnWrapper
 	sc      *SMTWrapper
-	tx      *Indexer
+	ix      *Indexer
 	root    []byte
 }
 
@@ -62,7 +62,7 @@ func newStore(db *badger.DB, log types.LoggerI) (*Store, types.ErrorI) {
 		writer:  writer,
 		ss:      NewTxnWrapper(writer, log, stateStorePrefix),
 		sc:      NewSMTWrapper(NewTxnWrapper(writer, log, stateCommitmentPrefix), id.Root, log),
-		tx:      &Indexer{NewTxnWrapper(writer, log, transactionPrefix)},
+		ix:      &Indexer{NewTxnWrapper(writer, log, transactionPrefix)},
 		root:    id.Root,
 	}, nil
 }
@@ -90,7 +90,7 @@ func (s *Store) Copy() (types.StoreI, types.ErrorI) {
 		writer:  writer,
 		ss:      NewTxnWrapper(writer, s.log, stateStorePrefix),
 		sc:      NewSMTWrapper(NewTxnWrapper(writer, s.log, stateCommitmentPrefix), s.root, s.log),
-		tx:      &Indexer{NewTxnWrapper(writer, s.log, transactionPrefix)},
+		ix:      &Indexer{NewTxnWrapper(writer, s.log, transactionPrefix)},
 		root:    s.root,
 	}, nil
 }
@@ -153,7 +153,7 @@ func (s *Store) resetWriter(root []byte) {
 	s.writer = s.db.NewTransactionAt(s.version, true)
 	s.ss.setDB(s.writer)
 	s.sc.setDB(NewTxnWrapper(s.writer, s.log, stateCommitmentPrefix), root)
-	s.tx.setDB(NewTxnWrapper(s.writer, s.log, transactionPrefix))
+	s.ix.setDB(NewTxnWrapper(s.writer, s.log, transactionPrefix))
 }
 
 func (s *Store) commitIDKey(version uint64) []byte {
@@ -205,20 +205,38 @@ func getLatestCommitID(db *badger.DB, log types.LoggerI) (id *CommitID) {
 	return
 }
 
-func (s *Store) Index(result types.TxResultI) types.ErrorI          { return s.tx.Index(result) }
-func (s *Store) DeleteForHeight(height uint64) types.ErrorI         { return s.tx.DeleteForHeight(height) }
-func (s *Store) GetByHash(h []byte) (types.TxResultI, types.ErrorI) { return s.tx.GetByHash(h) }
+func (s *Store) IndexTx(result *types.TxResult) types.ErrorI { return s.ix.IndexTx(result) }
+func (s *Store) DeleteTxsForHeight(height uint64) types.ErrorI {
+	return s.ix.DeleteTxsForHeight(height)
+}
+func (s *Store) GetTxByHash(h []byte) (*types.TxResult, types.ErrorI) { return s.ix.GetTxByHash(h) }
 
-func (s *Store) GetByHeight(height uint64, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
-	return s.tx.GetByHeight(height, newestToOldest)
+func (s *Store) GetTxsByHeight(height uint64, newestToOldest bool) ([]*types.TxResult, types.ErrorI) {
+	return s.ix.GetTxsByHeight(height, newestToOldest)
 }
 
-func (s *Store) GetBySender(address crypto.AddressI, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
-	return s.tx.GetBySender(address, newestToOldest)
+func (s *Store) GetTxsBySender(address crypto.AddressI, newestToOldest bool) ([]*types.TxResult, types.ErrorI) {
+	return s.ix.GetTxsBySender(address, newestToOldest)
 }
 
-func (s *Store) GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
-	return s.tx.GetByRecipient(address, newestToOldest)
+func (s *Store) GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]*types.TxResult, types.ErrorI) {
+	return s.ix.GetTxsByRecipient(address, newestToOldest)
+}
+
+func (s *Store) IndexBlock(b *types.BlockResult) types.ErrorI {
+	return s.ix.IndexBlock(b)
+}
+
+func (s *Store) DeleteBlockForHeight(h uint64) types.ErrorI {
+	return s.ix.DeleteBlockForHeight(h)
+}
+
+func (s *Store) GetBlockByHash(h []byte) (*types.BlockResult, types.ErrorI) {
+	return s.ix.GetBlockByHash(h)
+}
+
+func (s *Store) GetBlockByHeight(h uint64) (*types.BlockResult, types.ErrorI) {
+	return s.ix.GetBlockByHeight(h)
 }
 
 func (s *Store) Close() types.ErrorI {

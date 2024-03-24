@@ -4,9 +4,10 @@
 
 - Converted `store` `errors` to `ErrorI`
 - Fixed `valid->invalid` store bug
-- Added `Mempool` functionality
-- Added `Block` functionality
-- Added `State` functionality
+- Added `Mempool` functionality to app
+- Added `Block` functionality to app
+- Added `State` functionality to app
+- Added `Block` functionality to indexer
 
 ## [Unreleased] - 03/21/2024
 

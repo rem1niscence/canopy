@@ -33,15 +33,19 @@ type RWIndexerI interface {
 }
 
 type WIndexerI interface {
-	Index(result TxResultI) ErrorI
-	DeleteForHeight(height uint64) ErrorI
+	IndexTx(result *TxResult) ErrorI
+	IndexBlock(b *BlockResult) ErrorI
+	DeleteTxsForHeight(height uint64) ErrorI
+	DeleteBlockForHeight(height uint64) ErrorI
 }
 
 type RIndexerI interface {
-	GetByHash(hash []byte) (TxResultI, ErrorI)
-	GetByHeight(height uint64, newestToOldest bool) ([]TxResultI, ErrorI)
-	GetBySender(address crypto.AddressI, newestToOldest bool) ([]TxResultI, ErrorI)
-	GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]TxResultI, ErrorI)
+	GetTxByHash(hash []byte) (*TxResult, ErrorI)
+	GetTxsByHeight(height uint64, newestToOldest bool) ([]*TxResult, ErrorI)
+	GetTxsBySender(address crypto.AddressI, newestToOldest bool) ([]*TxResult, ErrorI)
+	GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]*TxResult, ErrorI)
+	GetBlockByHash(hash []byte) (*BlockResult, ErrorI)
+	GetBlockByHeight(height uint64) (*BlockResult, ErrorI)
 }
 
 type StoreTxnI interface {

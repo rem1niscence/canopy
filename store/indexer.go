@@ -9,17 +9,63 @@ import (
 var _ types.RWIndexerI = &Indexer{}
 
 var (
-	hashPrefix      = []byte{1}
-	heightPrefix    = []byte{2}
-	senderPrefix    = []byte{3}
-	recipientPrefix = []byte{4}
+	txHashPrefix      = []byte{1}
+	txHeightPrefix    = []byte{2}
+	txSenderPrefix    = []byte{3}
+	txRecipientPrefix = []byte{4}
+	blockHashPrefix   = []byte{5}
+	blockHeightPrefix = []byte{6}
 )
 
 type Indexer struct {
 	db *TxnWrapper
 }
 
-func (t *Indexer) Index(result types.TxResultI) types.ErrorI {
+func (t *Indexer) IndexBlock(b *types.BlockResult) types.ErrorI {
+	bz, err := types.Marshal(b.BlockHeader)
+	if err != nil {
+		return err
+	}
+	hashKey, err := t.indexBlockByHash(crypto.Hash(bz), bz)
+	if err != nil {
+		return err
+	}
+	if err = t.indexBlockByHeight(b.BlockHeader.Height, hashKey); err != nil {
+		return err
+	}
+	for _, tx := range b.Transactions {
+		if err = t.IndexTx(tx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *Indexer) DeleteBlockForHeight(height uint64) types.ErrorI {
+	heightKey := t.blockHeightKey(height)
+	hashKey, err := t.db.Get(heightKey)
+	if err != nil {
+		return err
+	}
+	if err = t.db.Delete(heightKey); err != nil {
+		return err
+	}
+	return t.db.Delete(hashKey)
+}
+
+func (t *Indexer) GetBlockByHash(hash []byte) (*types.BlockResult, types.ErrorI) {
+	return t.getBlock(t.blockHashKey(hash))
+}
+
+func (t *Indexer) GetBlockByHeight(height uint64) (*types.BlockResult, types.ErrorI) {
+	hashKey, err := t.db.Get(t.blockHeightKey(height))
+	if err != nil {
+		return nil, err
+	}
+	return t.getBlock(hashKey)
+}
+
+func (t *Indexer) IndexTx(result *types.TxResult) types.ErrorI {
 	bz, err := result.GetBytes()
 	if err != nil {
 		return err
@@ -28,41 +74,60 @@ func (t *Indexer) Index(result types.TxResultI) types.ErrorI {
 	if err != nil {
 		return err
 	}
-	hashKey, err := t.indexByHash(hash, bz)
+	hashKey, err := t.indexTxByHash(hash, bz)
 	if err != nil {
 		return err
 	}
 	heightAndIndexKey := t.heightAndIndexKey(result.GetHeight(), result.GetIndex())
-	if err = t.indexByHeightAndIndex(heightAndIndexKey, hashKey); err != nil {
+	if err = t.indexTxByHeightAndIndex(heightAndIndexKey, hashKey); err != nil {
 		return err
 	}
-	if err = t.indexBySender(result.GetSender(), heightAndIndexKey, hashKey); err != nil {
+	if err = t.indexTxBySender(result.GetSender(), heightAndIndexKey, hashKey); err != nil {
 		return err
 	}
-	return t.indexByRecipient(result.GetRecipient(), heightAndIndexKey, hashKey)
+	return t.indexTxByRecipient(result.GetRecipient(), heightAndIndexKey, hashKey)
 }
 
-func (t *Indexer) GetByHash(hash []byte) (types.TxResultI, types.ErrorI) {
-	return t.get(t.hashKey(hash))
+func (t *Indexer) GetTxByHash(hash []byte) (*types.TxResult, types.ErrorI) {
+	return t.getTx(t.txHashKey(hash))
 }
 
-func (t *Indexer) GetByHeight(height uint64, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
-	return t.getAll(t.heightKey(height), newestToOldest)
+func (t *Indexer) GetTxsByHeight(height uint64, newestToOldest bool) ([]*types.TxResult, types.ErrorI) {
+	return t.getTxs(t.txHeightKey(height), newestToOldest)
 }
 
-func (t *Indexer) GetBySender(address crypto.AddressI, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
-	return t.getAll(t.senderKey(address.Bytes(), nil), newestToOldest)
+func (t *Indexer) GetTxsBySender(address crypto.AddressI, newestToOldest bool) ([]*types.TxResult, types.ErrorI) {
+	return t.getTxs(t.txSenderKey(address.Bytes(), nil), newestToOldest)
 }
 
-func (t *Indexer) GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]types.TxResultI, types.ErrorI) {
-	return t.getAll(t.senderKey(address.Bytes(), nil), newestToOldest)
+func (t *Indexer) GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]*types.TxResult, types.ErrorI) {
+	return t.getTxs(t.txSenderKey(address.Bytes(), nil), newestToOldest)
 }
 
-func (t *Indexer) DeleteForHeight(height uint64) types.ErrorI {
-	return t.deleteAll(t.heightKey(height))
+func (t *Indexer) DeleteTxsForHeight(height uint64) types.ErrorI {
+	return t.deleteAll(t.txHeightKey(height))
 }
 
-func (t *Indexer) get(key []byte) (types.TxResultI, types.ErrorI) {
+func (t *Indexer) getBlock(key []byte) (*types.BlockResult, types.ErrorI) {
+	bz, err := t.db.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	ptr := new(types.BlockHeader)
+	if err = types.Unmarshal(bz, ptr); err != nil {
+		return nil, err
+	}
+	txs, err := t.GetTxsByHeight(ptr.Height, false)
+	if err != nil {
+		return nil, err
+	}
+	return &types.BlockResult{
+		BlockHeader:  ptr,
+		Transactions: txs,
+	}, nil
+}
+
+func (t *Indexer) getTx(key []byte) (*types.TxResult, types.ErrorI) {
 	bz, err := t.db.Get(key)
 	if err != nil {
 		return nil, err
@@ -74,7 +139,7 @@ func (t *Indexer) get(key []byte) (types.TxResultI, types.ErrorI) {
 	return ptr, nil
 }
 
-func (t *Indexer) getAll(prefix []byte, newestToOldest bool) (result []types.TxResultI, err types.ErrorI) {
+func (t *Indexer) getTxs(prefix []byte, newestToOldest bool) (result []*types.TxResult, err types.ErrorI) {
 	var it types.IteratorI
 	switch newestToOldest {
 	case true:
@@ -87,7 +152,7 @@ func (t *Indexer) getAll(prefix []byte, newestToOldest bool) (result []types.TxR
 	}
 	defer it.Close()
 	for ; it.Valid(); it.Next() {
-		tx, err := t.get(it.Key())
+		tx, err := t.getTx(it.Key())
 		if err != nil {
 			return nil, err
 		}
@@ -113,44 +178,61 @@ func (t *Indexer) deleteAll(prefix []byte) types.ErrorI {
 	return nil
 }
 
-func (t *Indexer) indexByHash(hash, bz []byte) (hashKey []byte, err types.ErrorI) {
-	key := t.hashKey(hash)
+func (t *Indexer) indexTxByHash(hash, bz []byte) (hashKey []byte, err types.ErrorI) {
+	key := t.txHashKey(hash)
 	return key, t.db.Set(key, bz)
 }
 
-func (t *Indexer) indexByHeightAndIndex(heightAndIndexKey []byte, bz []byte) types.ErrorI {
+func (t *Indexer) indexTxByHeightAndIndex(heightAndIndexKey []byte, bz []byte) types.ErrorI {
 	return t.db.Set(heightAndIndexKey, bz)
 }
 
-func (t *Indexer) indexBySender(sender, heightAndIndexKey []byte, bz []byte) types.ErrorI {
-	return t.db.Set(t.senderKey(sender, heightAndIndexKey), bz)
+func (t *Indexer) indexTxBySender(sender, heightAndIndexKey []byte, bz []byte) types.ErrorI {
+	return t.db.Set(t.txSenderKey(sender, heightAndIndexKey), bz)
 }
 
-func (t *Indexer) indexByRecipient(recipient, heightAndIndexKey []byte, bz []byte) types.ErrorI {
+func (t *Indexer) indexTxByRecipient(recipient, heightAndIndexKey []byte, bz []byte) types.ErrorI {
 	if recipient == nil {
 		return nil
 	}
-	return t.db.Set(t.recipientKey(recipient, heightAndIndexKey), bz)
+	return t.db.Set(t.txRecipientKey(recipient, heightAndIndexKey), bz)
 }
 
-func (t *Indexer) hashKey(hash []byte) []byte {
-	return t.key(hashPrefix, hash, nil)
+func (t *Indexer) indexBlockByHash(hash, bz []byte) (hashKey []byte, err types.ErrorI) {
+	key := t.blockHashKey(hash)
+	return key, t.db.Set(key, bz)
+}
+
+func (t *Indexer) indexBlockByHeight(height uint64, bz []byte) types.ErrorI {
+	return t.db.Set(t.blockHeightKey(height), bz)
+}
+
+func (t *Indexer) txHashKey(hash []byte) []byte {
+	return t.key(txHashPrefix, hash, nil)
 }
 
 func (t *Indexer) heightAndIndexKey(height, index uint64) []byte {
-	return append(t.heightKey(height), t.encodeBigEndian(index)...)
+	return append(t.txHeightKey(height), t.encodeBigEndian(index)...)
 }
 
-func (t *Indexer) heightKey(height uint64) []byte {
-	return t.key(heightPrefix, t.encodeBigEndian(height), nil)
+func (t *Indexer) txHeightKey(height uint64) []byte {
+	return t.key(txHeightPrefix, t.encodeBigEndian(height), nil)
 }
 
-func (t *Indexer) senderKey(address, heightAndIndexKey []byte) []byte {
-	return t.key(senderPrefix, heightAndIndexKey, address)
+func (t *Indexer) txSenderKey(address, heightAndIndexKey []byte) []byte {
+	return t.key(txSenderPrefix, heightAndIndexKey, address)
 }
 
-func (t *Indexer) recipientKey(address, heightAndIndexKey []byte) []byte {
-	return t.key(recipientPrefix, heightAndIndexKey, address)
+func (t *Indexer) txRecipientKey(address, heightAndIndexKey []byte) []byte {
+	return t.key(txRecipientPrefix, heightAndIndexKey, address)
+}
+
+func (t *Indexer) blockHashKey(hash []byte) []byte {
+	return t.key(blockHashPrefix, hash, nil)
+}
+
+func (t *Indexer) blockHeightKey(height uint64) []byte {
+	return t.key(blockHeightPrefix, t.encodeBigEndian(height), nil)
 }
 
 func (t *Indexer) key(prefix []byte, param1, param2 []byte) []byte {
