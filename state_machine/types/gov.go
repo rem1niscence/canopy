@@ -122,7 +122,7 @@ func (x *ConsensusParams) SetString(address string, paramName string, value stri
 func (x *ConsensusParams) ParseProtocolVersion() (*ProtocolVersion, types.ErrorI) {
 	ptr := &ProtocolVersion{}
 	if err := json.Unmarshal([]byte(x.ProtocolVersion.Value), ptr); err != nil {
-		return nil, ErrUnmarshal(err)
+		return nil, types.ErrUnmarshal(err)
 	}
 	return ptr, nil
 }
@@ -130,7 +130,7 @@ func (x *ConsensusParams) ParseProtocolVersion() (*ProtocolVersion, types.ErrorI
 func CheckProtocolVersion(v string) types.ErrorI {
 	ptr := &ProtocolVersion{}
 	if err := json.Unmarshal([]byte(v), ptr); err != nil {
-		return ErrUnmarshal(err)
+		return types.ErrUnmarshal(err)
 	}
 	// TODO more validation?
 	return nil
@@ -139,7 +139,7 @@ func CheckProtocolVersion(v string) types.ErrorI {
 func NewProtocolVersion(height uint64, version uint64) (string, types.ErrorI) {
 	bz, err := json.Marshal(ProtocolVersion{Height: height, Version: version})
 	if err != nil {
-		return "", ErrMarshal(err)
+		return "", types.ErrMarshal(err)
 	}
 	return string(bz), nil
 }

@@ -132,11 +132,11 @@ func randomTestKey(_ *testing.T, k []byte, keys []string) []byte {
 	return k
 }
 
-func testDBSet(t *testing.T, db types.WritableStoreI, k, v []byte) {
+func testDBSet(t *testing.T, db types.WStoreI, k, v []byte) {
 	require.NoError(t, db.Set(k, v))
 }
 
-func testDBDelete(t *testing.T, db types.WritableStoreI, k []byte) {
+func testDBDelete(t *testing.T, db types.WStoreI, k []byte) {
 	require.NoError(t, db.Delete(k))
 }
 

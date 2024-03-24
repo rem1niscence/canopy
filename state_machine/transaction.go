@@ -7,8 +7,8 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash, mempoolFeeLimit string) (*lib.TransactionResult, lib.ErrorI) {
-	result, err := s.CheckTx(transaction, mempoolFeeLimit)
+func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash string) (*lib.TransactionResult, lib.ErrorI) {
+	result, err := s.CheckTx(transaction)
 	if err != nil {
 		return nil, err
 	}
@@ -32,9 +32,9 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 	}, nil
 }
 
-func (s *StateMachine) CheckTx(transaction []byte, mempoolFeeLimit string) (result *CheckTxResult, err lib.ErrorI) {
+func (s *StateMachine) CheckTx(transaction []byte) (result *CheckTxResult, err lib.ErrorI) {
 	tx := new(lib.Transaction)
-	if err = types.Unmarshal(transaction, tx); err != nil {
+	if err = lib.Unmarshal(transaction, tx); err != nil {
 		return
 	}
 	if err = s.CheckAccount(tx); err != nil {
@@ -52,7 +52,7 @@ func (s *StateMachine) CheckTx(transaction []byte, mempoolFeeLimit string) (resu
 	if err != nil {
 		return
 	}
-	if err = s.CheckFee(tx.Fee, mempoolFeeLimit, stateLimitFee); err != nil {
+	if err = s.CheckFee(tx.Fee, stateLimitFee); err != nil {
 		return
 	}
 	return &CheckTxResult{
@@ -108,7 +108,7 @@ func (s *StateMachine) CheckAccount(tx *lib.Transaction) lib.ErrorI {
 }
 
 func (s *StateMachine) CheckMessage(msg *anypb.Any) (message lib.MessageI, err lib.ErrorI) {
-	proto, err := types.FromAny(msg)
+	proto, err := lib.FromAny(msg)
 	if err != nil {
 		return nil, err
 	}
@@ -122,15 +122,8 @@ func (s *StateMachine) CheckMessage(msg *anypb.Any) (message lib.MessageI, err l
 	return message, nil
 }
 
-func (s *StateMachine) CheckFee(fee, mempoolLimit, stateLimit string) lib.ErrorI {
-	less, err := lib.StringsLess(fee, mempoolLimit)
-	if err != nil {
-		return err
-	}
-	if less {
-		return types.ErrTxFeeBelowMempoolLimit()
-	}
-	less, err = lib.StringsLess(fee, stateLimit)
+func (s *StateMachine) CheckFee(fee, stateLimit string) lib.ErrorI {
+	less, err := lib.StringsLess(fee, stateLimit)
 	if err != nil {
 		return err
 	}

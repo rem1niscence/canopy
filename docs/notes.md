@@ -32,7 +32,7 @@ State Machine Handling Byzantine Evidence:
 - Bad proposers, double signers, non signers and minority signers are proven via the finalized quorum certificate from
   the majority
 - Bad proposers are easily retraced by seeing who were the proposers for all the rounds before the finalized round
-- Non signers are who didn't sign on the final QC
+- Non signers are who didn's sign on the final QC
 - Minority signers are who signed faulty on the final QC
 - Double signers tracking is less straightforward, but likely can be included in the QC somehow
 

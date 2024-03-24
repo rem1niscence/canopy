@@ -52,12 +52,8 @@ type SignatureI interface {
 
 var _ TransactionResultI = &TransactionResult{}
 
-func (x *TransactionResult) GetTx() TransactionI {
-	return x.Transaction
-}
-func (x *TransactionResult) GetBytes() ([]byte, error) {
-	return cdc.Marshal(x)
-}
+func (x *TransactionResult) GetTx() TransactionI        { return x.Transaction }
+func (x *TransactionResult) GetBytes() ([]byte, ErrorI) { return Marshal(x) }
 
 type TransactionResultI interface {
 	proto.Message
@@ -66,7 +62,7 @@ type TransactionResultI interface {
 	GetMessageType() string
 	GetHeight() uint64
 	GetIndex() uint64
-	GetBytes() ([]byte, error)
+	GetBytes() ([]byte, ErrorI)
 	GetTxHash() string
 	GetTx() TransactionI
 }

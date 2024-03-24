@@ -6,6 +6,8 @@ import (
 	"github.com/ginchuco/ginchu/types"
 )
 
+var _ types.RWStoreI = &TxnWrapper{}
+
 type TxnWrapper struct {
 	logger types.LoggerI
 	db     *badger.Txn
@@ -20,23 +22,39 @@ func NewTxnWrapper(db *badger.Txn, logger types.LoggerI, prefix string) *TxnWrap
 	}
 }
 
-func (t *TxnWrapper) Get(k []byte) ([]byte, error) {
+func (t *TxnWrapper) Get(k []byte) ([]byte, types.ErrorI) {
 	item, err := t.db.Get(append([]byte(t.prefix), k...))
 	if err != nil {
 		if err == badger.ErrKeyNotFound {
 			return nil, nil
 		}
-		return nil, err
+		return nil, ErrStoreGet(err)
 	}
-	return item.ValueCopy(nil)
+	val, err := item.ValueCopy(nil)
+	if err != nil {
+		return nil, ErrStoreGet(err)
+	}
+	return val, nil
 }
 
-func (t *TxnWrapper) Set(k, v []byte) error { return t.db.Set(append([]byte(t.prefix), k...), v) }
-func (t *TxnWrapper) Delete(k []byte) error { return t.db.Delete(append([]byte(t.prefix), k...)) }
-func (t *TxnWrapper) Close()                { t.db.Discard() }
-func (t *TxnWrapper) setDB(p *badger.Txn)   { t.db = p }
+func (t *TxnWrapper) Set(k, v []byte) types.ErrorI {
+	if err := t.db.Set(append([]byte(t.prefix), k...), v); err != nil {
+		return ErrStoreSet(err)
+	}
+	return nil
+}
 
-func (t *TxnWrapper) Iterator(prefix []byte) (types.IteratorI, error) {
+func (t *TxnWrapper) Delete(k []byte) types.ErrorI {
+	if err := t.db.Delete(append([]byte(t.prefix), k...)); err != nil {
+		return ErrStoreDelete(err)
+	}
+	return nil
+}
+
+func (t *TxnWrapper) Close()              { t.db.Discard() }
+func (t *TxnWrapper) setDB(p *badger.Txn) { t.db = p }
+
+func (t *TxnWrapper) Iterator(prefix []byte) (types.IteratorI, types.ErrorI) {
 	parent := t.db.NewIterator(badger.IteratorOptions{
 		Prefix: append([]byte(t.prefix), prefix...),
 	})
@@ -48,7 +66,7 @@ func (t *TxnWrapper) Iterator(prefix []byte) (types.IteratorI, error) {
 	}, nil
 }
 
-func (t *TxnWrapper) RevIterator(prefix []byte) (types.IteratorI, error) {
+func (t *TxnWrapper) RevIterator(prefix []byte) (types.IteratorI, types.ErrorI) {
 	newPrefix := append([]byte(t.prefix), prefix...)
 	parent := t.db.NewIterator(badger.IteratorOptions{
 		Reverse: true,
@@ -77,7 +95,6 @@ var _ types.IteratorI = &Iterator{}
 
 func (i *Iterator) Valid() bool            { return i.parent.Valid() }
 func (i *Iterator) Next()                  { i.parent.Next() }
-func (i *Iterator) Error() error           { return i.err }
 func (i *Iterator) Close()                 { i.parent.Close() }
 func (i *Iterator) Key() (key []byte)      { return removePrefix(i.parent.Item().Key(), []byte(i.prefix)) }
 func removePrefix(b, prefix []byte) []byte { return b[len(prefix):] }

@@ -192,12 +192,12 @@ func (s *StateMachine) DeleteValidator(address crypto.AddressI) lib.ErrorI {
 }
 
 func (s *StateMachine) marshalValidator(validator *types.Validator) ([]byte, lib.ErrorI) {
-	return types.Marshal(validator)
+	return lib.Marshal(validator)
 }
 
 func (s *StateMachine) unmarshalValidator(bz []byte) (*types.Validator, lib.ErrorI) {
 	val := new(types.Validator)
-	if err := types.Unmarshal(bz, val); err != nil {
+	if err := lib.Unmarshal(bz, val); err != nil {
 		return nil, err
 	}
 	return val, nil

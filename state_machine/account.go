@@ -126,14 +126,14 @@ func (s *StateMachine) AccountSub(address crypto.AddressI, amountToSub string) l
 
 func (s *StateMachine) unmarshalAccount(bz []byte) (*types.Account, lib.ErrorI) {
 	acc := new(types.Account)
-	if err := types.Unmarshal(bz, acc); err != nil {
+	if err := lib.Unmarshal(bz, acc); err != nil {
 		return nil, err
 	}
 	return acc, nil
 }
 
 func (s *StateMachine) marshalAccount(account *types.Account) ([]byte, lib.ErrorI) {
-	return types.Marshal(account)
+	return lib.Marshal(account)
 }
 
 // Pool logic below
@@ -229,12 +229,12 @@ func (s *StateMachine) PoolSub(name types.PoolName, amountToSub string) lib.Erro
 
 func (s *StateMachine) unmarshalPool(bz []byte) (*types.Pool, lib.ErrorI) {
 	pool := new(types.Pool)
-	if err := types.Unmarshal(bz, pool); err != nil {
+	if err := lib.Unmarshal(bz, pool); err != nil {
 		return nil, err
 	}
 	return pool, nil
 }
 
 func (s *StateMachine) marshalPool(pool *types.Pool) ([]byte, lib.ErrorI) {
-	return types.Marshal(pool)
+	return lib.Marshal(pool)
 }

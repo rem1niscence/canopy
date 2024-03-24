@@ -18,12 +18,8 @@ func ErrInvalidTxMessage() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidTxMessage, lib.StateMachineModule, "invalid transaction message")
 }
 
-func ErrTxFeeBelowMempoolLimit() lib.ErrorI {
-	return lib.NewError(lib.CodeFeeBelowMempool, lib.StateMachineModule, "tx.fee is below mempool limit")
-}
-
 func ErrTxFeeBelowStateLimit() lib.ErrorI {
-	return lib.NewError(lib.CodeFeeBelowMempool, lib.StateMachineModule, "tx.fee is below state limit")
+	return lib.NewError(lib.CodeFeeBelowState, lib.StateMachineModule, "tx.fee is below state limit")
 }
 
 func ErrDuplicateTx(hash []byte) lib.ErrorI {
@@ -36,42 +32,6 @@ func ErrTxFoundInMempool(hash string) lib.ErrorI {
 
 func ErrGetTransaction(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeGetTransaction, lib.StateMachineModule, fmt.Sprintf("getTransaction() failed with err: %s", err.Error()))
-}
-
-func ErrAddressFromString(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeAddressFromString, lib.StateMachineModule, fmt.Sprintf("addressToString() failed with err: %s", err.Error()))
-}
-
-func ErrStoreGet(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeStoreGet, lib.StateMachineModule, fmt.Sprintf("store.Get() failed with err: %s", err.Error()))
-}
-
-func ErrStoreDelete(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeStoreDelete, lib.StateMachineModule, fmt.Sprintf("store.Delete() failed with err: %s", err.Error()))
-}
-
-func ErrStoreIter(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeStoreIter, lib.StateMachineModule, fmt.Sprintf("store.Iter() failed with err: %s", err.Error()))
-}
-
-func ErrStoreRevIter(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeStoreRevIter, lib.StateMachineModule, fmt.Sprintf("store.RevIter() failed with err: %s", err.Error()))
-}
-
-func ErrStoreSet(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeStoreSet, lib.StateMachineModule, fmt.Sprintf("store.Set() failed with err: %s", err.Error()))
-}
-
-func ErrUnmarshal(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeUnmarshal, lib.StateMachineModule, fmt.Sprintf("unmarshal() failed with err: %s", err.Error()))
-}
-
-func ErrFromAny(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeFromAny, lib.StateMachineModule, fmt.Sprintf("fromAny() failed with err: %s", err.Error()))
-}
-
-func ErrMarshal(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeMarshal, lib.StateMachineModule, fmt.Sprintf("marshal() failed with err: %s", err.Error()))
 }
 
 func ErrAddressEmpty() lib.ErrorI {

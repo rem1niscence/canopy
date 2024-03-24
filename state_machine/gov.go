@@ -78,7 +78,7 @@ func (s *StateMachine) SetParamsFee(f *types.FeeParams) lib.ErrorI {
 }
 
 func (s *StateMachine) setParams(space string, p proto.Message) lib.ErrorI {
-	bz, err := types.Marshal(p)
+	bz, err := lib.Marshal(p)
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (s *StateMachine) getParams(space string, ptr any, emptyErr func() lib.Erro
 	if bz == nil {
 		return emptyErr()
 	}
-	if err = types.Unmarshal(bz, ptr); err != nil {
+	if err = lib.Unmarshal(bz, ptr); err != nil {
 		return err
 	}
 	return nil

@@ -42,15 +42,15 @@ func NewTxn(parent lib.RWStoreI) *Txn {
 	return &Txn{parent: parent, txn: txn{ops: make(map[string]op), sorted: make([]string, 0)}}
 }
 
-func (c *Txn) Get(key []byte) ([]byte, error) {
+func (c *Txn) Get(key []byte) ([]byte, lib.ErrorI) {
 	if v, found := c.ops[string(key)]; found {
 		return v.value, nil
 	}
 	return c.parent.Get(key)
 }
 
-func (c *Txn) Set(key, value []byte) error { c.update(string(key), value, false); return nil }
-func (c *Txn) Delete(key []byte) error     { c.update(string(key), nil, true); return nil }
+func (c *Txn) Set(key, value []byte) lib.ErrorI { c.update(string(key), value, false); return nil }
+func (c *Txn) Delete(key []byte) lib.ErrorI     { c.update(string(key), nil, true); return nil }
 func (c *Txn) update(key string, v []byte, delete bool) {
 	if _, found := c.ops[key]; !found {
 		c.addToSorted(key)
@@ -66,7 +66,7 @@ func (c *Txn) addToSorted(key string) {
 	c.sortedLen++
 }
 
-func (c *Txn) Iterator(prefix []byte) (lib.IteratorI, error) {
+func (c *Txn) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	parent, err := c.parent.Iterator(prefix)
 	if err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func (c *Txn) Iterator(prefix []byte) (lib.IteratorI, error) {
 	return newTxnIterator(parent, c.txn, prefix, false), nil
 }
 
-func (c *Txn) RevIterator(prefix []byte) (lib.IteratorI, error) {
+func (c *Txn) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	parent, err := c.parent.RevIterator(prefix)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (c *Txn) RevIterator(prefix []byte) (lib.IteratorI, error) {
 }
 
 func (c *Txn) Discard() { c.ops, c.sorted, c.sortedLen = nil, nil, 0 }
-func (c *Txn) Write() (err error) {
+func (c *Txn) Write() (err lib.ErrorI) {
 	for k, v := range c.ops {
 		if v.delete {
 			if err = c.parent.Delete([]byte(k)); err != nil {
@@ -121,14 +121,13 @@ func (c *TxnIterator) First() *TxnIterator {
 	}
 	return c.seek()
 }
-func (c *TxnIterator) Error() error { return nil }
-func (c *TxnIterator) Close()       { c.parent.Close() }
+func (c *TxnIterator) Close() { c.parent.Close() }
 func (c *TxnIterator) Next() {
 	if !c.parent.Valid() {
 		c.txnNext()
 		return
 	}
-	if !c.txnInvalid() {
+	if c.txnInvalid() {
 		c.parent.Next()
 		return
 	}
@@ -165,7 +164,7 @@ func (c *TxnIterator) Valid() bool {
 			c.useTxn = true
 			break
 		}
-		if !c.txnInvalid() {
+		if c.txnInvalid() {
 			// parent is valid; txn is not
 			c.useTxn = false
 			break
@@ -191,13 +190,13 @@ func (c *TxnIterator) Valid() bool {
 		}
 		break
 	}
-	return c.txnInvalid() || c.parent.Valid()
+	return !c.txnInvalid() || c.parent.Valid()
 }
 
 // return when invalid or !deleted
 func (c *TxnIterator) txnFastForward() {
 	for {
-		if !c.txnInvalid() || !c.txnValue().delete {
+		if c.txnInvalid() || !c.txnValue().delete {
 			return
 		}
 		c.txnNext()

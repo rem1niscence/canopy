@@ -15,7 +15,7 @@ func (s *StateMachine) SlashAndResetNonSigners(params *types.ValidatorParams) li
 			return err
 		}
 		ptr := new(types.NonSignerInfo)
-		if err = types.Unmarshal(v, ptr); err != nil {
+		if err = lib.Unmarshal(v, ptr); err != nil {
 			return err
 		}
 		if ptr.Counter > params.ValidatorMaxNonSign.Value {
@@ -44,11 +44,11 @@ func (s *StateMachine) IncrementNonSigners(nonSigners []crypto.AddressI) lib.Err
 		if err != nil {
 			return err
 		}
-		if err = types.Unmarshal(bz, ptr); err != nil {
+		if err = lib.Unmarshal(bz, ptr); err != nil {
 			return err
 		}
 		ptr.Counter++
-		bz, err = types.Marshal(ptr)
+		bz, err = lib.Marshal(ptr)
 		if err != nil {
 			return err
 		}

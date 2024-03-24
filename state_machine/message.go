@@ -240,7 +240,7 @@ func (s *StateMachine) HandleMessageUnpause(msg *types.MessageUnpause) lib.Error
 
 func (s *StateMachine) HandleMessageChangeParameter(msg *types.MessageChangeParameter) lib.ErrorI {
 	address := crypto.NewAddressFromBytes(msg.Owner)
-	protoMsg, err := types.FromAny(msg.ParameterValue)
+	protoMsg, err := lib.FromAny(msg.ParameterValue)
 	if err != nil {
 		return err
 	}

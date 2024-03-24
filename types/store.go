@@ -3,63 +3,68 @@ package types
 import "github.com/ginchuco/ginchu/crypto"
 
 type StoreI interface {
-	Copy() (StoreI, error)
-	NewReadOnly(version uint64) (ReadOnlyStoreI, error)
-	Commit() (root []byte, err error)
-	Version() uint64
-	NewTxn() StoreTxnI
-	Discard()
-	Reset() error
-	ProvableStoreI
 	RWStoreI
-	IndexerI
-	Close() error
+	ProveStoreI
+	RWIndexerI
+	NewTxn() StoreTxnI
+	Version() uint64
+	Copy() (StoreI, ErrorI)
+	NewReadOnly(version uint64) (ReadOnlyStoreI, ErrorI)
+	Commit() (root []byte, err ErrorI)
+	Discard()
+	Reset() ErrorI
+	Close() ErrorI
 }
 
 type ReadOnlyStoreI interface {
-	ProvableStoreI
-	ReadableStoreI
-}
-
-type RWStoreI interface {
-	ReadableStoreI
-	WritableStoreI
-}
-
-type IndexerI interface {
-	Index(result TransactionResultI) error
-	DeleteForHeight(height uint64) error
+	ProveStoreI
+	RStoreI
 	RIndexerI
 }
 
-type RIndexerI interface {
-	GetByHash(hash []byte) (TransactionResultI, error)
-	GetByHeight(height uint64, newestToOldest bool) ([]TransactionResultI, error)
-	GetBySender(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, error)
-	GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, error)
+type RWStoreI interface {
+	RStoreI
+	WStoreI
 }
 
-type WritableStoreI interface {
-	Set(key, value []byte) error
-	Delete(key []byte) error
+type RWIndexerI interface {
+	WIndexerI
+	RIndexerI
+}
+
+type WIndexerI interface {
+	Index(result TransactionResultI) ErrorI
+	DeleteForHeight(height uint64) ErrorI
+}
+
+type RIndexerI interface {
+	GetByHash(hash []byte) (TransactionResultI, ErrorI)
+	GetByHeight(height uint64, newestToOldest bool) ([]TransactionResultI, ErrorI)
+	GetBySender(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, ErrorI)
+	GetByRecipient(address crypto.AddressI, newestToOldest bool) ([]TransactionResultI, ErrorI)
 }
 
 type StoreTxnI interface {
-	WritableStoreI
-	ReadableStoreI
-	Write() error
+	WStoreI
+	RStoreI
+	Write() ErrorI
 	Discard()
 }
 
-type ReadableStoreI interface {
-	Get(key []byte) ([]byte, error)
-	Iterator(prefix []byte) (IteratorI, error)
-	RevIterator(prefix []byte) (IteratorI, error)
+type WStoreI interface {
+	Set(key, value []byte) ErrorI
+	Delete(key []byte) ErrorI
 }
 
-type ProvableStoreI interface {
-	GetProof(key []byte) (proof, value []byte, err error) // Get gets the bytes for a compact merkle proof
-	VerifyProof(key, value, proof []byte) bool            // VerifyProof validates the merkle proof
+type RStoreI interface {
+	Get(key []byte) ([]byte, ErrorI)
+	Iterator(prefix []byte) (IteratorI, ErrorI)
+	RevIterator(prefix []byte) (IteratorI, ErrorI)
+}
+
+type ProveStoreI interface {
+	GetProof(key []byte) (proof, value []byte, err ErrorI) // Get gets the bytes for a compact merkle proof
+	VerifyProof(key, value, proof []byte) bool             // VerifyProof validates the merkle proof
 }
 
 type IteratorI interface {
@@ -67,6 +72,5 @@ type IteratorI interface {
 	Next()
 	Key() (key []byte)
 	Value() (value []byte)
-	Error() error
 	Close()
 }

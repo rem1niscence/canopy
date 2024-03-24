@@ -22,8 +22,8 @@ func TestGetSetDelete(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, got)
 	reader := db.NewTransactionAt(0, false)
-	_, err = reader.Get([]byte("a"))
-	require.Equal(t, badger.ErrKeyNotFound, err)
+	_, er := reader.Get([]byte("a"))
+	require.Contains(t, er.Error(), badger.ErrKeyNotFound.Error())
 }
 
 func TestIteratorBasic(t *testing.T) {
@@ -56,8 +56,8 @@ func TestIteratorWithDelete(t *testing.T) {
 		validateIterators(t, expectedVals, cIt)
 		cIt.Close()
 		add := make([]byte, 1)
-		_, err = rand.Read(add)
-		require.NoError(t, err)
+		_, er := rand.Read(add)
+		require.NoError(t, er)
 		expectedVals = append(expectedVals, hex.EncodeToString(add))
 	}
 }

@@ -21,36 +21,31 @@ const (
 
 	MainModule ErrorModule = "main"
 
-	CodeStringToBigInt ErrorCode = 11
+	CodeUnmarshal      ErrorCode = 9
+	CodeMarshal        ErrorCode = 10
+	CodeFromAny        ErrorCode = 11
+	CodeToAny          ErrorCode = 12
+	CodeStringToBigInt ErrorCode = 13
+	CodeStringToBytes  ErrorCode = 14
 
 	StateMachineModule ErrorModule = "state_machine"
 
-	CodeFeeBelowMempool         ErrorCode = 2
 	CodeFeeBelowState           ErrorCode = 2
-	CodeUnauthorizedTx          ErrorCode = 2
-	CodeEmptySignature          ErrorCode = 2
-	CodeTxSignBytes             ErrorCode = 2
-	CodeInvalidTxMessage        ErrorCode = 2
-	CodeInvalidTxSequence       ErrorCode = 3
-	CodeDuplicateTransaction    ErrorCode = 4
-	CodeGetTransaction          ErrorCode = 5
-	CodeTxFoundInMempool        ErrorCode = 6
-	CodeInvalidSignature        ErrorCode = 7
-	CodeMarshal                 ErrorCode = 8
-	CodeUnmarshal               ErrorCode = 9
-	CodeFromAny                 ErrorCode = 10
-	CodeStoreGet                ErrorCode = 11
-	CodeStoreSet                ErrorCode = 12
-	CodeStoreDelete             ErrorCode = 13
-	CodeStoreIter               ErrorCode = 14
-	CodeStoreRevIter            ErrorCode = 15
-	CodeAddressEmpty            ErrorCode = 16
-	CodeAddressSize             ErrorCode = 17
-	CodeRecipientAddressEmpty   ErrorCode = 18
-	CodeRecipientAddressSize    ErrorCode = 19
+	CodeUnauthorizedTx          ErrorCode = 3
+	CodeEmptySignature          ErrorCode = 4
+	CodeTxSignBytes             ErrorCode = 5
+	CodeInvalidTxMessage        ErrorCode = 6
+	CodeInvalidTxSequence       ErrorCode = 7
+	CodeDuplicateTransaction    ErrorCode = 8
+	CodeGetTransaction          ErrorCode = 9
+	CodeTxFoundInMempool        ErrorCode = 10
+	CodeInvalidSignature        ErrorCode = 11
+	CodeAddressEmpty            ErrorCode = 12
+	CodeAddressSize             ErrorCode = 13
+	CodeRecipientAddressEmpty   ErrorCode = 14
+	CodeRecipientAddressSize    ErrorCode = 15
 	CodeOutputAddressEmpty      ErrorCode = 20
 	CodeOutputAddressSize       ErrorCode = 21
-	CodeAddressFromString       ErrorCode = 22
 	CodeInvalidAmount           ErrorCode = 23
 	CodePubKeyEmpty             ErrorCode = 24
 	CodePubKeySize              ErrorCode = 25
@@ -87,9 +82,21 @@ const (
 	CodeInvalidProtocolVersion  ErrorCode = 56
 	CodeInvalidAddressKey       ErrorCode = 57
 
-	StorageModule ErrorModule = "store"
-	NilKeyCode    ErrorCode   = 1
-	TxWriteCode   ErrorCode   = 2
+	StorageModule      ErrorModule = "store"
+	CodeOpenDB         ErrorCode   = 1
+	CodeCloseDB        ErrorCode   = 2
+	CodeStoreSet       ErrorCode   = 3
+	CodeStoreGet       ErrorCode   = 4
+	CodeStoreDelete    ErrorCode   = 5
+	CodeStoreIter      ErrorCode   = 6
+	CodeStoreRevIter   ErrorCode   = 7
+	CodeCopyStore      ErrorCode   = 8
+	CodeWriteTxn       ErrorCode   = 9
+	CodeDecompactProof ErrorCode   = 10
+	CodeCommitDB       ErrorCode   = 11
+	CodeCommitTree     ErrorCode   = 12
+	CodeProve          ErrorCode   = 13
+	CodeCompactProof   ErrorCode   = 14
 )
 
 type ErrorI interface {
@@ -129,4 +136,24 @@ func newLogError(err error) ErrorI {
 
 func errStringToBigInt() ErrorI {
 	return NewError(CodeStringToBigInt, MainModule, "unable to convert string to big int")
+}
+
+func ErrUnmarshal(err error) ErrorI {
+	return NewError(CodeUnmarshal, MainModule, fmt.Sprintf("unmarshal() failed with err: %s", err.Error()))
+}
+
+func ErrFromAny(err error) ErrorI {
+	return NewError(CodeFromAny, MainModule, fmt.Sprintf("fromAny() failed with err: %s", err.Error()))
+}
+
+func ErrToAny(err error) ErrorI {
+	return NewError(CodeToAny, MainModule, fmt.Sprintf("toAny() failed with err: %s", err.Error()))
+}
+
+func ErrMarshal(err error) ErrorI {
+	return NewError(CodeMarshal, MainModule, fmt.Sprintf("marshal() failed with err: %s", err.Error()))
+}
+
+func ErrStringToBytes(err error) ErrorI {
+	return NewError(CodeStringToBytes, MainModule, fmt.Sprintf("stringToBytes() failed with err: %s", err.Error()))
 }

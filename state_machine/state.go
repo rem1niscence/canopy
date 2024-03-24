@@ -1,7 +1,6 @@
 package state_machine
 
 import (
-	"github.com/ginchuco/ginchu/state_machine/types"
 	lib "github.com/ginchuco/ginchu/types"
 )
 
@@ -19,7 +18,7 @@ func (s *StateMachine) SetHeight(height uint64)     { s.height = height }
 func (s *StateMachine) Set(k, v []byte) lib.ErrorI {
 	store := s.Store()
 	if err := store.Set(k, v); err != nil {
-		return types.ErrStoreSet(err)
+		return err
 	}
 	return nil
 }
@@ -28,7 +27,7 @@ func (s *StateMachine) Get(key []byte) ([]byte, lib.ErrorI) {
 	store := s.Store()
 	bz, err := store.Get(key)
 	if err != nil {
-		return nil, types.ErrStoreGet(err)
+		return nil, err
 	}
 	return bz, nil
 }
@@ -36,7 +35,7 @@ func (s *StateMachine) Get(key []byte) ([]byte, lib.ErrorI) {
 func (s *StateMachine) Delete(key []byte) lib.ErrorI {
 	store := s.Store()
 	if err := store.Delete(key); err != nil {
-		return types.ErrStoreDelete(err)
+		return err
 	}
 	return nil
 }
@@ -68,7 +67,7 @@ func (s *StateMachine) Iterator(key []byte) (lib.IteratorI, lib.ErrorI) {
 	store := s.Store()
 	it, err := store.Iterator(key)
 	if err != nil {
-		return nil, types.ErrStoreIter(err)
+		return nil, err
 	}
 	return it, nil
 }
@@ -77,7 +76,7 @@ func (s *StateMachine) RevIterator(key []byte) (lib.IteratorI, lib.ErrorI) {
 	store := s.Store()
 	it, err := store.RevIterator(key)
 	if err != nil {
-		return nil, types.ErrStoreRevIter(err)
+		return nil, err
 	}
 	return it, nil
 }

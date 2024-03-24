@@ -133,7 +133,7 @@ func validateIterators(t *testing.T, expectedKeys []string, iterators ...types.I
 	}
 }
 
-func bulkSetKV(t *testing.T, store types.WritableStoreI, prefix string, keyValue ...string) {
+func bulkSetKV(t *testing.T, store types.WStoreI, prefix string, keyValue ...string) {
 	for _, kv := range keyValue {
 		require.NoError(t, store.Set([]byte(prefix+kv), []byte(kv)))
 	}
