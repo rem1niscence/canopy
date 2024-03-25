@@ -17,8 +17,10 @@ message BlockHeader {
   bytes last_block_hash = 7;
   bytes state_root = 8;
   bytes transaction_root = 9;
-  bytes proposer_address = 10;
-  bytes quorum_certificate = 11;
+  bytes validator_root = 10;
+  bytes next_validator_root = 11;
+  bytes proposer_address = 12;
+  bytes quorum_certificate = 13;
 }
 
 message Block {
@@ -37,6 +39,7 @@ message BeginBlockParams {
   repeated bytes nonSigners = 3;
   repeated bytes faultySigners = 4;
   repeated bytes doubleSigners = 5;
+  ValidatorSet ValidatorSet = 6;
 }
 
 message EndBlockParams {

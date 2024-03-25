@@ -124,6 +124,7 @@ func (s *Store) Iterator(p []byte) (types.IteratorI, types.ErrorI)    { return s
 func (s *Store) RevIterator(p []byte) (types.IteratorI, types.ErrorI) { return s.ss.RevIterator(p) }
 func (s *Store) Version() uint64                                      { return s.version }
 func (s *Store) NewTxn() types.StoreTxnI                              { return NewTxn(s) }
+func (s *Store) Root() (root []byte, err types.ErrorI)                { return s.sc.Root() }
 func (s *Store) Commit() (root []byte, err types.ErrorI) {
 	s.version++
 	s.root, err = s.sc.Commit()

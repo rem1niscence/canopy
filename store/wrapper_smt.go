@@ -40,6 +40,10 @@ func (s *SMTWrapper) Commit() ([]byte, types.ErrorI) {
 	return types.CopyBytes(s.smt.LastSavedRoot()), nil
 }
 
+func (s *SMTWrapper) Root() ([]byte, types.ErrorI) {
+	return types.CopyBytes(s.smt.Root()), nil
+}
+
 func (s *SMTWrapper) setDB(db *TxnWrapper, root []byte) {
 	if root == nil {
 		s.smt = smt.NewSMT(NewMapStore(db), crypto.Hasher())

@@ -6,17 +6,14 @@ import (
 )
 
 type Mempool struct {
-	State
+	*State
 	lib.Mempool
-
-	log lib.Logger
 }
 
-func NewMempool(state State, log lib.Logger, config types.MempoolConfig) *Mempool {
+func NewMempool(state *State, config types.MempoolConfig) *Mempool {
 	return &Mempool{
 		Mempool: types.NewMempool(config),
 		State:   state,
-		log:     log,
 	}
 }
 
@@ -28,7 +25,7 @@ func NewMempool(state State, log lib.Logger, config types.MempoolConfig) *Mempoo
 // - notes:
 //   - new tx added may also be evicted, this is expected behavior
 func (m *Mempool) HandleTransaction(tx []byte) lib.ErrorI {
-	fee, err := m.ApplyAndWriteTx(tx)
+	fee, err := m.applyAndWriteTx(tx)
 	if err != nil {
 		return err
 	}
@@ -37,17 +34,15 @@ func (m *Mempool) HandleTransaction(tx []byte) lib.ErrorI {
 		return err
 	}
 	if recheck {
-		return m.CheckMempool()
+		return m.checkMempool()
 	}
 	return nil
 }
 
-func (m *Mempool) CheckMempool() lib.ErrorI {
-	if err := m.ResetToBeginBlock(); err != nil {
-		return err
-	}
+func (m *Mempool) checkMempool() lib.ErrorI {
+	m.resetToBeginBlock()
 	var remove [][]byte
-	m.RecheckAll(func(tx []byte, err lib.ErrorI) {
+	m.recheckAll(func(tx []byte, err lib.ErrorI) {
 		m.log.Error(err.Error())
 		remove = append(remove, tx)
 	})
@@ -57,21 +52,21 @@ func (m *Mempool) CheckMempool() lib.ErrorI {
 	return nil
 }
 
-func (m *Mempool) RecheckAll(errorCallback func([]byte, lib.ErrorI)) {
+func (m *Mempool) recheckAll(errorCallback func([]byte, lib.ErrorI)) {
 	it := m.Iterator()
 	defer it.Close()
 	for ; it.Valid(); it.Next() {
 		tx := it.Key()
-		if _, err := m.ApplyAndWriteTx(tx); err != nil {
+		if _, err := m.applyAndWriteTx(tx); err != nil {
 			errorCallback(tx, err)
 		}
 	}
 }
 
-func (m *Mempool) ApplyAndWriteTx(tx []byte) (fee string, err lib.ErrorI) {
-	txn, cleanup := m.TxnWrap()
+func (m *Mempool) applyAndWriteTx(tx []byte) (fee string, err lib.ErrorI) {
+	txn, cleanup := m.txnWrap()
 	defer cleanup()
-	result, err := m.ApplyTransaction(tx, m.Size())
+	result, err := m.applyTransaction(tx, m.Size())
 	if err != nil {
 		return "", err
 	}

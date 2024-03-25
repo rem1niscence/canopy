@@ -37,6 +37,10 @@ const (
 	CodeNilNetworkID         ErrorCode = 22
 	CodeNilStateRoot         ErrorCode = 23
 	CodeNilTxRoot            ErrorCode = 24
+	CodeNilValRoot           ErrorCode = 25
+	CodeNilNextValRoot       ErrorCode = 26
+	CodeMerkleTree           ErrorCode = 27
+	CodeUnequalBlockHash     ErrorCode = 28
 
 	StateMachineModule ErrorModule = "state_machine"
 
@@ -206,4 +210,20 @@ func ErrNilTransactionRoot() ErrorI {
 
 func ErrNilStateRoot() ErrorI {
 	return NewError(CodeNilStateRoot, MainModule, "nil state root")
+}
+
+func ErrNilValidatorRoot() ErrorI {
+	return NewError(CodeNilValRoot, MainModule, "nil validator root")
+}
+
+func ErrNilNextValidatorRoot() ErrorI {
+	return NewError(CodeNilNextValRoot, MainModule, "nil next validator root")
+}
+
+func ErrMerkleTree(err error) ErrorI {
+	return NewError(CodeMerkleTree, MainModule, fmt.Sprintf("merkle tree failed with err: %s", err.Error()))
+}
+
+func ErrUnequalBlockHash() ErrorI {
+	return NewError(CodeUnequalBlockHash, MainModule, "unequal block hash")
 }

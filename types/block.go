@@ -39,6 +39,12 @@ func (x *BlockHeader) Check() ErrorI {
 	if x.TransactionRoot == nil {
 		return ErrNilTransactionRoot()
 	}
+	if x.ValidatorRoot == nil {
+		return ErrNilValidatorRoot()
+	}
+	if x.NextValidatorRoot == nil {
+		return ErrNilNextValidatorRoot()
+	}
 	if x.QuorumCertificate == nil {
 		return ErrNilQuorumCertificate()
 	}

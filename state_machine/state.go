@@ -10,6 +10,10 @@ type StateMachine struct {
 	store           lib.RWStoreI
 }
 
+func NewStateMachine(protocolVersion int, height uint64, store lib.RWStoreI) *StateMachine {
+	return &StateMachine{protocolVersion: protocolVersion, height: height, store: store}
+}
+
 func (s *StateMachine) Store() lib.RWStoreI         { return s.store }
 func (s *StateMachine) SetStore(store lib.RWStoreI) { s.store = store }
 func (s *StateMachine) Height() uint64              { return s.height }

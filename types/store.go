@@ -7,6 +7,7 @@ type StoreI interface {
 	ProveStoreI
 	RWIndexerI
 	NewTxn() StoreTxnI
+	Root() ([]byte, ErrorI)
 	Version() uint64
 	Copy() (StoreI, ErrorI)
 	NewReadOnly(version uint64) (ReadOnlyStoreI, ErrorI)

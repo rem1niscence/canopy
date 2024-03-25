@@ -7,37 +7,64 @@ import (
 )
 
 type State struct {
-	store      lib.StoreI
-	lastBlock  *lib.BlockHeader
-	beginBlock *lib.BeginBlockParams
-	fsm        state_machine.StateMachine
+	store     lib.StoreI
+	lastBlock *lib.BlockHeader
+	params    *lib.BeginBlockParams
+	chain     *ChainParams
+	fsm       *state_machine.StateMachine
+	log       lib.Logger
 }
 
-func NewState(store lib.StoreI, beginBlock *lib.BeginBlockParams) State {
-	return State{store: store, beginBlock: beginBlock, fsm: state_machine.StateMachine{}}
+type ChainParams struct {
+	SelfAddress     crypto.AddressI
+	NetworkID       []byte
+	MaxBlockBytes   uint64
+	ProtocolVersion int
 }
 
-func (s *State) TxnWrap() (lib.StoreTxnI, func()) {
+func NewState(store lib.StoreI, beginBlock *lib.BeginBlockParams, lastBlock *lib.BlockHeader, chain *ChainParams, log lib.Logger) State {
+	return State{
+		store:     store,
+		lastBlock: lastBlock,
+		params:    beginBlock,
+		chain:     chain,
+		fsm:       state_machine.NewStateMachine(chain.ProtocolVersion, store.Version(), store),
+		log:       log,
+	}
+}
+
+func (s *State) txnWrap() (lib.StoreTxnI, func()) {
 	txn := s.store.NewTxn()
 	s.fsm.SetStore(txn)
 	return txn, func() { s.fsm.SetStore(s.store); txn.Discard() }
 }
 
-func (s *State) BeginBlock() lib.ErrorI                      { return s.fsm.BeginBlock(s.beginBlock) }
-func (s *State) EndBlock() (*lib.EndBlockParams, lib.ErrorI) { return s.fsm.EndBlock() }
-func (s *State) ApplyTransaction(tx []byte, index int) (*lib.TxResult, lib.ErrorI) {
+func (s *State) beginBlock() lib.ErrorI                      { return s.fsm.BeginBlock(s.params) }
+func (s *State) endBlock() (*lib.EndBlockParams, lib.ErrorI) { return s.fsm.EndBlock() }
+func (s *State) reset()                                      { s.store.Reset() }
+func (s *State) height() uint64                              { return s.store.Version() }
+
+func (s *State) applyTransaction(tx []byte, index int) (*lib.TxResult, lib.ErrorI) {
 	return s.fsm.ApplyTransaction(uint64(index), tx, crypto.HashString(tx))
 }
-func (s *State) SetStore(store lib.StoreI) { s.store = store }
-func (s *State) Reset()                    { s.store.Reset() }
-func (s *State) ResetToBeginBlock() lib.ErrorI {
-	s.Reset()
-	return s.BeginBlock()
-}
-func (s *State) Height() uint64 { return s.store.Version() }
 
-type ChainParams struct {
-	SelfAddress   crypto.AddressI
-	NetworkID     []byte
-	MaxBlockBytes uint64
+func (s *State) resetToBeginBlock() {
+	s.reset()
+	if err := s.beginBlock(); err != nil {
+		s.log.Error(err.Error())
+	}
+}
+
+func (s *State) copy() (*State, lib.ErrorI) {
+	storeCopy, err := s.store.Copy()
+	if err != nil {
+		return nil, err
+	}
+	return &State{
+		store:     storeCopy,
+		lastBlock: s.lastBlock,
+		params:    s.params,
+		fsm:       state_machine.NewStateMachine(s.chain.ProtocolVersion, storeCopy.Version(), storeCopy),
+		log:       s.log,
+	}, nil
 }

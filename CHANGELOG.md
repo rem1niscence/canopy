@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [Unreleased] - 03/25/2024
+
+- Added `validators_root` to block header
+- Added `next_validators_root` to block header
+- Added `merkle root` functionality
+- Added `app/app.go` functionality
+
 ## [Unreleased] - 03/24/2024
 
 - Converted `store` `errors` to `ErrorI`
