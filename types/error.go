@@ -19,82 +19,90 @@ const (
 	// the combination of error code + module must be conflict free
 	// to avoid consensus level issues
 
-	MainModule ErrorModule = "main"
+	MainModule               ErrorModule = "main"
+	CodeUnmarshal            ErrorCode   = 9
+	CodeMarshal              ErrorCode   = 10
+	CodeFromAny              ErrorCode   = 11
+	CodeToAny                ErrorCode   = 12
+	CodeStringToBigInt       ErrorCode   = 13
+	CodeStringToBytes        ErrorCode   = 14
+	CodeNilBlock             ErrorCode   = 15
+	CodeNilBlockHeader       ErrorCode   = 16
+	CodeNilBlockProposer     ErrorCode   = 17
+	CodeNilQuorumCertificate ErrorCode   = 18
+	CodeNilBlockHash         ErrorCode   = 19
+	CodeNilBlockTime         ErrorCode   = 20
+	CodeNilLastBlockHash     ErrorCode   = 21
+	CodeNilNetworkID         ErrorCode   = 22
+	CodeNilStateRoot         ErrorCode   = 23
+	CodeNilTxRoot            ErrorCode   = 24
+	CodeNilValRoot           ErrorCode   = 25
+	CodeNilNextValRoot       ErrorCode   = 26
+	CodeMerkleTree           ErrorCode   = 27
+	CodeUnequalBlockHash     ErrorCode   = 28
+	CodeNewPubKeyFromBytes   ErrorCode   = 29
+	CodeNewMultiPubKey       ErrorCode   = 30
 
-	CodeUnmarshal            ErrorCode = 9
-	CodeMarshal              ErrorCode = 10
-	CodeFromAny              ErrorCode = 11
-	CodeToAny                ErrorCode = 12
-	CodeStringToBigInt       ErrorCode = 13
-	CodeStringToBytes        ErrorCode = 14
-	CodeNilBlock             ErrorCode = 15
-	CodeNilBlockHeader       ErrorCode = 16
-	CodeNilBlockProposer     ErrorCode = 17
-	CodeNilQuorumCertificate ErrorCode = 18
-	CodeNilBlockHash         ErrorCode = 19
-	CodeNilBlockTime         ErrorCode = 20
-	CodeNilLastBlockHash     ErrorCode = 21
-	CodeNilNetworkID         ErrorCode = 22
-	CodeNilStateRoot         ErrorCode = 23
-	CodeNilTxRoot            ErrorCode = 24
-	CodeNilValRoot           ErrorCode = 25
-	CodeNilNextValRoot       ErrorCode = 26
-	CodeMerkleTree           ErrorCode = 27
-	CodeUnequalBlockHash     ErrorCode = 28
+	ConsensusModule                ErrorModule = "consensus"
+	CodeUnknownConsensusMessage    ErrorCode   = 15
+	CodeValidatorNotInSet          ErrorCode   = 16
+	CodeWrongHeight                ErrorCode   = 17
+	CodeWrongView                  ErrorCode   = 18
+	CodePartialSignatureEmpty      ErrorCode   = 19
+	CodeErrInvalidPartialSignature ErrorCode   = 20
 
-	StateMachineModule ErrorModule = "state_machine"
-
-	CodeFeeBelowState           ErrorCode = 2
-	CodeUnauthorizedTx          ErrorCode = 3
-	CodeEmptySignature          ErrorCode = 4
-	CodeTxSignBytes             ErrorCode = 5
-	CodeInvalidTxMessage        ErrorCode = 6
-	CodeInvalidTxSequence       ErrorCode = 7
-	CodeDuplicateTransaction    ErrorCode = 8
-	CodeGetTransaction          ErrorCode = 9
-	CodeTxFoundInMempool        ErrorCode = 10
-	CodeInvalidSignature        ErrorCode = 11
-	CodeAddressEmpty            ErrorCode = 12
-	CodeAddressSize             ErrorCode = 13
-	CodeRecipientAddressEmpty   ErrorCode = 14
-	CodeRecipientAddressSize    ErrorCode = 15
-	CodeOutputAddressEmpty      ErrorCode = 20
-	CodeOutputAddressSize       ErrorCode = 21
-	CodeInvalidAmount           ErrorCode = 23
-	CodePubKeyEmpty             ErrorCode = 24
-	CodePubKeySize              ErrorCode = 25
-	CodeParamKeyEmpty           ErrorCode = 26
-	CodeParamValEmpty           ErrorCode = 27
-	CodeVoteEmpty               ErrorCode = 28
-	CodeHashEmpty               ErrorCode = 29
-	CodeHashSize                ErrorCode = 30
-	CodeUnknownMsg              ErrorCode = 31
-	CodeInsufficientFunds       ErrorCode = 32
-	CodeValidatorExists         ErrorCode = 33
-	CodeValidatorNotExists      ErrorCode = 34
-	CodeValidatorUnstaking      ErrorCode = 35
-	CodeValidatorPaused         ErrorCode = 36
-	CodeValidatorNotPaused      ErrorCode = 37
-	CodeEmptyConsParams         ErrorCode = 38
-	CodeEmptyValParams          ErrorCode = 39
-	CodeEmptyFeeParams          ErrorCode = 40
-	CodeEmptyGovParams          ErrorCode = 41
-	CodeUnknownParam            ErrorCode = 42
-	CodeUnknownParamType        ErrorCode = 43
-	CodeUnknownParamSpace       ErrorCode = 44
-	CodeUnauthorizedParamChange ErrorCode = 45
-	CodeBelowMinimumStake       ErrorCode = 46
-	CodeInvalidSlashPercentage  ErrorCode = 47
-	CodePublicKeysNotEqual      ErrorCode = 48
-	CodeHeightsNotEqual         ErrorCode = 49
-	CodeRoundsNotEqual          ErrorCode = 50
-	CodeVoteTypesNotEqual       ErrorCode = 51
-	CodeIdenticalVotes          ErrorCode = 52
-	CodeInvalidParamOwner       ErrorCode = 53
-	CodeInvalidParam            ErrorCode = 54
-	CodeInvalidPoolName         ErrorCode = 55
-	CodeInvalidProtocolVersion  ErrorCode = 56
-	CodeInvalidAddressKey       ErrorCode = 57
+	StateMachineModule          ErrorModule = "state_machine"
+	CodeFeeBelowState           ErrorCode   = 2
+	CodeUnauthorizedTx          ErrorCode   = 3
+	CodeEmptySignature          ErrorCode   = 4
+	CodeTxSignBytes             ErrorCode   = 5
+	CodeInvalidTxMessage        ErrorCode   = 6
+	CodeInvalidTxSequence       ErrorCode   = 7
+	CodeDuplicateTransaction    ErrorCode   = 8
+	CodeGetTransaction          ErrorCode   = 9
+	CodeTxFoundInMempool        ErrorCode   = 10
+	CodeInvalidSignature        ErrorCode   = 11
+	CodeAddressEmpty            ErrorCode   = 12
+	CodeAddressSize             ErrorCode   = 13
+	CodeRecipientAddressEmpty   ErrorCode   = 14
+	CodeRecipientAddressSize    ErrorCode   = 15
+	CodeOutputAddressEmpty      ErrorCode   = 20
+	CodeOutputAddressSize       ErrorCode   = 21
+	CodeInvalidAmount           ErrorCode   = 23
+	CodePubKeyEmpty             ErrorCode   = 24
+	CodePubKeySize              ErrorCode   = 25
+	CodeParamKeyEmpty           ErrorCode   = 26
+	CodeParamValEmpty           ErrorCode   = 27
+	CodeVoteEmpty               ErrorCode   = 28
+	CodeHashEmpty               ErrorCode   = 29
+	CodeHashSize                ErrorCode   = 30
+	CodeUnknownMsg              ErrorCode   = 31
+	CodeInsufficientFunds       ErrorCode   = 32
+	CodeValidatorExists         ErrorCode   = 33
+	CodeValidatorNotExists      ErrorCode   = 34
+	CodeValidatorUnstaking      ErrorCode   = 35
+	CodeValidatorPaused         ErrorCode   = 36
+	CodeValidatorNotPaused      ErrorCode   = 37
+	CodeEmptyConsParams         ErrorCode   = 38
+	CodeEmptyValParams          ErrorCode   = 39
+	CodeEmptyFeeParams          ErrorCode   = 40
+	CodeEmptyGovParams          ErrorCode   = 41
+	CodeUnknownParam            ErrorCode   = 42
+	CodeUnknownParamType        ErrorCode   = 43
+	CodeUnknownParamSpace       ErrorCode   = 44
+	CodeUnauthorizedParamChange ErrorCode   = 45
+	CodeBelowMinimumStake       ErrorCode   = 46
+	CodeInvalidSlashPercentage  ErrorCode   = 47
+	CodePublicKeysNotEqual      ErrorCode   = 48
+	CodeHeightsNotEqual         ErrorCode   = 49
+	CodeRoundsNotEqual          ErrorCode   = 50
+	CodeVoteTypesNotEqual       ErrorCode   = 51
+	CodeIdenticalVotes          ErrorCode   = 52
+	CodeInvalidParamOwner       ErrorCode   = 53
+	CodeInvalidParam            ErrorCode   = 54
+	CodeInvalidPoolName         ErrorCode   = 55
+	CodeInvalidProtocolVersion  ErrorCode   = 56
+	CodeInvalidAddressKey       ErrorCode   = 57
 
 	StorageModule      ErrorModule = "store"
 	CodeOpenDB         ErrorCode   = 1
@@ -226,4 +234,12 @@ func ErrMerkleTree(err error) ErrorI {
 
 func ErrUnequalBlockHash() ErrorI {
 	return NewError(CodeUnequalBlockHash, MainModule, "unequal block hash")
+}
+
+func ErrPubKeyFromBytes(err error) ErrorI {
+	return NewError(CodeNewPubKeyFromBytes, MainModule, fmt.Sprintf("publicKeyFromBytes() failed with err: %s", err.Error()))
+}
+
+func ErrNewMultiPubKey(err error) ErrorI {
+	return NewError(CodeNewMultiPubKey, MainModule, fmt.Sprintf("newMultiPubKey() failed with err: %s", err.Error()))
 }

@@ -1,0 +1,93 @@
+syntax = "proto3";
+package types;
+
+option go_package = "github.com/ginchuco/ginchu/consensus";
+
+import "block.proto";
+import "tx.proto";
+
+enum MsgType {
+  UNKNOWN = 0;
+  PREPARE = 1;
+  PREPARE_VOTE = 2;
+  PRECOMMIT = 3;
+  PRECOMMIT_VOTE = 4;
+  COMMIT = 5;
+  COMMIT_VOTE = 6;
+  DECIDE = 7;
+  NEW_VIEW = 8;
+}
+
+message QuorumCert {
+  uint64 height = 1;
+  uint64 viewNum = 2;
+  bytes BlockHash = 3;
+  MsgType type = 4;
+  bytes signature = 5;
+  bytes vrf_outs = 6;
+}
+
+message VRFs {
+  repeated VRF vrfs = 1;
+}
+
+message VRF {
+  bytes PublicKey = 1;
+  bytes Out = 2;
+}
+
+message Prepare {
+  uint64 height = 1;
+  uint64 viewNum = 2;
+  Block curProposal = 3;
+  QuorumCert highQC = 4;
+}
+
+message PrepareVote {
+  uint64 height = 1;
+  uint64 viewNum = 2;
+  bytes blockHash = 3;
+  QuorumCert qc = 4;
+  Signature partialSig = 5;
+}
+
+message PreCommit {
+  uint64 height = 1;
+  uint64 viewNum = 2;
+  QuorumCert prepareQC = 3;
+}
+
+message PreCommitVote {
+  uint64 height = 1;
+  uint64 viewNum = 2;
+  bytes blockHash = 3;
+  QuorumCert qc = 4;
+  Signature partialSig = 5;
+}
+
+message Commit {
+  uint64 height = 1;
+  uint64 viewNum = 2;
+  QuorumCert preCommitQC = 3;
+}
+
+message CommitVote {
+  uint64 height = 1;
+  uint64 viewNum = 2;
+  bytes blockHash = 3;
+  QuorumCert qc = 4;
+  Signature partialSig = 5;
+}
+
+message Decide {
+  uint64 height = 1;
+  uint64 viewNum = 2;
+  QuorumCert commitQC = 3;
+}
+
+message NewView {
+  uint64 height = 1;
+  uint64 viewNum = 2;
+  QuorumCert prepareQC = 3;
+  Signature partialSig = 4;
+}

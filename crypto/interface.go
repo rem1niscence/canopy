@@ -23,3 +23,14 @@ type AddressI interface {
 	String() string
 	Equals(AddressI) bool
 }
+
+type MultiPublicKey interface {
+	AggregateSignatures(ordered [][]byte) ([]byte, error)
+	VerifyBytes(msg, aggregatedSignature []byte) bool
+	AddSigner(index int) error
+	PublicKeys() (keys []PublicKeyI)
+	SetBitmap(bm []byte) error
+	Bitmap() []byte
+	Copy() MultiPublicKey
+	Reset()
+}

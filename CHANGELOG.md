@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [Unreleased] - 03/29/2024
+- Added `bls` crypto
+- Started `hotstuff` logic
+- Added `consensus.proto` types
+- Added outline for `practical vrf` for leader selection
+
 ## [Unreleased] - 03/25/2024
 
 - Added `validators_root` to block header
