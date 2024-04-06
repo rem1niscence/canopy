@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"encoding/hex"
+	"errors"
 	"github.com/drand/kyber"
 	bls12381 "github.com/drand/kyber-bls12381"
 	"github.com/drand/kyber/pairing"
@@ -22,7 +23,7 @@ type BLS12381PrivateKey struct {
 	scheme *bdn.Scheme
 }
 
-func NewBLS12381PrivateKey(privateKey kyber.Scalar, publicKey kyber.Point) *BLS12381PrivateKey {
+func NewBLS12381PrivateKey(privateKey kyber.Scalar) *BLS12381PrivateKey {
 	return &BLS12381PrivateKey{Scalar: privateKey, scheme: newBLSScheme()}
 }
 
@@ -91,12 +92,13 @@ func (b *BLS12381PublicKey) String() string {
 }
 
 type BLS12381MultiPublicKey struct {
-	mask   *sign.Mask
-	scheme *bdn.Scheme
+	signatures [][]byte
+	mask       *sign.Mask
+	scheme     *bdn.Scheme
 }
 
 func NewBLSMultiPublicKey(mask *sign.Mask) *BLS12381MultiPublicKey {
-	return &BLS12381MultiPublicKey{mask: mask, scheme: newBLSScheme()}
+	return &BLS12381MultiPublicKey{mask: mask, scheme: newBLSScheme(), signatures: make([][]byte, len(mask.Publics()))}
 }
 
 func (b *BLS12381MultiPublicKey) VerifyBytes(msg, sig []byte) bool {
@@ -104,7 +106,13 @@ func (b *BLS12381MultiPublicKey) VerifyBytes(msg, sig []byte) bool {
 	return b.scheme.Verify(publicKey, msg, sig) == nil
 }
 
-func (b *BLS12381MultiPublicKey) AggregateSignatures(ordered [][]byte) ([]byte, error) {
+func (b *BLS12381MultiPublicKey) AggregateSignatures() ([]byte, error) {
+	var ordered [][]byte
+	for _, signature := range b.signatures {
+		if len(signature) != 0 {
+			ordered = append(ordered, signature)
+		}
+	}
 	signature, err := b.scheme.AggregateSignatures(ordered, b.mask)
 	if err != nil {
 		return nil, err
@@ -112,15 +120,17 @@ func (b *BLS12381MultiPublicKey) AggregateSignatures(ordered [][]byte) ([]byte, 
 	return signature.MarshalBinary()
 }
 
-func (b *BLS12381MultiPublicKey) AddSigner(index int) error {
+func (b *BLS12381MultiPublicKey) AddSigner(signature []byte, index int) error {
+	b.signatures[index] = signature
 	return b.mask.SetBit(index, true)
 }
 
 func (b *BLS12381MultiPublicKey) Reset() {
 	b.mask, _ = sign.NewMask(newBLSSuite(), b.mask.Publics(), nil)
+	b.signatures = make([][]byte, len(b.mask.Publics()))
 }
 
-func (b *BLS12381MultiPublicKey) Copy() MultiPublicKey {
+func (b *BLS12381MultiPublicKey) Copy() MultiPublicKeyI {
 	p := b.mask.Publics()
 	pCopy := make([]kyber.Point, len(p))
 	copy(pCopy, p)
@@ -138,7 +148,17 @@ func (b *BLS12381MultiPublicKey) PublicKeys() (keys []PublicKeyI) {
 	return
 }
 
-func (b *BLS12381MultiPublicKey) Bitmap() []byte            { return b.mask.Mask() }
+func (b *BLS12381MultiPublicKey) Bitmap() []byte { return b.mask.Mask() }
+func (b *BLS12381MultiPublicKey) SignerEnabledAt(i int) (bool, error) {
+	if i > len(b.PublicKeys()) || i < 0 {
+		return false, errors.New("invalid bitmap index")
+	}
+	mask := b.Bitmap()
+	byteIndex := i / 8
+	mm := byte(1) << (i & 7)
+	return mask[byteIndex]&mm != 0, nil
+}
+
 func (b *BLS12381MultiPublicKey) SetBitmap(bm []byte) error { return b.mask.SetMask(bm) }
 func newBLSScheme() *bdn.Scheme                             { return bdn.NewSchemeOnG2(newBLSSuite()) }
 func newBLSSuite() pairing.Suite                            { return bls12381.NewBLS12381Suite() }

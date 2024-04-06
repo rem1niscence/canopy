@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"github.com/drand/kyber"
 	"github.com/drand/kyber/sign"
+	"github.com/drand/kyber/util/random"
 )
 
 func NewPrivateKey() (PrivateKeyI, error) {
@@ -69,6 +70,11 @@ func NewAddressFromString(hexString string) (AddressI, error) {
 	return NewAddressFromBytes(bz), nil
 }
 
+func NewBLSPrivateKey() (PrivateKeyI, error) {
+	privateKey, _ := newBLSScheme().NewKeyPair(random.New())
+	return NewBLS12381PrivateKey(privateKey), nil
+}
+
 func NewBLSPrivateKeyFromString(hexString string) (PrivateKeyI, error) {
 	bz, err := hex.DecodeString(hexString)
 	if err != nil {
@@ -86,6 +92,14 @@ func NewBLSPrivateKeyFromBytes(bz []byte) (PrivateKeyI, error) {
 		Scalar: keyCopy,
 		scheme: newBLSScheme(),
 	}, nil
+}
+
+func NewBLSPublicKey() (PublicKeyI, error) {
+	pk, err := NewBLSPrivateKey()
+	if err != nil {
+		return nil, err
+	}
+	return pk.PublicKey(), nil
 }
 
 func NewBLSPublicKeyFromString(hexString string) (PublicKeyI, error) {
@@ -115,7 +129,7 @@ func NewBLSPointFromBytes(bz []byte) (kyber.Point, error) {
 	return point, nil
 }
 
-func NewMultiBLSFromPoints(publicKeys []kyber.Point, bitmap []byte) (MultiPublicKey, error) {
+func NewMultiBLSFromPoints(publicKeys []kyber.Point, bitmap []byte) (MultiPublicKeyI, error) {
 	mask, err := sign.NewMask(newBLSSuite(), publicKeys, nil)
 	if err != nil {
 		return nil, err
@@ -128,7 +142,7 @@ func NewMultiBLSFromPoints(publicKeys []kyber.Point, bitmap []byte) (MultiPublic
 	return NewBLSMultiPublicKey(mask), nil
 }
 
-func NewMultiBLS(publicKeys [][]byte, bitmap []byte) (MultiPublicKey, error) {
+func NewMultiBLS(publicKeys [][]byte, bitmap []byte) (MultiPublicKeyI, error) {
 	var points []kyber.Point
 	for _, bz := range publicKeys {
 		point, err := NewBLSPointFromBytes(bz)

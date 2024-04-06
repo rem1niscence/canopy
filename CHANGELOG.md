@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [Unreleased] - 03/30/2024
+- Added `leader_election` VRF and CDF
+- Continued `hotstuff` logic
+
 ## [Unreleased] - 03/29/2024
 - Added `bls` crypto
 - Started `hotstuff` logic

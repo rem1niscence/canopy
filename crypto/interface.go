@@ -24,13 +24,14 @@ type AddressI interface {
 	Equals(AddressI) bool
 }
 
-type MultiPublicKey interface {
-	AggregateSignatures(ordered [][]byte) ([]byte, error)
+type MultiPublicKeyI interface {
+	AggregateSignatures() ([]byte, error)
 	VerifyBytes(msg, aggregatedSignature []byte) bool
-	AddSigner(index int) error
+	AddSigner(signature []byte, index int) error
+	SignerEnabledAt(i int) (bool, error)
 	PublicKeys() (keys []PublicKeyI)
 	SetBitmap(bm []byte) error
 	Bitmap() []byte
-	Copy() MultiPublicKey
+	Copy() MultiPublicKeyI
 	Reset()
 }

@@ -66,3 +66,10 @@ type TxResultI interface {
 	GetTxHash() string
 	GetTx() TransactionI
 }
+
+func (x *Signature) Copy() *Signature {
+	return &Signature{
+		PublicKey: CopyBytes(x.PublicKey),
+		Signature: CopyBytes(x.Signature),
+	}
+}

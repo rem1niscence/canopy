@@ -6,88 +6,75 @@ option go_package = "github.com/ginchuco/ginchu/consensus";
 import "block.proto";
 import "tx.proto";
 
-enum MsgType {
+enum Phase {
   UNKNOWN = 0;
-  PREPARE = 1;
-  PREPARE_VOTE = 2;
-  PRECOMMIT = 3;
-  PRECOMMIT_VOTE = 4;
-  COMMIT = 5;
-  COMMIT_VOTE = 6;
-  DECIDE = 7;
-  NEW_VIEW = 8;
+  ELECTION = 1;
+  ELECTION_VOTE = 2;
+  PROPOSE = 3;
+  PROPOSE_VOTE = 4;
+  PRECOMMIT = 5;
+  PRECOMMIT_VOTE = 6;
+  COMMIT = 7;
+  COMMIT_PROCESS = 8;
+  ROUND_INTERRUPT = 9;
 }
 
-message QuorumCert {
+message QuorumCertificate {
+  View header = 1;
+  ReplicaMessage payload = 2;
+  AggregateSignature signature = 3;
+}
+
+message LeaderMessage {
+  View header = 1;
+  QuorumCertificate qc = 2;
+  oneof Payload {
+    Block block = 3;
+    Signature vrf = 4; // only used in ELECTION phase
+  }
+  QuorumCertificate high_qc = 5; // only used in PROPOSE phase if a previous lock was seen
+  Signature leader_signature = 6;
+}
+
+message ReplicaMessage {
+  View header = 1;
+  oneof Payload {
+    Block block = 2;
+    bytes leader_public_key = 3; // only used in ELECTION-VOTE
+  }
+  QuorumCertificate highQC = 4; // never in sign bytes, only used in ELECTION-VOTE to let the leader satisfy safe node predicate
+  Signature partial_signature = 5;
+}
+
+message Message {
+  View header = 1;
+  oneof Payload {
+    Block block = 2;
+    bytes leader_public_key = 3; // only used in ELECTION-VOTE
+    Signature vrf = 4; // only used in ELECTION phase
+  }
+  QuorumCertificate high_qc = 5; // used in PROPOSE phase if a previous lock was seen or ELECTION-VOTE phase if a previous lock was seen
+  Signature signature = 6;
+}
+
+message ElectionMessage {
+  View header = 1;
+  Signature vrf = 2;
+  Signature candidate_signature = 3;
+}
+
+message PacemakerMessage {
+  View header = 1;
+  Signature partial_signature = 2;
+}
+
+message View {
   uint64 height = 1;
-  uint64 viewNum = 2;
-  bytes BlockHash = 3;
-  MsgType type = 4;
-  bytes signature = 5;
-  bytes vrf_outs = 6;
+  uint64 round = 2;
+  Phase phase = 3;
 }
 
-message VRFs {
-  repeated VRF vrfs = 1;
-}
-
-message VRF {
-  bytes PublicKey = 1;
-  bytes Out = 2;
-}
-
-message Prepare {
-  uint64 height = 1;
-  uint64 viewNum = 2;
-  Block curProposal = 3;
-  QuorumCert highQC = 4;
-}
-
-message PrepareVote {
-  uint64 height = 1;
-  uint64 viewNum = 2;
-  bytes blockHash = 3;
-  QuorumCert qc = 4;
-  Signature partialSig = 5;
-}
-
-message PreCommit {
-  uint64 height = 1;
-  uint64 viewNum = 2;
-  QuorumCert prepareQC = 3;
-}
-
-message PreCommitVote {
-  uint64 height = 1;
-  uint64 viewNum = 2;
-  bytes blockHash = 3;
-  QuorumCert qc = 4;
-  Signature partialSig = 5;
-}
-
-message Commit {
-  uint64 height = 1;
-  uint64 viewNum = 2;
-  QuorumCert preCommitQC = 3;
-}
-
-message CommitVote {
-  uint64 height = 1;
-  uint64 viewNum = 2;
-  bytes blockHash = 3;
-  QuorumCert qc = 4;
-  Signature partialSig = 5;
-}
-
-message Decide {
-  uint64 height = 1;
-  uint64 viewNum = 2;
-  QuorumCert commitQC = 3;
-}
-
-message NewView {
-  uint64 height = 1;
-  uint64 viewNum = 2;
-  QuorumCert prepareQC = 3;
-  Signature partialSig = 4;
+message AggregateSignature {
+  bytes signature = 1;
+  bytes bitmap = 2;
 }

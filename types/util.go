@@ -2,6 +2,7 @@ package types
 
 import (
 	"math/big"
+	"strconv"
 )
 
 func BigAdd(a, b *big.Int) *big.Int          { return new(big.Int).Add(a, b) }
@@ -45,6 +46,14 @@ func StringsLess(s, s2 string) (bool, ErrorI) {
 		return false, err
 	}
 	return cmp == -1, nil
+}
+
+func StringsGTE(s, s2 string) (bool, ErrorI) {
+	cmp, err := StringsCmp(s, s2)
+	if err != nil {
+		return false, err
+	}
+	return cmp >= 0, nil
 }
 
 func StringsCmp(s, s2 string) (int, ErrorI) {
@@ -98,6 +107,19 @@ func StringAdd(s string, s2 string) (string, ErrorI) {
 	return BigIntToString(c), nil
 }
 
+func StringDiv(s, s2 string) (string, ErrorI) {
+	a, err := StringToBigInt(s)
+	if err != nil {
+		return "", err
+	}
+	b, err := StringToBigInt(s2)
+	if err != nil {
+		return "", err
+	}
+	c := BigDiv(a, b)
+	return BigIntToString(c), nil
+}
+
 func StringToBigInt(s string) (*big.Int, ErrorI) {
 	b := big.Int{}
 	i, ok := b.SetString(s, 10)
@@ -105,6 +127,11 @@ func StringToBigInt(s string) (*big.Int, ErrorI) {
 		return nil, errStringToBigInt()
 	}
 	return i, nil
+}
+
+func StringToUint64(s string) uint64 {
+	i, _ := strconv.ParseUint(s, 10, 64)
+	return i
 }
 
 func BigIntToString(b *big.Int) string {
