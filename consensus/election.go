@@ -1,4 +1,4 @@
-package leader_election
+package consensus
 
 import (
 	"encoding/binary"
@@ -46,12 +46,12 @@ type SortitionVerifyParams struct {
 }
 
 type SortitionData struct {
-	LastNLeaderPubKeys [][]byte
-	Height             uint64
-	Round              uint64
-	TotalValidators    uint64
-	VotingPower        string
-	TotalPower         string
+	LastProducersPublicKeys [][]byte
+	Height                  uint64
+	Round                   uint64
+	TotalValidators         uint64
+	VotingPower             string
+	TotalPower              string
 }
 
 type RoundRobinParams struct {
@@ -60,7 +60,7 @@ type RoundRobinParams struct {
 }
 
 func Sortition(p *SortitionParams) (out []byte, vrf *lib.Signature, isCandidate bool) {
-	vrf = VRF(p.LastNLeaderPubKeys, p.Height, p.Round, p.PrivateKey)
+	vrf = VRF(p.LastProducersPublicKeys, p.Height, p.Round, p.PrivateKey)
 	out, isCandidate = sortition(p.VotingPower, p.TotalPower, p.TotalValidators, vrf.Signature)
 	return
 }
@@ -69,7 +69,7 @@ func VerifyCandidate(p *SortitionVerifyParams) (out []byte, isCandidate bool) {
 	if p == nil {
 		return nil, false
 	}
-	msg := formatInput(p.LastNLeaderPubKeys, p.Height, p.Round)
+	msg := formatInput(p.LastProducersPublicKeys, p.Height, p.Round)
 	if !p.PublicKey.VerifyBytes(msg, p.Signature) {
 		return nil, false
 	}
@@ -82,13 +82,24 @@ func sortition(votingPower, totalPower string, totalValidators uint64, signature
 	return
 }
 
-func SelectLeaderFromCandidates(outs [][]byte) (leaderIndex int) {
+type VRFCandidate struct {
+	PublicKey crypto.PublicKeyI
+	Out       []byte
+}
+
+func SelectLeaderFromCandidates(candidates []VRFCandidate, data SortitionData, v *lib.ValidatorSet) (leaderPublicKey crypto.PublicKeyI) {
+	if candidates == nil {
+		return WeightedRoundRobin(&RoundRobinParams{
+			SortitionData: data,
+			ValidatorSet:  v,
+		})
+	}
 	largest := new(big.Int)
-	for i, out := range outs {
-		candidate := new(big.Int).SetBytes(out)
+	for _, c := range candidates {
+		candidate := new(big.Int).SetBytes(c.Out)
 		if lib.BigGreater(candidate, largest) {
-			leaderIndex = i
-			candidate = largest
+			leaderPublicKey = c.PublicKey
+			largest = candidate
 		}
 	}
 	return
@@ -116,8 +127,8 @@ func CDF(votingPower, totalVotingPower, expectedCandidates uint64, vrfOut []byte
 	return votingPower
 }
 
-func WeightedRoundRobin(p *RoundRobinParams) (publicKey []byte) {
-	seed := crypto.Hash(formatInput(p.LastNLeaderPubKeys, p.Height, p.Round))[:16]
+func WeightedRoundRobin(p *RoundRobinParams) (publicKey crypto.PublicKeyI) {
+	seed := crypto.Hash(formatInput(p.LastProducersPublicKeys, p.Height, p.Round))[:16]
 	seedUint64 := binary.BigEndian.Uint64(seed)
 	totalPower := lib.StringToUint64(p.TotalPower)
 	powerIndex := seedUint64 % totalPower
@@ -126,7 +137,8 @@ func WeightedRoundRobin(p *RoundRobinParams) (publicKey []byte) {
 	for _, v := range p.ValidatorSet.ValidatorSet {
 		powerCount += lib.StringToUint64(v.VotingPower)
 		if powerCount >= powerIndex {
-			return v.PublicKey
+			publicKey, _ = crypto.NewBLSPublicKeyFromBytes(v.PublicKey)
+			return
 		}
 	}
 	return nil

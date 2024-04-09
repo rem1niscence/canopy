@@ -60,7 +60,7 @@ const (
 	CodeEmptyPayload                    ErrorCode   = 22
 	CodeInvalidPayload                  ErrorCode   = 23
 	CodeInvalidLeaderPubKey             ErrorCode   = 24
-	CodeInvalidMessageType              ErrorCode   = 25
+	CodeNoMaj23                         ErrorCode   = 25
 	CodeEmptyAggregateSignature         ErrorCode   = 26
 	CodeInvalidAggregateSignature       ErrorCode   = 27
 	CodeInvalidAggregateSignatureLen    ErrorCode   = 28
@@ -69,7 +69,7 @@ const (
 	CodeVRFEmpty                        ErrorCode   = 31
 	CodeNotVRFCandidate                 ErrorCode   = 32
 	CodeMismatchPublicKeys              ErrorCode   = 33
-	CodeInvalidVRFPublicKey             ErrorCode   = 34
+	CodeEmptyPreviousAggregateSignature ErrorCode   = 34
 	CodePublicKeyFromBytes              ErrorCode   = 35
 	CodeAggregateSignature              ErrorCode   = 36
 	CodeEmptyQuorumCertificate          ErrorCode   = 37
@@ -78,10 +78,7 @@ const (
 	CodeFailedSafeNode                  ErrorCode   = 40
 	CodeInvalidValidatorIndex           ErrorCode   = 41
 	CodeUnableToAddSigner               ErrorCode   = 42
-	CodeEmptyElectionMessage            ErrorCode   = 43
-	CodeEmptyReplicaMessage             ErrorCode   = 44
-	CodeEmptyLeaderMessage              ErrorCode   = 45
-	CodeEmptyPacemakerMessage           ErrorCode   = 46
+	CodeEmptyLeaderMessage              ErrorCode   = 43
 
 	StateMachineModule          ErrorModule = "state_machine"
 	CodeFeeBelowState           ErrorCode   = 2
@@ -180,7 +177,7 @@ func (p *Error) Module() ErrorModule { return p.module }
 func (p *Error) String() string      { return p.Error() }
 
 func (p *Error) Error() string {
-	return fmt.Sprintf("Code: %d\nModule: %s\nMessage:%s", p.code, p.module, p.msg)
+	return fmt.Sprintf("Code:\t%d\nModule:\t%s\nMessage:\t%s", p.code, p.module, p.msg)
 }
 
 // error implementations below for the `types` package

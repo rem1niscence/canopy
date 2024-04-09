@@ -2,10 +2,13 @@ package consensus
 
 import (
 	"bytes"
-	"github.com/drand/kyber"
 	"github.com/ginchuco/ginchu/crypto"
 	lib "github.com/ginchuco/ginchu/types"
 	"sync"
+)
+
+const (
+	maxRounds = 10000
 )
 
 type HeightLeaderMessages struct {
@@ -13,321 +16,193 @@ type HeightLeaderMessages struct {
 	roundLeaderMessages map[uint64]RoundLeaderMessages
 }
 
-func (hlm *HeightLeaderMessages) GetRound(round uint64) RoundLeaderMessages {
-	return hlm.roundLeaderMessages[round]
-}
-
-func (hlm *HeightLeaderMessages) AddElectionMessage(message *ElectionMessage) lib.ErrorI {
-	hlm.Lock()
-	defer hlm.Unlock()
-	rlm := hlm.roundLeaderMessages[message.Header.Round]
-	for _, msg := range rlm.Election {
-		if bytes.Equal(msg.CandidateSignature.PublicKey, message.CandidateSignature.PublicKey) {
-			return ErrDuplicateLeaderMessage()
-		}
-	}
-	rlm.Election = append(rlm.Election, message)
-	hlm.roundLeaderMessages[message.Header.Round] = rlm
-	return nil
-}
-
-func (hlm *HeightLeaderMessages) AddLeaderMessage(message *LeaderMessage) lib.ErrorI {
-	hlm.Lock()
-	defer hlm.Unlock()
-	rlm := hlm.roundLeaderMessages[message.Header.Round]
-	switch message.Header.Phase {
-	case Phase_PROPOSE:
-		if rlm.ProposeMessage != nil {
-			return ErrDuplicateLeaderMessage()
-		}
-		rlm.ProposeMessage = message
-	case Phase_PRECOMMIT:
-		if rlm.PrecommitMessage != nil {
-			return ErrDuplicateLeaderMessage()
-		}
-		rlm.PrecommitMessage = message
-	case Phase_COMMIT:
-		if rlm.CommitMessage != nil {
-			return ErrDuplicateLeaderMessage()
-		}
-		rlm.CommitMessage = message
-	}
-	hlm.roundLeaderMessages[message.Header.Round] = rlm
-	return nil
-}
-
 type RoundLeaderMessages struct {
-	Election         []*ElectionMessage
-	ProposeMessage   *LeaderMessage
-	PrecommitMessage *LeaderMessage
-	CommitMessage    *LeaderMessage
-	MultiKey         crypto.MultiPublicKeyI
+	Election []*Message         // ELECTION
+	Messages PhaseLeaderMessage // PROPOSE, PRECOMMIT, COMMIT
+	MultiKey crypto.MultiPublicKeyI
 }
 
-func (rlm *RoundLeaderMessages) GetElectionMessages() []*ElectionMessage {
-	cpy := make([]*ElectionMessage, len(rlm.Election))
-	for i, msg := range rlm.Election {
-		cpy[i] = msg.Copy()
+type PhaseLeaderMessage map[Phase]*Message
+
+func (hlm *HeightLeaderMessages) GetElectionMessages(round uint64) ElectionMessages {
+	hlm.Lock()
+	defer hlm.Unlock()
+	rlm := hlm.roundLeaderMessages[round]
+	cpy := make([]*Message, len(rlm.Election))
+	for i, p := range rlm.Election {
+		if p == nil {
+			continue
+		}
+		v := *p
+		cpy[i] = &v
 	}
 	return cpy
 }
 
-func (rlm *RoundLeaderMessages) GetProposeMessage() *LeaderMessage {
-	return rlm.ProposeMessage
+type ElectionMessages []*Message
+
+func (m ElectionMessages) GetCandidates(vs ValidatorSet, data SortitionData) ([]VRFCandidate, lib.ErrorI) {
+	var candidates []VRFCandidate
+	for _, msg := range m {
+		vrf := msg.GetVrf()
+		v, err := vs.GetValidator(vrf.PublicKey)
+		if err != nil {
+			return nil, err
+		}
+		data.VotingPower = v.VotingPower
+		out, isCandidate := VerifyCandidate(&SortitionVerifyParams{
+			SortitionData: data,
+			Signature:     vrf.Signature,
+			PublicKey:     v.PublicKey,
+		})
+		if isCandidate {
+			candidates = append(candidates, VRFCandidate{
+				PublicKey: v.PublicKey,
+				Out:       out,
+			})
+		}
+	}
+	return candidates, nil
 }
 
-func (rlm *RoundLeaderMessages) GetPrecommitMessage() *LeaderMessage {
-	return rlm.PrecommitMessage
+func (hlm *HeightLeaderMessages) AddLeaderMessage(message *Message) lib.ErrorI {
+	hlm.Lock()
+	defer hlm.Unlock()
+	rlm := hlm.roundLeaderMessages[message.Header.Round]
+	phase := message.Header.Phase
+	if phase == Phase_ELECTION {
+		for _, msg := range rlm.Election {
+			if bytes.Equal(msg.Signature.PublicKey, message.Signature.PublicKey) {
+				return ErrDuplicateLeaderMessage()
+			}
+		}
+		rlm.Election = append(rlm.Election, message)
+	} else {
+		m := rlm.Messages[phase]
+		if m != nil {
+			return ErrDuplicateLeaderMessage()
+		}
+		rlm.Messages[phase] = message
+	}
+	hlm.roundLeaderMessages[message.Header.Round] = rlm
+	return nil
 }
 
-func (rlm *RoundLeaderMessages) GetCommitMessage() *LeaderMessage {
-	return rlm.CommitMessage
+func (hlm *HeightLeaderMessages) GetLeaderMessage(view *View) *Message {
+	hlm.Lock()
+	defer hlm.Unlock()
+	view.Phase--
+	rlm := hlm.roundLeaderMessages[view.Round]
+	return rlm.Messages[view.Phase]
 }
 
 type HeightVoteSet struct {
 	sync.Mutex
 	roundVoteSets  map[uint64]RoundVoteSet
-	validatorViews []VoteSet // height -> used for pacemaker
+	pacemakerVotes []VoteSet // one set of view votes per height; round -> seenRoundVote
 }
 
-func (hvs *HeightVoteSet) Add(vote *ReplicaMessage, v ValidatorSet) lib.ErrorI {
-	hvs.Lock()
-	defer hvs.Unlock()
-	val, err := v.GetValidator(vote.PartialSignature.PublicKey)
-	if err != nil {
-		return err
-	}
-	rvs := hvs.roundVoteSets[vote.Header.Round]
-	switch vote.Header.Phase {
-	case Phase_ELECTION_VOTE:
-		key := lib.BytesToString(vote.GetLeaderPublicKey())
-		voteSet := rvs.Election[key]
-		if err = voteSet.AddVote(vote.PartialSignature.Signature, val); err != nil {
-			return err
-		}
-		rvs.Election[key] = voteSet
-		return nil
-	case Phase_PROPOSE_VOTE:
-		key := lib.BytesToString(vote.GetBlock().BlockHeader.Hash)
-		voteSet := rvs.Propose[key]
-		if err = voteSet.AddVote(vote.PartialSignature.Signature, val); err != nil {
-			return err
-		}
-		rvs.Propose[key] = voteSet
-		return nil
-	case Phase_PRECOMMIT_VOTE:
-		key := lib.BytesToString(vote.GetBlock().BlockHeader.Hash)
-		voteSet := rvs.Precommit[key]
-		if err = voteSet.AddVote(vote.PartialSignature.Signature, val); err != nil {
-			return err
-		}
-		rvs.Precommit[key] = voteSet
-		return nil
-	default:
-		return ErrWrongPhase()
-	}
-}
-
-func (hvs *HeightVoteSet) AddPacemakerMessage(p *PacemakerMessage, v ValidatorSet) lib.ErrorI {
-	val, err := v.GetValidator(p.PartialSignature.PublicKey)
-	if err != nil {
-		return err
-	}
-	voteSet := hvs.validatorViews[p.Header.Round]
-	if err = voteSet.AddVote(p.PartialSignature.Signature, val); err != nil {
-		return err
-	}
-	hvs.validatorViews[p.Header.Round] = voteSet
-	return nil
-}
-
-func (hvs *HeightVoteSet) GetRound(r uint64) RoundVoteSet {
-	return hvs.roundVoteSets[r]
-}
-
-// Pacemaker returns the highest round where 2/3rds majority have previously signed they were on
-func (hvs *HeightVoteSet) Pacemaker() (round uint64) {
-	for i := len(hvs.validatorViews) - 1; i >= 0; i-- {
-		if hvs.validatorViews[i].HasQuorum() {
-			return round
-		}
-	}
-	return 0
-}
-
-type RoundVoteSet struct {
-	Election  map[string]VoteSet
-	Propose   map[string]VoteSet
-	Precommit map[string]VoteSet
-}
-
-type ValidatorView struct {
-	Validator Validator
-	View      *View
-}
-
-func (rvs *RoundVoteSet) GetElectionVotesFor(payload []byte) VoteSet {
-	return rvs.Election[lib.BytesToString(payload)]
-}
-
-func (rvs *RoundVoteSet) GetQuorumForElection() (payload *ReplicaMessage, multiKey crypto.MultiPublicKeyI) {
-	for _, votes := range rvs.Election {
-		if votes.HasQuorum() {
-			votes.payload.HighQC = nil
-			votes.payload.PartialSignature = nil
-			return votes.payload, votes.multiKey
-		}
-	}
-	return
-}
-
-func (rvs *RoundVoteSet) GetProposeVotesFor(payload []byte) VoteSet {
-	return rvs.Propose[lib.BytesToString(payload)]
-}
-
-func (rvs *RoundVoteSet) GetQuorumForPropose() (payload *ReplicaMessage, multiKey crypto.MultiPublicKeyI) {
-	for _, votes := range rvs.Precommit {
-		if votes.HasQuorum() {
-			votes.payload.PartialSignature = nil
-			return votes.payload, votes.multiKey
-		}
-	}
-	return
-}
-
-func (rvs *RoundVoteSet) GetPrecommitVotesFor(payload []byte) VoteSet {
-	return rvs.Precommit[lib.BytesToString(payload)]
-}
-
-func (rvs *RoundVoteSet) GetQuorumForPrecommit() (payload *ReplicaMessage, multiKey crypto.MultiPublicKeyI) {
-	for _, votes := range rvs.Precommit {
-		if votes.HasQuorum() {
-			votes.payload.PartialSignature = nil
-			return votes.payload, votes.multiKey
-		}
-	}
-	return
-}
+type RoundVoteSet map[Phase]PhaseVoteSet // ELECTION_VOTE, PROPOSE_VOTE, PRECOMMIT_VOTE
+type PhaseVoteSet map[string]VoteSet     // vote -> VoteSet
 
 type VoteSet struct {
-	payload               *ReplicaMessage
-	pacemakerPayload      *PacemakerMessage
+	vote                  *Message
+	highQC                *QuorumCertificate
 	multiKey              crypto.MultiPublicKeyI
 	totalVotedPower       string
 	minimumPowerForQuorum string // 2f+1
 }
 
-func (vs *VoteSet) AddVote(signature []byte, val *Validator) (err lib.ErrorI) {
-	enabled, er := vs.multiKey.SignerEnabledAt(val.Index)
-	if er != nil {
-		return ErrInvalidValidatorIndex()
-	}
-	if enabled {
-		return ErrDuplicateVote()
-	}
-	vs.totalVotedPower, err = lib.StringAdd(val.VotingPower, vs.totalVotedPower)
+func (hvs *HeightVoteSet) AddVote(view *View, vote *Message, v ValidatorSet) lib.ErrorI {
+	hvs.Lock()
+	defer hvs.Unlock()
+	var vs VoteSet
+	var key string
+	val, err := v.GetValidator(vote.Signature.PublicKey)
 	if err != nil {
 		return err
 	}
-	if er = vs.multiKey.AddSigner(signature, val.Index); er != nil {
-		return ErrUnableToAddSigner(er)
+	phase, round := vote.Qc.Header.Phase, vote.Qc.Header.Round
+	if phase == Phase_ROUND_INTERRUPT {
+		vs = hvs.pacemakerVotes[round]
+		vs, err = hvs.addVote(view, vote, vs, val, v)
+		if err != nil {
+			return err
+		}
+		hvs.pacemakerVotes[round] = vs
+	} else {
+		rvs := hvs.roundVoteSets[round]
+		bz, _ := vote.SignBytes()
+		key = lib.BytesToString(bz)
+		pvs := rvs[phase]
+		vs, err = hvs.addVote(view, vote, pvs[key], val, v)
+		if err != nil {
+			return err
+		}
+		pvs[key] = vs
+		rvs[phase] = pvs
+		hvs.roundVoteSets[round] = rvs
 	}
 	return nil
 }
 
-func (vs *VoteSet) Copy() *VoteSet {
-	return &VoteSet{
-		multiKey:        vs.multiKey.Copy(),
-		totalVotedPower: vs.totalVotedPower,
-	}
-}
-
-func (vs *VoteSet) HasQuorum() bool {
-	hasQuorum, _ := lib.StringsGTE(vs.totalVotedPower, vs.minimumPowerForQuorum)
-	return hasQuorum
-}
-
-type ValidatorSet struct {
-	validatorSet          *lib.ValidatorSet
-	key                   crypto.MultiPublicKeyI
-	powerMap              map[string]Validator // public_key -> Validator
-	totalPower            string
-	minimumPowerForQuorum string // 2f+1
-	numValidators         uint64
-}
-
-type Validator struct {
-	PublicKey   crypto.PublicKeyI
-	VotingPower string
-	Index       int
-}
-
-func NewValidatorSet(validators *lib.ValidatorSet) (vs ValidatorSet, err lib.ErrorI) {
-	totalPower, count := "", uint64(0)
-	points, powerMap := make([]kyber.Point, 0), make(map[string]Validator)
-	for i, v := range validators.ValidatorSet {
-		point, er := crypto.NewBLSPointFromBytes(v.PublicKey)
-		if err != nil {
-			return ValidatorSet{}, lib.ErrPubKeyFromBytes(er)
-		}
-		points = append(points, point)
-		powerMap[lib.BytesToString(v.PublicKey)] = Validator{
-			PublicKey:   crypto.NewBLS12381PublicKey(point),
-			VotingPower: v.VotingPower,
-			Index:       i,
-		}
-		totalPower, err = lib.StringAdd(totalPower, v.VotingPower)
-		if err != nil {
-			return
-		}
-		count++
-	}
-	minimumPowerForQuorum, err := lib.StringReducePercentage(totalPower, 33)
-	if err != nil {
-		return
-	}
-	mpk, er := crypto.NewMultiBLSFromPoints(points, nil)
+func (hvs *HeightVoteSet) addVote(view *View, vote *Message, vs VoteSet, val *Validator, valSet ValidatorSet) (voteSet VoteSet, err lib.ErrorI) {
+	enabled, er := vs.multiKey.SignerEnabledAt(val.Index)
 	if er != nil {
-		return ValidatorSet{}, lib.ErrNewMultiPubKey(er)
+		return voteSet, ErrInvalidValidatorIndex()
 	}
-	return ValidatorSet{
-		validatorSet:          validators,
-		key:                   mpk,
-		powerMap:              powerMap,
-		totalPower:            totalPower,
-		minimumPowerForQuorum: minimumPowerForQuorum,
-		numValidators:         count,
-	}, nil
-}
-
-func (vs *ValidatorSet) GetValidator(publicKey []byte) (*Validator, lib.ErrorI) {
-	val, found := vs.powerMap[lib.BytesToString(publicKey)]
-	if !found {
-		return nil, ErrValidatorNotInSet(publicKey)
+	if enabled {
+		return voteSet, ErrDuplicateVote()
 	}
-	return &val, nil
-}
-
-func (vs *ValidatorSet) GetValidatorAtIndex(i int) (*Validator, lib.ErrorI) {
-	if uint64(i) >= vs.numValidators {
-		return nil, ErrInvalidValidatorIndex()
-	}
-	val := vs.validatorSet.ValidatorSet[i]
-	publicKey, err := publicKeyFromBytes(val.PublicKey)
+	vs.totalVotedPower, err = lib.StringAdd(val.VotingPower, vs.totalVotedPower)
 	if err != nil {
-		return nil, err
+		return voteSet, err
 	}
-	return &Validator{
-		PublicKey:   publicKey,
-		VotingPower: val.VotingPower,
-		Index:       i,
-	}, nil
+	if er = vs.multiKey.AddSigner(vote.Signature.Signature, val.Index); er != nil {
+		return voteSet, ErrUnableToAddSigner(er)
+	}
+	vs.vote = vote
+	if vote.HighQc != nil {
+		if err = vote.HighQc.CheckHighQC(view, valSet); err != nil {
+			return vs, err
+		}
+		if vs.highQC == nil || vs.highQC.Header.Less(vote.Header) {
+			vs.highQC = vote.HighQc
+		}
+	}
+	return vs, nil
 }
 
-func publicKeyFromBytes(pubKey []byte) (crypto.PublicKeyI, lib.ErrorI) {
-	publicKey, err := crypto.NewBLSPublicKeyFromBytes(pubKey)
-	if err != nil {
-		return nil, ErrPubKeyFromBytes(err)
+func (hvs *HeightVoteSet) GetMaj23(view *View) (p *Message, sig, bitmap []byte, err lib.ErrorI) {
+	hvs.Lock()
+	defer hvs.Unlock()
+	view.Phase--
+	rvs := hvs.roundVoteSets[view.Round]
+	pvs := rvs[view.Phase]
+	for _, votes := range pvs {
+		has23maj, _ := lib.StringsGTE(votes.totalVotedPower, votes.minimumPowerForQuorum)
+		if has23maj {
+			votes.vote.HighQc = votes.highQC
+			signature, er := votes.multiKey.AggregateSignatures()
+			if er != nil {
+				return nil, nil, nil, ErrAggregateSignature(er)
+			}
+			return votes.vote, signature, votes.multiKey.Bitmap(), nil
+		}
 	}
-	return publicKey, nil
+	return nil, nil, nil, ErrNoMaj23()
+}
+
+// Pacemaker returns the highest round where 2/3rds majority have previously signed they were on
+func (hvs *HeightVoteSet) Pacemaker() (round uint64) {
+	hvs.Lock()
+	defer hvs.Unlock()
+	for i := len(hvs.pacemakerVotes) - 1; i >= 0; i-- {
+		votes := hvs.pacemakerVotes[i]
+		has23maj, _ := lib.StringsGTE(votes.totalVotedPower, votes.minimumPowerForQuorum)
+		if has23maj {
+			return round
+		}
+	}
+	return 0
 }

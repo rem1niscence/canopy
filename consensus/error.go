@@ -71,43 +71,31 @@ func ErrEmptyBlock() lib.ErrorI {
 }
 
 func ErrEmptyPayload() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyPayload, lib.ConsensusModule, "empty payload")
-}
-
-func ErrEmptyReplicaMessage() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyReplicaMessage, lib.ConsensusModule, "empty replica message")
-}
-
-func ErrEmptyPacemakerMessage() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyPacemakerMessage, lib.ConsensusModule, "empty pacemaker message")
+	return lib.NewError(lib.CodeEmptyPayload, lib.ConsensusModule, "empty vote")
 }
 
 func ErrEmptyLeaderMessage() lib.ErrorI {
 	return lib.NewError(lib.CodeEmptyLeaderMessage, lib.ConsensusModule, "empty leader message")
 }
 
-func ErrEmptyElectionMessage() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyElectionMessage, lib.ConsensusModule, "empty election message")
-}
-
 func ErrEmptyQCPayload() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyQuorumCertificatePayload, lib.ConsensusModule, "empty quorum certificate payload")
+	return lib.NewError(lib.CodeEmptyQuorumCertificatePayload, lib.ConsensusModule, "empty quorum certificate vote")
 }
 
 func ErrInvalidPayload() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidPayload, lib.ConsensusModule, "invalid payload")
+	return lib.NewError(lib.CodeInvalidPayload, lib.ConsensusModule, "invalid vote")
 }
 
 func ErrInvalidLeaderPublicKey() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidLeaderPubKey, lib.ConsensusModule, "invalid leader public key")
 }
 
-func ErrInvalidMessageType(msgType string, publicKey []byte, expectedType string) lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidMessageType, lib.ConsensusModule, fmt.Sprintf("%s from %s has an invalid message type: expected %s", msgType, lib.BytesToString(publicKey), expectedType))
-}
-
 func ErrEmptyAggregateSignature() lib.ErrorI {
 	return lib.NewError(lib.CodeEmptyAggregateSignature, lib.ConsensusModule, "empty aggregate signature")
+}
+
+func ErrEmptyAggregatePreviousSignature() lib.ErrorI {
+	return lib.NewError(lib.CodeEmptyPreviousAggregateSignature, lib.ConsensusModule, "empty previous aggregate signature")
 }
 
 func ErrInvalidAggrSignatureLength() lib.ErrorI {
@@ -132,6 +120,10 @@ func ErrEmptyVRF() lib.ErrorI {
 
 func ErrNotVRFCandidate() lib.ErrorI {
 	return lib.NewError(lib.CodeNotVRFCandidate, lib.ConsensusModule, "vrf not a candidate")
+}
+
+func ErrNoMaj23() lib.ErrorI {
+	return lib.NewError(lib.CodeNoMaj23, lib.ConsensusModule, "quorum not reached")
 }
 
 func ErrMismatchPublicKeys() lib.ErrorI {

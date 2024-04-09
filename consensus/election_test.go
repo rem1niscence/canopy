@@ -1,4 +1,4 @@
-package leader_election
+package consensus
 
 import (
 	"fmt"
@@ -24,10 +24,10 @@ func TestSortition(t *testing.T) {
 	for i := 0; i < totalIterations; i++ {
 		avg += vrfAndCDF(SortitionParams{
 			SortitionData: SortitionData{
-				LastNLeaderPubKeys: lastNLeaders,
-				Height:             uint64(rand.Intn(math.MaxUint32)),
-				VotingPower:        powerString,
-				TotalPower:         totalPowerString,
+				LastProducersPublicKeys: lastNLeaders,
+				Height:                  uint64(rand.Intn(math.MaxUint32)),
+				VotingPower:             powerString,
+				TotalPower:              totalPowerString,
 			},
 			PrivateKey: privateKey,
 		})
@@ -37,7 +37,7 @@ func TestSortition(t *testing.T) {
 }
 
 func vrfAndCDF(p SortitionParams) uint64 {
-	vrf := VRF(p.LastNLeaderPubKeys, p.Height, p.Round, p.PrivateKey)
+	vrf := VRF(p.LastProducersPublicKeys, p.Height, p.Round, p.PrivateKey)
 	return CDF(lib.StringToUint64(p.VotingPower), lib.StringToUint64(p.TotalPower), 1, crypto.Hash(vrf.Signature))
 }
 
