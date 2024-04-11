@@ -1,8 +1,30 @@
 # CHANGELOG
 
+## [Unreleased] - 04/09/2024
+- Added `syncing` logic
+- Started `byzantine` evidence logic
+- Added indexing for `evidence` and `qc`
+- Added `p2p` TODO outline
+- Updated `block` structure with `last_qc` and `evidence`
+
+## [Unreleased] - 04/06/2024
+- Consolidated `leader election` and `consensus` packages
+- Added verification to `Message` and `AggrSig` structures
+- Added `consensus` diagrams
+- Cleanup up `Consensus State` lifecycle
+- Fixed `hvs` and `hlm` structures
+
 ## [Unreleased] - 03/30/2024
 - Added `leader_election` VRF and CDF
 - Continued `hotstuff` logic
+- Added `consensus` messages
+- Added `consensus state` lifecycle
+- Added `bls` helper functions
+- Added `p2p` interface
+- Added `app` interface
+- Added `vote` and `leader` message container structures
+- Added `consensus` documentation
+
 
 ## [Unreleased] - 03/29/2024
 - Added `bls` crypto
