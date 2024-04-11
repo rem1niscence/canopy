@@ -48,7 +48,7 @@ func (x *BlockHeader) Check() ErrorI {
 	if x.NextValidatorRoot == nil {
 		return ErrNilNextValidatorRoot()
 	}
-	if x.QuorumCertificate == nil {
+	if x.LastQuorumCertificate == nil {
 		return ErrNilQuorumCertificate()
 	}
 	if x.Time.Seconds == 0 {
@@ -103,7 +103,9 @@ func (x *BlockHeader) Equals(b *BlockHeader) bool {
 	if !bytes.Equal(x.ProposerAddress, b.ProposerAddress) {
 		return false
 	}
-	if !bytes.Equal(x.QuorumCertificate, b.QuorumCertificate) {
+	qc1Bz, _ := Marshal(x.LastQuorumCertificate)
+	qc2Bz, _ := Marshal(b.LastQuorumCertificate)
+	if !bytes.Equal(qc1Bz, qc2Bz) {
 		return false
 	}
 	return true
@@ -126,4 +128,19 @@ func (x *Block) Equals(b *Block) bool {
 		}
 	}
 	return true
+}
+
+func (x *BlockResult) ToBlock() (*Block, ErrorI) {
+	var txs [][]byte
+	for _, txResult := range x.Transactions {
+		txBz, err := Marshal(txResult.Transaction)
+		if err != nil {
+			return nil, err
+		}
+		txs = append(txs, txBz)
+	}
+	return &Block{
+		BlockHeader:  x.BlockHeader,
+		Transactions: txs,
+	}, nil
 }

@@ -6,44 +6,11 @@ option go_package = "github.com/ginchuco/ginchu/consensus";
 import "block.proto";
 import "tx.proto";
 
-enum Phase {
-  UNKNOWN = 0;
-  ELECTION = 1;
-  ELECTION_VOTE = 2;
-  PROPOSE = 3;
-  PROPOSE_VOTE = 4;
-  PRECOMMIT = 5;
-  PRECOMMIT_VOTE = 6;
-  COMMIT = 7;
-  COMMIT_PROCESS = 8;
-  ROUND_INTERRUPT = 9;
-}
-
-message QuorumCertificate {
-  View header = 1; // view of the previous message (from the voters)
-  Block block = 2; // block accepted by the voters (During and after PROPOSE)
-  bytes leader_public_key = 3; // leader accepted by the voters (PROPOSE only)
-  AggregateSignature previous_aggr_signature = 4; // the aggregate signature from the previous leader message (needed for byzantine punishments)
-  AggregateSignature signature = 5; // aggregate signature from the current leader message
-}
-
-// Replica messages only use view + payload, except for ELECTION-VOTE, where highQC is added to help the leader
-// Leaders use the quorum certificate to convince replicas to listen to next message; highQC is sent in the PROPOSE phase
 message Message {
-  View header = 1; // view of the current message
-  Signature vrf = 2; // only used in the ELECTION phase as a leader
+  View header = 1;
+  Signature vrf = 2; // only ELECTION phase from leader
   QuorumCertificate qc = 3; // Leaders use this to aggregate replica messages, Replicas sign parts of this to vote
-  QuorumCertificate high_qc = 4; // used in PROPOSE phase by leader or ELECTION-VOTE phase by replica if a previous lock was seen
-  Signature signature = 5; // partial signature
-}
-
-message View {
-  uint64 height = 1;
-  uint64 round = 2;
-  Phase phase = 3;
-}
-
-message AggregateSignature {
-  bytes signature = 1;
-  bytes bitmap = 2;
+  QuorumCertificate high_qc = 4; // only if a previous lock was seen: ELECTION-VOTE phase by replica and PROPOSE phase by leader
+  repeated DoubleSignEvidence evidence = 5;
+  Signature signature = 6;
 }

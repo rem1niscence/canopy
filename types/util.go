@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/ginchuco/ginchu/crypto"
 	"math/big"
 	"strconv"
 )
@@ -148,4 +149,12 @@ func MapCopy[M1 ~map[K]V, M2 ~map[K]V, K comparable, V any](dst M1, src M2) {
 	for k, v := range src {
 		dst[k] = v
 	}
+}
+
+func PublicKeyFromBytes(pubKey []byte) (crypto.PublicKeyI, ErrorI) {
+	publicKey, err := crypto.NewBLSPublicKeyFromBytes(pubKey)
+	if err != nil {
+		return nil, ErrPubKeyFromBytes(err)
+	}
+	return publicKey, nil
 }

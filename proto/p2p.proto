@@ -1,0 +1,39 @@
+syntax = "proto3";
+package types;
+
+option go_package = "github.com/ginchuco/ginchu/types";
+
+import "block.proto";
+import "google/protobuf/any.proto";
+
+enum Topic {
+  INVALID = 0;
+  P2P = 1;
+  BLOCK_REQUEST = 2;
+  BLOCK = 3;
+  TX = 4;
+  CONSENSUS = 5;
+}
+
+message PeerInfo {
+  bytes public_key = 1;
+  string net_address = 2;
+  uint64 min_height = 3;
+  uint64 max_height = 4;
+  bool is_validator = 5;
+  bool is_unconditional = 6;
+  int32 reputation = 7;
+}
+
+message EnvelopeMessage {
+  Topic topic = 1;
+  google.protobuf.Any payload = 2;
+}
+
+message BlockRequestMessage {
+  uint64 height = 1;
+}
+
+message BlockResponseMessage {
+  QuorumCertificate BlockAndCertificate = 1;
+}

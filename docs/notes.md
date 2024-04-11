@@ -36,6 +36,9 @@ State Machine Handling Byzantine Evidence:
 - Minority signers are who signed faulty on the final QC
 - Double signers tracking is less straightforward, but likely can be included in the QC somehow
 
+- Height 0 should be the database version of the genesis begin state and height 1 should be the database version of the 
+  genesis end state. There are no quorum certificates associated with height 0 and height 1
+
 ### Placeholder Name:
 
 - **Canopy**

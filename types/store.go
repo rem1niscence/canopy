@@ -1,6 +1,8 @@
 package types
 
-import "github.com/ginchuco/ginchu/crypto"
+import (
+	"github.com/ginchuco/ginchu/crypto"
+)
 
 type StoreI interface {
 	RWStoreI
@@ -10,7 +12,7 @@ type StoreI interface {
 	Root() ([]byte, ErrorI)
 	Version() uint64
 	Copy() (StoreI, ErrorI)
-	NewReadOnly(version uint64) (ReadOnlyStoreI, ErrorI)
+	NewReadOnly(version uint64) (RWStoreI, ErrorI)
 	Commit() (root []byte, err ErrorI)
 	Discard()
 	Reset()
@@ -34,10 +36,13 @@ type RWIndexerI interface {
 }
 
 type WIndexerI interface {
+	IndexQC(qc *QuorumCertificate) ErrorI
 	IndexTx(result *TxResult) ErrorI
 	IndexBlock(b *BlockResult) ErrorI
 	DeleteTxsForHeight(height uint64) ErrorI
 	DeleteBlockForHeight(height uint64) ErrorI
+	DeleteEvidenceForHeight(height uint64) ErrorI
+	DeleteQCForHeight(height uint64) ErrorI
 }
 
 type RIndexerI interface {
@@ -47,6 +52,9 @@ type RIndexerI interface {
 	GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]*TxResult, ErrorI)
 	GetBlockByHash(hash []byte) (*BlockResult, ErrorI)
 	GetBlockByHeight(height uint64) (*BlockResult, ErrorI)
+	GetEvidenceByHash(hash []byte) (*DoubleSignEvidence, ErrorI)
+	GetEvidenceByHeight(height uint64) ([]*DoubleSignEvidence, ErrorI)
+	GetQCByHeight(height uint64) (*QuorumCertificate, ErrorI)
 }
 
 type StoreTxnI interface {

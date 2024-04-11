@@ -10,7 +10,7 @@ func (s *StateMachine) BeginBlock(beginBlock *lib.BeginBlockParams) lib.ErrorI {
 	if err := s.CheckProtocolVersion(); err != nil {
 		return err
 	}
-	if err := s.RewardProposer(crypto.NewAddressFromBytes(beginBlock.ProposerAddress)); err != nil {
+	if err := s.RewardProposer(crypto.NewAddressFromBytes(beginBlock.BlockHeader.ProposerAddress)); err != nil {
 		return err
 	}
 	if err := s.HandleByzantine(beginBlock); err != nil {
@@ -97,6 +97,7 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI) lib.ErrorI {
 }
 
 func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams) (err lib.ErrorI) {
+	block := beginBlock.BlockHeader
 	params, err := s.GetParamsVal()
 	if err != nil {
 		return err
@@ -106,14 +107,15 @@ func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams) (err li
 			return err
 		}
 	}
-	if err = s.SlashBadProposers(params, beginBlock.BadProposers); err != nil {
-		return err
-	}
-	if err = s.SlashFaultySigners(params, beginBlock.FaultySigners); err != nil {
+	if err = s.SlashBadProposers(params, block.BadProposers); err != nil {
 		return err
 	}
 	if err = s.SlashDoubleSigners(params, beginBlock.DoubleSigners); err != nil {
 		return err
 	}
-	return s.IncrementNonSigners(beginBlock.NonSigners)
+	nonSigners, err := block.LastQuorumCertificate.GetNonSigners(beginBlock.ValidatorSet)
+	if err != nil {
+		return err
+	}
+	return s.IncrementNonSigners(nonSigners)
 }

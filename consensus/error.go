@@ -10,14 +10,6 @@ func ErrUnknownConsensusMsg(t proto.Message) lib.ErrorI {
 	return lib.NewError(lib.CodeUnknownConsensusMessage, lib.ConsensusModule, fmt.Sprintf("unknown consensus message: %T", t))
 }
 
-func ErrValidatorNotInSet(publicKey []byte) lib.ErrorI {
-	return lib.NewError(lib.CodeValidatorNotInSet, lib.ConsensusModule, fmt.Sprintf("validator %s not found in validator set", lib.BytesToString(publicKey)))
-}
-
-func ErrInvalidValidatorIndex() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidValidatorIndex, lib.ConsensusModule, "invalid validator index")
-}
-
 func ErrDuplicateVote() lib.ErrorI {
 	return lib.NewError(lib.CodeDuplicateVote, lib.ConsensusModule, "duplicate vote")
 }
@@ -28,26 +20,6 @@ func ErrDuplicateLeaderMessage() lib.ErrorI {
 
 func ErrUnableToAddSigner(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeUnableToAddSigner, lib.ConsensusModule, fmt.Sprintf("multiKey.AddSigner() failed with err: %s", err.Error()))
-}
-
-func ErrWrongHeight() lib.ErrorI {
-	return lib.NewError(lib.CodeWrongHeight, lib.ConsensusModule, "wrong height")
-}
-
-func ErrEmptyView() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyView, lib.ConsensusModule, "empty view")
-}
-
-func ErrWrongRound() lib.ErrorI {
-	return lib.NewError(lib.CodeWrongRound, lib.ConsensusModule, "wrong round")
-}
-
-func ErrWrongPhase() lib.ErrorI {
-	return lib.NewError(lib.CodeWrongPhase, lib.ConsensusModule, "wrong phase")
-}
-
-func ErrEmptyQuorumCertificate() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyQuorumCertificate, lib.ConsensusModule, "empty quorum certificate")
 }
 
 func ErrPartialSignatureEmpty() lib.ErrorI {
@@ -90,40 +62,12 @@ func ErrInvalidLeaderPublicKey() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidLeaderPubKey, lib.ConsensusModule, "invalid leader public key")
 }
 
-func ErrEmptyAggregateSignature() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyAggregateSignature, lib.ConsensusModule, "empty aggregate signature")
-}
-
-func ErrEmptyAggregatePreviousSignature() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyPreviousAggregateSignature, lib.ConsensusModule, "empty previous aggregate signature")
-}
-
-func ErrInvalidAggrSignatureLength() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidAggregateSignatureLen, lib.ConsensusModule, "invalid aggregate signature length")
-}
-
-func ErrEmptySignerBitmap() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyAggregateSignatureBitmap, lib.ConsensusModule, "empty signer bitmap")
-}
-
-func ErrInvalidSignerBitmap(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidAggregateSignatureBitmap, lib.ConsensusModule, fmt.Sprintf("invalid signature bitmap: %s", err.Error()))
-}
-
-func ErrInvalidAggrSignature() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidAggregateSignature, lib.ConsensusModule, "invalid aggregate signature")
-}
-
 func ErrEmptyVRF() lib.ErrorI {
 	return lib.NewError(lib.CodeVRFEmpty, lib.ConsensusModule, "empty vrf")
 }
 
 func ErrNotVRFCandidate() lib.ErrorI {
 	return lib.NewError(lib.CodeNotVRFCandidate, lib.ConsensusModule, "vrf not a candidate")
-}
-
-func ErrNoMaj23() lib.ErrorI {
-	return lib.NewError(lib.CodeNoMaj23, lib.ConsensusModule, "quorum not reached")
 }
 
 func ErrMismatchPublicKeys() lib.ErrorI {
@@ -136,10 +80,6 @@ func ErrMismatchBlocks() lib.ErrorI {
 
 func ErrFailedSafeNodePredicate() lib.ErrorI {
 	return lib.NewError(lib.CodeFailedSafeNode, lib.ConsensusModule, "safe node failed")
-}
-
-func ErrPubKeyFromBytes(err error) lib.ErrorI {
-	return lib.NewError(lib.CodePublicKeyFromBytes, lib.ConsensusModule, fmt.Sprintf("publicKeyFromBytes() failed with err: %s", err.Error()))
 }
 
 func ErrAggregateSignature(err error) lib.ErrorI {

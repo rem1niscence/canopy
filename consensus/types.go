@@ -11,6 +11,9 @@ const (
 	maxRounds = 10000
 )
 
+type QuorumCertificate = lib.QuorumCertificate
+type Phase = lib.Phase
+
 type HeightLeaderMessages struct {
 	sync.Mutex
 	roundLeaderMessages map[uint64]RoundLeaderMessages
@@ -41,7 +44,7 @@ func (hlm *HeightLeaderMessages) GetElectionMessages(round uint64) ElectionMessa
 
 type ElectionMessages []*Message
 
-func (m ElectionMessages) GetCandidates(vs ValidatorSet, data SortitionData) ([]VRFCandidate, lib.ErrorI) {
+func (m ElectionMessages) GetCandidates(vs lib.ValidatorSetWrapper, data SortitionData) ([]VRFCandidate, lib.ErrorI) {
 	var candidates []VRFCandidate
 	for _, msg := range m {
 		vrf := msg.GetVrf()
@@ -70,7 +73,7 @@ func (hlm *HeightLeaderMessages) AddLeaderMessage(message *Message) lib.ErrorI {
 	defer hlm.Unlock()
 	rlm := hlm.roundLeaderMessages[message.Header.Round]
 	phase := message.Header.Phase
-	if phase == Phase_ELECTION {
+	if phase == lib.Phase_ELECTION {
 		for _, msg := range rlm.Election {
 			if bytes.Equal(msg.Signature.PublicKey, message.Signature.PublicKey) {
 				return ErrDuplicateLeaderMessage()
@@ -88,7 +91,7 @@ func (hlm *HeightLeaderMessages) AddLeaderMessage(message *Message) lib.ErrorI {
 	return nil
 }
 
-func (hlm *HeightLeaderMessages) GetLeaderMessage(view *View) *Message {
+func (hlm *HeightLeaderMessages) GetLeaderMessage(view *lib.View) *Message {
 	hlm.Lock()
 	defer hlm.Unlock()
 	view.Phase--
@@ -107,13 +110,14 @@ type PhaseVoteSet map[string]VoteSet     // vote -> VoteSet
 
 type VoteSet struct {
 	vote                  *Message
+	doubleSigners         lib.Evidence
 	highQC                *QuorumCertificate
 	multiKey              crypto.MultiPublicKeyI
 	totalVotedPower       string
 	minimumPowerForQuorum string // 2f+1
 }
 
-func (hvs *HeightVoteSet) AddVote(view *View, vote *Message, v ValidatorSet) lib.ErrorI {
+func (hvs *HeightVoteSet) AddVote(app lib.App, view *lib.View, vote *Message, v lib.ValidatorSetWrapper) lib.ErrorI {
 	hvs.Lock()
 	defer hvs.Unlock()
 	var vs VoteSet
@@ -123,9 +127,9 @@ func (hvs *HeightVoteSet) AddVote(view *View, vote *Message, v ValidatorSet) lib
 		return err
 	}
 	phase, round := vote.Qc.Header.Phase, vote.Qc.Header.Round
-	if phase == Phase_ROUND_INTERRUPT {
+	if phase == lib.Phase_ROUND_INTERRUPT {
 		vs = hvs.pacemakerVotes[round]
-		vs, err = hvs.addVote(view, vote, vs, val, v)
+		vs, err = hvs.addVote(app, view, vote, vs, val, v)
 		if err != nil {
 			return err
 		}
@@ -135,7 +139,7 @@ func (hvs *HeightVoteSet) AddVote(view *View, vote *Message, v ValidatorSet) lib
 		bz, _ := vote.SignBytes()
 		key = lib.BytesToString(bz)
 		pvs := rvs[phase]
-		vs, err = hvs.addVote(view, vote, pvs[key], val, v)
+		vs, err = hvs.addVote(app, view, vote, pvs[key], val, v)
 		if err != nil {
 			return err
 		}
@@ -146,10 +150,10 @@ func (hvs *HeightVoteSet) AddVote(view *View, vote *Message, v ValidatorSet) lib
 	return nil
 }
 
-func (hvs *HeightVoteSet) addVote(view *View, vote *Message, vs VoteSet, val *Validator, valSet ValidatorSet) (voteSet VoteSet, err lib.ErrorI) {
+func (hvs *HeightVoteSet) addVote(app lib.App, view *lib.View, vote *Message, vs VoteSet, val *lib.ValidatorWrapper, v lib.ValidatorSetWrapper) (voteSet VoteSet, err lib.ErrorI) {
 	enabled, er := vs.multiKey.SignerEnabledAt(val.Index)
 	if er != nil {
-		return voteSet, ErrInvalidValidatorIndex()
+		return voteSet, lib.ErrInvalidValidatorIndex()
 	}
 	if enabled {
 		return voteSet, ErrDuplicateVote()
@@ -163,17 +167,31 @@ func (hvs *HeightVoteSet) addVote(view *View, vote *Message, vs VoteSet, val *Va
 	}
 	vs.vote = vote
 	if vote.HighQc != nil {
-		if err = vote.HighQc.CheckHighQC(view, valSet); err != nil {
+		if err = vote.HighQc.CheckHighQC(view, v); err != nil {
 			return vs, err
 		}
 		if vs.highQC == nil || vs.highQC.Header.Less(vote.Header) {
 			vs.highQC = vote.HighQc
 		}
 	}
+	if vote.Evidence != nil {
+	OUT:
+		for _, e1 := range vs.doubleSigners {
+			if err = e1.Check(app); err != nil {
+				continue
+			}
+			for _, e2 := range vote.Evidence {
+				if e1.Equals(e2) {
+					continue OUT
+				}
+			}
+			vs.doubleSigners = append(vs.doubleSigners, e1)
+		}
+	}
 	return vs, nil
 }
 
-func (hvs *HeightVoteSet) GetMaj23(view *View) (p *Message, sig, bitmap []byte, err lib.ErrorI) {
+func (hvs *HeightVoteSet) GetMaj23(view *lib.View) (p *Message, sig, bitmap []byte, err lib.ErrorI) {
 	hvs.Lock()
 	defer hvs.Unlock()
 	view.Phase--
@@ -183,6 +201,7 @@ func (hvs *HeightVoteSet) GetMaj23(view *View) (p *Message, sig, bitmap []byte, 
 		has23maj, _ := lib.StringsGTE(votes.totalVotedPower, votes.minimumPowerForQuorum)
 		if has23maj {
 			votes.vote.HighQc = votes.highQC
+			votes.vote.Evidence = votes.doubleSigners
 			signature, er := votes.multiKey.AggregateSignatures()
 			if er != nil {
 				return nil, nil, nil, ErrAggregateSignature(er)
@@ -190,7 +209,7 @@ func (hvs *HeightVoteSet) GetMaj23(view *View) (p *Message, sig, bitmap []byte, 
 			return votes.vote, signature, votes.multiKey.Bitmap(), nil
 		}
 	}
-	return nil, nil, nil, ErrNoMaj23()
+	return nil, nil, nil, lib.ErrNoMaj23()
 }
 
 // Pacemaker returns the highest round where 2/3rds majority have previously signed they were on

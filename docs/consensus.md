@@ -28,7 +28,7 @@ PRECOMMIT
 - Leader receives +2/3 signatures from replicas confirming the validity of PROPOSE-MSG and sends the votes to the replicas
 
 PRECOMMIT-VOTE
-- Replicas check the validity of QC.Votes (PROPOSE votes), set `lockQC` to QC
+- Replicas check the validity of QC.Votes (PROPOSE votes), set `highQC` to QC
 - Replicas send a signed vote back to the Leader
 
 COMMIT
@@ -51,8 +51,15 @@ ATTACKS:
 
 NOTES:
 - Each phase waits delta time bound for consistent block times and to prevent hidden lock problem
-- TODO add byzantine evidence to messages
-- TODO validators fall behind 1 block
+
+- A COMMIT message is used as justification to add a block to the blockchain for any node, however consensus on the
+  commit message isn't able to be achieved until height+1 since there's not an additional phase guaranteeing the
+  exact contents of the commit message. Meaning a commit message is enough proof that we can commit the current block
+  but not enough proof to add it to the block, modifying the block hash, and make state changes based on it until the
+  next height. Even if an additional phase of consensus was added, the block may become invalid based on the COMMIT message.
+
+  Thus, while syncing the blocks are verified the same height, but the contents of the commit message aren't applied until
+  height+1 e.g rewarding the proposer, slashing non-signers etc.
 
 FAQ:
 - Why not 3 phase hotstuff for optimistic responsiveness?

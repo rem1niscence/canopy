@@ -70,7 +70,7 @@ const (
 	CodeNotVRFCandidate                 ErrorCode   = 32
 	CodeMismatchPublicKeys              ErrorCode   = 33
 	CodeEmptyPreviousAggregateSignature ErrorCode   = 34
-	CodePublicKeyFromBytes              ErrorCode   = 35
+	CodeEmptyEvidence                   ErrorCode   = 35
 	CodeAggregateSignature              ErrorCode   = 36
 	CodeEmptyQuorumCertificate          ErrorCode   = 37
 	CodeEmptyQuorumCertificatePayload   ErrorCode   = 38
@@ -79,6 +79,9 @@ const (
 	CodeInvalidValidatorIndex           ErrorCode   = 41
 	CodeUnableToAddSigner               ErrorCode   = 42
 	CodeEmptyLeaderMessage              ErrorCode   = 43
+	CodeInvalidBlockTime                ErrorCode   = 44
+	CodeInvalidEvidence                 ErrorCode   = 45
+	CodeDuplicateEvidence               ErrorCode   = 46
 
 	StateMachineModule          ErrorModule = "state_machine"
 	CodeFeeBelowState           ErrorCode   = 2
@@ -271,4 +274,76 @@ func ErrPubKeyFromBytes(err error) ErrorI {
 
 func ErrNewMultiPubKey(err error) ErrorI {
 	return NewError(CodeNewMultiPubKey, MainModule, fmt.Sprintf("newMultiPubKey() failed with err: %s", err.Error()))
+}
+
+func ErrWrongHeight() ErrorI {
+	return NewError(CodeWrongHeight, ConsensusModule, "wrong height")
+}
+
+func ErrEmptyView() ErrorI {
+	return NewError(CodeEmptyView, ConsensusModule, "empty view")
+}
+
+func ErrWrongRound() ErrorI {
+	return NewError(CodeWrongRound, ConsensusModule, "wrong round")
+}
+
+func ErrWrongPhase() ErrorI {
+	return NewError(CodeWrongPhase, ConsensusModule, "wrong phase")
+}
+
+func ErrEmptyQuorumCertificate() ErrorI {
+	return NewError(CodeEmptyQuorumCertificate, ConsensusModule, "empty quorum certificate")
+}
+
+func ErrDuplicateEvidence() ErrorI {
+	return NewError(CodeDuplicateEvidence, ConsensusModule, "duplicate evidence")
+}
+
+func ErrEmptyAggregateSignature() ErrorI {
+	return NewError(CodeEmptyAggregateSignature, ConsensusModule, "empty aggregate signature")
+}
+
+func ErrEmptyAggregatePreviousSignature() ErrorI {
+	return NewError(CodeEmptyPreviousAggregateSignature, ConsensusModule, "empty previous aggregate signature")
+}
+
+func ErrInvalidAggrSignatureLength() ErrorI {
+	return NewError(CodeInvalidAggregateSignatureLen, ConsensusModule, "invalid aggregate signature length")
+}
+
+func ErrEmptySignerBitmap() ErrorI {
+	return NewError(CodeEmptyAggregateSignatureBitmap, ConsensusModule, "empty signer bitmap")
+}
+
+func ErrInvalidSignerBitmap(err error) ErrorI {
+	return NewError(CodeInvalidAggregateSignatureBitmap, ConsensusModule, fmt.Sprintf("invalid signature bitmap: %s", err.Error()))
+}
+
+func ErrInvalidAggrSignature() ErrorI {
+	return NewError(CodeInvalidAggregateSignature, ConsensusModule, "invalid aggregate signature")
+}
+
+func ErrNoMaj23() ErrorI {
+	return NewError(CodeNoMaj23, ConsensusModule, "quorum not reached")
+}
+
+func ErrValidatorNotInSet(publicKey []byte) ErrorI {
+	return NewError(CodeValidatorNotInSet, ConsensusModule, fmt.Sprintf("validator %s not found in validator set", BytesToString(publicKey)))
+}
+
+func ErrInvalidValidatorIndex() ErrorI {
+	return NewError(CodeInvalidValidatorIndex, ConsensusModule, "invalid validator index")
+}
+
+func ErrInvalidBlockTime() ErrorI {
+	return NewError(CodeInvalidBlockTime, ConsensusModule, "invalid block time")
+}
+
+func ErrEmptyEvidence() ErrorI {
+	return NewError(CodeEmptyEvidence, ConsensusModule, "evidence is empty")
+}
+
+func ErrInvalidEvidence() ErrorI {
+	return NewError(CodeInvalidEvidence, ConsensusModule, "evidence is invalid")
 }

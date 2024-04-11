@@ -212,7 +212,7 @@ type ValidatorParams struct {
 	ValidatorMaxPauseBlocks             *Uint64Param `protobuf:"bytes,5,opt,name=validator_max_pause_blocks,json=validatorMaxPauseBlocks,proto3" json:"validator_max_pause_blocks,omitempty"`
 	ValidatorMaxEvidenceAgeInBlocks     *Uint64Param `protobuf:"bytes,6,opt,name=validator_max_evidence_age_in_blocks,json=validatorMaxEvidenceAgeInBlocks,proto3" json:"validator_max_evidence_age_in_blocks,omitempty"`
 	ValidatorDoubleSignSlashPercentage  *Uint64Param `protobuf:"bytes,7,opt,name=validator_double_sign_slash_percentage,json=validatorDoubleSignSlashPercentage,proto3" json:"validator_double_sign_slash_percentage,omitempty"`
-	ValidatorFaultySignSlashPercentage  *Uint64Param `protobuf:"bytes,8,opt,name=validator_faulty_sign_slash_percentage,json=validatorFaultySignSlashPercentage,proto3" json:"validator_faulty_sign_slash_percentage,omitempty"`
+	ValidatorFaultySignSlashPercentage  *Uint64Param `protobuf:"bytes,8,opt,name=validator_faulty_sign_slash_percentage,json=validatorFaultySignSlashPercentage,proto3" json:"validator_faulty_sign_slash_percentage,omitempty"` // TODO remove
 	ValidatorBadProposalSlashPercentage *Uint64Param `protobuf:"bytes,9,opt,name=validator_bad_proposal_slash_percentage,json=validatorBadProposalSlashPercentage,proto3" json:"validator_bad_proposal_slash_percentage,omitempty"`
 	ValidatorNonSignSlashPercentage     *Uint64Param `protobuf:"bytes,10,opt,name=validator_non_sign_slash_percentage,json=validatorNonSignSlashPercentage,proto3" json:"validator_non_sign_slash_percentage,omitempty"`
 	ValidatorMaxNonSign                 *Uint64Param `protobuf:"bytes,11,opt,name=validator_max_non_sign,json=validatorMaxNonSign,proto3" json:"validator_max_non_sign,omitempty"`

@@ -20,28 +20,63 @@ message BlockHeader {
   bytes validator_root = 10;
   bytes next_validator_root = 11;
   bytes proposer_address = 12;
-  bytes quorum_certificate = 13;
+  repeated DoubleSignEvidence evidence = 13;
+  repeated bytes double_signers = 14;
+  repeated bytes bad_proposers = 15;
+  QuorumCertificate last_quorum_certificate = 16;
 }
 
 message Block {
-  BlockHeader blockHeader = 1;
+  BlockHeader block_header = 1;
   repeated bytes transactions = 2;
 }
 
 message BlockResult {
-  BlockHeader blockHeader = 1;
+  BlockHeader block_header = 1;
   repeated TxResult transactions = 2;
 }
 
 message BeginBlockParams {
-  bytes proposerAddress = 1;
-  repeated bytes badProposers = 2;
-  repeated bytes nonSigners = 3;
-  repeated bytes faultySigners = 4;
-  repeated bytes doubleSigners = 5;
-  ValidatorSet ValidatorSet = 6;
+  BlockHeader block_header = 1;
+  ValidatorSet validator_set = 2;
 }
 
 message EndBlockParams {
   ValidatorSet ValidatorSet = 1;
+}
+
+message DoubleSignEvidence {
+  QuorumCertificate vote_a = 1;
+  QuorumCertificate vote_b = 2;
+}
+
+enum Phase {
+  UNKNOWN = 0;
+  ELECTION = 1;
+  ELECTION_VOTE = 2;
+  PROPOSE = 3;
+  PROPOSE_VOTE = 4;
+  PRECOMMIT = 5;
+  PRECOMMIT_VOTE = 6;
+  COMMIT = 7;
+  COMMIT_PROCESS = 8;
+  ROUND_INTERRUPT = 9;
+}
+
+message QuorumCertificate {
+  View header = 1; // replica vote view
+  Block block = 2; // used after EV
+  bytes leader_public_key = 3; // only EV and PROPOSE
+  AggregateSignature signature = 5; // aggregate signature from the current leader message
+}
+
+message View {
+  uint64 height = 1;
+  uint64 round = 2;
+  Phase phase = 3;
+}
+
+message AggregateSignature {
+  bytes signature = 1;
+  bytes bitmap = 2;
 }
