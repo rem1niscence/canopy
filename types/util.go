@@ -121,11 +121,34 @@ func StringDiv(s, s2 string) (string, ErrorI) {
 	return BigIntToString(c), nil
 }
 
+func StringPercentDiv(s, s2 string) (int, ErrorI) {
+	a, err := StringToBigFloat(s)
+	if err != nil {
+		return 0, err
+	}
+	b, err := StringToBigFloat(s2)
+	if err != nil {
+		return 0, err
+	}
+	c := new(big.Float).Quo(a, b)
+	f, _ := c.Float64()
+	return int(f * 100), nil
+}
+
 func StringToBigInt(s string) (*big.Int, ErrorI) {
 	b := big.Int{}
 	i, ok := b.SetString(s, 10)
 	if !ok {
 		return nil, errStringToBigInt()
+	}
+	return i, nil
+}
+
+func StringToBigFloat(s string) (*big.Float, ErrorI) {
+	b := big.Float{}
+	i, ok := b.SetString(s)
+	if !ok {
+		return nil, errStringToBigFloat()
 	}
 	return i, nil
 }

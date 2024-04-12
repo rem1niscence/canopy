@@ -1,86 +1,72 @@
 package state_machine
 
 import (
+	"github.com/ginchuco/ginchu/crypto"
+	"github.com/ginchuco/ginchu/state_machine/fsm"
 	lib "github.com/ginchuco/ginchu/types"
 )
 
-type StateMachine struct {
-	protocolVersion int
-	height          uint64
-	store           lib.RWStoreI
+type State struct {
+	store  lib.StoreI
+	params *lib.BeginBlockParams
+	chain  *ChainParams
+	fsm    *fsm.StateMachine
+	log    lib.Logger
 }
 
-func NewStateMachine(protocolVersion int, height uint64, store lib.RWStoreI) *StateMachine {
-	return &StateMachine{protocolVersion: protocolVersion, height: height, store: store}
+type ChainParams struct {
+	SelfAddress     crypto.AddressI
+	NetworkID       []byte
+	MaxBlockBytes   uint64
+	ProtocolVersion int
 }
 
-func (s *StateMachine) Store() lib.RWStoreI         { return s.store }
-func (s *StateMachine) SetStore(store lib.RWStoreI) { s.store = store }
-func (s *StateMachine) Height() uint64              { return s.height }
-func (s *StateMachine) SetHeight(height uint64)     { s.height = height }
-
-func (s *StateMachine) Set(k, v []byte) lib.ErrorI {
-	store := s.Store()
-	if err := store.Set(k, v); err != nil {
-		return err
+func NewState(store lib.StoreI, vs *lib.ValidatorSet, lastBlock *lib.BlockHeader, chain *ChainParams, log lib.Logger) State {
+	return State{
+		store: store,
+		params: &lib.BeginBlockParams{
+			BlockHeader:  lastBlock,
+			ValidatorSet: vs,
+		},
+		chain: chain,
+		fsm:   fsm.NewStateMachine(chain.ProtocolVersion, store.Version(), store),
+		log:   log,
 	}
-	return nil
 }
 
-func (s *StateMachine) Get(key []byte) ([]byte, lib.ErrorI) {
-	store := s.Store()
-	bz, err := store.Get(key)
+func (s *State) txnWrap() (lib.StoreTxnI, func()) {
+	txn := s.store.NewTxn()
+	s.fsm.SetStore(txn)
+	return txn, func() { s.fsm.SetStore(s.store); txn.Discard() }
+}
+
+func (s *State) beginBlock() lib.ErrorI {
+	return s.fsm.BeginBlock(s.params)
+}
+func (s *State) endBlock() (*lib.EndBlockParams, lib.ErrorI) { return s.fsm.EndBlock() }
+func (s *State) reset()                                      { s.store.Reset() }
+func (s *State) height() uint64                              { return s.store.Version() }
+
+func (s *State) applyTransaction(tx []byte, index int) (*lib.TxResult, lib.ErrorI) {
+	return s.fsm.ApplyTransaction(uint64(index), tx, crypto.HashString(tx))
+}
+
+func (s *State) resetToBeginBlock() {
+	s.reset()
+	if err := s.beginBlock(); err != nil {
+		s.log.Error(err.Error())
+	}
+}
+
+func (s *State) copy() (*State, lib.ErrorI) {
+	storeCopy, err := s.store.Copy()
 	if err != nil {
 		return nil, err
 	}
-	return bz, nil
-}
-
-func (s *StateMachine) Delete(key []byte) lib.ErrorI {
-	store := s.Store()
-	if err := store.Delete(key); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *StateMachine) DeleteAll(keys [][]byte) lib.ErrorI {
-	for _, key := range keys {
-		if err := s.Delete(key); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *StateMachine) IterateAndExecute(prefix []byte, callback func(key, value []byte) lib.ErrorI) lib.ErrorI {
-	it, err := s.Iterator(prefix)
-	if err != nil {
-		return err
-	}
-	defer it.Close()
-	for ; it.Valid(); it.Next() {
-		if err = callback(it.Key(), it.Value()); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *StateMachine) Iterator(key []byte) (lib.IteratorI, lib.ErrorI) {
-	store := s.Store()
-	it, err := store.Iterator(key)
-	if err != nil {
-		return nil, err
-	}
-	return it, nil
-}
-
-func (s *StateMachine) RevIterator(key []byte) (lib.IteratorI, lib.ErrorI) {
-	store := s.Store()
-	it, err := store.RevIterator(key)
-	if err != nil {
-		return nil, err
-	}
-	return it, nil
+	return &State{
+		store:  storeCopy,
+		params: s.params,
+		fsm:    fsm.NewStateMachine(s.chain.ProtocolVersion, storeCopy.Version(), storeCopy),
+		log:    s.log,
+	}, nil
 }

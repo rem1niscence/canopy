@@ -20,10 +20,9 @@ message BlockHeader {
   bytes validator_root = 10;
   bytes next_validator_root = 11;
   bytes proposer_address = 12;
-  repeated DoubleSignEvidence evidence = 13;
-  repeated bytes double_signers = 14;
-  repeated bytes bad_proposers = 15;
-  QuorumCertificate last_quorum_certificate = 16;
+  repeated bytes bad_proposers = 13;
+  repeated bytes last_double_signers = 14;
+  QuorumCertificate last_quorum_certificate = 15;
 }
 
 message Block {
@@ -45,9 +44,17 @@ message EndBlockParams {
   ValidatorSet ValidatorSet = 1;
 }
 
+message ProducerKeys {
+  repeated bytes producer_keys = 1;
+}
+
 message DoubleSignEvidence {
   QuorumCertificate vote_a = 1;
   QuorumCertificate vote_b = 2;
+}
+
+message BadProposerEvidence {
+  QuorumCertificate election_vote_qc = 1;
 }
 
 enum Phase {

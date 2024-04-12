@@ -1,6 +1,12 @@
 # CHANGELOG
 
+## [Unreleased] - 04/11/2024
+
+- Added `byzantine` evidence logic to consensus
+- Added `lastProducers` logic to state_machine
+
 ## [Unreleased] - 04/09/2024
+
 - Added `syncing` logic
 - Started `byzantine` evidence logic
 - Added indexing for `evidence` and `qc`
@@ -8,6 +14,7 @@
 - Updated `block` structure with `last_qc` and `evidence`
 
 ## [Unreleased] - 04/06/2024
+
 - Consolidated `leader election` and `consensus` packages
 - Added verification to `Message` and `AggrSig` structures
 - Added `consensus` diagrams
@@ -15,6 +22,7 @@
 - Fixed `hvs` and `hlm` structures
 
 ## [Unreleased] - 03/30/2024
+
 - Added `leader_election` VRF and CDF
 - Continued `hotstuff` logic
 - Added `consensus` messages
@@ -25,8 +33,8 @@
 - Added `vote` and `leader` message container structures
 - Added `consensus` documentation
 
-
 ## [Unreleased] - 03/29/2024
+
 - Added `bls` crypto
 - Started `hotstuff` logic
 - Added `consensus.proto` types

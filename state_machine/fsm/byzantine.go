@@ -1,4 +1,4 @@
-package state_machine
+package fsm
 
 import (
 	"github.com/ginchuco/ginchu/crypto"

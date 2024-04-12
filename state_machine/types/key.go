@@ -16,6 +16,7 @@ var (
 	pausedPrefix    = []byte{6}
 	paramsPrefix    = []byte{7}
 	nonSignerPrefix = []byte{8}
+	producersPrefix = []byte{9}
 )
 
 func KeyForAccount(address crypto.AddressI) []byte { return append(accountPrefix, address.Bytes()...) }
@@ -43,6 +44,7 @@ func ConsensusPrefix() []byte              { return consensusPrefix }
 func NonSignerPrefix() []byte              { return nonSignerPrefix }
 func UnstakingPrefix(height uint64) []byte { return append(unstakePrefix, formatHeight(height)...) }
 func PausedPrefix(height uint64) []byte    { return append(pausedPrefix, formatHeight(height)...) }
+func ProducersPrefix() []byte              { return producersPrefix }
 
 func AddressFromKey(k []byte) (crypto.AddressI, types.ErrorI) {
 	n := len(k)

@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+type DSE = lib.DoubleSignEvidences
+type BPE = lib.BadProposerEvidences
+type BE = lib.ByzantineEvidence
+
 type ConsensusState struct {
 	lib.View
 
@@ -23,7 +27,8 @@ type ConsensusState struct {
 	Block               *lib.Block
 	ProducersPublicKeys [][]byte
 
-	BadProposers [][]byte
+	ByzantineEvidence     *BE
+	NextByzantineEvidence *BE
 
 	PublicKey  crypto.PublicKeyI
 	PrivateKey crypto.PrivateKeyI
@@ -34,7 +39,7 @@ type ConsensusState struct {
 	log    lib.LoggerI
 }
 
-func NewConsensusState(height uint64, producersKeys [][]byte, v *lib.ValidatorSet, pk crypto.PrivateKeyI,
+func NewConsensusState(height uint64, v *lib.ValidatorSet, pk crypto.PrivateKeyI,
 	p lib.P2P, a lib.App, c Config, l lib.LoggerI) (*ConsensusState, lib.ErrorI) {
 	validatorSet, err := lib.NewValidatorSet(v)
 	if err != nil {
@@ -51,18 +56,19 @@ func NewConsensusState(height uint64, producersKeys [][]byte, v *lib.ValidatorSe
 		LeaderMessages: HeightLeaderMessages{
 			Mutex:               sync.Mutex{},
 			roundLeaderMessages: make(map[uint64]RoundLeaderMessages),
+			partialQCs:          make(map[string]*QuorumCertificate),
 		},
-		ProducersPublicKeys: producersKeys,
-		PublicKey:           pk.PublicKey(),
-		PrivateKey:          pk,
-		P2P:                 p,
-		App:                 a,
-		Config:              c,
-		log:                 l,
+		PublicKey:  pk.PublicKey(),
+		PrivateKey: pk,
+		P2P:        p,
+		App:        a,
+		Config:     c,
+		log:        l,
 	}, nil
 }
 
 func (cs *ConsensusState) Start() {
+	cs.NewHeight()
 	for {
 		now := time.Now()
 		timer := &now
@@ -101,6 +107,7 @@ func (cs *ConsensusState) StartElectionPhase() {
 		cs.log.Error(err.Error())
 		return
 	}
+	cs.ProducersPublicKeys = cs.App.GetProducerPubKeys()
 	// SORTITION (CDF + VRF)
 	_, vrf, isCandidate := Sortition(&SortitionParams{
 		SortitionData: SortitionData{
@@ -139,13 +146,22 @@ func (cs *ConsensusState) StartElectionVotePhase() {
 	}
 	cs.LeaderPublicKey = SelectLeaderFromCandidates(candidates, sortitionData, cs.ValidatorSet.ValidatorSet)
 
+	// CHECK BYZANTINE EVIDENCE
+	bpe, dse := BPE(nil), DSE(nil)
+	if cs.ByzantineEvidence != nil {
+		bpe = cs.ByzantineEvidence.BPE
+		dse = cs.ByzantineEvidence.DSE
+	}
+
 	// SEND VOTE TO LEADER
 	cs.SendToLeader(&Message{
 		Qc: &QuorumCertificate{
 			Header:          cs.View.Copy(),
 			LeaderPublicKey: cs.LeaderPublicKey.Bytes(),
 		},
-		HighQc: cs.HighQC,
+		HighQc:                 cs.HighQC,
+		LastDoubleSignEvidence: dse,
+		BadProposerEvidence:    bpe,
 	})
 }
 
@@ -156,15 +172,22 @@ func (cs *ConsensusState) StartProposePhase() {
 		cs.log.Error(err.Error())
 		return
 	}
+	// GATHER BYZANTINE EVIDENCE
+	dse, bpe := DSE(vote.LastDoubleSignEvidence), BPE(vote.BadProposerEvidence)
 	// PRODUCE BLOCK OR USE HQC BLOCK
 	if vote.HighQc == nil {
-		var doubleSigners [][]byte
-		doubleSigners, err = lib.Evidence(doubleSignEvidence).GetDoubleSigners(cs.App)
+		var lastDoubleSigners, badProposers [][]byte
+		lastDoubleSigners, err = dse.GetDoubleSigners(cs.App)
 		if err != nil {
 			cs.log.Error(err.Error())
 			return
 		}
-		cs.Block, err = cs.App.ProduceCandidateBlock(cs.BadProposers, doubleSigners)
+		badProposers, err = bpe.GetBadProposers(vote.Qc.LeaderPublicKey, cs.Height, cs.ValidatorSet)
+		if err != nil {
+			cs.log.Error(err.Error())
+			return
+		}
+		cs.Block, err = cs.App.ProduceCandidateBlock(badProposers, lastDoubleSigners)
 		if err != nil {
 			cs.log.Error(err.Error())
 			return
@@ -176,7 +199,6 @@ func (cs *ConsensusState) StartProposePhase() {
 	// SEND MSG TO REPLICAS
 	cs.SendToReplicas(&Message{
 		Header: cs.Copy(),
-		HighQc: cs.HighQC,
 		Qc: &QuorumCertificate{
 			Header:          vote.Qc.Header,
 			Block:           cs.Block,
@@ -186,6 +208,9 @@ func (cs *ConsensusState) StartProposePhase() {
 				Bitmap:    bitmap,
 			},
 		},
+		HighQc:                 cs.HighQC,
+		LastDoubleSignEvidence: dse,
+		BadProposerEvidence:    bpe,
 	})
 }
 
@@ -200,12 +225,17 @@ func (cs *ConsensusState) StartProposeVotePhase() (interrupt bool) {
 			return true
 		}
 	}
+	byzantineEvidence := BE{
+		DSE: msg.LastDoubleSignEvidence,
+		BPE: msg.BadProposerEvidence,
+	}
 	// CHECK CANDIDATE BLOCK AGAINST STATE MACHINE
-	if err := cs.App.CheckCandidateBlock(msg.Qc.Block); err != nil {
+	if err := cs.App.CheckCandidateBlock(msg.Qc.Block, &byzantineEvidence); err != nil {
 		cs.log.Error(err.Error())
 		return true
 	}
 	cs.Block = msg.Qc.Block
+	cs.ByzantineEvidence = &byzantineEvidence
 	// SEND VOTE TO LEADER
 	cs.SendToLeader(&Message{
 		Qc: &QuorumCertificate{
@@ -291,13 +321,16 @@ func (cs *ConsensusState) StartCommitProcessPhase() (interrupt bool) {
 	if err := cs.App.CommitBlock(msg.Qc); err != nil {
 		return true
 	}
+	cs.ByzantineEvidence = cs.LeaderMessages.GetByzantineEvidence(cs.App, cs.View.Copy(),
+		cs.ValidatorSet, cs.LeaderPublicKey.Bytes(), cs.Votes, cs.SelfIsLeader())
+	cs.NewHeight()
 	return
 }
 
 func (cs *ConsensusState) CheckLeaderAndBlock(msg *Message) (interrupt bool) {
 	// CONFIRM IS LEADER
 	if !cs.IsLeader(msg.Signature.PublicKey) {
-		cs.log.Error(ErrInvalidLeaderPublicKey().Error())
+		cs.log.Error(lib.ErrInvalidLeaderPublicKey().Error())
 		return true
 	}
 
@@ -312,13 +345,24 @@ func (cs *ConsensusState) CheckLeaderAndBlock(msg *Message) (interrupt bool) {
 func (cs *ConsensusState) HandleMessage(message proto.Message) lib.ErrorI {
 	switch msg := message.(type) {
 	case *Message:
-		if err := msg.Check(cs.View.Copy(), cs.ValidatorSet); err != nil {
-			return err
-		}
 		switch {
 		case msg.IsReplicaMessage() || msg.IsPacemakerMessage():
-			return cs.Votes.AddVote(cs.App, cs.View.Copy(), msg, cs.ValidatorSet)
+			isPartialQC, err := msg.Check(cs.View.Copy(), cs.ValidatorSet)
+			if err != nil {
+				return err
+			}
+			if isPartialQC {
+				return lib.ErrNoMaj23()
+			}
+			return cs.Votes.AddVote(cs.App, cs.LeaderPublicKey.Bytes(), cs.View.Copy(), msg, cs.ValidatorSet)
 		case msg.IsLeaderMessage():
+			partialQC, err := msg.Check(cs.View.Copy(), cs.ValidatorSet)
+			if err != nil {
+				return err
+			}
+			if partialQC {
+				return cs.LeaderMessages.AddIncompleteQC(msg)
+			}
 			return cs.LeaderMessages.AddLeaderMessage(msg)
 		}
 	}
@@ -332,9 +376,25 @@ func (cs *ConsensusState) RoundInterrupt(timer *time.Time) {
 		Header: cs.View.Copy(),
 	})
 	cs.ResetAndSleep(timer)
+	cs.NewRound()
+	cs.Pacemaker()
+}
+
+func (cs *ConsensusState) NewRound() {
 	cs.Round++
 	cs.Phase = lib.Phase_ELECTION
-	cs.Pacemaker()
+	cs.Votes.NewRound(cs.Round)
+	cs.LeaderMessages.NewRound(cs.Round, cs.ValidatorSet.Key)
+}
+func (cs *ConsensusState) NewHeight() {
+	cs.Height++
+	cs.Round = -1
+	cs.HighQC = nil
+	cs.LeaderPublicKey = nil
+	cs.Block = nil
+	cs.Votes.NewHeight()
+	cs.LeaderMessages.NewHeight()
+	cs.NewRound()
 }
 
 func (cs *ConsensusState) Pacemaker() {
@@ -396,6 +456,28 @@ func (cs *ConsensusState) SelfIsLeader() bool {
 
 func (cs *ConsensusState) IsLeader(sender []byte) bool {
 	return bytes.Equal(sender, cs.LeaderPublicKey.Bytes())
+}
+
+func (cs *ConsensusState) SendToReplicas(msg lib.Signable) {
+	if err := msg.Sign(cs.PrivateKey); err != nil {
+		cs.log.Error(err.Error())
+		return
+	}
+	if err := cs.P2P.SendToValidators(msg); err != nil {
+		cs.log.Error(err.Error())
+		return
+	}
+}
+
+func (cs *ConsensusState) SendToLeader(msg lib.Signable) {
+	if err := msg.Sign(cs.PrivateKey); err != nil {
+		cs.log.Error(err.Error())
+		return
+	}
+	if err := cs.P2P.SendToOne(cs.LeaderPublicKey.Bytes(), msg); err != nil {
+		cs.log.Error(err.Error())
+		return
+	}
 }
 
 type Config struct {

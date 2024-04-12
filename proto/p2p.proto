@@ -37,3 +37,7 @@ message BlockRequestMessage {
 message BlockResponseMessage {
   QuorumCertificate BlockAndCertificate = 1;
 }
+
+message TxMessage {
+  bytes Tx = 1;
+}

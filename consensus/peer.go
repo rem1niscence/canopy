@@ -22,11 +22,12 @@ import (
 const (
 	SyncTimeoutS = 5
 
-	PeerGoodBlock = 3
-
+	PeerGoodBlock               = 3
+	PeerGoodTx                  = 3
 	PeerTimeoutSlash            = -1
 	PeerUnexpectedBlockSlash    = -1
 	PeerInvalidBlockHeightSlash = -1
+	PeerInvalidTxSlash          = -1
 	PeerNotValidator            = -3
 	PeerInvalidMessageSlash     = -3
 	PeerInvalidBlockSlash       = -3
@@ -94,33 +95,29 @@ func (cs *ConsensusState) ListenForNewBlock() {
 	}
 }
 
-func (cs *ConsensusState) ValidatePeerBlock(height uint64, msg lib.MessageWrapper, vs lib.ValidatorSetWrapper) (*QuorumCertificate, lib.ErrorI) {
-	senderID := msg.Sender.PublicKey
-	response, ok := msg.Message.(*lib.BlockResponseMessage)
-	if !ok {
-		cs.P2P.ChangeReputation(senderID, PeerInvalidMessageSlash)
-		return nil, ErrUnknownConsensusMsg(msg.Message)
+func (cs *ConsensusState) ListenForNewTx() {
+	app, p2p := cs.App, cs.P2P
+	receiver := p2p.ReceiveChannel(lib.Topic_TX)
+	for {
+		select {
+		case msg := <-receiver:
+			senderID := msg.Sender.PublicKey
+			txMsg, ok := msg.Message.(*lib.TxMessage)
+			if !ok {
+				p2p.ChangeReputation(senderID, PeerInvalidMessageSlash)
+				continue
+			}
+			if txMsg == nil {
+				p2p.ChangeReputation(senderID, PeerInvalidMessageSlash)
+				continue
+			}
+			if err := app.HandleTransaction(txMsg.Tx); err != nil {
+				p2p.ChangeReputation(senderID, PeerInvalidTxSlash)
+				continue
+			}
+			p2p.ChangeReputation(senderID, PeerGoodTx)
+		}
 	}
-	qc := response.BlockAndCertificate
-	p2p := cs.P2P
-	if err := qc.Check(&lib.View{Height: height + 1}, vs); err != nil {
-		p2p.ChangeReputation(senderID, PeerInvalidJustifySlash)
-		return nil, err
-	}
-	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
-		p2p.ChangeReputation(senderID, PeerInvalidJustifySlash)
-		return nil, lib.ErrWrongPhase()
-	}
-	block := qc.Block
-	if err := block.Check(); err != nil {
-		p2p.ChangeReputation(senderID, PeerInvalidBlockSlash)
-		return nil, err
-	}
-	if block.BlockHeader.Height != height+1 {
-		p2p.ChangeReputation(senderID, PeerInvalidBlockHeightSlash)
-		return nil, lib.ErrWrongHeight()
-	}
-	return qc, nil
 }
 
 func (cs *ConsensusState) ListenForNewBlockRequests() {
@@ -168,24 +165,36 @@ func (cs *ConsensusState) ListenForValidatorMessages() {
 	}
 }
 
-func (cs *ConsensusState) SendToReplicas(msg lib.Signable) {
-	if err := msg.Sign(cs.PrivateKey); err != nil {
-		cs.log.Error(err.Error())
-		return
+func (cs *ConsensusState) ValidatePeerBlock(height uint64, msg lib.MessageWrapper, vs lib.ValidatorSetWrapper) (*QuorumCertificate, lib.ErrorI) {
+	senderID := msg.Sender.PublicKey
+	response, ok := msg.Message.(*lib.BlockResponseMessage)
+	if !ok {
+		cs.P2P.ChangeReputation(senderID, PeerInvalidMessageSlash)
+		return nil, ErrUnknownConsensusMsg(msg.Message)
 	}
-	if err := cs.P2P.SendToValidators(msg); err != nil {
-		cs.log.Error(err.Error())
-		return
+	qc := response.BlockAndCertificate
+	p2p := cs.P2P
+	isPartialQC, err := qc.Check(&lib.View{Height: height + 1}, vs)
+	if err != nil {
+		p2p.ChangeReputation(senderID, PeerInvalidJustifySlash)
+		return nil, err
 	}
-}
-
-func (cs *ConsensusState) SendToLeader(msg lib.Signable) {
-	if err := msg.Sign(cs.PrivateKey); err != nil {
-		cs.log.Error(err.Error())
-		return
+	if isPartialQC {
+		p2p.ChangeReputation(senderID, PeerInvalidJustifySlash)
+		return nil, lib.ErrNoMaj23()
 	}
-	if err := cs.P2P.SendToOne(cs.LeaderPublicKey.Bytes(), msg); err != nil {
-		cs.log.Error(err.Error())
-		return
+	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
+		p2p.ChangeReputation(senderID, PeerInvalidJustifySlash)
+		return nil, lib.ErrWrongPhase()
 	}
+	block := qc.Block
+	if err = block.Check(); err != nil {
+		p2p.ChangeReputation(senderID, PeerInvalidBlockSlash)
+		return nil, err
+	}
+	if block.BlockHeader.Height != height+1 {
+		p2p.ChangeReputation(senderID, PeerInvalidBlockHeightSlash)
+		return nil, lib.ErrWrongHeight()
+	}
+	return qc, nil
 }

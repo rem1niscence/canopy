@@ -111,6 +111,50 @@ func (x *BlockHeader) Equals(b *BlockHeader) bool {
 	return true
 }
 
+func (b *BlockHeader) ValidateByzantineEvidence(app App, be *ByzantineEvidence) ErrorI {
+	if be == nil {
+		return nil
+	}
+	if b.LastDoubleSigners != nil {
+		doubleSigners, err := be.DSE.GetDoubleSigners(app)
+		if err != nil {
+			return err
+		}
+		if len(doubleSigners) != len(b.LastDoubleSigners) {
+			return ErrMismatchDoubleSignerCount()
+		}
+		for i, ds := range b.LastDoubleSigners {
+			if !bytes.Equal(doubleSigners[i], ds) {
+				return ErrMismatchEvidenceAndHeader()
+			}
+		}
+	}
+	if b.BadProposers != nil {
+		height := app.LatestHeight() + 1
+		vs, err := app.GetBeginStateValSet(height)
+		if err != nil {
+			return err
+		}
+		valSet, err := NewValidatorSet(vs)
+		if err != nil {
+			return err
+		}
+		badProposers, err := be.BPE.GetBadProposers(nil, height, valSet)
+		if err != nil {
+			return err
+		}
+		if len(badProposers) != len(b.BadProposers) {
+			return ErrMismatchBadProducerCount()
+		}
+		for i, ds := range b.LastDoubleSigners {
+			if !bytes.Equal(badProposers[i], ds) {
+				return ErrMismatchEvidenceAndHeader()
+			}
+		}
+	}
+	return nil
+}
+
 func (x *Block) Equals(b *Block) bool {
 	if x == nil || b == nil {
 		return false

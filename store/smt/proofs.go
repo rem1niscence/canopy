@@ -29,22 +29,22 @@ func (proof *SparseMerkleProof) sanityCheck(base *BaseSMT) bool {
 	// cause the verifier to fatally exit (e.g. due to an index out-of-range
 	// error) or cause a CPU DoS attack.
 
-	// Check that the number of supplied sidenodes does not exceed the maximum possible.
+	// FilterBad that the number of supplied sidenodes does not exceed the maximum possible.
 	if len(proof.SideNodes) > base.ph.PathSize()*8 ||
 
-		// Check that leaf data for non-membership proofs is a valid size.
+		// FilterBad that leaf data for non-membership proofs is a valid size.
 		(proof.NonMembershipLeafData != nil && len(proof.NonMembershipLeafData) < len(leafPrefix)+base.ph.PathSize()) {
 		return false
 	}
 
-	// Check that all supplied sidenodes are the correct size.
+	// FilterBad that all supplied sidenodes are the correct size.
 	for _, v := range proof.SideNodes {
 		if len(v) != base.th.hashSize() {
 			return false
 		}
 	}
 
-	// Check that the sibling data hashes to the first side node if not nil
+	// FilterBad that the sibling data hashes to the first side node if not nil
 	if proof.SiblingData == nil || len(proof.SideNodes) == 0 {
 		return true
 	}

@@ -1,4 +1,4 @@
-package app
+package state_machine
 
 import (
 	"github.com/ginchuco/ginchu/state_machine/types"

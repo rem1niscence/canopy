@@ -29,12 +29,47 @@
 
 State Machine Handling Byzantine Evidence:
 
-- Bad proposers, double signers, non signers and minority signers are proven via the finalized quorum certificate from
-  the majority
-- Bad proposers are easily retraced by seeing who were the proposers for all the rounds before the finalized round
-- Non signers are who didn's sign on the final QC
-- Minority signers are who signed faulty on the final QC
-- Double signers tracking is less straightforward, but likely can be included in the QC somehow
+- FAULTY LEADER
+  - Election Vote QC (Propose Msg) for round-1 that has `+2/3Maj` but where `leaderKey` != `producerKey`
+  - Evidence is tracked via `HeightLeaderMessages` as `ProposeMessages` 
+  - Evidence is submitted by replicas to leader during the Election Vote phase of the next round
+  - Evidence is summarized in the next block by the leader and included in the QC to convince replicas
+
+- DOUBLE SIGNER
+  - A Vote QC (Propose, Precommit or Commit Msg) for round-1 where a different QC exists for the same view `(h,r,p)`
+  - Evidence is tracked via `HeightLeaderMessages` as `LeaderMessages` and `HeightVoteSet` as `ElectionVoteQC`
+  - Evidence is submitted by replicas to leader during the Election Vote phase of the next round
+  - Evidence is summarized in the next block by the leader and included in the QC to convince replicas
+
+- NON SIGNER // TODO Leader block reward should also be degraded based on NON SIGNERS to prevent against omission attacks
+  - Precommit QC (Commit Msg) for the previous height that has `+2/3Maj` but isn't signed by a Validator
+  - Evidence is tracked via Leader `SignatureAggregation`
+  - Evidence is included in the next block by the next leader
+
+NOTE: Round-1 includes the latest round of height-1 if round == 0
+
+- FAQ:
+  - Q: Since Evidence must be from the view-1, isn't it possible evidence may go unreported in Type 2 async networks?
+  - A: The consensus mechanism waits a max-network-delay delta time bound to prevent the hidden lock issue. This is the entire basis
+  of the `lock + highQC` design and is considered a peer-reviewed safeguard of the liveness of the protocol. Since Canopy adopts the same
+  mechanism for evidence, the security guarantee is the same. Thus Canopy does not need to look any further back than height-1 for 
+  evidence.
+  
+  - Q: Why aren't Replica Votes structures used as a type of Double Sign evidence.
+  - A: Replica Double Votes are always summarized in the form of `2 QCs` as it's more scalable to track multiple double signers. 
+  It's not a security issue because if the reporter is a Leader Candidate than they have the ability to make a QC and will receive
+  an equivocating QC from the Leader and if the reporter is a Replica, then they received the equivocating QCs from two leaders.
+
+Brain Dump: Theoretically, a double signed Replica Message vote is a malicious thing - however without it being tied to a Leader Message,
+the vote is useless and expensive to track. Let's not forget that in the linear message complexity design, all messages must run through
+a `Leader` of sorts. Let's say a secondary byzantine leader is trying to get signatures for a conflicting view and block, they'd get
+a vote from the `double-signer` but that wouldn't be enough to do anything. The Byzantine Leader would need +2/3Maj signatures to fork
+the chain. Since the upper bound of faulty (double signers) validators if +1/3, he must ask 'good validators' to double sign. Thus,
+`double-signers` *must be outed* to pull of an attack to 'good validators'. Another scenario is if a Replica Double Signs Election Vote
+Messages, and a good Leader Candidate can prove that they signed for them and the true leader by reporting the `partial Election VoteQC` 
+and the`+2/3Maj Election Vote QC`. Since `Replicas` only receive messages from Leaders, the double-sign-evidence must come from Leader Messages 
+in the form of an `partial QC`.
+
 
 - Height 0 should be the database version of the genesis begin state and height 1 should be the database version of the 
   genesis end state. There are no quorum certificates associated with height 0 and height 1

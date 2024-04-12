@@ -114,7 +114,7 @@ func bulkCheckAll(t *testing.T, smt *SMTWithStorage, kv []bulkop) {
 			continue
 		}
 
-		// Check that the key is at the correct height in the tree.
+		// FilterBad that the key is at the correct height in the tree.
 		largestCommonPrefix := 0
 		for ki2 := range kv {
 			k2, v2 := kv[ki2].key, kv[ki2].val

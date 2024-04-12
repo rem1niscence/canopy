@@ -1,4 +1,4 @@
-package state_machine
+package fsm
 
 import (
 	"github.com/ginchuco/ginchu/crypto"
@@ -10,10 +10,11 @@ func (s *StateMachine) BeginBlock(beginBlock *lib.BeginBlockParams) lib.ErrorI {
 	if err := s.CheckProtocolVersion(); err != nil {
 		return err
 	}
-	if err := s.RewardProposer(crypto.NewAddressFromBytes(beginBlock.BlockHeader.ProposerAddress)); err != nil {
+	nonSignerPercent, err := s.HandleByzantine(beginBlock)
+	if err != nil {
 		return err
 	}
-	if err := s.HandleByzantine(beginBlock); err != nil {
+	if err = s.RewardProposer(crypto.NewAddressFromBytes(beginBlock.BlockHeader.ProposerAddress), nonSignerPercent); err != nil {
 		return err
 	}
 	return nil
@@ -80,7 +81,41 @@ func (s *StateMachine) CheckProtocolVersion() lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) RewardProposer(address crypto.AddressI) lib.ErrorI {
+func (s *StateMachine) UpdateProducerKeys(publicKey []byte) lib.ErrorI {
+	keys, err := s.GetProducerKeys()
+	if err != nil {
+		return err
+	}
+	if keys == nil || len(keys.ProducerKeys) == 0 {
+		keys = new(lib.ProducerKeys)
+		keys.ProducerKeys = make([][]byte, 5)
+	}
+	index := s.Height() % 5
+	keys.ProducerKeys[index] = publicKey
+	return s.SetProducerKeys(keys)
+}
+
+func (s *StateMachine) GetProducerKeys() (*lib.ProducerKeys, lib.ErrorI) {
+	bz, err := s.Get(types.ProducersPrefix())
+	if err != nil {
+		return nil, err
+	}
+	ptr := new(lib.ProducerKeys)
+	if err = lib.Unmarshal(bz, ptr); err != nil {
+		return nil, err
+	}
+	return ptr, nil
+}
+
+func (s *StateMachine) SetProducerKeys(keys *lib.ProducerKeys) lib.ErrorI {
+	bz, err := lib.Marshal(keys)
+	if err != nil {
+		return err
+	}
+	return s.Set(types.ProducersPrefix(), bz)
+}
+
+func (s *StateMachine) RewardProposer(address crypto.AddressI, nonSignerPercent int) lib.ErrorI {
 	validator, err := s.GetValidator(address)
 	if err != nil {
 		return err
@@ -89,33 +124,43 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	amount, err := lib.StringToBigInt(params.ValidatorBlockReward.Value)
+	if err = s.UpdateProducerKeys(validator.PublicKey); err != nil {
+		return err
+	}
+	reducedAmount, err := lib.StringReducePercentage(params.ValidatorBlockReward.Value, int8(nonSignerPercent))
+	if err != nil {
+		return err
+	}
+	amount, err := lib.StringToBigInt(reducedAmount)
 	if err != nil {
 		return err
 	}
 	return s.MintToAccount(crypto.NewAddressFromBytes(validator.Output), amount)
 }
 
-func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams) (err lib.ErrorI) {
+func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams) (nonSignerPercent int, err lib.ErrorI) {
 	block := beginBlock.BlockHeader
 	params, err := s.GetParamsVal()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if s.Height()%params.ValidatorNonSignWindow.Value == 0 {
 		if err = s.SlashAndResetNonSigners(params); err != nil {
-			return err
+			return 0, err
 		}
 	}
 	if err = s.SlashBadProposers(params, block.BadProposers); err != nil {
-		return err
+		return 0, err
 	}
-	if err = s.SlashDoubleSigners(params, beginBlock.DoubleSigners); err != nil {
-		return err
+	if err = s.SlashDoubleSigners(params, beginBlock.BlockHeader.LastDoubleSigners); err != nil {
+		return 0, err
 	}
-	nonSigners, err := block.LastQuorumCertificate.GetNonSigners(beginBlock.ValidatorSet)
+	nonSigners, nonSignerPercent, err := block.LastQuorumCertificate.GetNonSigners(beginBlock.ValidatorSet)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return s.IncrementNonSigners(nonSigners)
+	if err = s.IncrementNonSigners(nonSigners); err != nil {
+		return 0, err
+	}
+	return
 }

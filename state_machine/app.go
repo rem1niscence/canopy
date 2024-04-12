@@ -1,9 +1,9 @@
-package app
+package state_machine
 
 import (
 	"bytes"
 	"github.com/ginchuco/ginchu/crypto"
-	"github.com/ginchuco/ginchu/state_machine"
+	"github.com/ginchuco/ginchu/state_machine/fsm"
 	"github.com/ginchuco/ginchu/state_machine/types"
 	lib "github.com/ginchuco/ginchu/types"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -28,14 +28,20 @@ func (a *App) HandleTransaction(tx []byte) lib.ErrorI {
 }
 
 // CheckCandidateBlock checks the candidate block for errors and resets back to begin block state
-func (a *App) CheckCandidateBlock(candidate *lib.Block) (err lib.ErrorI) {
+func (a *App) CheckCandidateBlock(candidate *lib.Block, evidence *lib.ByzantineEvidence) (err lib.ErrorI) {
 	defer a.resetToBeginBlock()
-	_, _, err = a.applyBlock(candidate)
+	_, _, err = a.applyAndValidateBlock(candidate, evidence, true)
 	return
 }
 
 // ProduceCandidateBlock uses the mempool and state params to build a candidate block
 func (a *App) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) (*lib.Block, lib.ErrorI) {
+	defer a.resetToBeginBlock()
+	qc, err := a.GetBlockAndCertificate(a.height())
+	if err != nil {
+		return nil, err
+	}
+	qc.Block = nil
 	numTxs, transactions := a.mempool.GetTransactions(a.chain.MaxBlockBytes)
 	header := &lib.BlockHeader{
 		Height:                a.height() + 1,
@@ -44,19 +50,17 @@ func (a *App) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) (*lib.
 		NumTxs:                uint64(numTxs),
 		TotalTxs:              a.params.BlockHeader.TotalTxs + uint64(numTxs),
 		LastBlockHash:         a.params.BlockHeader.Hash,
-		StateRoot:             nil,
-		TransactionRoot:       nil, // TODO
-		ValidatorRoot:         nil,
-		NextValidatorRoot:     nil,
 		ProposerAddress:       a.chain.SelfAddress.Bytes(),
-		DoubleSigners:         doubleSigners,
+		LastDoubleSigners:     doubleSigners,
 		BadProposers:          badProposers,
-		LastQuorumCertificate: nil,
+		LastQuorumCertificate: qc,
 	}
-	return &lib.Block{
+	block := &lib.Block{
 		BlockHeader:  header,
 		Transactions: transactions,
-	}, nil
+	}
+	block.BlockHeader, _, _, err = a.applyBlock(block)
+	return block, err
 }
 
 // CommitBlock used after consensus decides on a block
@@ -68,7 +72,7 @@ func (a *App) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) (*lib.
 // - sets up the app for the next height
 func (a *App) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
 	block := qc.Block
-	blockResult, nextValidatorSet, err := a.applyBlock(block)
+	blockResult, nextValidatorSet, err := a.applyAndValidateBlock(block, nil, false)
 	if err != nil {
 		return err
 	}
@@ -95,39 +99,74 @@ func (a *App) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
 	return nil
 }
 
-func (a *App) applyBlock(b *lib.Block) (*lib.BlockResult, *lib.ValidatorSet, lib.ErrorI) {
-	if err := a.beginBlock(); err != nil {
-		return nil, nil, err
-	}
-	txResults, txRoot, numTxs, err := a.applyTransactions(b)
+func (a *App) applyAndValidateBlock(b *lib.Block, evidence *lib.ByzantineEvidence, isCandidateBlock bool) (*lib.BlockResult, *lib.ValidatorSet, lib.ErrorI) {
+	header, txResults, valSet, err := a.applyBlock(b)
 	if err != nil {
 		return nil, nil, err
 	}
-	eb, err := a.endBlock()
-	if err != nil {
-		return nil, nil, err
-	}
-	if err = a.validateBlock(b.BlockHeader, txRoot, uint64(numTxs), eb.ValidatorSet); err != nil {
+	if err = a.validateBlock(b.BlockHeader, header, evidence, isCandidateBlock); err != nil {
 		return nil, nil, err
 	}
 	return &lib.BlockResult{
 		BlockHeader:  b.BlockHeader,
 		Transactions: txResults,
-	}, eb.ValidatorSet, nil
+	}, valSet, nil
 }
 
-func (a *App) validateBlock(header *lib.BlockHeader, txRoot []byte, numTxs uint64, nvs *lib.ValidatorSet) lib.ErrorI {
+func (a *App) applyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResult, *lib.ValidatorSet, lib.ErrorI) {
+	if err := a.beginBlock(); err != nil {
+		return nil, nil, nil, err
+	}
+	txResults, txRoot, numTxs, err := a.applyTransactions(b)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	eb, err := a.endBlock()
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	validatorRoot, err := a.params.ValidatorSet.Root()
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
-	nextValidatorRoot, err := nvs.Root()
+	nextValidatorRoot, err := eb.ValidatorSet.Root()
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 	stateRoot, err := a.store.Root()
 	if err != nil {
+		return nil, nil, nil, err
+	}
+	header := lib.BlockHeader{
+		Height:                a.height() + 1,
+		Hash:                  nil,
+		NetworkId:             a.chain.NetworkID,
+		Time:                  b.BlockHeader.Time,
+		NumTxs:                uint64(numTxs),
+		TotalTxs:              a.params.BlockHeader.TotalTxs + uint64(numTxs),
+		LastBlockHash:         a.params.BlockHeader.Hash,
+		StateRoot:             stateRoot,
+		TransactionRoot:       txRoot,
+		ValidatorRoot:         validatorRoot,
+		NextValidatorRoot:     nextValidatorRoot,
+		ProposerAddress:       b.BlockHeader.ProposerAddress,
+		LastDoubleSigners:     b.BlockHeader.LastDoubleSigners,
+		BadProposers:          b.BlockHeader.BadProposers,
+		LastQuorumCertificate: b.BlockHeader.LastQuorumCertificate,
+	}
+	if _, err = header.SetHash(); err != nil {
+		return nil, nil, nil, err
+	}
+	return &header, txResults, eb.ValidatorSet, nil
+}
+
+func (a *App) validateBlock(header *lib.BlockHeader, compare *lib.BlockHeader, evidence *lib.ByzantineEvidence, isCandidateBlock bool) lib.ErrorI {
+	hash, err := compare.SetHash()
+	if err != nil {
 		return err
+	}
+	if !bytes.Equal(hash, header.Hash) {
+		return lib.ErrUnequalBlockHash()
 	}
 	qcValidatorSet, err := a.GetBeginStateValSet(header.Height - 1)
 	if err != nil {
@@ -137,32 +176,20 @@ func (a *App) validateBlock(header *lib.BlockHeader, txRoot []byte, numTxs uint6
 	if err != nil {
 		return err
 	}
-	if err = header.LastQuorumCertificate.Check(&lib.View{Height: header.Height - 1}, vs); err != nil {
+	isPartialQC, err := header.LastQuorumCertificate.Check(&lib.View{Height: header.Height - 1}, vs)
+	if err != nil {
 		return err
+	}
+	if isPartialQC {
+		return lib.ErrNoMaj23()
 	}
 	if err = a.validateBlockTime(header); err != nil {
 		return err
 	}
-	compare := &lib.BlockHeader{
-		Height:                a.height(),
-		NetworkId:             a.chain.NetworkID,
-		Time:                  header.Time,
-		NumTxs:                numTxs,
-		TotalTxs:              a.params.BlockHeader.TotalTxs + numTxs,
-		LastBlockHash:         a.params.BlockHeader.Hash,
-		StateRoot:             stateRoot,
-		TransactionRoot:       txRoot,
-		ValidatorRoot:         validatorRoot,
-		NextValidatorRoot:     nextValidatorRoot,
-		ProposerAddress:       header.ProposerAddress,
-		LastQuorumCertificate: header.LastQuorumCertificate,
-	}
-	hash, err := compare.SetHash()
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(hash, header.Hash) {
-		return lib.ErrUnequalBlockHash()
+	if isCandidateBlock {
+		if err = header.ValidateByzantineEvidence(a, evidence); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -208,7 +235,7 @@ func (a *App) GetBeginStateValSet(height uint64) (*lib.ValidatorSet, lib.ErrorI)
 	if err != nil {
 		return nil, err
 	}
-	return state_machine.NewStateMachine(a.chain.ProtocolVersion, height, newStore).GetConsensusValidators()
+	return fsm.NewStateMachine(a.chain.ProtocolVersion, height, newStore).GetConsensusValidators()
 }
 
 func (a *App) EvidenceExists(e *lib.DoubleSignEvidence) (bool, lib.ErrorI) {
@@ -225,6 +252,13 @@ func (a *App) EvidenceExists(e *lib.DoubleSignEvidence) (bool, lib.ErrorI) {
 
 func (a *App) LatestHeight() uint64                       { return a.store.Version() }
 func (a *App) GetBeginBlockParams() *lib.BeginBlockParams { return a.params }
+func (a *App) GetProducerPubKeys() [][]byte {
+	keys, err := a.fsm.GetProducerKeys()
+	if err != nil {
+		return nil
+	}
+	return keys.ProducerKeys
+}
 func (a *App) GetBlockAndCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
 	return a.store.GetQCByHeight(height)
 }

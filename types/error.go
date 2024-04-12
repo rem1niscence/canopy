@@ -42,8 +42,10 @@ const (
 	CodeUnequalBlockHash     ErrorCode   = 28
 	CodeNewPubKeyFromBytes   ErrorCode   = 29
 	CodeNewMultiPubKey       ErrorCode   = 30
+	CodeStringToBigFloat     ErrorCode   = 31
 
 	ConsensusModule                     ErrorModule = "consensus"
+	CodeEmptyTxMessage                  ErrorCode   = 8
 	CodeDuplicateLeaderMessage          ErrorCode   = 9
 	CodeDuplicateVote                   ErrorCode   = 10
 	CodeInvalidSignatureLength          ErrorCode   = 11
@@ -82,6 +84,9 @@ const (
 	CodeInvalidBlockTime                ErrorCode   = 44
 	CodeInvalidEvidence                 ErrorCode   = 45
 	CodeDuplicateEvidence               ErrorCode   = 46
+	CodeMismatchDoubleSignerCount       ErrorCode   = 47
+	CodeMismatchEvidenceAndHeader       ErrorCode   = 48
+	CodeMismatchBadProposerCount        ErrorCode   = 49
 
 	StateMachineModule          ErrorModule = "state_machine"
 	CodeFeeBelowState           ErrorCode   = 2
@@ -190,6 +195,10 @@ func newLogError(err error) ErrorI {
 
 func errStringToBigInt() ErrorI {
 	return NewError(CodeStringToBigInt, MainModule, "unable to convert string to big int")
+}
+
+func errStringToBigFloat() ErrorI {
+	return NewError(CodeStringToBigFloat, MainModule, "unable to convert string to big float")
 }
 
 func ErrUnmarshal(err error) ErrorI {
@@ -346,4 +355,20 @@ func ErrEmptyEvidence() ErrorI {
 
 func ErrInvalidEvidence() ErrorI {
 	return NewError(CodeInvalidEvidence, ConsensusModule, "evidence is invalid")
+}
+
+func ErrInvalidLeaderPublicKey() ErrorI {
+	return NewError(CodeInvalidLeaderPubKey, ConsensusModule, "invalid leader public key")
+}
+
+func ErrMismatchDoubleSignerCount() ErrorI {
+	return NewError(CodeMismatchDoubleSignerCount, ConsensusModule, "mismatch double signer count")
+}
+
+func ErrMismatchEvidenceAndHeader() ErrorI {
+	return NewError(CodeMismatchEvidenceAndHeader, ConsensusModule, "mismatch evidence and block header")
+}
+
+func ErrMismatchBadProducerCount() ErrorI {
+	return NewError(CodeMismatchBadProposerCount, ConsensusModule, "mismatch bad proposer count")
 }

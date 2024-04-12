@@ -10,6 +10,10 @@ func ErrUnknownConsensusMsg(t proto.Message) lib.ErrorI {
 	return lib.NewError(lib.CodeUnknownConsensusMessage, lib.ConsensusModule, fmt.Sprintf("unknown consensus message: %T", t))
 }
 
+func ErrEmptyTxMessage() lib.ErrorI {
+	return lib.NewError(lib.CodeEmptyTxMessage, lib.ConsensusModule, fmt.Sprintf("empty tx message"))
+}
+
 func ErrDuplicateVote() lib.ErrorI {
 	return lib.NewError(lib.CodeDuplicateVote, lib.ConsensusModule, "duplicate vote")
 }
@@ -56,10 +60,6 @@ func ErrEmptyQCPayload() lib.ErrorI {
 
 func ErrInvalidPayload() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidPayload, lib.ConsensusModule, "invalid vote")
-}
-
-func ErrInvalidLeaderPublicKey() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidLeaderPubKey, lib.ConsensusModule, "invalid leader public key")
 }
 
 func ErrEmptyVRF() lib.ErrorI {
