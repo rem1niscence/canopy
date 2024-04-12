@@ -1,6 +1,6 @@
 package types
 
-import "github.com/ginchuco/ginchu/crypto"
+import "github.com/ginchuco/ginchu/types/crypto"
 
 func MerkleTree(items [][]byte) (root []byte, tree [][]byte, err ErrorI) {
 	root, tree, er := crypto.MerkleTree(items)

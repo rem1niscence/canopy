@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-protoc -I=./proto --go_out=$GOPATH/src/ ./proto/*
+protoc -I=./types/proto --go_out=$GOPATH/src/ ./types/proto/*
 
 
 

@@ -2,8 +2,8 @@ package types
 
 import (
 	"bytes"
-	"github.com/ginchuco/ginchu/crypto"
 	lib "github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/types/crypto"
 	"math/big"
 )
 

@@ -1,9 +1,9 @@
 package fsm
 
 import (
-	"github.com/ginchuco/ginchu/crypto"
 	"github.com/ginchuco/ginchu/state_machine/types"
 	lib "github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/types/crypto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 

@@ -2,8 +2,8 @@ package consensus
 
 import (
 	"fmt"
-	"github.com/ginchuco/ginchu/crypto"
 	lib "github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/types/crypto"
 	"github.com/stretchr/testify/require"
 	"math"
 	"math/rand"

@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/ginchuco/ginchu/crypto"
+	"github.com/ginchuco/ginchu/types/crypto"
 )
 
 type StoreI interface {

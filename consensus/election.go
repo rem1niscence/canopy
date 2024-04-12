@@ -3,8 +3,8 @@ package consensus
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/ginchuco/ginchu/crypto"
 	lib "github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/types/crypto"
 	"gonum.org/v1/gonum/stat/distuv"
 	"math/big"
 	"strings"

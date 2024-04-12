@@ -3,7 +3,7 @@ package types
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"github.com/ginchuco/ginchu/codec"
+	"github.com/ginchuco/ginchu/types/codec"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )

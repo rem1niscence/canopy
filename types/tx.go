@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/ginchuco/ginchu/crypto"
+	"github.com/ginchuco/ginchu/types/crypto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )

@@ -1,9 +1,9 @@
 package state_machine
 
 import (
-	"github.com/ginchuco/ginchu/crypto"
 	"github.com/ginchuco/ginchu/state_machine/fsm"
 	lib "github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/types/crypto"
 )
 
 type State struct {

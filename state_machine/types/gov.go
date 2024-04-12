@@ -2,8 +2,8 @@ package types
 
 import (
 	"encoding/json"
-	"github.com/ginchuco/ginchu/crypto"
 	"github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/types/crypto"
 	"strings"
 )
 

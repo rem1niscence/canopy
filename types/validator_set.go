@@ -2,7 +2,7 @@ package types
 
 import (
 	"github.com/drand/kyber"
-	"github.com/ginchuco/ginchu/crypto"
+	"github.com/ginchuco/ginchu/types/crypto"
 )
 
 type ValidatorSetWrapper struct {

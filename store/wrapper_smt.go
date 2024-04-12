@@ -1,9 +1,9 @@
 package store
 
 import (
-	"github.com/ginchuco/ginchu/crypto"
 	"github.com/ginchuco/ginchu/store/smt"
 	"github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/types/crypto"
 )
 
 type SMTWrapper struct {

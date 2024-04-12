@@ -2,7 +2,7 @@ package types
 
 import (
 	"bytes"
-	"github.com/ginchuco/ginchu/crypto"
+	"github.com/ginchuco/ginchu/types/crypto"
 )
 
 func (x *Block) Check() ErrorI {

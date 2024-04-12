@@ -3,8 +3,8 @@ package store
 import (
 	"fmt"
 	"github.com/dgraph-io/badger/v4"
-	"github.com/ginchuco/ginchu/crypto"
 	"github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/types/crypto"
 	"math"
 )
 

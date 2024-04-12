@@ -2,8 +2,8 @@ package store
 
 import (
 	"encoding/binary"
-	"github.com/ginchuco/ginchu/crypto"
 	"github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/types/crypto"
 )
 
 var _ types.RWIndexerI = &Indexer{}

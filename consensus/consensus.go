@@ -2,8 +2,8 @@ package consensus
 
 import (
 	"bytes"
-	"github.com/ginchuco/ginchu/crypto"
 	lib "github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/types/crypto"
 	"google.golang.org/protobuf/proto"
 	"math"
 	"sync"
