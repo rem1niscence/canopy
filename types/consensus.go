@@ -198,7 +198,7 @@ func (e *DoubleSignEvidences) Add(app App, evidence *DoubleSignEvidence) {
 	if equals := evidence.VoteA.Equals(evidence.VoteB); equals {
 		return
 	}
-	var duplicate map[string]struct{}
+	duplicate := make(map[string]struct{})
 	for _, ev := range *e {
 		bz, _ := Marshal(ev)
 		key := BytesToString(bz)
@@ -309,7 +309,7 @@ func (bpe *BadProposerEvidences) Add(expectedLeader []byte, height uint64, vs Va
 	if bytes.Equal(evidence.ElectionVoteQc.LeaderPublicKey, expectedLeader) {
 		return
 	}
-	var duplicate map[string]struct{}
+	duplicate := make(map[string]struct{})
 	for _, e := range *bpe {
 		bz, _ := Marshal(e.ElectionVoteQc.Header)
 		key := BytesToString(bz) + BytesToString(e.ElectionVoteQc.LeaderPublicKey)

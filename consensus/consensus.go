@@ -322,7 +322,7 @@ func (cs *ConsensusState) StartCommitProcessPhase() (interrupt bool) {
 		return true
 	}
 	cs.ByzantineEvidence = cs.LeaderMessages.GetByzantineEvidence(cs.App, cs.View.Copy(),
-		cs.ValidatorSet, cs.LeaderPublicKey.Bytes(), cs.Votes, cs.SelfIsLeader())
+		cs.ValidatorSet, cs.LeaderPublicKey.Bytes(), &cs.Votes, cs.SelfIsLeader())
 	cs.NewHeight()
 	return
 }
@@ -376,25 +376,27 @@ func (cs *ConsensusState) RoundInterrupt(timer *time.Time) {
 		Header: cs.View.Copy(),
 	})
 	cs.ResetAndSleep(timer)
-	cs.NewRound()
+	cs.NewRound(false)
 	cs.Pacemaker()
 }
 
-func (cs *ConsensusState) NewRound() {
-	cs.Round++
+func (cs *ConsensusState) NewRound(newHeight bool) {
+	if !newHeight {
+		cs.Round++
+	}
 	cs.Phase = lib.Phase_ELECTION
 	cs.Votes.NewRound(cs.Round)
 	cs.LeaderMessages.NewRound(cs.Round, cs.ValidatorSet.Key)
 }
 func (cs *ConsensusState) NewHeight() {
 	cs.Height++
-	cs.Round = -1
+	cs.Round = 0
 	cs.HighQC = nil
 	cs.LeaderPublicKey = nil
 	cs.Block = nil
 	cs.Votes.NewHeight()
 	cs.LeaderMessages.NewHeight()
-	cs.NewRound()
+	cs.NewRound(true)
 }
 
 func (cs *ConsensusState) Pacemaker() {

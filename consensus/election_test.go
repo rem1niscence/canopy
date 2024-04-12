@@ -6,9 +6,7 @@ import (
 	lib "github.com/ginchuco/ginchu/types"
 	"github.com/stretchr/testify/require"
 	"math"
-	"math/big"
 	"math/rand"
-	"strings"
 	"testing"
 )
 
@@ -39,13 +37,4 @@ func TestSortition(t *testing.T) {
 func vrfAndCDF(p SortitionParams) uint64 {
 	vrf := VRF(p.LastProducersPublicKeys, p.Height, p.Round, p.PrivateKey)
 	return CDF(lib.StringToUint64(p.VotingPower), lib.StringToUint64(p.TotalPower), 1, crypto.Hash(vrf.Signature))
-}
-
-func TestT(t *testing.T) {
-	numValidators := uint64(119)
-	maxHash := strings.Repeat("F", crypto.HashSize*2)[:16]
-	blockHash, _, _ := big.ParseFloat(maxHash, 16, vrfFloatPrec, big.ToNearestEven)
-	mod, _ := blockHash.Uint64()
-	mod = 121
-	fmt.Println(mod % numValidators)
 }

@@ -41,7 +41,6 @@ type WIndexerI interface {
 	IndexBlock(b *BlockResult) ErrorI
 	DeleteTxsForHeight(height uint64) ErrorI
 	DeleteBlockForHeight(height uint64) ErrorI
-	DeleteEvidenceForHeight(height uint64) ErrorI
 	DeleteQCForHeight(height uint64) ErrorI
 }
 
@@ -52,8 +51,6 @@ type RIndexerI interface {
 	GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]*TxResult, ErrorI)
 	GetBlockByHash(hash []byte) (*BlockResult, ErrorI)
 	GetBlockByHeight(height uint64) (*BlockResult, ErrorI)
-	GetEvidenceByHash(hash []byte) (*DoubleSignEvidence, ErrorI)
-	GetEvidenceByHeight(height uint64) ([]*DoubleSignEvidence, ErrorI)
 	GetQCByHeight(height uint64) (*QuorumCertificate, ErrorI)
 }
 

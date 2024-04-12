@@ -240,14 +240,6 @@ func (s *Store) GetBlockByHeight(h uint64) (*types.BlockResult, types.ErrorI) {
 	return s.ix.GetBlockByHeight(h)
 }
 
-func (s *Store) DeleteEvidenceForHeight(h uint64) types.ErrorI {
-	return s.ix.DeleteEvidenceForHeight(h)
-}
-
-func (s *Store) GetEvidenceByHash(h []byte) (*types.DoubleSignEvidence, types.ErrorI) {
-	return s.ix.GetEvidenceByHash(h)
-}
-
 func (s *Store) IndexQC(qc *types.QuorumCertificate) types.ErrorI {
 	return s.ix.IndexQC(qc)
 }
@@ -258,10 +250,6 @@ func (s *Store) GetQCByHeight(height uint64) (*types.QuorumCertificate, types.Er
 
 func (s *Store) DeleteQCForHeight(height uint64) types.ErrorI {
 	return s.ix.DeleteQCForHeight(height)
-}
-
-func (s *Store) GetEvidenceByHeight(h uint64) ([]*types.DoubleSignEvidence, types.ErrorI) {
-	return s.ix.GetEvidenceByHeight(h)
 }
 
 func (s *Store) Close() types.ErrorI {

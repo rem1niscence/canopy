@@ -9,12 +9,5 @@ type App interface {
 	CommitBlock(block *QuorumCertificate) ErrorI
 	GetBlockAndCertificate(height uint64) (*QuorumCertificate, ErrorI)
 	GetBeginStateValSet(height uint64) (*ValidatorSet, ErrorI)
-	EvidenceExists(e *DoubleSignEvidence) (bool, ErrorI)
 	GetProducerPubKeys() [][]byte
 }
-
-/*
-	TODO
-		- add n-1 QC to the block structure
-		-
-*/

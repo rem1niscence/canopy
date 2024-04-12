@@ -105,10 +105,7 @@ func (x *BlockHeader) Equals(b *BlockHeader) bool {
 	}
 	qc1Bz, _ := Marshal(x.LastQuorumCertificate)
 	qc2Bz, _ := Marshal(b.LastQuorumCertificate)
-	if !bytes.Equal(qc1Bz, qc2Bz) {
-		return false
-	}
-	return true
+	return bytes.Equal(qc1Bz, qc2Bz)
 }
 
 func (b *BlockHeader) ValidateByzantineEvidence(app App, be *ByzantineEvidence) ErrorI {

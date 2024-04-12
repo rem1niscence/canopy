@@ -79,93 +79,77 @@ func (cs *ConsensusState) Sync() {
 
 func (cs *ConsensusState) ListenForNewBlock() {
 	app, p2p := cs.App, cs.P2P
-	receiver := p2p.ReceiveChannel(lib.Topic_BLOCK)
-	for {
-		select {
-		case msg := <-receiver:
-			qc, err := cs.ValidatePeerBlock(cs.Height, msg, cs.ValidatorSet)
-			if err != nil {
-				cs.P2P.ChangeReputation(msg.Sender.PublicKey, PeerInvalidBlockSlash)
-				continue
-			}
-			if err = app.CommitBlock(qc); err != nil {
-				cs.log.Fatalf("unable to commit block at height %d: %s", qc.Header.Height, err.Error())
-			}
+	for msg := range p2p.ReceiveChannel(lib.Topic_BLOCK) {
+		qc, err := cs.ValidatePeerBlock(cs.Height, msg, cs.ValidatorSet)
+		if err != nil {
+			cs.P2P.ChangeReputation(msg.Sender.PublicKey, PeerInvalidBlockSlash)
+			continue
+		}
+		if err = app.CommitBlock(qc); err != nil {
+			cs.log.Fatalf("unable to commit block at height %d: %s", qc.Header.Height, err.Error())
 		}
 	}
 }
 
 func (cs *ConsensusState) ListenForNewTx() {
 	app, p2p := cs.App, cs.P2P
-	receiver := p2p.ReceiveChannel(lib.Topic_TX)
-	for {
-		select {
-		case msg := <-receiver:
-			senderID := msg.Sender.PublicKey
-			txMsg, ok := msg.Message.(*lib.TxMessage)
-			if !ok {
-				p2p.ChangeReputation(senderID, PeerInvalidMessageSlash)
-				continue
-			}
-			if txMsg == nil {
-				p2p.ChangeReputation(senderID, PeerInvalidMessageSlash)
-				continue
-			}
-			if err := app.HandleTransaction(txMsg.Tx); err != nil {
-				p2p.ChangeReputation(senderID, PeerInvalidTxSlash)
-				continue
-			}
-			p2p.ChangeReputation(senderID, PeerGoodTx)
+	for msg := range p2p.ReceiveChannel(lib.Topic_TX) {
+		senderID := msg.Sender.PublicKey
+		txMsg, ok := msg.Message.(*lib.TxMessage)
+		if !ok {
+			p2p.ChangeReputation(senderID, PeerInvalidMessageSlash)
+			continue
 		}
+		if txMsg == nil {
+			p2p.ChangeReputation(senderID, PeerInvalidMessageSlash)
+			continue
+		}
+		if err := app.HandleTransaction(txMsg.Tx); err != nil {
+			p2p.ChangeReputation(senderID, PeerInvalidTxSlash)
+			continue
+		}
+		p2p.ChangeReputation(senderID, PeerGoodTx)
 	}
 }
 
 func (cs *ConsensusState) ListenForNewBlockRequests() {
 	app, p2p := cs.App, cs.P2P
-	receiver := p2p.ReceiveChannel(lib.Topic_BLOCK_REQUEST)
-	for {
-		select {
-		case msg := <-receiver:
-			request, ok := msg.Message.(*lib.BlockRequestMessage)
-			if !ok {
-				p2p.ChangeReputation(msg.Sender.PublicKey, PeerInvalidMessageSlash)
-				continue
-			}
-			blocAndCertificate, err := app.GetBlockAndCertificate(request.Height)
-			if err != nil {
-				cs.log.Error(err.Error())
-				continue
-			}
-			if err = p2p.SendToOne(msg.Sender.PublicKey, &lib.BlockResponseMessage{
-				BlockAndCertificate: blocAndCertificate,
-			}); err != nil {
-				cs.log.Error(err.Error())
-				continue
-			}
+	for msg := range p2p.ReceiveChannel(lib.Topic_BLOCK_REQUEST) {
+		request, ok := msg.Message.(*lib.BlockRequestMessage)
+		if !ok {
+			p2p.ChangeReputation(msg.Sender.PublicKey, PeerInvalidMessageSlash)
+			continue
+		}
+		blocAndCertificate, err := app.GetBlockAndCertificate(request.Height)
+		if err != nil {
+			cs.log.Error(err.Error())
+			continue
+		}
+		if err = p2p.SendToOne(msg.Sender.PublicKey, &lib.BlockResponseMessage{
+			BlockAndCertificate: blocAndCertificate,
+		}); err != nil {
+			cs.log.Error(err.Error())
+			continue
 		}
 	}
 }
 
 func (cs *ConsensusState) ListenForValidatorMessages() {
 	p2p := cs.P2P
-	receiver := p2p.ReceiveChannel(lib.Topic_CONSENSUS)
-	for {
-		select {
-		case msg := <-receiver:
-			if !msg.Sender.IsValidator {
-				p2p.ChangeReputation(msg.Sender.PublicKey, PeerNotValidator)
-				continue
-			}
-			if err := cs.HandleMessage(msg.Message); err != nil {
-				p2p.ChangeReputation(msg.Sender.PublicKey, PeerInvalidMessageSlash)
-				cs.log.Error(err.Error())
-				continue
-			}
+	for msg := range p2p.ReceiveChannel(lib.Topic_CONSENSUS) {
+		if !msg.Sender.IsValidator {
+			p2p.ChangeReputation(msg.Sender.PublicKey, PeerNotValidator)
+			continue
+		}
+		if err := cs.HandleMessage(msg.Message); err != nil {
+			p2p.ChangeReputation(msg.Sender.PublicKey, PeerInvalidMessageSlash)
+			cs.log.Error(err.Error())
+			continue
 		}
 	}
 }
 
-func (cs *ConsensusState) ValidatePeerBlock(height uint64, msg lib.MessageWrapper, vs lib.ValidatorSetWrapper) (*QuorumCertificate, lib.ErrorI) {
+func (cs *ConsensusState) ValidatePeerBlock(height uint64, msg *lib.MessageWrapper, vs lib.ValidatorSetWrapper) (*QuorumCertificate, lib.ErrorI) {
 	senderID := msg.Sender.PublicKey
 	response, ok := msg.Message.(*lib.BlockResponseMessage)
 	if !ok {

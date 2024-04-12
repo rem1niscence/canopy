@@ -37,8 +37,15 @@ func (hlm *HeightLeaderMessages) GetElectionMessages(round uint64) ElectionMessa
 		if p == nil {
 			continue
 		}
-		v := *p
-		cpy[i] = &v
+		cpy[i] = &Message{
+			Header:                 p.Header,
+			Vrf:                    p.Vrf,
+			Qc:                     p.Qc,
+			HighQc:                 p.HighQc,
+			LastDoubleSignEvidence: p.LastDoubleSignEvidence,
+			BadProposerEvidence:    p.BadProposerEvidence,
+			Signature:              p.Signature,
+		}
 	}
 	return cpy
 }
@@ -129,7 +136,7 @@ func (hlm *HeightLeaderMessages) AddIncompleteQC(message *Message) lib.ErrorI {
 }
 func (hlm *HeightLeaderMessages) GetByzantineEvidence(
 	app lib.App, v *lib.View, vs lib.ValidatorSetWrapper,
-	leaderKey []byte, hvs HeightVoteSet, selfIsLeader bool) *BE {
+	leaderKey []byte, hvs *HeightVoteSet, selfIsLeader bool) *BE {
 	bpe := hlm.GetBadProposerEvidence(v, vs, leaderKey)
 	dse := hlm.GetDoubleSignEvidence(app, v, hvs, selfIsLeader)
 	if bpe == nil && dse == nil {
@@ -141,7 +148,7 @@ func (hlm *HeightLeaderMessages) GetByzantineEvidence(
 	}
 }
 
-func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(app lib.App, view *lib.View, hvs HeightVoteSet, selfIsLeader bool) DSE {
+func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(app lib.App, view *lib.View, hvs *HeightVoteSet, selfIsLeader bool) DSE {
 	hlm.Lock()
 	defer hlm.Unlock()
 	hvs.Lock()
@@ -163,7 +170,7 @@ func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(app lib.App, view *lib.Vi
 	}
 	if !selfIsLeader {
 		v := view.Copy()
-		for round := v.Round - 1; round >= 0; round-- {
+		for round := v.Round - 1; ; round-- {
 			rvs := hvs.roundVoteSets[round]
 			if rvs == nil {
 				continue
@@ -188,6 +195,9 @@ func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(app lib.App, view *lib.Vi
 					})
 				}
 			}
+			if round == 0 {
+				break
+			}
 		}
 	}
 	doubleSigners, err := dse.GetDoubleSigners(app)
@@ -204,13 +214,16 @@ func (hlm *HeightLeaderMessages) GetBadProposerEvidence(view *lib.View, vs lib.V
 	hlm.Lock()
 	defer hlm.Unlock()
 	bpe := make(lib.BadProposerEvidences, 0)
-	for r := view.Round - 1; r >= 0; r-- {
+	for r := view.Round - 1; ; r-- {
 		v := view.Copy()
 		v.Round = r
 		v.Phase = lib.Phase_PROPOSE_VOTE
 		msg := hlm.GetLeaderMessage(v)
 		if msg != nil && msg.Qc != nil {
 			bpe.Add(leaderKey, view.Height, vs, &lib.BadProposerEvidence{ElectionVoteQc: msg.Qc})
+		}
+		if r == 0 {
+			break
 		}
 	}
 	if len(bpe) == 0 {
@@ -462,7 +475,7 @@ func (x *Message) Check(view *lib.View, vs lib.ValidatorSetWrapper) (isPartialQC
 			return false, ErrUnknownConsensusMsg(x)
 		}
 	}
-	return false, nil
+	return
 }
 
 func (x *Message) Sign(privateKey crypto.PrivateKeyI) lib.ErrorI {

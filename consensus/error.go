@@ -11,7 +11,7 @@ func ErrUnknownConsensusMsg(t proto.Message) lib.ErrorI {
 }
 
 func ErrEmptyTxMessage() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyTxMessage, lib.ConsensusModule, fmt.Sprintf("empty tx message"))
+	return lib.NewError(lib.CodeEmptyTxMessage, lib.ConsensusModule, "empty tx message")
 }
 
 func ErrDuplicateVote() lib.ErrorI {

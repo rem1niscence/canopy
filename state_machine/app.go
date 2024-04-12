@@ -238,18 +238,6 @@ func (a *App) GetBeginStateValSet(height uint64) (*lib.ValidatorSet, lib.ErrorI)
 	return fsm.NewStateMachine(a.chain.ProtocolVersion, height, newStore).GetConsensusValidators()
 }
 
-func (a *App) EvidenceExists(e *lib.DoubleSignEvidence) (bool, lib.ErrorI) {
-	bz, err := lib.Marshal(e)
-	if err != nil {
-		return false, err
-	}
-	evidence, err := a.store.GetEvidenceByHash(crypto.Hash(bz))
-	if err != nil {
-		return false, err
-	}
-	return evidence != nil, nil
-}
-
 func (a *App) LatestHeight() uint64                       { return a.store.Version() }
 func (a *App) GetBeginBlockParams() *lib.BeginBlockParams { return a.params }
 func (a *App) GetProducerPubKeys() [][]byte {
