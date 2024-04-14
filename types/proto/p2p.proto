@@ -6,13 +6,14 @@ option go_package = "github.com/ginchuco/ginchu/types";
 import "block.proto";
 import "google/protobuf/any.proto";
 
+// ordered by stream priority
 enum Topic {
-  INVALID = 0;
-  P2P = 1;
+  CONSENSUS = 0;
+  BLOCK = 1;
   BLOCK_REQUEST = 2;
-  BLOCK = 3;
-  TX = 4;
-  CONSENSUS = 5;
+  TX = 3;
+  P2P = 4;
+  INVALID = 5;
 }
 
 message PeerInfo {
@@ -24,6 +25,18 @@ message PeerInfo {
   bool is_unconditional = 6;
   int32 reputation = 7;
 }
+
+message ProtoMessage {
+  google.protobuf.Any payload = 1;
+}
+
+message Packet{
+  Topic stream_id = 1;
+  bool eof = 2;
+  bytes bytes = 3;
+}
+message Ping {}
+message Pong {}
 
 message EnvelopeMessage {
   Topic topic = 1;

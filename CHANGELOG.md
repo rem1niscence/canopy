@@ -1,9 +1,13 @@
 # CHANGELOG
 
+## [Unreleased] - 04/12/2024
+- Added `encrypted` p2p connection
+
 ## [Unreleased] - 04/11/2024
 
 - Added `byzantine` evidence logic to consensus
 - Added `lastProducers` logic to state_machine
+- Reorganize, linter, and license
 
 ## [Unreleased] - 04/09/2024
 

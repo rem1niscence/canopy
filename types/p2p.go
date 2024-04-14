@@ -19,3 +19,7 @@ type MessageWrapper struct {
 	Message proto.Message
 	Sender  PeerInfo
 }
+
+func (x *PeerInfo) ChangeReputation(delta int32) {
+	x.Reputation += delta
+}

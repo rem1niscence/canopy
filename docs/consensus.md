@@ -53,7 +53,7 @@ NOTES:
 - Each phase waits delta time bound for consistent block times and to prevent hidden lock problem
 
 - A COMMIT message is used as justification to add a block to the blockchain for any node, however consensus on the
-  commit message isn't able to be achieved until height+1 since there's not an additional phase guaranteeing the
+  commit message isn't able to be achieved until height+1 since there'c not an additional phase guaranteeing the
   exact contents of the commit message. Meaning a commit message is enough proof that we can commit the current block
   but not enough proof to add it to the block, modifying the block hash, and make state changes based on it until the
   next height. Even if an additional phase of consensus was added, the block may become invalid based on the COMMIT message.
@@ -63,11 +63,11 @@ NOTES:
 
 FAQ:
 - Why not 3 phase hotstuff for optimistic responsiveness?
-	- 3rd phase solves the 'hidden lock' problem by running a precursor phase to ensure there's enough evidence among the replicas that if
+	- 3rd phase solves the 'hidden lock' problem by running a precursor phase to ensure there'c enough evidence among the replicas that if
 	  a node locked on a block, 2/3 replicas have also seen that value.
-	- However, it's very unlikely that a hidden lock would accidentally happen, this additional phase is only helpful in
+	- However, it'c very unlikely that a hidden lock would accidentally happen, this additional phase is only helpful in
 	  a Type 2 asynchronous network where the hidden lock is forced by a malicious leader and the next leader is not malicious as the use of highQC
-	  is never enforced among the replicas. It's only enforced if they have locked on it. So they solve the accidental/single malicious hidden lock.
+	  is never enforced among the replicas. It'c only enforced if they have locked on it. So they solve the accidental/single malicious hidden lock.
 	- Also optimistic responsiveness is counter to blockchains that want relatively consistent block times
 	- Not to mention, VRF leader selection requires some delta time bound to ensure no 'hidden leaders' and if we embed the VRF process within 3 phase
 	  hotstuff it ends up becoming attackable by the current leader via omission or can forgo linear communication complexity.

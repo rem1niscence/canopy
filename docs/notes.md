@@ -56,13 +56,13 @@ NOTE: Round-1 includes the latest round of height-1 if round == 0
   evidence.
   
   - Q: Why aren't Replica Votes structures used as a type of Double Sign evidence.
-  - A: Replica Double Votes are always summarized in the form of `2 QCs` as it's more scalable to track multiple double signers. 
-  It's not a security issue because if the reporter is a Leader Candidate than they have the ability to make a QC and will receive
+  - A: Replica Double Votes are always summarized in the form of `2 QCs` as it'c more scalable to track multiple double signers. 
+  It'c not a security issue because if the reporter is a Leader Candidate than they have the ability to make a QC and will receive
   an equivocating QC from the Leader and if the reporter is a Replica, then they received the equivocating QCs from two leaders.
 
 Brain Dump: Theoretically, a double signed Replica Message vote is a malicious thing - however without it being tied to a Leader Message,
-the vote is useless and expensive to track. Let's not forget that in the linear message complexity design, all messages must run through
-a `Leader` of sorts. Let's say a secondary byzantine leader is trying to get signatures for a conflicting view and block, they'd get
+the vote is useless and expensive to track. Let'c not forget that in the linear message complexity design, all messages must run through
+a `Leader` of sorts. Let'c say a secondary byzantine leader is trying to get signatures for a conflicting view and block, they'd get
 a vote from the `double-signer` but that wouldn't be enough to do anything. The Byzantine Leader would need +2/3Maj signatures to fork
 the chain. Since the upper bound of faulty (double signers) validators if +1/3, he must ask 'good validators' to double sign. Thus,
 `double-signers` *must be outed* to pull of an attack to 'good validators'. Another scenario is if a Replica Double Signs Election Vote
@@ -82,7 +82,7 @@ in the form of an `partial QC`.
 
 - Merged Mining for **BFT** protocols
 
-### What's the value add?
+### What'c the value add?
 
 - **Incentivizing** validator participation in other BFT protocols by rewarding participants for Validating on 3rd party
   chains.
