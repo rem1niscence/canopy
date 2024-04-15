@@ -91,19 +91,19 @@ func DecryptMessage(key []byte, message string) (string, error) {
 	return string(cipherText), nil
 }
 
-func GenerateCurve25519Keypair() (publicKey, privateKey *[32]byte) {
-	publicKey = new([32]byte)
-	privateKey = new([32]byte)
+func GenerateCurve25519Keypair() (public, private []byte) {
+	publicKey := new([32]byte)
+	privateKey := new([32]byte)
 	if _, err := io.ReadFull(rand.Reader, privateKey[:]); err != nil {
 		publicKey = nil
 		privateKey = nil
 		return
 	}
 	curve25519.ScalarBaseMult(publicKey, privateKey)
-	if CheckBlacklist(publicKey) {
+	if CheckBlacklist(publicKey[:]) {
 		GenerateCurve25519Keypair()
 	}
-	return
+	return publicKey[:], privateKey[:]
 }
 
 var blacklist = [][32]byte{
@@ -139,7 +139,7 @@ var blacklist = [][32]byte{
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f},
 }
 
-func CheckBlacklist(pubKey *[32]byte) bool {
+func CheckBlacklist(pubKey []byte) bool {
 	for _, bl := range blacklist {
 		if subtle.ConstantTimeCompare(pubKey[:], bl[:]) == 1 {
 			return true

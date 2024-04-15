@@ -141,6 +141,35 @@ const (
 	CodeInvalidProtocolVersion  ErrorCode   = 56
 	CodeInvalidAddressKey       ErrorCode   = 57
 
+	P2PModule                        ErrorModule = "p2p"
+	CodeUnknownP2PMessage            ErrorCode   = 1
+	CodeFailedRead                   ErrorCode   = 2
+	CodeFailedWrite                  ErrorCode   = 3
+	CodeFailedReadFull               ErrorCode   = 4
+	CodeMaxMessageSize               ErrorCode   = 7
+	CodePongTimeout                  ErrorCode   = 8
+	CodeBlacklisted                  ErrorCode   = 9
+	CodeErrorGroup                   ErrorCode   = 10
+	CodeConnDecrypt                  ErrorCode   = 11
+	CodeChunkLargerThanMax           ErrorCode   = 12
+	CodeFailedChallenge              ErrorCode   = 13
+	CodeFailedDiffieHellman          ErrorCode   = 14
+	CodeFailedHKDF                   ErrorCode   = 15
+	CodePeerAlreadyExists            ErrorCode   = 16
+	CodePeerNotFound                 ErrorCode   = 17
+	CodeFailedDial                   ErrorCode   = 18
+	CodeMismatchPeerPublicKey        ErrorCode   = 19
+	CodeFailedListen                 ErrorCode   = 20
+	CodeHostAndPortFromRemote        ErrorCode   = 21
+	CodeIPLookup                     ErrorCode   = 22
+	CodeBannedIP                     ErrorCode   = 23
+	CodeNonTCPAddr                   ErrorCode   = 24
+	CodeInvalidNetAddressString      ErrorCode   = 25
+	CodeInvalidNetAddressPubKey      ErrorCode   = 26
+	CodeInvalidNetAddressHostAndPort ErrorCode   = 27
+	CodeMaxOutbound                  ErrorCode   = 28
+	CodeMaxInbound                   ErrorCode   = 29
+
 	StorageModule      ErrorModule = "store"
 	CodeOpenDB         ErrorCode   = 1
 	CodeCloseDB        ErrorCode   = 2
@@ -371,4 +400,16 @@ func ErrMismatchEvidenceAndHeader() ErrorI {
 
 func ErrMismatchBadProducerCount() ErrorI {
 	return NewError(CodeMismatchBadProposerCount, ConsensusModule, "mismatch bad proposer count")
+}
+
+func ErrInvalidNetAddrString(s string) ErrorI {
+	return NewError(CodeInvalidNetAddressString, P2PModule, fmt.Sprintf("invalid net address string: %s", s))
+}
+
+func ErrInvalidNetAddressPubKey(s string) ErrorI {
+	return NewError(CodeInvalidNetAddressPubKey, P2PModule, fmt.Sprintf("invalid net address public key: %s", s))
+}
+
+func ErrInvalidNetAddressHostAndPort(s string) ErrorI {
+	return NewError(CodeInvalidNetAddressHostAndPort, P2PModule, fmt.Sprintf("invalid net address host and port: %s", s))
 }

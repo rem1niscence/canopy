@@ -2,8 +2,8 @@ package consensus
 
 import (
 	"bytes"
+	"fmt"
 	lib "github.com/ginchuco/ginchu/types"
-	"math/rand"
 	"time"
 )
 
@@ -46,12 +46,12 @@ func (cs *ConsensusState) Sync() {
 		if height >= maxHeight {
 			return
 		}
-		peers := p2p.GetPeersForHeight(height + 1)
-		if len(peers) == 0 {
-			continue
+		peer := p2p.GetPeerWithHeight(height + 1)
+		if peer == nil {
+			// TODO handle
+			panic(fmt.Sprintf("no peer with height %d found", height+1))
 		}
-		peer := peers[rand.Intn(len(peers))]
-		if err = p2p.SendToOne(peer.PublicKey, &lib.BlockRequestMessage{Height: height + 1}); err != nil {
+		if err = p2p.SendTo(peer.PublicKey, lib.Topic_BLOCK_REQUEST, &lib.BlockRequestMessage{Height: height + 1}); err != nil {
 			cs.log.Error(err.Error())
 			continue
 		}
@@ -125,7 +125,7 @@ func (cs *ConsensusState) ListenForNewBlockRequests() {
 			cs.log.Error(err.Error())
 			continue
 		}
-		if err = p2p.SendToOne(msg.Sender.PublicKey, &lib.BlockResponseMessage{
+		if err = p2p.SendTo(msg.Sender.PublicKey, lib.Topic_BLOCK, &lib.BlockResponseMessage{
 			BlockAndCertificate: blocAndCertificate,
 		}); err != nil {
 			cs.log.Error(err.Error())

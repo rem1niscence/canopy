@@ -21,14 +21,14 @@ const (
 	HKDFSize           = TwoAEADKeySize + ChallengeSize // 2 keys and challenge
 )
 
-func HKDFSecretsAndChallenge(dhSecret []byte, ePub, ePeerPub *[32]byte) (send cipher.AEAD, receive cipher.AEAD, challenge *[32]byte, err error) {
+func HKDFSecretsAndChallenge(dhSecret []byte, ePub, ePeerPub []byte) (send cipher.AEAD, receive cipher.AEAD, challenge *[32]byte, err error) {
 	hkdfReader := hkdf.New(Hasher, dhSecret, nil, nil)
 	buffer := new([HKDFSize]byte)
 	if _, err = io.ReadFull(hkdfReader, buffer[:]); err != nil {
 		return
 	}
 	challenge, receiveSecret, sendSecret := new([ChallengeSize]byte), new([AEADKeySize]byte), new([AEADKeySize]byte)
-	if bytes.Compare(ePub[:], ePeerPub[:]) < 0 {
+	if bytes.Compare(ePub, ePeerPub) < 0 {
 		getTwoSecretsFromBuffer(buffer, receiveSecret, sendSecret)
 	} else {
 		getTwoSecretsFromBuffer(buffer, sendSecret, receiveSecret)

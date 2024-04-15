@@ -37,19 +37,19 @@ type internalState struct {
 	nonce  *[crypto.AEADNonceSize]byte
 }
 
-func NewHandshake(conn net.Conn, privateKey crypto.PrivateKeyI) (c *EncryptedConn, err error) {
+func NewHandshake(conn net.Conn, privateKey crypto.PrivateKeyI) (c *EncryptedConn, e lib.ErrorI) {
 	ephemeralPublic, ephemeralPrivate := crypto.GenerateCurve25519Keypair()
-	peerEphemeralPublic, err := keySwap(conn, ephemeralPublic)
-	if err != nil {
+	peerEphemeralPublic, e := keySwap(conn, ephemeralPublic)
+	if e != nil {
 		return
 	}
-	secret, err := crypto.SharedSecret(peerEphemeralPublic[:], ephemeralPrivate[:])
+	secret, err := crypto.SharedSecret(peerEphemeralPublic, ephemeralPrivate)
 	if err != nil {
-		return
+		return nil, ErrFailedDiffieHellman(err)
 	}
 	sendAEAD, receiveAEAD, challenge, err := crypto.HKDFSecretsAndChallenge(secret, ephemeralPublic, peerEphemeralPublic)
 	if err != nil {
-		return
+		return nil, ErrFailedHKDF(err)
 	}
 	c = &EncryptedConn{
 		conn:    conn,
@@ -88,8 +88,8 @@ func (c *EncryptedConn) Write(data []byte) (n int, err error) {
 		copy(plainTextBuffer[crypto.LengthHeaderSize:], chunk)                       // body
 		c.send.aead.Seal(encryptedBuffer[:0], c.send.nonce[:], plainTextBuffer, nil) // encrypt
 		incrementNonce(c.send.nonce)                                                 // increment nonce
-		if _, err = c.conn.Write(encryptedBuffer); err != nil {                      // write
-			return
+		if _, er := c.conn.Write(encryptedBuffer); er != nil {                       // write
+			return 0, ErrFailedWrite(er)
 		}
 		n += chunkLen             // update bytes written
 		pool.Put(encryptedBuffer) // put buffers back
@@ -106,11 +106,11 @@ func (c *EncryptedConn) Read(data []byte) (n int, err error) {
 	}
 	encryptedBuffer, plainTextBuffer := pool.Get(crypto.EncryptedFrameSize), pool.Get(crypto.FrameSize)
 	defer func() { pool.Put(plainTextBuffer); pool.Put(encryptedBuffer) }()
-	if _, err = io.ReadFull(c.conn, encryptedBuffer); err != nil {
-		return
+	if _, er := io.ReadFull(c.conn, encryptedBuffer); er != nil {
+		return 0, ErrFailedReadFull(er)
 	}
-	if _, err = c.receive.aead.Open(plainTextBuffer[:0], c.receive.nonce[:], encryptedBuffer, nil); err != nil {
-		return n, ErrConnDecryptFailed()
+	if _, er := c.receive.aead.Open(plainTextBuffer[:0], c.receive.nonce[:], encryptedBuffer, nil); er != nil {
+		return n, ErrConnDecryptFailed(er)
 	}
 	incrementNonce(c.receive.nonce)
 	chunkLength := binary.LittleEndian.Uint32(plainTextBuffer) // read the length header
@@ -131,7 +131,7 @@ func (c *EncryptedConn) checkUnread(data []byte) (int, bool) {
 	return 0, false
 }
 
-func (c *EncryptedConn) populateUnread(bytesRead int, chunk []byte) (int, error) {
+func (c *EncryptedConn) populateUnread(bytesRead int, chunk []byte) (int, lib.ErrorI) {
 	if bytesRead < len(chunk) { // next call of read will read directly from unread
 		c.receive.unread = make([]byte, len(chunk)-bytesRead)
 		copy(c.receive.unread, chunk[bytesRead:])
@@ -146,42 +146,42 @@ func (c *EncryptedConn) SetDeadline(t time.Time) error      { return c.conn.SetD
 func (c *EncryptedConn) SetReadDeadline(t time.Time) error  { return c.conn.SetReadDeadline(t) }
 func (c *EncryptedConn) SetWriteDeadline(t time.Time) error { return c.conn.SetWriteDeadline(t) }
 
-func keySwap(conn io.ReadWriter, ephemeralPublicKey *[32]byte) (peerEphemeralPublic *[32]byte, err error) {
+func keySwap(conn io.ReadWriter, ephemeralPublicKey []byte) (peerPublic []byte, err lib.ErrorI) {
 	var g errgroup.Group
-	peerEphemeralPublic = &[32]byte{}
+	peerEphemeralPublic := &[]byte{}
 	g.Go(func() error { return sendKey(conn, ephemeralPublicKey) })
 	g.Go(func() error { return receiveKey(conn, peerEphemeralPublic) })
-	if err = g.Wait(); err != nil {
-		return nil, err
+	if er := g.Wait(); er != nil {
+		return nil, ErrErrorGroup(er)
 	}
-	return
+	return *peerEphemeralPublic, nil
 }
 
-func signatureSwap(conn io.ReadWriter, signature *lib.Signature) (peerSig *lib.Signature, err error) {
+func signatureSwap(conn io.ReadWriter, signature *lib.Signature) (peerSig *lib.Signature, err lib.ErrorI) {
 	var g errgroup.Group
 	g.Go(func() error { return sendSig(conn, signature) })
 	g.Go(func() error { return receiveSig(conn, peerSig) })
-	if err = g.Wait(); err != nil {
-		return nil, err
+	if er := g.Wait(); er != nil {
+		return nil, ErrErrorGroup(er)
 	}
 	return
 }
 
-func sendSig(conn io.ReadWriter, signature *lib.Signature) error {
+func sendSig(conn io.ReadWriter, signature *lib.Signature) lib.ErrorI {
 	bz, err := lib.Marshal(signature)
 	if err != nil {
 		return err
 	}
 	if _, er := conn.Write(bz); er != nil {
-		return er
+		return ErrFailedWrite(er)
 	}
 	return nil
 }
 
-func receiveSig(conn io.ReadWriter, signature *lib.Signature) error {
+func receiveSig(conn io.ReadWriter, signature *lib.Signature) lib.ErrorI {
 	buffer := make([]byte, units.Megabyte)
 	if _, err := conn.Read(buffer); err != nil {
-		return err
+		return ErrFailedRead(err)
 	}
 	if err := lib.Unmarshal(buffer, signature); err != nil {
 		return err
@@ -189,26 +189,28 @@ func receiveSig(conn io.ReadWriter, signature *lib.Signature) error {
 	return nil
 }
 
-func sendKey(conn io.ReadWriter, ephemeralPublicKey *[32]byte) error {
-	bz, err := lib.Marshal(ephemeralPublicKey)
+func sendKey(conn io.ReadWriter, ephemeralPublicKey []byte) lib.ErrorI {
+	bz, err := lib.Marshal(&crypto.ProtoPubKey{Pubkey: ephemeralPublicKey[:]})
 	if err != nil {
 		return err
 	}
 	if _, er := conn.Write(bz); er != nil {
-		return er
+		return ErrFailedWrite(er)
 	}
 	return nil
 }
 
-func receiveKey(conn io.ReadWriter, ephemeralPublicKey *[32]byte) error {
+func receiveKey(conn io.ReadWriter, ephemeralPublicKey *[]byte) lib.ErrorI {
 	buffer := make([]byte, units.Megabyte)
 	if _, err := conn.Read(buffer); err != nil {
+		return ErrFailedRead(err)
+	}
+	var key *crypto.ProtoPubKey
+	if err := lib.Unmarshal(buffer, key); err != nil {
 		return err
 	}
-	if err := lib.Unmarshal(buffer, ephemeralPublicKey); err != nil {
-		return err
-	}
-	if crypto.CheckBlacklist(ephemeralPublicKey) {
+	*ephemeralPublicKey = key.Pubkey
+	if crypto.CheckBlacklist(*ephemeralPublicKey) {
 		return ErrIsBlacklisted()
 	}
 	return nil

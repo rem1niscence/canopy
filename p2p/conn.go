@@ -24,6 +24,7 @@ const (
 	recRatePerS         = 500 * units.KB
 	maxMessageSize      = 50 * units.Megabyte
 	maxChannelCalls     = 10000
+	maxQueueSize        = 100
 
 	maxMessageExceededSlash = -10
 	unknownMessageSlash     = -3
@@ -32,10 +33,9 @@ const (
 	noPongSlash             = -1
 )
 
-var (
-	maxPacket, _  = lib.Marshal(lib.Packet{StreamId: lib.Topic_P2P, Eof: false, Bytes: make([]byte, maxPayloadSize)})
-	maxPacketSize = len(maxPacket)
-)
+/*
+	A rate-limited, multiplexed connection that utilizes a series streams with varying priority for sending and receiving
+*/
 
 type MultiConn struct {
 	conn          net.Conn
@@ -45,14 +45,17 @@ type MultiConn struct {
 	quitReceiving chan struct{} // signal to quit
 	sendPong      chan struct{}
 	receivedPong  chan struct{}
-	onError       func()
+	onError       func([]byte)
 	getPeerInfo   func(crypto.PublicKeyI) lib.PeerInfo
 	error         sync.Once
 	p2p           lib.P2P
 }
 
-func NewConnection(conn net.Conn, streams map[lib.Topic]*Stream, p2p lib.P2P, onError func(), privateKey crypto.PrivateKeyI) (*MultiConn, error) {
+func NewConnection(conn net.Conn, streams map[lib.Topic]*Stream, p2p lib.P2P, onError func([]byte), privateKey crypto.PrivateKeyI) (*MultiConn, lib.ErrorI) {
 	eConn, err := NewHandshake(conn, privateKey)
+	for _, s := range streams {
+		s.conn = eConn
+	}
 	return &MultiConn{
 		conn:          eConn,
 		peerPublicKey: eConn.peerPubKey.Bytes(),
@@ -77,6 +80,7 @@ func (c *MultiConn) Stop() {
 	c.quitSending <- struct{}{}
 	close(c.quitSending)
 	close(c.quitReceiving)
+	_ = c.conn.Close()
 }
 
 func (c *MultiConn) Send(topic lib.Topic, msg lib.ProtoMessage) (ok bool) {
@@ -97,7 +101,7 @@ func (c *MultiConn) Send(topic lib.Topic, msg lib.ProtoMessage) (ok bool) {
 func (c *MultiConn) startSendLoop() {
 	defer c.catchPanic()
 	send, m := time.NewTimer(sendInterval), limiter.New(0, 0)
-	ping, err := time.NewTicker(pingInterval), error(nil)
+	ping, err := time.NewTicker(pingInterval), lib.ErrorI(nil)
 	pongTimer, didntReceivePong := new(time.Timer), make(chan struct{}, maxChannelCalls)
 	defer func() { close(didntReceivePong); pongTimer.Stop(); ping.Stop(); send.Stop(); m.Done() }()
 	for {
@@ -151,7 +155,8 @@ func (c *MultiConn) startReceiveLoop() {
 					c.Error(badStreamSlash)
 					return
 				}
-				if slash, er := stream.handlePacket(c.p2p.GetPeerInfo(c.peerPublicKey), x); er != nil {
+				info, _ := c.p2p.GetPeerInfo(c.peerPublicKey)
+				if slash, er := stream.handlePacket(info, x); er != nil {
 					c.Error(slash)
 					return
 				}
@@ -160,7 +165,7 @@ func (c *MultiConn) startReceiveLoop() {
 			case *lib.Pong:
 				c.receivedPong <- struct{}{}
 			default:
-				ErrUnknownP2PMsg()
+				_ = ErrUnknownP2PMsg(x)
 				c.Error(unknownMessageSlash)
 				return
 			}
@@ -174,25 +179,30 @@ func (c *MultiConn) Error(reputationDelta ...int32) {
 	if len(reputationDelta) == 1 {
 		c.p2p.ChangeReputation(c.peerPublicKey, reputationDelta[0])
 	}
-	c.error.Do(c.onError)
+	c.error.Do(func() { c.onError(c.peerPublicKey) })
 }
 
-func (c *MultiConn) receive(reader bufio.Reader, m *limiter.Monitor) (proto.Message, error) {
+var (
+	maxPacket, _  = lib.Marshal(lib.Packet{StreamId: lib.Topic_P2P, Eof: false, Bytes: make([]byte, maxPayloadSize)})
+	maxPacketSize = len(maxPacket)
+)
+
+func (c *MultiConn) receive(reader bufio.Reader, m *limiter.Monitor) (proto.Message, lib.ErrorI) {
 	msg := new(lib.ProtoMessage)
 	buffer := make([]byte, maxPacketSize)
 	m.Limit(maxPacketSize, int64(recRatePerS), true)
-	n, err := reader.Read(buffer)
+	n, er := reader.Read(buffer)
 	m.Update(n)
-	if err != nil {
-		return nil, err
+	if er != nil {
+		return nil, ErrFailedRead(er)
 	}
-	if err = lib.Unmarshal(buffer, msg); err != nil {
+	if err := lib.Unmarshal(buffer, msg); err != nil {
 		return nil, err
 	}
 	return lib.FromAny(msg.Payload)
 }
 
-func (c *MultiConn) send(message proto.Message, m *limiter.Monitor) (err error) {
+func (c *MultiConn) send(message proto.Message, m *limiter.Monitor) (err lib.ErrorI) {
 	a, err := lib.ToAny(message)
 	if err != nil {
 		return err
@@ -204,15 +214,16 @@ func (c *MultiConn) send(message proto.Message, m *limiter.Monitor) (err error) 
 		return
 	}
 	m.Limit(maxPacketSize, int64(sendRatePerS), true)
-	n, err := c.conn.Write(bz)
-	if err != nil {
-		return
+	n, er := c.conn.Write(bz)
+	if er != nil {
+		return ErrFailedWrite(er)
 	}
 	m.Update(n)
 	return
 }
 
 func (c *MultiConn) getNextPacket() *lib.Packet {
+	// ordered by stream priority
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
 		stream := c.streams[i]
 		if stream.hasStuffToSend() {
@@ -277,7 +288,7 @@ func (s *Stream) chunkNextSend() (chunk []byte, eof bool) {
 	return
 }
 
-func (s *Stream) handlePacket(peerInfo lib.PeerInfo, packet *lib.Packet) (int32, error) {
+func (s *Stream) handlePacket(peerInfo lib.PeerInfo, packet *lib.Packet) (int32, lib.ErrorI) {
 	if int(maxMessageSize) < len(s.receiving)+len(packet.Bytes) {
 		s.receiving = make([]byte, 0, maxMessageSize)
 		return maxMessageExceededSlash, ErrMaxMessageSize()

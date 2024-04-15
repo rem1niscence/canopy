@@ -21,9 +21,10 @@ message PeerInfo {
   string net_address = 2;
   uint64 min_height = 3;
   uint64 max_height = 4;
-  bool is_validator = 5;
-  bool is_unconditional = 6;
-  int32 reputation = 7;
+  bool is_outbound = 5;
+  bool is_validator = 6;
+  bool is_unconditional = 7;
+  int32 reputation = 8;
 }
 
 message ProtoMessage {
