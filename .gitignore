@@ -27,6 +27,6 @@ go.work
 vendor
 
 # Environment
-.env
+.docker/.env
 
-TIMELOG.md
+.docs/TIMELOG.md

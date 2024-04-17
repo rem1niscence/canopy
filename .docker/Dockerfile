@@ -4,7 +4,7 @@ RUN apk add --no-cache git
 ARG BUILD_PATH
 
 WORKDIR /go/src/github.com/ginchuco/ginchu
-COPY . .
+COPY .. .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -o bin ./${BUILD_PATH}/*.go
 

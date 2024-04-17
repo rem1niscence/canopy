@@ -4,8 +4,8 @@ services:
   node-1:
     container_name: node-1
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: .docker/Dockerfile
       args:
         BUILD_PATH: cmd
     ports:
@@ -21,8 +21,8 @@ services:
   node-2:
     container_name: node-2
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: .docker/Dockerfile
       args:
         BUILD_PATH: cmd
     ports:
