@@ -38,7 +38,7 @@ const (
 )
 
 func (cs *ConsensusState) Sync() {
-	app, p2p := cs.App, cs.P2P
+	app, p2p := cs, cs.P2P
 	receiveChannel := p2p.ReceiveChannel(lib.Topic_BLOCK)
 	maxHeight := cs.PollPeersMaxHeight(receiveChannel, 1)
 	for {
@@ -103,7 +103,7 @@ func (cs *ConsensusState) PollPeersMaxHeight(receiveChan chan *lib.MessageWrappe
 }
 
 func (cs *ConsensusState) ListenForNewBlock() {
-	app, p2p := cs.App, cs.P2P
+	app, p2p := cs, cs.P2P
 	cache := lib.NewMessageCache()
 	for msg := range p2p.ReceiveChannel(lib.Topic_BLOCK) {
 		if ok := cache.Add(msg); !ok {
@@ -124,7 +124,7 @@ func (cs *ConsensusState) ListenForNewBlock() {
 }
 
 func (cs *ConsensusState) ListenForNewTx() {
-	app, p2p := cs.App, cs.P2P
+	app, p2p := cs, cs.P2P
 	cache := lib.NewMessageCache()
 	for msg := range p2p.ReceiveChannel(lib.Topic_TX) {
 		if ok := cache.Add(msg); !ok {
@@ -152,7 +152,7 @@ func (cs *ConsensusState) ListenForNewTx() {
 }
 
 func (cs *ConsensusState) ListenForNewBlockRequests() {
-	app, p2p := cs.App, cs.P2P
+	app, p2p := cs, cs.P2P
 	l := lib.NewLimiter(MaxBlockRequestsPerWindow, p2p.MaxPossiblePeers()*MaxBlockRequestsPerWindow, BlockRequestWindowS)
 	for {
 		select {

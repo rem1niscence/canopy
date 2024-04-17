@@ -26,7 +26,7 @@ services:
       args:
         BUILD_PATH: cmd
     ports:
-      - 3000:3001
+      - 3001:3001
     restart: always
     environment:
       LOG_LEVEL: -4 # Debug

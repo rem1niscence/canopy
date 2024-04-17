@@ -34,13 +34,15 @@ type ConsensusState struct {
 	PrivateKey crypto.PrivateKeyI
 
 	P2P    lib.P2P
-	App    lib.App
 	Config Config
 	log    lib.LoggerI
+
+	State   State
+	Mempool Mempool
 }
 
 func NewConsensusState(height uint64, v *lib.ValidatorSet, pk crypto.PrivateKeyI,
-	p lib.P2P, a lib.App, c Config, l lib.LoggerI) (*ConsensusState, lib.ErrorI) {
+	p lib.P2P, c Config, l lib.LoggerI) (*ConsensusState, lib.ErrorI) {
 	validatorSet, err := lib.NewValidatorSet(v)
 	if err != nil {
 		return nil, err
@@ -61,7 +63,8 @@ func NewConsensusState(height uint64, v *lib.ValidatorSet, pk crypto.PrivateKeyI
 		PublicKey:  pk.PublicKey(),
 		PrivateKey: pk,
 		P2P:        p,
-		App:        a,
+		State:      State{},
+		Mempool:    Mempool{},
 		Config:     c,
 		log:        l,
 	}, nil
@@ -107,7 +110,7 @@ func (cs *ConsensusState) StartElectionPhase() {
 		cs.log.Error(err.Error())
 		return
 	}
-	cs.ProducersPublicKeys = cs.App.GetProducerPubKeys()
+	cs.ProducersPublicKeys = cs.GetProducerPubKeys()
 	// SORTITION (CDF + VRF)
 	_, vrf, isCandidate := Sortition(&SortitionParams{
 		SortitionData: SortitionData{
@@ -177,7 +180,7 @@ func (cs *ConsensusState) StartProposePhase() {
 	// PRODUCE BLOCK OR USE HQC BLOCK
 	if vote.HighQc == nil {
 		var lastDoubleSigners, badProposers [][]byte
-		lastDoubleSigners, err = dse.GetDoubleSigners(cs.App)
+		lastDoubleSigners, err = dse.GetDoubleSigners(cs)
 		if err != nil {
 			cs.log.Error(err.Error())
 			return
@@ -187,7 +190,7 @@ func (cs *ConsensusState) StartProposePhase() {
 			cs.log.Error(err.Error())
 			return
 		}
-		cs.Block, err = cs.App.ProduceCandidateBlock(badProposers, lastDoubleSigners)
+		cs.Block, err = cs.ProduceCandidateBlock(badProposers, lastDoubleSigners)
 		if err != nil {
 			cs.log.Error(err.Error())
 			return
@@ -230,7 +233,7 @@ func (cs *ConsensusState) StartProposeVotePhase() (interrupt bool) {
 		BPE: msg.BadProposerEvidence,
 	}
 	// CHECK CANDIDATE BLOCK AGAINST STATE MACHINE
-	if err := cs.App.CheckCandidateBlock(msg.Qc.Block, &byzantineEvidence); err != nil {
+	if err := cs.CheckCandidateBlock(msg.Qc.Block, &byzantineEvidence); err != nil {
 		cs.log.Error(err.Error())
 		return true
 	}
@@ -318,10 +321,10 @@ func (cs *ConsensusState) StartCommitProcessPhase() (interrupt bool) {
 	if interrupt = cs.CheckLeaderAndBlock(msg); interrupt {
 		return
 	}
-	if err := cs.App.CommitBlock(msg.Qc); err != nil {
+	if err := cs.CommitBlock(msg.Qc); err != nil {
 		return true
 	}
-	cs.ByzantineEvidence = cs.LeaderMessages.GetByzantineEvidence(cs.App, cs.View.Copy(),
+	cs.ByzantineEvidence = cs.LeaderMessages.GetByzantineEvidence(cs, cs.View.Copy(),
 		cs.ValidatorSet, cs.LeaderPublicKey.Bytes(), &cs.Votes, cs.SelfIsLeader())
 	cs.NewHeight()
 	return
@@ -354,7 +357,7 @@ func (cs *ConsensusState) HandleMessage(message proto.Message) lib.ErrorI {
 			if isPartialQC {
 				return lib.ErrNoMaj23()
 			}
-			return cs.Votes.AddVote(cs.App, cs.LeaderPublicKey.Bytes(), cs.View.Copy(), msg, cs.ValidatorSet)
+			return cs.Votes.AddVote(cs, cs.LeaderPublicKey.Bytes(), cs.View.Copy(), msg, cs.ValidatorSet)
 		case msg.IsLeaderMessage():
 			partialQC, err := msg.Check(cs.View.Copy(), cs.ValidatorSet)
 			if err != nil {

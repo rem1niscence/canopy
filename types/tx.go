@@ -18,6 +18,16 @@ type TransactionI interface {
 	GetHash() ([]byte, error)
 }
 
+type MessageI interface {
+	proto.Message
+
+	SetSigner(signer []byte)
+	Check() ErrorI
+	Bytes() ([]byte, ErrorI)
+	Name() string
+	Recipient() []byte // for transaction indexing by recipient
+}
+
 func (x *Transaction) GetHash() ([]byte, error) {
 	bz, err := x.GetBytes()
 	if err != nil {
@@ -73,3 +83,22 @@ func (x *Signature) Copy() *Signature {
 		Signature: CopyBytes(x.Signature),
 	}
 }
+
+type Mempool interface {
+	Contains(hash string) bool
+	AddTransaction(tx []byte, fee string) (recheck bool, err ErrorI)
+	DeleteTransaction(tx []byte)
+	GetTransactions(maxBytes uint64) (int, [][]byte)
+
+	Clear()
+	Size() int
+	TxsBytes() int
+	Iterator() IteratorI
+}
+
+type Signable interface {
+	proto.Message
+	Sign(p crypto.PrivateKeyI) ErrorI
+}
+
+type SignByte interface{ SignBytes() ([]byte, ErrorI) }

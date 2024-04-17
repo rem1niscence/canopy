@@ -1,4 +1,4 @@
-package fsm
+package state_machine
 
 import (
 	"github.com/ginchuco/ginchu/state_machine/types"
@@ -8,7 +8,7 @@ import (
 )
 
 func (s *StateMachine) UpdateParam(address string, space, paramName string, value proto.Message) (err lib.ErrorI) {
-	var sp lib.ParamSpace
+	var sp types.ParamSpace
 	switch space {
 	case types.ParamSpaceCons:
 		sp, err = s.GetParamsCons()
@@ -37,7 +37,7 @@ func (s *StateMachine) UpdateParam(address string, space, paramName string, valu
 	}
 }
 
-func (s *StateMachine) updateOwner(address string, sp lib.ParamSpace, paramName, newOwner string) lib.ErrorI {
+func (s *StateMachine) updateOwner(address string, sp types.ParamSpace, paramName, newOwner string) lib.ErrorI {
 	gov, err := s.GetParamsGov()
 	if err != nil {
 		return err

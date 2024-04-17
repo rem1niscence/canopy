@@ -8,51 +8,24 @@ import (
 )
 
 type LoggerI interface {
-	// Debug prints a debug message.
 	Debug(msg string)
-
-	// Info prints an info message.
 	Info(msg string)
-
-	// Warn prints a warning message.
 	Warn(msg string)
-
-	// Error prints an error message.
 	Error(msg string)
-
-	// Fatal prints an fatal message and exits
 	Fatal(msg string)
-
-	// Print prints a message with no level.
 	Print(msg string)
-
-	// Debugf prints a debug message with formatting.
 	Debugf(format string, args ...interface{})
-
-	// Infof prints an info message with formatting.
 	Infof(format string, args ...interface{})
-
-	// Warnf prints a warning message with formatting.
 	Warnf(format string, args ...interface{})
-
-	// Errorf prints an error message with formatting.
 	Errorf(format string, args ...interface{})
-
-	// Fatalf prints a fatal message with formatting and exits
 	Fatalf(format string, args ...interface{})
-
-	// Printf prints a message with no level and formatting.
 	Printf(format string, args ...interface{})
 }
 
 const (
-	// DebugLevel is the debug level.
 	DebugLevel int32 = -4
-	// InfoLevel is the info level.
-	InfoLevel int32 = 0
-	// WarnLevel is the warn level.
-	WarnLevel int32 = 4
-	// ErrorLevel is the error level.
+	InfoLevel  int32 = 0
+	WarnLevel  int32 = 4
 	ErrorLevel int32 = 8
 
 	Reset  = "\033[0m"
@@ -60,17 +33,11 @@ const (
 	GREEN  = "\033[32m"
 	YELLOW = "\033[33m"
 	BLUE   = "\033[34m"
-	PURPLE = "\033[35m"
 	GRAY   = "\033[37m"
 )
 
 var (
 	_ LoggerI = &Logger{}
-
-	DefaultLoggerConfig = LoggerConfig{
-		Level: DebugLevel,
-		Out:   os.Stdout,
-	}
 )
 
 type LoggerConfig struct {
@@ -95,28 +62,22 @@ func (l *Logger) Fatal(msg string) {
 func (l *Logger) Debugf(format string, args ...interface{}) {
 	l.write(colorStringWithFormat(BLUE, "DEBUG: "+format, args...))
 }
-
 func (l *Logger) Infof(format string, args ...interface{}) {
 	l.write(colorStringWithFormat(GREEN, "INFO: "+format, args...))
 }
-
 func (l *Logger) Warnf(format string, args ...interface{}) {
 	l.write(colorStringWithFormat(YELLOW, "WARN: "+format, args...))
 }
-
 func (l *Logger) Errorf(format string, args ...interface{}) {
 	l.write(colorStringWithFormat(RED, "ERROR: "+format, args...))
 }
-
 func (l *Logger) Fatalf(format string, args ...interface{}) {
 	l.Errorf(format, args)
 	os.Exit(1)
 }
-
 func (l *Logger) Printf(format string, args ...interface{}) {
 	l.write(fmt.Sprintf(format, args...))
 }
-
 func (l *Logger) write(msg string) {
 	timeColored := colorString(GRAY, time.Now().Format(time.DateTime))
 	if _, err := l.config.Out.Write([]byte(fmt.Sprintf("%s %s\n", timeColored, msg))); err != nil {
@@ -134,13 +95,13 @@ func NewLogger(config LoggerConfig) LoggerI {
 }
 
 func NewDefaultLogger() LoggerI {
-	return NewLogger(DefaultLoggerConfig)
+	return NewLogger(LoggerConfig{
+		Level: DebugLevel,
+		Out:   os.Stdout,
+	})
 }
 
 func colorStringWithFormat(c string, format string, args ...interface{}) string {
 	return c + fmt.Sprintf(format, args...) + Reset
 }
-
-func colorString(c, msg string) string {
-	return c + msg + Reset
-}
+func colorString(c, msg string) string { return c + msg + Reset }

@@ -21,6 +21,13 @@ const (
 	ParamKeywordOwner = "_owner"
 )
 
+type ParamSpace interface {
+	Validate() types.ErrorI
+	SetString(address string, paramName string, value string) types.ErrorI
+	SetUint64(address string, paramName string, value uint64) types.ErrorI
+	SetOwner(paramName string, owner string) types.ErrorI
+}
+
 func IsValidParamSpace(space string) bool {
 	switch space {
 	case ParamSpaceCons, ParamSpaceVal, ParamSpaceFee, ParamSpaceGov:
@@ -65,7 +72,7 @@ const (
 	ParamProtocolVersion = "protocol_version"
 )
 
-var _ types.ParamSpace = &ConsensusParams{}
+var _ ParamSpace = &ConsensusParams{}
 
 func (x *ConsensusParams) Validate() types.ErrorI {
 	if x.BlockSize.Value == 0 {
@@ -146,7 +153,7 @@ func NewProtocolVersion(height uint64, version uint64) (string, types.ErrorI) {
 
 // validator param space
 
-var _ types.ParamSpace = &ValidatorParams{}
+var _ ParamSpace = &ValidatorParams{}
 
 const (
 	ParamValidatorMinStake                  = "validator_min_stake"
@@ -378,7 +385,7 @@ func (x *ValidatorParams) SetOwner(paramName string, owner string) types.ErrorI 
 
 // fee param space
 
-var _ types.ParamSpace = &FeeParams{}
+var _ ParamSpace = &FeeParams{}
 
 const (
 	ParamMessageSendFee            = "message_send_fee"
@@ -526,7 +533,7 @@ const (
 	ParamACLOwner = "acl"
 )
 
-var _ types.ParamSpace = &GovernanceParams{}
+var _ ParamSpace = &GovernanceParams{}
 
 func (x *GovernanceParams) Validate() types.ErrorI {
 	if _, err := crypto.NewAddressFromString(x.AclOwner); err != nil {
