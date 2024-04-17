@@ -1,7 +1,12 @@
 # CHANGELOG
 
 ## [Unreleased] - 04/12/2024
+
 - Added `encrypted` p2p connection
+- Added `multiplexed` p2p connection
+- Added `peerBook` functionality
+- Added `gossip` functionality
+- Added `peerList` functionality
 
 ## [Unreleased] - 04/11/2024
 

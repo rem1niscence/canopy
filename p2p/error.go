@@ -90,6 +90,10 @@ func ErrBannedIP(s string) lib.ErrorI {
 	return lib.NewError(lib.CodeBannedIP, lib.P2PModule, fmt.Sprintf("banned IP attempted to connect: %s", s))
 }
 
+func ErrBannedID(s string) lib.ErrorI {
+	return lib.NewError(lib.CodeBannedID, lib.P2PModule, fmt.Sprintf("banned ID attempted to connect: %s", s))
+}
+
 func ErrNonTCPAddress() lib.ErrorI {
 	return lib.NewError(lib.CodeNonTCPAddr, lib.P2PModule, "non tcp address")
 }

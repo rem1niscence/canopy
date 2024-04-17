@@ -60,6 +60,9 @@ func NewHandshake(conn net.Conn, privateKey crypto.PrivateKeyI) (c *EncryptedCon
 		PublicKey: privateKey.PublicKey().Bytes(),
 		Signature: privateKey.Sign(challenge[:]),
 	})
+	if err != nil {
+		return
+	}
 	c.peerPubKey, err = lib.PublicKeyFromBytes(peer.PublicKey)
 	if err != nil {
 		return

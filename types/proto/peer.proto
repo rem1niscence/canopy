@@ -1,0 +1,44 @@
+syntax = "proto3";
+package types;
+
+option go_package = "github.com/ginchuco/ginchu/types";
+
+import "block.proto";
+
+// ordered by stream priority
+enum Topic {
+  CONSENSUS = 0;
+  BLOCK = 1;
+  BLOCK_REQUEST = 2;
+  TX = 3;
+  PEERS_RESPONSE = 4;
+  PEERS_REQUEST = 5;
+  INVALID = 6;
+}
+
+message PeerInfo {
+  PeerAddress Address = 1;
+  bool is_outbound = 2;
+  bool is_validator = 3;
+  bool is_trusted = 4;
+  int32 reputation = 5;
+}
+
+message PeerAddress {
+  bytes public_key = 1;
+  string net_address = 2;
+}
+
+message BlockRequestMessage {
+  uint64 height = 1;
+  bool height_only = 2;
+}
+
+message BlockResponseMessage {
+  uint64 max_height = 1;
+  QuorumCertificate BlockAndCertificate = 2;
+}
+
+message TxMessage {
+  bytes Tx = 1;
+}

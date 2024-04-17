@@ -22,11 +22,10 @@ import (
 	- UnPn & nat-pimp auto config [-]
 	- DOS mitigation [x]
 	- Peer configs: unconditional, num in/out, timeouts [x]
-	- Peer list: discover, churn, share
-	- Message dissemination: rain tree
+	- Peer list: discover[x], churn[x], share[x]
+	- Message dissemination: gossip [x]
+	- Message dissemination improved: raintree [ ]
 */
-
-// TODO share peers and remove height excchange from P2P and move it to sync message (block + maxHeight)
 
 const (
 	transport   = "TCP"
@@ -40,12 +39,14 @@ type P2P struct {
 	listener   net.Listener
 	channels   lib.Channels
 	config     Config
-	PeerSet
+	PeerSet              // active set
+	book       *PeerBook // not active set
 
 	state State
 }
 
-func NewP2P(p crypto.PrivateKeyI, height uint64, maxValidators int, channels lib.Channels, c Config) *P2P {
+func NewP2P(p crypto.PrivateKeyI, maxValidators int, channels lib.Channels, c Config) *P2P {
+	peerBook := &PeerBook{} // TODO load from file / write to file
 	c.maxValidators = maxValidators
 	return &P2P{
 		privateKey: p,
@@ -55,41 +56,44 @@ func NewP2P(p crypto.PrivateKeyI, height uint64, maxValidators int, channels lib
 			RWMutex: sync.RWMutex{},
 			config:  c,
 			m:       make(map[string]*Peer),
+			book:    peerBook,
 		},
+		book: peerBook,
 		state: State{
 			RWMutex: sync.RWMutex{},
-			height:  height,
 		},
 	}
 }
 
-func (p *P2P) Start(validatorsReceiver chan []lib.PeerInfo, heightReceiver chan uint64) {
+func (p *P2P) Start(validatorsReceiver chan []*lib.PeerAddress) {
 	go p.InternalListenValidators(validatorsReceiver)
-	go p.InternalListenHeight(heightReceiver)
-	go p.Listen(lib.PeerInfo{NetAddress: p.config.ListenAddress})
+	go p.Listen(&lib.PeerAddress{NetAddress: p.config.ListenAddress})
 	for _, peer := range p.config.DialPeers {
-		pi := new(lib.PeerInfo)
+		pi := new(lib.PeerAddress)
 		if err := pi.FromString(peer); err != nil {
 			// log error
 			continue
 		}
-		p.DialWithBackoff(*pi)
+		p.DialWithBackoff(pi)
 	}
 }
 
-func (p *P2P) Dial(peerInfo lib.PeerInfo) lib.ErrorI {
-	if p.IsSelf(peerInfo) {
+func (p *P2P) Dial(address *lib.PeerAddress, disconnect bool) lib.ErrorI {
+	if p.IsSelf(address) || p.PeerSet.Has(address.PublicKey) {
 		return nil
 	}
-	conn, er := net.DialTimeout(transport, peerInfo.NetAddress, dialTimeout)
+	conn, er := net.DialTimeout(transport, address.NetAddress, dialTimeout)
 	if er != nil {
+		p.book.AddFailedDialAttempt(address.PublicKey)
 		return ErrFailedDial(er)
 	}
-	peerInfo.IsOutbound = true
-	return p.AddPeer(conn, peerInfo)
+	return p.AddPeer(conn, &lib.PeerInfo{
+		Address:    address,
+		IsOutbound: true,
+	}, disconnect)
 }
 
-func (p *P2P) Listen(listenAddress lib.PeerInfo) {
+func (p *P2P) Listen(listenAddress *lib.PeerAddress) {
 	ln, er := net.Listen(transport, listenAddress.NetAddress)
 	if er != nil {
 		panic(ErrFailedListen(er))
@@ -102,12 +106,12 @@ func (p *P2P) Listen(listenAddress lib.PeerInfo) {
 		}
 		go func(c net.Conn) {
 			defer p.catchPanic()
-			peerInfo, e := p.filter(c)
+			peerAddress, e := p.filter(c)
 			if e != nil {
 				_ = c.Close()
 				return
 			}
-			if err = p.AddPeer(c, peerInfo); err != nil {
+			if err = p.AddPeer(c, &lib.PeerInfo{Address: peerAddress}, false); err != nil {
 				_ = c.Close()
 				return
 			}
@@ -115,23 +119,33 @@ func (p *P2P) Listen(listenAddress lib.PeerInfo) {
 	}
 }
 
-func (p *P2P) AddPeer(conn net.Conn, info lib.PeerInfo) lib.ErrorI {
+func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) lib.ErrorI {
 	connection, err := NewConnection(conn, p.NewStreams(), p, p.OnPeerError, p.privateKey)
 	if err != nil {
 		return err
 	}
-	if info.PublicKey != nil && !bytes.Equal(connection.peerPublicKey, info.PublicKey) {
-		return ErrMismatchPeerPublicKey(info.PublicKey, connection.peerPublicKey)
+	if info.Address.PublicKey != nil && !bytes.Equal(connection.peerPublicKey, info.Address.PublicKey) {
+		return ErrMismatchPeerPublicKey(info.Address.PublicKey, connection.peerPublicKey)
+	}
+	if disconnect {
+		connection.Stop()
+		return nil
 	}
 	p.state.RLock()
 	for _, v := range p.state.validators {
-		if bytes.Equal(v.PublicKey, info.PublicKey) {
+		if bytes.Equal(v.PublicKey, info.Address.PublicKey) {
 			info.IsValidator = true
 			break
 		}
 	}
 	p.state.RUnlock()
-	info.PublicKey = connection.peerPublicKey
+	for _, t := range p.config.TrustedPeerIDs {
+		if lib.BytesToString(connection.peerPublicKey) == t {
+			info.IsTrusted = true
+			break
+		}
+	}
+	info.Address.PublicKey = connection.peerPublicKey
 	streams := make(map[lib.Topic]*Stream)
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
 		streams[i] = &Stream{
@@ -141,6 +155,13 @@ func (p *P2P) AddPeer(conn net.Conn, info lib.PeerInfo) lib.ErrorI {
 			receive:       p.ReceiveChannel(i),
 		}
 	}
+	for _, banned := range p.config.BannedPeerIDs {
+		pubKeyString := lib.BytesToString(connection.peerPublicKey)
+		if pubKeyString == banned {
+			return ErrBannedID(pubKeyString)
+		}
+	}
+	p.book.Add(&BookPeer{Address: info.Address})
 	return p.PeerSet.Add(&Peer{
 		conn:     connection,
 		PeerInfo: info,
@@ -148,33 +169,28 @@ func (p *P2P) AddPeer(conn net.Conn, info lib.PeerInfo) lib.ErrorI {
 	})
 }
 
-func (p *P2P) DialWithBackoff(peerInfo lib.PeerInfo) {
-	_ = backoff.Retry(func() error { return p.Dial(peerInfo) }, backoff.NewExponentialBackOff())
+func (p *P2P) DialWithBackoff(peerInfo *lib.PeerAddress) {
+	_ = backoff.Retry(func() error { return p.Dial(peerInfo, false) }, backoff.NewExponentialBackOff())
+}
+func (p *P2P) DialAndDisconnect(a *lib.PeerAddress) lib.ErrorI {
+	return p.Dial(a, true)
 }
 
-func (p *P2P) InternalListenValidators(validatorsReceiver chan []lib.PeerInfo) {
+func (p *P2P) InternalListenValidators(validatorsReceiver chan []*lib.PeerAddress) {
 	selfPubKey := p.privateKey.PublicKey().Bytes()
 	for vs := range validatorsReceiver {
 		p.state.Lock()
 		p.state.validators = vs
-		p.state.Unlock()
 		for _, val := range p.UpdateValidators(selfPubKey, vs) {
 			go p.DialWithBackoff(val)
 		}
-	}
-}
-
-func (p *P2P) InternalListenHeight(heightReceiver chan uint64) {
-	for h := range heightReceiver {
-		p.state.Lock()
-		p.state.height = h
 		p.state.Unlock()
 	}
 }
 
 func (p *P2P) OnPeerError(publicKey []byte) {
 	if err := p.PeerSet.Remove(publicKey); err != nil {
-		// handle error
+		fmt.Println(err.Error()) // handle error
 	}
 }
 
@@ -190,41 +206,44 @@ func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 	}
 	return
 }
-func (p *P2P) IsSelf(i lib.PeerInfo) bool {
-	return bytes.Equal(p.privateKey.PublicKey().Bytes(), i.PublicKey)
+func (p *P2P) IsSelf(address *lib.PeerAddress) bool {
+	return bytes.Equal(p.privateKey.PublicKey().Bytes(), address.PublicKey)
+}
+func (p *P2P) MaxPossiblePeers() int {
+	c := p.config
+	return c.MaxInbound + c.MaxOutbound + c.maxValidators + len(c.TrustedPeerIDs)
 }
 func (p *P2P) ReceiveChannel(topic lib.Topic) chan *lib.MessageWrapper { return p.channels[topic] }
 func (p *P2P) Close()                                                  { _ = p.listener.Close() }
-func (p *P2P) filter(conn net.Conn) (lib.PeerInfo, lib.ErrorI) {
+func (p *P2P) filter(conn net.Conn) (*lib.PeerAddress, lib.ErrorI) {
 	remoteAddr := conn.RemoteAddr()
 	tcpAddr, ok := remoteAddr.(*net.TCPAddr)
 	if !ok {
-		return lib.PeerInfo{}, ErrNonTCPAddress()
+		return nil, ErrNonTCPAddress()
 	}
 	host := tcpAddr.IP.String()
 	ips, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
 	if err != nil {
-		return lib.PeerInfo{}, ErrIPLookup(err)
+		return nil, ErrIPLookup(err)
 	}
 	for _, ip := range ips {
 		for _, bannedIP := range p.config.bannedIPs {
 			if ip.IP.Equal(bannedIP.IP) {
-				return lib.PeerInfo{}, ErrBannedIP(ip.String())
+				return nil, ErrBannedIP(ip.String())
 			}
 		}
 	}
-	return lib.PeerInfo{NetAddress: net.JoinHostPort(host, fmt.Sprintf("%d", tcpAddr.Port))}, nil
+	return &lib.PeerAddress{NetAddress: net.JoinHostPort(host, fmt.Sprintf("%d", tcpAddr.Port))}, nil
 }
 func (p *P2P) catchPanic() {
 	if r := recover(); r != nil {
-		// handle error
+		fmt.Println("recovered") // handle error
 	}
 }
 
 type State struct {
 	sync.RWMutex
-	validators []lib.PeerInfo
-	height     uint64
+	validators []*lib.PeerAddress
 }
 
 type Config struct {

@@ -87,6 +87,7 @@ const (
 	CodeMismatchDoubleSignerCount       ErrorCode   = 47
 	CodeMismatchEvidenceAndHeader       ErrorCode   = 48
 	CodeMismatchBadProposerCount        ErrorCode   = 49
+	CodeWrongMaxHeight                  ErrorCode   = 50
 
 	StateMachineModule          ErrorModule = "state_machine"
 	CodeFeeBelowState           ErrorCode   = 2
@@ -169,6 +170,7 @@ const (
 	CodeInvalidNetAddressHostAndPort ErrorCode   = 27
 	CodeMaxOutbound                  ErrorCode   = 28
 	CodeMaxInbound                   ErrorCode   = 29
+	CodeBannedID                     ErrorCode   = 30
 
 	StorageModule      ErrorModule = "store"
 	CodeOpenDB         ErrorCode   = 1
@@ -316,6 +318,10 @@ func ErrNewMultiPubKey(err error) ErrorI {
 
 func ErrWrongHeight() ErrorI {
 	return NewError(CodeWrongHeight, ConsensusModule, "wrong height")
+}
+
+func ErrWrongMaxHeight() ErrorI {
+	return NewError(CodeWrongMaxHeight, ConsensusModule, "wrong max height")
 }
 
 func ErrEmptyView() ErrorI {

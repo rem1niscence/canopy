@@ -7,36 +7,34 @@ import (
 	"sync"
 )
 
+const (
+	MinimumPeerReputation = -10
+)
+
 type PeerSet struct {
 	sync.RWMutex
-	config    Config
-	m         map[string]*Peer // public key -> Peer
-	maxHeight uint64
-	inbound   int
-	outbound  int
+	config   Config
+	m        map[string]*Peer // public key -> Peer
+	inbound  int
+	outbound int
+
+	book *PeerBook
 }
 
 type Peer struct {
 	conn *MultiConn
-	lib.PeerInfo
+	*lib.PeerInfo
 	stop sync.Once
 }
 
 func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 	ps.Lock()
 	defer ps.Unlock()
-	pubKey := lib.BytesToString(p.PublicKey)
+	pubKey := lib.BytesToString(p.Address.PublicKey)
 	if _, found := ps.m[pubKey]; found {
 		return ErrPeerAlreadyExists(pubKey)
 	}
-	var trusted bool
-	for _, t := range ps.config.TrustedPeerIDs {
-		if lib.BytesToString(p.PublicKey) == t {
-			trusted = true
-			break
-		}
-	}
-	if !trusted && !p.IsValidator {
+	if !p.IsTrusted && !p.IsValidator {
 		if p.IsOutbound && ps.config.MaxOutbound <= ps.outbound-1 {
 			return ErrMaxOutbound()
 		} else if !p.IsOutbound && ps.config.MaxInbound <= ps.inbound-1 {
@@ -49,11 +47,10 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 		ps.inbound++
 	}
 	ps.set(p)
-	ps.calculateMaxHeight()
 	return nil
 }
 
-func (ps *PeerSet) UpdateValidators(selfPublicKey []byte, vs []lib.PeerInfo) (toDial []lib.PeerInfo) {
+func (ps *PeerSet) UpdateValidators(selfPublicKey []byte, vs []*lib.PeerAddress) (toDial []*lib.PeerAddress) {
 	ps.Lock()
 	defer ps.Unlock()
 	var selfIsValidator bool
@@ -85,7 +82,7 @@ func (ps *PeerSet) Remove(publicKey []byte) lib.ErrorI {
 	}
 	peer.stop.Do(peer.conn.Stop)
 	ps.del(publicKey)
-	ps.calculateMaxHeight()
+	ps.book.Remove(publicKey)
 	return err
 }
 
@@ -97,24 +94,28 @@ func (ps *PeerSet) ChangeReputation(publicKey []byte, delta int32) {
 		return
 	}
 	peer.Reputation += delta
+	if !peer.IsTrusted && !peer.IsValidator && peer.Reputation < MinimumPeerReputation {
+		ps.del(peer.Address.PublicKey)
+		return
+	}
 	ps.set(peer)
 }
 
-func (ps *PeerSet) GetPeerInfo(publicKey []byte) (lib.PeerInfo, lib.ErrorI) {
+func (ps *PeerSet) GetPeerInfo(publicKey []byte) (*lib.PeerInfo, lib.ErrorI) {
 	ps.RLock()
 	defer ps.RUnlock()
 	peer, err := ps.get(publicKey)
 	if err != nil {
-		return lib.PeerInfo{}, err
+		return nil, err
 	}
-	return peer.PeerInfo, nil
+	return peer.PeerInfo.Copy(), nil
 }
 
 func (ps *PeerSet) SendToPeer(topic lib.Topic, msg proto.Message) (*lib.PeerInfo, lib.ErrorI) {
 	ps.RLock()
 	defer ps.RUnlock()
 	for _, p := range ps.m {
-		return &p.PeerInfo, ps.send(p, topic, msg)
+		return p.Copy(), ps.send(p, topic, msg)
 	}
 	return nil, nil
 }
@@ -129,17 +130,36 @@ func (ps *PeerSet) SendTo(publicKey []byte, topic lib.Topic, msg proto.Message) 
 	return ps.send(peer, topic, msg)
 }
 
+func (ps *PeerSet) SendToAll(topic lib.Topic, msg proto.Message) lib.ErrorI {
+	ps.RLock()
+	defer ps.RUnlock()
+	for _, p := range ps.m {
+		if err := ps.send(p, topic, msg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (ps *PeerSet) SendToValidators(msg proto.Message) lib.ErrorI {
 	ps.RLock()
 	defer ps.RUnlock()
 	for _, p := range ps.m {
 		if p.IsValidator {
 			if err := ps.send(p, lib.Topic_CONSENSUS, msg); err != nil {
-				// log error
+				return err
 			}
 		}
 	}
 	return nil
+}
+
+func (ps *PeerSet) Has(publicKey []byte) bool {
+	ps.RLock()
+	defer ps.RUnlock()
+	pubKey := lib.BytesToString(publicKey)
+	_, found := ps.m[pubKey]
+	return found
 }
 
 func (ps *PeerSet) send(peer *Peer, topic lib.Topic, msg proto.Message) lib.ErrorI {
@@ -147,18 +167,7 @@ func (ps *PeerSet) send(peer *Peer, topic lib.Topic, msg proto.Message) lib.Erro
 	if err != nil {
 		return err
 	}
-	peer.conn.Send(topic, lib.ProtoMessage{Payload: a})
-	return nil
-}
-
-func (ps *PeerSet) GetPeerWithHeight(height uint64) *lib.PeerInfo {
-	ps.RLock()
-	defer ps.RUnlock()
-	for _, p := range ps.m {
-		if p.MaxHeight >= height && height >= p.MinHeight {
-			return &p.PeerInfo
-		}
-	}
+	peer.conn.Send(topic, &Envelope{Payload: a})
 	return nil
 }
 
@@ -174,21 +183,8 @@ func (ps *PeerSet) Outbound() (outbound int) {
 	return ps.outbound
 }
 
-func (ps *PeerSet) GetMaxPeerHeight() uint64 {
-	ps.RLock()
-	defer ps.RUnlock()
-	return ps.maxHeight
-}
-
+func (ps *PeerSet) set(p *Peer)          { ps.m[lib.BytesToString(p.Address.PublicKey)] = p }
 func (ps *PeerSet) del(publicKey []byte) { delete(ps.m, lib.BytesToString(publicKey)) }
-func (ps *PeerSet) calculateMaxHeight() {
-	ps.maxHeight = uint64(0)
-	for _, p := range ps.m {
-		if p.MaxHeight > ps.maxHeight {
-			ps.maxHeight = p.MaxHeight
-		}
-	}
-}
 func (ps *PeerSet) get(publicKey []byte) (*Peer, lib.ErrorI) {
 	pub := lib.BytesToString(publicKey)
 	peer, ok := ps.m[pub]
@@ -196,8 +192,4 @@ func (ps *PeerSet) get(publicKey []byte) (*Peer, lib.ErrorI) {
 		return nil, ErrPeerNotFound(pub)
 	}
 	return peer, nil
-}
-func (ps *PeerSet) set(p *Peer) {
-	ps.m[lib.BytesToString(p.PublicKey)] = p
-	return
 }

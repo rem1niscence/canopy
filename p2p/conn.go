@@ -46,7 +46,6 @@ type MultiConn struct {
 	sendPong      chan struct{}
 	receivedPong  chan struct{}
 	onError       func([]byte)
-	getPeerInfo   func(crypto.PublicKeyI) lib.PeerInfo
 	error         sync.Once
 	p2p           lib.P2P
 }
@@ -83,7 +82,7 @@ func (c *MultiConn) Stop() {
 	_ = c.conn.Close()
 }
 
-func (c *MultiConn) Send(topic lib.Topic, msg lib.ProtoMessage) (ok bool) {
+func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 	stream, ok := c.streams[topic]
 	if !ok {
 		return
@@ -111,12 +110,12 @@ func (c *MultiConn) startSendLoop() {
 				err = c.send(packet, m)
 			}
 		case <-ping.C:
-			if err = c.send(new(lib.Ping), m); err != nil {
+			if err = c.send(new(Ping), m); err != nil {
 				break
 			}
 			pongTimer = time.AfterFunc(pongTimeoutDuration, func() { didntReceivePong <- struct{}{} })
 		case <-c.sendPong:
-			err = c.send(new(lib.Pong), m)
+			err = c.send(new(Pong), m)
 		case <-c.receivedPong:
 			_ = pongTimer.Stop()
 			pongTimer = new(time.Timer)
@@ -149,7 +148,7 @@ func (c *MultiConn) startReceiveLoop() {
 				return
 			}
 			switch x := msg.(type) {
-			case *lib.Packet:
+			case *Packet:
 				stream, ok := c.streams[x.StreamId]
 				if !ok {
 					c.Error(badStreamSlash)
@@ -160,9 +159,9 @@ func (c *MultiConn) startReceiveLoop() {
 					c.Error(slash)
 					return
 				}
-			case *lib.Ping:
+			case *Ping:
 				c.sendPong <- struct{}{}
-			case *lib.Pong:
+			case *Pong:
 				c.receivedPong <- struct{}{}
 			default:
 				_ = ErrUnknownP2PMsg(x)
@@ -183,12 +182,12 @@ func (c *MultiConn) Error(reputationDelta ...int32) {
 }
 
 var (
-	maxPacket, _  = lib.Marshal(lib.Packet{StreamId: lib.Topic_P2P, Eof: false, Bytes: make([]byte, maxPayloadSize)})
+	maxPacket, _  = lib.Marshal(&Packet{StreamId: lib.Topic_BLOCK, Eof: false, Bytes: make([]byte, maxPayloadSize)})
 	maxPacketSize = len(maxPacket)
 )
 
 func (c *MultiConn) receive(reader bufio.Reader, m *limiter.Monitor) (proto.Message, lib.ErrorI) {
-	msg := new(lib.ProtoMessage)
+	msg := new(Envelope)
 	buffer := make([]byte, maxPacketSize)
 	m.Limit(maxPacketSize, int64(recRatePerS), true)
 	n, er := reader.Read(buffer)
@@ -207,7 +206,7 @@ func (c *MultiConn) send(message proto.Message, m *limiter.Monitor) (err lib.Err
 	if err != nil {
 		return err
 	}
-	bz, err := lib.Marshal(lib.ProtoMessage{
+	bz, err := lib.Marshal(Envelope{
 		Payload: a,
 	})
 	if err != nil {
@@ -222,7 +221,7 @@ func (c *MultiConn) send(message proto.Message, m *limiter.Monitor) (err lib.Err
 	return
 }
 
-func (c *MultiConn) getNextPacket() *lib.Packet {
+func (c *MultiConn) getNextPacket() *Packet {
 	// ordered by stream priority
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
 		stream := c.streams[i]
@@ -270,8 +269,8 @@ func (s *Stream) hasStuffToSend() bool {
 	return false
 }
 
-func (s *Stream) nextPacket() (packet *lib.Packet) {
-	packet = &lib.Packet{StreamId: s.topic}
+func (s *Stream) nextPacket() (packet *Packet) {
+	packet = &Packet{StreamId: s.topic}
 	packet.Bytes, packet.Eof = s.chunkNextSend()
 	return
 }
@@ -288,14 +287,14 @@ func (s *Stream) chunkNextSend() (chunk []byte, eof bool) {
 	return
 }
 
-func (s *Stream) handlePacket(peerInfo lib.PeerInfo, packet *lib.Packet) (int32, lib.ErrorI) {
+func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
 	if int(maxMessageSize) < len(s.receiving)+len(packet.Bytes) {
 		s.receiving = make([]byte, 0, maxMessageSize)
 		return maxMessageExceededSlash, ErrMaxMessageSize()
 	}
 	s.receiving = append(s.receiving, packet.Bytes...)
 	if packet.Eof {
-		var msg lib.ProtoMessage
+		var msg Envelope
 		if err := lib.Unmarshal(s.receiving, &msg); err != nil {
 			return badPacketSlash, err
 		}
@@ -305,6 +304,7 @@ func (s *Stream) handlePacket(peerInfo lib.PeerInfo, packet *lib.Packet) (int32,
 		}
 		s.receive <- &lib.MessageWrapper{
 			Message: payload,
+			Hash:    crypto.Hash(s.receiving),
 			Sender:  peerInfo,
 		}
 		s.receiving = make([]byte, 0, maxMessageSize)

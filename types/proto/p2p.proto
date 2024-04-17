@@ -1,33 +1,12 @@
 syntax = "proto3";
 package types;
 
-option go_package = "github.com/ginchuco/ginchu/types";
-
-import "block.proto";
+option go_package = "github.com/ginchuco/ginchu/p2p";
+import "peer.proto";
 import "google/protobuf/any.proto";
 
-// ordered by stream priority
-enum Topic {
-  CONSENSUS = 0;
-  BLOCK = 1;
-  BLOCK_REQUEST = 2;
-  TX = 3;
-  P2P = 4;
-  INVALID = 5;
-}
 
-message PeerInfo {
-  bytes public_key = 1;
-  string net_address = 2;
-  uint64 min_height = 3;
-  uint64 max_height = 4;
-  bool is_outbound = 5;
-  bool is_validator = 6;
-  bool is_unconditional = 7;
-  int32 reputation = 8;
-}
-
-message ProtoMessage {
+message Envelope {
   google.protobuf.Any payload = 1;
 }
 
@@ -36,22 +15,18 @@ message Packet{
   bool eof = 2;
   bytes bytes = 3;
 }
+
 message Ping {}
+
 message Pong {}
 
-message EnvelopeMessage {
-  Topic topic = 1;
-  google.protobuf.Any payload = 2;
+message PeerBookRequestMessage{}
+
+message PeerBookResponseMessage{
+  repeated BookPeer book = 1;
 }
 
-message BlockRequestMessage {
-  uint64 height = 1;
-}
-
-message BlockResponseMessage {
-  QuorumCertificate BlockAndCertificate = 1;
-}
-
-message TxMessage {
-  bytes Tx = 1;
+message BookPeer {
+  PeerAddress Address = 1;
+  int32 consecutive_failed_dial = 2;
 }

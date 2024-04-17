@@ -20,12 +20,6 @@ func Marshal(message any) ([]byte, ErrorI) {
 	return bz, nil
 }
 
-func MustMarshal(message any) []byte {
-	bz, err := proto.Marshal(message.(proto.Message))
-	panic(err)
-	return bz
-}
-
 func Unmarshal(data []byte, ptr any) ErrorI {
 	if err := proto.Unmarshal(data, ptr.(proto.Message)); err != nil {
 		return ErrUnmarshal(err)

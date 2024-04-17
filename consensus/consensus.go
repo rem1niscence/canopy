@@ -476,7 +476,7 @@ func (cs *ConsensusState) SendToLeader(msg lib.Signable) {
 		cs.log.Error(err.Error())
 		return
 	}
-	if err := cs.P2P.SendTo(cs.LeaderPublicKey.Bytes(), msg); err != nil {
+	if err := cs.P2P.SendTo(cs.LeaderPublicKey.Bytes(), lib.Topic_CONSENSUS, msg); err != nil {
 		cs.log.Error(err.Error())
 		return
 	}
