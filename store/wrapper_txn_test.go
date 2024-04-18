@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"github.com/dgraph-io/badger/v4"
-	"github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/lib"
 	"github.com/stretchr/testify/require"
 	math "math/rand"
 	"testing"
@@ -65,7 +65,7 @@ func TestIteratorWithDelete(t *testing.T) {
 func newTestTxnWrapper(t *testing.T) (*badger.DB, *TxnWrapper, func()) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	parent := NewTxnWrapper(db.NewTransactionAt(0, true), types.NewDefaultLogger(), stateStorePrefix)
+	parent := NewTxnWrapper(db.NewTransactionAt(0, true), lib.NewDefaultLogger(), stateStorePrefix)
 	return db, parent, func() {
 		db.Close()
 		parent.Close()

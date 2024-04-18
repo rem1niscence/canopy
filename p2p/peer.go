@@ -2,7 +2,7 @@ package p2p
 
 import (
 	"bytes"
-	lib "github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/lib"
 	"google.golang.org/protobuf/proto"
 	"sync"
 )
@@ -13,12 +13,21 @@ const (
 
 type PeerSet struct {
 	sync.RWMutex
-	config   Config
+	config   lib.P2PConfig
 	m        map[string]*Peer // public key -> Peer
 	inbound  int
 	outbound int
 
 	book *PeerBook
+}
+
+func NewPeerSet(c lib.Config, peerBook *PeerBook) PeerSet {
+	return PeerSet{
+		RWMutex: sync.RWMutex{},
+		config:  c.P2PConfig,
+		m:       make(map[string]*Peer),
+		book:    peerBook,
+	}
 }
 
 type Peer struct {

@@ -1,17 +1,17 @@
 package store
 
 import (
+	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/ginchuco/ginchu/store/smt"
-	"github.com/ginchuco/ginchu/types"
-	"github.com/ginchuco/ginchu/types/crypto"
 )
 
 type SMTWrapper struct {
 	smt *smt.SMT
-	log types.LoggerI
+	log lib.LoggerI
 }
 
-func NewSMTWrapper(db *TxnWrapper, root []byte, log types.LoggerI) *SMTWrapper {
+func NewSMTWrapper(db *TxnWrapper, root []byte, log lib.LoggerI) *SMTWrapper {
 	store := &SMTWrapper{
 		log: log,
 	}
@@ -19,29 +19,29 @@ func NewSMTWrapper(db *TxnWrapper, root []byte, log types.LoggerI) *SMTWrapper {
 	return store
 }
 
-func (s *SMTWrapper) Set(k, v []byte) types.ErrorI {
+func (s *SMTWrapper) Set(k, v []byte) lib.ErrorI {
 	if err := s.smt.Update(crypto.Hash(k), v); err != nil {
 		return ErrStoreSet(err)
 	}
 	return nil
 }
 
-func (s *SMTWrapper) Delete(key []byte) types.ErrorI {
+func (s *SMTWrapper) Delete(key []byte) lib.ErrorI {
 	if err := s.smt.Delete(crypto.Hash(key)); err != nil && err != smt.ErrKeyNotPresent {
 		return ErrStoreDelete(err)
 	}
 	return nil
 }
 
-func (s *SMTWrapper) Commit() ([]byte, types.ErrorI) {
+func (s *SMTWrapper) Commit() ([]byte, lib.ErrorI) {
 	if err := s.smt.Commit(); err != nil {
 		return nil, ErrCommitTree(err)
 	}
-	return types.CopyBytes(s.smt.LastSavedRoot()), nil
+	return lib.CopyBytes(s.smt.LastSavedRoot()), nil
 }
 
-func (s *SMTWrapper) Root() ([]byte, types.ErrorI) {
-	return types.CopyBytes(s.smt.Root()), nil
+func (s *SMTWrapper) Root() ([]byte, lib.ErrorI) {
+	return lib.CopyBytes(s.smt.Root()), nil
 }
 
 func (s *SMTWrapper) setDB(db *TxnWrapper, root []byte) {
@@ -52,7 +52,7 @@ func (s *SMTWrapper) setDB(db *TxnWrapper, root []byte) {
 	}
 }
 
-func (s *SMTWrapper) GetProof(key []byte) ([]byte, []byte, types.ErrorI) {
+func (s *SMTWrapper) GetProof(key []byte) ([]byte, []byte, lib.ErrorI) {
 	pr, err := s.smt.Prove(crypto.Hash(key))
 	if err != nil {
 		return nil, nil, ErrProve(err)
@@ -68,7 +68,7 @@ func (s *SMTWrapper) GetProof(key []byte) ([]byte, []byte, types.ErrorI) {
 		NumSideNodes:          uint32(cProof.NumSideNodes),
 		SiblingData:           cProof.SiblingData,
 	}
-	proof, er := types.Marshal(ptr)
+	proof, er := lib.Marshal(ptr)
 	if er != nil {
 		return nil, nil, er
 	}
@@ -77,7 +77,7 @@ func (s *SMTWrapper) GetProof(key []byte) ([]byte, []byte, types.ErrorI) {
 
 func (s *SMTWrapper) VerifyProof(key, value, proof []byte) bool {
 	ptr := &SparseCompactMerkleProof{}
-	if err := types.Unmarshal(proof, ptr); err != nil {
+	if err := lib.Unmarshal(proof, ptr); err != nil {
 		s.log.Error(err.Error())
 		return false
 	}

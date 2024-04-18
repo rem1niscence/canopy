@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/dgraph-io/badger/v4"
-	"github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/lib"
 	"github.com/stretchr/testify/require"
 	math "math/rand"
 	"testing"
@@ -119,12 +119,12 @@ func testStore(t *testing.T) (*Store, *badger.DB, func()) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").
 		WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	store, err := newStore(db, types.NewDefaultLogger())
+	store, err := newStore(db, lib.NewDefaultLogger())
 	require.NoError(t, err)
 	return store, db, func() { store.Close() }
 }
 
-func validateIterators(t *testing.T, expectedKeys []string, iterators ...types.IteratorI) {
+func validateIterators(t *testing.T, expectedKeys []string, iterators ...lib.IteratorI) {
 	for _, it := range iterators {
 		for i := 0; it.Valid(); func() { i++; it.Next() }() {
 			got, wanted := string(it.Key()), expectedKeys[i]
@@ -133,7 +133,7 @@ func validateIterators(t *testing.T, expectedKeys []string, iterators ...types.I
 	}
 }
 
-func bulkSetKV(t *testing.T, store types.WStoreI, prefix string, keyValue ...string) {
+func bulkSetKV(t *testing.T, store lib.WStoreI, prefix string, keyValue ...string) {
 	for _, kv := range keyValue {
 		require.NoError(t, store.Set([]byte(prefix+kv), []byte(kv)))
 	}

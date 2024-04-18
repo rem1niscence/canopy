@@ -2,8 +2,8 @@ package consensus
 
 import (
 	"bytes"
-	lib "github.com/ginchuco/ginchu/types"
-	"github.com/ginchuco/ginchu/types/crypto"
+	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/ginchu/lib/crypto"
 	"sync"
 )
 
@@ -18,6 +18,14 @@ type HeightLeaderMessages struct {
 	sync.Mutex
 	roundLeaderMessages map[uint64]RoundLeaderMessages
 	partialQCs          map[string]*QuorumCertificate // track for double sign evidence
+}
+
+func NewHeightLeaderMessages() HeightLeaderMessages {
+	return HeightLeaderMessages{
+		Mutex:               sync.Mutex{},
+		roundLeaderMessages: make(map[uint64]RoundLeaderMessages),
+		partialQCs:          make(map[string]*QuorumCertificate),
+	}
 }
 
 type RoundLeaderMessages struct {
@@ -135,10 +143,10 @@ func (hlm *HeightLeaderMessages) AddIncompleteQC(message *Message) lib.ErrorI {
 	return nil
 }
 func (hlm *HeightLeaderMessages) GetByzantineEvidence(
-	app lib.App, v *lib.View, vs lib.ValidatorSetWrapper,
+	v *lib.View, vs, lastVS lib.ValidatorSetWrapper,
 	leaderKey []byte, hvs *HeightVoteSet, selfIsLeader bool) *BE {
 	bpe := hlm.GetBadProposerEvidence(v, vs, leaderKey)
-	dse := hlm.GetDoubleSignEvidence(app, v, hvs, selfIsLeader)
+	dse := hlm.GetDoubleSignEvidence(v, hvs, vs, lastVS, selfIsLeader)
 	if bpe == nil && dse == nil {
 		return nil
 	}
@@ -148,7 +156,7 @@ func (hlm *HeightLeaderMessages) GetByzantineEvidence(
 	}
 }
 
-func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(app lib.App, view *lib.View, hvs *HeightVoteSet, selfIsLeader bool) DSE {
+func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(view *lib.View, hvs *HeightVoteSet, vs, lastVS lib.ValidatorSetWrapper, selfIsLeader bool) DSE {
 	hlm.Lock()
 	defer hlm.Unlock()
 	hvs.Lock()
@@ -163,7 +171,7 @@ func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(app lib.App, view *lib.Vi
 		if message == nil {
 			continue
 		}
-		dse.Add(app, &lib.DoubleSignEvidence{
+		dse.Add(view.Height, vs, lastVS, &lib.DoubleSignEvidence{
 			VoteA: message.Qc,
 			VoteB: p,
 		})
@@ -189,7 +197,7 @@ func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(app lib.App, view *lib.Vi
 			}
 			for _, voteSet := range ev {
 				if voteSet.vote != nil {
-					dse.Add(app, &lib.DoubleSignEvidence{
+					dse.Add(view.Height, vs, lastVS, &lib.DoubleSignEvidence{
 						VoteA: message.Qc,
 						VoteB: voteSet.vote.Qc,
 					})
@@ -200,7 +208,7 @@ func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(app lib.App, view *lib.Vi
 			}
 		}
 	}
-	doubleSigners, err := dse.GetDoubleSigners(app)
+	doubleSigners, err := dse.GetDoubleSigners(view.Height, vs, lastVS)
 	if err != nil {
 		return nil
 	}
@@ -238,6 +246,14 @@ type HeightVoteSet struct {
 	pacemakerVotes []VoteSet // one set of view votes per height; round -> seenRoundVote
 }
 
+func NewHeightVoteSet() HeightVoteSet {
+	return HeightVoteSet{
+		Mutex:          sync.Mutex{},
+		roundVoteSets:  make(map[uint64]RoundVoteSet),
+		pacemakerVotes: make([]VoteSet, maxRounds),
+	}
+}
+
 type RoundVoteSet map[Phase]PhaseVoteSet // ELECTION_VOTE, PROPOSE_VOTE, PRECOMMIT_VOTE
 type PhaseVoteSet map[string]VoteSet     // vote -> VoteSet TODO why would there be different votes?
 
@@ -269,7 +285,7 @@ func (hvs *HeightVoteSet) NewRound(round uint64) {
 	hvs.pacemakerVotes = make([]VoteSet, 0)
 }
 
-func (hvs *HeightVoteSet) AddVote(app lib.App, leaderKey []byte, view *lib.View, vote *Message, v lib.ValidatorSetWrapper) lib.ErrorI {
+func (hvs *HeightVoteSet) AddVote(leaderKey []byte, view *lib.View, vote *Message, v, lastV lib.ValidatorSetWrapper) lib.ErrorI {
 	hvs.Lock()
 	defer hvs.Unlock()
 	var vs VoteSet
@@ -281,7 +297,7 @@ func (hvs *HeightVoteSet) AddVote(app lib.App, leaderKey []byte, view *lib.View,
 	phase, round := vote.Qc.Header.Phase, vote.Qc.Header.Round
 	if phase == lib.Phase_ROUND_INTERRUPT {
 		vs = hvs.pacemakerVotes[round]
-		vs, err = hvs.addVote(app, leaderKey, view, vote, vs, val, v)
+		vs, err = hvs.addVote(leaderKey, view, vote, vs, val, v, lastV)
 		if err != nil {
 			return err
 		}
@@ -291,7 +307,7 @@ func (hvs *HeightVoteSet) AddVote(app lib.App, leaderKey []byte, view *lib.View,
 		bz, _ := vote.SignBytes()
 		key = lib.BytesToString(bz)
 		pvs := rvs[phase]
-		vs, err = hvs.addVote(app, leaderKey, view, vote, pvs[key], val, v)
+		vs, err = hvs.addVote(leaderKey, view, vote, pvs[key], val, v, lastV)
 		if err != nil {
 			return err
 		}
@@ -302,7 +318,7 @@ func (hvs *HeightVoteSet) AddVote(app lib.App, leaderKey []byte, view *lib.View,
 	return nil
 }
 
-func (hvs *HeightVoteSet) addVote(app lib.App, leaderKey []byte, view *lib.View, vote *Message, vs VoteSet, val *lib.ValidatorWrapper, v lib.ValidatorSetWrapper) (voteSet VoteSet, err lib.ErrorI) {
+func (hvs *HeightVoteSet) addVote(leaderKey []byte, view *lib.View, vote *Message, vs VoteSet, val *lib.ValidatorWrapper, v, lastVS lib.ValidatorSetWrapper) (voteSet VoteSet, err lib.ErrorI) {
 	if vs.multiKey == nil {
 		vs.multiKey = v.Key.Copy()
 	}
@@ -335,7 +351,7 @@ func (hvs *HeightVoteSet) addVote(app lib.App, leaderKey []byte, view *lib.View,
 			if vs.lastDoubleSigners == nil {
 				vs.lastDoubleSigners = make([]*lib.DoubleSignEvidence, 0)
 			}
-			vs.lastDoubleSigners.Add(app, evidence)
+			vs.lastDoubleSigners.Add(view.Height, v, lastVS, evidence)
 		}
 		for _, evidence := range vote.BadProposerEvidence {
 			if vs.badProposers == nil {

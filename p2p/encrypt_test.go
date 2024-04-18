@@ -4,7 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"fmt"
-	"github.com/ginchuco/ginchu/types/crypto"
+	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"testing"
 )

@@ -3,7 +3,7 @@ package p2p
 import (
 	"bytes"
 	"fmt"
-	lib "github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/lib"
 	"math/rand"
 	"sort"
 	"sync"

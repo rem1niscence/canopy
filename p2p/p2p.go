@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/cenkalti/backoff/v4"
-	lib "github.com/ginchuco/ginchu/types"
-	"github.com/ginchuco/ginchu/types/crypto"
+	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/ginchu/lib/crypto"
 	"golang.org/x/net/netutil"
 	"net"
 	"sync"
@@ -28,8 +28,9 @@ import (
 */
 
 const (
-	transport   = "TCP"
-	dialTimeout = time.Second
+	transport            = "TCP"
+	dialTimeout          = time.Second
+	defaultMaxValidators = 1000
 )
 
 var _ lib.P2P = new(P2P)
@@ -38,30 +39,42 @@ type P2P struct {
 	privateKey crypto.PrivateKeyI
 	listener   net.Listener
 	channels   lib.Channels
-	config     Config
+	config     lib.Config
 	PeerSet              // active set
 	book       *PeerBook // not active set
 
-	state State
+	state         State
+	maxValidators int
+	bannedIPs     []net.IPAddr // banned IPs (non-string)
+	logger        lib.LoggerI
 }
 
-func NewP2P(p crypto.PrivateKeyI, maxValidators int, channels lib.Channels, c Config) *P2P {
+func New(p crypto.PrivateKeyI, maxValidators uint64, c lib.Config, l lib.LoggerI) *P2P {
+	var channels lib.Channels
+	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
+		channels[i] = make(chan *lib.MessageWrapper, maxChannelCalls)
+	}
 	peerBook := &PeerBook{} // TODO load from file / write to file
-	c.maxValidators = maxValidators
+	if maxValidators == 0 {
+		maxValidators = defaultMaxValidators
+	}
+	var bannedIPs []net.IPAddr
+	for _, ip := range c.BannedIPs {
+		i, err := net.ResolveIPAddr("", ip)
+		if err != nil {
+			l.Fatalf(err.Error())
+		}
+		bannedIPs = append(bannedIPs, *i)
+	}
 	return &P2P{
-		privateKey: p,
-		channels:   channels,
-		config:     c,
-		PeerSet: PeerSet{
-			RWMutex: sync.RWMutex{},
-			config:  c,
-			m:       make(map[string]*Peer),
-			book:    peerBook,
-		},
-		book: peerBook,
-		state: State{
-			RWMutex: sync.RWMutex{},
-		},
+		privateKey:    p,
+		channels:      channels,
+		config:        c,
+		PeerSet:       NewPeerSet(c, peerBook),
+		book:          peerBook,
+		state:         State{RWMutex: sync.RWMutex{}},
+		maxValidators: int(maxValidators),
+		bannedIPs:     bannedIPs,
 	}
 }
 
@@ -98,7 +111,7 @@ func (p *P2P) Listen(listenAddress *lib.PeerAddress) {
 	if er != nil {
 		panic(ErrFailedListen(er))
 	}
-	p.listener = netutil.LimitListener(ln, p.config.MaxInbound+len(p.config.TrustedPeerIDs)+p.config.maxValidators)
+	p.listener = netutil.LimitListener(ln, p.config.MaxInbound+len(p.config.TrustedPeerIDs)+p.maxValidators)
 	for {
 		c, err := p.listener.Accept()
 		if err != nil {
@@ -211,7 +224,7 @@ func (p *P2P) IsSelf(address *lib.PeerAddress) bool {
 }
 func (p *P2P) MaxPossiblePeers() int {
 	c := p.config
-	return c.MaxInbound + c.MaxOutbound + c.maxValidators + len(c.TrustedPeerIDs)
+	return c.MaxInbound + c.MaxOutbound + p.maxValidators + len(c.TrustedPeerIDs)
 }
 func (p *P2P) ReceiveChannel(topic lib.Topic) chan *lib.MessageWrapper { return p.channels[topic] }
 func (p *P2P) Close()                                                  { _ = p.listener.Close() }
@@ -227,7 +240,7 @@ func (p *P2P) filter(conn net.Conn) (*lib.PeerAddress, lib.ErrorI) {
 		return nil, ErrIPLookup(err)
 	}
 	for _, ip := range ips {
-		for _, bannedIP := range p.config.bannedIPs {
+		for _, bannedIP := range p.bannedIPs {
 			if ip.IP.Equal(bannedIP.IP) {
 				return nil, ErrBannedIP(ip.String())
 			}
@@ -244,17 +257,4 @@ func (p *P2P) catchPanic() {
 type State struct {
 	sync.RWMutex
 	validators []*lib.PeerAddress
-}
-
-type Config struct {
-	ListenAddress   string       // listen for incoming connection
-	ExternalAddress string       // advertise for external dialing
-	MaxInbound      int          // max inbound peers
-	MaxOutbound     int          // max outbound peers
-	TrustedPeerIDs  []string     // trusted public keys
-	DialPeers       []string     // peers to consistently dial (format pubkey@ip:port)
-	BannedPeerIDs   []string     // banned public keys
-	BannedIPs       []string     // banned IPs
-	bannedIPs       []net.IPAddr // banned IPs (non-string)
-	maxValidators   int
 }

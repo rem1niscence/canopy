@@ -1,8 +1,9 @@
 package consensus
 
 import (
+	"encoding/hex"
 	"fmt"
-	lib "github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/lib"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -84,4 +85,8 @@ func ErrFailedSafeNodePredicate() lib.ErrorI {
 
 func ErrAggregateSignature(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeAggregateSignature, lib.ConsensusModule, fmt.Sprintf("aggregateSignature() failed with err: %s", err.Error()))
+}
+
+func ErrDuplicateTx(hash []byte) lib.ErrorI {
+	return lib.NewError(lib.CodeDuplicateTransaction, lib.ConsensusModule, fmt.Sprintf("tx %s is a duplicate", hex.EncodeToString(hash)))
 }

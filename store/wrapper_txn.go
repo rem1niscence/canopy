@@ -3,18 +3,18 @@ package store
 import (
 	"bytes"
 	"github.com/dgraph-io/badger/v4"
-	"github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/lib"
 )
 
-var _ types.RWStoreI = &TxnWrapper{}
+var _ lib.RWStoreI = &TxnWrapper{}
 
 type TxnWrapper struct {
-	logger types.LoggerI
+	logger lib.LoggerI
 	db     *badger.Txn
 	prefix string
 }
 
-func NewTxnWrapper(db *badger.Txn, logger types.LoggerI, prefix string) *TxnWrapper {
+func NewTxnWrapper(db *badger.Txn, logger lib.LoggerI, prefix string) *TxnWrapper {
 	return &TxnWrapper{
 		logger: logger,
 		db:     db,
@@ -22,7 +22,7 @@ func NewTxnWrapper(db *badger.Txn, logger types.LoggerI, prefix string) *TxnWrap
 	}
 }
 
-func (t *TxnWrapper) Get(k []byte) ([]byte, types.ErrorI) {
+func (t *TxnWrapper) Get(k []byte) ([]byte, lib.ErrorI) {
 	item, err := t.db.Get(append([]byte(t.prefix), k...))
 	if err != nil {
 		if err == badger.ErrKeyNotFound {
@@ -37,14 +37,14 @@ func (t *TxnWrapper) Get(k []byte) ([]byte, types.ErrorI) {
 	return val, nil
 }
 
-func (t *TxnWrapper) Set(k, v []byte) types.ErrorI {
+func (t *TxnWrapper) Set(k, v []byte) lib.ErrorI {
 	if err := t.db.Set(append([]byte(t.prefix), k...), v); err != nil {
 		return ErrStoreSet(err)
 	}
 	return nil
 }
 
-func (t *TxnWrapper) Delete(k []byte) types.ErrorI {
+func (t *TxnWrapper) Delete(k []byte) lib.ErrorI {
 	if err := t.db.Delete(append([]byte(t.prefix), k...)); err != nil {
 		return ErrStoreDelete(err)
 	}
@@ -54,7 +54,7 @@ func (t *TxnWrapper) Delete(k []byte) types.ErrorI {
 func (t *TxnWrapper) Close()              { t.db.Discard() }
 func (t *TxnWrapper) setDB(p *badger.Txn) { t.db = p }
 
-func (t *TxnWrapper) Iterator(prefix []byte) (types.IteratorI, types.ErrorI) {
+func (t *TxnWrapper) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	parent := t.db.NewIterator(badger.IteratorOptions{
 		Prefix: append([]byte(t.prefix), prefix...),
 	})
@@ -66,7 +66,7 @@ func (t *TxnWrapper) Iterator(prefix []byte) (types.IteratorI, types.ErrorI) {
 	}, nil
 }
 
-func (t *TxnWrapper) RevIterator(prefix []byte) (types.IteratorI, types.ErrorI) {
+func (t *TxnWrapper) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	newPrefix := append([]byte(t.prefix), prefix...)
 	parent := t.db.NewIterator(badger.IteratorOptions{
 		Reverse: true,
@@ -85,13 +85,13 @@ func seekLast(it *badger.Iterator, prefix []byte) {
 }
 
 type Iterator struct {
-	logger types.LoggerI
+	logger lib.LoggerI
 	parent *badger.Iterator
 	prefix string
 	err    error
 }
 
-var _ types.IteratorI = &Iterator{}
+var _ lib.IteratorI = &Iterator{}
 
 func (i *Iterator) Valid() bool            { return i.parent.Valid() }
 func (i *Iterator) Next()                  { i.parent.Next() }

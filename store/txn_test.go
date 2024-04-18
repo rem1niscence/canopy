@@ -3,7 +3,7 @@ package store
 import (
 	"fmt"
 	"github.com/dgraph-io/badger/v4"
-	lib "github.com/ginchuco/ginchu/types"
+	"github.com/ginchuco/ginchu/lib"
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
