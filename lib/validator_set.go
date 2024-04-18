@@ -6,31 +6,31 @@ import (
 	"github.com/ginchuco/ginchu/lib/crypto"
 )
 
-type ValidatorSetWrapper struct {
-	ValidatorSet  *ValidatorSet
+type ValidatorSet struct {
+	ValidatorSet  *ConsensusValidators
 	Key           crypto.MultiPublicKeyI
-	PowerMap      map[string]ValidatorWrapper // public_key -> Validator
+	PowerMap      map[string]SetValidator // public_key -> Validator
 	TotalPower    string
 	MinimumMaj23  string // 2f+1
 	NumValidators uint64
 }
 
-type ValidatorWrapper struct {
+type SetValidator struct {
 	PublicKey   crypto.PublicKeyI
 	VotingPower string
 	Index       int
 }
 
-func NewValidatorSet(validators *ValidatorSet) (vs ValidatorSetWrapper, err ErrorI) {
+func NewValidatorSet(validators *ConsensusValidators) (vs ValidatorSet, err ErrorI) {
 	totalPower, count := "0", uint64(0)
-	points, powerMap := make([]kyber.Point, 0), make(map[string]ValidatorWrapper)
+	points, powerMap := make([]kyber.Point, 0), make(map[string]SetValidator)
 	for i, v := range validators.ValidatorSet {
 		point, er := crypto.NewBLSPointFromBytes(v.PublicKey)
 		if err != nil {
-			return ValidatorSetWrapper{}, ErrPubKeyFromBytes(er)
+			return ValidatorSet{}, ErrPubKeyFromBytes(er)
 		}
 		points = append(points, point)
-		powerMap[BytesToString(v.PublicKey)] = ValidatorWrapper{
+		powerMap[BytesToString(v.PublicKey)] = SetValidator{
 			PublicKey:   crypto.NewBLS12381PublicKey(point),
 			VotingPower: v.VotingPower,
 			Index:       i,
@@ -47,9 +47,9 @@ func NewValidatorSet(validators *ValidatorSet) (vs ValidatorSetWrapper, err Erro
 	}
 	mpk, er := crypto.NewMultiBLSFromPoints(points, nil)
 	if er != nil {
-		return ValidatorSetWrapper{}, ErrNewMultiPubKey(er)
+		return ValidatorSet{}, ErrNewMultiPubKey(er)
 	}
-	return ValidatorSetWrapper{
+	return ValidatorSet{
 		ValidatorSet:  validators,
 		Key:           mpk,
 		PowerMap:      powerMap,
@@ -59,7 +59,7 @@ func NewValidatorSet(validators *ValidatorSet) (vs ValidatorSetWrapper, err Erro
 	}, nil
 }
 
-func (vs *ValidatorSetWrapper) GetValidator(publicKey []byte) (*ValidatorWrapper, ErrorI) {
+func (vs *ValidatorSet) GetValidator(publicKey []byte) (*SetValidator, ErrorI) {
 	val, found := vs.PowerMap[BytesToString(publicKey)]
 	if !found {
 		return nil, ErrValidatorNotInSet(publicKey)
@@ -67,7 +67,7 @@ func (vs *ValidatorSetWrapper) GetValidator(publicKey []byte) (*ValidatorWrapper
 	return &val, nil
 }
 
-func (vs *ValidatorSetWrapper) GetValidatorAtIndex(i int) (*ValidatorWrapper, ErrorI) {
+func (vs *ValidatorSet) GetValidatorAtIndex(i int) (*SetValidator, ErrorI) {
 	if uint64(i) >= vs.NumValidators {
 		return nil, ErrInvalidValidatorIndex()
 	}
@@ -76,14 +76,14 @@ func (vs *ValidatorSetWrapper) GetValidatorAtIndex(i int) (*ValidatorWrapper, Er
 	if err != nil {
 		return nil, err
 	}
-	return &ValidatorWrapper{
+	return &SetValidator{
 		PublicKey:   publicKey,
 		VotingPower: val.VotingPower,
 		Index:       i,
 	}, nil
 }
 
-func (x *ValidatorSet) Root() ([]byte, ErrorI) {
+func (x *ConsensusValidators) Root() ([]byte, ErrorI) {
 	if x == nil || len(x.ValidatorSet) == 0 {
 		return nil, nil
 	}
@@ -112,7 +112,7 @@ func (x *AggregateSignature) Equals(a2 *AggregateSignature) bool {
 	return true
 }
 
-func (x *AggregateSignature) CheckBasic(sb SignByte, vs ValidatorSetWrapper) ErrorI {
+func (x *AggregateSignature) CheckBasic(sb SignByte, vs ValidatorSet) ErrorI {
 	if x == nil {
 		return ErrEmptyAggregateSignature()
 	}
@@ -136,7 +136,7 @@ func (x *AggregateSignature) CheckBasic(sb SignByte, vs ValidatorSetWrapper) Err
 	return nil
 }
 
-func (x *AggregateSignature) Check(sb SignByte, vs ValidatorSetWrapper) (isPartialQC bool, err ErrorI) {
+func (x *AggregateSignature) Check(sb SignByte, vs ValidatorSet) (isPartialQC bool, err ErrorI) {
 	if err = x.CheckBasic(sb, vs); err != nil {
 		return false, err
 	}
@@ -168,7 +168,7 @@ func (x *AggregateSignature) Check(sb SignByte, vs ValidatorSetWrapper) (isParti
 	return false, nil
 }
 
-func (x *AggregateSignature) GetDoubleSigners(y *AggregateSignature, vs ValidatorSetWrapper) (doubleSigners [][]byte, err ErrorI) {
+func (x *AggregateSignature) GetDoubleSigners(y *AggregateSignature, vs ValidatorSet) (doubleSigners [][]byte, err ErrorI) {
 	key, key2 := vs.Key.Copy(), vs.Key.Copy()
 	if er := key.SetBitmap(x.Bitmap); er != nil {
 		return nil, ErrInvalidSignerBitmap(er)
@@ -194,7 +194,7 @@ func (x *AggregateSignature) GetDoubleSigners(y *AggregateSignature, vs Validato
 	return
 }
 
-func (x *AggregateSignature) GetNonSigners(valSet *ValidatorSet) (nonSigners [][]byte, nonSignerPercent int, err ErrorI) {
+func (x *AggregateSignature) GetNonSigners(valSet *ConsensusValidators) (nonSigners [][]byte, nonSignerPercent int, err ErrorI) {
 	vs, err := NewValidatorSet(valSet)
 	if err != nil {
 		return nil, 0, err

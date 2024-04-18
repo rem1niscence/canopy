@@ -1,7 +1,7 @@
 syntax = "proto3";
 package cli;
 
-option go_package = "github.com/ginchuco/ginchu/types/crypto";
+option go_package = "github.com/ginchuco/ginchu/lib/crypto";
 
 message ProtoAddress {
   bytes address = 1;

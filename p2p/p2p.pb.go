@@ -7,7 +7,7 @@
 package p2p
 
 import (
-	types "github.com/ginchuco/ginchu/lib"
+	lib "github.com/ginchuco/ginchu/lib"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -74,9 +74,9 @@ type Packet struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	StreamId types.Topic `protobuf:"varint,1,opt,name=stream_id,json=streamId,proto3,enum=types.Topic" json:"stream_id,omitempty"`
-	Eof      bool        `protobuf:"varint,2,opt,name=eof,proto3" json:"eof,omitempty"`
-	Bytes    []byte      `protobuf:"bytes,3,opt,name=bytes,proto3" json:"bytes,omitempty"`
+	StreamId lib.Topic `protobuf:"varint,1,opt,name=stream_id,json=streamId,proto3,enum=types.Topic" json:"stream_id,omitempty"`
+	Eof      bool      `protobuf:"varint,2,opt,name=eof,proto3" json:"eof,omitempty"`
+	Bytes    []byte    `protobuf:"bytes,3,opt,name=bytes,proto3" json:"bytes,omitempty"`
 }
 
 func (x *Packet) Reset() {
@@ -111,11 +111,11 @@ func (*Packet) Descriptor() ([]byte, []int) {
 	return file_p2p_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *Packet) GetStreamId() types.Topic {
+func (x *Packet) GetStreamId() lib.Topic {
 	if x != nil {
 		return x.StreamId
 	}
-	return types.Topic(0)
+	return lib.Topic(0)
 }
 
 func (x *Packet) GetEof() bool {
@@ -298,8 +298,8 @@ type BookPeer struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Address               *types.PeerAddress `protobuf:"bytes,1,opt,name=Address,proto3" json:"Address,omitempty"`
-	ConsecutiveFailedDial int32              `protobuf:"varint,2,opt,name=consecutive_failed_dial,json=consecutiveFailedDial,proto3" json:"consecutive_failed_dial,omitempty"`
+	Address               *lib.PeerAddress `protobuf:"bytes,1,opt,name=Address,proto3" json:"Address,omitempty"`
+	ConsecutiveFailedDial int32            `protobuf:"varint,2,opt,name=consecutive_failed_dial,json=consecutiveFailedDial,proto3" json:"consecutive_failed_dial,omitempty"`
 }
 
 func (x *BookPeer) Reset() {
@@ -334,7 +334,7 @@ func (*BookPeer) Descriptor() ([]byte, []int) {
 	return file_p2p_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *BookPeer) GetAddress() *types.PeerAddress {
+func (x *BookPeer) GetAddress() *lib.PeerAddress {
 	if x != nil {
 		return x.Address
 	}
@@ -405,8 +405,8 @@ var file_p2p_proto_goTypes = []interface{}{
 	(*PeerBookResponseMessage)(nil), // 5: types.PeerBookResponseMessage
 	(*BookPeer)(nil),                // 6: types.BookPeer
 	(*anypb.Any)(nil),               // 7: google.protobuf.Any
-	(types.Topic)(0),                // 8: types.Topic
-	(*types.PeerAddress)(nil),       // 9: types.PeerAddress
+	(lib.Topic)(0),                  // 8: types.Topic
+	(*lib.PeerAddress)(nil),         // 9: types.PeerAddress
 }
 var file_p2p_proto_depIdxs = []int32{
 	7, // 0: types.Envelope.payload:type_name -> google.protobuf.Any

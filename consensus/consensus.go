@@ -9,26 +9,23 @@ import (
 	"github.com/ginchuco/ginchu/store"
 	"google.golang.org/protobuf/proto"
 	"math"
+	"sync"
 	"time"
 )
 
-type DSE = lib.DoubleSignEvidences
-type BPE = lib.BadProposerEvidences
-type BE = lib.ByzantineEvidence
-
-type State struct {
+type Consensus struct {
 	lib.View
 
 	LeaderPublicKey crypto.PublicKeyI
 
-	LastValidatorSet    lib.ValidatorSetWrapper // TODO repopulate
-	ValidatorSet        lib.ValidatorSetWrapper
-	Votes               HeightVoteSet
-	LeaderMessages      HeightLeaderMessages
-	HighQC              *QuorumCertificate
-	Locked              bool
-	Block               *lib.Block
-	ProducersPublicKeys [][]byte
+	LastValidatorSet lib.ValidatorSet
+	ValidatorSet     lib.ValidatorSet
+	Votes            HeightVoteSet
+	LeaderMessages   HeightLeaderMessages
+	HighQC           *QC
+	Locked           bool
+	Block            *lib.Block
+	SortitionData    SortitionData
 
 	ByzantineEvidence     *BE
 	NextByzantineEvidence *BE
@@ -42,9 +39,10 @@ type State struct {
 
 	FSM     *fsm.StateMachine
 	Mempool *Mempool
+	sync.Mutex
 }
 
-func New(pk crypto.PrivateKeyI, c lib.Config, l lib.LoggerI) (*State, lib.ErrorI) {
+func New(pk crypto.PrivateKeyI, c lib.Config, l lib.LoggerI) (*Consensus, lib.ErrorI) {
 	db, err := store.New(c, l)
 	if err != nil {
 		return nil, err
@@ -70,7 +68,7 @@ func New(pk crypto.PrivateKeyI, c lib.Config, l lib.LoggerI) (*State, lib.ErrorI
 	if err != nil {
 		return nil, err
 	}
-	return &State{
+	return &Consensus{
 		View:             lib.View{Height: height},
 		LastValidatorSet: lastVS,
 		ValidatorSet:     valSet,
@@ -83,112 +81,109 @@ func New(pk crypto.PrivateKeyI, c lib.Config, l lib.LoggerI) (*State, lib.ErrorI
 		log:              l,
 		FSM:              sm,
 		Mempool:          NewMempool(fsmCopy, c.MempoolConfig, l),
+		Mutex:            sync.Mutex{},
 	}, nil
 }
 
-func (s *State) Start() {
-	s.NewHeight()
+func (c *Consensus) Start() {
+	c.P2P.Start()
+	c.StartListeners()
+	c.Sync()
+	c.NewHeight()
 	for {
 		now := time.Now()
 		timer := &now
-		s.StartElectionPhase()
-		s.ResetAndSleep(timer)
-		s.StartElectionVotePhase()
-		s.ResetAndSleep(timer)
-		s.StartProposePhase()
-		s.ResetAndSleep(timer)
-		if interrupt := s.StartProposeVotePhase(); interrupt {
-			s.RoundInterrupt(timer)
+		c.StartElectionPhase()
+		c.ResetAndSleep(timer)
+		c.StartElectionVotePhase()
+		c.ResetAndSleep(timer)
+		c.StartProposePhase()
+		c.ResetAndSleep(timer)
+		if interrupt := c.StartProposeVotePhase(); interrupt {
+			c.RoundInterrupt(timer)
 			continue
 		}
-		s.ResetAndSleep(timer)
-		s.StartPrecommitPhase()
-		s.ResetAndSleep(timer)
-		if interrupt := s.StartPrecommitVotePhase(); interrupt {
-			s.RoundInterrupt(timer)
+		c.ResetAndSleep(timer)
+		c.StartPrecommitPhase()
+		c.ResetAndSleep(timer)
+		if interrupt := c.StartPrecommitVotePhase(); interrupt {
+			c.RoundInterrupt(timer)
 			continue
 		}
-		s.ResetAndSleep(timer)
-		s.StartCommitPhase()
-		s.ResetAndSleep(timer)
-		if interrupt := s.StartCommitProcessPhase(); interrupt {
-			s.RoundInterrupt(timer)
+		c.ResetAndSleep(timer)
+		c.StartCommitPhase()
+		c.ResetAndSleep(timer)
+		if interrupt := c.StartCommitProcessPhase(); interrupt {
+			c.RoundInterrupt(timer)
 			continue
 		}
 	}
 }
 
-func (s *State) StartElectionPhase() {
-	s.Phase = lib.Phase_ELECTION
-	s.LeaderPublicKey = nil
-	selfValidator, err := s.ValidatorSet.GetValidator(s.PublicKey.Bytes())
+func (c *Consensus) StartElectionPhase() {
+	c.Phase = lib.Phase_ELECTION
+	c.LeaderPublicKey = nil
+	selfValidator, err := c.ValidatorSet.GetValidator(c.PublicKey.Bytes())
 	if err != nil {
-		s.log.Error(err.Error())
+		c.log.Error(err.Error())
 		return
 	}
-	s.ProducersPublicKeys = s.getProducerKeys()
+	c.SortitionData = SortitionData{
+		LastProducersPublicKeys: c.getProducerKeys(),
+		Height:                  c.Height,
+		Round:                   c.Round,
+		TotalValidators:         c.ValidatorSet.NumValidators,
+		VotingPower:             selfValidator.VotingPower,
+		TotalPower:              c.ValidatorSet.TotalPower,
+	}
 	// SORTITION (CDF + VRF)
 	_, vrf, isCandidate := Sortition(&SortitionParams{
-		SortitionData: SortitionData{
-			LastProducersPublicKeys: s.ProducersPublicKeys,
-			Height:                  s.Height,
-			Round:                   s.Round,
-			TotalValidators:         s.ValidatorSet.NumValidators,
-			VotingPower:             selfValidator.VotingPower,
-			TotalPower:              s.ValidatorSet.TotalPower,
-		},
-		PrivateKey: s.PrivateKey,
+		SortitionData: c.SortitionData,
+		PrivateKey:    c.PrivateKey,
 	})
 	if isCandidate {
-		s.SendToReplicas(&Message{
-			Header: s.View.Copy(),
+		c.SendToReplicas(&Message{
+			Header: c.View.Copy(),
 			Vrf:    vrf,
 		})
 	}
 }
 
-func (s *State) StartElectionVotePhase() {
-	s.Phase = lib.Phase_ELECTION_VOTE
-	sortitionData := SortitionData{
-		LastProducersPublicKeys: s.ProducersPublicKeys,
-		Height:                  s.Height,
-		Round:                   s.Round,
-		TotalValidators:         s.ValidatorSet.NumValidators,
-		TotalPower:              s.ValidatorSet.TotalPower,
-	}
-	electionMessages := s.LeaderMessages.GetElectionMessages(s.View.Round)
+func (c *Consensus) StartElectionVotePhase() {
+	c.Phase = lib.Phase_ELECTION_VOTE
+	electionMessages := c.LeaderMessages.GetElectionMessages(c.View.Round)
 
 	// LEADER SELECTION
-	candidates, err := electionMessages.GetCandidates(s.ValidatorSet, sortitionData)
+	candidates, err := electionMessages.GetCandidates(c.ValidatorSet, c.SortitionData)
 	if err != nil {
-		s.log.Error(err.Error())
+		c.log.Error(err.Error())
 	}
-	s.LeaderPublicKey = SelectLeaderFromCandidates(candidates, sortitionData, s.ValidatorSet.ValidatorSet)
+	c.LeaderPublicKey = SelectLeaderFromCandidates(candidates, c.SortitionData, c.ValidatorSet.ValidatorSet)
 
 	// CHECK BYZANTINE EVIDENCE
 	bpe, dse := BPE(nil), DSE(nil)
-	if s.ByzantineEvidence != nil {
-		bpe = s.ByzantineEvidence.BPE
-		dse = s.ByzantineEvidence.DSE
+	if c.ByzantineEvidence != nil {
+		bpe = c.ByzantineEvidence.BPE
+		dse = c.ByzantineEvidence.DSE
 	}
 
 	// SEND VOTE TO LEADER
-	s.SendToLeader(&Message{
-		Qc: &QuorumCertificate{
-			Header:          s.View.Copy(),
-			LeaderPublicKey: s.LeaderPublicKey.Bytes(),
+	c.SendToLeader(&Message{
+		Qc: &QC{
+			Header:          c.View.Copy(),
+			LeaderPublicKey: c.LeaderPublicKey.Bytes(),
 		},
-		HighQc:                 s.HighQC,
+		HighQc:                 c.HighQC,
 		LastDoubleSignEvidence: dse,
 		BadProposerEvidence:    bpe,
 	})
 }
 
-func (s *State) StartProposePhase() {
-	s.Phase = lib.Phase_PROPOSE
-	vote, as, bitmap, err := s.Votes.GetMaj23(s.View.Copy())
+func (c *Consensus) StartProposePhase() {
+	c.Phase = lib.Phase_PROPOSE
+	vote, as, bitmap, err := c.Votes.GetMaj23(c.View.Copy())
 	if err != nil {
-		s.log.Error(err.Error())
+		c.log.Error(err.Error())
 		return
 	}
 	// GATHER BYZANTINE EVIDENCE
@@ -196,51 +191,51 @@ func (s *State) StartProposePhase() {
 	// PRODUCE BLOCK OR USE HQC BLOCK
 	if vote.HighQc == nil {
 		var lastDoubleSigners, badProposers [][]byte
-		lastDoubleSigners, err = dse.GetDoubleSigners(s.Height, s.ValidatorSet, s.LastValidatorSet)
+		lastDoubleSigners, err = dse.GetDoubleSigners(c.Height, c.ValidatorSet, c.LastValidatorSet)
 		if err != nil {
-			s.log.Error(err.Error())
+			c.log.Error(err.Error())
 			return
 		}
-		badProposers, err = bpe.GetBadProposers(vote.Qc.LeaderPublicKey, s.Height, s.ValidatorSet)
+		badProposers, err = bpe.GetBadProposers(vote.Qc.LeaderPublicKey, c.Height, c.ValidatorSet)
 		if err != nil {
-			s.log.Error(err.Error())
+			c.log.Error(err.Error())
 			return
 		}
-		s.Block, err = s.ProduceCandidateBlock(badProposers, lastDoubleSigners)
+		c.Block, err = c.ProduceCandidateBlock(badProposers, lastDoubleSigners)
 		if err != nil {
-			s.log.Error(err.Error())
+			c.log.Error(err.Error())
 			return
 		}
 	} else {
-		s.HighQC = vote.HighQc
-		s.Block = s.HighQC.Block
+		c.HighQC = vote.HighQc
+		c.Block = c.HighQC.Block
 	}
 	// SEND MSG TO REPLICAS
-	s.SendToReplicas(&Message{
-		Header: s.Copy(),
-		Qc: &QuorumCertificate{
+	c.SendToReplicas(&Message{
+		Header: c.Copy(),
+		Qc: &QC{
 			Header:          vote.Qc.Header,
-			Block:           s.Block,
+			Block:           c.Block,
 			LeaderPublicKey: vote.Qc.LeaderPublicKey,
 			Signature: &lib.AggregateSignature{
 				Signature: as,
 				Bitmap:    bitmap,
 			},
 		},
-		HighQc:                 s.HighQC,
+		HighQc:                 c.HighQC,
 		LastDoubleSignEvidence: dse,
 		BadProposerEvidence:    bpe,
 	})
 }
 
-func (s *State) StartProposeVotePhase() (interrupt bool) {
-	s.Phase = lib.Phase_PROPOSE_VOTE
-	msg := s.LeaderMessages.GetLeaderMessage(s.View.Copy())
-	s.LeaderPublicKey, _ = lib.PublicKeyFromBytes(msg.Signature.PublicKey)
+func (c *Consensus) StartProposeVotePhase() (interrupt bool) {
+	c.Phase = lib.Phase_PROPOSE_VOTE
+	msg := c.LeaderMessages.GetLeaderMessage(c.View.Copy())
+	c.LeaderPublicKey, _ = lib.PublicKeyFromBytes(msg.Signature.PublicKey)
 	// IF LOCKED, CONFIRM SAFE TO UNLOCK
-	if s.Locked {
-		if err := s.SafeNode(msg.HighQc, msg.Qc.Block); err != nil {
-			s.log.Error(err.Error())
+	if c.Locked {
+		if err := c.SafeNode(msg.HighQc, msg.Qc.Block); err != nil {
+			c.log.Error(err.Error())
 			return true
 		}
 	}
@@ -249,34 +244,34 @@ func (s *State) StartProposeVotePhase() (interrupt bool) {
 		BPE: msg.BadProposerEvidence,
 	}
 	// CHECK CANDIDATE BLOCK AGAINST STATE MACHINE
-	if err := s.CheckCandidateBlock(msg.Qc.Block, &byzantineEvidence); err != nil {
-		s.log.Error(err.Error())
+	if err := c.CheckCandidateBlock(msg.Qc.Block, &byzantineEvidence); err != nil {
+		c.log.Error(err.Error())
 		return true
 	}
-	s.Block = msg.Qc.Block
-	s.ByzantineEvidence = &byzantineEvidence
+	c.Block = msg.Qc.Block
+	c.ByzantineEvidence = &byzantineEvidence
 	// SEND VOTE TO LEADER
-	s.SendToLeader(&Message{
-		Qc: &QuorumCertificate{
-			Header: s.View.Copy(),
-			Block:  s.Block},
+	c.SendToLeader(&Message{
+		Qc: &QC{
+			Header: c.View.Copy(),
+			Block:  c.Block},
 	})
 	return
 }
 
-func (s *State) StartPrecommitPhase() {
-	s.Phase = lib.Phase_PRECOMMIT
-	if !s.SelfIsLeader() {
+func (c *Consensus) StartPrecommitPhase() {
+	c.Phase = lib.Phase_PRECOMMIT
+	if !c.SelfIsLeader() {
 		return
 	}
-	vote, as, bitmap, err := s.Votes.GetMaj23(s.View.Copy())
+	vote, as, bitmap, err := c.Votes.GetMaj23(c.View.Copy())
 	if err != nil {
-		s.log.Error(err.Error())
+		c.log.Error(err.Error())
 		return
 	}
-	s.SendToReplicas(&Message{
-		Header: s.Copy(),
-		Qc: &QuorumCertificate{
+	c.SendToReplicas(&Message{
+		Header: c.Copy(),
+		Qc: &QC{
 			Header: vote.Qc.Header,
 			Block:  vote.Qc.Block,
 			Signature: &lib.AggregateSignature{
@@ -287,39 +282,39 @@ func (s *State) StartPrecommitPhase() {
 	})
 }
 
-func (s *State) StartPrecommitVotePhase() (interrupt bool) {
-	s.Phase = lib.Phase_PRECOMMIT_VOTE
-	msg := s.LeaderMessages.GetLeaderMessage(s.View.Copy())
-	if interrupt = s.CheckLeaderAndBlock(msg); interrupt {
+func (c *Consensus) StartPrecommitVotePhase() (interrupt bool) {
+	c.Phase = lib.Phase_PRECOMMIT_VOTE
+	msg := c.LeaderMessages.GetLeaderMessage(c.View.Copy())
+	if interrupt = c.CheckLeaderAndBlock(msg); interrupt {
 		return
 	}
 	// LOCK AND SET HIGH-QC TO PROTECT THOSE WHO MAY COMMIT
-	s.HighQC = msg.Qc
-	s.Locked = true
+	c.HighQC = msg.Qc
+	c.Locked = true
 	// SEND VOTE TO LEADER
-	s.SendToLeader(&Message{
-		Qc: &QuorumCertificate{
-			Header: s.View.Copy(),
-			Block:  s.Block,
+	c.SendToLeader(&Message{
+		Qc: &QC{
+			Header: c.View.Copy(),
+			Block:  c.Block,
 		},
 	})
 	return
 }
 
-func (s *State) StartCommitPhase() {
-	s.Phase = lib.Phase_COMMIT
-	if !s.SelfIsLeader() {
+func (c *Consensus) StartCommitPhase() {
+	c.Phase = lib.Phase_COMMIT
+	if !c.SelfIsLeader() {
 		return
 	}
-	vote, as, bitmap, err := s.Votes.GetMaj23(s.View.Copy())
+	vote, as, bitmap, err := c.Votes.GetMaj23(c.View.Copy())
 	if err != nil {
-		s.log.Error(err.Error())
+		c.log.Error(err.Error())
 		return
 	}
 	// SEND MSG TO REPLICAS
-	s.SendToReplicas(&Message{
-		Header: s.Copy(), // header
-		Qc: &QuorumCertificate{
+	c.SendToReplicas(&Message{
+		Header: c.Copy(), // header
+		Qc: &QC{
 			Header: vote.Header,   // vote view
 			Block:  vote.Qc.Block, // vote block
 			Signature: &lib.AggregateSignature{
@@ -330,107 +325,107 @@ func (s *State) StartCommitPhase() {
 	})
 }
 
-func (s *State) StartCommitProcessPhase() (interrupt bool) {
-	s.Phase = lib.Phase_COMMIT_PROCESS
-	msg := s.LeaderMessages.GetLeaderMessage(s.View.Copy())
+func (c *Consensus) StartCommitProcessPhase() (interrupt bool) {
+	c.Phase = lib.Phase_COMMIT_PROCESS
+	msg := c.LeaderMessages.GetLeaderMessage(c.View.Copy())
 	// CONFIRM LEADER & BLOCK
-	if interrupt = s.CheckLeaderAndBlock(msg); interrupt {
+	if interrupt = c.CheckLeaderAndBlock(msg); interrupt {
 		return
 	}
-	if err := s.CommitBlock(msg.Qc); err != nil {
+	if err := c.CommitBlock(msg.Qc); err != nil {
 		return true
 	}
-	s.ByzantineEvidence = s.LeaderMessages.GetByzantineEvidence(s.View.Copy(),
-		s.ValidatorSet, s.LastValidatorSet, s.LeaderPublicKey.Bytes(), &s.Votes, s.SelfIsLeader())
-	s.NewHeight()
+	c.ByzantineEvidence = c.LeaderMessages.GetByzantineEvidence(c.View.Copy(),
+		c.ValidatorSet, c.LastValidatorSet, c.LeaderPublicKey.Bytes(), &c.Votes, c.SelfIsLeader())
+	c.NewHeight()
 	return
 }
 
-func (s *State) CheckLeaderAndBlock(msg *Message) (interrupt bool) {
+func (c *Consensus) CheckLeaderAndBlock(msg *Message) (interrupt bool) {
 	// CONFIRM IS LEADER
-	if !s.IsLeader(msg.Signature.PublicKey) {
-		s.log.Error(lib.ErrInvalidLeaderPublicKey().Error())
+	if !c.IsLeader(msg.Signature.PublicKey) {
+		c.log.Error(lib.ErrInvalidLeaderPublicKey().Error())
 		return true
 	}
 
 	// CONFIRM BLOCK
-	if !s.Block.Equals(msg.Qc.Block) {
-		s.log.Error(ErrMismatchBlocks().Error())
+	if !c.Block.Equals(msg.Qc.Block) {
+		c.log.Error(ErrMismatchBlocks().Error())
 		return true
 	}
 	return
 }
 
-func (s *State) HandleMessage(message proto.Message) lib.ErrorI {
+func (c *Consensus) HandleMessage(message proto.Message) lib.ErrorI {
 	switch msg := message.(type) {
 	case *Message:
 		switch {
 		case msg.IsReplicaMessage() || msg.IsPacemakerMessage():
-			isPartialQC, err := msg.Check(s.View.Copy(), s.ValidatorSet)
+			isPartialQC, err := msg.Check(c.View.Copy(), c.ValidatorSet)
 			if err != nil {
 				return err
 			}
 			if isPartialQC {
 				return lib.ErrNoMaj23()
 			}
-			return s.Votes.AddVote(s.LeaderPublicKey.Bytes(), s.View.Copy(), msg, s.ValidatorSet, s.LastValidatorSet)
+			return c.Votes.AddVote(c.LeaderPublicKey.Bytes(), c.View.Copy(), msg, c.ValidatorSet, c.LastValidatorSet)
 		case msg.IsLeaderMessage():
-			partialQC, err := msg.Check(s.View.Copy(), s.ValidatorSet)
+			partialQC, err := msg.Check(c.View.Copy(), c.ValidatorSet)
 			if err != nil {
 				return err
 			}
 			if partialQC {
-				return s.LeaderMessages.AddIncompleteQC(msg)
+				return c.LeaderMessages.AddIncompleteQC(msg)
 			}
-			return s.LeaderMessages.AddLeaderMessage(msg)
+			return c.LeaderMessages.AddLeaderMessage(msg)
 		}
 	}
 	return ErrUnknownConsensusMsg(message)
 }
 
-func (s *State) RoundInterrupt(timer *time.Time) {
-	s.Phase = lib.Phase_ROUND_INTERRUPT
+func (c *Consensus) RoundInterrupt(timer *time.Time) {
+	c.Phase = lib.Phase_ROUND_INTERRUPT
 	// send pacemaker message
-	s.SendToLeader(&Message{
-		Header: s.View.Copy(),
+	c.SendToLeader(&Message{
+		Header: c.View.Copy(),
 	})
-	s.ResetAndSleep(timer)
-	s.NewRound(false)
-	s.Pacemaker()
+	c.ResetAndSleep(timer)
+	c.NewRound(false)
+	c.Pacemaker()
 }
 
-func (s *State) NewRound(newHeight bool) {
+func (c *Consensus) NewRound(newHeight bool) {
 	if !newHeight {
-		s.Round++
+		c.Round++
 	}
-	s.Phase = lib.Phase_ELECTION
-	s.Votes.NewRound(s.Round)
-	s.LeaderMessages.NewRound(s.Round, s.ValidatorSet.Key)
+	c.Phase = lib.Phase_ELECTION
+	c.Votes.NewRound(c.Round)
+	c.LeaderMessages.NewRound(c.Round, c.ValidatorSet.Key)
 }
-func (s *State) NewHeight() {
-	s.Height++
-	s.Round = 0
-	s.HighQC = nil
-	s.LeaderPublicKey = nil
-	s.Block = nil
-	s.Votes.NewHeight()
-	s.LeaderMessages.NewHeight()
-	s.NewRound(true)
+func (c *Consensus) NewHeight() {
+	c.Height++
+	c.Round = 0
+	c.HighQC = nil
+	c.LeaderPublicKey = nil
+	c.Block = nil
+	c.Votes.NewHeight()
+	c.LeaderMessages.NewHeight()
+	c.NewRound(true)
 }
 
-func (s *State) Pacemaker() {
-	highestQuorumRoundFromPeers := s.Votes.Pacemaker()
-	if highestQuorumRoundFromPeers > s.Round {
-		s.Round = highestQuorumRoundFromPeers
+func (c *Consensus) Pacemaker() {
+	highestQuorumRoundFromPeers := c.Votes.Pacemaker()
+	if highestQuorumRoundFromPeers > c.Round {
+		c.Round = highestQuorumRoundFromPeers
 	}
 }
 
-func (s *State) SafeNode(qc *QuorumCertificate, b *lib.Block) lib.ErrorI {
+func (c *Consensus) SafeNode(qc *QC, b *lib.Block) lib.ErrorI {
 	block, view := qc.Block, qc.Header
 	if bytes.Equal(b.BlockHeader.Hash, block.BlockHeader.Hash) {
 		return ErrMismatchBlocks()
 	}
-	lockedBlock, locked := s.HighQC.Block, s.HighQC.Header
+	lockedBlock, locked := c.HighQC.Block, c.HighQC.Header
 	if bytes.Equal(lockedBlock.BlockHeader.Hash, block.BlockHeader.Hash) {
 		return nil // SAFETY
 	}
@@ -440,26 +435,26 @@ func (s *State) SafeNode(qc *QuorumCertificate, b *lib.Block) lib.ErrorI {
 	return ErrFailedSafeNodePredicate()
 }
 
-func (s *State) ResetAndSleep(startTime *time.Time) {
+func (c *Consensus) ResetAndSleep(startTime *time.Time) {
 	processingTime := time.Since(*startTime)
 	var sleepTime time.Duration
-	switch s.Phase {
+	switch c.Phase {
 	case lib.Phase_ELECTION:
-		sleepTime = s.SleepTime(s.Config.ElectionTimeoutMS)
+		sleepTime = c.SleepTime(c.Config.ElectionTimeoutMS)
 	case lib.Phase_ELECTION_VOTE:
-		sleepTime = s.SleepTime(s.Config.ElectionVoteTimeoutMS)
+		sleepTime = c.SleepTime(c.Config.ElectionVoteTimeoutMS)
 	case lib.Phase_PROPOSE:
-		sleepTime = s.SleepTime(s.Config.ProposeTimeoutMS)
+		sleepTime = c.SleepTime(c.Config.ProposeTimeoutMS)
 	case lib.Phase_PROPOSE_VOTE:
-		sleepTime = s.SleepTime(s.Config.ProposeVoteTimeoutMS)
+		sleepTime = c.SleepTime(c.Config.ProposeVoteTimeoutMS)
 	case lib.Phase_PRECOMMIT:
-		sleepTime = s.SleepTime(s.Config.PrecommitTimeoutMS)
+		sleepTime = c.SleepTime(c.Config.PrecommitTimeoutMS)
 	case lib.Phase_PRECOMMIT_VOTE:
-		sleepTime = s.SleepTime(s.Config.PrecommitVoteTimeoutMS)
+		sleepTime = c.SleepTime(c.Config.PrecommitVoteTimeoutMS)
 	case lib.Phase_COMMIT:
-		sleepTime = s.SleepTime(s.Config.CommitTimeoutMS)
+		sleepTime = c.SleepTime(c.Config.CommitTimeoutMS)
 	case lib.Phase_COMMIT_PROCESS:
-		sleepTime = s.SleepTime(s.Config.CommitProcessMS)
+		sleepTime = c.SleepTime(c.Config.CommitProcessMS)
 	}
 	if sleepTime > processingTime {
 		time.Sleep(sleepTime - processingTime)
@@ -467,44 +462,49 @@ func (s *State) ResetAndSleep(startTime *time.Time) {
 	*startTime = time.Now()
 }
 
-func (s *State) SleepTime(sleepTimeMS int) time.Duration {
-	return time.Duration(math.Pow(float64(sleepTimeMS), float64(s.Round+1)) * float64(time.Millisecond))
+func (c *Consensus) SleepTime(sleepTimeMS int) time.Duration {
+	return time.Duration(math.Pow(float64(sleepTimeMS), float64(c.Round+1)) * float64(time.Millisecond))
 }
 
-func (s *State) SelfIsLeader() bool {
-	return s.IsLeader(s.PublicKey.Bytes())
+func (c *Consensus) SelfIsLeader() bool {
+	return c.IsLeader(c.PublicKey.Bytes())
 }
 
-func (s *State) IsLeader(sender []byte) bool {
-	return bytes.Equal(sender, s.LeaderPublicKey.Bytes())
+func (c *Consensus) IsLeader(sender []byte) bool {
+	return bytes.Equal(sender, c.LeaderPublicKey.Bytes())
 }
 
-func (s *State) SendToReplicas(msg lib.Signable) {
-	if err := msg.Sign(s.PrivateKey); err != nil {
-		s.log.Error(err.Error())
+func (c *Consensus) SendToReplicas(msg lib.Signable) {
+	if err := msg.Sign(c.PrivateKey); err != nil {
+		c.log.Error(err.Error())
 		return
 	}
-	if err := s.P2P.SendToValidators(msg); err != nil {
-		s.log.Error(err.Error())
-		return
-	}
-}
-
-func (s *State) SendToLeader(msg lib.Signable) {
-	if err := msg.Sign(s.PrivateKey); err != nil {
-		s.log.Error(err.Error())
-		return
-	}
-	if err := s.P2P.SendTo(s.LeaderPublicKey.Bytes(), lib.Topic_CONSENSUS, msg); err != nil {
-		s.log.Error(err.Error())
+	if err := c.P2P.SendToValidators(msg); err != nil {
+		c.log.Error(err.Error())
 		return
 	}
 }
 
-func (s *State) getProducerKeys() [][]byte {
-	keys, err := s.FSM.GetProducerKeys()
+func (c *Consensus) SendToLeader(msg lib.Signable) {
+	if err := msg.Sign(c.PrivateKey); err != nil {
+		c.log.Error(err.Error())
+		return
+	}
+	if err := c.P2P.SendTo(c.LeaderPublicKey.Bytes(), lib.Topic_CONSENSUS, msg); err != nil {
+		c.log.Error(err.Error())
+		return
+	}
+}
+
+func (c *Consensus) getProducerKeys() [][]byte {
+	keys, err := c.FSM.GetProducerKeys()
 	if err != nil {
 		return nil
 	}
 	return keys.ProducerKeys
 }
+
+type DSE = lib.DoubleSignEvidences
+type BPE = lib.BadProposerEvidences
+type BE = lib.ByzantineEvidence
+type QC = lib.QuorumCertificate

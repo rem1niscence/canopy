@@ -108,7 +108,7 @@ func (x *BlockHeader) Equals(b *BlockHeader) bool {
 	return bytes.Equal(qc1Bz, qc2Bz)
 }
 
-func (b *BlockHeader) ValidateByzantineEvidence(vs, lastVS ValidatorSetWrapper, be *ByzantineEvidence) ErrorI {
+func (b *BlockHeader) ValidateByzantineEvidence(vs, lastVS ValidatorSet, be *ByzantineEvidence) ErrorI {
 	if be == nil {
 		return nil
 	}

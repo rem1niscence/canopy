@@ -17,7 +17,7 @@ func (x *QuorumCertificate) SignBytes() (signBytes []byte, err ErrorI) {
 	return
 }
 
-func (x *QuorumCertificate) Check(view *View, vs ValidatorSetWrapper) (isPartialQC bool, error ErrorI) {
+func (x *QuorumCertificate) Check(view *View, vs ValidatorSet) (isPartialQC bool, error ErrorI) {
 	if x == nil {
 		return false, ErrEmptyQuorumCertificate()
 	}
@@ -27,7 +27,7 @@ func (x *QuorumCertificate) Check(view *View, vs ValidatorSetWrapper) (isPartial
 	return x.Signature.Check(x, vs)
 }
 
-func (x *QuorumCertificate) CheckHighQC(view *View, vs ValidatorSetWrapper) ErrorI {
+func (x *QuorumCertificate) CheckHighQC(view *View, vs ValidatorSet) ErrorI {
 	if x == nil {
 		return ErrEmptyQuorumCertificate()
 	}
@@ -66,7 +66,7 @@ func (x *QuorumCertificate) Equals(qc *QuorumCertificate) bool {
 	return x.Signature.Equals(qc.Signature)
 }
 
-func (x *QuorumCertificate) GetNonSigners(vs *ValidatorSet) ([][]byte, int, ErrorI) {
+func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) ([][]byte, int, ErrorI) {
 	return x.Signature.GetNonSigners(vs)
 }
 
@@ -89,7 +89,7 @@ func (x *DoubleSignEvidence) CheckBasic(latestHeight uint64) ErrorI {
 	return nil
 }
 
-func (x *DoubleSignEvidence) Check(vs ValidatorSetWrapper) ErrorI {
+func (x *DoubleSignEvidence) Check(vs ValidatorSet) ErrorI {
 	if _, err := x.VoteA.Check(x.VoteA.Header, vs); err != nil {
 		return err
 	}

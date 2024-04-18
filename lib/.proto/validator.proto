@@ -1,15 +1,16 @@
 syntax = "proto3";
 package types;
 
-option go_package = "github.com/ginchuco/ginchu/state_machine/types";
+option go_package = "github.com/ginchuco/ginchu/fsm/types";
 
 message Validator {
   bytes address = 1;
   bytes public_key = 2;
-  string staked_amount = 3;
-  uint64 max_paused_height = 4;
-  uint64 unstaking_height = 5;
-  bytes output = 6;
+  string net_address = 3;
+  string staked_amount = 4;
+  uint64 max_paused_height = 5;
+  uint64 unstaking_height = 6;
+  bytes output = 7;
 }
 
 message NonSignerInfo {

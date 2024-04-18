@@ -45,6 +45,10 @@ func ErrAddressSize() lib.ErrorI {
 	return lib.NewError(lib.CodeAddressSize, lib.StateMachineModule, "address size is invalid")
 }
 
+func ErrInvalidNetAddressLen() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidNetAddressLen, lib.StateMachineModule, "net address has invalid length")
+}
+
 func ErrRecipientAddressSize() lib.ErrorI {
 	return lib.NewError(lib.CodeRecipientAddressSize, lib.StateMachineModule, "recipient address size is invalid")
 }
@@ -203,4 +207,8 @@ func ErrInvalidPoolName() lib.ErrorI {
 
 func ErrWrongStoreType() lib.ErrorI {
 	return lib.NewError(lib.CodeWrongStoreType, lib.StateMachineModule, "wrong store type")
+}
+
+func ErrMaxBlockSize() lib.ErrorI {
+	return lib.NewError(lib.CodeMaxBlockSize, lib.StateMachineModule, "max block size")
 }

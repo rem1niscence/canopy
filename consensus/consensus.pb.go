@@ -7,7 +7,7 @@
 package consensus
 
 import (
-	types "github.com/ginchuco/ginchu/lib"
+	lib "github.com/ginchuco/ginchu/lib"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -26,13 +26,13 @@ type Message struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Header                 *types.View                  `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
-	Vrf                    *types.Signature             `protobuf:"bytes,2,opt,name=vrf,proto3" json:"vrf,omitempty"`                                                                         // only ELECTION phase from leader
-	Qc                     *types.QuorumCertificate     `protobuf:"bytes,3,opt,name=qc,proto3" json:"qc,omitempty"`                                                                           // Leaders use this to aggregate replica messages, Replicas sign parts of this to vote
-	HighQc                 *types.QuorumCertificate     `protobuf:"bytes,4,opt,name=high_qc,json=highQc,proto3" json:"high_qc,omitempty"`                                                     // only if a previous lock was seen: ELECTION-VOTE phase by replica and PROPOSE phase by leader
-	LastDoubleSignEvidence []*types.DoubleSignEvidence  `protobuf:"bytes,5,rep,name=last_double_sign_evidence,json=lastDoubleSignEvidence,proto3" json:"last_double_sign_evidence,omitempty"` // evidence from height - 1 (required cause last round ds would not be caught otherwise)
-	BadProposerEvidence    []*types.BadProposerEvidence `protobuf:"bytes,6,rep,name=bad_proposer_evidence,json=badProposerEvidence,proto3" json:"bad_proposer_evidence,omitempty"`            // evidence from current height (last round is always good, so we can do same height)
-	Signature              *types.Signature             `protobuf:"bytes,7,opt,name=signature,proto3" json:"signature,omitempty"`
+	Header                 *lib.View                  `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	Vrf                    *lib.Signature             `protobuf:"bytes,2,opt,name=vrf,proto3" json:"vrf,omitempty"`                                                                         // only ELECTION phase from leader
+	Qc                     *lib.QuorumCertificate     `protobuf:"bytes,3,opt,name=qc,proto3" json:"qc,omitempty"`                                                                           // Leaders use this to aggregate replica messages, Replicas sign parts of this to vote
+	HighQc                 *lib.QuorumCertificate     `protobuf:"bytes,4,opt,name=high_qc,json=highQc,proto3" json:"high_qc,omitempty"`                                                     // only if a previous lock was seen: ELECTION-VOTE phase by replica and PROPOSE phase by leader
+	LastDoubleSignEvidence []*lib.DoubleSignEvidence  `protobuf:"bytes,5,rep,name=last_double_sign_evidence,json=lastDoubleSignEvidence,proto3" json:"last_double_sign_evidence,omitempty"` // evidence from height - 1 (required cause last round ds would not be caught otherwise)
+	BadProposerEvidence    []*lib.BadProposerEvidence `protobuf:"bytes,6,rep,name=bad_proposer_evidence,json=badProposerEvidence,proto3" json:"bad_proposer_evidence,omitempty"`            // evidence from current height (last round is always good, so we can do same height)
+	Signature              *lib.Signature             `protobuf:"bytes,7,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 
 func (x *Message) Reset() {
@@ -67,49 +67,49 @@ func (*Message) Descriptor() ([]byte, []int) {
 	return file_consensus_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *Message) GetHeader() *types.View {
+func (x *Message) GetHeader() *lib.View {
 	if x != nil {
 		return x.Header
 	}
 	return nil
 }
 
-func (x *Message) GetVrf() *types.Signature {
+func (x *Message) GetVrf() *lib.Signature {
 	if x != nil {
 		return x.Vrf
 	}
 	return nil
 }
 
-func (x *Message) GetQc() *types.QuorumCertificate {
+func (x *Message) GetQc() *lib.QuorumCertificate {
 	if x != nil {
 		return x.Qc
 	}
 	return nil
 }
 
-func (x *Message) GetHighQc() *types.QuorumCertificate {
+func (x *Message) GetHighQc() *lib.QuorumCertificate {
 	if x != nil {
 		return x.HighQc
 	}
 	return nil
 }
 
-func (x *Message) GetLastDoubleSignEvidence() []*types.DoubleSignEvidence {
+func (x *Message) GetLastDoubleSignEvidence() []*lib.DoubleSignEvidence {
 	if x != nil {
 		return x.LastDoubleSignEvidence
 	}
 	return nil
 }
 
-func (x *Message) GetBadProposerEvidence() []*types.BadProposerEvidence {
+func (x *Message) GetBadProposerEvidence() []*lib.BadProposerEvidence {
 	if x != nil {
 		return x.BadProposerEvidence
 	}
 	return nil
 }
 
-func (x *Message) GetSignature() *types.Signature {
+func (x *Message) GetSignature() *lib.Signature {
 	if x != nil {
 		return x.Signature
 	}
@@ -166,12 +166,12 @@ func file_consensus_proto_rawDescGZIP() []byte {
 
 var file_consensus_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_consensus_proto_goTypes = []interface{}{
-	(*Message)(nil),                   // 0: types.Message
-	(*types.View)(nil),                // 1: types.View
-	(*types.Signature)(nil),           // 2: types.Signature
-	(*types.QuorumCertificate)(nil),   // 3: types.QuorumCertificate
-	(*types.DoubleSignEvidence)(nil),  // 4: types.DoubleSignEvidence
-	(*types.BadProposerEvidence)(nil), // 5: types.BadProposerEvidence
+	(*Message)(nil),                 // 0: types.Message
+	(*lib.View)(nil),                // 1: types.View
+	(*lib.Signature)(nil),           // 2: types.Signature
+	(*lib.QuorumCertificate)(nil),   // 3: types.QuorumCertificate
+	(*lib.DoubleSignEvidence)(nil),  // 4: types.DoubleSignEvidence
+	(*lib.BadProposerEvidence)(nil), // 5: types.BadProposerEvidence
 }
 var file_consensus_proto_depIdxs = []int32{
 	1, // 0: types.Message.header:type_name -> types.View

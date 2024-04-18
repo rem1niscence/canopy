@@ -32,8 +32,9 @@ type PeerBook struct {
 	bookSize int
 }
 
-func (p *PeerBook) CrawlAndClean(dialAndDisconnect func(a *lib.PeerAddress) lib.ErrorI) {
+func (p *PeerBook) StartChurnManagement(dialAndDisconnect func(a *lib.PeerAddress) lib.ErrorI) {
 	for {
+		time.Sleep(CrawlAndCleanBookFrequency)
 		p.RLock()
 		bookCopy := make([]*BookPeer, len(p.book))
 		copy(bookCopy, p.book)
@@ -43,7 +44,6 @@ func (p *PeerBook) CrawlAndClean(dialAndDisconnect func(a *lib.PeerAddress) lib.
 				p.AddFailedDialAttempt(peer.Address.PublicKey)
 			}
 		}
-		time.Sleep(CrawlAndCleanBookFrequency)
 	}
 }
 

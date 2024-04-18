@@ -6,15 +6,15 @@ import (
 	"github.com/ginchuco/ginchu/lib/crypto"
 )
 
-func (s *StateMachine) BeginBlock(beginBlock *lib.BeginBlockParams) lib.ErrorI {
+func (s *StateMachine) BeginBlock() lib.ErrorI {
 	if err := s.CheckProtocolVersion(); err != nil {
 		return err
 	}
-	nonSignerPercent, err := s.HandleByzantine(beginBlock)
+	nonSignerPercent, err := s.HandleByzantine(s.BeginBlockParams)
 	if err != nil {
 		return err
 	}
-	if err = s.RewardProposer(crypto.NewAddressFromBytes(beginBlock.BlockHeader.ProposerAddress), nonSignerPercent); err != nil {
+	if err = s.RewardProposer(crypto.NewAddressFromBytes(s.BeginBlockParams.BlockHeader.ProposerAddress), nonSignerPercent); err != nil {
 		return err
 	}
 	return nil
@@ -32,8 +32,8 @@ func (s *StateMachine) EndBlock() (endBlock *lib.EndBlockParams, err lib.ErrorI)
 	return
 }
 
-func (s *StateMachine) GetConsensusValidators() (*lib.ValidatorSet, lib.ErrorI) {
-	set := new(lib.ValidatorSet)
+func (s *StateMachine) GetConsensusValidators() (*lib.ConsensusValidators, lib.ErrorI) {
+	set := new(lib.ConsensusValidators)
 	params, err := s.GetParamsVal()
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (s *StateMachine) GetConsensusValidators() (*lib.ValidatorSet, lib.ErrorI) 
 		if val.UnstakingHeight != 0 {
 			return nil, types.ErrValidatorUnstaking()
 		}
-		set.ValidatorSet = append(set.ValidatorSet, &lib.ValidatorKeyAndPower{
+		set.ValidatorSet = append(set.ValidatorSet, &lib.ConsensusValidator{
 			PublicKey:   val.PublicKey,
 			VotingPower: val.StakedAmount,
 		})

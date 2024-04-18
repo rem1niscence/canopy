@@ -20,10 +20,6 @@ func (s *StateMachine) HandleMessage(msg lib.MessageI) lib.ErrorI {
 		return s.HandleMessageUnpause(x)
 	case *types.MessageChangeParameter:
 		return s.HandleMessageChangeParameter(x)
-	case *types.MessageDoubleSign: // TODO likely remove and leave to QC in consensus layer
-		return s.HandleMessageDoubleSign(x)
-	//case *types.MessageInvalidBlock: TODO ^
-	//	return s.HandleMessageInvalidBlock(x)
 	default:
 		return types.ErrUnknownMessage(x)
 	}
@@ -127,6 +123,7 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	return s.SetValidator(&types.Validator{
 		Address:      address.Bytes(),
 		PublicKey:    publicKey.Bytes(),
+		NetAddress:   msg.NetAddress,
 		StakedAmount: msg.Amount,
 		Output:       msg.OutputAddress,
 	})
@@ -174,6 +171,7 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 	return s.SetValidator(&types.Validator{
 		Address:         val.Address,
 		PublicKey:       val.PublicKey,
+		NetAddress:      msg.NetAddress,
 		StakedAmount:    newStakedAmount,
 		MaxPausedHeight: val.MaxPausedHeight,
 		UnstakingHeight: val.UnstakingHeight,
@@ -245,31 +243,4 @@ func (s *StateMachine) HandleMessageChangeParameter(msg *types.MessageChangePara
 		return err
 	}
 	return s.UpdateParam(address.String(), msg.ParameterSpace, msg.ParameterKey, protoMsg)
-}
-
-func (s *StateMachine) HandleMessageDoubleSign(msg *types.MessageDoubleSign) lib.ErrorI {
-	doubleSignerPK := crypto.NewPublicKeyFromBytes(msg.VoteA.PublicKey)
-	doubleSignerAddr := doubleSignerPK.Address()
-	reporterAddr := crypto.NewAddressFromBytes(msg.ReporterAddress)
-	params, err := s.GetParamsVal()
-	if err != nil {
-		return err
-	}
-	doubleSigner, err := s.GetValidator(doubleSignerAddr)
-	if err != nil {
-		return err
-	}
-	reporter, err := s.GetValidator(reporterAddr)
-	if err != nil {
-		return err
-	}
-	reporterOutputAddr := crypto.NewAddressFromBytes(reporter.Output)
-	if err = s.SlashValidator(doubleSigner, params.ValidatorDoubleSignSlashPercentage.Value); err != nil {
-		return err
-	}
-	amount, err := lib.StringToBigInt(params.ValidatorDoubleSignReporterReward.Value)
-	if err != nil {
-		return err
-	}
-	return s.MintToAccount(reporterOutputAddr, amount)
 }

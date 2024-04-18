@@ -9,10 +9,12 @@ import (
 
 // HandleTransaction accepts or rejects inbound txs based on the mempool state
 // - pass through call checking indexer and mempool for duplicate
-func (s *State) HandleTransaction(tx []byte) lib.ErrorI {
+func (c *Consensus) HandleTransaction(tx []byte) lib.ErrorI {
+	c.Lock()
+	defer c.Unlock()
 	hash := crypto.Hash(tx)
 	// indexer
-	txResult, err := s.FSM.Store().(lib.StoreI).GetTxByHash(hash)
+	txResult, err := c.FSM.Store().(lib.StoreI).GetTxByHash(hash)
 	if err != nil {
 		return err
 	}
@@ -20,38 +22,44 @@ func (s *State) HandleTransaction(tx []byte) lib.ErrorI {
 		return ErrDuplicateTx(hash)
 	}
 	// mempool
-	if h := lib.BytesToString(hash); s.Mempool.Contains(h) {
+	if h := lib.BytesToString(hash); c.Mempool.Contains(h) {
 		return lib.ErrTxFoundInMempool(h)
 	}
-	return s.Mempool.HandleTransaction(tx)
+	return c.Mempool.HandleTransaction(tx)
 }
 
 // CheckCandidateBlock checks the candidate block for errors and resets back to begin block state
-func (s *State) CheckCandidateBlock(candidate *lib.Block, evidence *lib.ByzantineEvidence) (err lib.ErrorI) {
-	defer s.FSM.ResetToBeginBlock()
-	_, _, err = s.FSM.ApplyAndValidateBlock(candidate, evidence, true)
+func (c *Consensus) CheckCandidateBlock(candidate *lib.Block, evidence *lib.ByzantineEvidence) (err lib.ErrorI) {
+	c.Lock()
+	defer func() { c.FSM.ResetToBeginBlock(); c.Unlock() }()
+	_, _, err = c.FSM.ApplyAndValidateBlock(candidate, evidence, true)
 	return
 }
 
 // ProduceCandidateBlock uses the mempool and state params to build a candidate block
-func (s *State) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) (*lib.Block, lib.ErrorI) {
-	defer s.FSM.ResetToBeginBlock()
-	height := s.FSM.Height()
-	qc, err := s.FSM.GetBlockAndCertificate(height)
+func (c *Consensus) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) (*lib.Block, lib.ErrorI) {
+	c.Lock()
+	defer func() { c.FSM.ResetToBeginBlock(); c.Unlock() }()
+	height := c.FSM.Height()
+	qc, err := c.FSM.GetBlockAndCertificate(height)
 	if err != nil {
 		return nil, err
 	}
 	qc.Block = nil
-	lastBlock := s.FSM.LastBlockHeader()
-	numTxs, transactions := s.Mempool.GetTransactions(s.FSM.MaxBlockBytes)
+	lastBlock := c.FSM.LastBlockHeader()
+	maxBlockSize, err := c.FSM.GetMaxBlockSize()
+	if err != nil {
+		return nil, err
+	}
+	numTxs, transactions := c.Mempool.GetTransactions(maxBlockSize)
 	header := &lib.BlockHeader{
 		Height:                height + 1,
-		NetworkId:             s.FSM.NetworkID,
+		NetworkId:             c.FSM.NetworkID,
 		Time:                  timestamppb.Now(),
 		NumTxs:                uint64(numTxs),
 		TotalTxs:              lastBlock.TotalTxs + uint64(numTxs),
 		LastBlockHash:         lastBlock.Hash,
-		ProposerAddress:       s.PublicKey.Bytes(),
+		ProposerAddress:       c.PublicKey.Bytes(),
 		LastDoubleSigners:     doubleSigners,
 		BadProposers:          badProposers,
 		LastQuorumCertificate: qc,
@@ -60,7 +68,7 @@ func (s *State) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) (*li
 		BlockHeader:  header,
 		Transactions: transactions,
 	}
-	block.BlockHeader, _, _, err = s.FSM.ApplyBlock(block)
+	block.BlockHeader, _, _, err = c.FSM.ApplyBlock(block)
 	return block, err
 }
 
@@ -71,13 +79,15 @@ func (s *State) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) (*li
 // - re-checks all transactions in mempool
 // - atomically writes all to the underlying db
 // - sets up the app for the next height
-func (s *State) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
+func (c *Consensus) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
+	c.Lock()
+	defer func() { c.FSM.ResetToBeginBlock(); c.Unlock() }()
 	block := qc.Block
-	blockResult, nextValidatorSet, err := s.FSM.ApplyAndValidateBlock(block, nil, false)
+	blockResult, nextValidatorSet, err := c.FSM.ApplyAndValidateBlock(block, nil, false)
 	if err != nil {
 		return err
 	}
-	store := s.FSM.Store().(lib.StoreI)
+	store := c.FSM.Store().(lib.StoreI)
 	if err = store.IndexQC(qc); err != nil {
 		return err
 	}
@@ -85,20 +95,30 @@ func (s *State) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
 		return err
 	}
 	for _, tx := range block.Transactions {
-		s.Mempool.DeleteTransaction(tx)
+		c.Mempool.DeleteTransaction(tx)
 	}
-	if err = s.Mempool.checkMempool(); err != nil {
+	if err = c.Mempool.checkMempool(); err != nil {
 		return err
 	}
 	if _, err = store.Commit(); err != nil {
 		return err
 	}
-	beginBlockParams := lib.BeginBlockParams{BlockHeader: block.BlockHeader, ValidatorSet: nextValidatorSet}
-	s.FSM = fsm.NewWithBeginBlock(&beginBlockParams, s.FSM.ProtocolVersion, s.FSM.NetworkID, block.BlockHeader.Height+1, store)
-	s.Mempool.FSM, err = s.FSM.Copy()
+	c.LastValidatorSet = c.ValidatorSet
+	c.ValidatorSet, err = lib.NewValidatorSet(nextValidatorSet)
 	if err != nil {
 		return err
 	}
+	c.NotifyNextValidatorSet(nextValidatorSet)
+	beginBlockParams := lib.BeginBlockParams{BlockHeader: block.BlockHeader, ValidatorSet: nextValidatorSet}
+	c.FSM = fsm.NewWithBeginBlock(&beginBlockParams, c.FSM.ProtocolVersion, c.FSM.NetworkID, block.BlockHeader.Height+1, store)
+	c.Mempool.FSM, err = c.FSM.Copy()
+	if err != nil {
+		return err
+	}
+	if err = c.Mempool.FSM.BeginBlock(); err != nil {
+		return err
+	}
+	c.GossipBlock(qc)
 	return nil
 }
 

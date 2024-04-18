@@ -43,10 +43,11 @@ type P2P struct {
 	PeerSet              // active set
 	book       *PeerBook // not active set
 
-	state         State
-	maxValidators int
-	bannedIPs     []net.IPAddr // banned IPs (non-string)
-	logger        lib.LoggerI
+	state              State
+	validatorsReceiver chan []*lib.PeerAddress
+	maxValidators      int
+	bannedIPs          []net.IPAddr // banned IPs (non-string)
+	logger             lib.LoggerI
 }
 
 func New(p crypto.PrivateKeyI, maxValidators uint64, c lib.Config, l lib.LoggerI) *P2P {
@@ -67,28 +68,33 @@ func New(p crypto.PrivateKeyI, maxValidators uint64, c lib.Config, l lib.LoggerI
 		bannedIPs = append(bannedIPs, *i)
 	}
 	return &P2P{
-		privateKey:    p,
-		channels:      channels,
-		config:        c,
-		PeerSet:       NewPeerSet(c, peerBook),
-		book:          peerBook,
-		state:         State{RWMutex: sync.RWMutex{}},
-		maxValidators: int(maxValidators),
-		bannedIPs:     bannedIPs,
+		privateKey:         p,
+		channels:           channels,
+		config:             c,
+		PeerSet:            NewPeerSet(c, peerBook),
+		book:               peerBook,
+		state:              State{RWMutex: sync.RWMutex{}},
+		validatorsReceiver: make(chan []*lib.PeerAddress, maxChannelCalls),
+		maxValidators:      int(maxValidators),
+		bannedIPs:          bannedIPs,
+		logger:             l,
 	}
 }
 
-func (p *P2P) Start(validatorsReceiver chan []*lib.PeerAddress) {
-	go p.InternalListenValidators(validatorsReceiver)
+func (p *P2P) Start() {
+	go p.InternalListenValidators(p.validatorsReceiver)
 	go p.Listen(&lib.PeerAddress{NetAddress: p.config.ListenAddress})
-	for _, peer := range p.config.DialPeers {
-		pi := new(lib.PeerAddress)
-		if err := pi.FromString(peer); err != nil {
-			// log error
-			continue
+	go p.book.StartChurnManagement(p.DialAndDisconnect)
+	go func() {
+		for _, peer := range p.config.DialPeers {
+			pi := new(lib.PeerAddress)
+			if err := pi.FromString(peer); err != nil {
+				// log error
+				continue
+			}
+			p.DialWithBackoff(pi)
 		}
-		p.DialWithBackoff(pi)
-	}
+	}()
 }
 
 func (p *P2P) Dial(address *lib.PeerAddress, disconnect bool) lib.ErrorI {
@@ -227,6 +233,7 @@ func (p *P2P) MaxPossiblePeers() int {
 	return c.MaxInbound + c.MaxOutbound + p.maxValidators + len(c.TrustedPeerIDs)
 }
 func (p *P2P) ReceiveChannel(topic lib.Topic) chan *lib.MessageWrapper { return p.channels[topic] }
+func (p *P2P) ValidatorsReceiver() chan []*lib.PeerAddress             { return p.validatorsReceiver }
 func (p *P2P) Close()                                                  { _ = p.listener.Close() }
 func (p *P2P) filter(conn net.Conn) (*lib.PeerAddress, lib.ErrorI) {
 	remoteAddr := conn.RemoteAddr()

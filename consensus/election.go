@@ -56,7 +56,7 @@ type SortitionData struct {
 
 type RoundRobinParams struct {
 	SortitionData
-	ValidatorSet *lib.ValidatorSet
+	ValidatorSet *lib.ConsensusValidators
 }
 
 func Sortition(p *SortitionParams) (out []byte, vrf *lib.Signature, isCandidate bool) {
@@ -87,7 +87,7 @@ type VRFCandidate struct {
 	Out       []byte
 }
 
-func SelectLeaderFromCandidates(candidates []VRFCandidate, data SortitionData, v *lib.ValidatorSet) (leaderPublicKey crypto.PublicKeyI) {
+func SelectLeaderFromCandidates(candidates []VRFCandidate, data SortitionData, v *lib.ConsensusValidators) (leaderPublicKey crypto.PublicKeyI) {
 	if candidates == nil {
 		return WeightedRoundRobin(&RoundRobinParams{
 			SortitionData: data,

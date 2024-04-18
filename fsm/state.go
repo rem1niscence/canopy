@@ -55,12 +55,12 @@ func NewWithBeginBlock(bb *lib.BeginBlockParams, protocolVersion int, networkID 
 	}
 }
 
-func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResult, *lib.ValidatorSet, lib.ErrorI) {
+func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResult, *lib.ConsensusValidators, lib.ErrorI) {
 	store, ok := s.Store().(lib.StoreI)
 	if !ok {
 		return nil, nil, nil, types.ErrWrongStoreType()
 	}
-	if err := s.BeginBlock(s.BeginBlockParams); err != nil {
+	if err := s.BeginBlock(); err != nil {
 		return nil, nil, nil, err
 	}
 	txResults, txRoot, numTxs, err := s.ApplyTransactions(b)
@@ -140,7 +140,7 @@ func (s *StateMachine) ValidateBlock(header *lib.BlockHeader, compare *lib.Block
 	return nil
 }
 
-func (s *StateMachine) ApplyAndValidateBlock(b *lib.Block, evidence *lib.ByzantineEvidence, isCandidateBlock bool) (*lib.BlockResult, *lib.ValidatorSet, lib.ErrorI) {
+func (s *StateMachine) ApplyAndValidateBlock(b *lib.Block, evidence *lib.ByzantineEvidence, isCandidateBlock bool) (*lib.BlockResult, *lib.ConsensusValidators, lib.ErrorI) {
 	header, txResults, valSet, err := s.ApplyBlock(b)
 	if err != nil {
 		return nil, nil, err
@@ -155,7 +155,8 @@ func (s *StateMachine) ApplyAndValidateBlock(b *lib.Block, evidence *lib.Byzanti
 }
 
 func (s *StateMachine) ApplyTransactions(block *lib.Block) (results []*lib.TxResult, root []byte, n int, er lib.ErrorI) {
-	var items [][]byte
+	var txBytes [][]byte
+	blockSize := uint64(0)
 	for index, tx := range block.Transactions {
 		result, err := s.ApplyTransaction(uint64(index), tx, crypto.HashString(tx))
 		if err != nil {
@@ -166,10 +167,18 @@ func (s *StateMachine) ApplyTransactions(block *lib.Block) (results []*lib.TxRes
 			return nil, nil, 0, err
 		}
 		results = append(results, result)
-		items = append(items, bz)
+		txBytes = append(txBytes, bz)
+		blockSize += uint64(len(bz))
 		n++
 	}
-	root, _, err := lib.MerkleTree(items)
+	maxBlockSize, err := s.GetMaxBlockSize()
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	if blockSize > maxBlockSize {
+		return nil, nil, 0, types.ErrMaxBlockSize()
+	}
+	root, _, err = lib.MerkleTree(txBytes)
 	return results, root, n, err
 }
 
@@ -195,14 +204,14 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 	return New(s.ProtocolVersion, s.NetworkID, newStore)
 }
 
-func (s *StateMachine) GetHistoricalValidatorSet(height uint64) (lib.ValidatorSetWrapper, lib.ErrorI) {
+func (s *StateMachine) GetHistoricalValidatorSet(height uint64) (lib.ValidatorSet, lib.ErrorI) {
 	fsm, err := s.TimeMachine(height - 1) // end block state is begin block of next height
 	if err != nil {
-		return lib.ValidatorSetWrapper{}, err
+		return lib.ValidatorSet{}, err
 	}
 	vs, err := fsm.GetConsensusValidators()
 	if err != nil {
-		return lib.ValidatorSetWrapper{}, err
+		return lib.ValidatorSet{}, err
 	}
 	return lib.NewValidatorSet(vs)
 }
@@ -213,6 +222,14 @@ func (s *StateMachine) GetMaxValidators() (uint64, lib.ErrorI) {
 		return 0, err
 	}
 	return valParams.ValidatorMaxCount.Value, nil
+}
+
+func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
+	consParams, err := s.GetParamsCons()
+	if err != nil {
+		return 0, err
+	}
+	return consParams.BlockSize.Value, nil
 }
 
 func (s *StateMachine) GetBlockAndCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
@@ -259,7 +276,7 @@ func (s *StateMachine) validateBlockTime(header *lib.BlockHeader) lib.ErrorI {
 }
 func (s *StateMachine) ResetToBeginBlock() {
 	s.Reset()
-	if err := s.BeginBlock(s.BeginBlockParams); err != nil {
+	if err := s.BeginBlock(); err != nil {
 		panic(err)
 	}
 }

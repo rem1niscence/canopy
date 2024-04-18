@@ -98,6 +98,9 @@ func (ps *PeerSet) Remove(publicKey []byte) lib.ErrorI {
 func (ps *PeerSet) ChangeReputation(publicKey []byte, delta int32) {
 	ps.Lock()
 	defer ps.Unlock()
+	if publicKey == nil { // self
+		return
+	}
 	peer, err := ps.get(publicKey)
 	if err != nil {
 		return

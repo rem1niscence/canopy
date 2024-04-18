@@ -1,7 +1,6 @@
 package types
 
 import (
-	"bytes"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"math/big"
@@ -15,7 +14,6 @@ const (
 	MessagePauseName           = "pause"
 	MessageUnpauseName         = "unpause"
 	MessageChangeParameterName = "change_parameter"
-	MessageDoubleSignName      = "double_sign"
 )
 
 var _ lib.MessageI = &MessageSend{}
@@ -44,6 +42,9 @@ func (x *MessageStake) Check() lib.ErrorI {
 	if err := checkOutputAddress(x.OutputAddress); err != nil {
 		return err
 	}
+	if err := checkNetAddress(x.NetAddress); err != nil {
+		return err
+	}
 	if err := checkPubKey(x.PublicKey); err != nil {
 		return err
 	}
@@ -62,6 +63,9 @@ func (x *MessageEditStake) Check() lib.ErrorI {
 		return err
 	}
 	if err := checkOutputAddress(x.OutputAddress); err != nil {
+		return err
+	}
+	if err := checkNetAddress(x.NetAddress); err != nil {
 		return err
 	}
 	if err := checkAmount(x.Amount); err != nil {
@@ -119,44 +123,6 @@ func (x *MessageChangeParameter) Bytes() ([]byte, lib.ErrorI) { return lib.Marsh
 func (x *MessageChangeParameter) Name() string                { return MessageChangeParameterName }
 func (x *MessageChangeParameter) Recipient() []byte           { return nil }
 
-var _ lib.MessageI = &MessageDoubleSign{}
-
-func (x *MessageDoubleSign) Check() lib.ErrorI {
-	if err := checkAddress(x.ReporterAddress); err != nil {
-		return err
-	}
-	pk1, err := checkVote(x.VoteA)
-	if err != nil {
-		return err
-	}
-	pk2, err := checkVote(x.VoteB)
-	if err != nil {
-		return err
-	}
-	// compare votes
-	if !pk1.Equals(pk2) {
-		return ErrPublicKeysNotEqual()
-	}
-	if x.VoteA.Height != x.VoteB.Height {
-		return ErrHeightsNotEqual()
-	}
-	if x.VoteA.Round != x.VoteB.Round {
-		return ErrRoundsNotEqual()
-	}
-	if x.VoteA.Type != x.VoteB.Type {
-		return ErrVoteTypesNotEqual()
-	}
-	if bytes.Equal(x.VoteA.BlockHash, x.VoteB.BlockHash) {
-		return ErrIdenticalVotes()
-	}
-	return nil
-}
-
-func (x *MessageDoubleSign) SetSigner(signer []byte)     { x.Signer = signer }
-func (x *MessageDoubleSign) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessageDoubleSign) Name() string                { return MessageDoubleSignName }
-func (x *MessageDoubleSign) Recipient() []byte           { return nil }
-
 func checkAmount(amount string) lib.ErrorI {
 	am, err := lib.StringToBigInt(amount)
 	if err != nil {
@@ -174,6 +140,14 @@ func checkAddress(address []byte) lib.ErrorI {
 	}
 	if len(address) != crypto.AddressSize {
 		return ErrAddressSize()
+	}
+	return nil
+}
+
+func checkNetAddress(netAddress string) lib.ErrorI {
+	netAddressLen := len(netAddress)
+	if netAddressLen < 1 || netAddressLen > 50 {
+		return ErrInvalidNetAddressLen()
 	}
 	return nil
 }

@@ -11,21 +11,10 @@ const (
 	maxRounds = 10000
 )
 
-type QuorumCertificate = lib.QuorumCertificate
-type Phase = lib.Phase
-
 type HeightLeaderMessages struct {
 	sync.Mutex
 	roundLeaderMessages map[uint64]RoundLeaderMessages
-	partialQCs          map[string]*QuorumCertificate // track for double sign evidence
-}
-
-func NewHeightLeaderMessages() HeightLeaderMessages {
-	return HeightLeaderMessages{
-		Mutex:               sync.Mutex{},
-		roundLeaderMessages: make(map[uint64]RoundLeaderMessages),
-		partialQCs:          make(map[string]*QuorumCertificate),
-	}
+	partialQCs          map[string]*QC // track for double sign evidence
 }
 
 type RoundLeaderMessages struct {
@@ -34,7 +23,33 @@ type RoundLeaderMessages struct {
 	MultiKey crypto.MultiPublicKeyI
 }
 
-type PhaseLeaderMessage map[Phase]*Message
+type PhaseLeaderMessage map[lib.Phase]*Message
+type ElectionMessages []*Message
+
+func NewHeightLeaderMessages() HeightLeaderMessages {
+	return HeightLeaderMessages{
+		Mutex:               sync.Mutex{},
+		roundLeaderMessages: make(map[uint64]RoundLeaderMessages),
+		partialQCs:          make(map[string]*QC),
+	}
+}
+
+func (hlm *HeightLeaderMessages) NewHeight() {
+	hlm.Lock()
+	defer hlm.Unlock()
+	hlm.roundLeaderMessages = make(map[uint64]RoundLeaderMessages)
+	hlm.partialQCs = make(map[string]*QC)
+}
+
+func (hlm *HeightLeaderMessages) NewRound(round uint64, multiKey crypto.MultiPublicKeyI) {
+	hlm.Lock()
+	defer hlm.Unlock()
+	rlm := hlm.roundLeaderMessages[round]
+	rlm.Election = make([]*Message, 0)
+	rlm.Messages = make(PhaseLeaderMessage)
+	rlm.MultiKey = multiKey.Copy()
+	hlm.roundLeaderMessages[round] = rlm
+}
 
 func (hlm *HeightLeaderMessages) GetElectionMessages(round uint64) ElectionMessages {
 	hlm.Lock()
@@ -58,26 +73,7 @@ func (hlm *HeightLeaderMessages) GetElectionMessages(round uint64) ElectionMessa
 	return cpy
 }
 
-func (hlm *HeightLeaderMessages) NewHeight() {
-	hlm.Lock()
-	defer hlm.Unlock()
-	hlm.roundLeaderMessages = make(map[uint64]RoundLeaderMessages)
-	hlm.partialQCs = make(map[string]*QuorumCertificate)
-}
-
-func (hlm *HeightLeaderMessages) NewRound(round uint64, multiKey crypto.MultiPublicKeyI) {
-	hlm.Lock()
-	defer hlm.Unlock()
-	rlm := hlm.roundLeaderMessages[round]
-	rlm.Election = make([]*Message, 0)
-	rlm.Messages = make(PhaseLeaderMessage)
-	rlm.MultiKey = multiKey.Copy()
-	hlm.roundLeaderMessages[round] = rlm
-}
-
-type ElectionMessages []*Message
-
-func (m ElectionMessages) GetCandidates(vs lib.ValidatorSetWrapper, data SortitionData) ([]VRFCandidate, lib.ErrorI) {
+func (m ElectionMessages) GetCandidates(vs lib.ValidatorSet, data SortitionData) ([]VRFCandidate, lib.ErrorI) {
 	var candidates []VRFCandidate
 	for _, msg := range m {
 		vrf := msg.GetVrf()
@@ -142,8 +138,9 @@ func (hlm *HeightLeaderMessages) AddIncompleteQC(message *Message) lib.ErrorI {
 	hlm.partialQCs[lib.BytesToString(bz)] = message.Qc
 	return nil
 }
+
 func (hlm *HeightLeaderMessages) GetByzantineEvidence(
-	v *lib.View, vs, lastVS lib.ValidatorSetWrapper,
+	v *lib.View, vs, lastVS lib.ValidatorSet,
 	leaderKey []byte, hvs *HeightVoteSet, selfIsLeader bool) *BE {
 	bpe := hlm.GetBadProposerEvidence(v, vs, leaderKey)
 	dse := hlm.GetDoubleSignEvidence(v, hvs, vs, lastVS, selfIsLeader)
@@ -156,12 +153,12 @@ func (hlm *HeightLeaderMessages) GetByzantineEvidence(
 	}
 }
 
-func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(view *lib.View, hvs *HeightVoteSet, vs, lastVS lib.ValidatorSetWrapper, selfIsLeader bool) DSE {
+func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(view *lib.View, hvs *HeightVoteSet, vs, lastVS lib.ValidatorSet, selfIsLeader bool) DSE {
 	hlm.Lock()
 	defer hlm.Unlock()
 	hvs.Lock()
 	defer hvs.Unlock()
-	dse := make(lib.DoubleSignEvidences, 0)
+	dse := make(DSE, 0)
 	for _, p := range hlm.partialQCs {
 		rlm := hlm.roundLeaderMessages[p.Header.Round]
 		if rlm.Messages == nil {
@@ -218,7 +215,7 @@ func (hlm *HeightLeaderMessages) GetDoubleSignEvidence(view *lib.View, hvs *Heig
 	return dse
 }
 
-func (hlm *HeightLeaderMessages) GetBadProposerEvidence(view *lib.View, vs lib.ValidatorSetWrapper, leaderKey []byte) BPE {
+func (hlm *HeightLeaderMessages) GetBadProposerEvidence(view *lib.View, vs lib.ValidatorSet, leaderKey []byte) BPE {
 	hlm.Lock()
 	defer hlm.Unlock()
 	bpe := make(lib.BadProposerEvidences, 0)
@@ -254,14 +251,14 @@ func NewHeightVoteSet() HeightVoteSet {
 	}
 }
 
-type RoundVoteSet map[Phase]PhaseVoteSet // ELECTION_VOTE, PROPOSE_VOTE, PRECOMMIT_VOTE
-type PhaseVoteSet map[string]VoteSet     // vote -> VoteSet TODO why would there be different votes?
+type RoundVoteSet map[lib.Phase]PhaseVoteSet // ELECTION_VOTE, PROPOSE_VOTE, PRECOMMIT_VOTE
+type PhaseVoteSet map[string]VoteSet         // vote -> VoteSet TODO why would there be different votes?
 
 type VoteSet struct {
 	vote                  *Message
-	lastDoubleSigners     lib.DoubleSignEvidences
-	badProposers          lib.BadProposerEvidences
-	highQC                *QuorumCertificate
+	lastDoubleSigners     DSE
+	badProposers          BPE
+	highQC                *QC
 	multiKey              crypto.MultiPublicKeyI
 	totalVotedPower       string
 	minimumPowerForQuorum string // 2f+1
@@ -285,7 +282,7 @@ func (hvs *HeightVoteSet) NewRound(round uint64) {
 	hvs.pacemakerVotes = make([]VoteSet, 0)
 }
 
-func (hvs *HeightVoteSet) AddVote(leaderKey []byte, view *lib.View, vote *Message, v, lastV lib.ValidatorSetWrapper) lib.ErrorI {
+func (hvs *HeightVoteSet) AddVote(leaderKey []byte, view *lib.View, vote *Message, v, lastV lib.ValidatorSet) lib.ErrorI {
 	hvs.Lock()
 	defer hvs.Unlock()
 	var vs VoteSet
@@ -318,7 +315,7 @@ func (hvs *HeightVoteSet) AddVote(leaderKey []byte, view *lib.View, vote *Messag
 	return nil
 }
 
-func (hvs *HeightVoteSet) addVote(leaderKey []byte, view *lib.View, vote *Message, vs VoteSet, val *lib.ValidatorWrapper, v, lastVS lib.ValidatorSetWrapper) (voteSet VoteSet, err lib.ErrorI) {
+func (hvs *HeightVoteSet) addVote(leaderKey []byte, view *lib.View, vote *Message, vs VoteSet, val *lib.SetValidator, v, lastVS lib.ValidatorSet) (voteSet VoteSet, err lib.ErrorI) {
 	if vs.multiKey == nil {
 		vs.multiKey = v.Key.Copy()
 	}
@@ -405,7 +402,7 @@ func (x *Message) SignBytes() (signBytes []byte, err lib.ErrorI) {
 		return lib.Marshal(&Message{
 			Header: x.Header,
 			Vrf:    x.Vrf,
-			Qc: &QuorumCertificate{
+			Qc: &QC{
 				Header:          x.Qc.Header,
 				Block:           x.Qc.Block,
 				LeaderPublicKey: x.Qc.LeaderPublicKey,
@@ -416,7 +413,7 @@ func (x *Message) SignBytes() (signBytes []byte, err lib.ErrorI) {
 			BadProposerEvidence:    x.BadProposerEvidence,
 		})
 	case x.IsReplicaMessage():
-		return lib.Marshal(&QuorumCertificate{
+		return lib.Marshal(&QC{
 			Header:          x.Qc.Header,
 			Block:           x.Qc.Block,
 			LeaderPublicKey: x.Qc.LeaderPublicKey,
@@ -428,7 +425,7 @@ func (x *Message) SignBytes() (signBytes []byte, err lib.ErrorI) {
 	}
 }
 
-func (x *Message) Check(view *lib.View, vs lib.ValidatorSetWrapper) (isPartialQC bool, err lib.ErrorI) {
+func (x *Message) Check(view *lib.View, vs lib.ValidatorSet) (isPartialQC bool, err lib.ErrorI) {
 	if x == nil {
 		return false, ErrEmptyLeaderMessage()
 	}

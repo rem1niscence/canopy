@@ -1,0 +1,14 @@
+syntax = "proto3";
+package types;
+
+option go_package = "github.com/ginchuco/ginchu/lib";
+
+message ConsensusValidator {
+  bytes public_key = 1;
+  string voting_power = 2;
+  string net_address = 3;
+}
+
+message ConsensusValidators {
+  repeated ConsensusValidator ValidatorSet = 1;
+}

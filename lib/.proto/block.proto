@@ -1,10 +1,10 @@
 syntax = "proto3";
 package types;
 
-option go_package = "github.com/ginchuco/ginchu/types";
+option go_package = "github.com/ginchuco/ginchu/lib";
 
 import "google/protobuf/timestamp.proto";
-import "validator_set.proto";
+import "validators.proto";
 import "tx.proto";
 
 message BlockHeader {
@@ -37,11 +37,11 @@ message BlockResult {
 
 message BeginBlockParams {
   BlockHeader block_header = 1;
-  ValidatorSet validator_set = 2;
+  ConsensusValidators validator_set = 2;
 }
 
 message EndBlockParams {
-  ValidatorSet ValidatorSet = 1;
+  ConsensusValidators validator_set = 1;
 }
 
 message ProducerKeys {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/alecthomas/units"
 	"github.com/ginchuco/ginchu/consensus"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
@@ -17,12 +16,6 @@ import (
 //		log.Info("This is a program to test docker")
 //	}
 //}
-
-const (
-	ProtocolVersion = 0
-	NetworkID       = 0
-	MaxBlockBytes   = units.MB
-)
 
 var (
 	rootCmd = &cobra.Command{Use: "ginchu", Short: "ginchu is a generic blockchain implementation"}

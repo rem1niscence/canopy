@@ -9,8 +9,8 @@ type ByzantineEvidence struct {
 
 type DoubleSignEvidences []*DoubleSignEvidence
 
-func (e *DoubleSignEvidences) Add(height uint64, vs, lastVS ValidatorSetWrapper, evidence *DoubleSignEvidence) {
-	var valSet ValidatorSetWrapper
+func (e *DoubleSignEvidences) Add(height uint64, vs, lastVS ValidatorSet, evidence *DoubleSignEvidence) {
+	var valSet ValidatorSet
 	if err := evidence.CheckBasic(height); err != nil {
 		return
 	}
@@ -45,11 +45,11 @@ func (e *DoubleSignEvidences) Add(height uint64, vs, lastVS ValidatorSetWrapper,
 	}
 }
 
-func (e *DoubleSignEvidences) FilterBad(height uint64, vs, lastVS ValidatorSetWrapper) ErrorI { // TODO de-dup
+func (e *DoubleSignEvidences) FilterBad(height uint64, vs, lastVS ValidatorSet) ErrorI { // TODO de-dup
 	if e == nil {
 		return ErrEmptyEvidence()
 	}
-	var valSet ValidatorSetWrapper
+	var valSet ValidatorSet
 	var goodEvidences DoubleSignEvidences
 	for _, evidence := range *e {
 		if evidence == nil {
@@ -75,7 +75,7 @@ func (e *DoubleSignEvidences) FilterBad(height uint64, vs, lastVS ValidatorSetWr
 	return nil
 }
 
-func (e DoubleSignEvidences) GetDoubleSigners(height uint64, vs, lastVS ValidatorSetWrapper) (pubKeys [][]byte, error ErrorI) {
+func (e DoubleSignEvidences) GetDoubleSigners(height uint64, vs, lastVS ValidatorSet) (pubKeys [][]byte, error ErrorI) {
 	if err := e.FilterBad(height, vs, lastVS); err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (e DoubleSignEvidences) GetDoubleSigners(height uint64, vs, lastVS Validato
 	// one infraction per view
 	deDupMap := make(map[string]map[string]struct{}) // view -> map[pubkey]
 	for _, evidence := range e {
-		valSet, h := ValidatorSetWrapper{}, evidence.VoteA.Header.Height
+		valSet, h := ValidatorSet{}, evidence.VoteA.Header.Height
 		viewBytes, err := Marshal(evidence.VoteA.Header)
 		if err != nil {
 			return nil, err
@@ -123,7 +123,7 @@ func (e DoubleSignEvidences) GetDoubleSigners(height uint64, vs, lastVS Validato
 
 type BadProposerEvidences []*BadProposerEvidence
 
-func (bpe *BadProposerEvidences) Add(expectedLeader []byte, height uint64, vs ValidatorSetWrapper, evidence *BadProposerEvidence) {
+func (bpe *BadProposerEvidences) Add(expectedLeader []byte, height uint64, vs ValidatorSet, evidence *BadProposerEvidence) {
 	if evidence == nil {
 		return
 	}
@@ -150,7 +150,7 @@ func (bpe *BadProposerEvidences) Add(expectedLeader []byte, height uint64, vs Va
 	}
 }
 
-func (bpe *BadProposerEvidences) FilterBad(expectedLeader []byte, height uint64, vs ValidatorSetWrapper) ErrorI {
+func (bpe *BadProposerEvidences) FilterBad(expectedLeader []byte, height uint64, vs ValidatorSet) ErrorI {
 	if bpe == nil {
 		return ErrEmptyEvidence()
 	}
@@ -175,7 +175,7 @@ func (bpe *BadProposerEvidences) FilterBad(expectedLeader []byte, height uint64,
 	return nil
 }
 
-func (bpe BadProposerEvidences) GetBadProposers(expectedLeader []byte, height uint64, vs ValidatorSetWrapper) (pubKeys [][]byte, error ErrorI) {
+func (bpe BadProposerEvidences) GetBadProposers(expectedLeader []byte, height uint64, vs ValidatorSet) (pubKeys [][]byte, error ErrorI) {
 	if err := bpe.FilterBad(expectedLeader, height, vs); err != nil {
 		return nil, err
 	}

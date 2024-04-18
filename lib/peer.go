@@ -8,11 +8,13 @@ import (
 )
 
 type P2P interface {
+	Start()
 	SendToValidators(msg proto.Message) ErrorI
 	SendTo(pubKey []byte, topic Topic, msg proto.Message) ErrorI
 	SendToAll(topic Topic, msg proto.Message) ErrorI
 	SendToPeer(topic Topic, msg proto.Message) (*PeerInfo, ErrorI)
 	ReceiveChannel(topic Topic) chan *MessageWrapper
+	ValidatorsReceiver() chan []*PeerAddress
 	GetPeerInfo(pubKey []byte) (*PeerInfo, ErrorI)
 	ChangeReputation(pubKey []byte, delta int32)
 	MaxPossiblePeers() int
