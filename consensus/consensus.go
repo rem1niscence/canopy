@@ -14,29 +14,25 @@ import (
 )
 
 type Consensus struct {
-	lib.View
+	*lib.View
+	Votes         VotesForHeight
+	Proposals     ProposalsForHeight
+	ProposerKey   []byte
+	ValidatorSet  ValSet
+	HighQC        *QC
+	Locked        bool
+	Block         *lib.Block
+	SortitionData *SortitionData
 
-	LeaderPublicKey crypto.PublicKeyI
+	ByzantineEvidence *BE
+	LastValidatorSet  ValSet
 
-	LastValidatorSet lib.ValidatorSet
-	ValidatorSet     lib.ValidatorSet
-	Votes            HeightVoteSet
-	LeaderMessages   HeightLeaderMessages
-	HighQC           *QC
-	Locked           bool
-	Block            *lib.Block
-	SortitionData    SortitionData
-
-	ByzantineEvidence     *BE
-	NextByzantineEvidence *BE
-
-	PublicKey  crypto.PublicKeyI
+	PublicKey  []byte
 	PrivateKey crypto.PrivateKeyI
+	Config     lib.Config
+	log        lib.LoggerI
 
-	P2P    lib.P2P
-	Config lib.ConsensusConfig
-	log    lib.LoggerI
-
+	P2P     *p2p.P2P
 	FSM     *fsm.StateMachine
 	Mempool *Mempool
 	sync.Mutex
@@ -69,15 +65,15 @@ func New(pk crypto.PrivateKeyI, c lib.Config, l lib.LoggerI) (*Consensus, lib.Er
 		return nil, err
 	}
 	return &Consensus{
-		View:             lib.View{Height: height},
+		View:             &lib.View{Height: height},
 		LastValidatorSet: lastVS,
 		ValidatorSet:     valSet,
-		Votes:            NewHeightVoteSet(),
-		LeaderMessages:   NewHeightLeaderMessages(),
-		PublicKey:        pk.PublicKey(),
+		Votes:            NewVotesForHeight(),
+		Proposals:        NewProposalsForHeight(),
+		PublicKey:        pk.PublicKey().Bytes(),
 		PrivateKey:       pk,
 		P2P:              p2p.New(pk, maxVals, c, l),
-		Config:           c.ConsensusConfig,
+		Config:           c,
 		log:              l,
 		FSM:              sm,
 		Mempool:          NewMempool(fsmCopy, c.MempoolConfig, l),
@@ -87,7 +83,6 @@ func New(pk crypto.PrivateKeyI, c lib.Config, l lib.LoggerI) (*Consensus, lib.Er
 
 func (c *Consensus) Start() {
 	c.P2P.Start()
-	c.StartListeners()
 	c.Sync()
 	c.NewHeight()
 	for {
@@ -121,14 +116,16 @@ func (c *Consensus) Start() {
 }
 
 func (c *Consensus) StartElectionPhase() {
-	c.Phase = lib.Phase_ELECTION
-	c.LeaderPublicKey = nil
-	selfValidator, err := c.ValidatorSet.GetValidator(c.PublicKey.Bytes())
+	c.Lock()
+	defer c.Unlock()
+	c.Phase = Election
+	c.ProposerKey = nil
+	selfValidator, err := c.ValidatorSet.GetValidator(c.PublicKey)
 	if err != nil {
 		c.log.Error(err.Error())
 		return
 	}
-	c.SortitionData = SortitionData{
+	c.SortitionData = &SortitionData{
 		LastProducersPublicKeys: c.getProducerKeys(),
 		Height:                  c.Height,
 		Round:                   c.Round,
@@ -150,15 +147,15 @@ func (c *Consensus) StartElectionPhase() {
 }
 
 func (c *Consensus) StartElectionVotePhase() {
-	c.Phase = lib.Phase_ELECTION_VOTE
-	electionMessages := c.LeaderMessages.GetElectionMessages(c.View.Round)
-
-	// LEADER SELECTION
-	candidates, err := electionMessages.GetCandidates(c.ValidatorSet, c.SortitionData)
+	c.Lock()
+	defer c.Unlock()
+	c.Phase = ElectionVote
+	// PROPOSER SELECTION
+	candidates, err := c.Proposals.GetElectionCandidates(c.View.Round, c.ValidatorSet, c.SortitionData)
 	if err != nil {
 		c.log.Error(err.Error())
 	}
-	c.LeaderPublicKey = SelectLeaderFromCandidates(candidates, c.SortitionData, c.ValidatorSet.ValidatorSet)
+	c.ProposerKey = SelectProposerFromCandidates(candidates, c.SortitionData, c.ValidatorSet.ValidatorSet)
 
 	// CHECK BYZANTINE EVIDENCE
 	bpe, dse := BPE(nil), DSE(nil)
@@ -167,11 +164,11 @@ func (c *Consensus) StartElectionVotePhase() {
 		dse = c.ByzantineEvidence.DSE
 	}
 
-	// SEND VOTE TO LEADER
-	c.SendToLeader(&Message{
+	// SEND VOTE TO PROPOSER
+	c.SendToProposer(&Message{
 		Qc: &QC{
-			Header:          c.View.Copy(),
-			LeaderPublicKey: c.LeaderPublicKey.Bytes(),
+			Header:      c.View.Copy(),
+			ProposerKey: c.ProposerKey,
 		},
 		HighQc:                 c.HighQC,
 		LastDoubleSignEvidence: dse,
@@ -180,28 +177,22 @@ func (c *Consensus) StartElectionVotePhase() {
 }
 
 func (c *Consensus) StartProposePhase() {
-	c.Phase = lib.Phase_PROPOSE
-	vote, as, bitmap, err := c.Votes.GetMaj23(c.View.Copy())
+	c.Lock()
+	defer c.Unlock()
+	c.Phase = Propose
+	vote, as, err := c.Votes.GetMaj23(c.View)
 	if err != nil {
 		c.log.Error(err.Error())
 		return
 	}
 	// GATHER BYZANTINE EVIDENCE
-	dse, bpe := DSE(vote.LastDoubleSignEvidence), BPE(vote.BadProposerEvidence)
+	dse, bpe := lib.NewDSE(vote.LastDoubleSignEvidence), lib.NewBPE(vote.BadProposerEvidence)
 	// PRODUCE BLOCK OR USE HQC BLOCK
 	if vote.HighQc == nil {
-		var lastDoubleSigners, badProposers [][]byte
-		lastDoubleSigners, err = dse.GetDoubleSigners(c.Height, c.ValidatorSet, c.LastValidatorSet)
-		if err != nil {
-			c.log.Error(err.Error())
-			return
-		}
-		badProposers, err = bpe.GetBadProposers(vote.Qc.LeaderPublicKey, c.Height, c.ValidatorSet)
-		if err != nil {
-			c.log.Error(err.Error())
-			return
-		}
-		c.Block, err = c.ProduceCandidateBlock(badProposers, lastDoubleSigners)
+		c.Block, err = c.ProduceCandidateBlock(
+			bpe.GetBadProposers(),
+			dse.GetDoubleSigners(c.Height, c.ValidatorSet, c.LastValidatorSet),
+		)
 		if err != nil {
 			c.log.Error(err.Error())
 			return
@@ -214,24 +205,23 @@ func (c *Consensus) StartProposePhase() {
 	c.SendToReplicas(&Message{
 		Header: c.Copy(),
 		Qc: &QC{
-			Header:          vote.Qc.Header,
-			Block:           c.Block,
-			LeaderPublicKey: vote.Qc.LeaderPublicKey,
-			Signature: &lib.AggregateSignature{
-				Signature: as,
-				Bitmap:    bitmap,
-			},
+			Header:      vote.Qc.Header,
+			Block:       c.Block,
+			ProposerKey: vote.Qc.ProposerKey,
+			Signature:   as,
 		},
 		HighQc:                 c.HighQC,
-		LastDoubleSignEvidence: dse,
-		BadProposerEvidence:    bpe,
+		LastDoubleSignEvidence: dse.DSE,
+		BadProposerEvidence:    bpe.BPE,
 	})
 }
 
 func (c *Consensus) StartProposeVotePhase() (interrupt bool) {
-	c.Phase = lib.Phase_PROPOSE_VOTE
-	msg := c.LeaderMessages.GetLeaderMessage(c.View.Copy())
-	c.LeaderPublicKey, _ = lib.PublicKeyFromBytes(msg.Signature.PublicKey)
+	c.Lock()
+	defer c.Unlock()
+	c.Phase = ProposeVote
+	msg := c.Proposals.GetProposal(c.View.Copy())
+	c.ProposerKey = msg.Signature.PublicKey
 	// IF LOCKED, CONFIRM SAFE TO UNLOCK
 	if c.Locked {
 		if err := c.SafeNode(msg.HighQc, msg.Qc.Block); err != nil {
@@ -250,8 +240,8 @@ func (c *Consensus) StartProposeVotePhase() (interrupt bool) {
 	}
 	c.Block = msg.Qc.Block
 	c.ByzantineEvidence = &byzantineEvidence
-	// SEND VOTE TO LEADER
-	c.SendToLeader(&Message{
+	// SEND VOTE TO PROPOSER
+	c.SendToProposer(&Message{
 		Qc: &QC{
 			Header: c.View.Copy(),
 			Block:  c.Block},
@@ -260,11 +250,13 @@ func (c *Consensus) StartProposeVotePhase() (interrupt bool) {
 }
 
 func (c *Consensus) StartPrecommitPhase() {
-	c.Phase = lib.Phase_PRECOMMIT
-	if !c.SelfIsLeader() {
+	c.Lock()
+	defer c.Unlock()
+	c.Phase = Precommit
+	if !c.SelfIsProposer() {
 		return
 	}
-	vote, as, bitmap, err := c.Votes.GetMaj23(c.View.Copy())
+	vote, as, err := c.Votes.GetMaj23(c.View)
 	if err != nil {
 		c.log.Error(err.Error())
 		return
@@ -272,27 +264,26 @@ func (c *Consensus) StartPrecommitPhase() {
 	c.SendToReplicas(&Message{
 		Header: c.Copy(),
 		Qc: &QC{
-			Header: vote.Qc.Header,
-			Block:  vote.Qc.Block,
-			Signature: &lib.AggregateSignature{
-				Signature: as,
-				Bitmap:    bitmap,
-			},
+			Header:    vote.Qc.Header,
+			Block:     vote.Qc.Block,
+			Signature: as,
 		},
 	})
 }
 
 func (c *Consensus) StartPrecommitVotePhase() (interrupt bool) {
-	c.Phase = lib.Phase_PRECOMMIT_VOTE
-	msg := c.LeaderMessages.GetLeaderMessage(c.View.Copy())
-	if interrupt = c.CheckLeaderAndBlock(msg); interrupt {
+	c.Lock()
+	defer c.Unlock()
+	c.Phase = PrecommitVote
+	msg := c.Proposals.GetProposal(c.View.Copy())
+	if interrupt = c.CheckProposerAndBlock(msg); interrupt {
 		return
 	}
 	// LOCK AND SET HIGH-QC TO PROTECT THOSE WHO MAY COMMIT
 	c.HighQC = msg.Qc
 	c.Locked = true
-	// SEND VOTE TO LEADER
-	c.SendToLeader(&Message{
+	// SEND VOTE TO PROPOSER
+	c.SendToProposer(&Message{
 		Qc: &QC{
 			Header: c.View.Copy(),
 			Block:  c.Block,
@@ -302,11 +293,13 @@ func (c *Consensus) StartPrecommitVotePhase() (interrupt bool) {
 }
 
 func (c *Consensus) StartCommitPhase() {
-	c.Phase = lib.Phase_COMMIT
-	if !c.SelfIsLeader() {
+	c.Lock()
+	defer c.Unlock()
+	c.Phase = Commit
+	if !c.SelfIsProposer() {
 		return
 	}
-	vote, as, bitmap, err := c.Votes.GetMaj23(c.View.Copy())
+	vote, as, err := c.Votes.GetMaj23(c.View)
 	if err != nil {
 		c.log.Error(err.Error())
 		return
@@ -315,36 +308,35 @@ func (c *Consensus) StartCommitPhase() {
 	c.SendToReplicas(&Message{
 		Header: c.Copy(), // header
 		Qc: &QC{
-			Header: vote.Header,   // vote view
-			Block:  vote.Qc.Block, // vote block
-			Signature: &lib.AggregateSignature{
-				Signature: as,
-				Bitmap:    bitmap,
-			},
+			Header:    vote.Header,   // vote view
+			Block:     vote.Qc.Block, // vote block
+			Signature: as,
 		},
 	})
 }
 
 func (c *Consensus) StartCommitProcessPhase() (interrupt bool) {
-	c.Phase = lib.Phase_COMMIT_PROCESS
-	msg := c.LeaderMessages.GetLeaderMessage(c.View.Copy())
-	// CONFIRM LEADER & BLOCK
-	if interrupt = c.CheckLeaderAndBlock(msg); interrupt {
+	c.Lock()
+	defer c.Unlock()
+	c.Phase = CommitProcess
+	msg := c.Proposals.GetProposal(c.View.Copy())
+	// CONFIRM PROPOSER & BLOCK
+	if interrupt = c.CheckProposerAndBlock(msg); interrupt {
 		return
 	}
 	if err := c.CommitBlock(msg.Qc); err != nil {
 		return true
 	}
-	c.ByzantineEvidence = c.LeaderMessages.GetByzantineEvidence(c.View.Copy(),
-		c.ValidatorSet, c.LastValidatorSet, c.LeaderPublicKey.Bytes(), &c.Votes, c.SelfIsLeader())
+	c.ByzantineEvidence = c.Proposals.GetByzantineEvidence(c.View.Copy(),
+		c.ValidatorSet, c.LastValidatorSet, c.ProposerKey, &c.Votes, c.SelfIsProposer())
 	c.NewHeight()
 	return
 }
 
-func (c *Consensus) CheckLeaderAndBlock(msg *Message) (interrupt bool) {
-	// CONFIRM IS LEADER
-	if !c.IsLeader(msg.Signature.PublicKey) {
-		c.log.Error(lib.ErrInvalidLeaderPublicKey().Error())
+func (c *Consensus) CheckProposerAndBlock(msg *Message) (interrupt bool) {
+	// CONFIRM IS PROPOSER
+	if !c.IsProposer(msg.Signature.PublicKey) {
+		c.log.Error(lib.ErrInvalidProposerPubKey().Error())
 		return true
 	}
 
@@ -359,65 +351,63 @@ func (c *Consensus) CheckLeaderAndBlock(msg *Message) (interrupt bool) {
 func (c *Consensus) HandleMessage(message proto.Message) lib.ErrorI {
 	switch msg := message.(type) {
 	case *Message:
+		c.Lock()
+		height, vals, lastVals, proposer := c.Height, c.ValidatorSet, c.LastValidatorSet, c.ProposerKey
+		c.Unlock()
 		switch {
 		case msg.IsReplicaMessage() || msg.IsPacemakerMessage():
-			isPartialQC, err := msg.Check(c.View.Copy(), c.ValidatorSet)
-			if err != nil {
+			if err := msg.CheckReplicaMessage(height, vals); err != nil {
 				return err
 			}
-			if isPartialQC {
-				return lib.ErrNoMaj23()
-			}
-			return c.Votes.AddVote(c.LeaderPublicKey.Bytes(), c.View.Copy(), msg, c.ValidatorSet, c.LastValidatorSet)
-		case msg.IsLeaderMessage():
-			partialQC, err := msg.Check(c.View.Copy(), c.ValidatorSet)
+			return c.Votes.AddVote(proposer, height, msg, vals, lastVals)
+		case msg.IsProposerMessage():
+			partialQC, err := msg.CheckProposerMessage(proposer, height, vals)
 			if err != nil {
 				return err
 			}
 			if partialQC {
-				return c.LeaderMessages.AddIncompleteQC(msg)
+				return c.Proposals.AddPartialQC(msg)
 			}
-			return c.LeaderMessages.AddLeaderMessage(msg)
+			return c.Proposals.AddProposal(msg)
 		}
 	}
 	return ErrUnknownConsensusMsg(message)
 }
 
 func (c *Consensus) RoundInterrupt(timer *time.Time) {
-	c.Phase = lib.Phase_ROUND_INTERRUPT
+	c.Lock()
+	defer c.Unlock()
+	c.Phase = RoundInterrupt
 	// send pacemaker message
-	c.SendToLeader(&Message{
+	c.SendToProposer(&Message{
 		Header: c.View.Copy(),
 	})
 	c.ResetAndSleep(timer)
 	c.NewRound(false)
-	c.Pacemaker()
+	if pacerRound := c.Votes.Pacemaker(); pacerRound > c.Round {
+		c.Round = pacerRound
+	}
 }
 
 func (c *Consensus) NewRound(newHeight bool) {
 	if !newHeight {
 		c.Round++
 	}
-	c.Phase = lib.Phase_ELECTION
+	c.Phase = Election
 	c.Votes.NewRound(c.Round)
-	c.LeaderMessages.NewRound(c.Round, c.ValidatorSet.Key)
+	c.Proposals.NewRound(c.Round)
 }
 func (c *Consensus) NewHeight() {
 	c.Height++
 	c.Round = 0
 	c.HighQC = nil
-	c.LeaderPublicKey = nil
+	c.ProposerKey = nil
 	c.Block = nil
+	c.Locked = false
+	c.SortitionData = nil
 	c.Votes.NewHeight()
-	c.LeaderMessages.NewHeight()
+	c.Proposals.NewHeight()
 	c.NewRound(true)
-}
-
-func (c *Consensus) Pacemaker() {
-	highestQuorumRoundFromPeers := c.Votes.Pacemaker()
-	if highestQuorumRoundFromPeers > c.Round {
-		c.Round = highestQuorumRoundFromPeers
-	}
 }
 
 func (c *Consensus) SafeNode(qc *QC, b *lib.Block) lib.ErrorI {
@@ -439,21 +429,21 @@ func (c *Consensus) ResetAndSleep(startTime *time.Time) {
 	processingTime := time.Since(*startTime)
 	var sleepTime time.Duration
 	switch c.Phase {
-	case lib.Phase_ELECTION:
+	case Election:
 		sleepTime = c.SleepTime(c.Config.ElectionTimeoutMS)
-	case lib.Phase_ELECTION_VOTE:
+	case ElectionVote:
 		sleepTime = c.SleepTime(c.Config.ElectionVoteTimeoutMS)
-	case lib.Phase_PROPOSE:
+	case Propose:
 		sleepTime = c.SleepTime(c.Config.ProposeTimeoutMS)
-	case lib.Phase_PROPOSE_VOTE:
+	case ProposeVote:
 		sleepTime = c.SleepTime(c.Config.ProposeVoteTimeoutMS)
-	case lib.Phase_PRECOMMIT:
+	case Precommit:
 		sleepTime = c.SleepTime(c.Config.PrecommitTimeoutMS)
-	case lib.Phase_PRECOMMIT_VOTE:
+	case PrecommitVote:
 		sleepTime = c.SleepTime(c.Config.PrecommitVoteTimeoutMS)
-	case lib.Phase_COMMIT:
+	case Commit:
 		sleepTime = c.SleepTime(c.Config.CommitTimeoutMS)
-	case lib.Phase_COMMIT_PROCESS:
+	case CommitProcess:
 		sleepTime = c.SleepTime(c.Config.CommitProcessMS)
 	}
 	if sleepTime > processingTime {
@@ -466,12 +456,12 @@ func (c *Consensus) SleepTime(sleepTimeMS int) time.Duration {
 	return time.Duration(math.Pow(float64(sleepTimeMS), float64(c.Round+1)) * float64(time.Millisecond))
 }
 
-func (c *Consensus) SelfIsLeader() bool {
-	return c.IsLeader(c.PublicKey.Bytes())
+func (c *Consensus) SelfIsProposer() bool {
+	return c.IsProposer(c.PublicKey)
 }
 
-func (c *Consensus) IsLeader(sender []byte) bool {
-	return bytes.Equal(sender, c.LeaderPublicKey.Bytes())
+func (c *Consensus) IsProposer(sender []byte) bool {
+	return bytes.Equal(sender, c.ProposerKey)
 }
 
 func (c *Consensus) SendToReplicas(msg lib.Signable) {
@@ -485,12 +475,12 @@ func (c *Consensus) SendToReplicas(msg lib.Signable) {
 	}
 }
 
-func (c *Consensus) SendToLeader(msg lib.Signable) {
+func (c *Consensus) SendToProposer(msg lib.Signable) {
 	if err := msg.Sign(c.PrivateKey); err != nil {
 		c.log.Error(err.Error())
 		return
 	}
-	if err := c.P2P.SendTo(c.LeaderPublicKey.Bytes(), lib.Topic_CONSENSUS, msg); err != nil {
+	if err := c.P2P.SendTo(c.ProposerKey, lib.Topic_CONSENSUS, msg); err != nil {
 		c.log.Error(err.Error())
 		return
 	}
@@ -504,7 +494,23 @@ func (c *Consensus) getProducerKeys() [][]byte {
 	return keys.ProducerKeys
 }
 
-type DSE = lib.DoubleSignEvidences
-type BPE = lib.BadProposerEvidences
-type BE = lib.ByzantineEvidence
-type QC = lib.QuorumCertificate
+type (
+	DSE    = []*lib.DoubleSignEvidence
+	BPE    = []*lib.BadProposerEvidence
+	BE     = lib.ByzantineEvidence
+	QC     = lib.QuorumCertificate
+	Phase  = lib.Phase
+	ValSet = lib.ValidatorSet
+)
+
+const (
+	Election       = lib.Phase_ELECTION
+	ElectionVote   = lib.Phase_ELECTION_VOTE
+	Propose        = lib.Phase_PROPOSE
+	ProposeVote    = lib.Phase_PROPOSE_VOTE
+	Precommit      = lib.Phase_PRECOMMIT
+	PrecommitVote  = lib.Phase_PRECOMMIT_VOTE
+	Commit         = lib.Phase_COMMIT
+	CommitProcess  = lib.Phase_COMMIT_PROCESS
+	RoundInterrupt = lib.Phase_ROUND_INTERRUPT
+)

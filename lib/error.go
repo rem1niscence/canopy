@@ -44,52 +44,49 @@ const (
 	CodeNewMultiPubKey       ErrorCode   = 30
 	CodeStringToBigFloat     ErrorCode   = 31
 
-	ConsensusModule                     ErrorModule = "consensus"
-	CodeDuplicateTransaction            ErrorCode   = 6
-	CodeTxFoundInMempool                ErrorCode   = 7
-	CodeEmptyTxMessage                  ErrorCode   = 8
-	CodeDuplicateLeaderMessage          ErrorCode   = 9
-	CodeDuplicateVote                   ErrorCode   = 10
-	CodeInvalidSignatureLength          ErrorCode   = 11
-	CodeInvalidPubKey                   ErrorCode   = 12
-	CodeEmptyView                       ErrorCode   = 13
-	CodeUnknownConsensusMessage         ErrorCode   = 14
-	CodeValidatorNotInSet               ErrorCode   = 15
-	CodeWrongHeight                     ErrorCode   = 16
-	CodeWrongRound                      ErrorCode   = 17
-	CodeWrongPhase                      ErrorCode   = 18
-	CodePartialSignatureEmpty           ErrorCode   = 19
-	CodeInvalidPartialSignature         ErrorCode   = 20
-	CodeEmptyBlock                      ErrorCode   = 21
-	CodeEmptyPayload                    ErrorCode   = 22
-	CodeInvalidPayload                  ErrorCode   = 23
-	CodeInvalidLeaderPubKey             ErrorCode   = 24
-	CodeNoMaj23                         ErrorCode   = 25
-	CodeEmptyAggregateSignature         ErrorCode   = 26
-	CodeInvalidAggregateSignature       ErrorCode   = 27
-	CodeInvalidAggregateSignatureLen    ErrorCode   = 28
-	CodeEmptyAggregateSignatureBitmap   ErrorCode   = 29
-	CodeInvalidAggregateSignatureBitmap ErrorCode   = 30
-	CodeVRFEmpty                        ErrorCode   = 31
-	CodeNotVRFCandidate                 ErrorCode   = 32
-	CodeMismatchPublicKeys              ErrorCode   = 33
-	CodeEmptyPreviousAggregateSignature ErrorCode   = 34
-	CodeEmptyEvidence                   ErrorCode   = 35
-	CodeAggregateSignature              ErrorCode   = 36
-	CodeEmptyQuorumCertificate          ErrorCode   = 37
-	CodeEmptyQuorumCertificatePayload   ErrorCode   = 38
-	CodeMismatchBlocks                  ErrorCode   = 39
-	CodeFailedSafeNode                  ErrorCode   = 40
-	CodeInvalidValidatorIndex           ErrorCode   = 41
-	CodeUnableToAddSigner               ErrorCode   = 42
-	CodeEmptyLeaderMessage              ErrorCode   = 43
-	CodeInvalidBlockTime                ErrorCode   = 44
-	CodeInvalidEvidence                 ErrorCode   = 45
-	CodeDuplicateEvidence               ErrorCode   = 46
-	CodeMismatchDoubleSignerCount       ErrorCode   = 47
-	CodeMismatchEvidenceAndHeader       ErrorCode   = 48
-	CodeMismatchBadProposerCount        ErrorCode   = 49
-	CodeWrongMaxHeight                  ErrorCode   = 50
+	ConsensusModule          ErrorModule = "consensus"
+	CodeDuplicateTransaction ErrorCode   = 6
+	CodeTxFoundInMempool     ErrorCode   = 7
+
+	CodeDuplicateProposerMessage ErrorCode = 9
+	CodeDuplicateVote            ErrorCode = 10
+	CodeInvalidSignatureLength   ErrorCode = 11
+	CodeInvalidPubKey            ErrorCode = 12
+	CodeEmptyView                ErrorCode = 13
+	CodeUnknownConsensusMessage  ErrorCode = 14
+	CodeValidatorNotInSet        ErrorCode = 15
+	CodeWrongHeight              ErrorCode = 16
+	CodeWrongRound               ErrorCode = 17
+	CodeWrongPhase               ErrorCode = 18
+	CodePartialSignatureEmpty    ErrorCode = 19
+	CodeInvalidPartialSignature  ErrorCode = 20
+
+	CodeInvalidProposerPubKey           ErrorCode = 24
+	CodeNoMaj23                         ErrorCode = 25
+	CodeEmptyAggregateSignature         ErrorCode = 26
+	CodeInvalidAggregateSignature       ErrorCode = 27
+	CodeInvalidAggregateSignatureLen    ErrorCode = 28
+	CodeEmptyAggregateSignatureBitmap   ErrorCode = 29
+	CodeInvalidAggregateSignatureBitmap ErrorCode = 30
+
+	CodeMismatchPublicKeys              ErrorCode = 33
+	CodeEmptyPreviousAggregateSignature ErrorCode = 34
+	CodeEmptyEvidence                   ErrorCode = 35
+	CodeAggregateSignature              ErrorCode = 36
+	CodeEmptyQuorumCertificate          ErrorCode = 37
+
+	CodeMismatchBlocks            ErrorCode = 39
+	CodeFailedSafeNode            ErrorCode = 40
+	CodeInvalidValidatorIndex     ErrorCode = 41
+	CodeUnableToAddSigner         ErrorCode = 42
+	CodeEmptyProposerMessage      ErrorCode = 43
+	CodeInvalidBlockTime          ErrorCode = 44
+	CodeInvalidEvidence           ErrorCode = 45
+	CodeDuplicateEvidence         ErrorCode = 46
+	CodeMismatchDoubleSignerCount ErrorCode = 47
+	CodeMismatchEvidenceAndHeader ErrorCode = 48
+	CodeMismatchBadProposerCount  ErrorCode = 49
+	CodeWrongMaxHeight            ErrorCode = 50
 
 	StateMachineModule          ErrorModule = "state_machine"
 	CodeFeeBelowState           ErrorCode   = 2
@@ -395,8 +392,8 @@ func ErrInvalidEvidence() ErrorI {
 	return NewError(CodeInvalidEvidence, ConsensusModule, "evidence is invalid")
 }
 
-func ErrInvalidLeaderPublicKey() ErrorI {
-	return NewError(CodeInvalidLeaderPubKey, ConsensusModule, "invalid leader public key")
+func ErrInvalidProposerPubKey() ErrorI {
+	return NewError(CodeInvalidProposerPubKey, ConsensusModule, "invalid proposer public key")
 }
 
 func ErrMismatchDoubleSignerCount() ErrorI {

@@ -30,16 +30,14 @@ func (c *Consensus) HandleTransaction(tx []byte) lib.ErrorI {
 
 // CheckCandidateBlock checks the candidate block for errors and resets back to begin block state
 func (c *Consensus) CheckCandidateBlock(candidate *lib.Block, evidence *lib.ByzantineEvidence) (err lib.ErrorI) {
-	c.Lock()
-	defer func() { c.FSM.ResetToBeginBlock(); c.Unlock() }()
+	defer c.FSM.ResetToBeginBlock()
 	_, _, err = c.FSM.ApplyAndValidateBlock(candidate, evidence, true)
 	return
 }
 
 // ProduceCandidateBlock uses the mempool and state params to build a candidate block
 func (c *Consensus) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) (*lib.Block, lib.ErrorI) {
-	c.Lock()
-	defer func() { c.FSM.ResetToBeginBlock(); c.Unlock() }()
+	defer c.FSM.ResetToBeginBlock()
 	height := c.FSM.Height()
 	qc, err := c.FSM.GetBlockAndCertificate(height)
 	if err != nil {
@@ -59,7 +57,7 @@ func (c *Consensus) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) 
 		NumTxs:                uint64(numTxs),
 		TotalTxs:              lastBlock.TotalTxs + uint64(numTxs),
 		LastBlockHash:         lastBlock.Hash,
-		ProposerAddress:       c.PublicKey.Bytes(),
+		ProposerAddress:       c.PublicKey,
 		LastDoubleSigners:     doubleSigners,
 		BadProposers:          badProposers,
 		LastQuorumCertificate: qc,
@@ -80,8 +78,7 @@ func (c *Consensus) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) 
 // - atomically writes all to the underlying db
 // - sets up the app for the next height
 func (c *Consensus) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
-	c.Lock()
-	defer func() { c.FSM.ResetToBeginBlock(); c.Unlock() }()
+	defer c.FSM.ResetToBeginBlock()
 	block := qc.Block
 	blockResult, nextValidatorSet, err := c.FSM.ApplyAndValidateBlock(block, nil, false)
 	if err != nil {
@@ -108,7 +105,7 @@ func (c *Consensus) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	c.NotifyNextValidatorSet(nextValidatorSet)
+	c.NotifyP2P(nextValidatorSet)
 	beginBlockParams := lib.BeginBlockParams{BlockHeader: block.BlockHeader, ValidatorSet: nextValidatorSet}
 	c.FSM = fsm.NewWithBeginBlock(&beginBlockParams, c.FSM.ProtocolVersion, c.FSM.NetworkID, block.BlockHeader.Height+1, store)
 	c.Mempool.FSM, err = c.FSM.Copy()

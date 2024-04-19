@@ -1,9 +1,6 @@
 package main
 
 import (
-	"github.com/ginchuco/ginchu/consensus"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/spf13/cobra"
 	"log"
 )
@@ -40,10 +37,10 @@ func main() {
 }
 
 func Start() {
-	config, logger := lib.DefaultConfig(), lib.NewDefaultLogger()
-	pk, _ := crypto.NewPrivateKey()
-	cs, err := consensus.New(pk, config, logger)
-	if err != nil {
-		logger.Fatal(err.Error())
-	}
+	//config, logger := lib.DefaultConfig(), lib.NewDefaultLogger()
+	//pk, _ := crypto.NewPrivateKey()
+	//cs, err := consensus.New(pk, config, logger)
+	//if err != nil {
+	//	logger.Fatal(err.Error())
+	//}
 }

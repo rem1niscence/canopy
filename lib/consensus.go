@@ -17,21 +17,21 @@ func (x *QuorumCertificate) SignBytes() (signBytes []byte, err ErrorI) {
 	return
 }
 
-func (x *QuorumCertificate) Check(view *View, vs ValidatorSet) (isPartialQC bool, error ErrorI) {
+func (x *QuorumCertificate) Check(height uint64, vs ValidatorSet) (isPartialQC bool, error ErrorI) {
 	if x == nil {
 		return false, ErrEmptyQuorumCertificate()
 	}
-	if err := x.Header.Check(view); err != nil {
+	if err := x.Header.Check(height); err != nil {
 		return false, err
 	}
 	return x.Signature.Check(x, vs)
 }
 
-func (x *QuorumCertificate) CheckHighQC(view *View, vs ValidatorSet) ErrorI {
+func (x *QuorumCertificate) CheckHighQC(height uint64, vs ValidatorSet) ErrorI {
 	if x == nil {
 		return ErrEmptyQuorumCertificate()
 	}
-	if err := x.Header.Check(view); err != nil {
+	if err := x.Header.Check(height); err != nil {
 		return err
 	}
 	if x.Header.Phase != Phase_PRECOMMIT {
@@ -57,7 +57,7 @@ func (x *QuorumCertificate) Equals(qc *QuorumCertificate) bool {
 	if !x.Header.Equals(qc.Header) {
 		return false
 	}
-	if !bytes.Equal(x.LeaderPublicKey, qc.LeaderPublicKey) {
+	if !bytes.Equal(x.ProposerKey, qc.ProposerKey) {
 		return false
 	}
 	if !x.Block.Equals(qc.Block) {
@@ -90,10 +90,10 @@ func (x *DoubleSignEvidence) CheckBasic(latestHeight uint64) ErrorI {
 }
 
 func (x *DoubleSignEvidence) Check(vs ValidatorSet) ErrorI {
-	if _, err := x.VoteA.Check(x.VoteA.Header, vs); err != nil {
+	if _, err := x.VoteA.Check(x.VoteA.Header.Height, vs); err != nil {
 		return err
 	}
-	if _, err := x.VoteB.Check(x.VoteB.Header, vs); err != nil {
+	if _, err := x.VoteB.Check(x.VoteB.Header.Height, vs); err != nil {
 		return err
 	}
 	if x.VoteA.Header.Equals(x.VoteB.Header) && !x.VoteA.Equals(x.VoteB) {
@@ -141,14 +141,14 @@ func (x *DoubleSignEvidence) FlippedBytes() (bz []byte) {
 
 const MaxRound = 1000
 
-func (x *View) Check(view *View) ErrorI {
+func (x *View) Check(height uint64) ErrorI {
 	if x == nil {
 		return ErrEmptyView()
 	}
 	if x.Round >= MaxRound {
 		return ErrWrongRound()
 	}
-	if x.Height != view.Height {
+	if x.Height != height {
 		return ErrWrongHeight()
 	}
 	return nil

@@ -73,8 +73,8 @@ enum Phase {
 message QuorumCertificate {
   View header = 1; // replica vote view
   Block block = 2; // used after EV
-  bytes leader_public_key = 3; // only EV and PROPOSE
-  AggregateSignature signature = 5; // aggregate signature from the current leader message
+  bytes proposer_key = 3; // only EV and PROPOSE
+  AggregateSignature signature = 5; // aggregate signature from the current proposer message
 }
 
 message View {

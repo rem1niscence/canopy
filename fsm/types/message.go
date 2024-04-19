@@ -171,35 +171,3 @@ func checkPubKey(publicKey []byte) lib.ErrorI {
 	}
 	return nil
 }
-
-func checkVote(vote *Vote) (crypto.PublicKeyI, lib.ErrorI) {
-	if vote == nil {
-		return nil, ErrVoteEmpty()
-	}
-	if err := checkPubKey(vote.PublicKey); err != nil {
-		return nil, err
-	}
-	if vote.BlockHash == nil {
-		return nil, ErrHashEmpty()
-	}
-	if len(vote.BlockHash) != crypto.HashSize {
-		return nil, ErrHashSize()
-	}
-	pk := crypto.NewPublicKeyFromBytes(vote.PublicKey)
-	voteCpy := &Vote{
-		PublicKey: vote.PublicKey,
-		Height:    vote.Height,
-		Round:     vote.Round,
-		Type:      vote.Type,
-		BlockHash: vote.BlockHash,
-		Signature: nil,
-	}
-	msg, err := lib.Marshal(voteCpy)
-	if err != nil {
-		return nil, err
-	}
-	if !pk.VerifyBytes(msg, vote.Signature) {
-		return nil, ErrInvalidSignature()
-	}
-	return pk, nil
-}

@@ -108,34 +108,32 @@ func (x *BlockHeader) Equals(b *BlockHeader) bool {
 	return bytes.Equal(qc1Bz, qc2Bz)
 }
 
-func (b *BlockHeader) ValidateByzantineEvidence(vs, lastVS ValidatorSet, be *ByzantineEvidence) ErrorI {
+func (x *BlockHeader) ValidateByzantineEvidence(vs, lastVS ValidatorSet, be *ByzantineEvidence) ErrorI {
 	if be == nil {
 		return nil
 	}
-	if b.LastDoubleSigners != nil {
-		doubleSigners, err := be.DSE.GetDoubleSigners(b.Height, vs, lastVS)
-		if err != nil {
-			return err
-		}
-		if len(doubleSigners) != len(b.LastDoubleSigners) {
+	if x.LastDoubleSigners != nil {
+		doubleSigners := NewDSE(be.DSE).GetDoubleSigners(x.Height, vs, lastVS)
+		if len(doubleSigners) != len(x.LastDoubleSigners) {
 			return ErrMismatchDoubleSignerCount()
 		}
-		for i, ds := range b.LastDoubleSigners {
+		for i, ds := range x.LastDoubleSigners {
 			if !bytes.Equal(doubleSigners[i], ds) {
 				return ErrMismatchEvidenceAndHeader()
 			}
 		}
 	}
-	if b.BadProposers != nil {
-		badProposers, err := be.BPE.GetBadProposers(nil, b.Height, vs)
-		if err != nil {
-			return err
+	if x.BadProposers != nil {
+		bpe := NewBPE(be.BPE)
+		if !bpe.IsValid(nil, x.Height, vs) {
+			return ErrInvalidEvidence()
 		}
-		if len(badProposers) != len(b.BadProposers) {
+		badProposers := bpe.GetBadProposers()
+		if len(badProposers) != len(x.BadProposers) {
 			return ErrMismatchBadProducerCount()
 		}
-		for i, ds := range b.LastDoubleSigners {
-			if !bytes.Equal(badProposers[i], ds) {
+		for i, bp := range x.BadProposers {
+			if !bytes.Equal(badProposers[i], bp) {
 				return ErrMismatchEvidenceAndHeader()
 			}
 		}

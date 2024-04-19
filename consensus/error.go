@@ -11,16 +11,12 @@ func ErrUnknownConsensusMsg(t proto.Message) lib.ErrorI {
 	return lib.NewError(lib.CodeUnknownConsensusMessage, lib.ConsensusModule, fmt.Sprintf("unknown consensus message: %T", t))
 }
 
-func ErrEmptyTxMessage() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyTxMessage, lib.ConsensusModule, "empty tx message")
-}
-
 func ErrDuplicateVote() lib.ErrorI {
 	return lib.NewError(lib.CodeDuplicateVote, lib.ConsensusModule, "duplicate vote")
 }
 
-func ErrDuplicateLeaderMessage() lib.ErrorI {
-	return lib.NewError(lib.CodeDuplicateLeaderMessage, lib.ConsensusModule, "duplicate leader message")
+func ErrDuplicateProposerMessage() lib.ErrorI {
+	return lib.NewError(lib.CodeDuplicateProposerMessage, lib.ConsensusModule, "duplicate proposer message")
 }
 
 func ErrUnableToAddSigner(err error) lib.ErrorI {
@@ -43,32 +39,8 @@ func ErrInvalidPartialSignature() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidPartialSignature, lib.ConsensusModule, "invalid partial signature")
 }
 
-func ErrEmptyBlock() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyBlock, lib.ConsensusModule, "block empty")
-}
-
-func ErrEmptyPayload() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyPayload, lib.ConsensusModule, "empty vote")
-}
-
-func ErrEmptyLeaderMessage() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyLeaderMessage, lib.ConsensusModule, "empty leader message")
-}
-
-func ErrEmptyQCPayload() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyQuorumCertificatePayload, lib.ConsensusModule, "empty quorum certificate vote")
-}
-
-func ErrInvalidPayload() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidPayload, lib.ConsensusModule, "invalid vote")
-}
-
-func ErrEmptyVRF() lib.ErrorI {
-	return lib.NewError(lib.CodeVRFEmpty, lib.ConsensusModule, "empty vrf")
-}
-
-func ErrNotVRFCandidate() lib.ErrorI {
-	return lib.NewError(lib.CodeNotVRFCandidate, lib.ConsensusModule, "vrf not a candidate")
+func ErrEmptyProposerMessage() lib.ErrorI {
+	return lib.NewError(lib.CodeEmptyProposerMessage, lib.ConsensusModule, "empty proposer message")
 }
 
 func ErrMismatchPublicKeys() lib.ErrorI {

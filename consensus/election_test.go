@@ -12,7 +12,7 @@ import (
 
 func TestSortition(t *testing.T) {
 	privateKey, _ := crypto.NewBLSPrivateKey()
-	lastNLeaders := [][]byte{[]byte("a"), []byte("b"), []byte("c")}
+	lastNProposers := [][]byte{[]byte("a"), []byte("b"), []byte("c")}
 	power, totalPower := 1, 2
 	powerString, totalPowerString := fmt.Sprintf("%d", power), fmt.Sprintf("%d", totalPower)
 	expectedAvg := float64(power) / float64(totalPower)
@@ -21,8 +21,8 @@ func TestSortition(t *testing.T) {
 	avg := uint64(0)
 	for i := 0; i < totalIterations; i++ {
 		avg += vrfAndCDF(SortitionParams{
-			SortitionData: SortitionData{
-				LastProducersPublicKeys: lastNLeaders,
+			SortitionData: &SortitionData{
+				LastProducersPublicKeys: lastNProposers,
 				Height:                  uint64(rand.Intn(math.MaxUint32)),
 				VotingPower:             powerString,
 				TotalPower:              totalPowerString,

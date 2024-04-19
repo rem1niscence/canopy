@@ -35,12 +35,12 @@ func init() {
 }
 
 type SortitionParams struct {
-	SortitionData
+	*SortitionData
 	PrivateKey crypto.PrivateKeyI
 }
 
 type SortitionVerifyParams struct {
-	SortitionData
+	*SortitionData
 	Signature []byte
 	PublicKey crypto.PublicKeyI
 }
@@ -55,7 +55,7 @@ type SortitionData struct {
 }
 
 type RoundRobinParams struct {
-	SortitionData
+	*SortitionData
 	ValidatorSet *lib.ConsensusValidators
 }
 
@@ -87,26 +87,26 @@ type VRFCandidate struct {
 	Out       []byte
 }
 
-func SelectLeaderFromCandidates(candidates []VRFCandidate, data SortitionData, v *lib.ConsensusValidators) (leaderPublicKey crypto.PublicKeyI) {
+func SelectProposerFromCandidates(candidates []VRFCandidate, data *SortitionData, v *lib.ConsensusValidators) (proposerPubKey []byte) {
 	if candidates == nil {
 		return WeightedRoundRobin(&RoundRobinParams{
 			SortitionData: data,
 			ValidatorSet:  v,
-		})
+		}).Bytes()
 	}
 	largest := new(big.Int)
 	for _, c := range candidates {
 		candidate := new(big.Int).SetBytes(c.Out)
 		if lib.BigGreater(candidate, largest) {
-			leaderPublicKey = c.PublicKey
+			proposerPubKey = c.PublicKey.Bytes()
 			largest = candidate
 		}
 	}
 	return
 }
 
-func VRF(lastNLeaders [][]byte, height, round uint64, privateKey crypto.PrivateKeyI) *lib.Signature {
-	vrfIn := formatInput(lastNLeaders, height, round)
+func VRF(lastNProposers [][]byte, height, round uint64, privateKey crypto.PrivateKeyI) *lib.Signature {
+	vrfIn := formatInput(lastNProposers, height, round)
 	return &lib.Signature{
 		PublicKey: privateKey.PublicKey().Bytes(),
 		Signature: privateKey.Sign(vrfIn),
@@ -162,9 +162,9 @@ func toFloatBetween0And1(vrfOut []byte) float64 {
 	return prob
 }
 
-func formatInput(lastNLeaderPublicKeys [][]byte, height, round uint64) []byte {
+func formatInput(lastNProposerPublicKeys [][]byte, height, round uint64) []byte {
 	var input string
-	for _, key := range lastNLeaderPublicKeys {
+	for _, key := range lastNProposerPublicKeys {
 		input += lib.BytesToString(key) + delimiter
 	}
 	return []byte(input + fmt.Sprintf("%d/%d", height, round))

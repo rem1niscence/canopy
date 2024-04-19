@@ -33,8 +33,6 @@ const (
 	defaultMaxValidators = 1000
 )
 
-var _ lib.P2P = new(P2P)
-
 type P2P struct {
 	privateKey crypto.PrivateKeyI
 	listener   net.Listener
@@ -51,7 +49,7 @@ type P2P struct {
 }
 
 func New(p crypto.PrivateKeyI, maxValidators uint64, c lib.Config, l lib.LoggerI) *P2P {
-	var channels lib.Channels
+	channels := make(lib.Channels)
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
 		channels[i] = make(chan *lib.MessageWrapper, maxChannelCalls)
 	}

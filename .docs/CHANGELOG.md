@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [Unreleased] - 04/19/2024
+
+- Massive project restructuring and overhaul
+- Cleanup in `consensus/vote.go` module
+- Update thread safety in `consensus`
+
 ## [Unreleased] - 04/12/2024
 
 - Added `encrypted` p2p connection

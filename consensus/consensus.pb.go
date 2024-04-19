@@ -27,9 +27,9 @@ type Message struct {
 	unknownFields protoimpl.UnknownFields
 
 	Header                 *lib.View                  `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
-	Vrf                    *lib.Signature             `protobuf:"bytes,2,opt,name=vrf,proto3" json:"vrf,omitempty"`                                                                         // only ELECTION phase from leader
-	Qc                     *lib.QuorumCertificate     `protobuf:"bytes,3,opt,name=qc,proto3" json:"qc,omitempty"`                                                                           // Leaders use this to aggregate replica messages, Replicas sign parts of this to vote
-	HighQc                 *lib.QuorumCertificate     `protobuf:"bytes,4,opt,name=high_qc,json=highQc,proto3" json:"high_qc,omitempty"`                                                     // only if a previous lock was seen: ELECTION-VOTE phase by replica and PROPOSE phase by leader
+	Vrf                    *lib.Signature             `protobuf:"bytes,2,opt,name=vrf,proto3" json:"vrf,omitempty"`                                                                         // only ELECTION phase from proposer
+	Qc                     *lib.QuorumCertificate     `protobuf:"bytes,3,opt,name=qc,proto3" json:"qc,omitempty"`                                                                           // Proposers use this to aggregate replica messages, Replicas sign parts of this to vote
+	HighQc                 *lib.QuorumCertificate     `protobuf:"bytes,4,opt,name=high_qc,json=highQc,proto3" json:"high_qc,omitempty"`                                                     // only if a previous lock was seen: ELECTION-VOTE phase by replica and PROPOSE phase by proposer
 	LastDoubleSignEvidence []*lib.DoubleSignEvidence  `protobuf:"bytes,5,rep,name=last_double_sign_evidence,json=lastDoubleSignEvidence,proto3" json:"last_double_sign_evidence,omitempty"` // evidence from height - 1 (required cause last round ds would not be caught otherwise)
 	BadProposerEvidence    []*lib.BadProposerEvidence `protobuf:"bytes,6,rep,name=bad_proposer_evidence,json=badProposerEvidence,proto3" json:"bad_proposer_evidence,omitempty"`            // evidence from current height (last round is always good, so we can do same height)
 	Signature              *lib.Signature             `protobuf:"bytes,7,opt,name=signature,proto3" json:"signature,omitempty"`

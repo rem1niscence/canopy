@@ -47,10 +47,10 @@ type MultiConn struct {
 	receivedPong  chan struct{}
 	onError       func([]byte)
 	error         sync.Once
-	p2p           lib.P2P
+	p2p           *P2P
 }
 
-func NewConnection(conn net.Conn, streams map[lib.Topic]*Stream, p2p lib.P2P, onError func([]byte), privateKey crypto.PrivateKeyI) (*MultiConn, lib.ErrorI) {
+func NewConnection(conn net.Conn, streams map[lib.Topic]*Stream, p2p *P2P, onError func([]byte), privateKey crypto.PrivateKeyI) (*MultiConn, lib.ErrorI) {
 	eConn, err := NewHandshake(conn, privateKey)
 	for _, s := range streams {
 		s.conn = eConn
@@ -182,11 +182,14 @@ func (c *MultiConn) Error(reputationDelta ...int32) {
 }
 
 var (
-	maxPacket, _  = lib.Marshal(&Packet{StreamId: lib.Topic_BLOCK, Eof: false, Bytes: make([]byte, maxPayloadSize)})
-	maxPacketSize = len(maxPacket)
+	maxPacketSize int
 )
 
 func (c *MultiConn) receive(reader bufio.Reader, m *limiter.Monitor) (proto.Message, lib.ErrorI) {
+	if maxPacketSize == 0 {
+		maxPacket, _ := lib.Marshal(&Packet{StreamId: lib.Topic_BLOCK, Eof: false, Bytes: make([]byte, maxPayloadSize)})
+		maxPacketSize = len(maxPacket)
+	}
 	msg := new(Envelope)
 	buffer := make([]byte, maxPacketSize)
 	m.Limit(maxPacketSize, int64(recRatePerS), true)

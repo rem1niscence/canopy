@@ -122,7 +122,7 @@ func (s *StateMachine) ValidateBlock(header *lib.BlockHeader, compare *lib.Block
 	if err != nil {
 		return err
 	}
-	isPartialQC, err := header.LastQuorumCertificate.Check(&lib.View{Height: header.Height - 1}, vs)
+	isPartialQC, err := header.LastQuorumCertificate.Check(header.Height-1, vs)
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,6 @@ func (s *StateMachine) LastBlockHeader() *lib.BlockHeader { return s.BeginBlockP
 func (s *StateMachine) Store() lib.RWStoreI               { return s.store }
 func (s *StateMachine) SetStore(store lib.RWStoreI)       { s.store = store }
 func (s *StateMachine) Height() uint64                    { return s.height }
-func (s *StateMachine) SetHeight(height uint64)           { s.height = height }
 func (s *StateMachine) Reset()                            { s.store.(lib.StoreI).Reset() }
 func (s *StateMachine) validateBlockTime(header *lib.BlockHeader) lib.ErrorI {
 	now := time.Now()
