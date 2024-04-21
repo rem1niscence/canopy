@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [Unreleased] - 04/21/2024
+
+- Cleanup `consensus` module
+- Fixed `syncing` multithreading issues
+- Changed `Governance` to be Validator vote
+
 ## [Unreleased] - 04/19/2024
 
 - Massive project restructuring and overhaul
