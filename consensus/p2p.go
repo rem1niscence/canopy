@@ -20,166 +20,155 @@ import (
 */
 
 const (
-	SyncTimeoutS              = 5
-	MaxBlockRequestsPerWindow = 5
-	BlockRequestWindowS       = 10
+	SyncTimeoutS         = 5
+	MaxBlockReqPerWindow = 5
+	BlockReqWindowS      = 10
 
-	PeerGoodBlock                  = 3
-	PeerGoodTx                     = 3
-	PeerTimeoutSlash               = -1
-	PeerUnexpectedBlockSlash       = -1
-	PeerInvalidBlockHeightSlash    = -1
-	PeerInvalidTxSlash             = -1
-	PeerNotValidator               = -3
-	PeerInvalidMessageSlash        = -3
-	PeerInvalidBlockSlash          = -3
-	PeerInvalidJustifySlash        = -3
-	PeerBlockRequestsExceededSlash = -3
+	GoodBlockRep        = 3
+	GoodTxRep           = 3
+	TimeoutRep          = -1
+	UnexpectedBlockRep  = -1
+	InvalidTxRep        = -1
+	NotValRep           = -3
+	InvalidMsgRep       = -3
+	InvalidBlockRep     = -3
+	InvalidJustifyRep   = -3
+	BlockReqExceededRep = -3
 )
 
 func (c *Consensus) Sync() {
-	var qc *QC
-	syncDone, maxHeight := c.StartIgnoreListeners(), c.PollPeersMaxHeight(1)
+	var reqRecipient []byte
+	c.syncing.Store(true)
+	maxHeight, maxHeights := c.pollMaxHeight(1)
 	for {
-		height, bb := c.FSM.Height(), c.FSM.BeginBlockParams
-		vs, err := lib.NewValidatorSet(bb.ValidatorSet)
-		if err != nil {
-			c.log.Fatalf("NewValidatorSet() failed with err: %s", err)
-		}
-		if height >= maxHeight {
-			syncDone <- struct{}{}
-			go c.StartListeners()
+		if c.syncingDone(maxHeight) {
 			return
 		}
-		peer, err := c.P2P.SendToPeer(lib.Topic_BLOCK_REQUEST, &lib.BlockRequestMessage{Height: height + 1})
-		if err != nil {
+		for p, m := range maxHeights {
+			if m > c.Height+1 {
+				reqRecipient, _ = lib.StringToBytes(p)
+			}
+		}
+		if err := c.P2P.SendTo(reqRecipient, BlockRequest, &lib.BlockRequestMessage{Height: c.Height + 1}); err != nil {
+			maxHeight, maxHeights = c.pollMaxHeight(1)
 			continue
 		}
 		select {
-		case msg := <-c.P2P.ReceiveChannel(lib.Topic_BLOCK):
-			senderID := msg.Sender.Address.PublicKey
-			if !bytes.Equal(senderID, peer.Address.PublicKey) {
-				c.P2P.ChangeReputation(senderID, PeerUnexpectedBlockSlash)
+		case msg := <-c.P2P.ReceiveChannel(Block):
+			responder := msg.Sender.Address.PublicKey
+			if !bytes.Equal(responder, reqRecipient) {
+				c.P2P.ChangeReputation(responder, UnexpectedBlockRep)
 				continue
 			}
-			maxHeight, qc, err = c.ValidatePeerBlock(height, msg, vs)
+			m, qc, _, err := c.validatePeerBlock(c.Height, msg, c.ValidatorSet)
 			if err != nil {
 				continue
+			}
+			if m > maxHeight {
+				maxHeight = m
 			}
 			if err = c.CommitBlock(qc); err != nil {
-				c.log.Fatalf("unable to commit synced block at height %d: %s", height+1, err.Error())
+				c.log.Fatalf("unable to commit synced block at height %d: %s", c.Height+1, err.Error())
 			}
-			c.P2P.ChangeReputation(senderID, PeerGoodBlock)
+			c.P2P.ChangeReputation(responder, GoodBlockRep)
 		case <-time.After(SyncTimeoutS * time.Second):
-			c.P2P.ChangeReputation(peer.Address.PublicKey, PeerTimeoutSlash)
+			c.P2P.ChangeReputation(reqRecipient, TimeoutRep)
+			maxHeight, maxHeights = c.pollMaxHeight(1)
 			continue
 		}
 	}
 }
 
-func (c *Consensus) PollPeersMaxHeight(backoff int) (maxHeight uint64) {
-	if err := c.P2P.SendToAll(lib.Topic_BLOCK_REQUEST, &lib.BlockRequestMessage{HeightOnly: true}); err != nil {
-		panic(err)
-	}
-	for {
-		select {
-		case m := <-c.P2P.ReceiveChannel(lib.Topic_BLOCK):
-			response, ok := m.Message.(*lib.BlockResponseMessage)
-			if !ok {
-				c.P2P.ChangeReputation(m.Sender.Address.PublicKey, PeerInvalidMessageSlash)
-				continue
-			}
-			if response.MaxHeight > maxHeight {
-				maxHeight = response.MaxHeight
-			}
-		case <-time.After(SyncTimeoutS * time.Second * time.Duration(backoff)):
-			if maxHeight == 0 { // genesis file is 0 and first height is 1
-				return c.PollPeersMaxHeight(backoff + 1)
-			}
-			return
-		}
-	}
-}
-
-func (c *Consensus) GossipBlock(blockAndCertificate *QC) {
-	if err := c.P2P.SendToAll(lib.Topic_BLOCK, &lib.BlockResponseMessage{
-		MaxHeight:           blockAndCertificate.Header.Height,
-		BlockAndCertificate: blockAndCertificate,
-	}); err != nil {
-		c.log.Error(fmt.Sprintf("unable to gossip block with err: %s", err.Error()))
-	}
-}
-
-func (c *Consensus) ListenForNewBlock() {
+func (c *Consensus) ListenForBlock() {
 	app := c
 	cache := lib.NewMessageCache()
-	for msg := range c.P2P.ReceiveChannel(lib.Topic_BLOCK) {
-		func() {
-			c.Lock()
-			defer c.Unlock()
+	for {
+		select {
+		case msg := <-c.P2P.ReceiveChannel(Block):
+			startTime := time.Now()
 			if ok := cache.Add(msg); !ok {
-				return
+				break
 			}
-			_, qc, err := c.ValidatePeerBlock(c.Height, msg, c.ValidatorSet)
+			c.Lock()
+			_, qc, outOfSync, err := c.validatePeerBlock(c.Height, msg, c.ValidatorSet)
+			if outOfSync {
+				c.Unlock()
+				go c.Sync()
+				break
+			}
 			if err != nil {
-				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, PeerInvalidBlockSlash)
-				return
+				c.Unlock()
+				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, InvalidBlockRep)
+				break
 			}
 			if err = app.CommitBlock(qc); err != nil {
 				c.log.Fatalf("unable to commit block at height %d: %s", qc.Header.Height, err.Error())
 			}
-			if err = c.P2P.SendToAll(lib.Topic_BLOCK, msg.Message); err != nil {
-				c.log.Error(fmt.Sprintf("unable to gossip block with err: %s", err.Error()))
-			}
-		}()
+			c.newBlock <- time.Since(startTime)
+			c.notifyP2P(c.ValidatorSet.ValidatorSet)
+			c.gossipBlock(qc)
+		}
 	}
 }
 
-func (c *Consensus) GossipNewTx(tx []byte) {
-	if err := c.HandleTransaction(tx); err != nil {
-		return
-	}
-	if err := c.P2P.SendToAll(lib.Topic_TX, &lib.TxMessage{Tx: tx}); err != nil {
-		c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
+func (c *Consensus) ListenForConsensus() {
+	for msg := range c.P2P.ReceiveChannel(Cons) {
+		if c.syncing.Load() {
+			continue
+		}
+		if !msg.Sender.IsValidator {
+			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, NotValRep)
+			continue
+		}
+		if err := c.HandleMessage(msg.Message); err != nil {
+			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, InvalidMsgRep)
+			continue
+		}
 	}
 }
 
-func (c *Consensus) ListenForNewTx() {
+func (c *Consensus) ListenForTx() {
 	cache := lib.NewMessageCache()
-	for msg := range c.P2P.ReceiveChannel(lib.Topic_TX) {
+	for msg := range c.P2P.ReceiveChannel(Tx) {
+		if !c.syncing.Load() {
+			continue
+		}
 		if ok := cache.Add(msg); !ok {
 			continue
 		}
 		senderID := msg.Sender.Address.PublicKey
 		txMsg, ok := msg.Message.(*lib.TxMessage)
 		if !ok {
-			c.P2P.ChangeReputation(senderID, PeerInvalidMessageSlash)
+			c.P2P.ChangeReputation(senderID, InvalidMsgRep)
 			continue
 		}
 		if txMsg == nil {
-			c.P2P.ChangeReputation(senderID, PeerInvalidMessageSlash)
+			c.P2P.ChangeReputation(senderID, InvalidMsgRep)
 			continue
 		}
 		if err := c.HandleTransaction(txMsg.Tx); err != nil {
-			c.P2P.ChangeReputation(senderID, PeerInvalidTxSlash)
+			c.P2P.ChangeReputation(senderID, InvalidTxRep)
 			continue
 		}
-		c.P2P.ChangeReputation(senderID, PeerGoodTx)
-		if err := c.P2P.SendToAll(lib.Topic_TX, msg.Message); err != nil {
+		c.P2P.ChangeReputation(senderID, GoodTxRep)
+		if err := c.P2P.SendToAll(Tx, msg.Message); err != nil {
 			c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
 		}
 	}
 }
 
-func (c *Consensus) ListenForNewBlockRequests() {
-	l := lib.NewLimiter(MaxBlockRequestsPerWindow, c.P2P.MaxPossiblePeers()*MaxBlockRequestsPerWindow, BlockRequestWindowS)
+func (c *Consensus) ListenForBlockReq() {
+	l := lib.NewLimiter(MaxBlockReqPerWindow, c.P2P.MaxPossiblePeers()*MaxBlockReqPerWindow, BlockReqWindowS)
 	for {
 		select {
-		case msg := <-c.P2P.ReceiveChannel(lib.Topic_BLOCK_REQUEST):
+		case msg := <-c.P2P.ReceiveChannel(BlockRequest):
+			if c.syncing.Load() {
+				continue
+			}
 			senderID := msg.Sender.Address.PublicKey
 			blocked, allBlocked := l.NewRequest(lib.BytesToString(senderID))
 			if blocked {
-				c.P2P.ChangeReputation(senderID, PeerBlockRequestsExceededSlash)
+				c.P2P.ChangeReputation(senderID, BlockReqExceededRep)
 				continue
 			}
 			if allBlocked {
@@ -187,7 +176,7 @@ func (c *Consensus) ListenForNewBlockRequests() {
 			}
 			request, ok := msg.Message.(*lib.BlockRequestMessage)
 			if !ok {
-				c.P2P.ChangeReputation(senderID, PeerInvalidMessageSlash)
+				c.P2P.ChangeReputation(senderID, InvalidMsgRep)
 				continue
 			}
 			blocAndCertificate, err := c.FSM.GetBlockAndCertificate(request.Height)
@@ -198,7 +187,7 @@ func (c *Consensus) ListenForNewBlockRequests() {
 			c.Lock()
 			height := c.FSM.Height()
 			c.Unlock()
-			if err = c.P2P.SendTo(senderID, lib.Topic_BLOCK, &lib.BlockResponseMessage{
+			if err = c.P2P.SendTo(senderID, Block, &lib.BlockResponseMessage{
 				MaxHeight:           height,
 				BlockAndCertificate: blocAndCertificate,
 			}); err != nil {
@@ -211,83 +200,137 @@ func (c *Consensus) ListenForNewBlockRequests() {
 	}
 }
 
-func (c *Consensus) ListenForValidatorMessages() {
-	for msg := range c.P2P.ReceiveChannel(lib.Topic_CONSENSUS) {
-		if !msg.Sender.IsValidator {
-			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, PeerNotValidator)
-			continue
-		}
-		if err := c.HandleMessage(msg.Message); err != nil {
-			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, PeerInvalidMessageSlash)
-			continue
-		}
+func (c *Consensus) StartListeners() {
+	go c.ListenForBlockReq()
+	go c.ListenForConsensus()
+	go c.ListenForTx()
+}
+
+func (c *Consensus) NewTx(tx []byte) {
+	if err := c.HandleTransaction(tx); err != nil {
+		return
+	}
+	if err := c.P2P.SendToAll(Tx, &lib.TxMessage{Tx: tx}); err != nil {
+		c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
 	}
 }
 
-func (c *Consensus) ValidatePeerBlock(height uint64, m *lib.MessageWrapper, v lib.ValidatorSet) (uint64, *QC, lib.ErrorI) {
+func (c *Consensus) validatePeerBlock(height uint64, m *lib.MessageWrapper, v lib.ValidatorSet) (max uint64, qc *QC, outOfSync bool, err lib.ErrorI) {
 	senderID := m.Sender.Address.PublicKey
 	response, ok := m.Message.(*lib.BlockResponseMessage)
 	if !ok {
-		c.P2P.ChangeReputation(senderID, PeerInvalidMessageSlash)
-		return 0, nil, ErrUnknownConsensusMsg(m.Message)
+		c.P2P.ChangeReputation(senderID, InvalidMsgRep)
+		err = ErrUnknownConsensusMsg(m.Message)
+		return
 	}
-	qc := response.BlockAndCertificate
-	isPartialQC, err := qc.Check(height, v)
-	if err != nil {
-		c.P2P.ChangeReputation(senderID, PeerInvalidJustifySlash)
-		return 0, nil, err
+	qc = response.BlockAndCertificate
+	if err = c.checkPeerQC(height, v, senderID, response.BlockAndCertificate); err != nil {
+		return
 	}
-	if isPartialQC {
-		c.P2P.ChangeReputation(senderID, PeerInvalidJustifySlash)
-		return 0, nil, lib.ErrNoMaj23()
+	if outOfSync, err = c.checkPeerBlock(height, qc.Block, senderID); outOfSync || err != nil {
+		return
 	}
-	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
-		c.P2P.ChangeReputation(senderID, PeerInvalidJustifySlash)
-		return 0, nil, lib.ErrWrongPhase()
+	if qc.Block.BlockHeader.Height > response.MaxHeight {
+		c.P2P.ChangeReputation(senderID, InvalidBlockRep)
+		err = lib.ErrWrongMaxHeight()
+		return
 	}
-	block := qc.Block
-	if err = block.Check(); err != nil {
-		c.P2P.ChangeReputation(senderID, PeerInvalidBlockSlash)
-		return 0, nil, err
+	hash, _ := qc.Block.BlockHeader.SetHash()
+	if !bytes.Equal(qc.BlockHash, hash) {
+		c.P2P.ChangeReputation(senderID, InvalidJustifyRep)
+		err = ErrMismatchBlockHash()
+		return
 	}
-	if block.BlockHeader.Height != height+1 {
-		c.P2P.ChangeReputation(senderID, PeerInvalidBlockHeightSlash)
-		return 0, nil, lib.ErrWrongHeight()
-	}
-	if block.BlockHeader.Height > response.MaxHeight {
-		c.P2P.ChangeReputation(senderID, PeerInvalidBlockHeightSlash)
-		return 0, nil, lib.ErrWrongMaxHeight()
-	}
-	return response.MaxHeight, qc, nil
+	max = response.MaxHeight
+	return
 }
 
-func (c *Consensus) NotifyP2P(nextValidatorSet *lib.ConsensusValidators) {
-	var p []*lib.PeerAddress
+func (c *Consensus) checkPeerQC(height uint64, v lib.ValidatorSet, senderID []byte, qc *lib.QuorumCertificate) lib.ErrorI {
+	isPartialQC, err := qc.Check(height, v)
+	if err != nil {
+		c.P2P.ChangeReputation(senderID, InvalidJustifyRep)
+		return err
+	}
+	if isPartialQC {
+		c.P2P.ChangeReputation(senderID, InvalidJustifyRep)
+		return lib.ErrNoMaj23()
+	}
+	if qc.Header.Phase != PrecommitVote {
+		c.P2P.ChangeReputation(senderID, InvalidJustifyRep)
+		return lib.ErrWrongPhase()
+	}
+	return nil
+}
+
+func (c *Consensus) checkPeerBlock(height uint64, block *lib.Block, senderID []byte) (outOfSync bool, err lib.ErrorI) {
+	if err = block.Check(); err != nil {
+		c.P2P.ChangeReputation(senderID, InvalidBlockRep)
+		return false, err
+	}
+	if height > block.BlockHeader.Height {
+		c.P2P.ChangeReputation(senderID, InvalidBlockRep)
+		return false, lib.ErrWrongHeight()
+	}
+	outOfSync = height != block.BlockHeader.Height
+	return
+}
+
+func (c *Consensus) gossipBlock(blockAndCertificate *QC) {
+	if err := c.P2P.SendToAll(Block, &lib.BlockResponseMessage{
+		MaxHeight:           c.Height,
+		BlockAndCertificate: blockAndCertificate,
+	}); err != nil {
+		c.log.Error(fmt.Sprintf("unable to gossip block with err: %s", err.Error()))
+	}
+}
+
+func (c *Consensus) notifyP2P(nextValidatorSet *lib.ConsensusValidators) {
+	p := []*lib.PeerAddress(nil)
 	for _, v := range nextValidatorSet.ValidatorSet {
 		p = append(p, &lib.PeerAddress{PublicKey: v.PublicKey, NetAddress: v.NetAddress})
 	}
 	c.P2P.ValidatorsReceiver() <- p
 }
 
-func (c *Consensus) StartIgnoreListeners() (stop chan struct{}) {
-	stop = make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-c.P2P.ReceiveChannel(lib.Topic_TX):
-			case <-c.P2P.ReceiveChannel(lib.Topic_BLOCK_REQUEST):
-			case <-c.P2P.ReceiveChannel(lib.Topic_CONSENSUS):
-			case <-stop:
-				return
+func (c *Consensus) pollMaxHeight(backoff int) (maxHeight uint64, maxHeights map[string]uint64) {
+	maxHeights = make(map[string]uint64)
+	if err := c.P2P.SendToAll(BlockRequest, &lib.BlockRequestMessage{HeightOnly: true}); err != nil {
+		panic(err)
+	}
+	for {
+		select {
+		case m := <-c.P2P.ReceiveChannel(Block):
+			response, ok := m.Message.(*lib.BlockResponseMessage)
+			if !ok {
+				c.P2P.ChangeReputation(m.Sender.Address.PublicKey, InvalidMsgRep)
+				continue
 			}
+			if response.MaxHeight > maxHeight {
+				maxHeight = response.MaxHeight
+			}
+			maxHeights[lib.BytesToString(m.Sender.Address.PublicKey)] = response.MaxHeight
+		case <-time.After(SyncTimeoutS * time.Second * time.Duration(backoff)):
+			if maxHeight == 0 { // genesis file is 0 and first height is 1
+				return c.pollMaxHeight(backoff + 1)
+			}
+			return
 		}
-	}()
-	return
+	}
 }
 
-func (c *Consensus) StartListeners() {
-	go c.ListenForNewBlock()
-	go c.ListenForNewBlockRequests()
-	go c.ListenForValidatorMessages()
-	go c.ListenForNewTx()
+func (c *Consensus) syncingDone(maxHeight uint64) bool {
+	if c.Height >= maxHeight {
+		c.syncDone <- struct{}{}
+		c.syncing.Store(false)
+		go c.ListenForBlock()
+		return true
+	}
+	return false
 }
+
+const (
+	BlockRequest = lib.Topic_BLOCK_REQUEST
+	Block        = lib.Topic_BLOCK
+	Tx           = lib.Topic_TX
+	Cons         = lib.Topic_CONSENSUS
+)

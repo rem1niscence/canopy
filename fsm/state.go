@@ -9,12 +9,12 @@ import (
 )
 
 type StateMachine struct {
-	BeginBlockParams *lib.BeginBlockParams
-	ProtocolVersion  int
-	MaxBlockBytes    uint64 // TODO parameterize
-	NetworkID        uint32
-	height           uint64
-	store            lib.RWStoreI
+	BeginBlockParams  *lib.BeginBlockParams
+	ProtocolVersion   int
+	NetworkID         uint32
+	height            uint64
+	proposeVoteConfig types.ProposalVoteConfig
+	store             lib.RWStoreI
 }
 
 func New(protocolVersion int, networkID uint32, store lib.StoreI) (*StateMachine, lib.ErrorI) {
@@ -38,10 +38,11 @@ func New(protocolVersion int, networkID uint32, store lib.StoreI) (*StateMachine
 			BlockHeader:  lastBlock.BlockHeader,
 			ValidatorSet: validatorSet,
 		},
-		ProtocolVersion: protocolVersion,
-		NetworkID:       networkID,
-		height:          latestHeight,
-		store:           store,
+		ProtocolVersion:   protocolVersion,
+		NetworkID:         networkID,
+		height:            latestHeight,
+		proposeVoteConfig: types.AcceptAllProposals,
+		store:             store,
 	}, nil
 }
 
@@ -221,7 +222,7 @@ func (s *StateMachine) GetMaxValidators() (uint64, lib.ErrorI) {
 	if err != nil {
 		return 0, err
 	}
-	return valParams.ValidatorMaxCount.Value, nil
+	return valParams.ValidatorMaxCount, nil
 }
 
 func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
@@ -229,7 +230,7 @@ func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
 	if err != nil {
 		return 0, err
 	}
-	return consParams.BlockSize.Value, nil
+	return consParams.BlockSize, nil
 }
 
 func (s *StateMachine) GetBlockAndCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
@@ -238,6 +239,15 @@ func (s *StateMachine) GetBlockAndCertificate(height uint64) (*lib.QuorumCertifi
 		return nil, types.ErrWrongStoreType()
 	}
 	return store.GetQCByHeight(height)
+}
+
+func (s *StateMachine) GetCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
+	qc, err := s.GetBlockAndCertificate(height)
+	if err != nil {
+		return nil, err
+	}
+	qc.Block = nil
+	return qc, nil
 }
 
 func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
@@ -250,24 +260,24 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 		return nil, err
 	}
 	return &StateMachine{
-		BeginBlockParams: s.BeginBlockParams,
-		ProtocolVersion:  s.ProtocolVersion,
-		NetworkID:        s.NetworkID,
-		height:           s.height,
-		store:            storeCopy,
+		BeginBlockParams:  s.BeginBlockParams,
+		ProtocolVersion:   s.ProtocolVersion,
+		NetworkID:         s.NetworkID,
+		height:            s.height,
+		proposeVoteConfig: s.proposeVoteConfig,
+		store:             storeCopy,
 	}, nil
 }
 
-func (s *StateMachine) LastBlockHeader() *lib.BlockHeader { return s.BeginBlockParams.BlockHeader }
-func (s *StateMachine) Store() lib.RWStoreI               { return s.store }
-func (s *StateMachine) SetStore(store lib.RWStoreI)       { s.store = store }
-func (s *StateMachine) Height() uint64                    { return s.height }
-func (s *StateMachine) Reset()                            { s.store.(lib.StoreI).Reset() }
+func (s *StateMachine) LastBlockHeader() *lib.BlockHeader                { return s.BeginBlockParams.BlockHeader }
+func (s *StateMachine) Store() lib.RWStoreI                              { return s.store }
+func (s *StateMachine) SetStore(store lib.RWStoreI)                      { s.store = store }
+func (s *StateMachine) Height() uint64                                   { return s.height }
+func (s *StateMachine) Reset()                                           { s.store.(lib.StoreI).Reset() }
+func (s *StateMachine) SetProposalVoteConfig(c types.ProposalVoteConfig) { s.proposeVoteConfig = c }
 func (s *StateMachine) validateBlockTime(header *lib.BlockHeader) lib.ErrorI {
 	now := time.Now()
-	t := header.Time.AsTime()
-	minTime := now.Add(30 * time.Minute)
-	maxTime := now.Add(30 * time.Minute)
+	maxTime, minTime, t := now.Add(time.Hour), now.Add(-time.Hour), header.Time.AsTime()
 	if minTime.Compare(t) > 0 || maxTime.Compare(t) < 0 {
 		return lib.ErrInvalidBlockTime()
 	}

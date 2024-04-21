@@ -3,11 +3,11 @@ package fsm
 import (
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/proto"
-	"strings"
 )
 
-func (s *StateMachine) UpdateParam(address string, space, paramName string, value proto.Message) (err lib.ErrorI) {
+func (s *StateMachine) UpdateParam(space, paramName string, value proto.Message) (err lib.ErrorI) {
 	var sp types.ParamSpace
 	switch space {
 	case types.ParamSpaceCons:
@@ -26,26 +26,12 @@ func (s *StateMachine) UpdateParam(address string, space, paramName string, valu
 	}
 	switch v := value.(type) {
 	case *lib.UInt64Wrapper:
-		return sp.SetUint64(address, paramName, v.Value)
+		return sp.SetUint64(paramName, v.Value)
 	case *lib.StringWrapper:
-		if strings.Contains(paramName, types.ParamKeywordOwner) {
-			return s.updateOwner(address, sp, paramName, v.Value)
-		}
-		return sp.SetString(address, paramName, v.Value)
+		return sp.SetString(paramName, v.Value)
 	default:
 		return types.ErrUnknownParamType(value)
 	}
-}
-
-func (s *StateMachine) updateOwner(address string, sp types.ParamSpace, paramName, newOwner string) lib.ErrorI {
-	gov, err := s.GetParamsGov()
-	if err != nil {
-		return err
-	}
-	if gov.AclOwner != address {
-		return types.ErrUnauthorizedParamChange()
-	}
-	return sp.SetOwner(paramName, newOwner)
 }
 
 func (s *StateMachine) SetParams(p *types.Params) lib.ErrorI {
@@ -132,6 +118,28 @@ func (s *StateMachine) GetParamsFee() (ptr *types.FeeParams, err lib.ErrorI) {
 	ptr = new(types.FeeParams)
 	err = s.getParams(types.ParamSpaceFee, ptr, types.ErrEmptyFeeParams)
 	return
+}
+
+func (s *StateMachine) ApproveProposal(msg types.Proposal) lib.ErrorI {
+	if msg.GetStartHeight() <= s.Height() && s.Height() <= msg.GetEndHeight() {
+		return types.ErrRejectProposal()
+	}
+	switch s.proposeVoteConfig {
+	case types.ProposalApproveList:
+		bz, err := lib.Marshal(msg)
+		if err != nil {
+			return err
+		}
+		if crypto.Hash(bz) == nil {
+			return types.ErrRejectProposal()
+		}
+		// TODO lookup hash in file
+		return nil
+	case types.RejectAllProposals:
+		return types.ErrRejectProposal()
+	default:
+		return nil
+	}
 }
 
 func (s *StateMachine) getParams(space string, ptr any, emptyErr func() lib.ErrorI) lib.ErrorI {

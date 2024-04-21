@@ -44,22 +44,22 @@ const (
 	CodeNewMultiPubKey       ErrorCode   = 30
 	CodeStringToBigFloat     ErrorCode   = 31
 
-	ConsensusModule          ErrorModule = "consensus"
-	CodeDuplicateTransaction ErrorCode   = 6
-	CodeTxFoundInMempool     ErrorCode   = 7
-
-	CodeDuplicateProposerMessage ErrorCode = 9
-	CodeDuplicateVote            ErrorCode = 10
-	CodeInvalidSignatureLength   ErrorCode = 11
-	CodeInvalidPubKey            ErrorCode = 12
-	CodeEmptyView                ErrorCode = 13
-	CodeUnknownConsensusMessage  ErrorCode = 14
-	CodeValidatorNotInSet        ErrorCode = 15
-	CodeWrongHeight              ErrorCode = 16
-	CodeWrongRound               ErrorCode = 17
-	CodeWrongPhase               ErrorCode = 18
-	CodePartialSignatureEmpty    ErrorCode = 19
-	CodeInvalidPartialSignature  ErrorCode = 20
+	ConsensusModule              ErrorModule = "consensus"
+	CodeDuplicateTransaction     ErrorCode   = 6
+	CodeTxFoundInMempool         ErrorCode   = 7
+	CodeMismatchBlockHash        ErrorCode   = 8
+	CodeDuplicateProposerMessage ErrorCode   = 9
+	CodeDuplicateVote            ErrorCode   = 10
+	CodeInvalidSignatureLength   ErrorCode   = 11
+	CodeInvalidPubKey            ErrorCode   = 12
+	CodeEmptyView                ErrorCode   = 13
+	CodeUnknownConsensusMessage  ErrorCode   = 14
+	CodeValidatorNotInSet        ErrorCode   = 15
+	CodeWrongHeight              ErrorCode   = 16
+	CodeWrongRound               ErrorCode   = 17
+	CodeWrongPhase               ErrorCode   = 18
+	CodePartialSignatureEmpty    ErrorCode   = 19
+	CodeInvalidPartialSignature  ErrorCode   = 20
 
 	CodeInvalidProposerPubKey           ErrorCode = 24
 	CodeNoMaj23                         ErrorCode = 25
@@ -96,7 +96,7 @@ const (
 	CodeInvalidTxMessage        ErrorCode   = 6
 	CodeInvalidTxSequence       ErrorCode   = 7
 	CodeMaxBlockSize            ErrorCode   = 8
-	CodeGetTransaction          ErrorCode   = 9
+	CodeRejectProposal          ErrorCode   = 9
 	CodeInvalidNetAddressLen    ErrorCode   = 10
 	CodeInvalidSignature        ErrorCode   = 11
 	CodeAddressEmpty            ErrorCode   = 12

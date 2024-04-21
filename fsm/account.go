@@ -77,8 +77,8 @@ func (s *StateMachine) AccountDeductFees(address crypto.AddressI, fee string) li
 	return s.PoolAdd(types.PoolName_FeeCollector, fee)
 }
 
-func (s *StateMachine) MintToAccount(address crypto.AddressI, amount *big.Int) lib.ErrorI {
-	return s.AccountAdd(address, lib.BigIntToString(amount))
+func (s *StateMachine) MintToAccount(address crypto.AddressI, amount string) lib.ErrorI {
+	return s.AccountAdd(address, amount)
 }
 
 func (s *StateMachine) AccountSetSequence(address crypto.AddressI, sequence uint64) lib.ErrorI {
@@ -192,8 +192,8 @@ func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) MintToPool(name types.PoolName, amount *big.Int) lib.ErrorI {
-	return s.PoolAdd(name, lib.BigIntToString(amount))
+func (s *StateMachine) MintToPool(name types.PoolName, amount string) lib.ErrorI {
+	return s.PoolAdd(name, amount)
 }
 
 func (s *StateMachine) PoolAdd(name types.PoolName, amountToAdd string) lib.ErrorI {

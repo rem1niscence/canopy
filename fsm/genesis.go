@@ -33,7 +33,7 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.Err
 		if len(val.Output) < crypto.AddressSize {
 			return types.ErrAddressSize()
 		}
-		lessThanMin, err := lib.StringsLess(val.StakedAmount, genesis.Params.Validator.ValidatorMinStake.Value)
+		lessThanMin, err := lib.StringsLess(val.StakedAmount, genesis.Params.Validator.ValidatorMinStake)
 		if err != nil {
 			return err
 		}

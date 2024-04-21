@@ -15,6 +15,7 @@ func (x *Message) SignBytes() (signBytes []byte, err lib.ErrorI) {
 			Qc: &QC{
 				Header:      x.Qc.Header,
 				Block:       x.Qc.Block,
+				BlockHash:   x.Qc.BlockHash,
 				ProposerKey: x.Qc.ProposerKey,
 				Signature:   x.Qc.Signature,
 			},
@@ -25,7 +26,7 @@ func (x *Message) SignBytes() (signBytes []byte, err lib.ErrorI) {
 	case x.IsReplicaMessage():
 		return lib.Marshal(&QC{
 			Header:      x.Qc.Header,
-			Block:       x.Qc.Block,
+			BlockHash:   x.Qc.BlockHash,
 			ProposerKey: x.Qc.ProposerKey,
 		})
 	case x.IsPacemakerMessage():
@@ -35,7 +36,7 @@ func (x *Message) SignBytes() (signBytes []byte, err lib.ErrorI) {
 	}
 }
 
-func (x *Message) CheckProposerMessage(expectedProposer []byte, height uint64, vals ValSet) (isPartialQC bool, err lib.ErrorI) {
+func (x *Message) CheckProposerMessage(expectedProposer, expectedBlockHash []byte, height uint64, vals ValSet) (isPartialQC bool, err lib.ErrorI) {
 	if err = x.checkBasic(height); err != nil {
 		return false, err
 	}
@@ -56,19 +57,23 @@ func (x *Message) CheckProposerMessage(expectedProposer []byte, height uint64, v
 		if err != nil {
 			return
 		}
-		if err = x.Qc.Block.Check(); err != nil {
-			return
-		}
 		if x.Header.Phase == Propose {
+			if err = x.Qc.Block.Check(); err != nil {
+				return
+			}
 			if len(x.Qc.ProposerKey) != crypto.BLS12381PubKeySize {
 				return false, lib.ErrInvalidProposerPubKey()
+			}
+		} else {
+			if !bytes.Equal(x.Qc.BlockHash, expectedBlockHash) {
+				return false, ErrMismatchBlockHash()
 			}
 		}
 	}
 	return
 }
 
-func (x *Message) CheckReplicaMessage(height uint64, vs ValSet) lib.ErrorI {
+func (x *Message) CheckReplicaMessage(height uint64, expectedBlockHash []byte, vs ValSet) lib.ErrorI {
 	if err := x.checkBasic(height); err != nil {
 		return err
 	}
@@ -92,8 +97,8 @@ func (x *Message) CheckReplicaMessage(height uint64, vs ValSet) lib.ErrorI {
 				return ErrMismatchPublicKeys()
 			}
 		}
-		if err = x.Qc.Block.Check(); err != nil {
-			return err
+		if !bytes.Equal(x.Qc.BlockHash, expectedBlockHash) {
+			return ErrMismatchBlockHash()
 		}
 	}
 	return nil

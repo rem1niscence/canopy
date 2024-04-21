@@ -17,7 +17,7 @@ func (s *StateMachine) SlashAndResetNonSigners(params *types.ValidatorParams) li
 		if err = lib.Unmarshal(v, ptr); err != nil {
 			return err
 		}
-		if ptr.Counter > params.ValidatorMaxNonSign.Value {
+		if ptr.Counter > params.ValidatorMaxNonSign {
 			addrs = append(addrs, addr.Bytes())
 		}
 		keys = append(keys, k)
@@ -59,19 +59,15 @@ func (s *StateMachine) IncrementNonSigners(nonSigners [][]byte) lib.ErrorI {
 }
 
 func (s *StateMachine) SlashNonSigners(params *types.ValidatorParams, nonSigners [][]byte) lib.ErrorI {
-	return s.SlashValidators(nonSigners, params.ValidatorNonSignSlashPercentage.Value)
+	return s.SlashValidators(nonSigners, params.ValidatorNonSignSlashPercentage)
 }
 
 func (s *StateMachine) SlashBadProposers(params *types.ValidatorParams, badProposers [][]byte) lib.ErrorI {
-	return s.SlashValidators(badProposers, params.ValidatorBadProposalSlashPercentage.Value)
-}
-
-func (s *StateMachine) SlashFaultySigners(params *types.ValidatorParams, faultySigners [][]byte) lib.ErrorI {
-	return s.SlashValidators(faultySigners, params.ValidatorFaultySignSlashPercentage.Value)
+	return s.SlashValidators(badProposers, params.ValidatorBadProposalSlashPercentage)
 }
 
 func (s *StateMachine) SlashDoubleSigners(params *types.ValidatorParams, doubleSigners [][]byte) lib.ErrorI {
-	return s.SlashValidators(doubleSigners, params.ValidatorDoubleSignSlashPercentage.Value)
+	return s.SlashValidators(doubleSigners, params.ValidatorDoubleSignSlashPercentage)
 }
 
 func (s *StateMachine) ForceUnstakeValidator(address crypto.AddressI) lib.ErrorI {
@@ -89,7 +85,7 @@ func (s *StateMachine) ForceUnstakeValidator(address crypto.AddressI) lib.ErrorI
 	if err != nil {
 		return err
 	}
-	unstakingBlocks := p.GetValidatorUnstakingBlocks().Value
+	unstakingBlocks := p.GetValidatorUnstakingBlocks()
 	unstakingHeight := s.Height() + unstakingBlocks
 	// set validator unstaking
 	return s.SetValidatorUnstaking(address, validator, unstakingHeight)

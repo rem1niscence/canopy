@@ -43,7 +43,7 @@ func (s *StateMachine) GetConsensusValidators() (*lib.ConsensusValidators, lib.E
 		return nil, err
 	}
 	defer it.Close()
-	for i := uint64(0); it.Valid() && i < params.ValidatorMaxCount.Value; it.Next() {
+	for i := uint64(0); it.Valid() && i < params.ValidatorMaxCount; it.Next() {
 		addr, err := types.AddressFromKey(it.Key())
 		if err != nil {
 			return nil, err
@@ -120,22 +120,41 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI, nonSignerPercent 
 	if err != nil {
 		return err
 	}
-	params, err := s.GetParamsVal()
+	valParams, err := s.GetParamsVal()
+	if err != nil {
+		return err
+	}
+	govParams, err := s.GetParamsGov()
 	if err != nil {
 		return err
 	}
 	if err = s.UpdateProducerKeys(validator.PublicKey); err != nil {
 		return err
 	}
-	reducedAmount, err := lib.StringReducePercentage(params.ValidatorBlockReward.Value, int8(nonSignerPercent))
+	fee, err := s.GetPool(types.PoolName_FeeCollector)
 	if err != nil {
 		return err
 	}
-	amount, err := lib.StringToBigInt(reducedAmount)
+	totalReward, err := lib.StringAdd(fee.Amount, valParams.ValidatorBlockReward)
 	if err != nil {
 		return err
 	}
-	return s.MintToAccount(crypto.NewAddressFromBytes(validator.Output), amount)
+	afterDAOCut, err := lib.StringReducePercentage(totalReward, int8(govParams.DaoRewardPercentage))
+	if err != nil {
+		return err
+	}
+	daoCut, err := lib.StringSub(totalReward, afterDAOCut)
+	if err != nil {
+		return err
+	}
+	proposerCut, err := lib.StringReducePercentage(afterDAOCut, int8(nonSignerPercent))
+	if err != nil {
+		return err
+	}
+	if err = s.MintToPool(types.PoolName_DAO, daoCut); err != nil {
+		return err
+	}
+	return s.MintToAccount(crypto.NewAddressFromBytes(validator.Output), proposerCut)
 }
 
 func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams) (nonSignerPercent int, err lib.ErrorI) {
@@ -144,7 +163,7 @@ func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams) (nonSig
 	if err != nil {
 		return 0, err
 	}
-	if s.Height()%params.ValidatorNonSignWindow.Value == 0 {
+	if s.Height()%params.ValidatorNonSignWindow == 0 {
 		if err = s.SlashAndResetNonSigners(params); err != nil {
 			return 0, err
 		}

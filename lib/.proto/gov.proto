@@ -16,48 +16,42 @@ message ProtocolVersion {
 }
 
 message ConsensusParams {
-  Uint64Param block_size = 1;
-  StringParam protocol_version = 2;
+  uint64 block_size = 1;
+  string protocol_version = 2;
 }
 
 message ValidatorParams {
-  StringParam validator_min_stake = 1;
-  Uint64Param validator_max_count = 2;
-  Uint64Param validator_unstaking_blocks = 3;
-  Uint64Param validator_max_pause_blocks = 5;
-  Uint64Param validator_max_evidence_age_in_blocks = 6;
-  Uint64Param validator_double_sign_slash_percentage = 7;
-  Uint64Param validator_faulty_sign_slash_percentage = 8; // TODO remove
-  Uint64Param validator_bad_proposal_slash_percentage = 9;
-  Uint64Param validator_non_sign_slash_percentage = 10;
-  Uint64Param validator_max_non_sign = 11;
-  Uint64Param validator_non_sign_window = 12;
-  StringParam validator_double_sign_reporter_reward = 13; // TODO likely remove
-  Uint64Param validator_proposer_percentage_of_fees = 14;
-  StringParam validator_block_reward = 15;
+  string validator_min_stake = 1;
+  uint64 validator_max_count = 2;
+  uint64 validator_unstaking_blocks = 3;
+  uint64 validator_max_pause_blocks = 5;
+  uint64 validator_max_evidence_age_in_blocks = 6;
+  uint64 validator_double_sign_slash_percentage = 7;
+  uint64 validator_bad_proposal_slash_percentage = 8;
+  uint64 validator_non_sign_slash_percentage = 9;
+  uint64 validator_max_non_sign = 10;
+  uint64 validator_non_sign_window = 11;
+  uint64 validator_proposer_percentage_of_fees = 12;
+  string validator_block_reward = 13;
 }
 
 message FeeParams {
-  StringParam message_send_fee = 1;
-  StringParam message_stake_fee = 2;
-  StringParam message_edit_stake_fee = 3;
-  StringParam message_unstake_fee = 4;
-  StringParam message_pause_fee = 5;
-  StringParam message_unpause_fee = 6;
-  StringParam message_change_parameter_fee = 7;
-  StringParam message_double_sign_fee = 8;
+  string message_send_fee = 1;
+  string message_stake_fee = 2;
+  string message_edit_stake_fee = 3;
+  string message_unstake_fee = 4;
+  string message_pause_fee = 5;
+  string message_unpause_fee = 6;
+  string message_change_parameter_fee = 7;
+  string message_double_sign_fee = 8;
 }
 
 message GovernanceParams {
-  string acl_owner = 1;
+  uint64 dao_reward_percentage = 1;
 }
 
-message StringParam {
-  string value = 1;
-  string owner = 2;
-}
-
-message Uint64Param {
-  uint64 value = 1;
-  string owner = 2;
+enum ProposalVoteConfig {
+  ACCEPT_ALL = 0;
+  APPROVE_LIST = 1;
+  REJECT_ALL = 2;
 }

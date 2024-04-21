@@ -21,7 +21,6 @@ type TransactionI interface {
 type MessageI interface {
 	proto.Message
 
-	SetSigner(signer []byte)
 	Check() ErrorI
 	Bytes() ([]byte, ErrorI)
 	Name() string

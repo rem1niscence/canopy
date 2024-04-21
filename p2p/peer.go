@@ -89,9 +89,7 @@ func (ps *PeerSet) Remove(publicKey []byte) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	peer.stop.Do(peer.conn.Stop)
-	ps.del(publicKey)
-	ps.book.Remove(publicKey)
+	ps.stopAndRemove(peer)
 	return err
 }
 
@@ -107,7 +105,7 @@ func (ps *PeerSet) ChangeReputation(publicKey []byte, delta int32) {
 	}
 	peer.Reputation += delta
 	if !peer.IsTrusted && !peer.IsValidator && peer.Reputation < MinimumPeerReputation {
-		ps.del(peer.Address.PublicKey)
+		ps.stopAndRemove(peer)
 		return
 	}
 	ps.set(peer)
@@ -193,6 +191,12 @@ func (ps *PeerSet) Outbound() (outbound int) {
 	ps.RLock()
 	defer ps.RUnlock()
 	return ps.outbound
+}
+
+func (ps *PeerSet) stopAndRemove(peer *Peer) {
+	peer.stop.Do(peer.conn.Stop)
+	ps.del(peer.PeerInfo.Address.PublicKey)
+	ps.book.Remove(peer.PeerInfo.Address.PublicKey)
 }
 
 func (ps *PeerSet) set(p *Peer)          { ps.m[lib.BytesToString(p.Address.PublicKey)] = p }

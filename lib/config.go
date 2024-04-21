@@ -35,6 +35,11 @@ type ConsensusConfig struct {
 	RoundInterruptTimeoutMS int
 }
 
+func (c ConsensusConfig) BlockTimeMS() int {
+	return c.ElectionTimeoutMS + c.ElectionVoteTimeoutMS + c.ProposeTimeoutMS + c.ProposeVoteTimeoutMS +
+		c.PrecommitTimeoutMS + c.PrecommitVoteTimeoutMS + c.CommitTimeoutMS + c.CommitProcessMS
+}
+
 func DefaultConsensusConfig() ConsensusConfig {
 	return ConsensusConfig{
 		ElectionTimeoutMS:       5000,

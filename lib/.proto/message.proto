@@ -9,7 +9,6 @@ message MessageSend {
   bytes from_address = 1;
   bytes to_address = 2;
   string amount = 3;
-  optional bytes signer = 4;
 }
 
 message MessageStake {
@@ -17,7 +16,6 @@ message MessageStake {
   string amount = 2;
   string net_address = 3;
   bytes output_address = 4;
-  optional bytes signer = 5;
 }
 
 message MessageEditStake {
@@ -25,28 +23,32 @@ message MessageEditStake {
   string amount = 2;
   string net_address = 3;
   bytes output_address = 4;
-  optional bytes signer = 5;
 }
 
 message MessageUnstake {
   bytes address = 1;
-  optional bytes signer = 2;
 }
 
 message MessagePause {
   bytes address = 1;
-  optional bytes signer = 2;
 }
 
 message MessageUnpause {
   bytes address = 1;
-  optional bytes signer = 2;
 }
 
 message MessageChangeParameter {
-  bytes owner = 1;
-  string parameter_space = 2;
-  string parameter_key = 3;
-  google.protobuf.Any parameter_value = 4;
-  optional bytes signer = 5;
+  string parameter_space = 1;
+  string parameter_key = 2;
+  google.protobuf.Any parameter_value = 3;
+  uint64 start_height = 4;
+  uint64 end_height = 5;
+  bytes signer = 6;
+}
+
+message MessageDAOTransfer {
+  bytes address = 1;
+  string amount = 2;
+  uint64 start_height = 4;
+  uint64 end_height = 5;
 }

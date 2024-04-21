@@ -20,6 +20,8 @@ func (s *StateMachine) HandleMessage(msg lib.MessageI) lib.ErrorI {
 		return s.HandleMessageUnpause(x)
 	case *types.MessageChangeParameter:
 		return s.HandleMessageChangeParameter(x)
+	case *types.MessageDAOTransfer:
+		return s.HandleMessageDAOTransfer(x)
 	default:
 		return types.ErrUnknownMessage(x)
 	}
@@ -32,17 +34,17 @@ func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee string, err lib.E
 	}
 	switch x := msg.(type) {
 	case *types.MessageSend:
-		return feeParams.MessageSendFee.Value, nil
+		return feeParams.MessageSendFee, nil
 	case *types.MessageStake:
-		return feeParams.MessageStakeFee.Value, nil
+		return feeParams.MessageStakeFee, nil
 	case *types.MessageEditStake:
-		return feeParams.MessageEditStakeFee.Value, nil
+		return feeParams.MessageEditStakeFee, nil
 	case *types.MessageUnstake:
-		return feeParams.MessageUnstakeFee.Value, nil
+		return feeParams.MessageUnstakeFee, nil
 	case *types.MessageUnpause:
-		return feeParams.MessageUnpauseFee.Value, nil
+		return feeParams.MessageUnpauseFee, nil
 	case *types.MessageChangeParameter:
-		return feeParams.MessageChangeParameterFee.Value, nil
+		return feeParams.MessageChangeParameterFee, nil
 	default:
 		return "", types.ErrUnknownMessage(x)
 	}
@@ -54,7 +56,9 @@ func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]by
 	case *types.MessageSend:
 		return [][]byte{x.FromAddress}, nil
 	case *types.MessageChangeParameter:
-		return [][]byte{x.Owner}, nil // authenticated later
+		return [][]byte{x.Signer}, nil
+	case *types.MessageDAOTransfer:
+		return [][]byte{x.Address}, nil
 	case *types.MessageStake:
 		validator, err = s.GetValidator(crypto.NewPublicKeyFromBytes(x.PublicKey).Address())
 		if err != nil {
@@ -95,7 +99,7 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	lessThanMinimum, err := lib.StringsLess(msg.Amount, params.ValidatorMinStake.Value)
+	lessThanMinimum, err := lib.StringsLess(msg.Amount, params.ValidatorMinStake)
 	if err != nil {
 		return err
 	}
@@ -195,7 +199,7 @@ func (s *StateMachine) HandleMessageUnstake(msg *types.MessageUnstake) lib.Error
 	if err != nil {
 		return err
 	}
-	unstakingBlocks := p.GetValidatorUnstakingBlocks().Value
+	unstakingBlocks := p.GetValidatorUnstakingBlocks()
 	unstakingHeight := s.Height() + unstakingBlocks
 	// set validator unstaking
 	return s.SetValidatorUnstaking(address, validator, unstakingHeight)
@@ -216,7 +220,7 @@ func (s *StateMachine) HandleMessagePause(msg *types.MessagePause) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	maxPausedHeight := s.Height() + params.ValidatorMaxPauseBlocks.Value
+	maxPausedHeight := s.Height() + params.ValidatorMaxPauseBlocks
 	// set validator paused
 	return s.SetValidatorPaused(address, validator, maxPausedHeight)
 }
@@ -237,10 +241,22 @@ func (s *StateMachine) HandleMessageUnpause(msg *types.MessageUnpause) lib.Error
 }
 
 func (s *StateMachine) HandleMessageChangeParameter(msg *types.MessageChangeParameter) lib.ErrorI {
-	address := crypto.NewAddressFromBytes(msg.Owner)
+	if err := s.ApproveProposal(msg); err != nil {
+		return types.ErrRejectProposal()
+	}
 	protoMsg, err := lib.FromAny(msg.ParameterValue)
 	if err != nil {
 		return err
 	}
-	return s.UpdateParam(address.String(), msg.ParameterSpace, msg.ParameterKey, protoMsg)
+	return s.UpdateParam(msg.ParameterSpace, msg.ParameterKey, protoMsg)
+}
+
+func (s *StateMachine) HandleMessageDAOTransfer(msg *types.MessageDAOTransfer) lib.ErrorI {
+	if err := s.ApproveProposal(msg); err != nil {
+		return types.ErrRejectProposal()
+	}
+	if err := s.PoolSub(types.PoolName_DAO, msg.Amount); err != nil {
+		return err
+	}
+	return s.AccountAdd(crypto.NewAddressFromBytes(msg.Address), msg.Amount)
 }

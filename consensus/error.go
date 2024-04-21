@@ -62,3 +62,7 @@ func ErrAggregateSignature(err error) lib.ErrorI {
 func ErrDuplicateTx(hash []byte) lib.ErrorI {
 	return lib.NewError(lib.CodeDuplicateTransaction, lib.ConsensusModule, fmt.Sprintf("tx %s is a duplicate", hex.EncodeToString(hash)))
 }
+
+func ErrMismatchBlockHash() lib.ErrorI {
+	return lib.NewError(lib.CodeMismatchBlockHash, lib.ConsensusModule, "mismatch block hash")
+}

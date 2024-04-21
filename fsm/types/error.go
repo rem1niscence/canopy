@@ -21,8 +21,8 @@ func ErrTxFeeBelowStateLimit() lib.ErrorI {
 	return lib.NewError(lib.CodeFeeBelowState, lib.StateMachineModule, "tx.fee is below state limit")
 }
 
-func ErrGetTransaction(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeGetTransaction, lib.StateMachineModule, fmt.Sprintf("getTransaction() failed with err: %s", err.Error()))
+func ErrRejectProposal() lib.ErrorI {
+	return lib.NewError(lib.CodeRejectProposal, lib.StateMachineModule, fmt.Sprintf("proposal rejected"))
 }
 
 func ErrAddressEmpty() lib.ErrorI {

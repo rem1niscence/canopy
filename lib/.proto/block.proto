@@ -68,12 +68,14 @@ enum Phase {
   COMMIT = 7;
   COMMIT_PROCESS = 8;
   ROUND_INTERRUPT = 9;
+  PACEMAKER = 10;
 }
 
 message QuorumCertificate {
   View header = 1; // replica vote view
-  Block block = 2; // used after EV
-  bytes proposer_key = 3; // only EV and PROPOSE
+  Block block = 2; // used for PROPOSE
+  bytes block_hash = 3; // used after PROPOSE
+  bytes proposer_key = 4; // only EV and PROPOSE
   AggregateSignature signature = 5; // aggregate signature from the current proposer message
 }
 

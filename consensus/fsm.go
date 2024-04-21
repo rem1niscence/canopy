@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"github.com/ginchuco/ginchu/fsm"
+	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -30,23 +31,26 @@ func (c *Consensus) HandleTransaction(tx []byte) lib.ErrorI {
 
 // CheckCandidateBlock checks the candidate block for errors and resets back to begin block state
 func (c *Consensus) CheckCandidateBlock(candidate *lib.Block, evidence *lib.ByzantineEvidence) (err lib.ErrorI) {
-	defer c.FSM.ResetToBeginBlock()
+	reset := c.ValidatorProposalConfig(c.FSM)
+	defer func() { c.FSM.ResetToBeginBlock(); reset() }()
 	_, _, err = c.FSM.ApplyAndValidateBlock(candidate, evidence, true)
 	return
 }
 
 // ProduceCandidateBlock uses the mempool and state params to build a candidate block
 func (c *Consensus) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) (*lib.Block, lib.ErrorI) {
-	defer c.FSM.ResetToBeginBlock()
-	height := c.FSM.Height()
-	qc, err := c.FSM.GetBlockAndCertificate(height)
+	reset := c.ValidatorProposalConfig(c.FSM, c.Mempool.FSM)
+	defer func() { c.FSM.ResetToBeginBlock(); reset() }()
+	height, lastBlock := c.FSM.Height(), c.FSM.LastBlockHeader()
+	qc, err := c.FSM.GetCertificate(height)
 	if err != nil {
 		return nil, err
 	}
-	qc.Block = nil
-	lastBlock := c.FSM.LastBlockHeader()
 	maxBlockSize, err := c.FSM.GetMaxBlockSize()
 	if err != nil {
+		return nil, err
+	}
+	if err = c.Mempool.checkMempool(); err != nil {
 		return nil, err
 	}
 	numTxs, transactions := c.Mempool.GetTransactions(maxBlockSize)
@@ -78,13 +82,12 @@ func (c *Consensus) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) 
 // - atomically writes all to the underlying db
 // - sets up the app for the next height
 func (c *Consensus) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
-	defer c.FSM.ResetToBeginBlock()
-	block := qc.Block
+	defer func() { c.FSM.ResetToBeginBlock() }()
+	store, block := c.FSM.Store().(lib.StoreI), qc.Block
 	blockResult, nextValidatorSet, err := c.FSM.ApplyAndValidateBlock(block, nil, false)
 	if err != nil {
 		return err
 	}
-	store := c.FSM.Store().(lib.StoreI)
 	if err = store.IndexQC(qc); err != nil {
 		return err
 	}
@@ -100,23 +103,37 @@ func (c *Consensus) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
 	if _, err = store.Commit(); err != nil {
 		return err
 	}
-	c.LastValidatorSet = c.ValidatorSet
-	c.ValidatorSet, err = lib.NewValidatorSet(nextValidatorSet)
-	if err != nil {
+	c.LastValidatorSet, c.Height = c.ValidatorSet, block.BlockHeader.Height+1
+	if c.ValidatorSet, err = lib.NewValidatorSet(nextValidatorSet); err != nil {
 		return err
 	}
-	c.NotifyP2P(nextValidatorSet)
-	beginBlockParams := lib.BeginBlockParams{BlockHeader: block.BlockHeader, ValidatorSet: nextValidatorSet}
-	c.FSM = fsm.NewWithBeginBlock(&beginBlockParams, c.FSM.ProtocolVersion, c.FSM.NetworkID, block.BlockHeader.Height+1, store)
-	c.Mempool.FSM, err = c.FSM.Copy()
-	if err != nil {
+	c.FSM = fsm.NewWithBeginBlock(
+		&lib.BeginBlockParams{BlockHeader: block.BlockHeader, ValidatorSet: nextValidatorSet},
+		c.FSM.ProtocolVersion, c.FSM.NetworkID, c.Height, store,
+	)
+	if c.Mempool.FSM, err = c.FSM.Copy(); err != nil {
 		return err
 	}
 	if err = c.Mempool.FSM.BeginBlock(); err != nil {
 		return err
 	}
-	c.GossipBlock(qc)
 	return nil
+}
+
+func (c *Consensus) ValidatorProposalConfig(fsm ...*fsm.StateMachine) (reset func()) {
+	for _, f := range fsm {
+		if c.Round < 3 {
+			f.SetProposalVoteConfig(types.ProposalVoteConfig_APPROVE_LIST)
+		} else {
+			f.SetProposalVoteConfig(types.ProposalVoteConfig_REJECT_ALL)
+		}
+	}
+	reset = func() {
+		for _, f := range fsm {
+			f.SetProposalVoteConfig(types.AcceptAllProposals)
+		}
+	}
+	return
 }
 
 // Mempool accepts or rejects incoming txs based on the mempool state
@@ -132,12 +149,16 @@ type Mempool struct {
 	lib.Mempool
 }
 
-func NewMempool(fsm *fsm.StateMachine, config lib.MempoolConfig, log lib.LoggerI) *Mempool {
-	return &Mempool{
+func NewMempool(fsm *fsm.StateMachine, config lib.MempoolConfig, log lib.LoggerI) (m *Mempool, err lib.ErrorI) {
+	m = &Mempool{
 		log:     log,
-		FSM:     fsm,
 		Mempool: lib.NewMempool(config),
 	}
+	m.FSM, err = fsm.Copy()
+	if err != nil {
+		return nil, err
+	}
+	return m, err
 }
 
 func (m *Mempool) HandleTransaction(tx []byte) lib.ErrorI {
