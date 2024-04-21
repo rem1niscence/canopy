@@ -266,7 +266,6 @@ func (c *Consensus) StartProposeVotePhase() {
 			BlockHash: c.Block.BlockHeader.Hash,
 		},
 	})
-	return
 }
 
 func (c *Consensus) StartPrecommitPhase() {
@@ -308,7 +307,6 @@ func (c *Consensus) StartPrecommitVotePhase() {
 			BlockHash: c.Block.BlockHeader.Hash,
 		},
 	})
-	return
 }
 
 func (c *Consensus) StartCommitPhase() {
@@ -346,7 +344,6 @@ func (c *Consensus) StartCommitProcessPhase() {
 	c.gossipBlock(msg.Qc)
 	c.ByzantineEvidence = c.Proposals.GetByzantineEvidence(c.View.Copy(),
 		c.ValidatorSet, c.LastValidatorSet, c.ProposerKey, &c.Votes, c.SelfIsProposer())
-	return
 }
 
 func (c *Consensus) CheckProposerAndBlock(msg *Message) (interrupt bool) {

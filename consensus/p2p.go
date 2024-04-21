@@ -80,34 +80,30 @@ func (c *Consensus) Sync() {
 }
 
 func (c *Consensus) ListenForBlock() {
-	app := c
 	cache := lib.NewMessageCache()
-	for {
-		select {
-		case msg := <-c.P2P.ReceiveChannel(Block):
-			startTime := time.Now()
-			if ok := cache.Add(msg); !ok {
-				break
-			}
-			c.Lock()
-			_, qc, outOfSync, err := c.validatePeerBlock(c.Height, msg, c.ValidatorSet)
-			if outOfSync {
-				c.Unlock()
-				go c.Sync()
-				break
-			}
-			if err != nil {
-				c.Unlock()
-				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, InvalidBlockRep)
-				break
-			}
-			if err = app.CommitBlock(qc); err != nil {
-				c.log.Fatalf("unable to commit block at height %d: %s", qc.Header.Height, err.Error())
-			}
-			c.newBlock <- time.Since(startTime)
-			c.notifyP2P(c.ValidatorSet.ValidatorSet)
-			c.gossipBlock(qc)
+	for msg := range c.P2P.ReceiveChannel(Block) {
+		startTime := time.Now()
+		if ok := cache.Add(msg); !ok {
+			break
 		}
+		c.Lock()
+		_, qc, outOfSync, err := c.validatePeerBlock(c.Height, msg, c.ValidatorSet)
+		if outOfSync {
+			c.Unlock()
+			go c.Sync()
+			break
+		}
+		if err != nil {
+			c.Unlock()
+			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, InvalidBlockRep)
+			break
+		}
+		if err = c.CommitBlock(qc); err != nil {
+			c.log.Fatalf("unable to commit block at height %d: %s", qc.Header.Height, err.Error())
+		}
+		c.newBlock <- time.Since(startTime)
+		c.notifyP2P(c.ValidatorSet.ValidatorSet)
+		c.gossipBlock(qc)
 	}
 }
 

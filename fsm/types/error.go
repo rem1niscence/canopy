@@ -22,7 +22,7 @@ func ErrTxFeeBelowStateLimit() lib.ErrorI {
 }
 
 func ErrRejectProposal() lib.ErrorI {
-	return lib.NewError(lib.CodeRejectProposal, lib.StateMachineModule, fmt.Sprintf("proposal rejected"))
+	return lib.NewError(lib.CodeRejectProposal, lib.StateMachineModule, "proposal rejected")
 }
 
 func ErrAddressEmpty() lib.ErrorI {
