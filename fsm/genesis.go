@@ -33,11 +33,7 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.Err
 		if len(val.Output) < crypto.AddressSize {
 			return types.ErrAddressSize()
 		}
-		lessThanMin, err := lib.StringsLess(val.StakedAmount, genesis.Params.Validator.ValidatorMinStake)
-		if err != nil {
-			return err
-		}
-		if lessThanMin {
+		if val.StakedAmount < genesis.Params.Validator.ValidatorMinStake {
 			return types.ErrBelowMinimumStake()
 		}
 	}
@@ -45,16 +41,16 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.Err
 		if len(account.Address) < crypto.AddressSize {
 			return types.ErrAddressSize()
 		}
-		if _, err := lib.StringToBigInt(account.Amount); err != nil {
-			return err
+		if account.Amount == 0 {
+			return types.ErrInvalidAmount()
 		}
 	}
 	for _, pool := range genesis.Pools {
 		if pool.Name < 0 {
 			return types.ErrInvalidPoolName()
 		}
-		if _, err := lib.StringToBigInt(pool.Amount); err != nil {
-			return err
+		if pool.Amount == 0 {
+			return types.ErrInvalidAmount()
 		}
 	}
 	return nil

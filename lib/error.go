@@ -224,14 +224,6 @@ func newLogError(err error) ErrorI {
 	return NewError(NoCode, MainModule, err.Error())
 }
 
-func errStringToBigInt() ErrorI {
-	return NewError(CodeStringToBigInt, MainModule, "unable to convert string to big int")
-}
-
-func errStringToBigFloat() ErrorI {
-	return NewError(CodeStringToBigFloat, MainModule, "unable to convert string to big float")
-}
-
 func ErrUnmarshal(err error) ErrorI {
 	return NewError(CodeUnmarshal, MainModule, fmt.Sprintf("unmarshal() failed with err: %s", err.Error()))
 }

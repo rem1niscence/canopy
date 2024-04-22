@@ -50,8 +50,8 @@ type SortitionData struct {
 	Height                  uint64
 	Round                   uint64
 	TotalValidators         uint64
-	VotingPower             string
-	TotalPower              string
+	VotingPower             uint64
+	TotalPower              uint64
 }
 
 type RoundRobinParams struct {
@@ -76,9 +76,9 @@ func VerifyCandidate(p *SortitionVerifyParams) (out []byte, isCandidate bool) {
 	return sortition(p.VotingPower, p.TotalPower, p.TotalValidators, p.Signature)
 }
 
-func sortition(votingPower, totalPower string, totalValidators uint64, signature []byte) (out []byte, isCandidate bool) {
+func sortition(votingPower, totalPower, totalValidators uint64, signature []byte) (out []byte, isCandidate bool) {
 	out = crypto.Hash(signature)
-	isCandidate = CDF(lib.StringToUint64(votingPower), lib.StringToUint64(totalPower), expectedCandidates(totalValidators), out) >= 1
+	isCandidate = CDF(votingPower, totalPower, expectedCandidates(totalValidators), out) >= 1
 	return
 }
 
@@ -113,7 +113,13 @@ func VRF(lastNProposers [][]byte, height, round uint64, privateKey crypto.Privat
 	}
 }
 
+const VotingPowerReduction = 1000000
+
+// CDF makes the upperbound on voting power a float64, a 1E6 voting power
+// reduction is used to increase the totalVotingPower ceiling further
 func CDF(votingPower, totalVotingPower, expectedCandidates uint64, vrfOut []byte) uint64 {
+	votingPower /= VotingPowerReduction
+	totalVotingPower /= VotingPowerReduction
 	binomial := distuv.Binomial{
 		N: float64(votingPower),
 		P: float64(expectedCandidates) / float64(totalVotingPower),
@@ -130,12 +136,11 @@ func CDF(votingPower, totalVotingPower, expectedCandidates uint64, vrfOut []byte
 func WeightedRoundRobin(p *RoundRobinParams) (publicKey crypto.PublicKeyI) {
 	seed := crypto.Hash(formatInput(p.LastProducersPublicKeys, p.Height, p.Round))[:16]
 	seedUint64 := binary.BigEndian.Uint64(seed)
-	totalPower := lib.StringToUint64(p.TotalPower)
-	powerIndex := seedUint64 % totalPower
+	powerIndex := seedUint64 % p.TotalPower
 
 	powerCount := uint64(0)
 	for _, v := range p.ValidatorSet.ValidatorSet {
-		powerCount += lib.StringToUint64(v.VotingPower)
+		powerCount += v.VotingPower
 		if powerCount >= powerIndex {
 			publicKey, _ = crypto.NewBLSPublicKeyFromBytes(v.PublicKey)
 			return

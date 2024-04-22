@@ -197,19 +197,19 @@ func (m *Mempool) recheckAll(errorCallback func([]byte, lib.ErrorI)) {
 	}
 }
 
-func (m *Mempool) applyAndWriteTx(tx []byte) (fee string, err lib.ErrorI) {
+func (m *Mempool) applyAndWriteTx(tx []byte) (fee uint64, err lib.ErrorI) {
 	store := m.FSM.Store()
 	txn, err := m.FSM.TxnWrap()
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 	defer func() { m.FSM.SetStore(store); txn.Discard() }()
 	result, err := m.FSM.ApplyTransaction(uint64(m.Size()), tx, crypto.HashString(tx))
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 	if err = txn.Write(); err != nil {
-		return "", err
+		return 0, err
 	}
 	return result.Transaction.Fee, nil
 }

@@ -1,10 +1,10 @@
 package types
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
-	"math/big"
 )
 
 var (
@@ -33,8 +33,10 @@ func KeyForPaused(maxPausedHeight uint64, address crypto.AddressI) []byte {
 	return append(append(pausedPrefix, formatHeight(maxPausedHeight)...), address.Bytes()...)
 }
 
-func KeyForConsensus(address crypto.AddressI, stake *big.Int) []byte {
-	return append(append(consensusPrefix, stake.Bytes()...), address.Bytes()...)
+func KeyForConsensus(address crypto.AddressI, stake uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, stake)
+	return append(append(consensusPrefix, b...), address.Bytes()...)
 }
 
 func AccountPrefix() []byte                { return accountPrefix }

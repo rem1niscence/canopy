@@ -27,10 +27,10 @@ func (s *StateMachine) HandleMessage(msg lib.MessageI) lib.ErrorI {
 	}
 }
 
-func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee string, err lib.ErrorI) {
+func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee uint64, err lib.ErrorI) {
 	feeParams, err := s.GetParamsFee()
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 	switch x := msg.(type) {
 	case *types.MessageSend:
@@ -46,7 +46,7 @@ func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee string, err lib.E
 	case *types.MessageChangeParameter:
 		return feeParams.MessageChangeParameterFee, nil
 	default:
-		return "", types.ErrUnknownMessage(x)
+		return 0, types.ErrUnknownMessage(x)
 	}
 }
 
@@ -99,11 +99,7 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	lessThanMinimum, err := lib.StringsLess(msg.Amount, params.ValidatorMinStake)
-	if err != nil {
-		return err
-	}
-	if lessThanMinimum {
+	if msg.Amount < params.ValidatorMinStake {
 		return types.ErrBelowMinimumStake()
 	}
 	// subtract from sender
@@ -144,29 +140,20 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 	if val.UnstakingHeight != 0 {
 		return types.ErrValidatorUnstaking()
 	}
-	cmp, err := lib.StringsCmp(msg.Amount, val.StakedAmount)
-	if err != nil {
-		return err
-	}
-	amountToAdd := "0"
-	switch cmp {
-	case -1: // amount less than stake
+	var amountToAdd uint64
+	switch {
+	case msg.Amount < val.StakedAmount: // amount less than stake
 		return types.ErrInvalidAmount()
-	case 0: // amount equals stake
-	case 1: // amount greater than stake
-		if amountToAdd, err = lib.StringSub(msg.Amount, val.StakedAmount); err != nil {
-			return err
-		}
+	case msg.Amount == val.StakedAmount: // amount equals stake
+	case msg.Amount > val.StakedAmount: // amount greater than stake
+		amountToAdd = msg.Amount - val.StakedAmount
 	}
 	// subtract from sender
 	if err = s.AccountSub(address, amountToAdd); err != nil {
 		return err
 	}
 	// update validator stake amount
-	newStakedAmount, err := lib.StringAdd(val.StakedAmount, amountToAdd)
-	if err != nil {
-		return err
-	}
+	newStakedAmount := val.StakedAmount + amountToAdd
 	// updated sorted validator set
 	if err = s.UpdateConsensusValidator(address, val.StakedAmount, newStakedAmount); err != nil {
 		return err

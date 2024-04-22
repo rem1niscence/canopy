@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"fmt"
-	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"math"
@@ -13,8 +11,7 @@ import (
 func TestSortition(t *testing.T) {
 	privateKey, _ := crypto.NewBLSPrivateKey()
 	lastNProposers := [][]byte{[]byte("a"), []byte("b"), []byte("c")}
-	power, totalPower := 1, 2
-	powerString, totalPowerString := fmt.Sprintf("%d", power), fmt.Sprintf("%d", totalPower)
+	power, totalPower := 1000000, 2000000
 	expectedAvg := float64(power) / float64(totalPower)
 	totalIterations := 1000
 	errorThreshold := .07
@@ -24,8 +21,8 @@ func TestSortition(t *testing.T) {
 			SortitionData: &SortitionData{
 				LastProducersPublicKeys: lastNProposers,
 				Height:                  uint64(rand.Intn(math.MaxUint32)),
-				VotingPower:             powerString,
-				TotalPower:              totalPowerString,
+				VotingPower:             uint64(power),
+				TotalPower:              uint64(totalPower),
 			},
 			PrivateKey: privateKey,
 		})
@@ -36,5 +33,5 @@ func TestSortition(t *testing.T) {
 
 func vrfAndCDF(p SortitionParams) uint64 {
 	vrf := VRF(p.LastProducersPublicKeys, p.Height, p.Round, p.PrivateKey)
-	return CDF(lib.StringToUint64(p.VotingPower), lib.StringToUint64(p.TotalPower), 1, crypto.Hash(vrf.Signature))
+	return CDF(p.VotingPower, p.TotalPower, 1, crypto.Hash(vrf.Signature))
 }

@@ -21,7 +21,7 @@ message ConsensusParams {
 }
 
 message ValidatorParams {
-  string validator_min_stake = 1;
+  uint64 validator_min_stake = 1;
   uint64 validator_max_count = 2;
   uint64 validator_unstaking_blocks = 3;
   uint64 validator_max_pause_blocks = 5;
@@ -32,18 +32,18 @@ message ValidatorParams {
   uint64 validator_max_non_sign = 10;
   uint64 validator_non_sign_window = 11;
   uint64 validator_proposer_percentage_of_fees = 12;
-  string validator_block_reward = 13;
+  uint64 validator_block_reward = 13;
 }
 
 message FeeParams {
-  string message_send_fee = 1;
-  string message_stake_fee = 2;
-  string message_edit_stake_fee = 3;
-  string message_unstake_fee = 4;
-  string message_pause_fee = 5;
-  string message_unpause_fee = 6;
-  string message_change_parameter_fee = 7;
-  string message_double_sign_fee = 8;
+  uint64 message_send_fee = 1;
+  uint64 message_stake_fee = 2;
+  uint64 message_edit_stake_fee = 3;
+  uint64 message_unstake_fee = 4;
+  uint64 message_pause_fee = 5;
+  uint64 message_unpause_fee = 6;
+  uint64 message_change_parameter_fee = 7;
+  uint64 message_double_sign_fee = 8;
 }
 
 message GovernanceParams {

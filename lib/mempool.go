@@ -21,7 +21,7 @@ type FeeMempool struct {
 
 type MempoolTx struct {
 	Tx  []byte
-	Fee string
+	Fee uint64
 }
 
 func NewMempool(config MempoolConfig) Mempool {
@@ -49,7 +49,7 @@ func DefaultMempoolConfig() MempoolConfig {
 	}
 }
 
-func (f *FeeMempool) AddTransaction(tx []byte, fee string) (recheck bool, err ErrorI) {
+func (f *FeeMempool) AddTransaction(tx []byte, fee uint64) (recheck bool, err ErrorI) {
 	f.l.Lock()
 	defer f.l.Unlock()
 	hash := crypto.HashString(tx)
@@ -156,8 +156,7 @@ type Transactions struct {
 
 func (t *Transactions) Insert(tr MempoolTx) (recheck bool) {
 	i := sort.Search(t.n, func(i int) bool {
-		less, _ := StringsLess(t.s[i].Fee, tr.Fee)
-		return less
+		return t.s[i].Fee < tr.Fee
 	})
 	if i != t.n {
 		recheck = true

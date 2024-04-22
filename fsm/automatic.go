@@ -135,22 +135,10 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI, nonSignerPercent 
 	if err != nil {
 		return err
 	}
-	totalReward, err := lib.StringAdd(fee.Amount, valParams.ValidatorBlockReward)
-	if err != nil {
-		return err
-	}
-	afterDAOCut, err := lib.StringReducePercentage(totalReward, int8(govParams.DaoRewardPercentage))
-	if err != nil {
-		return err
-	}
-	daoCut, err := lib.StringSub(totalReward, afterDAOCut)
-	if err != nil {
-		return err
-	}
-	proposerCut, err := lib.StringReducePercentage(afterDAOCut, int8(nonSignerPercent))
-	if err != nil {
-		return err
-	}
+	totalReward := fee.Amount + valParams.ValidatorBlockReward
+	afterDAOCut := lib.Uint64ReducePercentage(totalReward, int8(govParams.DaoRewardPercentage))
+	daoCut := totalReward - afterDAOCut
+	proposerCut := lib.Uint64ReducePercentage(afterDAOCut, int8(nonSignerPercent))
 	if err = s.MintToPool(types.PoolName_DAO, daoCut); err != nil {
 		return err
 	}

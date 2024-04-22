@@ -122,12 +122,8 @@ func (s *StateMachine) CheckMessage(msg *anypb.Any) (message lib.MessageI, err l
 	return message, nil
 }
 
-func (s *StateMachine) CheckFee(fee, stateLimit string) lib.ErrorI {
-	less, err := lib.StringsLess(fee, stateLimit)
-	if err != nil {
-		return err
-	}
-	if less {
+func (s *StateMachine) CheckFee(fee, stateLimit uint64) lib.ErrorI {
+	if fee < stateLimit {
 		return types.ErrTxFeeBelowStateLimit()
 	}
 	return nil

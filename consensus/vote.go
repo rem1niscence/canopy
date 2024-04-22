@@ -23,8 +23,8 @@ type (
 		badProposers      lib.BadProposerEvidences
 		highQC            *QC
 		multiKey          crypto.MultiPublicKeyI
-		totalVotedPower   string
-		minPowerFor23Maj  string
+		totalVotedPower   uint64
+		minPowerFor23Maj  uint64
 	}
 )
 
@@ -78,7 +78,7 @@ func (v *VotesForHeight) GetMaj23(view *lib.View) (m *Message, sig *lib.Aggregat
 	v.Lock()
 	defer v.Unlock()
 	for _, vs := range v.votesByRound[view.Round][view.Phase-1] {
-		if has23maj, _ := lib.StringsGTE(vs.totalVotedPower, vs.minPowerFor23Maj); has23maj {
+		if has23maj := vs.totalVotedPower >= vs.minPowerFor23Maj; has23maj {
 			m = vs.vote
 			m.HighQc, m.LastDoubleSignEvidence, m.BadProposerEvidence = vs.highQC, vs.lastDoubleSigners.DSE, vs.badProposers.BPE
 			signature, er := vs.multiKey.AggregateSignatures()
@@ -100,7 +100,7 @@ func (v *VotesForHeight) Pacemaker() (round uint64) {
 		if vs == nil {
 			continue
 		}
-		if has23maj, _ := lib.StringsGTE(vs.totalVotedPower, vs.minPowerFor23Maj); has23maj {
+		if has23maj := vs.totalVotedPower >= vs.minPowerFor23Maj; has23maj {
 			return round
 		}
 	}
@@ -143,10 +143,7 @@ func (v *VotesForHeight) addVote(vote *Message, vs *VoteSet, vals ValSet) lib.Er
 	if enabled {
 		return ErrDuplicateVote()
 	}
-	vs.totalVotedPower, err = lib.StringAdd(val.VotingPower, vs.totalVotedPower)
-	if err != nil {
-		return err
-	}
+	vs.totalVotedPower += val.VotingPower
 	if er = vs.multiKey.AddSigner(vote.Signature.Signature, val.Index); er != nil {
 		return ErrUnableToAddSigner(er)
 	}

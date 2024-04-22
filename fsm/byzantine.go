@@ -108,11 +108,8 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, percent uint64
 	if percent > 100 {
 		return types.ErrInvalidSlashPercentage()
 	}
-	newStake, err := lib.StringReducePercentage(validator.StakedAmount, int8(percent))
-	if err != nil {
-		return err
-	}
-	if err = s.UpdateConsensusValidator(crypto.NewAddressFromBytes(validator.Address), validator.StakedAmount, newStake); err != nil {
+	newStake := lib.Uint64ReducePercentage(validator.StakedAmount, int8(percent))
+	if err := s.UpdateConsensusValidator(crypto.NewAddressFromBytes(validator.Address), validator.StakedAmount, newStake); err != nil {
 		return err
 	}
 	validator.StakedAmount = newStake

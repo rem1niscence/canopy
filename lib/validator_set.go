@@ -10,19 +10,19 @@ type ValidatorSet struct {
 	ValidatorSet  *ConsensusValidators
 	Key           crypto.MultiPublicKeyI
 	PowerMap      map[string]SetValidator // public_key -> Validator
-	TotalPower    string
-	MinimumMaj23  string // 2f+1
+	TotalPower    uint64
+	MinimumMaj23  uint64 // 2f+1
 	NumValidators uint64
 }
 
 type SetValidator struct {
 	PublicKey   crypto.PublicKeyI
-	VotingPower string
+	VotingPower uint64
 	Index       int
 }
 
 func NewValidatorSet(validators *ConsensusValidators) (vs ValidatorSet, err ErrorI) {
-	totalPower, count := "0", uint64(0)
+	totalPower, count := uint64(0), uint64(0)
 	points, powerMap := make([]kyber.Point, 0), make(map[string]SetValidator)
 	for i, v := range validators.ValidatorSet {
 		point, er := crypto.NewBLSPointFromBytes(v.PublicKey)
@@ -35,13 +35,10 @@ func NewValidatorSet(validators *ConsensusValidators) (vs ValidatorSet, err Erro
 			VotingPower: v.VotingPower,
 			Index:       i,
 		}
-		totalPower, err = StringAdd(totalPower, v.VotingPower)
-		if err != nil {
-			return
-		}
+		totalPower += v.VotingPower
 		count++
 	}
-	minimumPowerForQuorum, err := StringReducePercentage(totalPower, 33)
+	minimumPowerForQuorum := Uint64ReducePercentage(totalPower, 33)
 	if err != nil {
 		return
 	}
@@ -145,24 +142,17 @@ func (x *AggregateSignature) Check(sb SignByte, vs ValidatorSet) (isPartialQC bo
 	if er := key.SetBitmap(x.Bitmap); er != nil {
 		return false, ErrInvalidSignerBitmap(er)
 	}
-	totalSignedPower := "0"
+	totalSignedPower := uint64(0)
 	for i, val := range vs.ValidatorSet.ValidatorSet {
 		signed, er := key.SignerEnabledAt(i)
 		if er != nil {
 			return false, ErrInvalidSignerBitmap(er)
 		}
 		if signed {
-			totalSignedPower, err = StringAdd(totalSignedPower, val.VotingPower)
-			if err != nil {
-				return false, err
-			}
+			totalSignedPower += val.VotingPower
 		}
 	}
-	hasMaj23, err := StringsGTE(totalSignedPower, vs.MinimumMaj23)
-	if err != nil {
-		return false, err
-	}
-	if !hasMaj23 {
+	if totalSignedPower < vs.MinimumMaj23 {
 		return true, nil
 	}
 	return false, nil
@@ -203,7 +193,7 @@ func (x *AggregateSignature) GetNonSigners(valSet *ConsensusValidators) (nonSign
 	if er := key.SetBitmap(x.Bitmap); er != nil {
 		return nil, 0, ErrInvalidSignerBitmap(er)
 	}
-	nonSignerPower := "0"
+	var nonSignerPower uint64
 	for i, val := range vs.ValidatorSet.ValidatorSet {
 		signed, er := key.SignerEnabledAt(i)
 		if er != nil {
@@ -211,12 +201,9 @@ func (x *AggregateSignature) GetNonSigners(valSet *ConsensusValidators) (nonSign
 		}
 		if !signed {
 			nonSigners = append(nonSigners, val.PublicKey)
-			nonSignerPower, err = StringAdd(nonSignerPower, val.VotingPower)
-			if err != nil {
-				return nil, 0, err
-			}
+			nonSignerPower += val.VotingPower
 		}
 	}
-	nonSignerPercent, err = StringPercentDiv(nonSignerPower, vs.TotalPower)
+	nonSignerPercent = int(Uint64PercentageDiv(nonSignerPower, vs.TotalPower))
 	return
 }

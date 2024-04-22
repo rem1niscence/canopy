@@ -85,7 +85,7 @@ func (x *Signature) Copy() *Signature {
 
 type Mempool interface {
 	Contains(hash string) bool
-	AddTransaction(tx []byte, fee string) (recheck bool, err ErrorI)
+	AddTransaction(tx []byte, fee uint64) (recheck bool, err ErrorI)
 	DeleteTransaction(tx []byte)
 	GetTransactions(maxBytes uint64) (int, [][]byte)
 

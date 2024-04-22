@@ -69,30 +69,22 @@ func (s *StateMachine) SetValidator(validator *types.Validator) lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) UpdateConsensusValidator(address crypto.AddressI, oldStake, newStake string) lib.ErrorI {
+func (s *StateMachine) UpdateConsensusValidator(address crypto.AddressI, oldStake, newStake uint64) lib.ErrorI {
 	if err := s.DeleteConsensusValidator(address, oldStake); err != nil {
 		return err
 	}
 	return s.SetConsensusValidator(address, newStake)
 }
 
-func (s *StateMachine) SetConsensusValidator(address crypto.AddressI, stakeAmount string) lib.ErrorI {
-	stake, err := lib.StringToBigInt(stakeAmount)
-	if err != nil {
-		return err
-	}
-	return s.Set(types.KeyForConsensus(address, stake), nil)
+func (s *StateMachine) SetConsensusValidator(address crypto.AddressI, stakeAmount uint64) lib.ErrorI {
+	return s.Set(types.KeyForConsensus(address, stakeAmount), nil)
 }
 
-func (s *StateMachine) DeleteConsensusValidator(address crypto.AddressI, stakeAmount string) lib.ErrorI {
-	if stakeAmount == "" {
+func (s *StateMachine) DeleteConsensusValidator(address crypto.AddressI, stakeAmount uint64) lib.ErrorI {
+	if stakeAmount == 0 {
 		return nil
 	}
-	stake, err := lib.StringToBigInt(stakeAmount)
-	if err != nil {
-		return err
-	}
-	return s.Set(types.KeyForConsensus(address, stake), nil)
+	return s.Set(types.KeyForConsensus(address, stakeAmount), nil)
 }
 
 func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, height uint64) lib.ErrorI {

@@ -160,7 +160,7 @@ const (
 )
 
 func (x *ValidatorParams) Validate() lib.ErrorI {
-	if i, err := lib.StringToBigInt(x.ValidatorMinStake); err != nil || lib.BigIsZero(i) {
+	if x.ValidatorMinStake == 0 {
 		return ErrInvalidParam(ParamValidatorMinStake)
 	}
 	if x.ValidatorMaxCount == 0 {
@@ -193,7 +193,7 @@ func (x *ValidatorParams) Validate() lib.ErrorI {
 	if x.ValidatorProposerPercentageOfFees > 100 {
 		return ErrInvalidParam(ParamValidatorProposerPercentageOfFees)
 	}
-	if _, err := lib.StringToBigInt(x.ValidatorBlockReward); err != nil {
+	if x.ValidatorBlockReward == 0 {
 		return ErrInvalidParam(ParamValidatorBlockReward)
 	}
 	return nil
@@ -221,14 +221,6 @@ func (x *ValidatorParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.ValidatorDoubleSignSlashPercentage = value
 	case ParamValidatorProposerPercentageOfFees:
 		x.ValidatorProposerPercentageOfFees = value
-	default:
-		return ErrUnknownParam()
-	}
-	return x.Validate()
-}
-
-func (x *ValidatorParams) SetString(paramName string, value string) lib.ErrorI {
-	switch paramName {
 	case ParamValidatorMinStake:
 		x.ValidatorMinStake = value
 	case ParamValidatorBlockReward:
@@ -237,6 +229,10 @@ func (x *ValidatorParams) SetString(paramName string, value string) lib.ErrorI {
 		return ErrUnknownParam()
 	}
 	return x.Validate()
+}
+
+func (x *ValidatorParams) SetString(_ string, _ string) lib.ErrorI {
+	return ErrUnknownParam()
 }
 
 // fee param space
@@ -255,34 +251,38 @@ const (
 )
 
 func (x *FeeParams) Validate() lib.ErrorI {
-	if i, err := lib.StringToBigInt(x.MessageSendFee); err != nil || lib.BigIsZero(i) {
+	if x.MessageSendFee == 0 {
 		return ErrInvalidParam(ParamMessageSendFee)
 	}
-	if i, err := lib.StringToBigInt(x.MessageStakeFee); err != nil || lib.BigIsZero(i) {
+	if x.MessageStakeFee == 0 {
 		return ErrInvalidParam(ParamMessageStakeFee)
 	}
-	if i, err := lib.StringToBigInt(x.MessageEditStakeFee); err != nil || lib.BigIsZero(i) {
+	if x.MessageEditStakeFee == 0 {
 		return ErrInvalidParam(ParamMessageEditStakeFee)
 	}
-	if i, err := lib.StringToBigInt(x.MessageUnstakeFee); err != nil || lib.BigIsZero(i) {
+	if x.MessageUnstakeFee == 0 {
 		return ErrInvalidParam(ParamMessageUnstakeFee)
 	}
-	if i, err := lib.StringToBigInt(x.MessagePauseFee); err != nil || lib.BigIsZero(i) {
+	if x.MessagePauseFee == 0 {
 		return ErrInvalidParam(ParamMessagePauseFee)
 	}
-	if i, err := lib.StringToBigInt(x.MessageUnpauseFee); err != nil || lib.BigIsZero(i) {
+	if x.MessageUnpauseFee == 0 {
 		return ErrInvalidParam(ParamMessageUnpauseFee)
 	}
-	if i, err := lib.StringToBigInt(x.MessageChangeParameterFee); err != nil || lib.BigIsZero(i) {
+	if x.MessageChangeParameterFee == 0 {
 		return ErrInvalidParam(ParamMessageChangeParameterFee)
 	}
-	if i, err := lib.StringToBigInt(x.MessageDoubleSignFee); err != nil || lib.BigIsZero(i) {
+	if x.MessageDoubleSignFee == 0 {
 		return ErrInvalidParam(ParamMessageDoubleSignFee)
 	}
 	return nil
 }
 
-func (x *FeeParams) SetString(paramName string, value string) lib.ErrorI {
+func (x *FeeParams) SetString(_ string, _ string) lib.ErrorI {
+	return ErrUnknownParam()
+}
+
+func (x *FeeParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 	switch paramName {
 	case ParamMessageSendFee:
 		x.MessageSendFee = value
@@ -304,10 +304,6 @@ func (x *FeeParams) SetString(paramName string, value string) lib.ErrorI {
 		return ErrUnknownParam()
 	}
 	return x.Validate()
-}
-
-func (x *FeeParams) SetUint64(paramName string, value uint64) lib.ErrorI {
-	return ErrUnknownParam()
 }
 
 // governance param space

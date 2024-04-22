@@ -3,7 +3,6 @@ package types
 import (
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
-	"math/big"
 )
 
 const (
@@ -130,12 +129,8 @@ func (x *MessageDAOTransfer) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x
 func (x *MessageDAOTransfer) Name() string                { return MessageDAOTransferName }
 func (x *MessageDAOTransfer) Recipient() []byte           { return nil }
 
-func checkAmount(amount string) lib.ErrorI {
-	am, err := lib.StringToBigInt(amount)
-	if err != nil {
-		return err
-	}
-	if lib.BigLTE(am, big.NewInt(0)) {
+func checkAmount(amount uint64) lib.ErrorI {
+	if amount == 0 {
 		return ErrInvalidAmount()
 	}
 	return nil

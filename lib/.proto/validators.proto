@@ -5,7 +5,7 @@ option go_package = "github.com/ginchuco/ginchu/lib";
 
 message ConsensusValidator {
   bytes public_key = 1;
-  string voting_power = 2;
+  uint64 voting_power = 2;
   string net_address = 3;
 }
 

@@ -8,19 +8,19 @@ import "google/protobuf/any.proto";
 message MessageSend {
   bytes from_address = 1;
   bytes to_address = 2;
-  string amount = 3;
+  uint64 amount = 3;
 }
 
 message MessageStake {
   bytes public_key = 1;
-  string amount = 2;
+  uint64 amount = 2;
   string net_address = 3;
   bytes output_address = 4;
 }
 
 message MessageEditStake {
   bytes address = 1;
-  string amount = 2;
+  uint64 amount = 2;
   string net_address = 3;
   bytes output_address = 4;
 }
@@ -48,7 +48,7 @@ message MessageChangeParameter {
 
 message MessageDAOTransfer {
   bytes address = 1;
-  string amount = 2;
+  uint64 amount = 2;
   uint64 start_height = 4;
   uint64 end_height = 5;
 }

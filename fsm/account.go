@@ -4,7 +4,6 @@ import (
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
-	"math/big"
 )
 
 func (s *StateMachine) GetAccount(address crypto.AddressI) (*types.Account, lib.ErrorI) {
@@ -33,10 +32,10 @@ func (s *StateMachine) GetAccounts() ([]*types.Account, lib.ErrorI) {
 	return result, nil
 }
 
-func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (string, lib.ErrorI) {
+func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (uint64, lib.ErrorI) {
 	account, err := s.GetAccount(address)
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 	return account.Amount, nil
 }
@@ -70,14 +69,14 @@ func (s *StateMachine) SetAccounts(accounts []*types.Account) lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) AccountDeductFees(address crypto.AddressI, fee string) lib.ErrorI {
+func (s *StateMachine) AccountDeductFees(address crypto.AddressI, fee uint64) lib.ErrorI {
 	if err := s.AccountSub(address, fee); err != nil {
 		return err
 	}
 	return s.PoolAdd(types.PoolName_FeeCollector, fee)
 }
 
-func (s *StateMachine) MintToAccount(address crypto.AddressI, amount string) lib.ErrorI {
+func (s *StateMachine) MintToAccount(address crypto.AddressI, amount uint64) lib.ErrorI {
 	return s.AccountAdd(address, amount)
 }
 
@@ -93,34 +92,24 @@ func (s *StateMachine) AccountSetSequence(address crypto.AddressI, sequence uint
 	return s.SetAccount(acc)
 }
 
-func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd string) lib.ErrorI {
+func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd uint64) lib.ErrorI {
 	account, err := s.GetAccount(address)
 	if err != nil {
 		return err
 	}
-	account.Amount, err = lib.StringBigAdd(account.Amount, amountToAdd)
-	if err != nil {
-		return err
-	}
+	account.Amount += amountToAdd
 	return s.SetAccount(account)
 }
 
-func (s *StateMachine) AccountSub(address crypto.AddressI, amountToSub string) lib.ErrorI {
+func (s *StateMachine) AccountSub(address crypto.AddressI, amountToSub uint64) lib.ErrorI {
 	account, err := s.GetAccount(address)
 	if err != nil {
 		return err
 	}
-	account.Amount, err = lib.StringSub(account.Amount, amountToSub)
-	if err != nil {
-		return err
-	}
-	isLessThanZero, err := lib.StringBigLTE(account.Amount, big.NewInt(0))
-	if err != nil {
-		return err
-	}
-	if isLessThanZero {
+	if account.Amount < amountToSub {
 		return types.ErrInsufficientFunds()
 	}
+	account.Amount -= amountToSub
 	return s.SetAccount(account)
 }
 
@@ -164,12 +153,12 @@ func (s *StateMachine) GetPools() ([]*types.Pool, lib.ErrorI) {
 	return result, nil
 }
 
-func (s *StateMachine) GetPoolBalance(name types.PoolName) (*big.Int, lib.ErrorI) {
+func (s *StateMachine) GetPoolBalance(name types.PoolName) (uint64, lib.ErrorI) {
 	pool, err := s.GetPool(name)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return lib.StringToBigInt(pool.Amount)
+	return pool.Amount, nil
 }
 
 func (s *StateMachine) SetPools(pools []*types.Pool) lib.ErrorI {
@@ -192,38 +181,28 @@ func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) MintToPool(name types.PoolName, amount string) lib.ErrorI {
+func (s *StateMachine) MintToPool(name types.PoolName, amount uint64) lib.ErrorI {
 	return s.PoolAdd(name, amount)
 }
 
-func (s *StateMachine) PoolAdd(name types.PoolName, amountToAdd string) lib.ErrorI {
+func (s *StateMachine) PoolAdd(name types.PoolName, amountToAdd uint64) lib.ErrorI {
 	pool, err := s.GetPool(name)
 	if err != nil {
 		return err
 	}
-	pool.Amount, err = lib.StringBigAdd(pool.Amount, amountToAdd)
-	if err != nil {
-		return err
-	}
+	pool.Amount += amountToAdd
 	return s.SetPool(pool)
 }
 
-func (s *StateMachine) PoolSub(name types.PoolName, amountToSub string) lib.ErrorI {
+func (s *StateMachine) PoolSub(name types.PoolName, amountToSub uint64) lib.ErrorI {
 	pool, err := s.GetPool(name)
 	if err != nil {
 		return err
 	}
-	pool.Amount, err = lib.StringSub(pool.Amount, amountToSub)
-	if err != nil {
-		return err
-	}
-	isLessThanZero, err := lib.StringBigLTE(pool.Amount, big.NewInt(0))
-	if err != nil {
-		return err
-	}
-	if isLessThanZero {
+	if pool.Amount < amountToSub {
 		return types.ErrInsufficientFunds()
 	}
+	pool.Amount -= amountToSub
 	return s.SetPool(pool)
 }
 
