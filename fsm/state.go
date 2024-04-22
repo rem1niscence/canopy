@@ -19,43 +19,57 @@ type StateMachine struct {
 }
 
 func New(c lib.Config, store lib.StoreI) (*StateMachine, lib.ErrorI) {
-	// TODO handle genesis state (add state machine config, read genesis file, import it to db etc.)
-	latestHeight := store.Version()
-	lastHeightStore, err := store.NewReadOnly(latestHeight - 1)
-	if err != nil {
-		return nil, err
-	}
-	latestHeightFSM := StateMachine{store: lastHeightStore}
-	validatorSet, err := latestHeightFSM.GetConsensusValidators()
-	if err != nil {
-		return nil, err
-	}
-	lastBlock, err := store.GetBlockByHeight(latestHeight - 1)
-	if err != nil {
-		return nil, err
-	}
-	return &StateMachine{
-		Config: c,
-		BeginBlockParams: &lib.BeginBlockParams{
-			BlockHeader:  lastBlock.BlockHeader,
-			ValidatorSet: validatorSet,
-		},
+	sm := &StateMachine{
+		Config:            c,
+		BeginBlockParams:  new(lib.BeginBlockParams),
 		ProtocolVersion:   c.ProtocolVersion,
 		NetworkID:         c.NetworkID,
-		height:            latestHeight,
 		proposeVoteConfig: types.AcceptAllProposals,
-		store:             store,
-	}, nil
+	}
+	return sm, sm.Initialize(store)
 }
 
 func NewWithBeginBlock(bb *lib.BeginBlockParams, c lib.Config, height uint64, store lib.RWStoreI) *StateMachine {
 	return &StateMachine{
-		Config:           c,
-		BeginBlockParams: bb,
-		ProtocolVersion:  c.ProtocolVersion,
-		NetworkID:        c.NetworkID,
-		height:           height,
-		store:            store,
+		Config:            c,
+		BeginBlockParams:  bb,
+		ProtocolVersion:   c.ProtocolVersion,
+		NetworkID:         c.NetworkID,
+		height:            height,
+		proposeVoteConfig: types.AcceptAllProposals,
+		store:             store,
+	}
+}
+
+func (s *StateMachine) Initialize(db lib.StoreI) (error lib.ErrorI) {
+	s.height, s.store = db.Version(), db
+	if s.height != 0 {
+		lastStore, err := db.NewReadOnly(s.height - 1)
+		if err != nil {
+			return err
+		}
+		lastFSM := StateMachine{store: lastStore}
+		if s.BeginBlockParams.ValidatorSet, err = lastFSM.GetConsensusValidators(); err != nil {
+			return err
+		}
+		if s.height != 1 {
+			blk, e := db.GetBlockByHeight(s.height - 1)
+			if e != nil {
+				return e
+			}
+			s.BeginBlockParams.BlockHeader = blk.BlockHeader
+		} else {
+			s.BeginBlockParams.BlockHeader, err = s.GenesisBlockHeader()
+			if err != nil {
+				return err
+			}
+		}
+		return
+	} else {
+		if err := s.NewFromGenesisFile(); err != nil {
+			return err
+		}
+		return s.Initialize(db)
 	}
 }
 
@@ -209,7 +223,10 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 }
 
 func (s *StateMachine) GetHistoricalValidatorSet(height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	fsm, err := s.TimeMachine(height - 1) // end block state is begin block of next height
+	if height != 0 {
+		height -= 1 // end block state is begin block of next height
+	}
+	fsm, err := s.TimeMachine(height)
 	if err != nil {
 		return lib.ValidatorSet{}, err
 	}

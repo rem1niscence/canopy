@@ -6,6 +6,7 @@ import (
 )
 
 type Config struct {
+	StateMachineConfig
 	StoreConfig
 	P2PConfig
 	ConsensusConfig
@@ -14,10 +15,21 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		StoreConfig:     DefaultStoreConfig(),
-		P2PConfig:       DefaultP2PConfig(),
-		ConsensusConfig: DefaultConsensusConfig(),
-		MempoolConfig:   DefaultMempoolConfig(),
+		StateMachineConfig: DefaultStateMachineConfig(),
+		StoreConfig:        DefaultStoreConfig(),
+		P2PConfig:          DefaultP2PConfig(),
+		ConsensusConfig:    DefaultConsensusConfig(),
+		MempoolConfig:      DefaultMempoolConfig(),
+	}
+}
+
+type StateMachineConfig struct {
+	GenesisFileName string
+}
+
+func DefaultStateMachineConfig() StateMachineConfig {
+	return StateMachineConfig{
+		GenesisFileName: "genesis.json",
 	}
 }
 

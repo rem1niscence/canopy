@@ -5,6 +5,14 @@ import (
 	"github.com/ginchuco/ginchu/lib"
 )
 
+func ErrReadGenesisFile(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeReadGenesisFile, lib.StateMachineModule, fmt.Sprintf("read genesis file failed with err: %s", err.Error()))
+}
+
+func ErrUnmarshalGenesis(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeUnmarshalGenesis, lib.StateMachineModule, fmt.Sprintf("unmarshal genesis failed with err: %s", err.Error()))
+}
+
 func ErrUnauthorizedTx() lib.ErrorI {
 	return lib.NewError(lib.CodeUnauthorizedTx, lib.StateMachineModule, "unauthorized tx")
 }
@@ -130,7 +138,7 @@ func ErrEmptyGovParams() lib.ErrorI {
 }
 
 func ErrUnknownParam() lib.ErrorI {
-	return lib.NewError(lib.CodeUnknownParamType, lib.StateMachineModule, "unknown param")
+	return lib.NewError(lib.CodeUnknownParam, lib.StateMachineModule, "unknown param")
 }
 
 func ErrUnknownParamSpace() lib.ErrorI {

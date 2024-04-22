@@ -1,10 +1,65 @@
 package fsm
 
 import (
+	"encoding/json"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
+	"os"
+	"path/filepath"
+	"strings"
 )
+
+func (s *StateMachine) NewFromGenesisFile() lib.ErrorI {
+	genesis, err := s.ReadGenesisFromFile()
+	if err != nil {
+		return err
+	}
+	if err = s.NewStateFromGenesis(genesis); err != nil {
+		return err
+	}
+	if _, err = s.store.(lib.StoreI).Commit(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *StateMachine) GenesisBlockHeader() (*lib.BlockHeader, lib.ErrorI) {
+	genesis, err := s.ReadGenesisFromFile()
+	if err != nil {
+		return nil, err
+	}
+	maxHash, maxAddress := []byte(strings.Repeat("F", crypto.HashSize*2)), []byte(strings.Repeat("F", crypto.AddressSize*2))
+	return &lib.BlockHeader{
+		Height:                0,
+		Hash:                  maxHash,
+		NetworkId:             s.Config.NetworkID,
+		Time:                  genesis.Time,
+		NumTxs:                0,
+		TotalTxs:              0,
+		LastBlockHash:         maxHash,
+		StateRoot:             maxHash,
+		TransactionRoot:       maxHash,
+		ValidatorRoot:         maxHash,
+		NextValidatorRoot:     maxHash,
+		ProposerAddress:       maxAddress,
+		BadProposers:          nil,
+		LastDoubleSigners:     nil,
+		LastQuorumCertificate: nil,
+	}, nil
+}
+
+func (s *StateMachine) ReadGenesisFromFile() (genesis *types.GenesisState, e lib.ErrorI) {
+	bz, err := os.ReadFile(filepath.Join(s.Config.DataDirPath, s.Config.GenesisFileName))
+	if err != nil {
+		return nil, types.ErrReadGenesisFile(err)
+	}
+	if err = json.Unmarshal(bz, genesis); err != nil {
+		return nil, types.ErrUnmarshalGenesis(err)
+	}
+	e = s.ValidateGenesisState(genesis)
+	return
+}
 
 func (s *StateMachine) NewStateFromGenesis(genesis *types.GenesisState) lib.ErrorI {
 	if err := s.SetAccounts(genesis.Accounts); err != nil {

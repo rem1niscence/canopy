@@ -6,10 +6,12 @@ option go_package = "github.com/ginchuco/ginchu/fsm/types";
 import "account.proto";
 import "validator.proto";
 import "gov.proto";
+import "google/protobuf/timestamp.proto";
 
 message GenesisState {
-  repeated Pool pools = 1;
-  repeated Account accounts = 2;
-  repeated Validator validators = 3;
-  Params params = 4;
+  google.protobuf.Timestamp time = 1;
+  repeated Pool pools = 2;
+  repeated Account accounts = 3;
+  repeated Validator validators = 4;
+  Params params = 5;
 }

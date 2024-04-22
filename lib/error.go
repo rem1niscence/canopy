@@ -89,6 +89,7 @@ const (
 	CodeWrongMaxHeight            ErrorCode = 50
 
 	StateMachineModule          ErrorModule = "state_machine"
+	CodeReadGenesisFile         ErrorCode   = 1
 	CodeFeeBelowState           ErrorCode   = 2
 	CodeUnauthorizedTx          ErrorCode   = 3
 	CodeEmptySignature          ErrorCode   = 4
@@ -141,6 +142,7 @@ const (
 	CodeInvalidProtocolVersion  ErrorCode   = 56
 	CodeInvalidAddressKey       ErrorCode   = 57
 	CodeWrongStoreType          ErrorCode   = 58
+	CodeUnmarshalGenesis        ErrorCode   = 59
 
 	P2PModule                 ErrorModule = "p2p"
 	CodeUnknownP2PMessage     ErrorCode   = 1
