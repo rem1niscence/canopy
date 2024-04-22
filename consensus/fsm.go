@@ -83,8 +83,8 @@ func (c *Consensus) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) 
 // - sets up the app for the next height
 func (c *Consensus) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
 	defer func() { c.FSM.ResetToBeginBlock() }()
-	store, block := c.FSM.Store().(lib.StoreI), qc.Block
-	blockResult, nextValidatorSet, err := c.FSM.ApplyAndValidateBlock(block, nil, false)
+	store, blk := c.FSM.Store().(lib.StoreI), qc.Block
+	blockResult, nextVals, err := c.FSM.ApplyAndValidateBlock(blk, nil, false)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (c *Consensus) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
 	if err = store.IndexBlock(blockResult); err != nil {
 		return err
 	}
-	for _, tx := range block.Transactions {
+	for _, tx := range blk.Transactions {
 		c.Mempool.DeleteTransaction(tx)
 	}
 	if err = c.Mempool.checkMempool(); err != nil {
@@ -103,14 +103,11 @@ func (c *Consensus) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
 	if _, err = store.Commit(); err != nil {
 		return err
 	}
-	c.LastValidatorSet, c.Height = c.ValidatorSet, block.BlockHeader.Height+1
-	if c.ValidatorSet, err = lib.NewValidatorSet(nextValidatorSet); err != nil {
+	c.LastValidatorSet, c.Height = c.ValidatorSet, blk.BlockHeader.Height+1
+	if c.ValidatorSet, err = lib.NewValidatorSet(nextVals); err != nil {
 		return err
 	}
-	c.FSM = fsm.NewWithBeginBlock(
-		&lib.BeginBlockParams{BlockHeader: block.BlockHeader, ValidatorSet: nextValidatorSet},
-		c.FSM.ProtocolVersion, c.FSM.NetworkID, c.Height, store,
-	)
+	c.FSM = fsm.NewWithBeginBlock(&lib.BeginBlockParams{BlockHeader: blk.BlockHeader, ValidatorSet: nextVals}, c.Config, c.Height, store)
 	if c.Mempool.FSM, err = c.FSM.Copy(); err != nil {
 		return err
 	}

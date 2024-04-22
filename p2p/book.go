@@ -18,12 +18,12 @@ const (
 	PeerBookRequestTimeoutS      = 5
 	CrawlAndCleanBookFrequency   = time.Hour
 
-	GoodPeerBookResponseBoost       = 3
-	PeerBookRequestTimeoutSlash     = -1
-	PeerUnexpectedMessageSlash      = -1
-	PeerInvalidMessageSlash         = -3
-	PeerMaxPeerBookRequestsExceeded = -3
-	PeerMaxBookLenExceeded          = -3
+	GoodPeerBookRespRep   = 3
+	PeerBookReqTimeoutRep = -1
+	UnexpectedMsgRep      = -1
+	InvalidMsgRep         = -3
+	ExceedMaxPBReqRep     = -3
+	ExceedMaxPBLenRep     = -3
 )
 
 type PeerBook struct {
@@ -111,15 +111,15 @@ func (p *P2P) SendPeerBookRequests() {
 			senderID := msg.Sender.Address.PublicKey
 			peerBookResponseMsg, ok := msg.Message.(*PeerBookResponseMessage)
 			if !ok {
-				p.ChangeReputation(senderID, PeerInvalidMessageSlash)
+				p.ChangeReputation(senderID, InvalidMsgRep)
 				continue
 			}
 			if !bytes.Equal(msg.Sender.Address.PublicKey, peerInfo.Address.PublicKey) {
-				p.ChangeReputation(senderID, PeerUnexpectedMessageSlash)
+				p.ChangeReputation(senderID, UnexpectedMsgRep)
 				continue
 			}
 			if len(peerBookResponseMsg.Book) > MaxPeerBookLen {
-				p.ChangeReputation(senderID, PeerMaxBookLenExceeded)
+				p.ChangeReputation(senderID, ExceedMaxPBLenRep)
 				continue
 			}
 			p.book.Lock()
@@ -127,9 +127,9 @@ func (p *P2P) SendPeerBookRequests() {
 				p.book.Add(b)
 			}
 			p.book.Unlock()
-			p.ChangeReputation(senderID, GoodPeerBookResponseBoost)
+			p.ChangeReputation(senderID, GoodPeerBookRespRep)
 		case <-time.After(PeerBookRequestTimeoutS):
-			p.ChangeReputation(peerInfo.Address.PublicKey, PeerBookRequestTimeoutSlash)
+			p.ChangeReputation(peerInfo.Address.PublicKey, PeerBookReqTimeoutRep)
 			continue
 		}
 	}
@@ -144,14 +144,14 @@ func (p *P2P) ListenForPeerBookRequests() {
 			sender := lib.BytesToString(senderID)
 			blocked, totalBlock := l.NewRequest(sender)
 			if blocked {
-				p.ChangeReputation(senderID, PeerMaxPeerBookRequestsExceeded)
+				p.ChangeReputation(senderID, ExceedMaxPBReqRep)
 				continue
 			}
 			if totalBlock {
 				continue // dos defensive
 			}
 			if _, ok := msg.Message.(*PeerBookRequestMessage); !ok {
-				p.ChangeReputation(senderID, PeerInvalidMessageSlash)
+				p.ChangeReputation(senderID, InvalidMsgRep)
 				continue
 			}
 			p.book.RLock()
@@ -176,14 +176,14 @@ func (p *P2P) ListenForPeerJoin() {
 			sender := lib.BytesToString(senderID)
 			blocked, totalBlock := l.NewRequest(sender)
 			if blocked {
-				p.ChangeReputation(senderID, PeerMaxPeerBookRequestsExceeded)
+				p.ChangeReputation(senderID, ExceedMaxPBReqRep)
 				continue
 			}
 			if totalBlock {
 				continue // dos defensive
 			}
 			if _, ok := msg.Message.(*PeerBookRequestMessage); !ok {
-				p.ChangeReputation(senderID, PeerInvalidMessageSlash)
+				p.ChangeReputation(senderID, InvalidMsgRep)
 				continue
 			}
 			p.book.RLock()

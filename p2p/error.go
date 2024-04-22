@@ -78,10 +78,6 @@ func ErrFailedListen(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeFailedListen, lib.P2PModule, fmt.Sprintf("net.listen() failed with err: %s", err.Error()))
 }
 
-func ErrHostAndPortFromRemote(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeHostAndPortFromRemote, lib.P2PModule, fmt.Sprintf("net.hostAndPortFromRemote() failed with err: %s", err.Error()))
-}
-
 func ErrIPLookup(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeIPLookup, lib.P2PModule, fmt.Sprintf("net.ipLookup() failed with err: %s", err.Error()))
 }

@@ -47,7 +47,7 @@ func New(pk crypto.PrivateKeyI, c lib.Config, l lib.LoggerI) (*Consensus, lib.Er
 	if err != nil {
 		return nil, err
 	}
-	sm, err := fsm.New(c.ProtocolVersion, c.NetworkID, db)
+	sm, err := fsm.New(c, db)
 	if err != nil {
 		return nil, err
 	}

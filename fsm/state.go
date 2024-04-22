@@ -9,6 +9,7 @@ import (
 )
 
 type StateMachine struct {
+	Config            lib.Config
 	BeginBlockParams  *lib.BeginBlockParams
 	ProtocolVersion   int
 	NetworkID         uint32
@@ -17,8 +18,8 @@ type StateMachine struct {
 	store             lib.RWStoreI
 }
 
-func New(protocolVersion int, networkID uint32, store lib.StoreI) (*StateMachine, lib.ErrorI) {
-	// TODO handle genesis state
+func New(c lib.Config, store lib.StoreI) (*StateMachine, lib.ErrorI) {
+	// TODO handle genesis state (add state machine config, read genesis file, import it to db etc.)
 	latestHeight := store.Version()
 	lastHeightStore, err := store.NewReadOnly(latestHeight - 1)
 	if err != nil {
@@ -34,23 +35,25 @@ func New(protocolVersion int, networkID uint32, store lib.StoreI) (*StateMachine
 		return nil, err
 	}
 	return &StateMachine{
+		Config: c,
 		BeginBlockParams: &lib.BeginBlockParams{
 			BlockHeader:  lastBlock.BlockHeader,
 			ValidatorSet: validatorSet,
 		},
-		ProtocolVersion:   protocolVersion,
-		NetworkID:         networkID,
+		ProtocolVersion:   c.ProtocolVersion,
+		NetworkID:         c.NetworkID,
 		height:            latestHeight,
 		proposeVoteConfig: types.AcceptAllProposals,
 		store:             store,
 	}, nil
 }
 
-func NewWithBeginBlock(bb *lib.BeginBlockParams, protocolVersion int, networkID uint32, height uint64, store lib.RWStoreI) *StateMachine {
+func NewWithBeginBlock(bb *lib.BeginBlockParams, c lib.Config, height uint64, store lib.RWStoreI) *StateMachine {
 	return &StateMachine{
+		Config:           c,
 		BeginBlockParams: bb,
-		ProtocolVersion:  protocolVersion,
-		NetworkID:        networkID,
+		ProtocolVersion:  c.ProtocolVersion,
+		NetworkID:        c.NetworkID,
 		height:           height,
 		store:            store,
 	}
@@ -202,7 +205,7 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 	if err != nil {
 		return nil, err
 	}
-	return New(s.ProtocolVersion, s.NetworkID, newStore)
+	return New(s.Config, newStore)
 }
 
 func (s *StateMachine) GetHistoricalValidatorSet(height uint64) (lib.ValidatorSet, lib.ErrorI) {
