@@ -374,7 +374,7 @@ func (c *Consensus) HandleMessage(message proto.Message) lib.ErrorI {
 			}
 			return c.Votes.AddVote(proposer, height, msg, vs, c.LoadValSet, minEvidenceHeight, c.GetEvidenceByHeight)
 		case msg.IsProposerMessage():
-			partialQC, err := msg.CheckProposerMessage(proposer, blockHash, height, c.LoadValSet, vs)
+			partialQC, err := msg.CheckProposerMessage(proposer, blockHash, height, c.LoadValSet)
 			if err != nil {
 				return err
 			}

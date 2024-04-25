@@ -37,7 +37,7 @@ func (x *Message) SignBytes() (signBytes []byte, err lib.ErrorI) {
 }
 
 func (x *Message) CheckProposerMessage(expectedProposer, expectedBlockHash []byte, height uint64,
-	loadValSet func(height uint64) (lib.ValidatorSet, lib.ErrorI), vals ValSet) (isPartialQC bool, err lib.ErrorI) {
+	loadValSet func(height uint64) (lib.ValidatorSet, lib.ErrorI)) (isPartialQC bool, err lib.ErrorI) {
 	if err = x.checkBasic(0); err != nil {
 		return false, err
 	}
@@ -57,6 +57,7 @@ func (x *Message) CheckProposerMessage(expectedProposer, expectedBlockHash []byt
 			return false, ErrMismatchPublicKeys()
 		}
 	} else {
+		var vals ValSet
 		if x.Qc.Header == nil {
 			return false, lib.ErrEmptyView()
 		}

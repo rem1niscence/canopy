@@ -55,7 +55,7 @@ func (e *DoubleSignEvidences) HasDoubleSigners() bool {
 	return false
 }
 
-func (x DoubleSignEvidence) GetBadSigners(getEvByHeight func(height uint64) (*DoubleSigners, ErrorI),
+func (x *DoubleSignEvidence) GetBadSigners(getEvByHeight func(height uint64) (*DoubleSigners, ErrorI),
 	getValSet func(height uint64) (ValidatorSet, ErrorI)) (pubKeys [][]byte) {
 	ddMap := make(DeDuplicateMap)
 	var valSet ValidatorSet
