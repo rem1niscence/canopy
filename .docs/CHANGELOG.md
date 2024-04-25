@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [Unreleased] - 04/25/2024
+- Changed `evidence` to be accepted from any height
+- Index `double_signers`
+- Added genesis and startup functionality
+- Data directory functionality
+- Genesis block is `1` not `0`
+
 ## [Unreleased] - 04/21/2024
 
 - Cleanup `consensus` module
