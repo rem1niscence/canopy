@@ -83,9 +83,11 @@ func (s *Store) NewReadOnly(version uint64) (lib.StoreI, lib.ErrorI) {
 	reader := s.db.NewTransactionAt(version, false)
 	return &Store{
 		version: version,
-		log:     nil,
+		log:     s.log,
+		db:      s.db,
 		ss:      NewTxnWrapper(reader, s.log, stateStorePrefix),
 		sc:      NewSMTWrapper(NewTxnWrapper(reader, s.log, stateCommitmentPrefix), id.Root, s.log),
+		ix:      s.ix,
 	}, nil
 }
 
@@ -134,7 +136,6 @@ func (s *Store) Version() uint64                                  { return s.ver
 func (s *Store) NewTxn() lib.StoreTxnI                            { return NewTxn(s) }
 func (s *Store) Root() (root []byte, err lib.ErrorI)              { return s.sc.Root() }
 func (s *Store) Commit() (root []byte, err lib.ErrorI) {
-	s.version++
 	s.root, err = s.sc.Commit()
 	if err != nil {
 		return nil, err
@@ -145,6 +146,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	if err := s.writer.CommitAt(s.version, nil); err != nil {
 		return nil, ErrCommitDB(err)
 	}
+	s.version++
 	s.resetWriter(s.root)
 	return lib.CopyBytes(s.root), nil
 }
@@ -211,6 +213,9 @@ func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *CommitID) {
 	if err = lib.Unmarshal(bz, id); err != nil {
 		log.Fatalf("unmarshalCommitID() failed with err: %s", err.Error())
 	}
+	if id.Height == 0 {
+		id.Height++
+	}
 	return
 }
 
@@ -248,6 +253,10 @@ func (s *Store) GetBlockByHeight(h uint64) (*lib.BlockResult, lib.ErrorI) {
 	return s.ix.GetBlockByHeight(h)
 }
 
+func (s *Store) DeleteDoubleSignersForHeight(h uint64) lib.ErrorI {
+	return s.ix.DeleteDoubleSignersForHeight(h)
+}
+
 func (s *Store) IndexQC(qc *lib.QuorumCertificate) lib.ErrorI {
 	return s.ix.IndexQC(qc)
 }
@@ -258,6 +267,10 @@ func (s *Store) GetQCByHeight(height uint64) (*lib.QuorumCertificate, lib.ErrorI
 
 func (s *Store) DeleteQCForHeight(height uint64) lib.ErrorI {
 	return s.ix.DeleteQCForHeight(height)
+}
+
+func (s *Store) GetDoubleSigners(h uint64) (*lib.DoubleSigners, lib.ErrorI) {
+	return s.ix.GetDoubleSigners(h)
 }
 
 func (s *Store) Close() lib.ErrorI {

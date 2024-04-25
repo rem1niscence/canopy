@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+// TODO unstaking limitations and force unstake for slash below minimum stake
+
 type StateMachine struct {
 	Config            lib.Config
 	BeginBlockParams  *lib.BeginBlockParams
@@ -43,8 +45,8 @@ func NewWithBeginBlock(bb *lib.BeginBlockParams, c lib.Config, height uint64, st
 
 func (s *StateMachine) Initialize(db lib.StoreI) (error lib.ErrorI) {
 	s.height, s.store = db.Version(), db
-	if s.height != 0 {
-		lastStore, err := db.NewReadOnly(s.height - 1)
+	if s.height != 1 {
+		lastStore, err := db.NewReadOnly(s.height)
 		if err != nil {
 			return err
 		}
@@ -52,8 +54,8 @@ func (s *StateMachine) Initialize(db lib.StoreI) (error lib.ErrorI) {
 		if s.BeginBlockParams.ValidatorSet, err = lastFSM.GetConsensusValidators(); err != nil {
 			return err
 		}
-		if s.height != 1 {
-			blk, e := db.GetBlockByHeight(s.height - 1)
+		if s.height != 2 {
+			blk, e := db.GetBlockByHeight(s.height)
 			if e != nil {
 				return e
 			}
@@ -113,8 +115,8 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 		TransactionRoot:       txRoot,
 		ValidatorRoot:         validatorRoot,
 		NextValidatorRoot:     nextValidatorRoot,
+		Evidence:              b.BlockHeader.Evidence,
 		ProposerAddress:       b.BlockHeader.ProposerAddress,
-		LastDoubleSigners:     b.BlockHeader.LastDoubleSigners,
 		BadProposers:          b.BlockHeader.BadProposers,
 		LastQuorumCertificate: b.BlockHeader.LastQuorumCertificate,
 	}
@@ -132,10 +134,6 @@ func (s *StateMachine) ValidateBlock(header *lib.BlockHeader, compare *lib.Block
 	if !bytes.Equal(hash, header.Hash) {
 		return lib.ErrUnequalBlockHash()
 	}
-	lastVS, err := s.GetHistoricalValidatorSet(header.Height - 1)
-	if err != nil {
-		return err
-	}
 	vs, err := lib.NewValidatorSet(s.BeginBlockParams.ValidatorSet)
 	if err != nil {
 		return err
@@ -151,7 +149,12 @@ func (s *StateMachine) ValidateBlock(header *lib.BlockHeader, compare *lib.Block
 		return err
 	}
 	if isCandidateBlock {
-		if err = header.ValidateByzantineEvidence(vs, lastVS, evidence); err != nil {
+		var minimumEvidenceAge uint64
+		minimumEvidenceAge, err = s.GetMinimumEvidenceHeight()
+		if err != nil {
+			return err
+		}
+		if err = header.ValidateByzantineEvidence(s.LoadValSet, s.store.(lib.StoreI).GetDoubleSigners, evidence, minimumEvidenceAge); err != nil {
 			return err
 		}
 	}
@@ -215,15 +218,39 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 	if !ok {
 		return nil, types.ErrWrongStoreType()
 	}
-	newStore, err := store.NewReadOnly(height)
+	heightBeforeStore, err := store.NewReadOnly(height - 1)
 	if err != nil {
 		return nil, err
 	}
-	return New(s.Config, newStore)
+	qc, err := heightBeforeStore.GetBlockByHeight(height - 1)
+	if err != nil {
+		return nil, err
+	}
+	if height < 2 {
+		qc.BlockHeader, err = s.GenesisBlockHeader()
+		if err != nil {
+			return nil, err
+		}
+	}
+	heightBeforeStateMachine := StateMachine{store: heightBeforeStore}
+	consensusValidators, err := heightBeforeStateMachine.GetConsensusValidators()
+	if err != nil {
+		return nil, err
+	}
+	heightStore, err := store.NewReadOnly(height)
+	if err != nil {
+		return nil, err
+	}
+	return NewWithBeginBlock(&lib.BeginBlockParams{
+		BlockHeader:  qc.BlockHeader,
+		ValidatorSet: consensusValidators,
+	}, s.Config, height, heightStore), nil
 }
 
-func (s *StateMachine) GetHistoricalValidatorSet(height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	if height != 0 {
+func (s *StateMachine) LoadValSet(height uint64) (lib.ValidatorSet, lib.ErrorI) {
+	if height <= 2 {
+		height = 2 // 2 is first non-genesis height
+	} else {
 		height -= 1 // end block state is begin block of next height
 	}
 	fsm, err := s.TimeMachine(height)
@@ -235,6 +262,10 @@ func (s *StateMachine) GetHistoricalValidatorSet(height uint64) (lib.ValidatorSe
 		return lib.ValidatorSet{}, err
 	}
 	return lib.NewValidatorSet(vs)
+}
+
+func (s *StateMachine) LoadEvidence(height uint64) (*lib.DoubleSigners, lib.ErrorI) {
+	return s.store.(lib.StoreI).GetDoubleSigners(height)
 }
 
 func (s *StateMachine) GetMaxValidators() (uint64, lib.ErrorI) {
@@ -253,7 +284,7 @@ func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
 	return consParams.BlockSize, nil
 }
 
-func (s *StateMachine) GetBlockAndCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
+func (s *StateMachine) LoadBlockAndQC(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
 	store, ok := s.store.(lib.StoreI)
 	if !ok {
 		return nil, types.ErrWrongStoreType()
@@ -261,8 +292,8 @@ func (s *StateMachine) GetBlockAndCertificate(height uint64) (*lib.QuorumCertifi
 	return store.GetQCByHeight(height)
 }
 
-func (s *StateMachine) GetCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
-	qc, err := s.GetBlockAndCertificate(height)
+func (s *StateMachine) LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
+	qc, err := s.LoadBlockAndQC(height)
 	if err != nil {
 		return nil, err
 	}

@@ -70,7 +70,7 @@ func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) ([][]byte, in
 	return x.Signature.GetNonSigners(vs)
 }
 
-func (x *DoubleSignEvidence) CheckBasic(latestHeight uint64) ErrorI {
+func (x *DoubleSignEvidence) CheckBasic() ErrorI {
 	if x == nil {
 		return ErrEmptyEvidence()
 	}
@@ -83,13 +83,13 @@ func (x *DoubleSignEvidence) CheckBasic(latestHeight uint64) ErrorI {
 	if x.VoteA.Header.Round >= MaxRound {
 		return ErrWrongRound()
 	}
-	if x.VoteA.Header.Height != latestHeight || x.VoteA.Header.Height != latestHeight-1 {
-		return ErrWrongHeight()
-	}
 	return nil
 }
 
-func (x *DoubleSignEvidence) Check(vs ValidatorSet) ErrorI {
+func (x *DoubleSignEvidence) Check(vs ValidatorSet, minimumEvidenceHeight uint64) ErrorI {
+	if x.VoteA.Header.Height < minimumEvidenceHeight {
+		return ErrEvidenceTooOld()
+	}
 	if _, err := x.VoteA.Check(x.VoteA.Header.Height, vs); err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (x *View) Check(height uint64) ErrorI {
 	if x.Round >= MaxRound {
 		return ErrWrongRound()
 	}
-	if x.Height != height {
+	if height != 0 && x.Height != height {
 		return ErrWrongHeight()
 	}
 	return nil

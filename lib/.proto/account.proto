@@ -10,11 +10,16 @@ message Account {
 }
 
 message Pool {
-  PoolName name = 1;
+  PoolID id = 1;
   uint64 amount = 2;
 }
 
-enum PoolName {
+message Supply {
+  uint64 total = 1;
+  uint64 staked = 2;
+}
+
+enum PoolID {
   PoolNameUnspecified = 0;
   FeeCollector = 1;
   DAO = 2;

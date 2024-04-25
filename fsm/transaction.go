@@ -48,11 +48,7 @@ func (s *StateMachine) CheckTx(transaction []byte) (result *CheckTxResult, err l
 	if err != nil {
 		return
 	}
-	stateLimitFee, err := s.GetFeeForMessage(msg)
-	if err != nil {
-		return
-	}
-	if err = s.CheckFee(tx.Fee, stateLimitFee); err != nil {
+	if err = s.CheckFee(tx.Fee, msg); err != nil {
 		return
 	}
 	return &CheckTxResult{
@@ -122,8 +118,12 @@ func (s *StateMachine) CheckMessage(msg *anypb.Any) (message lib.MessageI, err l
 	return message, nil
 }
 
-func (s *StateMachine) CheckFee(fee, stateLimit uint64) lib.ErrorI {
-	if fee < stateLimit {
+func (s *StateMachine) CheckFee(fee uint64, msg lib.MessageI) lib.ErrorI {
+	stateLimitFee, err := s.GetFeeForMessage(msg)
+	if err != nil {
+		return err
+	}
+	if fee < stateLimitFee {
 		return types.ErrTxFeeBelowStateLimit()
 	}
 	return nil

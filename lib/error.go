@@ -74,19 +74,19 @@ const (
 	CodeEmptyEvidence                   ErrorCode = 35
 	CodeAggregateSignature              ErrorCode = 36
 	CodeEmptyQuorumCertificate          ErrorCode = 37
-
-	CodeMismatchBlocks            ErrorCode = 39
-	CodeFailedSafeNode            ErrorCode = 40
-	CodeInvalidValidatorIndex     ErrorCode = 41
-	CodeUnableToAddSigner         ErrorCode = 42
-	CodeEmptyProposerMessage      ErrorCode = 43
-	CodeInvalidBlockTime          ErrorCode = 44
-	CodeInvalidEvidence           ErrorCode = 45
-	CodeDuplicateEvidence         ErrorCode = 46
-	CodeMismatchDoubleSignerCount ErrorCode = 47
-	CodeMismatchEvidenceAndHeader ErrorCode = 48
-	CodeMismatchBadProposerCount  ErrorCode = 49
-	CodeWrongMaxHeight            ErrorCode = 50
+	CodeEvidenceTooOld                  ErrorCode = 38
+	CodeMismatchBlocks                  ErrorCode = 39
+	CodeFailedSafeNode                  ErrorCode = 40
+	CodeInvalidValidatorIndex           ErrorCode = 41
+	CodeUnableToAddSigner               ErrorCode = 42
+	CodeEmptyProposerMessage            ErrorCode = 43
+	CodeInvalidBlockTime                ErrorCode = 44
+	CodeInvalidEvidence                 ErrorCode = 45
+	CodeDuplicateEvidence               ErrorCode = 46
+	CodeMismatchDoubleSignerCount       ErrorCode = 47
+	CodeMismatchEvidenceAndHeader       ErrorCode = 48
+	CodeMismatchBadProposerCount        ErrorCode = 49
+	CodeWrongMaxHeight                  ErrorCode = 50
 
 	StateMachineModule          ErrorModule = "state_machine"
 	CodeReadGenesisFile         ErrorCode   = 1
@@ -143,6 +143,7 @@ const (
 	CodeInvalidAddressKey       ErrorCode   = 57
 	CodeWrongStoreType          ErrorCode   = 58
 	CodeUnmarshalGenesis        ErrorCode   = 59
+	CodeInsufficientSupply      ErrorCode   = 60
 
 	P2PModule                 ErrorModule = "p2p"
 	CodeUnknownP2PMessage     ErrorCode   = 1
@@ -218,7 +219,7 @@ func (p *Error) Module() ErrorModule { return p.module }
 func (p *Error) String() string      { return p.Error() }
 
 func (p *Error) Error() string {
-	return fmt.Sprintf("Code:\t%d\nModule:\t%s\nMessage:\t%s", p.code, p.module, p.msg)
+	return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s", p.module, p.code, p.msg)
 }
 
 // error implementations below for the `types` package
@@ -384,6 +385,10 @@ func ErrEmptyEvidence() ErrorI {
 
 func ErrInvalidEvidence() ErrorI {
 	return NewError(CodeInvalidEvidence, ConsensusModule, "evidence is invalid")
+}
+
+func ErrEvidenceTooOld() ErrorI {
+	return NewError(CodeEvidenceTooOld, ConsensusModule, "evidence is too old")
 }
 
 func ErrInvalidProposerPubKey() ErrorI {

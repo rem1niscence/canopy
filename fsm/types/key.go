@@ -17,10 +17,11 @@ var (
 	paramsPrefix    = []byte{7}
 	nonSignerPrefix = []byte{8}
 	producersPrefix = []byte{9}
+	supplyPrefix    = []byte{10}
 )
 
 func KeyForAccount(address crypto.AddressI) []byte { return append(accountPrefix, address.Bytes()...) }
-func KeyForPool(n PoolName) []byte                 { return append(poolPrefix, lib.ProtoEnumToBytes(uint32(n))...) }
+func KeyForPool(n PoolID) []byte                   { return append(poolPrefix, lib.ProtoEnumToBytes(uint32(n))...) }
 func KeyForValidator(addr crypto.AddressI) []byte  { return append(validatorPrefix, addr.Bytes()...) }
 func KeyForParams(s string) []byte                 { return append(paramsPrefix, []byte(prefixForParamSpace(s))...) }
 func KeyForNonSigner(a []byte) []byte              { return append(nonSignerPrefix, a...) }
@@ -41,6 +42,7 @@ func KeyForConsensus(address crypto.AddressI, stake uint64) []byte {
 
 func AccountPrefix() []byte                { return accountPrefix }
 func PoolPrefix() []byte                   { return poolPrefix }
+func SupplyPrefix() []byte                 { return supplyPrefix }
 func ValidatorPrefix() []byte              { return validatorPrefix }
 func ConsensusPrefix() []byte              { return consensusPrefix }
 func NonSignerPrefix() []byte              { return nonSignerPrefix }

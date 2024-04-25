@@ -1,9 +1,12 @@
 package types
 
 import (
-	"encoding/json"
+	"fmt"
+	"github.com/alecthomas/units"
 	"github.com/ginchuco/ginchu/lib"
 	"google.golang.org/protobuf/proto"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -16,9 +19,9 @@ const (
 	ParamSpaceVal  = "validator"
 	ParamSpaceFee  = "fee"
 	ParamSpaceGov  = "governance"
-)
 
-const (
+	Delimiter = "/"
+
 	AcceptAllProposals  = ProposalVoteConfig_ACCEPT_ALL
 	ProposalApproveList = ProposalVoteConfig_APPROVE_LIST
 	RejectAllProposals  = ProposalVoteConfig_REJECT_ALL
@@ -36,12 +39,35 @@ type Proposal interface {
 	GetEndHeight() uint64
 }
 
-func IsValidParamSpace(space string) bool {
-	switch space {
-	case ParamSpaceCons, ParamSpaceVal, ParamSpaceFee, ParamSpaceGov:
-		return true
-	default:
-		return false
+func DefaultParams() *Params {
+	return &Params{
+		Consensus: &ConsensusParams{
+			BlockSize:       uint64(units.MB),
+			ProtocolVersion: NewProtocolVersion(0, 0),
+		},
+		Validator: &ValidatorParams{
+			ValidatorMinStake:                   1000000,
+			ValidatorMaxCount:                   1000,
+			ValidatorUnstakingBlocks:            2,
+			ValidatorMaxPauseBlocks:             4380,
+			ValidatorDoubleSignSlashPercentage:  25,
+			ValidatorBadProposalSlashPercentage: 1,
+			ValidatorNonSignSlashPercentage:     1,
+			ValidatorMaxNonSign:                 4,
+			ValidatorNonSignWindow:              10,
+			ValidatorBlockReward:                1000000,
+		},
+		Fee: &FeeParams{
+			MessageSendFee:            10000,
+			MessageStakeFee:           10000,
+			MessageEditStakeFee:       10000,
+			MessageUnstakeFee:         10000,
+			MessagePauseFee:           10000,
+			MessageUnpauseFee:         10000,
+			MessageChangeParameterFee: 10000,
+			MessageDaoTransferFee:     10000,
+		},
+		Governance: &GovernanceParams{DaoRewardPercentage: 10},
 	}
 }
 
@@ -105,7 +131,7 @@ func (x *ConsensusParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 func (x *ConsensusParams) SetString(paramName string, value string) lib.ErrorI {
 	switch paramName {
 	case ParamProtocolVersion:
-		if err := CheckProtocolVersion(value); err != nil {
+		if _, err := CheckProtocolVersion(value); err != nil {
 			return err
 		}
 		x.ProtocolVersion = value
@@ -116,28 +142,29 @@ func (x *ConsensusParams) SetString(paramName string, value string) lib.ErrorI {
 }
 
 func (x *ConsensusParams) ParseProtocolVersion() (*ProtocolVersion, lib.ErrorI) {
-	ptr := &ProtocolVersion{}
-	if err := json.Unmarshal([]byte(x.ProtocolVersion), ptr); err != nil {
-		return nil, lib.ErrUnmarshal(err)
+	return CheckProtocolVersion(x.ProtocolVersion)
+}
+
+func CheckProtocolVersion(v string) (*ProtocolVersion, lib.ErrorI) {
+	ptr := new(ProtocolVersion)
+	arr := strings.Split(v, Delimiter)
+	if len(arr) != 2 {
+		return nil, ErrInvalidProtocolVersion()
 	}
+	version, err := strconv.Atoi(arr[0])
+	if err != nil {
+		return nil, ErrInvalidProtocolVersion()
+	}
+	height, err := strconv.Atoi(arr[1])
+	if err != nil {
+		return nil, ErrInvalidProtocolVersion()
+	}
+	ptr.Height, ptr.Version = uint64(height), uint64(version)
 	return ptr, nil
 }
 
-func CheckProtocolVersion(v string) lib.ErrorI {
-	ptr := &ProtocolVersion{}
-	if err := json.Unmarshal([]byte(v), ptr); err != nil {
-		return lib.ErrUnmarshal(err)
-	}
-	// TODO more validation?
-	return nil
-}
-
-func NewProtocolVersion(height uint64, version uint64) (string, lib.ErrorI) {
-	bz, err := json.Marshal(ProtocolVersion{Height: height, Version: version})
-	if err != nil {
-		return "", lib.ErrMarshal(err)
-	}
-	return string(bz), nil
+func NewProtocolVersion(height uint64, version uint64) string {
+	return fmt.Sprintf("%d%s%d", version, Delimiter, height)
 }
 
 // validator param space
@@ -149,13 +176,11 @@ const (
 	ParamValidatorMaxCount                  = "validator_max_count"
 	ParamValidatorUnstakingBlocks           = "validator_unstaking_blocks"
 	ParamValidatorMaxPauseBlocks            = "validator_max_pause_blocks"
-	ParamValidatorMaxEvidenceAgeInBlocks    = "validator_max_evidence_age_in_blocks"
 	ParamValidatorBadProposeSlashPercentage = "validator_bad_propose_slash_percentage"
 	ParamValidatorNonSignSlashPercentage    = "validator_non_sign_slash_percentage"
-	ParamValidatorMaxNonSign                = "validator_max_missed_sign"
+	ParamValidatorMaxNonSign                = "validator_max_non_sign"
 	ParamValidatorNonSignWindow             = "validator_non_sign_window"
 	ParamValidatorDoubleSignSlashPercentage = "validator_double_sign_slash_percentage"
-	ParamValidatorProposerPercentageOfFees  = "validator_proposer_percentage_of_fees"
 	ParamValidatorBlockReward               = "validator_block_reward"
 )
 
@@ -172,9 +197,6 @@ func (x *ValidatorParams) Validate() lib.ErrorI {
 	if x.ValidatorMaxPauseBlocks == 0 {
 		return ErrInvalidParam(ParamValidatorMaxPauseBlocks)
 	}
-	if x.ValidatorMaxEvidenceAgeInBlocks == 0 {
-		return ErrInvalidParam(ParamValidatorMaxEvidenceAgeInBlocks)
-	}
 	if x.ValidatorBadProposalSlashPercentage > 100 {
 		return ErrInvalidParam(ParamValidatorBadProposeSlashPercentage)
 	}
@@ -184,14 +206,11 @@ func (x *ValidatorParams) Validate() lib.ErrorI {
 	if x.ValidatorNonSignWindow == 0 {
 		return ErrInvalidParam(ParamValidatorNonSignWindow)
 	}
-	if x.ValidatorMaxNonSign < x.ValidatorNonSignWindow {
+	if x.ValidatorMaxNonSign > x.ValidatorNonSignWindow {
 		return ErrInvalidParam(ParamValidatorMaxNonSign)
 	}
 	if x.ValidatorDoubleSignSlashPercentage > 100 {
 		return ErrInvalidParam(ParamValidatorDoubleSignSlashPercentage)
-	}
-	if x.ValidatorProposerPercentageOfFees > 100 {
-		return ErrInvalidParam(ParamValidatorProposerPercentageOfFees)
 	}
 	if x.ValidatorBlockReward == 0 {
 		return ErrInvalidParam(ParamValidatorBlockReward)
@@ -207,8 +226,6 @@ func (x *ValidatorParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.ValidatorMaxCount = value
 	case ParamValidatorMaxPauseBlocks:
 		x.ValidatorMaxPauseBlocks = value
-	case ParamValidatorMaxEvidenceAgeInBlocks:
-		x.ValidatorMaxEvidenceAgeInBlocks = value
 	case ParamValidatorBadProposeSlashPercentage:
 		x.ValidatorBadProposalSlashPercentage = value
 	case ParamValidatorNonSignWindow:
@@ -219,8 +236,6 @@ func (x *ValidatorParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.ValidatorNonSignSlashPercentage = value
 	case ParamValidatorDoubleSignSlashPercentage:
 		x.ValidatorDoubleSignSlashPercentage = value
-	case ParamValidatorProposerPercentageOfFees:
-		x.ValidatorProposerPercentageOfFees = value
 	case ParamValidatorMinStake:
 		x.ValidatorMinStake = value
 	case ParamValidatorBlockReward:
@@ -247,7 +262,7 @@ const (
 	ParamMessagePauseFee           = "message_pause_fee"
 	ParamMessageUnpauseFee         = "message_unpause_fee"
 	ParamMessageChangeParameterFee = "message_change_parameter_fee"
-	ParamMessageDoubleSignFee      = "message_double_sign_fee"
+	ParamMessageDAOTransferFee     = "message_dao_transfer_fee"
 )
 
 func (x *FeeParams) Validate() lib.ErrorI {
@@ -272,8 +287,8 @@ func (x *FeeParams) Validate() lib.ErrorI {
 	if x.MessageChangeParameterFee == 0 {
 		return ErrInvalidParam(ParamMessageChangeParameterFee)
 	}
-	if x.MessageDoubleSignFee == 0 {
-		return ErrInvalidParam(ParamMessageDoubleSignFee)
+	if x.MessageDaoTransferFee == 0 {
+		return ErrInvalidParam(ParamMessageDAOTransferFee)
 	}
 	return nil
 }
@@ -298,8 +313,8 @@ func (x *FeeParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.MessageUnpauseFee = value
 	case ParamMessageChangeParameterFee:
 		x.MessageChangeParameterFee = value
-	case ParamMessageDoubleSignFee:
-		x.MessageDoubleSignFee = value
+	case ParamMessageDAOTransferFee:
+		x.MessageDaoTransferFee = value
 	default:
 		return ErrUnknownParam()
 	}

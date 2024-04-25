@@ -19,8 +19,11 @@ func NewDSE(dse []*DoubleSignEvidence) DoubleSignEvidences {
 	}
 }
 
-func (e *DoubleSignEvidences) Add(height uint64, vs, lastVS ValidatorSet, ev *DoubleSignEvidence) {
-	if !e.isValid(height, vs, lastVS, ev) {
+func (e *DoubleSignEvidences) Add(
+	getValSet func(height uint64) (ValidatorSet, ErrorI),
+	getEvByHeight func(height uint64) (*DoubleSigners, ErrorI),
+	vs ValidatorSet, ev *DoubleSignEvidence, minimumEvidenceHeight uint64) {
+	if !e.isValid(vs, ev, minimumEvidenceHeight) {
 		return
 	}
 	if e.Duplicate == nil {
@@ -32,6 +35,10 @@ func (e *DoubleSignEvidences) Add(height uint64, vs, lastVS ValidatorSet, ev *Do
 	key2 := BytesToString(bz)
 	if _, isDuplicate := e.Duplicate[key1]; !isDuplicate {
 		if _, isDuplicate = e.Duplicate[key2]; !isDuplicate {
+			ev.DoubleSigners = ev.GetBadSigners(getEvByHeight, getValSet)
+			if len(ev.DoubleSigners) == 0 {
+				return
+			}
 			e.DSE = append(e.DSE, ev)
 			e.Duplicate[key1] = struct{}{}
 			e.Duplicate[key2] = struct{}{}
@@ -39,51 +46,75 @@ func (e *DoubleSignEvidences) Add(height uint64, vs, lastVS ValidatorSet, ev *Do
 	}
 }
 
-func (e DoubleSignEvidences) GetDoubleSigners(height uint64, vs, lastVS ValidatorSet) (pubKeys [][]byte) {
-	ddMap := make(DeDuplicateMap)
+func (e *DoubleSignEvidences) HasDoubleSigners() bool {
 	for _, ev := range e.DSE {
-		var valSet ValidatorSet
-		sig1, sig2 := ev.VoteA.Signature, ev.VoteB.Signature
-		if ev.VoteA.Header.Height == height {
-			valSet = vs
-		} else {
-			valSet = lastVS
+		if len(ev.DoubleSigners) > 0 {
+			return true
 		}
-		doubleSigners, err := sig1.GetDoubleSigners(sig2, valSet)
-		if err != nil {
-			return
-		}
-		ddMap.Add(ev.VoteA.Header, doubleSigners, pubKeys)
 	}
+	return false
+}
+
+func (x DoubleSignEvidence) GetBadSigners(getEvByHeight func(height uint64) (*DoubleSigners, ErrorI),
+	getValSet func(height uint64) (ValidatorSet, ErrorI)) (pubKeys [][]byte) {
+	ddMap := make(DeDuplicateMap)
+	var valSet ValidatorSet
+	sig1, sig2 := x.VoteA.Signature, x.VoteB.Signature
+	valSet, err := getValSet(x.VoteA.Header.Height)
+	if err != nil {
+		return
+	}
+	alreadyCounted, err := getEvByHeight(x.VoteA.Header.Height)
+	if err != nil {
+		return
+	}
+	var excluded [][]byte
+	if alreadyCounted != nil {
+		excluded = alreadyCounted.DoubleSigners
+	}
+	doubleSigners, err := sig1.GetDoubleSigners(sig2, valSet)
+	if err != nil {
+		return
+	}
+OUT:
+	for i, ds := range doubleSigners {
+		for _, ex := range excluded {
+			if bytes.Equal(ex, ds) {
+				doubleSigners = append(doubleSigners[:i], doubleSigners[i+1:]...)
+				continue OUT
+			}
+		}
+	}
+	ddMap.Add(x.VoteA.Header, doubleSigners, pubKeys)
 	return
 }
 
-func (e DoubleSignEvidences) IsValid(height uint64, vs, lastVS ValidatorSet) (ok bool) {
+func (e DoubleSignEvidences) IsValid(vs ValidatorSet, minimumEvidenceHeight uint64) (ok bool) {
 	for _, ev := range e.DSE {
-		if !e.isValid(height, vs, lastVS, ev) {
+		if !e.isValid(vs, ev, minimumEvidenceHeight) {
 			return
 		}
 	}
 	return true
 }
 
-func (e DoubleSignEvidences) isValid(height uint64, vs, lastVS ValidatorSet, ev *DoubleSignEvidence) (ok bool) {
-	var valSet ValidatorSet
-	if err := ev.CheckBasic(height); err != nil {
+func (e DoubleSignEvidences) isValid(vs ValidatorSet, ev *DoubleSignEvidence, minimumEvidenceHeight uint64) (ok bool) {
+	if err := ev.CheckBasic(); err != nil {
 		return
 	}
-	if ev.VoteA.Header.Height == height {
-		valSet = vs
-	} else {
-		valSet = lastVS
-	}
-	if err := ev.Check(valSet); err != nil {
+	if err := ev.Check(vs, minimumEvidenceHeight); err != nil {
 		return
 	}
 	if equals := ev.VoteA.Equals(ev.VoteB); equals {
 		return
 	}
 	return true
+}
+
+func (e DoubleSignEvidences) Equals(b DoubleSignEvidences) bool {
+	bz1, _ := Marshal(e)
+	bz2, _ := Marshal(b)
+	return bytes.Equal(bz1, bz2)
 }
 
 type BadProposerEvidences struct {

@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 )
@@ -23,14 +24,10 @@ func DefaultConfig() Config {
 	}
 }
 
-type StateMachineConfig struct {
-	GenesisFileName string
-}
+type StateMachineConfig struct{}
 
 func DefaultStateMachineConfig() StateMachineConfig {
-	return StateMachineConfig{
-		GenesisFileName: "genesis.json",
-	}
+	return StateMachineConfig{}
 }
 
 type ConsensusConfig struct {
@@ -94,11 +91,42 @@ type StoreConfig struct {
 	InMemory    bool
 }
 
-func DefaultStoreConfig() StoreConfig {
+func DefaultDataDirPath() string {
 	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".ginchu")
+}
+
+func DefaultStoreConfig() StoreConfig {
 	return StoreConfig{
-		DataDirPath: filepath.Join(home, ".ginchu"),
+		DataDirPath: DefaultDataDirPath(),
 		DBName:      "ginchu",
 		InMemory:    false,
 	}
 }
+
+func (c Config) WriteToFile(filepath string) error {
+	configBz, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath, configBz, os.ModePerm)
+}
+
+func NewConfigFromFile(filepath string) (Config, error) {
+	bz, err := os.ReadFile(filepath)
+	if err != nil {
+		return Config{}, err
+	}
+	c := new(Config)
+	if err = json.Unmarshal(bz, c); err != nil {
+		return Config{}, err
+	}
+	return *c, nil
+}
+
+const (
+	ConfigFilePath  = "config.json"
+	ValKeyPath      = "validator_key.json"
+	NodeKeyPath     = "node_key.json"
+	GenesisFilePath = "genesis.json"
+)

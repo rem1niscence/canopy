@@ -20,8 +20,8 @@ message BlockHeader {
   bytes validator_root = 10;
   bytes next_validator_root = 11;
   bytes proposer_address = 12;
-  repeated bytes bad_proposers = 13;
-  repeated bytes last_double_signers = 14;
+  repeated DoubleSignEvidence evidence = 13;
+  repeated bytes bad_proposers = 14;
   QuorumCertificate last_quorum_certificate = 15;
 }
 
@@ -51,6 +51,11 @@ message ProducerKeys {
 message DoubleSignEvidence {
   QuorumCertificate vote_a = 1;
   QuorumCertificate vote_b = 2;
+  repeated bytes double_signers = 3;
+}
+
+message DoubleSigners {
+  repeated bytes double_signers = 1;
 }
 
 message BadProposerEvidence {

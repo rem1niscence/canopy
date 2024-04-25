@@ -6,7 +6,6 @@ import (
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/ginchuco/ginchu/p2p"
-	"github.com/ginchuco/ginchu/store"
 	"google.golang.org/protobuf/proto"
 	"math"
 	"sync"
@@ -42,21 +41,17 @@ type Consensus struct {
 	syncing  atomic.Bool
 }
 
-func New(pk crypto.PrivateKeyI, c lib.Config, l lib.LoggerI) (*Consensus, lib.ErrorI) {
-	db, err := store.New(c, l)
-	if err != nil {
-		return nil, err
-	}
+func New(c lib.Config, nodeKey, valKey crypto.PrivateKeyI, db lib.StoreI, l lib.LoggerI) (*Consensus, lib.ErrorI) {
 	sm, err := fsm.New(c, db)
 	if err != nil {
 		return nil, err
 	}
 	height := sm.Height()
-	valSet, err := sm.GetHistoricalValidatorSet(height)
+	valSet, err := sm.LoadValSet(height)
 	if err != nil {
 		return nil, err
 	}
-	lastVS, err := sm.GetHistoricalValidatorSet(height - 1)
+	lastVS, err := sm.LoadValSet(height - 1)
 	if err != nil {
 		return nil, err
 	}
@@ -74,9 +69,9 @@ func New(pk crypto.PrivateKeyI, c lib.Config, l lib.LoggerI) (*Consensus, lib.Er
 		ValidatorSet:     valSet,
 		Votes:            NewVotesForHeight(),
 		Proposals:        NewProposalsForHeight(),
-		PublicKey:        pk.PublicKey().Bytes(),
-		PrivateKey:       pk,
-		P2P:              p2p.New(pk, maxVals, c, l),
+		PublicKey:        valKey.PublicKey().Bytes(),
+		PrivateKey:       valKey,
+		P2P:              p2p.New(nodeKey, maxVals, c, l),
 		Config:           c,
 		log:              l,
 		FSM:              sm,
@@ -209,7 +204,7 @@ func (c *Consensus) StartProposePhase() {
 	if vote.HighQc == nil {
 		c.Block, err = c.ProduceCandidateBlock(
 			bpe.GetBadProposers(),
-			dse.GetDoubleSigners(c.Height, c.ValidatorSet, c.LastValidatorSet),
+			dse,
 		)
 		if err != nil {
 			c.log.Error(err.Error())
@@ -342,8 +337,8 @@ func (c *Consensus) StartCommitProcessPhase() {
 	}
 	msg.Qc.Block = c.Block
 	c.gossipBlock(msg.Qc)
-	c.ByzantineEvidence = c.Proposals.GetByzantineEvidence(c.View.Copy(),
-		c.ValidatorSet, c.LastValidatorSet, c.ProposerKey, &c.Votes, c.SelfIsProposer())
+	c.ByzantineEvidence = c.Proposals.GetByzantineEvidence(c.View.Copy(), c.ValidatorSet, c.FSM.LoadValSet,
+		c.FSM.GetMinimumEvidenceHeight, c.FSM.LoadEvidence, c.FSM.LoadCertificate, c.ProposerKey, &c.Votes, c.SelfIsProposer())
 }
 
 func (c *Consensus) CheckProposerAndBlock(msg *Message) (interrupt bool) {
@@ -369,16 +364,17 @@ func (c *Consensus) HandleMessage(message proto.Message) lib.ErrorI {
 		if c.Block != nil {
 			blockHash = c.Block.BlockHeader.Hash
 		}
-		height, vals, lastVals, proposer := c.Height, c.ValidatorSet, c.LastValidatorSet, c.ProposerKey
+		minEvidenceHeight, _ := c.FSM.GetMinimumEvidenceHeight()
+		height, vs, proposer := c.Height, c.ValidatorSet, c.ProposerKey
 		c.RUnlock()
 		switch {
 		case msg.IsReplicaMessage() || msg.IsPacemakerMessage():
-			if err := msg.CheckReplicaMessage(height, blockHash, vals); err != nil {
+			if err := msg.CheckReplicaMessage(height, blockHash, vs); err != nil {
 				return err
 			}
-			return c.Votes.AddVote(proposer, height, msg, vals, lastVals)
+			return c.Votes.AddVote(proposer, height, msg, vs, c.LoadValSet, minEvidenceHeight, c.GetEvidenceByHeight)
 		case msg.IsProposerMessage():
-			partialQC, err := msg.CheckProposerMessage(proposer, blockHash, height, vals)
+			partialQC, err := msg.CheckProposerMessage(proposer, blockHash, height, c.LoadValSet, vs)
 			if err != nil {
 				return err
 			}
@@ -389,6 +385,18 @@ func (c *Consensus) HandleMessage(message proto.Message) lib.ErrorI {
 		}
 	}
 	return ErrUnknownConsensusMsg(message)
+}
+
+func (c *Consensus) LoadValSet(height uint64) (lib.ValidatorSet, lib.ErrorI) {
+	c.Lock()
+	defer c.Unlock()
+	return c.FSM.LoadValSet(height)
+}
+
+func (c *Consensus) GetEvidenceByHeight(height uint64) (*lib.DoubleSigners, lib.ErrorI) {
+	c.Lock()
+	defer c.Unlock()
+	return c.FSM.LoadEvidence(height)
 }
 
 func (c *Consensus) RoundInterrupt() {

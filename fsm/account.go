@@ -60,8 +60,9 @@ func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) SetAccounts(accounts []*types.Account) lib.ErrorI {
+func (s *StateMachine) SetAccounts(accounts []*types.Account, supply *types.Supply) lib.ErrorI {
 	for _, acc := range accounts {
+		supply.Total += acc.Amount
 		if err := s.SetAccount(acc); err != nil {
 			return err
 		}
@@ -73,10 +74,13 @@ func (s *StateMachine) AccountDeductFees(address crypto.AddressI, fee uint64) li
 	if err := s.AccountSub(address, fee); err != nil {
 		return err
 	}
-	return s.PoolAdd(types.PoolName_FeeCollector, fee)
+	return s.PoolAdd(types.PoolID_FeeCollector, fee)
 }
 
 func (s *StateMachine) MintToAccount(address crypto.AddressI, amount uint64) lib.ErrorI {
+	if err := s.AddToTotalSupply(amount); err != nil {
+		return err
+	}
 	return s.AccountAdd(address, amount)
 }
 
@@ -127,7 +131,7 @@ func (s *StateMachine) marshalAccount(account *types.Account) ([]byte, lib.Error
 
 // Pool logic below
 
-func (s *StateMachine) GetPool(name types.PoolName) (*types.Pool, lib.ErrorI) {
+func (s *StateMachine) GetPool(name types.PoolID) (*types.Pool, lib.ErrorI) {
 	bz, err := s.Get(types.KeyForPool(name))
 	if err != nil {
 		return nil, err
@@ -153,7 +157,7 @@ func (s *StateMachine) GetPools() ([]*types.Pool, lib.ErrorI) {
 	return result, nil
 }
 
-func (s *StateMachine) GetPoolBalance(name types.PoolName) (uint64, lib.ErrorI) {
+func (s *StateMachine) GetPoolBalance(name types.PoolID) (uint64, lib.ErrorI) {
 	pool, err := s.GetPool(name)
 	if err != nil {
 		return 0, err
@@ -161,8 +165,9 @@ func (s *StateMachine) GetPoolBalance(name types.PoolName) (uint64, lib.ErrorI) 
 	return pool.Amount, nil
 }
 
-func (s *StateMachine) SetPools(pools []*types.Pool) lib.ErrorI {
+func (s *StateMachine) SetPools(pools []*types.Pool, supply *types.Supply) lib.ErrorI {
 	for _, pool := range pools {
+		supply.Total += pool.Amount
 		if err := s.SetPool(pool); err != nil {
 			return err
 		}
@@ -175,17 +180,20 @@ func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	if err = s.Set(types.KeyForPool(pool.Name), bz); err != nil {
+	if err = s.Set(types.KeyForPool(pool.Id), bz); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *StateMachine) MintToPool(name types.PoolName, amount uint64) lib.ErrorI {
+func (s *StateMachine) MintToPool(name types.PoolID, amount uint64) lib.ErrorI {
+	if err := s.AddToTotalSupply(amount); err != nil {
+		return err
+	}
 	return s.PoolAdd(name, amount)
 }
 
-func (s *StateMachine) PoolAdd(name types.PoolName, amountToAdd uint64) lib.ErrorI {
+func (s *StateMachine) PoolAdd(name types.PoolID, amountToAdd uint64) lib.ErrorI {
 	pool, err := s.GetPool(name)
 	if err != nil {
 		return err
@@ -194,7 +202,7 @@ func (s *StateMachine) PoolAdd(name types.PoolName, amountToAdd uint64) lib.Erro
 	return s.SetPool(pool)
 }
 
-func (s *StateMachine) PoolSub(name types.PoolName, amountToSub uint64) lib.ErrorI {
+func (s *StateMachine) PoolSub(name types.PoolID, amountToSub uint64) lib.ErrorI {
 	pool, err := s.GetPool(name)
 	if err != nil {
 		return err
@@ -216,4 +224,79 @@ func (s *StateMachine) unmarshalPool(bz []byte) (*types.Pool, lib.ErrorI) {
 
 func (s *StateMachine) marshalPool(pool *types.Pool) ([]byte, lib.ErrorI) {
 	return lib.Marshal(pool)
+}
+
+// supply logic below
+
+func (s *StateMachine) AddToStakedSupply(amount uint64) lib.ErrorI {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	supply.Staked += amount
+	return s.SetSupply(supply)
+}
+
+func (s *StateMachine) AddToTotalSupply(amount uint64) lib.ErrorI {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	supply.Total += amount
+	return s.SetSupply(supply)
+}
+
+func (s *StateMachine) SubFromTotalSupply(amount uint64) lib.ErrorI {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	if supply.Total < amount {
+		return types.ErrInsufficientSupply()
+	}
+	supply.Total -= amount
+	return s.SetSupply(supply)
+}
+
+func (s *StateMachine) SubFromStakedSupply(amount uint64) lib.ErrorI {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	if supply.Staked < amount {
+		return types.ErrInsufficientSupply()
+	}
+	supply.Staked -= amount
+	return s.SetSupply(supply)
+}
+
+func (s *StateMachine) GetSupply() (*types.Supply, lib.ErrorI) {
+	bz, err := s.Get(types.SupplyPrefix())
+	if err != nil {
+		return nil, err
+	}
+	return s.unmarshalSupply(bz)
+}
+
+func (s *StateMachine) SetSupply(supply *types.Supply) lib.ErrorI {
+	bz, err := s.marshalSupply(supply)
+	if err != nil {
+		return err
+	}
+	if err = s.Set(types.SupplyPrefix(), bz); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *StateMachine) marshalSupply(supply *types.Supply) ([]byte, lib.ErrorI) {
+	return lib.Marshal(supply)
+}
+
+func (s *StateMachine) unmarshalSupply(bz []byte) (*types.Supply, lib.ErrorI) {
+	supply := new(types.Supply)
+	if err := lib.Unmarshal(bz, supply); err != nil {
+		return nil, err
+	}
+	return supply, nil
 }

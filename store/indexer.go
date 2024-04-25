@@ -9,13 +9,16 @@ import (
 var _ lib.RWIndexerI = &Indexer{}
 
 var (
-	txHashPrefix      = []byte{1}
-	txHeightPrefix    = []byte{2}
-	txSenderPrefix    = []byte{3}
-	txRecipientPrefix = []byte{4}
-	blockHashPrefix   = []byte{5}
-	blockHeightPrefix = []byte{6}
-	qcHeightPrefix    = []byte{7}
+	txHashPrefix           = []byte{1}
+	txHeightPrefix         = []byte{2}
+	txSenderPrefix         = []byte{3}
+	txRecipientPrefix      = []byte{4}
+	blockHashPrefix        = []byte{5}
+	blockHeightPrefix      = []byte{6}
+	doubleSignersPrefixKey = []byte{7} // This is required since evidence is store in QC and QCs are maleable by a malicious leader. Ensure that evidence can't be unfairly replayed
+	qcHeightPrefix         = []byte{8}
+
+	delim = []byte("/") // TODO test for things like height collisions ex: iterating txHeightPrefix/10 and capturing txHeightPrefix/100/0 etc.
 )
 
 type Indexer struct {
@@ -39,6 +42,11 @@ func (t *Indexer) IndexBlock(b *lib.BlockResult) lib.ErrorI {
 			return err
 		}
 	}
+	for _, evidence := range b.BlockHeader.Evidence {
+		if err = t.IndexDoubleSigners(b.BlockHeader.Height, evidence); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -52,6 +60,9 @@ func (t *Indexer) DeleteBlockForHeight(height uint64) lib.ErrorI {
 		return err
 	}
 	if err = t.DeleteTxsForHeight(height); err != nil {
+		return err
+	}
+	if err = t.DeleteDoubleSignersForHeight(height); err != nil {
 		return err
 	}
 	return t.db.Delete(hashKey)
@@ -96,6 +107,30 @@ func (t *Indexer) IndexQC(qc *lib.QuorumCertificate) lib.ErrorI {
 	}
 	qc.Block = nil
 	return t.indexQCByHeight(qc.Header.Height, bz)
+}
+
+func (t *Indexer) IndexDoubleSigners(height uint64, evidence *lib.DoubleSignEvidence) lib.ErrorI {
+	doubleSigners, err := t.GetDoubleSigners(height)
+	if err != nil {
+		return err
+	}
+	if doubleSigners == nil {
+		doubleSigners = new(lib.DoubleSigners)
+	}
+	doubleSigners.DoubleSigners = append(doubleSigners.DoubleSigners, evidence.DoubleSigners...)
+	bz, err := lib.Marshal(doubleSigners)
+	if err != nil {
+		return err
+	}
+	return t.indexDoubleSignersByHeight(height, bz)
+}
+
+func (t *Indexer) GetDoubleSigners(height uint64) (*lib.DoubleSigners, lib.ErrorI) {
+	return t.getDoubleSigners(t.doubleSignersHeightKey(height))
+}
+
+func (t *Indexer) DeleteDoubleSignersForHeight(height uint64) lib.ErrorI {
+	return t.deleteAll(t.doubleSignersHeightKey(height))
 }
 
 func (t *Indexer) IndexTx(result *lib.TxResult) lib.ErrorI {
@@ -172,6 +207,18 @@ func (t *Indexer) getBlock(key []byte) (*lib.BlockResult, lib.ErrorI) {
 	}, nil
 }
 
+func (t *Indexer) getDoubleSigners(key []byte) (*lib.DoubleSigners, lib.ErrorI) {
+	bz, err := t.db.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	ptr := new(lib.DoubleSigners)
+	if err = lib.Unmarshal(bz, ptr); err != nil {
+		return nil, err
+	}
+	return ptr, nil
+}
+
 func (t *Indexer) getTx(key []byte) (*lib.TxResult, lib.ErrorI) {
 	bz, err := t.db.Get(key)
 	if err != nil {
@@ -243,6 +290,10 @@ func (t *Indexer) indexTxByRecipient(recipient, heightAndIndexKey []byte, bz []b
 	return t.db.Set(t.txRecipientKey(recipient, heightAndIndexKey), bz)
 }
 
+func (t *Indexer) indexDoubleSignersByHeight(height uint64, bz []byte) lib.ErrorI {
+	return t.db.Set(t.doubleSignersHeightKey(height), bz)
+}
+
 func (t *Indexer) indexQCByHeight(height uint64, bz []byte) lib.ErrorI {
 	return t.db.Set(t.qcHeightKey(height), bz)
 }
@@ -261,7 +312,7 @@ func (t *Indexer) txHashKey(hash []byte) []byte {
 }
 
 func (t *Indexer) heightAndIndexKey(height, index uint64) []byte {
-	return append(t.txHeightKey(height), t.encodeBigEndian(index)...)
+	return multiAppendWithDelimiter(t.txHeightKey(height), t.encodeBigEndian(index))
 }
 
 func (t *Indexer) txHeightKey(height uint64) []byte {
@@ -274,6 +325,10 @@ func (t *Indexer) txSenderKey(address, heightAndIndexKey []byte) []byte {
 
 func (t *Indexer) txRecipientKey(address, heightAndIndexKey []byte) []byte {
 	return t.key(txRecipientPrefix, heightAndIndexKey, address)
+}
+
+func (t *Indexer) doubleSignersHeightKey(height uint64) []byte {
+	return t.key(doubleSignersPrefixKey, t.encodeBigEndian(height), nil)
 }
 
 func (t *Indexer) blockHashKey(hash []byte) []byte {
@@ -289,7 +344,14 @@ func (t *Indexer) qcHeightKey(height uint64) []byte {
 }
 
 func (t *Indexer) key(prefix []byte, param1, param2 []byte) []byte {
-	return append(append(prefix, param1...), param2...)
+	return multiAppendWithDelimiter(prefix, param1, param2)
+}
+
+func multiAppendWithDelimiter(toAppend ...[]byte) (res []byte) {
+	for _, a := range toAppend {
+		res = append(res, append(a, delim...)...)
+	}
+	return
 }
 
 func (t *Indexer) encodeBigEndian(i uint64) []byte {

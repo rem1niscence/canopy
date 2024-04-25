@@ -42,14 +42,15 @@ func (s *StateMachine) GetValidators() ([]*types.Validator, lib.ErrorI) {
 	return result, nil
 }
 
-func (s *StateMachine) SetValidators(validators []*types.Validator) lib.ErrorI {
+func (s *StateMachine) SetValidators(validators []*types.Validator, supply *types.Supply) lib.ErrorI {
 	for _, val := range validators {
+		supply.Total += val.StakedAmount
+		supply.Staked += val.StakedAmount
 		if err := s.SetValidator(val); err != nil {
 			return err
 		}
 		if val.MaxPausedHeight == 0 && val.UnstakingHeight == 0 {
-			address := crypto.NewAddressFromBytes(val.Address)
-			if err := s.SetConsensusValidator(address, val.StakedAmount); err != nil {
+			if err := s.SetConsensusValidator(crypto.NewAddressFromBytes(val.Address), val.StakedAmount); err != nil {
 				return err
 			}
 		}
@@ -62,8 +63,7 @@ func (s *StateMachine) SetValidator(validator *types.Validator) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	address := crypto.NewAddressFromBytes(validator.Address)
-	if err = s.Set(types.KeyForValidator(address), bz); err != nil {
+	if err = s.Set(types.KeyForValidator(crypto.NewAddressFromBytes(validator.Address)), bz); err != nil {
 		return err
 	}
 	return nil
@@ -167,6 +167,9 @@ func (s *StateMachine) DeleteUnstaking(height uint64) lib.ErrorI {
 			return err
 		}
 		if err = s.AccountAdd(crypto.NewAddressFromBytes(validator.Output), validator.StakedAmount); err != nil {
+			return err
+		}
+		if err = s.SubFromStakedSupply(validator.StakedAmount); err != nil {
 			return err
 		}
 		return s.DeleteValidator(addr)

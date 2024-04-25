@@ -45,6 +45,8 @@ func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee uint64, err lib.E
 		return feeParams.MessageUnpauseFee, nil
 	case *types.MessageChangeParameter:
 		return feeParams.MessageChangeParameterFee, nil
+	case *types.MessageDAOTransfer:
+		return feeParams.MessageDaoTransferFee, nil
 	default:
 		return 0, types.ErrUnknownMessage(x)
 	}
@@ -119,6 +121,9 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	if err = s.SetConsensusValidator(address, msg.Amount); err != nil {
 		return err
 	}
+	if err = s.AddToStakedSupply(msg.Amount); err != nil {
+		return err
+	}
 	// set validator
 	return s.SetValidator(&types.Validator{
 		Address:      address.Bytes(),
@@ -150,6 +155,9 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 	}
 	// subtract from sender
 	if err = s.AccountSub(address, amountToAdd); err != nil {
+		return err
+	}
+	if err = s.AddToStakedSupply(amountToAdd); err != nil {
 		return err
 	}
 	// update validator stake amount
@@ -242,7 +250,7 @@ func (s *StateMachine) HandleMessageDAOTransfer(msg *types.MessageDAOTransfer) l
 	if err := s.ApproveProposal(msg); err != nil {
 		return types.ErrRejectProposal()
 	}
-	if err := s.PoolSub(types.PoolName_DAO, msg.Amount); err != nil {
+	if err := s.PoolSub(types.PoolID_DAO, msg.Amount); err != nil {
 		return err
 	}
 	return s.AccountAdd(crypto.NewAddressFromBytes(msg.Address), msg.Amount)

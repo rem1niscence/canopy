@@ -38,11 +38,11 @@ func (c *Consensus) CheckCandidateBlock(candidate *lib.Block, evidence *lib.Byza
 }
 
 // ProduceCandidateBlock uses the mempool and state params to build a candidate block
-func (c *Consensus) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) (*lib.Block, lib.ErrorI) {
+func (c *Consensus) ProduceCandidateBlock(badProposers [][]byte, dse lib.DoubleSignEvidences) (*lib.Block, lib.ErrorI) {
 	reset := c.ValidatorProposalConfig(c.FSM, c.Mempool.FSM)
 	defer func() { c.FSM.ResetToBeginBlock(); reset() }()
 	height, lastBlock := c.FSM.Height(), c.FSM.LastBlockHeader()
-	qc, err := c.FSM.GetCertificate(height)
+	qc, err := c.FSM.LoadCertificate(height)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (c *Consensus) ProduceCandidateBlock(badProposers, doubleSigners [][]byte) 
 		TotalTxs:              lastBlock.TotalTxs + uint64(numTxs),
 		LastBlockHash:         lastBlock.Hash,
 		ProposerAddress:       c.PublicKey,
-		LastDoubleSigners:     doubleSigners,
+		Evidence:              dse.DSE,
 		BadProposers:          badProposers,
 		LastQuorumCertificate: qc,
 	}

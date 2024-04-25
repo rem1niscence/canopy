@@ -106,9 +106,16 @@ func (p *ProposalsForHeight) AddPartialQC(message *Message) (err lib.ErrorI) {
 }
 
 func (p *ProposalsForHeight) GetByzantineEvidence(
-	v *lib.View, vals, lastVals ValSet, proposerKey []byte, hvs *VotesForHeight, selfIsProposer bool) *BE {
-	bpe := p.GetBPE(v, vals, proposerKey)
-	dse := p.GetDSE(v, hvs, vals, lastVals, selfIsProposer)
+	v *lib.View, vs ValSet, loadValSet func(height uint64) (lib.ValidatorSet, lib.ErrorI),
+	getMinEvidenceHeight func() (uint64, lib.ErrorI), loadEvidence func(height uint64) (*lib.DoubleSigners, lib.ErrorI),
+	loadCertificate func(height uint64) (*lib.QuorumCertificate, lib.ErrorI),
+	proposerKey []byte, hvs *VotesForHeight, selfIsProposer bool) *BE {
+	bpe := p.GetBPE(v, vs, proposerKey)
+	minEvidenceHeight, err := getMinEvidenceHeight()
+	if err != nil {
+		return nil
+	}
+	dse := p.GetDSE(v, hvs, vs, minEvidenceHeight, loadEvidence, loadCertificate, loadValSet, selfIsProposer)
 	if bpe == nil && dse == nil {
 		return nil
 	}
@@ -132,38 +139,65 @@ func (p *ProposalsForHeight) GetBPE(view *lib.View, vs ValSet, proposerKey []byt
 	return e.BPE
 }
 
-func (p *ProposalsForHeight) GetDSE(view *lib.View, hvs *VotesForHeight, vals, lastVals ValSet, selfIsProposer bool) DSE {
+func (p *ProposalsForHeight) GetDSE(view *lib.View, hvs *VotesForHeight, vs ValSet,
+	minEvidenceHeight uint64, loadEvidence func(height uint64) (*lib.DoubleSigners, lib.ErrorI),
+	loadCertificate func(height uint64) (*lib.QuorumCertificate, lib.ErrorI),
+	loadValSet func(height uint64) (lib.ValidatorSet, lib.ErrorI), selfIsProposer bool) DSE {
 	p.Lock()
 	hvs.Lock()
 	defer func() { p.Unlock(); hvs.Unlock() }()
 	dse := lib.NewDSE(nil)
-	p.addDSEByPartialQC(view.Height, dse, vals, lastVals)
-	p.addDSEByCandidate(view, hvs, dse, vals, lastVals, selfIsProposer)
-	if len(dse.GetDoubleSigners(view.Height, vals, lastVals)) == 0 {
+	p.addDSEByPartialQC(view.Height, vs, minEvidenceHeight, loadEvidence, loadCertificate, dse, loadValSet)
+	p.addDSEByCandidate(view, hvs, dse, minEvidenceHeight, loadEvidence, loadValSet, selfIsProposer)
+	if !dse.HasDoubleSigners() {
 		return nil
 	}
 	return dse.DSE
 }
 
-func (p *ProposalsForHeight) addDSEByPartialQC(height uint64, dse lib.DoubleSignEvidences, vals, lastVals ValSet) {
+func (p *ProposalsForHeight) addDSEByPartialQC(height uint64, vs ValSet,
+	minEvidenceHeight uint64, loadEvidence func(height uint64) (*lib.DoubleSigners, lib.ErrorI),
+	loadCertificate func(height uint64) (*lib.QuorumCertificate, lib.ErrorI),
+	dse lib.DoubleSignEvidences, loadValSet func(height uint64) (lib.ValidatorSet, lib.ErrorI)) {
 	for _, pQC := range p.partialQCs { // REPLICA with two proposer messages for same (H,R,P) - the partial is the malicious one
-		rlm := p.proposalsByRound[pQC.Header.Round]
-		if rlm.Messages == nil {
-			continue
+		evidenceHeight := pQC.Header.Height
+		if evidenceHeight == height {
+			rlm := p.proposalsByRound[pQC.Header.Round]
+			if rlm.Messages == nil {
+				continue
+			}
+			message := rlm.Messages[pQC.Header.Phase]
+			if message == nil {
+				continue
+			}
+			dse.Add(loadValSet, loadEvidence, vs, &lib.DoubleSignEvidence{
+				VoteA: message.Qc, // if both a partial and full exists
+				VoteB: pQC,
+			}, minEvidenceHeight)
+		} else {
+			if pQC.Header.Phase != PrecommitVote {
+				continue // historically can only process precommit vote
+			}
+			certificate, err := loadCertificate(evidenceHeight)
+			if err != nil {
+				continue
+			}
+			valSet, err := loadValSet(evidenceHeight)
+			if err != nil {
+				continue
+			}
+			dse.Add(loadValSet, loadEvidence, valSet, &lib.DoubleSignEvidence{
+				VoteA: certificate, // if both a partial and full exists
+				VoteB: pQC,
+			}, minEvidenceHeight)
 		}
-		message := rlm.Messages[pQC.Header.Phase]
-		if message == nil {
-			continue
-		}
-		dse.Add(height, vals, lastVals, &lib.DoubleSignEvidence{
-			VoteA: message.Qc, // if both a partial and full exists
-			VoteB: pQC,
-		})
 	}
 }
 
 func (p *ProposalsForHeight) addDSEByCandidate(
-	view *lib.View, hvs *VotesForHeight, dse lib.DoubleSignEvidences, vals, lastVals ValSet, selfIsProposer bool) {
+	view *lib.View, hvs *VotesForHeight, dse lib.DoubleSignEvidences,
+	minEvidenceHeight uint64, loadEvidence func(height uint64) (*lib.DoubleSigners, lib.ErrorI),
+	loadValSet func(height uint64) (lib.ValidatorSet, lib.ErrorI), selfIsProposer bool) {
 	if !selfIsProposer { // CANDIDATE exposing double sign election
 		for r := uint64(0); r < view.Round-1; r++ {
 			rvs := hvs.votesByRound[r]
@@ -184,10 +218,14 @@ func (p *ProposalsForHeight) addDSEByCandidate(
 			}
 			for _, voteSet := range ev {
 				if voteSet.vote != nil {
-					dse.Add(view.Height, vals, lastVals, &lib.DoubleSignEvidence{
+					valSet, err := loadValSet(voteSet.vote.Header.Height)
+					if err != nil {
+						continue
+					}
+					dse.Add(loadValSet, loadEvidence, valSet, &lib.DoubleSignEvidence{
 						VoteA: message.Qc,
 						VoteB: voteSet.vote.Qc,
-					})
+					}, minEvidenceHeight)
 				}
 			}
 		}

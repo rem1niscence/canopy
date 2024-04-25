@@ -175,7 +175,7 @@ func (c *Consensus) ListenForBlockReq() {
 				c.P2P.ChangeReputation(senderID, InvalidMsgRep)
 				continue
 			}
-			blocAndCertificate, err := c.FSM.GetBlockAndCertificate(request.Height)
+			blocAndCertificate, err := c.FSM.LoadBlockAndQC(request.Height)
 			if err != nil {
 				c.log.Error(err.Error())
 				continue

@@ -131,7 +131,7 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI, nonSignerPercent 
 	if err = s.UpdateProducerKeys(validator.PublicKey); err != nil {
 		return err
 	}
-	fee, err := s.GetPool(types.PoolName_FeeCollector)
+	fee, err := s.GetPool(types.PoolID_FeeCollector)
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI, nonSignerPercent 
 	afterDAOCut := lib.Uint64ReducePercentage(totalReward, int8(govParams.DaoRewardPercentage))
 	daoCut := totalReward - afterDAOCut
 	proposerCut := lib.Uint64ReducePercentage(afterDAOCut, int8(nonSignerPercent))
-	if err = s.MintToPool(types.PoolName_DAO, daoCut); err != nil {
+	if err = s.MintToPool(types.PoolID_DAO, daoCut); err != nil {
 		return err
 	}
 	return s.MintToAccount(crypto.NewAddressFromBytes(validator.Output), proposerCut)
@@ -159,8 +159,10 @@ func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams) (nonSig
 	if err = s.SlashBadProposers(params, block.BadProposers); err != nil {
 		return 0, err
 	}
-	if err = s.SlashDoubleSigners(params, beginBlock.BlockHeader.LastDoubleSigners); err != nil {
-		return 0, err
+	for _, evidence := range beginBlock.BlockHeader.Evidence {
+		if err = s.SlashDoubleSigners(params, evidence.DoubleSigners); err != nil {
+			return 0, err
+		}
 	}
 	nonSigners, nonSignerPercent, err := block.LastQuorumCertificate.GetNonSigners(beginBlock.ValidatorSet)
 	if err != nil {

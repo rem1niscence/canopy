@@ -59,15 +59,15 @@ func (s *StateMachine) IncrementNonSigners(nonSigners [][]byte) lib.ErrorI {
 }
 
 func (s *StateMachine) SlashNonSigners(params *types.ValidatorParams, nonSigners [][]byte) lib.ErrorI {
-	return s.SlashValidators(nonSigners, params.ValidatorNonSignSlashPercentage)
+	return s.SlashValidators(nonSigners, params.ValidatorNonSignSlashPercentage, params)
 }
 
 func (s *StateMachine) SlashBadProposers(params *types.ValidatorParams, badProposers [][]byte) lib.ErrorI {
-	return s.SlashValidators(badProposers, params.ValidatorBadProposalSlashPercentage)
+	return s.SlashValidators(badProposers, params.ValidatorBadProposalSlashPercentage, params)
 }
 
 func (s *StateMachine) SlashDoubleSigners(params *types.ValidatorParams, doubleSigners [][]byte) lib.ErrorI {
-	return s.SlashValidators(doubleSigners, params.ValidatorDoubleSignSlashPercentage)
+	return s.SlashValidators(doubleSigners, params.ValidatorDoubleSignSlashPercentage, params)
 }
 
 func (s *StateMachine) ForceUnstakeValidator(address crypto.AddressI) lib.ErrorI {
@@ -85,33 +85,56 @@ func (s *StateMachine) ForceUnstakeValidator(address crypto.AddressI) lib.ErrorI
 	if err != nil {
 		return err
 	}
+	// set validator unstaking
+	return s.forceUnstakeValidator(address, validator, p)
+}
+
+func (s *StateMachine) forceUnstakeValidator(address crypto.AddressI, val *types.Validator, p *types.ValidatorParams) lib.ErrorI {
 	unstakingBlocks := p.GetValidatorUnstakingBlocks()
 	unstakingHeight := s.Height() + unstakingBlocks
 	// set validator unstaking
-	return s.SetValidatorUnstaking(address, validator, unstakingHeight)
+	return s.SetValidatorUnstaking(address, val, unstakingHeight)
 }
 
-func (s *StateMachine) SlashValidators(addresses [][]byte, percent uint64) lib.ErrorI {
+func (s *StateMachine) SlashValidators(addresses [][]byte, percent uint64, p *types.ValidatorParams) lib.ErrorI {
 	for _, addr := range addresses {
 		validator, err := s.GetValidator(crypto.NewAddressFromBytes(addr))
 		if err != nil {
 			return err
 		}
-		if err = s.SlashValidator(validator, percent); err != nil {
+		if err = s.SlashValidator(validator, percent, p); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *StateMachine) SlashValidator(validator *types.Validator, percent uint64) lib.ErrorI {
+func (s *StateMachine) SlashValidator(validator *types.Validator, percent uint64, p *types.ValidatorParams) lib.ErrorI {
 	if percent > 100 {
 		return types.ErrInvalidSlashPercentage()
 	}
-	newStake := lib.Uint64ReducePercentage(validator.StakedAmount, int8(percent))
-	if err := s.UpdateConsensusValidator(crypto.NewAddressFromBytes(validator.Address), validator.StakedAmount, newStake); err != nil {
+	oldStake := validator.StakedAmount
+	validator.StakedAmount = lib.Uint64ReducePercentage(validator.StakedAmount, int8(percent))
+	if err := s.SubFromStakedSupply(oldStake - validator.StakedAmount); err != nil {
 		return err
 	}
-	validator.StakedAmount = newStake
+	if validator.StakedAmount < p.ValidatorMinStake {
+		return s.forceUnstakeValidator(crypto.NewAddressFromBytes(validator.Address), validator, p)
+	}
+	if err := s.UpdateConsensusValidator(crypto.NewAddressFromBytes(validator.Address), oldStake, validator.StakedAmount); err != nil {
+		return err
+	}
 	return s.SetValidator(validator)
+}
+
+func (s *StateMachine) GetMinimumEvidenceHeight() (uint64, lib.ErrorI) {
+	valParams, err := s.GetParamsVal()
+	if err != nil {
+		return 0, err
+	}
+	height, unstakingBlocks := s.Height(), valParams.GetValidatorUnstakingBlocks()
+	if height < unstakingBlocks {
+		return 0, nil
+	}
+	return height - unstakingBlocks, nil
 }

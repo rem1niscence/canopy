@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"github.com/drand/kyber"
 	bls12381 "github.com/drand/kyber-bls12381"
@@ -73,6 +74,27 @@ func (b *BLS12381PublicKey) Address() AddressI {
 func (b *BLS12381PublicKey) Bytes() []byte {
 	bz, _ := b.MarshalBinary()
 	return bz
+}
+func (b *BLS12381PublicKey) MarshalJSON() ([]byte, error) { return json.Marshal(b.String()) }
+func (b *BLS12381PublicKey) UnmarshalJSON(bz []byte) (err error) {
+	var hexString string
+	if err = json.Unmarshal(bz, &hexString); err != nil {
+		return
+	}
+	bz, err = hex.DecodeString(hexString)
+	if err != nil {
+		return
+	}
+	pk, err := NewBLSPublicKeyFromBytes(bz)
+	if err != nil {
+		return err
+	}
+	bls, ok := pk.(*BLS12381PublicKey)
+	if !ok {
+		return errors.New("invalid bls key")
+	}
+	*b = *bls
+	return
 }
 
 func (b *BLS12381PublicKey) VerifyBytes(msg []byte, sig []byte) bool {

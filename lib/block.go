@@ -103,28 +103,53 @@ func (x *BlockHeader) Equals(b *BlockHeader) bool {
 	if !bytes.Equal(x.ProposerAddress, b.ProposerAddress) {
 		return false
 	}
+	if !NewDSE(x.Evidence).Equals(NewDSE(b.Evidence)) {
+		return false
+	}
 	qc1Bz, _ := Marshal(x.LastQuorumCertificate)
 	qc2Bz, _ := Marshal(b.LastQuorumCertificate)
 	return bytes.Equal(qc1Bz, qc2Bz)
 }
 
-func (x *BlockHeader) ValidateByzantineEvidence(vs, lastVS ValidatorSet, be *ByzantineEvidence) ErrorI {
+func (x *BlockHeader) ValidateByzantineEvidence(getValSet func(height uint64) (ValidatorSet, ErrorI),
+	getEvByHeight func(height uint64) (*DoubleSigners, ErrorI), be *ByzantineEvidence, minimumEvidenceHeight uint64) ErrorI {
 	if be == nil {
 		return nil
 	}
-	if x.LastDoubleSigners != nil {
-		doubleSigners := NewDSE(be.DSE).GetDoubleSigners(x.Height, vs, lastVS)
-		if len(doubleSigners) != len(x.LastDoubleSigners) {
-			return ErrMismatchDoubleSignerCount()
+	if x.Evidence != nil {
+		d := NewDSE(x.Evidence)
+		if !d.Equals(NewDSE(be.DSE)) {
+			return ErrMismatchEvidenceAndHeader()
 		}
-		for i, ds := range x.LastDoubleSigners {
-			if !bytes.Equal(doubleSigners[i], ds) {
-				return ErrMismatchEvidenceAndHeader()
+		for _, evidence := range x.Evidence {
+			if err := evidence.CheckBasic(); err != nil {
+				return err
+			}
+			height := evidence.VoteA.Header.Height
+			vs, err := getValSet(height)
+			if err != nil {
+				return err
+			}
+			if err = evidence.Check(vs, minimumEvidenceHeight); err != nil {
+				return err
+			}
+			doubleSigners := evidence.GetBadSigners(getEvByHeight, getValSet)
+			if len(doubleSigners) != len(evidence.DoubleSigners) {
+				return ErrMismatchDoubleSignerCount()
+			}
+			for i, ds := range evidence.DoubleSigners {
+				if !bytes.Equal(doubleSigners[i], ds) {
+					return ErrMismatchEvidenceAndHeader()
+				}
 			}
 		}
 	}
 	if x.BadProposers != nil {
 		bpe := NewBPE(be.BPE)
+		vs, err := getValSet(x.Height)
+		if err != nil {
+			return err
+		}
 		if !bpe.IsValid(nil, x.Height, vs) {
 			return ErrInvalidEvidence()
 		}

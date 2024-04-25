@@ -101,6 +101,10 @@ func ErrInsufficientFunds() lib.ErrorI {
 	return lib.NewError(lib.CodeInsufficientFunds, lib.StateMachineModule, "insufficient funds")
 }
 
+func ErrInsufficientSupply() lib.ErrorI {
+	return lib.NewError(lib.CodeInsufficientSupply, lib.StateMachineModule, "insufficient supply")
+}
+
 func ErrValidatorExists() lib.ErrorI {
 	return lib.NewError(lib.CodeValidatorExists, lib.StateMachineModule, "validator exists")
 }

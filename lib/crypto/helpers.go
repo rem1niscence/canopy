@@ -4,9 +4,11 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"github.com/drand/kyber"
 	"github.com/drand/kyber/sign"
 	"github.com/drand/kyber/util/random"
+	"os"
 )
 
 func NewPrivateKey() (PrivateKeyI, error) {
@@ -58,6 +60,9 @@ func NewAddress() (AddressI, error) {
 }
 
 func NewAddressFromBytes(bz []byte) AddressI {
+	if bz == nil {
+		return nil
+	}
 	a := Address(bz)
 	return &a
 }
@@ -152,4 +157,35 @@ func NewMultiBLS(publicKeys [][]byte, bitmap []byte) (MultiPublicKeyI, error) {
 		points = append(points, point)
 	}
 	return NewMultiBLSFromPoints(points, bitmap)
+}
+
+func NewBLSPrivateKeyFromFile(filepath string) (PrivateKeyI, error) {
+	hexBytes, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, err
+	}
+	bz, err := hex.DecodeString(string(hexBytes))
+	if err != nil {
+		return nil, err
+	}
+	return NewBLSPrivateKeyFromBytes(bz)
+}
+
+func PrivateKeyToFile(key PrivateKeyI, filepath string) error {
+	return os.WriteFile(filepath, []byte(hex.EncodeToString(key.Bytes())), 0777)
+}
+
+func NewED25519PrivateKeyFromFile(filepath string) (PrivateKeyI, error) {
+	hexBytes, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, err
+	}
+	bz, err := hex.DecodeString(string(hexBytes))
+	if err != nil {
+		return nil, err
+	}
+	if len(bz) != Ed25519PrivKeySize {
+		return nil, fmt.Errorf("wrong private key size")
+	}
+	return NewPrivateKeyED25519(bz), nil
 }

@@ -55,7 +55,9 @@ func (v *VotesForHeight) NewRound(round uint64) {
 	v.pacemakerVotesByRound = make([]*VoteSet, 0)
 }
 
-func (v *VotesForHeight) AddVote(proposer []byte, height uint64, vote *Message, vals, lastVals ValSet) lib.ErrorI {
+func (v *VotesForHeight) AddVote(proposer []byte, height uint64, vote *Message,
+	vals ValSet, loadValSet func(height uint64) (lib.ValidatorSet, lib.ErrorI),
+	minEvidenceHeight uint64, loadEvidence func(height uint64) (*lib.DoubleSigners, lib.ErrorI)) lib.ErrorI {
 	v.Lock()
 	defer v.Unlock()
 	if vote.Qc.Header.Phase == RoundInterrupt {
@@ -65,7 +67,7 @@ func (v *VotesForHeight) AddVote(proposer []byte, height uint64, vote *Message, 
 	if err != nil {
 		return err
 	}
-	if err = v.handleHighQCAndEvidence(proposer, height, vote, vs, vals, lastVals); err != nil {
+	if err = v.handleHighQCAndEvidence(proposer, height, vote, vs, vals, loadValSet, minEvidenceHeight, loadEvidence); err != nil {
 		return err
 	}
 	if err = v.addVote(vote, vs, vals); err != nil {
@@ -151,7 +153,10 @@ func (v *VotesForHeight) addVote(vote *Message, vs *VoteSet, vals ValSet) lib.Er
 	return nil
 }
 
-func (v *VotesForHeight) handleHighQCAndEvidence(proposer []byte, height uint64, vote *Message, vs *VoteSet, vals, lastVals ValSet) lib.ErrorI {
+// LEADER AGGREGATION
+func (v *VotesForHeight) handleHighQCAndEvidence(proposer []byte, height uint64, vote *Message,
+	vs *VoteSet, vals ValSet, loadValSet func(height uint64) (lib.ValidatorSet, lib.ErrorI),
+	minEvidenceHeight uint64, loadEvidence func(height uint64) (*lib.DoubleSigners, lib.ErrorI)) lib.ErrorI {
 	// Replicas sending in highQC & evidences to proposer during election vote
 	if vote.Qc.Header.Phase == ElectionVote {
 		if vote.HighQc != nil {
@@ -163,7 +168,14 @@ func (v *VotesForHeight) handleHighQCAndEvidence(proposer []byte, height uint64,
 			}
 		}
 		for _, evidence := range vote.LastDoubleSignEvidence {
-			vs.lastDoubleSigners.Add(height, vals, lastVals, evidence)
+			if err := evidence.CheckBasic(); err != nil {
+				continue
+			}
+			valSet, err := loadValSet(evidence.VoteA.Header.Height)
+			if err != nil {
+				continue
+			}
+			vs.lastDoubleSigners.Add(loadValSet, loadEvidence, valSet, evidence, minEvidenceHeight)
 		}
 		for _, evidence := range vote.BadProposerEvidence {
 			vs.badProposers.Add(proposer, height, vals, evidence)

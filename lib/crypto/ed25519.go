@@ -3,6 +3,7 @@ package crypto
 import (
 	ed25519 "crypto/ed25519"
 	"encoding/hex"
+	"encoding/json"
 )
 
 const (
@@ -48,7 +49,19 @@ func (p *PublicKeyED25519) Address() AddressI {
 	address := Address(pubHash[:AddressSize])
 	return &address
 }
-
+func (p *PublicKeyED25519) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
+func (p *PublicKeyED25519) UnmarshalJSON(b []byte) (err error) {
+	var hexString string
+	if err = json.Unmarshal(b, &hexString); err != nil {
+		return
+	}
+	bz, err := hex.DecodeString(hexString)
+	if err != nil {
+		return
+	}
+	*p = *NewPublicKeyED25519(bz)
+	return
+}
 func (p *PublicKeyED25519) Bytes() []byte  { return p.PublicKey }
 func (p *PublicKeyED25519) String() string { return hex.EncodeToString(p.Bytes()) }
 

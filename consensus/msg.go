@@ -36,8 +36,9 @@ func (x *Message) SignBytes() (signBytes []byte, err lib.ErrorI) {
 	}
 }
 
-func (x *Message) CheckProposerMessage(expectedProposer, expectedBlockHash []byte, height uint64, vals ValSet) (isPartialQC bool, err lib.ErrorI) {
-	if err = x.checkBasic(height); err != nil {
+func (x *Message) CheckProposerMessage(expectedProposer, expectedBlockHash []byte, height uint64,
+	loadValSet func(height uint64) (lib.ValidatorSet, lib.ErrorI), vals ValSet) (isPartialQC bool, err lib.ErrorI) {
+	if err = x.checkBasic(0); err != nil {
 		return false, err
 	}
 	if expectedProposer != nil {
@@ -46,6 +47,9 @@ func (x *Message) CheckProposerMessage(expectedProposer, expectedBlockHash []byt
 		}
 	}
 	if x.Header.Phase == Election {
+		if x.Header.Height != height {
+			return false, lib.ErrWrongHeight()
+		}
 		if err = checkSignatureBasic(x.Vrf); err != nil {
 			return false, err
 		}
@@ -53,9 +57,22 @@ func (x *Message) CheckProposerMessage(expectedProposer, expectedBlockHash []byt
 			return false, ErrMismatchPublicKeys()
 		}
 	} else {
-		isPartialQC, err = x.Qc.Check(height, vals)
+		if x.Qc.Header == nil {
+			return false, lib.ErrEmptyView()
+		}
+		vals, err = loadValSet(x.Qc.Header.Height)
+		if err != nil {
+			return false, err
+		}
+		isPartialQC, err = x.Qc.Check(0, vals) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
 		if err != nil {
 			return
+		}
+		if isPartialQC {
+			return
+		}
+		if x.Header.Height != height || x.Qc.Header.Height != height {
+			return false, lib.ErrWrongHeight()
 		}
 		if x.Header.Phase == Propose {
 			if err = x.Qc.Block.Check(); err != nil {

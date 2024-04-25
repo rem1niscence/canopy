@@ -43,14 +43,15 @@ func (s *StateMachine) GenesisBlockHeader() (*lib.BlockHeader, lib.ErrorI) {
 		ValidatorRoot:         maxHash,
 		NextValidatorRoot:     maxHash,
 		ProposerAddress:       maxAddress,
+		Evidence:              nil,
 		BadProposers:          nil,
-		LastDoubleSigners:     nil,
 		LastQuorumCertificate: nil,
 	}, nil
 }
 
 func (s *StateMachine) ReadGenesisFromFile() (genesis *types.GenesisState, e lib.ErrorI) {
-	bz, err := os.ReadFile(filepath.Join(s.Config.DataDirPath, s.Config.GenesisFileName))
+	genesis = new(types.GenesisState)
+	bz, err := os.ReadFile(filepath.Join(s.Config.DataDirPath, lib.GenesisFilePath))
 	if err != nil {
 		return nil, types.ErrReadGenesisFile(err)
 	}
@@ -62,13 +63,17 @@ func (s *StateMachine) ReadGenesisFromFile() (genesis *types.GenesisState, e lib
 }
 
 func (s *StateMachine) NewStateFromGenesis(genesis *types.GenesisState) lib.ErrorI {
-	if err := s.SetAccounts(genesis.Accounts); err != nil {
+	supply := new(types.Supply)
+	if err := s.SetAccounts(genesis.Accounts, supply); err != nil {
 		return err
 	}
-	if err := s.SetPools(genesis.Pools); err != nil {
+	if err := s.SetPools(genesis.Pools, supply); err != nil {
 		return err
 	}
-	if err := s.SetValidators(genesis.Validators); err != nil {
+	if err := s.SetValidators(genesis.Validators, supply); err != nil {
+		return err
+	}
+	if err := s.SetSupply(supply); err != nil {
 		return err
 	}
 	return s.SetParams(genesis.Params)
@@ -101,11 +106,8 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.Err
 		}
 	}
 	for _, pool := range genesis.Pools {
-		if pool.Name < 0 {
+		if pool.Id < 0 {
 			return types.ErrInvalidPoolName()
-		}
-		if pool.Amount == 0 {
-			return types.ErrInvalidAmount()
 		}
 	}
 	return nil

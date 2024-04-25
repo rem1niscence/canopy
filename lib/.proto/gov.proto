@@ -25,14 +25,12 @@ message ValidatorParams {
   uint64 validator_max_count = 2;
   uint64 validator_unstaking_blocks = 3;
   uint64 validator_max_pause_blocks = 5;
-  uint64 validator_max_evidence_age_in_blocks = 6;
-  uint64 validator_double_sign_slash_percentage = 7;
-  uint64 validator_bad_proposal_slash_percentage = 8;
-  uint64 validator_non_sign_slash_percentage = 9;
-  uint64 validator_max_non_sign = 10;
-  uint64 validator_non_sign_window = 11;
-  uint64 validator_proposer_percentage_of_fees = 12;
-  uint64 validator_block_reward = 13;
+  uint64 validator_double_sign_slash_percentage = 6;
+  uint64 validator_bad_proposal_slash_percentage = 7;
+  uint64 validator_non_sign_slash_percentage = 8;
+  uint64 validator_max_non_sign = 9;
+  uint64 validator_non_sign_window = 10;
+  uint64 validator_block_reward = 11;
 }
 
 message FeeParams {
@@ -43,7 +41,7 @@ message FeeParams {
   uint64 message_pause_fee = 5;
   uint64 message_unpause_fee = 6;
   uint64 message_change_parameter_fee = 7;
-  uint64 message_double_sign_fee = 8;
+  uint64 message_dao_transfer_fee = 8;
 }
 
 message GovernanceParams {
