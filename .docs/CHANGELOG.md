@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [Unreleased] - 04/28/2024
+- Startup functionality
+- Single node `blockchain` functionality
+- Basic logging in `consensus` module
+- Fixed `genesis` bugs
+
 ## [Unreleased] - 04/25/2024
 - Changed `evidence` to be accepted from any height
 - Index `double_signers`
