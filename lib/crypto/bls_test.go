@@ -33,3 +33,14 @@ func TestBLS(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, enabled)
 }
+
+func TestNewBLSPointFromBytes(t *testing.T) {
+	k1, err := NewBLSPrivateKey()
+	require.NoError(t, err)
+	k1Pub := k1.PublicKey().(*BLS12381PublicKey)
+	point := k1Pub.Point
+	bytes := k1Pub.Bytes()
+	point2, err := NewBLSPointFromBytes(bytes)
+	require.NoError(t, err)
+	require.True(t, point.Equal(point2))
+}

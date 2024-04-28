@@ -136,6 +136,7 @@ func (s *Store) Version() uint64                                  { return s.ver
 func (s *Store) NewTxn() lib.StoreTxnI                            { return NewTxn(s) }
 func (s *Store) Root() (root []byte, err lib.ErrorI)              { return s.sc.Root() }
 func (s *Store) Commit() (root []byte, err lib.ErrorI) {
+	s.version++
 	s.root, err = s.sc.Commit()
 	if err != nil {
 		return nil, err
@@ -143,10 +144,9 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	if err = s.setCommitID(s.version, s.root); err != nil {
 		return nil, err
 	}
-	if err := s.writer.CommitAt(s.version, nil); err != nil {
-		return nil, ErrCommitDB(err)
+	if e := s.writer.CommitAt(s.version, nil); e != nil {
+		return nil, ErrCommitDB(e)
 	}
-	s.version++
 	s.resetWriter(s.root)
 	return lib.CopyBytes(s.root), nil
 }
@@ -212,9 +212,6 @@ func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *CommitID) {
 	}
 	if err = lib.Unmarshal(bz, id); err != nil {
 		log.Fatalf("unmarshalCommitID() failed with err: %s", err.Error())
-	}
-	if id.Height == 0 {
-		id.Height++
 	}
 	return
 }

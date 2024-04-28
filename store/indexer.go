@@ -101,11 +101,15 @@ func (t *Indexer) DeleteQCForHeight(height uint64) lib.ErrorI {
 }
 
 func (t *Indexer) IndexQC(qc *lib.QuorumCertificate) lib.ErrorI {
-	bz, err := lib.Marshal(qc)
+	bz, err := lib.Marshal(&lib.QuorumCertificate{
+		Header:      qc.Header,
+		BlockHash:   qc.BlockHash,
+		ProposerKey: qc.ProposerKey,
+		Signature:   qc.Signature,
+	})
 	if err != nil {
 		return err
 	}
-	qc.Block = nil
 	return t.indexQCByHeight(qc.Header.Height, bz)
 }
 

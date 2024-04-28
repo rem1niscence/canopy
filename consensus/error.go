@@ -39,8 +39,8 @@ func ErrInvalidPartialSignature() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidPartialSignature, lib.ConsensusModule, "invalid partial signature")
 }
 
-func ErrEmptyProposerMessage() lib.ErrorI {
-	return lib.NewError(lib.CodeEmptyProposerMessage, lib.ConsensusModule, "empty proposer message")
+func ErrEmptyMessage() lib.ErrorI {
+	return lib.NewError(lib.CodeEmptyMessage, lib.ConsensusModule, "empty consensus message")
 }
 
 func ErrMismatchPublicKeys() lib.ErrorI {

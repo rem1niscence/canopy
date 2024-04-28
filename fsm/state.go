@@ -18,20 +18,22 @@ type StateMachine struct {
 	height            uint64
 	proposeVoteConfig types.ProposalVoteConfig
 	store             lib.RWStoreI
+	log               lib.LoggerI
 }
 
-func New(c lib.Config, store lib.StoreI) (*StateMachine, lib.ErrorI) {
+func New(c lib.Config, store lib.StoreI, log lib.LoggerI) (*StateMachine, lib.ErrorI) {
 	sm := &StateMachine{
 		Config:            c,
 		BeginBlockParams:  new(lib.BeginBlockParams),
 		ProtocolVersion:   c.ProtocolVersion,
 		NetworkID:         c.NetworkID,
 		proposeVoteConfig: types.AcceptAllProposals,
+		log:               log,
 	}
 	return sm, sm.Initialize(store)
 }
 
-func NewWithBeginBlock(bb *lib.BeginBlockParams, c lib.Config, height uint64, store lib.RWStoreI) *StateMachine {
+func NewWithBeginBlock(bb *lib.BeginBlockParams, c lib.Config, height uint64, store lib.RWStoreI, log lib.LoggerI) *StateMachine {
 	return &StateMachine{
 		Config:            c,
 		BeginBlockParams:  bb,
@@ -40,12 +42,13 @@ func NewWithBeginBlock(bb *lib.BeginBlockParams, c lib.Config, height uint64, st
 		height:            height,
 		proposeVoteConfig: types.AcceptAllProposals,
 		store:             store,
+		log:               log,
 	}
 }
 
 func (s *StateMachine) Initialize(db lib.StoreI) (error lib.ErrorI) {
 	s.height, s.store = db.Version(), db
-	if s.height != 1 {
+	if s.height != 0 {
 		lastStore, err := db.NewReadOnly(s.height)
 		if err != nil {
 			return err
@@ -54,8 +57,8 @@ func (s *StateMachine) Initialize(db lib.StoreI) (error lib.ErrorI) {
 		if s.BeginBlockParams.ValidatorSet, err = lastFSM.GetConsensusValidators(); err != nil {
 			return err
 		}
-		if s.height != 2 {
-			blk, e := db.GetBlockByHeight(s.height)
+		if s.height != 1 {
+			blk, e := db.GetBlockByHeight(s.height - 1)
 			if e != nil {
 				return e
 			}
@@ -104,7 +107,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 		return nil, nil, nil, err
 	}
 	header := lib.BlockHeader{
-		Height:                s.Height() + 1,
+		Height:                s.Height(),
 		Hash:                  nil,
 		NetworkId:             s.NetworkID,
 		Time:                  b.BlockHeader.Time,
@@ -138,12 +141,14 @@ func (s *StateMachine) ValidateBlock(header *lib.BlockHeader, compare *lib.Block
 	if err != nil {
 		return err
 	}
-	isPartialQC, err := header.LastQuorumCertificate.Check(header.Height-1, vs)
-	if err != nil {
-		return err
-	}
-	if isPartialQC {
-		return lib.ErrNoMaj23()
+	if header.Height > 2 {
+		isPartialQC, err := header.LastQuorumCertificate.Check(header.Height-1, vs)
+		if err != nil {
+			return err
+		}
+		if isPartialQC {
+			return lib.ErrNoMaj23()
+		}
 	}
 	if err = s.validateBlockTime(header); err != nil {
 		return err
@@ -162,13 +167,17 @@ func (s *StateMachine) ValidateBlock(header *lib.BlockHeader, compare *lib.Block
 }
 
 func (s *StateMachine) ApplyAndValidateBlock(b *lib.Block, evidence *lib.ByzantineEvidence, isCandidateBlock bool) (*lib.BlockResult, *lib.ConsensusValidators, lib.ErrorI) {
+	blockHash, blockHeight := lib.BytesToString(b.BlockHeader.Hash), b.BlockHeader.Height
+	s.log.Debugf("Applying block %s for height %d", blockHash, blockHeight)
 	header, txResults, valSet, err := s.ApplyBlock(b)
 	if err != nil {
 		return nil, nil, err
 	}
+	s.log.Debugf("Validating block %s for height %d", blockHash, blockHeight)
 	if err = s.ValidateBlock(b.BlockHeader, header, evidence, isCandidateBlock); err != nil {
 		return nil, nil, err
 	}
+	s.log.Infof("Block %s is valid for height %d ✅ ", blockHash, blockHeight)
 	return &lib.BlockResult{
 		BlockHeader:  b.BlockHeader,
 		Transactions: txResults,
@@ -218,15 +227,19 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 	if !ok {
 		return nil, types.ErrWrongStoreType()
 	}
-	heightBeforeStore, err := store.NewReadOnly(height - 1)
+	heightBeforeHeight := height - 1
+	if heightBeforeHeight <= 1 {
+		heightBeforeHeight = 1
+	}
+	heightBeforeStore, err := store.NewReadOnly(heightBeforeHeight)
 	if err != nil {
 		return nil, err
 	}
-	qc, err := heightBeforeStore.GetBlockByHeight(height - 1)
+	qc, err := heightBeforeStore.GetBlockByHeight(heightBeforeHeight)
 	if err != nil {
 		return nil, err
 	}
-	if height < 2 {
+	if height < 1 {
 		qc.BlockHeader, err = s.GenesisBlockHeader()
 		if err != nil {
 			return nil, err
@@ -244,12 +257,12 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 	return NewWithBeginBlock(&lib.BeginBlockParams{
 		BlockHeader:  qc.BlockHeader,
 		ValidatorSet: consensusValidators,
-	}, s.Config, height, heightStore), nil
+	}, s.Config, height, heightStore, s.log), nil
 }
 
 func (s *StateMachine) LoadValSet(height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	if height <= 2 {
-		height = 2 // 2 is first non-genesis height
+	if height <= 1 {
+		height = 1 // 1 is first non-genesis height
 	} else {
 		height -= 1 // end block state is begin block of next height
 	}
@@ -311,12 +324,14 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 		return nil, err
 	}
 	return &StateMachine{
+		Config:            s.Config,
 		BeginBlockParams:  s.BeginBlockParams,
 		ProtocolVersion:   s.ProtocolVersion,
 		NetworkID:         s.NetworkID,
 		height:            s.height,
 		proposeVoteConfig: s.proposeVoteConfig,
 		store:             storeCopy,
+		log:               s.log,
 	}, nil
 }
 

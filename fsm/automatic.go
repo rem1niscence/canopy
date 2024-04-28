@@ -7,6 +7,9 @@ import (
 )
 
 func (s *StateMachine) BeginBlock() lib.ErrorI {
+	if s.IsGenesis() {
+		return nil
+	}
 	if err := s.CheckProtocolVersion(); err != nil {
 		return err
 	}
@@ -18,6 +21,10 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 		return err
 	}
 	return nil
+}
+
+func (s *StateMachine) IsGenesis() bool {
+	return s.Height() <= 1 // height 1 will have a nil last qc
 }
 
 func (s *StateMachine) EndBlock() (endBlock *lib.EndBlockParams, err lib.ErrorI) {
@@ -163,6 +170,9 @@ func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams) (nonSig
 		if err = s.SlashDoubleSigners(params, evidence.DoubleSigners); err != nil {
 			return 0, err
 		}
+	}
+	if s.height <= 2 {
+		return // height 2 would use height 1 as begin_block which uses genesis as lastQC
 	}
 	nonSigners, nonSignerPercent, err := block.LastQuorumCertificate.GetNonSigners(beginBlock.ValidatorSet)
 	if err != nil {

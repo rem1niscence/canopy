@@ -79,7 +79,7 @@ const (
 	CodeFailedSafeNode                  ErrorCode = 40
 	CodeInvalidValidatorIndex           ErrorCode = 41
 	CodeUnableToAddSigner               ErrorCode = 42
-	CodeEmptyProposerMessage            ErrorCode = 43
+	CodeEmptyMessage                    ErrorCode = 43
 	CodeInvalidBlockTime                ErrorCode = 44
 	CodeInvalidEvidence                 ErrorCode = 45
 	CodeDuplicateEvidence               ErrorCode = 46

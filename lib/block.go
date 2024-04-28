@@ -2,7 +2,10 @@ package lib
 
 import (
 	"bytes"
+	"encoding/json"
 	"github.com/ginchuco/ginchu/lib/crypto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 func (x *Block) Check() ErrorI {
@@ -59,6 +62,78 @@ func (x *BlockHeader) Check() ErrorI {
 	}
 	if x.NetworkId == 0 {
 		return ErrNilNetworkID()
+	}
+	return nil
+}
+
+type jsonBlockHeader struct {
+	Height                uint64                `json:"height,omitempty"`
+	Hash                  HexBytes              `json:"hash,omitempty"`
+	NetworkId             uint32                `json:"network_id,omitempty"`
+	Time                  string                `json:"time,omitempty"`
+	NumTxs                uint64                `json:"num_txs,omitempty"`
+	TotalTxs              uint64                `json:"total_txs,omitempty"`
+	LastBlockHash         HexBytes              `json:"last_block_hash,omitempty"`
+	StateRoot             HexBytes              `json:"state_root,omitempty"`
+	TransactionRoot       HexBytes              `json:"transaction_root,omitempty"`
+	ValidatorRoot         HexBytes              `json:"validator_root,omitempty"`
+	NextValidatorRoot     HexBytes              `json:"next_validator_root,omitempty"`
+	ProposerAddress       HexBytes              `json:"proposer_address,omitempty"`
+	Evidence              []*DoubleSignEvidence `json:"evidence,omitempty"`
+	BadProposers          []HexBytes            `json:"bad_proposers,omitempty"`
+	LastQuorumCertificate *QuorumCertificate    `json:"last_quorum_certificate,omitempty"`
+}
+
+// nolint:all
+func (x BlockHeader) MarshalJSON() ([]byte, error) {
+	var badProposers []HexBytes
+	for _, b := range x.BadProposers {
+		badProposers = append(badProposers, b)
+	}
+	return json.Marshal(jsonBlockHeader{
+		Height:                x.Height,
+		Hash:                  x.Hash,
+		NetworkId:             x.NetworkId,
+		Time:                  x.Time.AsTime().Format(time.DateTime),
+		NumTxs:                x.NumTxs,
+		TotalTxs:              x.TotalTxs,
+		LastBlockHash:         x.LastBlockHash,
+		StateRoot:             x.StateRoot,
+		TransactionRoot:       x.TransactionRoot,
+		ValidatorRoot:         x.ValidatorRoot,
+		NextValidatorRoot:     x.NextValidatorRoot,
+		ProposerAddress:       x.ProposerAddress,
+		Evidence:              x.Evidence,
+		BadProposers:          badProposers,
+		LastQuorumCertificate: x.LastQuorumCertificate,
+	})
+}
+
+func (x *BlockHeader) UnmarshalJSON(b []byte) error {
+	var j jsonBlockHeader
+	if err := json.Unmarshal(b, &j); err != nil {
+		return err
+	}
+	t, err := time.Parse(time.DateTime, j.Time)
+	if err != nil {
+		return err
+	}
+	*x = BlockHeader{
+		Height:                j.Height,
+		Hash:                  j.Hash,
+		NetworkId:             j.NetworkId,
+		Time:                  timestamppb.New(t),
+		NumTxs:                x.NumTxs,
+		TotalTxs:              x.TotalTxs,
+		LastBlockHash:         x.LastBlockHash,
+		StateRoot:             x.StateRoot,
+		TransactionRoot:       x.TransactionRoot,
+		ValidatorRoot:         x.ValidatorRoot,
+		NextValidatorRoot:     x.NextValidatorRoot,
+		ProposerAddress:       x.ProposerAddress,
+		Evidence:              x.Evidence,
+		BadProposers:          x.BadProposers,
+		LastQuorumCertificate: x.LastQuorumCertificate,
 	}
 	return nil
 }
@@ -198,4 +273,34 @@ func (x *BlockResult) ToBlock() (*Block, ErrorI) {
 		BlockHeader:  x.BlockHeader,
 		Transactions: txs,
 	}, nil
+}
+
+type jsonBlock struct {
+	BlockHeader  *BlockHeader `json:"block_header,omitempty"`
+	Transactions []HexBytes   `json:"transactions,omitempty"`
+}
+
+// nolint:all
+func (x Block) MarshalJSON() ([]byte, error) {
+	var txs []HexBytes
+	for _, tx := range x.Transactions {
+		txs = append(txs, tx)
+	}
+	return json.Marshal(jsonBlock{
+		BlockHeader:  x.BlockHeader,
+		Transactions: txs,
+	})
+}
+
+func (x *Block) UnmarshalJSON(b []byte) error {
+	var j jsonBlock
+	if err := json.Unmarshal(b, &j); err != nil {
+		return err
+	}
+	var txs [][]byte
+	for _, tx := range j.Transactions {
+		txs = append(txs, tx)
+	}
+	x.BlockHeader, x.Transactions = j.BlockHeader, txs
+	return nil
 }

@@ -32,7 +32,7 @@ func (c *Consensus) HandleTransaction(tx []byte) lib.ErrorI {
 // CheckCandidateBlock checks the candidate block for errors and resets back to begin block state
 func (c *Consensus) CheckCandidateBlock(candidate *lib.Block, evidence *lib.ByzantineEvidence) (err lib.ErrorI) {
 	reset := c.ValidatorProposalConfig(c.FSM)
-	defer func() { c.FSM.ResetToBeginBlock(); reset() }()
+	defer func() { c.FSM.Reset(); reset() }()
 	_, _, err = c.FSM.ApplyAndValidateBlock(candidate, evidence, true)
 	return
 }
@@ -40,9 +40,9 @@ func (c *Consensus) CheckCandidateBlock(candidate *lib.Block, evidence *lib.Byza
 // ProduceCandidateBlock uses the mempool and state params to build a candidate block
 func (c *Consensus) ProduceCandidateBlock(badProposers [][]byte, dse lib.DoubleSignEvidences) (*lib.Block, lib.ErrorI) {
 	reset := c.ValidatorProposalConfig(c.FSM, c.Mempool.FSM)
-	defer func() { c.FSM.ResetToBeginBlock(); reset() }()
+	defer func() { c.FSM.Reset(); reset() }()
 	height, lastBlock := c.FSM.Height(), c.FSM.LastBlockHeader()
-	qc, err := c.FSM.LoadCertificate(height)
+	qc, err := c.FSM.LoadCertificate(height - 1)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +53,7 @@ func (c *Consensus) ProduceCandidateBlock(badProposers [][]byte, dse lib.DoubleS
 	if err = c.Mempool.checkMempool(); err != nil {
 		return nil, err
 	}
+	pubKey, _ := crypto.NewBLSPublicKeyFromBytes(c.PublicKey)
 	numTxs, transactions := c.Mempool.GetTransactions(maxBlockSize)
 	header := &lib.BlockHeader{
 		Height:                height + 1,
@@ -61,7 +62,7 @@ func (c *Consensus) ProduceCandidateBlock(badProposers [][]byte, dse lib.DoubleS
 		NumTxs:                uint64(numTxs),
 		TotalTxs:              lastBlock.TotalTxs + uint64(numTxs),
 		LastBlockHash:         lastBlock.Hash,
-		ProposerAddress:       c.PublicKey,
+		ProposerAddress:       pubKey.Address().Bytes(),
 		Evidence:              dse.DSE,
 		BadProposers:          badProposers,
 		LastQuorumCertificate: qc,
@@ -82,32 +83,42 @@ func (c *Consensus) ProduceCandidateBlock(badProposers [][]byte, dse lib.DoubleS
 // - atomically writes all to the underlying db
 // - sets up the app for the next height
 func (c *Consensus) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
-	defer func() { c.FSM.ResetToBeginBlock() }()
+	//defer func() { c.FSM.ResetToBeginBlock() }()
+	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.BlockHash))
 	store, blk := c.FSM.Store().(lib.StoreI), qc.Block
 	blockResult, nextVals, err := c.FSM.ApplyAndValidateBlock(blk, nil, false)
 	if err != nil {
 		return err
 	}
+	c.log.Debugf("Indexing quorum certificate %d", qc.Header.Height)
 	if err = store.IndexQC(qc); err != nil {
 		return err
 	}
+	c.log.Debugf("Indexing block %d", blk.BlockHeader.Height)
 	if err = store.IndexBlock(blockResult); err != nil {
 		return err
 	}
 	for _, tx := range blk.Transactions {
+		c.log.Debugf("Removing tx %s from mempool", lib.HexBytes(tx))
 		c.Mempool.DeleteTransaction(tx)
 	}
+	c.log.Debug("Checking mempool for newly invalid transactions")
 	if err = c.Mempool.checkMempool(); err != nil {
 		return err
 	}
+	c.log.Debug("Committing to store")
 	if _, err = store.Commit(); err != nil {
 		return err
 	}
+	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToString(qc.BlockHash), blk.BlockHeader.Height)
 	c.LastValidatorSet, c.Height = c.ValidatorSet, blk.BlockHeader.Height+1
 	if c.ValidatorSet, err = lib.NewValidatorSet(nextVals); err != nil {
 		return err
 	}
-	c.FSM = fsm.NewWithBeginBlock(&lib.BeginBlockParams{BlockHeader: blk.BlockHeader, ValidatorSet: nextVals}, c.Config, c.Height, store)
+	c.log.Debug("Setting up FSM for next height")
+	c.FSM = fsm.NewWithBeginBlock(&lib.BeginBlockParams{BlockHeader: blk.BlockHeader, ValidatorSet: nextVals},
+		c.Config, c.Height, store, c.log)
+	c.log.Debug("Setting up mempool for next height")
 	if c.Mempool.FSM, err = c.FSM.Copy(); err != nil {
 		return err
 	}

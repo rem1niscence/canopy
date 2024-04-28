@@ -8,6 +8,7 @@ import (
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"golang.org/x/net/netutil"
+	"google.golang.org/protobuf/proto"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -28,7 +29,7 @@ import (
 */
 
 const (
-	transport            = "TCP"
+	transport            = "tcp"
 	dialTimeout          = time.Second
 	defaultMaxValidators = 1000
 )
@@ -45,7 +46,7 @@ type P2P struct {
 	validatorsReceiver chan []*lib.PeerAddress
 	maxValidators      int
 	bannedIPs          []net.IPAddr // banned IPs (non-string)
-	logger             lib.LoggerI
+	log                lib.LoggerI
 }
 
 func New(p crypto.PrivateKeyI, maxValidators uint64, c lib.Config, l lib.LoggerI) *P2P {
@@ -75,11 +76,12 @@ func New(p crypto.PrivateKeyI, maxValidators uint64, c lib.Config, l lib.LoggerI
 		validatorsReceiver: make(chan []*lib.PeerAddress, maxChannelCalls),
 		maxValidators:      int(maxValidators),
 		bannedIPs:          bannedIPs,
-		logger:             l,
+		log:                l,
 	}
 }
 
 func (p *P2P) Start() {
+	p.log.Info("Starting P2P 🤝 ")
 	go p.InternalListenValidators(p.validatorsReceiver)
 	go p.Listen(&lib.PeerAddress{NetAddress: p.config.ListenAddress})
 	go p.book.StartChurnManagement(p.DialAndDisconnect)
@@ -95,10 +97,16 @@ func (p *P2P) Start() {
 	}()
 }
 
+func (p *P2P) Stop() {
+	p.Close()
+	p.PeerSet.Stop()
+}
+
 func (p *P2P) Dial(address *lib.PeerAddress, disconnect bool) lib.ErrorI {
 	if p.IsSelf(address) || p.PeerSet.Has(address.PublicKey) {
 		return nil
 	}
+	p.log.Debugf("Dialing %s@%s", lib.BytesToString(address.PublicKey), address.NetAddress)
 	conn, er := net.DialTimeout(transport, address.NetAddress, dialTimeout)
 	if er != nil {
 		p.book.AddFailedDialAttempt(address.PublicKey)
@@ -115,6 +123,7 @@ func (p *P2P) Listen(listenAddress *lib.PeerAddress) {
 	if er != nil {
 		panic(ErrFailedListen(er))
 	}
+	p.log.Debugf("Starting net.Listener on tcp://%s", listenAddress.NetAddress)
 	p.listener = netutil.LimitListener(ln, p.config.MaxInbound+len(p.config.TrustedPeerIDs)+p.maxValidators)
 	for {
 		c, err := p.listener.Accept()
@@ -123,11 +132,14 @@ func (p *P2P) Listen(listenAddress *lib.PeerAddress) {
 		}
 		go func(c net.Conn) {
 			defer p.catchPanic()
+			p.log.Debugf("Received ephemeral connection %s", c.RemoteAddr().String())
 			peerAddress, e := p.filter(c)
 			if e != nil {
+				p.log.Debugf("Closing ephemeral connection %s", c.RemoteAddr().String())
 				_ = c.Close()
 				return
 			}
+			p.log.Debugf("Received ephemeral connection from %s@%s", lib.BytesToString(peerAddress.PublicKey), peerAddress.NetAddress)
 			if err = p.AddPeer(c, &lib.PeerInfo{Address: peerAddress}, false); err != nil {
 				_ = c.Close()
 				return
@@ -141,6 +153,7 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) lib.Er
 	if err != nil {
 		return err
 	}
+	p.log.Infof("Adding peer: %s@%s", connection.peerPublicKey, info.Address.NetAddress)
 	if info.Address.PublicKey != nil && !bytes.Equal(connection.peerPublicKey, info.Address.PublicKey) {
 		return ErrMismatchPeerPublicKey(info.Address.PublicKey, connection.peerPublicKey)
 	}
@@ -226,13 +239,35 @@ func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 func (p *P2P) IsSelf(address *lib.PeerAddress) bool {
 	return bytes.Equal(p.privateKey.PublicKey().Bytes(), address.PublicKey)
 }
+func (p *P2P) SelfSend(fromPublicKey []byte, topic lib.Topic, payload proto.Message) lib.ErrorI {
+	p.log.Debugf("Self sending %s message", topic)
+	msgBz, err := lib.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	p.ReceiveChannel(topic) <- &lib.MessageWrapper{
+		Message: payload,
+		Hash:    crypto.Hash(msgBz),
+		Sender: &lib.PeerInfo{
+			Address: &lib.PeerAddress{
+				PublicKey:  fromPublicKey,
+				NetAddress: "",
+			},
+		},
+	}
+	return nil
+}
 func (p *P2P) MaxPossiblePeers() int {
 	c := p.config
 	return c.MaxInbound + c.MaxOutbound + p.maxValidators + len(c.TrustedPeerIDs)
 }
 func (p *P2P) ReceiveChannel(topic lib.Topic) chan *lib.MessageWrapper { return p.channels[topic] }
 func (p *P2P) ValidatorsReceiver() chan []*lib.PeerAddress             { return p.validatorsReceiver }
-func (p *P2P) Close()                                                  { _ = p.listener.Close() }
+func (p *P2P) Close() {
+	if err := p.listener.Close(); err != nil {
+		p.log.Error(err.Error())
+	}
+}
 func (p *P2P) filter(conn net.Conn) (*lib.PeerAddress, lib.ErrorI) {
 	remoteAddr := conn.RemoteAddr()
 	tcpAddr, ok := remoteAddr.(*net.TCPAddr)

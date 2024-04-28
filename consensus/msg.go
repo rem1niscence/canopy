@@ -9,26 +9,29 @@ import (
 func (x *Message) SignBytes() (signBytes []byte, err lib.ErrorI) {
 	switch {
 	case x.IsProposerMessage():
-		return lib.Marshal(&Message{
-			Header: x.Header,
-			Vrf:    x.Vrf,
-			Qc: &QC{
+		msg := &Message{
+			Header:                 x.Header,
+			Vrf:                    x.Vrf,
+			HighQc:                 x.HighQc,
+			LastDoubleSignEvidence: x.LastDoubleSignEvidence,
+			BadProposerEvidence:    x.BadProposerEvidence,
+		}
+		if x.Qc != nil {
+			msg.Qc = &QC{
 				Header:      x.Qc.Header,
 				Block:       x.Qc.Block,
 				BlockHash:   x.Qc.BlockHash,
 				ProposerKey: x.Qc.ProposerKey,
 				Signature:   x.Qc.Signature,
-			},
-			HighQc:                 x.HighQc,
-			LastDoubleSignEvidence: x.LastDoubleSignEvidence,
-			BadProposerEvidence:    x.BadProposerEvidence,
-		})
+			}
+		}
+		return lib.Marshal(msg)
 	case x.IsReplicaMessage():
-		return lib.Marshal(&QC{
+		return (&QC{
 			Header:      x.Qc.Header,
 			BlockHash:   x.Qc.BlockHash,
 			ProposerKey: x.Qc.ProposerKey,
-		})
+		}).SignBytes()
 	case x.IsPacemakerMessage():
 		return lib.Marshal(&Message{Header: x.Header})
 	default:
@@ -91,30 +94,32 @@ func (x *Message) CheckProposerMessage(expectedProposer, expectedBlockHash []byt
 	return
 }
 
-func (x *Message) CheckReplicaMessage(height uint64, expectedBlockHash []byte, vs ValSet) lib.ErrorI {
-	if err := x.checkBasic(height); err != nil {
+func (x *Message) CheckReplicaMessage(height uint64, expectedBlockHash []byte) lib.ErrorI {
+	if x == nil {
+		return ErrEmptyMessage()
+	}
+	if err := checkSignature(x.Signature, x); err != nil {
 		return err
 	}
 	if x.IsPacemakerMessage() {
 		return nil
 	}
-	isPartialQC, err := x.Qc.Check(height, vs)
-	if err != nil {
-		return err
+	if x.Qc == nil {
+		return lib.ErrEmptyQuorumCertificate()
 	}
-	if isPartialQC {
-		return lib.ErrNoMaj23()
+	if err := x.Qc.Header.Check(height); err != nil {
+		return err
 	}
 	if x.Qc.Header.Phase == ElectionVote {
 		if len(x.Qc.ProposerKey) != crypto.BLS12381PubKeySize {
 			return lib.ErrInvalidProposerPubKey()
 		}
 	} else {
-		if x.Qc.Header.Phase == ProposeVote {
-			if !bytes.Equal(x.Signature.PublicKey, x.Qc.ProposerKey) {
-				return ErrMismatchPublicKeys()
-			}
-		}
+		//if x.Qc.Header.Phase == ProposeVote {
+		//	if !bytes.Equal(x.Signature.PublicKey, x.Qc.ProposerKey) {
+		//		return ErrMismatchPublicKeys()
+		//	}
+		//}
 		if !bytes.Equal(x.Qc.BlockHash, expectedBlockHash) {
 			return ErrMismatchBlockHash()
 		}
@@ -159,7 +164,7 @@ func (x *Message) IsPacemakerMessage() bool {
 
 func (x *Message) checkBasic(height uint64) lib.ErrorI {
 	if x == nil {
-		return ErrEmptyProposerMessage()
+		return ErrEmptyMessage()
 	}
 	if err := checkSignature(x.Signature, x); err != nil {
 		return err

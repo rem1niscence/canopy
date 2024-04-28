@@ -41,8 +41,8 @@ type Consensus struct {
 	syncing  atomic.Bool
 }
 
-func New(c lib.Config, nodeKey, valKey crypto.PrivateKeyI, db lib.StoreI, l lib.LoggerI) (*Consensus, lib.ErrorI) {
-	sm, err := fsm.New(c, db)
+func New(c lib.Config, valKey, nodeKey crypto.PrivateKeyI, db lib.StoreI, l lib.LoggerI) (*Consensus, lib.ErrorI) {
+	sm, err := fsm.New(c, db, l)
 	if err != nil {
 		return nil, err
 	}
@@ -85,20 +85,36 @@ func New(c lib.Config, nodeKey, valKey crypto.PrivateKeyI, db lib.StoreI, l lib.
 
 func (c *Consensus) Start() {
 	c.P2P.Start()
+	c.StartListeners()
 	go c.Sync()
 	go c.StartBFT()
-	go c.StartListeners()
+}
+
+func (c *Consensus) Stop() {
+	c.Lock()
+	defer c.Unlock()
+	if err := c.FSM.Store().(lib.StoreI).Close(); err != nil {
+		c.log.Error(err.Error())
+	}
+	c.P2P.Stop()
 }
 
 func (c *Consensus) StartBFT() {
-	startTime, timer := time.Now(), time.NewTimer(time.Hour)
+	timer := time.NewTimer(time.Hour)
 	for {
 		select {
 		case <-timer.C:
-			if !c.SelfIsValidator() || c.syncing.Load() {
+			if c.syncing.Load() {
+				c.log.Info("Paused BFT loop as currently syncing")
 				timer.Stop()
 				continue
 			}
+			if !c.SelfIsValidator() {
+				c.log.Info("Not currently a validator, waiting for a new block")
+				timer.Stop()
+				continue
+			}
+			startTime := time.Now()
 			switch c.Phase {
 			case Election:
 				c.StartElectionPhase()
@@ -120,13 +136,13 @@ func (c *Consensus) StartBFT() {
 				c.Pacemaker()
 				continue
 			}
-			c.SetTimerForNextPhase(&startTime, timer, c.Phase, time.Since(startTime))
+			c.SetTimerForNextPhase(timer, c.Phase, time.Since(startTime))
 		case processTime := <-c.newBlock:
-			c.stopTimer(timer)
-			c.SetTimerForNextPhase(&startTime, timer, CommitProcess, processTime)
+			c.log.Info("Resetting BFT timer after receiving a new block")
+			c.SetTimerForNextPhase(timer, CommitProcess, processTime)
 		case <-c.syncDone:
-			c.stopTimer(timer)
-			c.SetTimerForNextPhase(&startTime, timer, CommitProcess, c.TimeSinceLastBlock())
+			c.log.Info("Syncing done ✅ ")
+			c.SetTimerForNextPhase(timer, CommitProcess, c.TimeSinceLastBlock())
 		}
 	}
 }
@@ -134,6 +150,7 @@ func (c *Consensus) StartBFT() {
 func (c *Consensus) StartElectionPhase() {
 	c.Lock()
 	defer c.Unlock()
+	c.log.Infof(c.View.ToString())
 	selfValidator, err := c.ValidatorSet.GetValidator(c.PublicKey)
 	if err != nil {
 		c.log.Error(err.Error())
@@ -163,6 +180,7 @@ func (c *Consensus) StartElectionPhase() {
 func (c *Consensus) StartElectionVotePhase() {
 	c.Lock()
 	defer c.Unlock()
+	c.log.Info(c.View.ToString())
 	// PROPOSER SELECTION
 	candidates, err := c.Proposals.GetElectionCandidates(c.View.Round, c.ValidatorSet, c.SortitionData)
 	if err != nil {
@@ -176,7 +194,6 @@ func (c *Consensus) StartElectionVotePhase() {
 		bpe = c.ByzantineEvidence.BPE
 		dse = c.ByzantineEvidence.DSE
 	}
-
 	// SEND VOTE TO PROPOSER
 	c.SendToProposer(&Message{
 		Qc: &QC{
@@ -193,6 +210,7 @@ func (c *Consensus) StartElectionVotePhase() {
 func (c *Consensus) StartProposePhase() {
 	c.Lock()
 	defer c.Unlock()
+	c.log.Info(c.View.ToString())
 	vote, as, err := c.Votes.GetMaj23(c.View)
 	if err != nil {
 		c.log.Error(err.Error())
@@ -216,7 +234,7 @@ func (c *Consensus) StartProposePhase() {
 	}
 	// SEND MSG TO REPLICAS
 	c.SendToReplicas(&Message{
-		Header: c.Copy(),
+		Header: c.View.Copy(),
 		Qc: &QC{
 			Header:      vote.Qc.Header,
 			Block:       c.Block,
@@ -232,7 +250,13 @@ func (c *Consensus) StartProposePhase() {
 func (c *Consensus) StartProposeVotePhase() {
 	c.Lock()
 	defer c.Unlock()
+	c.log.Info(c.View.ToString())
 	msg := c.Proposals.GetProposal(c.View.Copy())
+	if msg == nil {
+		c.log.Warn("No valid message received from Proposer")
+		c.RoundInterrupt()
+		return
+	}
 	c.ProposerKey = msg.Signature.PublicKey
 	// IF LOCKED, CONFIRM SAFE TO UNLOCK
 	if c.Locked {
@@ -266,6 +290,7 @@ func (c *Consensus) StartProposeVotePhase() {
 func (c *Consensus) StartPrecommitPhase() {
 	c.Lock()
 	defer c.Unlock()
+	c.log.Info(c.View.ToString())
 	if !c.SelfIsProposer() {
 		return
 	}
@@ -287,7 +312,13 @@ func (c *Consensus) StartPrecommitPhase() {
 func (c *Consensus) StartPrecommitVotePhase() {
 	c.Lock()
 	defer c.Unlock()
+	c.log.Info(c.View.ToString())
 	msg := c.Proposals.GetProposal(c.View.Copy())
+	if msg == nil {
+		c.log.Warn("No valid message received from Proposer")
+		c.RoundInterrupt()
+		return
+	}
 	if interrupt := c.CheckProposerAndBlock(msg); interrupt {
 		c.RoundInterrupt()
 		return
@@ -307,6 +338,7 @@ func (c *Consensus) StartPrecommitVotePhase() {
 func (c *Consensus) StartCommitPhase() {
 	c.Lock()
 	defer c.Unlock()
+	c.log.Info(c.View.ToString())
 	if !c.SelfIsProposer() {
 		return
 	}
@@ -319,7 +351,7 @@ func (c *Consensus) StartCommitPhase() {
 	c.SendToReplicas(&Message{
 		Header: c.Copy(), // header
 		Qc: &QC{
-			Header:    vote.Header,              // vote view
+			Header:    vote.Qc.Header,           // vote view
 			BlockHash: c.Block.BlockHeader.Hash, // vote block
 			Signature: as,
 		},
@@ -329,7 +361,13 @@ func (c *Consensus) StartCommitPhase() {
 func (c *Consensus) StartCommitProcessPhase() {
 	c.Lock()
 	defer c.Unlock()
+	c.log.Info(c.View.ToString())
 	msg := c.Proposals.GetProposal(c.View.Copy())
+	if msg == nil {
+		c.log.Warn("No valid message received from Proposer")
+		c.RoundInterrupt()
+		return
+	}
 	// CONFIRM PROPOSER & BLOCK
 	if interrupt := c.CheckProposerAndBlock(msg); interrupt {
 		c.RoundInterrupt()
@@ -339,6 +377,24 @@ func (c *Consensus) StartCommitProcessPhase() {
 	c.gossipBlock(msg.Qc)
 	c.ByzantineEvidence = c.Proposals.GetByzantineEvidence(c.View.Copy(), c.ValidatorSet, c.FSM.LoadValSet,
 		c.FSM.GetMinimumEvidenceHeight, c.FSM.LoadEvidence, c.FSM.LoadCertificate, c.ProposerKey, &c.Votes, c.SelfIsProposer())
+}
+
+func (c *Consensus) RoundInterrupt() {
+	c.log.Warn(c.View.ToString())
+	c.Lock()
+	defer c.Unlock()
+	c.Phase = RoundInterrupt
+	// send pacemaker message
+	c.SendToReplicas(&Message{
+		Header: c.View.Copy(),
+	})
+}
+
+func (c *Consensus) Pacemaker() {
+	c.NewRound(false)
+	if pacerRound := c.Votes.Pacemaker(); pacerRound > c.Round {
+		c.Round = pacerRound
+	}
 }
 
 func (c *Consensus) CheckProposerAndBlock(msg *Message) (interrupt bool) {
@@ -369,15 +425,19 @@ func (c *Consensus) HandleMessage(message proto.Message) lib.ErrorI {
 		c.RUnlock()
 		switch {
 		case msg.IsReplicaMessage() || msg.IsPacemakerMessage():
-			if err := msg.CheckReplicaMessage(height, blockHash, vs); err != nil {
+			if err := msg.CheckReplicaMessage(height, blockHash); err != nil {
+				c.log.Errorf("Received invalid vote from %s", lib.BytesToString(msg.Signature.PublicKey))
 				return err
 			}
+			c.log.Debugf("Received %s message from replica: %s", msg.Qc.Header.ToString(), lib.BzToTruncStr(msg.Signature.PublicKey))
 			return c.Votes.AddVote(proposer, height, msg, vs, c.LoadValSet, minEvidenceHeight, c.GetEvidenceByHeight)
 		case msg.IsProposerMessage():
 			partialQC, err := msg.CheckProposerMessage(proposer, blockHash, height, c.LoadValSet)
 			if err != nil {
+				c.log.Errorf("Received invalid proposal from %s", lib.BytesToString(msg.Signature.PublicKey))
 				return err
 			}
+			c.log.Debugf("Received %s message from proposer: %s", msg.Header.ToString(), lib.BzToTruncStr(msg.Signature.PublicKey))
 			if partialQC {
 				return c.Proposals.AddPartialQC(msg)
 			}
@@ -397,23 +457,6 @@ func (c *Consensus) GetEvidenceByHeight(height uint64) (*lib.DoubleSigners, lib.
 	c.Lock()
 	defer c.Unlock()
 	return c.FSM.LoadEvidence(height)
-}
-
-func (c *Consensus) RoundInterrupt() {
-	c.Lock()
-	defer c.Unlock()
-	c.Phase = RoundInterrupt
-	// send pacemaker message
-	c.SendToReplicas(&Message{
-		Header: c.View.Copy(),
-	})
-}
-
-func (c *Consensus) Pacemaker() {
-	c.NewRound(false)
-	if pacerRound := c.Votes.Pacemaker(); pacerRound > c.Round {
-		c.Round = pacerRound
-	}
 }
 
 func (c *Consensus) NewRound(newHeight bool) {
@@ -451,7 +494,7 @@ func (c *Consensus) SafeNode(qc *QC, b *lib.Block) lib.ErrorI {
 	return ErrFailedSafeNodePredicate()
 }
 
-func (c *Consensus) SetTimerForNextPhase(startTime *time.Time, timer *time.Timer, phase lib.Phase, processTime time.Duration) {
+func (c *Consensus) SetTimerForNextPhase(timer *time.Timer, phase lib.Phase, processTime time.Duration) {
 	var waitTime time.Duration
 	switch phase {
 	case Election:
@@ -480,16 +523,19 @@ func (c *Consensus) SetTimerForNextPhase(startTime *time.Time, timer *time.Timer
 		c.Phase++
 	}
 	c.Unlock()
-	c.SetTimerWait(startTime, timer, waitTime, processTime)
+	c.SetTimerWait(timer, waitTime, processTime)
 }
 
-func (c *Consensus) SetTimerWait(startTime *time.Time, timer *time.Timer, waitTime, processTime time.Duration) {
+func (c *Consensus) SetTimerWait(timer *time.Timer, waitTime, processTime time.Duration) {
+	var timerDuration time.Duration
 	if waitTime > processTime {
-		timer.Reset(waitTime - processTime)
+		timerDuration = waitTime - processTime
 	} else {
-		timer.Reset(0)
+		timerDuration = 0
 	}
-	*startTime = time.Now()
+	c.log.Debugf("Setting consensus timer: %s", timerDuration.Round(time.Second))
+	c.stopTimer(timer)
+	timer.Reset(timerDuration)
 }
 
 func (c *Consensus) WaitTime(sleepTimeMS int) time.Duration {
@@ -521,6 +567,10 @@ func (c *Consensus) SendToReplicas(msg lib.Signable) {
 		c.log.Error(err.Error())
 		return
 	}
+	if err := c.P2P.SelfSend(c.PublicKey, Cons, msg); err != nil {
+		c.log.Error(err.Error())
+		return
+	}
 }
 
 func (c *Consensus) SendToProposer(msg lib.Signable) {
@@ -528,7 +578,13 @@ func (c *Consensus) SendToProposer(msg lib.Signable) {
 		c.log.Error(err.Error())
 		return
 	}
-	if err := c.P2P.SendTo(c.ProposerKey, lib.Topic_CONSENSUS, msg); err != nil {
+	if c.SelfIsProposer() {
+		if err := c.P2P.SelfSend(c.PublicKey, Cons, msg); err != nil {
+			c.log.Error(err.Error())
+		}
+		return
+	}
+	if err := c.P2P.SendTo(c.ProposerKey, Cons, msg); err != nil {
 		c.log.Error(err.Error())
 		return
 	}
@@ -544,7 +600,10 @@ func (c *Consensus) getProducerKeys() [][]byte {
 
 func (c *Consensus) stopTimer(t *time.Timer) {
 	if !t.Stop() {
-		<-t.C
+		select {
+		case <-t.C:
+		default:
+		}
 	}
 }
 

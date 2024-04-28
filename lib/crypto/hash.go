@@ -26,6 +26,9 @@ func HashString(bz []byte) string {
 // MerkleTree creates a merkle tree from a slice of bytes. A
 // linear slice was chosen since it uses about half as much memory as a tree
 func MerkleTree(items [][]byte) (root []byte, store [][]byte, err error) {
+	if len(items) == 0 {
+		return []byte{}, [][]byte{}, nil
+	}
 	// Calculate how many entries are required to hold the binary merkle
 	// tree as a linear array and create a slice of that size.
 	offset := nextPowerOfTwo(len(items))

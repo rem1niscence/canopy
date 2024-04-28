@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"github.com/ginchuco/ginchu/lib/codec"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/proto"
@@ -127,6 +128,13 @@ func BytesToString(b []byte) string {
 	return hex.EncodeToString(b)
 }
 
+func BzToTruncStr(b []byte) string {
+	if len(b) > 10 {
+		return hex.EncodeToString(b[:10])
+	}
+	return hex.EncodeToString(b)
+}
+
 func StringToBytes(s string) ([]byte, ErrorI) {
 	b, err := hex.DecodeString(s)
 	if err != nil {
@@ -179,4 +187,22 @@ func Uint64ReducePercentage(amount uint64, percentage int8) (res uint64) {
 
 func Uint64ToBigFloat(u uint64) *big.Float {
 	return new(big.Float).SetUint64(u)
+}
+
+type HexBytes []byte
+
+func (x HexBytes) String() string {
+	return BytesToString(x)
+}
+
+func (x HexBytes) MarshalJSON() ([]byte, error) {
+	return json.Marshal(BytesToString(x))
+}
+func (x *HexBytes) UnmarshalJSON(b []byte) (err error) {
+	var s string
+	if err = json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	*x, err = StringToBytes(s)
+	return
 }

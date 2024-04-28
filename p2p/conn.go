@@ -75,6 +75,7 @@ func (c *MultiConn) Start() {
 }
 
 func (c *MultiConn) Stop() {
+	c.p2p.log.Warnf("Stopping peer %s@%s", c.peerPublicKey, c.conn.RemoteAddr().String())
 	c.quitReceiving <- struct{}{}
 	c.quitSending <- struct{}{}
 	close(c.quitSending)

@@ -29,7 +29,7 @@ func (s *StateMachine) GenesisBlockHeader() (*lib.BlockHeader, lib.ErrorI) {
 	if err != nil {
 		return nil, err
 	}
-	maxHash, maxAddress := []byte(strings.Repeat("F", crypto.HashSize*2)), []byte(strings.Repeat("F", crypto.AddressSize*2))
+	maxHash, maxAddress := []byte(strings.Repeat("F", crypto.HashSize)), []byte(strings.Repeat("F", crypto.AddressSize))
 	return &lib.BlockHeader{
 		Height:                0,
 		Hash:                  maxHash,

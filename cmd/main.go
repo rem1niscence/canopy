@@ -12,7 +12,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 )
 
 var (
@@ -39,21 +41,32 @@ func main() {
 
 func Start() {
 	l := lib.NewDefaultLogger()
-	c, nodeKey, valKey, db := InitializeDataDirectory("", l)
-	if _, err := consensus.New(c, nodeKey, valKey, db, l); err != nil {
+	c, valKey, nodeKey, db := InitializeDataDirectory("", l)
+	app, err := consensus.New(c, valKey, nodeKey, db, l)
+	if err != nil {
 		l.Fatal(err.Error())
 	}
+	app.Start()
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGABRT)
+	s := <-stop
+	app.Stop()
+	l.Infof("Exit command %s received", s)
+	os.Exit(0)
+
 }
 
 func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config, privateValKey, privateNodeKey crypto.PrivateKeyI, db lib.StoreI) {
 	if dataDirPath == "" {
 		dataDirPath = lib.DefaultDataDirPath()
 	}
+	log.Infof("Reading data directory at %s", dataDirPath)
 	if err := os.MkdirAll(dataDirPath, os.ModePerm); err != nil {
 		panic(err)
 	}
 	configFilePath := filepath.Join(dataDirPath, lib.ConfigFilePath)
 	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
+		log.Infof("Creating %s file", lib.ConfigFilePath)
 		if err = lib.DefaultConfig().WriteToFile(configFilePath); err != nil {
 			panic(err)
 		}
@@ -61,6 +74,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 	privateValKeyPath := filepath.Join(dataDirPath, lib.ValKeyPath)
 	if _, err := os.Stat(privateValKeyPath); errors.Is(err, os.ErrNotExist) {
 		blsPrivateKey, _ := crypto.NewBLSPrivateKey()
+		log.Infof("Creating %s file", lib.ValKeyPath)
 		if err = crypto.PrivateKeyToFile(blsPrivateKey, privateValKeyPath); err != nil {
 			panic(err)
 		}
@@ -68,6 +82,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 	privateNodeKeyPath := filepath.Join(dataDirPath, lib.NodeKeyPath)
 	if _, err := os.Stat(privateNodeKeyPath); errors.Is(err, os.ErrNotExist) {
 		ed25519PrivateKey, _ := crypto.NewPrivateKey()
+		log.Infof("Creating %s file", lib.NodeKeyPath)
 		if err = crypto.PrivateKeyToFile(ed25519PrivateKey, privateNodeKeyPath); err != nil {
 			panic(err)
 		}
@@ -87,6 +102,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 	c.DataDirPath = dataDirPath
 	genesisFilePath := filepath.Join(dataDirPath, lib.GenesisFilePath)
 	if _, err = os.Stat(genesisFilePath); errors.Is(err, os.ErrNotExist) {
+		log.Infof("Creating %s file", lib.GenesisFilePath)
 		WriteDefaultGenesisFile(privateValKey, privateNodeKey, genesisFilePath)
 	}
 	db, err = store.New(c, log)

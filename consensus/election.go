@@ -6,6 +6,7 @@ import (
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"gonum.org/v1/gonum/stat/distuv"
+	"math"
 	"math/big"
 	"strings"
 )
@@ -118,8 +119,10 @@ const VotingPowerReduction = 1000000
 // CDF makes the upperbound on voting power a float64, a 1E6 voting power
 // reduction is used to increase the totalVotingPower ceiling further
 func CDF(votingPower, totalVotingPower, expectedCandidates uint64, vrfOut []byte) uint64 {
-	votingPower /= VotingPowerReduction
-	totalVotingPower /= VotingPowerReduction
+	if totalVotingPower >= math.MaxUint32 {
+		votingPower /= VotingPowerReduction
+		totalVotingPower /= VotingPowerReduction
+	}
 	binomial := distuv.Binomial{
 		N: float64(votingPower),
 		P: float64(expectedCandidates) / float64(totalVotingPower),

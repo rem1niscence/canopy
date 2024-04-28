@@ -2,14 +2,14 @@ package lib
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 )
 
 func (x *QuorumCertificate) SignBytes() (signBytes []byte, err ErrorI) {
 	aggregateSignature := x.Signature
 	block := x.Block
-	if x.Header.Phase == Phase_PROPOSE_VOTE { // omit because in EV no block was included in the message, but proposer inserts one in PROPOSE
-		x.Block = nil
-	}
+	x.Block = nil
 	x.Signature = nil
 	signBytes, err = Marshal(x)
 	x.Signature = aggregateSignature
@@ -67,7 +67,39 @@ func (x *QuorumCertificate) Equals(qc *QuorumCertificate) bool {
 }
 
 func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) ([][]byte, int, ErrorI) {
+	if x == nil {
+		return nil, 0, ErrEmptyQuorumCertificate()
+	}
 	return x.Signature.GetNonSigners(vs)
+}
+
+type jsonQC struct {
+	Header      *View               `json:"header,omitempty"`
+	Block       *Block              `json:"block,omitempty"`
+	BlockHash   HexBytes            `json:"block_hash,omitempty"`
+	ProposerKey HexBytes            `json:"proposer_key,omitempty"`
+	Signature   *AggregateSignature `json:"signature,omitempty"`
+}
+
+// nolint:all
+func (x QuorumCertificate) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonQC{
+		Header:      x.Header,
+		Block:       x.Block,
+		BlockHash:   x.BlockHash,
+		ProposerKey: x.ProposerKey,
+		Signature:   x.Signature,
+	})
+}
+
+func (x *QuorumCertificate) UnmarshalJSON(b []byte) error {
+	var j jsonQC
+	if err := json.Unmarshal(b, &j); err != nil {
+		return err
+	}
+	x.Header, x.Block, x.BlockHash = j.Header, j.Block, j.BlockHash
+	x.ProposerKey, x.Signature = j.ProposerKey, j.Signature
+	return nil
 }
 
 func (x *DoubleSignEvidence) CheckBasic() ErrorI {
@@ -189,4 +221,30 @@ func (x *View) Less(v *View) bool {
 		return true
 	}
 	return false
+}
+
+func (x *View) ToString() string {
+	return fmt.Sprintf("(H:%d, R:%d, P:%s)", x.Height, x.Round, x.Phase)
+}
+
+type jsonAggregateSig struct {
+	Signature HexBytes `json:"signature,omitempty"`
+	Bitmap    HexBytes `json:"bitmap,omitempty"`
+}
+
+// nolint:all
+func (x AggregateSignature) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonAggregateSig{
+		Signature: x.Signature,
+		Bitmap:    x.Bitmap,
+	})
+}
+
+func (x *AggregateSignature) UnmarshalJSON(b []byte) error {
+	var j jsonAggregateSig
+	if err := json.Unmarshal(b, &j); err != nil {
+		return err
+	}
+	x.Signature, x.Bitmap = j.Signature, j.Bitmap
+	return nil
 }

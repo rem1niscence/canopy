@@ -51,14 +51,15 @@ func (c ConsensusConfig) BlockTimeMS() int {
 
 func DefaultConsensusConfig() ConsensusConfig {
 	return ConsensusConfig{
-		ElectionTimeoutMS:       5000,
-		ElectionVoteTimeoutMS:   2000,
-		ProposeTimeoutMS:        2000,
-		ProposeVoteTimeoutMS:    2000,
-		PrecommitTimeoutMS:      2000,
-		PrecommitVoteTimeoutMS:  2000,
-		CommitTimeoutMS:         2000,
-		CommitProcessMS:         583000, // 10 minute blocks - ^
+		ElectionTimeoutMS:      5000,
+		ElectionVoteTimeoutMS:  2000,
+		ProposeTimeoutMS:       2000,
+		ProposeVoteTimeoutMS:   2000,
+		PrecommitTimeoutMS:     2000,
+		PrecommitVoteTimeoutMS: 2000,
+		CommitTimeoutMS:        2000,
+		CommitProcessMS:        5000,
+		//CommitProcessMS:         583000, // 10 minute blocks - ^
 		RoundInterruptTimeoutMS: 5000,
 		ProtocolVersion:         1,
 		NetworkID:               1,
@@ -78,7 +79,7 @@ type P2PConfig struct {
 
 func DefaultP2PConfig() P2PConfig {
 	return P2PConfig{
-		ListenAddress:   "tcp://0.0.0.0:3000",
+		ListenAddress:   "0.0.0.0:3000",
 		ExternalAddress: "",
 		MaxInbound:      21,
 		MaxOutbound:     7,

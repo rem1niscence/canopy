@@ -36,9 +36,20 @@ const (
 	BlockReqExceededRep = -3
 )
 
+func (c *Consensus) SingleNodeNetwork() bool {
+	return len(c.ValidatorSet.ValidatorSet.ValidatorSet) == 1 &&
+		bytes.Equal(c.ValidatorSet.ValidatorSet.ValidatorSet[0].PublicKey, c.PublicKey)
+}
+
 func (c *Consensus) Sync() {
 	var reqRecipient []byte
 	c.syncing.Store(true)
+	c.log.Info("Sync started 🔄")
+	if c.SingleNodeNetwork() {
+		if c.syncingDone(0) {
+			return
+		}
+	}
 	maxHeight, maxHeights := c.pollMaxHeight(1)
 	for {
 		if c.syncingDone(maxHeight) {
@@ -80,23 +91,27 @@ func (c *Consensus) Sync() {
 }
 
 func (c *Consensus) ListenForBlock() {
+	c.log.Debug("Listening for inbound blocks")
 	cache := lib.NewMessageCache()
 	for msg := range c.P2P.ReceiveChannel(Block) {
 		startTime := time.Now()
 		if ok := cache.Add(msg); !ok {
-			break
+			continue
 		}
+		c.log.Infof("Received new block from %s 📥", lib.BzToTruncStr(msg.Sender.Address.PublicKey))
 		c.Lock()
 		_, qc, outOfSync, err := c.validatePeerBlock(c.Height, msg, c.ValidatorSet)
 		if outOfSync {
+			c.log.Warnf("Node fell out of sync")
 			c.Unlock()
 			go c.Sync()
 			break
 		}
 		if err != nil {
 			c.Unlock()
+			c.log.Error(err.Error())
 			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, InvalidBlockRep)
-			break
+			continue
 		}
 		if err = c.CommitBlock(qc); err != nil {
 			c.log.Fatalf("unable to commit block at height %d: %s", qc.Header.Height, err.Error())
@@ -104,6 +119,7 @@ func (c *Consensus) ListenForBlock() {
 		c.newBlock <- time.Since(startTime)
 		c.notifyP2P(c.ValidatorSet.ValidatorSet)
 		c.gossipBlock(qc)
+		c.Unlock()
 	}
 }
 
@@ -112,11 +128,13 @@ func (c *Consensus) ListenForConsensus() {
 		if c.syncing.Load() {
 			continue
 		}
-		if !msg.Sender.IsValidator {
+		if _, err := c.ValidatorSet.GetValidator(msg.Sender.Address.PublicKey); err != nil {
+			c.log.Error(err.Error())
 			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, NotValRep)
 			continue
 		}
 		if err := c.HandleMessage(msg.Message); err != nil {
+			c.log.Error(err.Error())
 			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, InvalidMsgRep)
 			continue
 		}
@@ -197,6 +215,7 @@ func (c *Consensus) ListenForBlockReq() {
 }
 
 func (c *Consensus) StartListeners() {
+	c.log.Debug("Listening for inbound txs, block requests, and consensus messages")
 	go c.ListenForBlockReq()
 	go c.ListenForConsensus()
 	go c.ListenForTx()
@@ -272,11 +291,16 @@ func (c *Consensus) checkPeerBlock(height uint64, block *lib.Block, senderID []b
 }
 
 func (c *Consensus) gossipBlock(blockAndCertificate *QC) {
-	if err := c.P2P.SendToAll(Block, &lib.BlockResponseMessage{
-		MaxHeight:           c.Height,
+	c.log.Debugf("Gossiping block: %s", lib.BytesToString(blockAndCertificate.BlockHash))
+	blockMessage := &lib.BlockResponseMessage{
+		MaxHeight:           blockAndCertificate.Block.BlockHeader.Height,
 		BlockAndCertificate: blockAndCertificate,
-	}); err != nil {
-		c.log.Error(fmt.Sprintf("unable to gossip block with err: %s", err.Error()))
+	}
+	if err := c.P2P.SendToAll(Block, blockMessage); err != nil {
+		c.log.Errorf("unable to gossip block with err: %s", err.Error())
+	}
+	if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
+		c.log.Errorf("unable to self-send block with err: %s", err.Error())
 	}
 }
 
@@ -289,11 +313,13 @@ func (c *Consensus) notifyP2P(nextValidatorSet *lib.ConsensusValidators) {
 }
 
 func (c *Consensus) pollMaxHeight(backoff int) (maxHeight uint64, maxHeights map[string]uint64) {
+	c.log.Info("Polling all peers for max height")
 	maxHeights = make(map[string]uint64)
 	if err := c.P2P.SendToAll(BlockRequest, &lib.BlockRequestMessage{HeightOnly: true}); err != nil {
 		panic(err)
 	}
 	for {
+		c.log.Debug("Waiting for peer max heights")
 		select {
 		case m := <-c.P2P.ReceiveChannel(Block):
 			response, ok := m.Message.(*lib.BlockResponseMessage)
@@ -306,6 +332,7 @@ func (c *Consensus) pollMaxHeight(backoff int) (maxHeight uint64, maxHeights map
 			}
 			maxHeights[lib.BytesToString(m.Sender.Address.PublicKey)] = response.MaxHeight
 		case <-time.After(SyncTimeoutS * time.Second * time.Duration(backoff)):
+			c.log.Warn("No heights received from peers. Trying again")
 			if maxHeight == 0 { // genesis file is 0 and first height is 1
 				return c.pollMaxHeight(backoff + 1)
 			}

@@ -193,6 +193,14 @@ func (ps *PeerSet) Outbound() (outbound int) {
 	return ps.outbound
 }
 
+func (ps *PeerSet) Stop() {
+	ps.RLock()
+	defer ps.RUnlock()
+	for _, p := range ps.m {
+		p.stop.Do(p.conn.Stop)
+	}
+}
+
 func (ps *PeerSet) stopAndRemove(peer *Peer) {
 	peer.stop.Do(peer.conn.Stop)
 	ps.del(peer.PeerInfo.Address.PublicKey)
