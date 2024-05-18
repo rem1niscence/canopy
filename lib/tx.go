@@ -10,14 +10,24 @@ import (
 
 var _ TransactionI = &Transaction{}
 
+const (
+	TxResultsPageName      = "tx-results-page"
+	PendingResultsPageName = "pending-results-page"
+)
+
+func init() {
+	RegisteredPageables[TxResultsPageName] = new(TxResults)
+	RegisteredPageables[PendingResultsPageName] = new(TxResults)
+}
+
 type TransactionI interface {
 	proto.Message
 	GetMsg() *anypb.Any
 	GetSig() SignatureI
 	GetSequence() uint64
-	GetBytes() ([]byte, error)
-	GetSignBytes() ([]byte, error)
-	GetHash() ([]byte, error)
+	GetBytes() ([]byte, ErrorI)
+	GetSignBytes() ([]byte, ErrorI)
+	GetHash() ([]byte, ErrorI)
 }
 
 type MessageI interface {
@@ -26,12 +36,13 @@ type MessageI interface {
 	Check() ErrorI
 	Bytes() ([]byte, ErrorI)
 	Name() string
+	New() MessageI
 	Recipient() []byte // for transaction indexing by recipient
 	MarshalJSON() ([]byte, error)
 	UnmarshalJSON([]byte) error
 }
 
-func (x *Transaction) GetHash() ([]byte, error) {
+func (x *Transaction) GetHash() ([]byte, ErrorI) {
 	bz, err := x.GetBytes()
 	if err != nil {
 		return nil, err
@@ -39,20 +50,45 @@ func (x *Transaction) GetHash() ([]byte, error) {
 	return crypto.Hash(bz), nil
 }
 
-func (x *Transaction) GetBytes() ([]byte, error) {
-	return cdc.Marshal(x)
+func (x *Transaction) GetBytes() ([]byte, ErrorI) {
+	return Marshal(x)
 }
 
 func (x *Transaction) GetSig() SignatureI {
 	return x.Signature
 }
 
-func (x *Transaction) GetSignBytes() ([]byte, error) {
-	return cdc.Marshal(Transaction{
+func (x *Transaction) GetSignBytes() ([]byte, ErrorI) {
+	return Marshal(&Transaction{
 		Msg:       x.Msg,
 		Signature: nil,
 		Sequence:  x.Sequence,
 	})
+}
+
+func (x *Transaction) Sign(pk crypto.PrivateKeyI) ErrorI {
+	bz, err := x.GetSignBytes()
+	if err != nil {
+		return err
+	}
+	x.Signature = &Signature{
+		PublicKey: pk.PublicKey().Bytes(),
+		Signature: pk.Sign(bz),
+	}
+	return nil
+}
+
+func (x *Transaction) Check() ErrorI {
+	if x.Msg == nil {
+		return ErrEmptyMessage()
+	}
+	if x.Type == "" {
+		return ErrUnknownMessageName(x.Type)
+	}
+	if x.Signature == nil {
+		return ErrEmptySignature()
+	}
+	return nil
 }
 
 var _ SignatureI = &Signature{}
@@ -125,11 +161,14 @@ type Signable interface {
 
 type SignByte interface{ SignBytes() ([]byte, ErrorI) }
 
+var RegisteredMessages map[string]MessageI
+
 type jsonTx struct {
-	Msg       MessageI   `json:"msg,omitempty"`
-	Signature *Signature `json:"signature,omitempty"`
-	Sequence  uint64     `json:"sequence,omitempty"`
-	Fee       uint64     `json:"fee,omitempty"`
+	Type      string          `json:"type,omitempty"`
+	Msg       json.RawMessage `json:"msg,omitempty"`
+	Signature *Signature      `json:"signature,omitempty"`
+	Sequence  uint64          `json:"sequence,omitempty"`
+	Fee       uint64          `json:"fee,omitempty"`
 }
 
 // nolint:all
@@ -142,8 +181,13 @@ func (x Transaction) MarshalJSON() ([]byte, error) {
 	if !ok {
 		return nil, fmt.Errorf("couldn't convert %T to type MessageI", a)
 	}
+	bz, err := JSONMarshal(msg)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(jsonTx{
-		Msg:       msg,
+		Type:      x.Type,
+		Msg:       bz,
 		Signature: x.Signature,
 		Sequence:  x.Sequence,
 		Fee:       x.Fee,
@@ -155,11 +199,21 @@ func (x *Transaction) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &j); err != nil {
 		return err
 	}
-	a, err := ToAny(j.Msg)
+	var msg MessageI
+	m, ok := RegisteredMessages[j.Type]
+	if !ok {
+		return ErrUnknownMessageName(j.Type)
+	}
+	msg = m.New()
+	if err := json.Unmarshal(j.Msg, msg); err != nil {
+		return err
+	}
+	a, err := ToAny(msg)
 	if err != nil {
 		return err
 	}
 	*x = Transaction{
+		Type:      j.Type,
 		Msg:       a,
 		Signature: j.Signature,
 		Sequence:  j.Sequence,
@@ -176,6 +230,16 @@ type jsonTxResult struct {
 	Index       uint64       `json:"index,omitempty"`
 	Transaction *Transaction `json:"transaction,omitempty"`
 	TxHash      string       `json:"tx_hash,omitempty"`
+}
+
+var _ Pageable = new(TxResults)
+
+type TxResults []*TxResult
+
+func (t *TxResults) Len() int { return len(*t) }
+
+func (t *TxResults) New() Pageable {
+	return &TxResults{}
 }
 
 // nolint:all
@@ -197,13 +261,13 @@ func (x *TxResult) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	*x = TxResult{
-		Sender:      x.Sender,
-		Recipient:   x.Recipient,
-		MessageType: x.MessageType,
-		Height:      x.Height,
-		Index:       x.Index,
-		Transaction: x.Transaction,
-		TxHash:      x.TxHash,
+		Sender:      j.Sender,
+		Recipient:   j.Recipient,
+		MessageType: j.MessageType,
+		Height:      j.Height,
+		Index:       j.Index,
+		Transaction: j.Transaction,
+		TxHash:      j.TxHash,
 	}
 	return nil
 }

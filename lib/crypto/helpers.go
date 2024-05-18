@@ -11,7 +11,22 @@ import (
 	"os"
 )
 
-func NewPrivateKey() (PrivateKeyI, error) {
+type KeyGroup struct {
+	Address    AddressI
+	PublicKey  PublicKeyI
+	PrivateKey PrivateKeyI
+}
+
+func NewKeyGroup(pk PrivateKeyI) *KeyGroup {
+	pub := pk.PublicKey()
+	return &KeyGroup{
+		Address:    pub.Address(),
+		PublicKey:  pub,
+		PrivateKey: pk,
+	}
+}
+
+func NewEd25519PrivateKey() (PrivateKeyI, error) {
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err
@@ -19,11 +34,11 @@ func NewPrivateKey() (PrivateKeyI, error) {
 	return NewPrivateKeyED25519(priv), nil
 }
 
-func NewPrivateKeyFromBytes(bz []byte) PrivateKeyI {
+func NewED25519PrivateKeyFromBytes(bz []byte) PrivateKeyI {
 	return NewPrivateKeyED25519(bz)
 }
 
-func NewPrivateKeyFromString(hexString string) (PrivateKeyI, error) {
+func NewED25519PrivateKeyFromString(hexString string) (PrivateKeyI, error) {
 	bz, err := hex.DecodeString(hexString)
 	if err != nil {
 		return nil, err
@@ -31,8 +46,8 @@ func NewPrivateKeyFromString(hexString string) (PrivateKeyI, error) {
 	return NewPrivateKeyED25519(bz), nil
 }
 
-func NewPublicKey() (PublicKeyI, error) {
-	pk, err := NewPrivateKey()
+func NewED25519PublicKey() (PublicKeyI, error) {
+	pk, err := NewEd25519PrivateKey()
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +58,7 @@ func NewPublicKeyFromBytes(bz []byte) PublicKeyI {
 	return NewPublicKeyED25519(bz)
 }
 
-func NewPublicKeyFromString(hexString string) (PublicKeyI, error) {
+func NewED25519PublicKeyFromString(hexString string) (PublicKeyI, error) {
 	bz, err := hex.DecodeString(hexString)
 	if err != nil {
 		return nil, err
@@ -51,8 +66,8 @@ func NewPublicKeyFromString(hexString string) (PublicKeyI, error) {
 	return NewPublicKeyED25519(bz), nil
 }
 
-func NewAddress() (AddressI, error) {
-	pk, err := NewPublicKey()
+func NewED25519AddressFromString() (AddressI, error) {
+	pk, err := NewED25519PublicKey()
 	if err != nil {
 		return nil, err
 	}
@@ -188,4 +203,12 @@ func NewED25519PrivateKeyFromFile(filepath string) (PrivateKeyI, error) {
 		return nil, fmt.Errorf("wrong private key size")
 	}
 	return NewPrivateKeyED25519(bz), nil
+}
+
+func NewPrivateKeyFromBytes(bz []byte) (PrivateKeyI, error) {
+	if len(bz) == BLS12381PrivKeySize {
+		return NewBLSPrivateKeyFromBytes(bz)
+	} else {
+		return NewED25519PrivateKeyFromBytes(bz), nil
+	}
 }

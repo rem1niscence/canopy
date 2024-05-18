@@ -119,7 +119,7 @@ func testStore(t *testing.T) (*Store, *badger.DB, func()) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").
 		WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	store, err := newStore(db, lib.NewDefaultLogger())
+	store, err := NewStoreWithDB(db, lib.NewDefaultLogger())
 	require.NoError(t, err)
 	return store, db, func() { store.Close() }
 }

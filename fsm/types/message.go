@@ -19,6 +19,18 @@ const (
 	MessageDAOTransferName     = "dao_transfer"
 )
 
+func init() {
+	lib.RegisteredMessages = make(map[string]lib.MessageI)
+	lib.RegisteredMessages[MessageSendName] = new(MessageSend)
+	lib.RegisteredMessages[MessageStakeName] = new(MessageStake)
+	lib.RegisteredMessages[MessageEditStakeName] = new(MessageEditStake)
+	lib.RegisteredMessages[MessageUnstakeName] = new(MessageUnstake)
+	lib.RegisteredMessages[MessagePauseName] = new(MessagePause)
+	lib.RegisteredMessages[MessageUnpauseName] = new(MessageUnpause)
+	lib.RegisteredMessages[MessageChangeParameterName] = new(MessageChangeParameter)
+	lib.RegisteredMessages[MessageDAOTransferName] = new(MessageDAOTransfer)
+}
+
 var _ lib.MessageI = &MessageSend{}
 
 func (x *MessageSend) Check() lib.ErrorI {
@@ -36,6 +48,7 @@ func (x *MessageSend) Check() lib.ErrorI {
 
 func (x *MessageSend) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
 func (x *MessageSend) Name() string                { return MessageSendName }
+func (x *MessageSend) New() lib.MessageI           { return new(MessageSend) }
 func (x *MessageSend) Recipient() []byte           { return crypto.NewAddressFromBytes(x.ToAddress).Bytes() }
 
 // nolint:all
@@ -83,6 +96,7 @@ func (x *MessageStake) Check() lib.ErrorI {
 
 func (x *MessageStake) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
 func (x *MessageStake) Name() string                { return MessageStakeName }
+func (x *MessageStake) New() lib.MessageI           { return new(MessageStake) }
 func (x *MessageStake) Recipient() []byte           { return nil }
 
 // nolint:all
@@ -136,6 +150,7 @@ func (x *MessageEditStake) Check() lib.ErrorI {
 
 func (x *MessageEditStake) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
 func (x *MessageEditStake) Name() string                { return MessageEditStakeName }
+func (x *MessageEditStake) New() lib.MessageI           { return new(MessageEditStake) }
 func (x *MessageEditStake) Recipient() []byte           { return nil }
 
 // nolint:all
@@ -174,6 +189,7 @@ var _ lib.MessageI = &MessageUnstake{}
 func (x *MessageUnstake) Check() lib.ErrorI           { return checkAddress(x.Address) }
 func (x *MessageUnstake) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
 func (x *MessageUnstake) Name() string                { return MessageUnstakeName }
+func (x *MessageUnstake) New() lib.MessageI           { return new(MessageUnstake) }
 func (x *MessageUnstake) Recipient() []byte           { return nil }
 
 // nolint:all
@@ -199,6 +215,7 @@ var _ lib.MessageI = &MessagePause{}
 func (x *MessagePause) Check() lib.ErrorI           { return checkAddress(x.Address) }
 func (x *MessagePause) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
 func (x *MessagePause) Name() string                { return MessagePauseName }
+func (x *MessagePause) New() lib.MessageI           { return new(MessagePause) }
 func (x *MessagePause) Recipient() []byte           { return nil }
 
 // nolint:all
@@ -220,6 +237,7 @@ var _ lib.MessageI = &MessageUnpause{}
 func (x *MessageUnpause) Check() lib.ErrorI           { return checkAddress(x.Address) }
 func (x *MessageUnpause) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
 func (x *MessageUnpause) Name() string                { return MessageUnpauseName }
+func (x *MessageUnpause) New() lib.MessageI           { return new(MessageUnpause) }
 func (x *MessageUnpause) Recipient() []byte           { return nil }
 
 // nolint:all
@@ -316,6 +334,7 @@ type jsonMessageChangeParameter struct {
 
 func (x *MessageChangeParameter) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
 func (x *MessageChangeParameter) Name() string                { return MessageChangeParameterName }
+func (x *MessageChangeParameter) New() lib.MessageI           { return new(MessageChangeParameter) }
 func (x *MessageChangeParameter) Recipient() []byte           { return nil }
 
 var _ lib.MessageI = &MessageDAOTransfer{}
@@ -329,6 +348,7 @@ func (x *MessageDAOTransfer) Check() lib.ErrorI {
 
 func (x *MessageDAOTransfer) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
 func (x *MessageDAOTransfer) Name() string                { return MessageDAOTransferName }
+func (x *MessageDAOTransfer) New() lib.MessageI           { return new(MessageDAOTransfer) }
 func (x *MessageDAOTransfer) Recipient() []byte           { return nil }
 
 // nolint:all

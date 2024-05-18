@@ -2,9 +2,9 @@ package store
 
 import (
 	"fmt"
+	"github.com/alecthomas/units"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
 	"math"
 	"path/filepath"
 )
@@ -31,8 +31,8 @@ type Store struct {
 	writer  *badger.Txn
 	ss      *TxnWrapper
 	sc      *SMTWrapper
-	ix      *Indexer
-	root    []byte
+	*Indexer
+	root []byte
 }
 
 func New(config lib.Config, l lib.LoggerI) (lib.StoreI, lib.ErrorI) {
@@ -44,11 +44,11 @@ func New(config lib.Config, l lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 
 func NewStore(path string, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).
-		WithLoggingLevel(badger.ERROR).WithMemTableSize(1000000000))
+		WithLoggingLevel(badger.ERROR).WithMemTableSize(int64(units.GB)))
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
-	return newStore(db, log)
+	return NewStoreWithDB(db, log)
 }
 
 func NewStoreInMemory(log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
@@ -57,10 +57,10 @@ func NewStoreInMemory(log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
-	return newStore(db, log)
+	return NewStoreWithDB(db, log)
 }
 
-func newStore(db *badger.DB, log lib.LoggerI) (*Store, lib.ErrorI) {
+func NewStoreWithDB(db *badger.DB, log lib.LoggerI) (*Store, lib.ErrorI) {
 	id := getLatestCommitID(db, log)
 	writer := db.NewTransactionAt(id.Height, true)
 	return &Store{
@@ -70,7 +70,7 @@ func newStore(db *badger.DB, log lib.LoggerI) (*Store, lib.ErrorI) {
 		writer:  writer,
 		ss:      NewTxnWrapper(writer, log, stateStorePrefix),
 		sc:      NewSMTWrapper(NewTxnWrapper(writer, log, stateCommitmentPrefix), id.Root, log),
-		ix:      &Indexer{NewTxnWrapper(writer, log, transactionPrefix)},
+		Indexer: &Indexer{NewTxnWrapper(writer, log, transactionPrefix)},
 		root:    id.Root,
 	}, nil
 }
@@ -87,7 +87,7 @@ func (s *Store) NewReadOnly(version uint64) (lib.StoreI, lib.ErrorI) {
 		db:      s.db,
 		ss:      NewTxnWrapper(reader, s.log, stateStorePrefix),
 		sc:      NewSMTWrapper(NewTxnWrapper(reader, s.log, stateCommitmentPrefix), id.Root, s.log),
-		ix:      s.ix,
+		Indexer: s.Indexer,
 	}, nil
 }
 
@@ -100,7 +100,7 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 		writer:  writer,
 		ss:      NewTxnWrapper(writer, s.log, stateStorePrefix),
 		sc:      NewSMTWrapper(NewTxnWrapper(writer, s.log, stateCommitmentPrefix), s.root, s.log),
-		ix:      &Indexer{NewTxnWrapper(writer, s.log, transactionPrefix)},
+		Indexer: &Indexer{NewTxnWrapper(writer, s.log, transactionPrefix)},
 		root:    s.root,
 	}, nil
 }
@@ -134,6 +134,7 @@ func (s *Store) Iterator(p []byte) (lib.IteratorI, lib.ErrorI)    { return s.ss.
 func (s *Store) RevIterator(p []byte) (lib.IteratorI, lib.ErrorI) { return s.ss.RevIterator(p) }
 func (s *Store) Version() uint64                                  { return s.version }
 func (s *Store) NewTxn() lib.StoreTxnI                            { return NewTxn(s) }
+func (s *Store) DB() *badger.DB                                   { return s.db }
 func (s *Store) Root() (root []byte, err lib.ErrorI)              { return s.sc.Root() }
 func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	s.version++
@@ -164,7 +165,7 @@ func (s *Store) resetWriter(root []byte) {
 	s.writer = s.db.NewTransactionAt(s.version, true)
 	s.ss.setDB(s.writer)
 	s.sc.setDB(NewTxnWrapper(s.writer, s.log, stateCommitmentPrefix), root)
-	s.ix.setDB(NewTxnWrapper(s.writer, s.log, transactionPrefix))
+	s.Indexer.setDB(NewTxnWrapper(s.writer, s.log, transactionPrefix))
 }
 
 func (s *Store) commitIDKey(version uint64) []byte {
@@ -214,60 +215,6 @@ func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *CommitID) {
 		log.Fatalf("unmarshalCommitID() failed with err: %s", err.Error())
 	}
 	return
-}
-
-func (s *Store) IndexTx(result *lib.TxResult) lib.ErrorI { return s.ix.IndexTx(result) }
-func (s *Store) DeleteTxsForHeight(height uint64) lib.ErrorI {
-	return s.ix.DeleteTxsForHeight(height)
-}
-func (s *Store) GetTxByHash(h []byte) (*lib.TxResult, lib.ErrorI) { return s.ix.GetTxByHash(h) }
-
-func (s *Store) GetTxsByHeight(height uint64, newestToOldest bool) ([]*lib.TxResult, lib.ErrorI) {
-	return s.ix.GetTxsByHeight(height, newestToOldest)
-}
-
-func (s *Store) GetTxsBySender(address crypto.AddressI, newestToOldest bool) ([]*lib.TxResult, lib.ErrorI) {
-	return s.ix.GetTxsBySender(address, newestToOldest)
-}
-
-func (s *Store) GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]*lib.TxResult, lib.ErrorI) {
-	return s.ix.GetTxsByRecipient(address, newestToOldest)
-}
-
-func (s *Store) IndexBlock(b *lib.BlockResult) lib.ErrorI {
-	return s.ix.IndexBlock(b)
-}
-
-func (s *Store) DeleteBlockForHeight(h uint64) lib.ErrorI {
-	return s.ix.DeleteBlockForHeight(h)
-}
-
-func (s *Store) GetBlockByHash(h []byte) (*lib.BlockResult, lib.ErrorI) {
-	return s.ix.GetBlockByHash(h)
-}
-
-func (s *Store) GetBlockByHeight(h uint64) (*lib.BlockResult, lib.ErrorI) {
-	return s.ix.GetBlockByHeight(h)
-}
-
-func (s *Store) DeleteDoubleSignersForHeight(h uint64) lib.ErrorI {
-	return s.ix.DeleteDoubleSignersForHeight(h)
-}
-
-func (s *Store) IndexQC(qc *lib.QuorumCertificate) lib.ErrorI {
-	return s.ix.IndexQC(qc)
-}
-
-func (s *Store) GetQCByHeight(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
-	return s.ix.GetQCByHeight(height)
-}
-
-func (s *Store) DeleteQCForHeight(height uint64) lib.ErrorI {
-	return s.ix.DeleteQCForHeight(height)
-}
-
-func (s *Store) GetDoubleSigners(h uint64) (*lib.DoubleSigners, lib.ErrorI) {
-	return s.ix.GetDoubleSigners(h)
 }
 
 func (s *Store) Close() lib.ErrorI {

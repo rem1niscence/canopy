@@ -37,6 +37,9 @@ func (s *StateMachine) CheckTx(transaction []byte) (result *CheckTxResult, err l
 	if err = lib.Unmarshal(transaction, tx); err != nil {
 		return
 	}
+	if err = tx.Check(); err != nil {
+		return
+	}
 	if err = s.CheckAccount(tx); err != nil {
 		return
 	}

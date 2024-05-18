@@ -169,14 +169,18 @@ func (t *Transactions) Insert(tr MempoolTx) (recheck bool) {
 }
 
 func (t *Transactions) Delete(tx []byte) (deleted MempoolTx) {
-	i := sort.Search(t.n, func(i int) bool {
-		return bytes.Equal(t.s[i].Tx, tx)
-	})
-	if i == t.n {
+	index := t.n
+	for i := 0; i < t.n; i++ {
+		if bytes.Equal(t.s[i].Tx, tx) {
+			index = i
+			break
+		}
+	}
+	if index == t.n {
 		return
 	}
-	deleted = t.s[i]
-	t.s = append(t.s[:i], t.s[i+1:]...)
+	deleted = t.s[index]
+	t.s = append(t.s[:index], t.s[index+1:]...)
 	t.n--
 	return
 }

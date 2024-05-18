@@ -30,3 +30,5 @@ vendor
 .docker/.env
 
 .docs/TIMELOG.md
+
+cmd/web/explorer/.idea

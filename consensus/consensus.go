@@ -77,7 +77,7 @@ func New(c lib.Config, valKey, nodeKey crypto.PrivateKeyI, db lib.StoreI, l lib.
 		FSM:              sm,
 		Mempool:          mempool,
 		RWMutex:          sync.RWMutex{},
-		newBlock:         make(chan time.Duration),
+		newBlock:         make(chan time.Duration, 1),
 		syncDone:         make(chan struct{}),
 		syncing:          atomic.Bool{},
 	}, nil
@@ -571,6 +571,7 @@ func (c *Consensus) SendToReplicas(msg lib.Signable) {
 		c.log.Error(err.Error())
 		return
 	}
+	c.log.Debugf("done sending to replica")
 }
 
 func (c *Consensus) SendToProposer(msg lib.Signable) {

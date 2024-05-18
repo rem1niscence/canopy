@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"github.com/ginchuco/ginchu/cmd/rpc"
 	"github.com/ginchuco/ginchu/consensus"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
@@ -47,6 +48,7 @@ func Start() {
 		l.Fatal(err.Error())
 	}
 	app.Start()
+	rpc.StartRPC(app, c, l)
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGABRT)
 	s := <-stop
@@ -81,7 +83,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 	}
 	privateNodeKeyPath := filepath.Join(dataDirPath, lib.NodeKeyPath)
 	if _, err := os.Stat(privateNodeKeyPath); errors.Is(err, os.ErrNotExist) {
-		ed25519PrivateKey, _ := crypto.NewPrivateKey()
+		ed25519PrivateKey, _ := crypto.NewEd25519PrivateKey()
 		log.Infof("Creating %s file", lib.NodeKeyPath)
 		if err = crypto.PrivateKeyToFile(ed25519PrivateKey, privateNodeKeyPath); err != nil {
 			panic(err)
@@ -122,7 +124,7 @@ func WriteDefaultGenesisFile(validatorPrivateKey, nodePrivateKey crypto.PrivateK
 		Validators: []*types.Validator{{
 			Address:      consPubKey.Address().Bytes(),
 			PublicKey:    consPubKey.Bytes(),
-			NetAddress:   "http://localhost:3000",
+			NetAddress:   "http://localhost:4000",
 			StakedAmount: 1000000,
 			Output:       address.Bytes(),
 		}},

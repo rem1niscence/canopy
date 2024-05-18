@@ -8,6 +8,24 @@ import (
 	"time"
 )
 
+const (
+	BlockResultsPageName = "block-results-page"
+)
+
+func init() {
+	RegisteredPageables[BlockResultsPageName] = new(BlockResults)
+}
+
+var _ Pageable = new(BlockResults)
+
+type BlockResults []*BlockResult
+
+func (b *BlockResults) Len() int { return len(*b) }
+
+func (b *BlockResults) New() Pageable {
+	return &BlockResults{}
+}
+
 func (x *Block) Check() ErrorI {
 	if x == nil {
 		return ErrNilBlock()
@@ -36,29 +54,29 @@ func (x *BlockHeader) Check() ErrorI {
 	if x.ProposerAddress == nil {
 		return ErrNilBlockProposer()
 	}
-	if x.Hash == nil {
+	if len(x.Hash) != crypto.HashSize {
 		return ErrNilBlockHash()
 	}
-	if x.StateRoot == nil {
+	if len(x.StateRoot) != crypto.HashSize {
 		return ErrNilStateRoot()
 	}
-	if x.TransactionRoot == nil {
+	if len(x.TransactionRoot) != crypto.HashSize {
 		return ErrNilTransactionRoot()
 	}
-	if x.ValidatorRoot == nil {
+	if len(x.ValidatorRoot) != crypto.HashSize {
 		return ErrNilValidatorRoot()
 	}
-	if x.NextValidatorRoot == nil {
+	if len(x.NextValidatorRoot) != crypto.HashSize {
 		return ErrNilNextValidatorRoot()
+	}
+	if len(x.LastBlockHash) != crypto.HashSize {
+		return ErrNilLastBlockHash()
 	}
 	if x.LastQuorumCertificate == nil {
 		return ErrNilQuorumCertificate()
 	}
 	if x.Time.Seconds == 0 {
 		return ErrNilBlockTime()
-	}
-	if x.LastBlockHash == nil {
-		return ErrNilLastBlockHash()
 	}
 	if x.NetworkId == 0 {
 		return ErrNilNetworkID()
@@ -118,22 +136,26 @@ func (x *BlockHeader) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
+	var badProposers [][]byte
+	for _, bp := range x.BadProposers {
+		badProposers = append(badProposers, bp)
+	}
 	*x = BlockHeader{
 		Height:                j.Height,
 		Hash:                  j.Hash,
 		NetworkId:             j.NetworkId,
 		Time:                  timestamppb.New(t),
-		NumTxs:                x.NumTxs,
-		TotalTxs:              x.TotalTxs,
-		LastBlockHash:         x.LastBlockHash,
-		StateRoot:             x.StateRoot,
-		TransactionRoot:       x.TransactionRoot,
-		ValidatorRoot:         x.ValidatorRoot,
-		NextValidatorRoot:     x.NextValidatorRoot,
-		ProposerAddress:       x.ProposerAddress,
-		Evidence:              x.Evidence,
-		BadProposers:          x.BadProposers,
-		LastQuorumCertificate: x.LastQuorumCertificate,
+		NumTxs:                j.NumTxs,
+		TotalTxs:              j.TotalTxs,
+		LastBlockHash:         j.LastBlockHash,
+		StateRoot:             j.StateRoot,
+		TransactionRoot:       j.TransactionRoot,
+		ValidatorRoot:         j.ValidatorRoot,
+		NextValidatorRoot:     j.NextValidatorRoot,
+		ProposerAddress:       j.ProposerAddress,
+		Evidence:              j.Evidence,
+		BadProposers:          badProposers,
+		LastQuorumCertificate: j.LastQuorumCertificate,
 	}
 	return nil
 }

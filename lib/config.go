@@ -7,6 +7,7 @@ import (
 )
 
 type Config struct {
+	RPCConfig
 	StateMachineConfig
 	StoreConfig
 	P2PConfig
@@ -16,11 +17,24 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
+		RPCConfig:          DefaultRPCConfig(),
 		StateMachineConfig: DefaultStateMachineConfig(),
 		StoreConfig:        DefaultStoreConfig(),
 		P2PConfig:          DefaultP2PConfig(),
 		ConsensusConfig:    DefaultConsensusConfig(),
 		MempoolConfig:      DefaultMempoolConfig(),
+	}
+}
+
+type RPCConfig struct {
+	Port     string
+	TimeoutS int
+}
+
+func DefaultRPCConfig() RPCConfig {
+	return RPCConfig{
+		Port:     "6001",
+		TimeoutS: 3,
 	}
 }
 

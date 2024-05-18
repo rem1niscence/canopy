@@ -10,8 +10,85 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"math/big"
+	"strings"
 	"time"
 )
+
+type Page struct {
+	PageParams
+	Results    Pageable `json:"results"`
+	Type       string   `json:"type"`
+	Count      int      `json:"count"`
+	TotalPages int      `json:"totalPages"`
+	TotalCount int      `json:"totalCount"`
+}
+
+func NewPage(p PageParams) *Page {
+	return &Page{PageParams: p}
+}
+
+type PageParams struct {
+	PageNumber int `json:"pageNumber"`
+	PerPage    int `json:"perPage"`
+}
+
+func (p *PageParams) SkipToIndex() int {
+	if p.PerPage == 0 {
+		p.PerPage = 10
+	}
+	if p.PerPage > 5000 {
+		p.PerPage = 5000
+	}
+	if p.PageNumber == 0 {
+		p.PageNumber = 1
+	}
+	if p.PageNumber == 1 {
+		return 0
+	}
+	lastPage := p.PageNumber - 1
+	return lastPage * p.PerPage
+}
+
+type jsonPage struct {
+	PageParams
+	Results    json.RawMessage `json:"results"`
+	Type       string          `json:"type"`
+	Count      int             `json:"count"`
+	TotalPages int             `json:"totalPages"`
+	TotalCount int             `json:"totalCount"`
+}
+
+type Pageable interface {
+	New() Pageable
+	Len() int
+}
+
+var RegisteredPageables = make(map[string]Pageable)
+
+func (p *Page) UnmarshalJSON(b []byte) error {
+	var j jsonPage
+	if err := json.Unmarshal(b, &j); err != nil {
+		return err
+	}
+	var pageable Pageable
+	m, ok := RegisteredPageables[j.Type]
+	if !ok {
+		return ErrUnknownPageable(j.Type)
+	}
+	pageable = m.New()
+	if err := json.Unmarshal(j.Results, pageable); err != nil {
+		return err
+	}
+	*p = Page{
+		PageParams: j.PageParams,
+		Results:    pageable,
+		Type:       j.Type,
+		Count:      j.Count,
+		TotalPages: j.TotalPages,
+		TotalCount: j.TotalCount,
+	}
+	return nil
+}
 
 type SimpleLimiter struct {
 	requests        map[string]int
@@ -98,6 +175,34 @@ func Marshal(message any) ([]byte, ErrorI) {
 func Unmarshal(data []byte, ptr any) ErrorI {
 	if err := proto.Unmarshal(data, ptr.(proto.Message)); err != nil {
 		return ErrUnmarshal(err)
+	}
+	return nil
+}
+
+func JSONMarshal(message any) ([]byte, ErrorI) {
+	bz, err := json.Marshal(message)
+	if err != nil {
+		return nil, ErrJSONMarshal(err)
+	}
+	return bz, nil
+}
+
+func JSONMarshalIndent(message any) ([]byte, ErrorI) {
+	bz, err := json.MarshalIndent(message, "", "  ")
+	if err != nil {
+		return nil, ErrJSONMarshal(err)
+	}
+	return bz, nil
+}
+
+func JSONMarshalIndentString(message any) (string, ErrorI) {
+	bz, err := JSONMarshalIndent(message)
+	return string(bz), err
+}
+
+func JSONUnmarshal(bz []byte, ptr any) ErrorI {
+	if err := json.Unmarshal(bz, ptr); err != nil {
+		return ErrJSONUnmarshal(err)
 	}
 	return nil
 }
@@ -206,3 +311,7 @@ func (x *HexBytes) UnmarshalJSON(b []byte) (err error) {
 	*x, err = StringToBytes(s)
 	return
 }
+
+var (
+	MaxHash, MaxAddress = []byte(strings.Repeat("F", crypto.HashSize)), []byte(strings.Repeat("F", crypto.AddressSize))
+)

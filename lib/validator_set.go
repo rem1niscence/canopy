@@ -2,6 +2,7 @@ package lib
 
 import (
 	"bytes"
+	"encoding/json"
 	"github.com/drand/kyber"
 	"github.com/ginchuco/ginchu/lib/crypto"
 )
@@ -205,5 +206,32 @@ func (x *AggregateSignature) GetNonSigners(valSet *ConsensusValidators) (nonSign
 		}
 	}
 	nonSignerPercent = int(Uint64PercentageDiv(nonSignerPower, vs.TotalPower))
+	return
+}
+
+type jsonConsValidator struct {
+	PublicKey   HexBytes `json:"public_key,omitempty"`
+	VotingPower uint64   `json:"voting_power,omitempty"`
+	NetAddress  string   `json:"net_address,omitempty"`
+}
+
+func (x *ConsensusValidator) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&jsonConsValidator{
+		PublicKey:   x.PublicKey,
+		VotingPower: x.VotingPower,
+		NetAddress:  x.NetAddress,
+	})
+}
+
+func (x *ConsensusValidator) UnmarshalJSON(b []byte) (err error) {
+	j := new(jsonConsValidator)
+	if err = json.Unmarshal(b, j); err != nil {
+		return err
+	}
+	*x = ConsensusValidator{
+		PublicKey:   j.PublicKey,
+		VotingPower: j.VotingPower,
+		NetAddress:  j.NetAddress,
+	}
 	return
 }

@@ -90,6 +90,9 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	if len(txRoot) == 0 {
+		txRoot = lib.MaxHash
+	}
 	eb, err := s.EndBlock()
 	if err != nil {
 		return nil, nil, nil, err
@@ -168,6 +171,9 @@ func (s *StateMachine) ValidateBlock(header *lib.BlockHeader, compare *lib.Block
 
 func (s *StateMachine) ApplyAndValidateBlock(b *lib.Block, evidence *lib.ByzantineEvidence, isCandidateBlock bool) (*lib.BlockResult, *lib.ConsensusValidators, lib.ErrorI) {
 	blockHash, blockHeight := lib.BytesToString(b.BlockHeader.Hash), b.BlockHeader.Height
+	if err := b.Check(); err != nil {
+		return nil, nil, err
+	}
 	s.log.Debugf("Applying block %s for height %d", blockHash, blockHeight)
 	header, txResults, valSet, err := s.ApplyBlock(b)
 	if err != nil {

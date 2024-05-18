@@ -6,6 +6,7 @@ import (
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"math"
 )
 
 // HandleTransaction accepts or rejects inbound txs based on the mempool state
@@ -19,7 +20,7 @@ func (c *Consensus) HandleTransaction(tx []byte) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	if txResult != nil {
+	if txResult.TxHash != "" {
 		return ErrDuplicateTx(hash)
 	}
 	// mempool
@@ -50,9 +51,7 @@ func (c *Consensus) ProduceCandidateBlock(badProposers [][]byte, dse lib.DoubleS
 	if err != nil {
 		return nil, err
 	}
-	if err = c.Mempool.checkMempool(); err != nil {
-		return nil, err
-	}
+	c.Mempool.checkMempool()
 	pubKey, _ := crypto.NewBLSPublicKeyFromBytes(c.PublicKey)
 	numTxs, transactions := c.Mempool.GetTransactions(maxBlockSize)
 	header := &lib.BlockHeader{
@@ -83,29 +82,32 @@ func (c *Consensus) ProduceCandidateBlock(badProposers [][]byte, dse lib.DoubleS
 // - atomically writes all to the underlying db
 // - sets up the app for the next height
 func (c *Consensus) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
-	//defer func() { c.FSM.ResetToBeginBlock() }()
 	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.BlockHash))
 	store, blk := c.FSM.Store().(lib.StoreI), qc.Block
 	blockResult, nextVals, err := c.FSM.ApplyAndValidateBlock(blk, nil, false)
 	if err != nil {
 		return err
 	}
-	c.log.Debugf("Indexing quorum certificate %d", qc.Header.Height)
+	c.log.Debugf("Indexing quorum certificate for height %d", qc.Header.Height)
 	if err = store.IndexQC(qc); err != nil {
 		return err
+	}
+	if blk.BlockHeader.Height != 1 {
+		c.log.Debugf("Indexing last quorum certificate for height %d", blk.BlockHeader.LastQuorumCertificate.Header.Height)
+		if err = store.IndexQC(qc.Block.BlockHeader.LastQuorumCertificate); err != nil {
+			return err
+		}
 	}
 	c.log.Debugf("Indexing block %d", blk.BlockHeader.Height)
 	if err = store.IndexBlock(blockResult); err != nil {
 		return err
 	}
 	for _, tx := range blk.Transactions {
-		c.log.Debugf("Removing tx %s from mempool", lib.HexBytes(tx))
+		c.log.Debugf("tx %s was included in a block so removing from mempool", crypto.HashString(tx))
 		c.Mempool.DeleteTransaction(tx)
 	}
 	c.log.Debug("Checking mempool for newly invalid transactions")
-	if err = c.Mempool.checkMempool(); err != nil {
-		return err
-	}
+	c.Mempool.checkMempool()
 	c.log.Debug("Committing to store")
 	if _, err = store.Commit(); err != nil {
 		return err
@@ -118,7 +120,7 @@ func (c *Consensus) CommitBlock(qc *lib.QuorumCertificate) lib.ErrorI {
 	c.log.Debug("Setting up FSM for next height")
 	c.FSM = fsm.NewWithBeginBlock(&lib.BeginBlockParams{BlockHeader: blk.BlockHeader, ValidatorSet: nextVals},
 		c.Config, c.Height, store, c.log)
-	c.log.Debug("Setting up mempool for next height")
+	c.log.Debug("Setting up Mempool for next height")
 	if c.Mempool.FSM, err = c.FSM.Copy(); err != nil {
 		return err
 	}
@@ -152,8 +154,9 @@ func (c *Consensus) ValidatorProposalConfig(fsm ...*fsm.StateMachine) (reset fun
 // - notes:
 //   - new tx added may also be evicted, this is expected behavior
 type Mempool struct {
-	log lib.LoggerI
-	FSM *fsm.StateMachine
+	log           lib.LoggerI
+	FSM           *fsm.StateMachine
+	cachedResults lib.TxResults
 	lib.Mempool
 }
 
@@ -170,57 +173,84 @@ func NewMempool(fsm *fsm.StateMachine, config lib.MempoolConfig, log lib.LoggerI
 }
 
 func (m *Mempool) HandleTransaction(tx []byte) lib.ErrorI {
-	fee, err := m.applyAndWriteTx(tx)
+	result, err := m.applyAndWriteTx(tx)
 	if err != nil {
 		return err
 	}
-	recheck, err := m.AddTransaction(tx, fee)
+	recheck, err := m.AddTransaction(tx, result.Transaction.Fee)
 	if err != nil {
 		return err
 	}
+	m.log.Infof("added tx %s to mempool for checking", crypto.HashString(tx))
+	m.cachedResults = append(m.cachedResults, result)
 	if recheck {
-		return m.checkMempool()
+		m.checkMempool()
 	}
 	return nil
 }
 
-func (m *Mempool) checkMempool() lib.ErrorI {
+func (m *Mempool) checkMempool() {
 	m.FSM.ResetToBeginBlock()
+	m.cachedResults = nil
 	var remove [][]byte
-	m.recheckAll(func(tx []byte, err lib.ErrorI) {
-		m.log.Error(err.Error())
-		remove = append(remove, tx)
-	})
-	for _, tx := range remove {
-		m.DeleteTransaction(tx)
-	}
-	return nil
-}
-
-func (m *Mempool) recheckAll(errorCallback func([]byte, lib.ErrorI)) {
 	it := m.Iterator()
 	defer it.Close()
 	for ; it.Valid(); it.Next() {
 		tx := it.Key()
-		if _, err := m.applyAndWriteTx(tx); err != nil {
-			errorCallback(tx, err)
+		result, err := m.applyAndWriteTx(tx)
+		if err != nil {
+			m.log.Error(err.Error())
+			remove = append(remove, tx)
+			continue
 		}
+		m.cachedResults = append(m.cachedResults, result)
+	}
+	for _, tx := range remove {
+		m.log.Infof("removed tx %s from mempool", crypto.HashString(tx))
+		m.DeleteTransaction(tx)
 	}
 }
 
-func (m *Mempool) applyAndWriteTx(tx []byte) (fee uint64, err lib.ErrorI) {
+func (m *Mempool) applyAndWriteTx(tx []byte) (result *lib.TxResult, err lib.ErrorI) {
 	store := m.FSM.Store()
 	txn, err := m.FSM.TxnWrap()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer func() { m.FSM.SetStore(store); txn.Discard() }()
-	result, err := m.FSM.ApplyTransaction(uint64(m.Size()), tx, crypto.HashString(tx))
+	result, err = m.FSM.ApplyTransaction(uint64(m.Size()), tx, crypto.HashString(tx))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if err = txn.Write(); err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.Transaction.Fee, nil
+	return result, nil
+}
+
+func (c *Consensus) GetPendingPage(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	c.Lock()
+	defer c.Unlock()
+	return c.Mempool.pendingPageForRPC(p)
+}
+
+func (m *Mempool) pendingPageForRPC(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	skipIdx, page := p.SkipToIndex(), lib.NewPage(p)
+	page.Type = lib.PendingResultsPageName
+	txResults := make(lib.TxResults, 0)
+	for countOnly, i := false, 0; i < len(m.cachedResults); i++ {
+		page.TotalCount++
+		switch {
+		case i < skipIdx || countOnly:
+			continue
+		case i == skipIdx+page.PerPage:
+			countOnly = true
+			continue
+		}
+		txResults = append(txResults, m.cachedResults[i])
+		page.Results = &txResults
+		page.Count++
+	}
+	page.TotalPages = int(math.Ceil(float64(page.TotalCount) / float64(page.PerPage)))
+	return
 }

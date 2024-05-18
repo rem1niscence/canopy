@@ -13,5 +13,7 @@ message GenesisState {
   repeated Pool pools = 2;
   repeated Account accounts = 3;
   repeated Validator validators = 4;
-  Params params = 5;
+  repeated NonSigner non_signers = 5; // only used for export debugging
+  Params params = 6;
+  Supply supply = 7; // only used for export debugging
 }

@@ -3,6 +3,7 @@ package lib
 import (
 	"fmt"
 	"math"
+	"runtime"
 )
 
 const (
@@ -20,6 +21,8 @@ const (
 	// to avoid consensus level issues
 
 	MainModule               ErrorModule = "main"
+	CodeJSONMarshal          ErrorCode   = 7
+	CodeJSONUnmarshal        ErrorCode   = 8
 	CodeUnmarshal            ErrorCode   = 9
 	CodeMarshal              ErrorCode   = 10
 	CodeFromAny              ErrorCode   = 11
@@ -43,6 +46,7 @@ const (
 	CodeNewPubKeyFromBytes   ErrorCode   = 29
 	CodeNewMultiPubKey       ErrorCode   = 30
 	CodeStringToBigFloat     ErrorCode   = 31
+	CodeWriteFile            ErrorCode   = 32
 
 	ConsensusModule              ErrorModule = "consensus"
 	CodeDuplicateTransaction     ErrorCode   = 6
@@ -144,6 +148,8 @@ const (
 	CodeWrongStoreType          ErrorCode   = 58
 	CodeUnmarshalGenesis        ErrorCode   = 59
 	CodeInsufficientSupply      ErrorCode   = 60
+	CodeUnknownMsgName          ErrorCode   = 61
+	CodeUnknownPageable         ErrorCode   = 62
 
 	P2PModule                 ErrorModule = "p2p"
 	CodeUnknownP2PMessage     ErrorCode   = 1
@@ -190,6 +196,17 @@ const (
 	CodeCommitTree     ErrorCode   = 12
 	CodeProve          ErrorCode   = 13
 	CodeCompactProof   ErrorCode   = 14
+
+	RPCModule         ErrorModule = "rpc"
+	CodeRPCTimeout                = 1
+	CodeInvalidParams             = 2
+	CodeNewFSM                    = 3
+	CodeTimeMachine               = 4
+	CodePostRequest               = 5
+	CodeGetRequest                = 6
+	CodeHttpStatus                = 7
+	CodeReadBody                  = 8
+	CodeNewStore                  = 9
 )
 
 type ErrorI interface {
@@ -205,21 +222,25 @@ type ErrorCode uint32
 type ErrorModule string
 
 type Error struct {
-	code   ErrorCode
-	module ErrorModule
-	msg    string
+	ECode   ErrorCode   `json:"Code"`
+	EModule ErrorModule `json:"Module"`
+	Msg     string      `json:"Msg"`
 }
 
 func NewError(code ErrorCode, module ErrorModule, msg string) *Error {
-	return &Error{code: code, module: module, msg: msg}
+	return &Error{ECode: code, EModule: module, Msg: msg}
 }
 
-func (p *Error) Code() ErrorCode     { return p.code }
-func (p *Error) Module() ErrorModule { return p.module }
+func (p *Error) Code() ErrorCode     { return p.ECode }
+func (p *Error) Module() ErrorModule { return p.EModule }
 func (p *Error) String() string      { return p.Error() }
 
 func (p *Error) Error() string {
-	return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s", p.module, p.code, p.msg)
+	_, file, no, ok := runtime.Caller(1)
+	if ok {
+		return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s\n%s L%d", p.EModule, p.ECode, p.Msg, file, no)
+	}
+	return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s\n", p.EModule, p.ECode, p.Msg)
 }
 
 // error implementations below for the `types` package
@@ -229,6 +250,14 @@ func newLogError(err error) ErrorI {
 
 func ErrUnmarshal(err error) ErrorI {
 	return NewError(CodeUnmarshal, MainModule, fmt.Sprintf("unmarshal() failed with err: %s", err.Error()))
+}
+
+func ErrJSONUnmarshal(err error) ErrorI {
+	return NewError(CodeJSONUnmarshal, MainModule, fmt.Sprintf("json.unmarshal() failed with err: %s", err.Error()))
+}
+
+func ErrJSONMarshal(err error) ErrorI {
+	return NewError(CodeJSONMarshal, MainModule, fmt.Sprintf("json.marshal() failed with err: %s", err.Error()))
 }
 
 func ErrFromAny(err error) ErrorI {
@@ -421,4 +450,24 @@ func ErrInvalidNetAddressHostAndPort(s string) ErrorI {
 
 func ErrTxFoundInMempool(hash string) ErrorI {
 	return NewError(CodeTxFoundInMempool, ConsensusModule, fmt.Sprintf("tx %s already found in mempool", hash))
+}
+
+func ErrWriteFile(err error) ErrorI {
+	return NewError(CodeWriteFile, MainModule, fmt.Sprintf("os.WriteFile() failed with err: %s", err.Error()))
+}
+
+func ErrUnknownMessageName(s string) ErrorI {
+	return NewError(CodeUnknownMsgName, StateMachineModule, fmt.Sprintf("message name %s is unknown", s))
+}
+
+func ErrUnknownPageable(s string) ErrorI {
+	return NewError(CodeUnknownPageable, StateMachineModule, fmt.Sprintf("pageable %s is unknown", s))
+}
+
+func ErrEmptyMessage() ErrorI {
+	return NewError(CodeEmptyMessage, StateMachineModule, "message is empty")
+}
+
+func ErrEmptySignature() ErrorI {
+	return NewError(CodeEmptySignature, StateMachineModule, "signature is empty")
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func (s *StateMachine) NewFromGenesisFile() lib.ErrorI {
@@ -22,31 +21,6 @@ func (s *StateMachine) NewFromGenesisFile() lib.ErrorI {
 		return err
 	}
 	return nil
-}
-
-func (s *StateMachine) GenesisBlockHeader() (*lib.BlockHeader, lib.ErrorI) {
-	genesis, err := s.ReadGenesisFromFile()
-	if err != nil {
-		return nil, err
-	}
-	maxHash, maxAddress := []byte(strings.Repeat("F", crypto.HashSize)), []byte(strings.Repeat("F", crypto.AddressSize))
-	return &lib.BlockHeader{
-		Height:                0,
-		Hash:                  maxHash,
-		NetworkId:             s.Config.NetworkID,
-		Time:                  genesis.Time,
-		NumTxs:                0,
-		TotalTxs:              0,
-		LastBlockHash:         maxHash,
-		StateRoot:             maxHash,
-		TransactionRoot:       maxHash,
-		ValidatorRoot:         maxHash,
-		NextValidatorRoot:     maxHash,
-		ProposerAddress:       maxAddress,
-		Evidence:              nil,
-		BadProposers:          nil,
-		LastQuorumCertificate: nil,
-	}, nil
 }
 
 func (s *StateMachine) ReadGenesisFromFile() (genesis *types.GenesisState, e lib.ErrorI) {
@@ -113,7 +87,7 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.Err
 	return nil
 }
 
-func (s *StateMachine) ExportStateToGenesis() (genesis *types.GenesisState, err lib.ErrorI) {
+func (s *StateMachine) ExportState() (genesis *types.GenesisState, err lib.ErrorI) {
 	genesis = new(types.GenesisState)
 	genesis.Accounts, err = s.GetAccounts()
 	if err != nil {
@@ -131,5 +105,32 @@ func (s *StateMachine) ExportStateToGenesis() (genesis *types.GenesisState, err 
 	if err != nil {
 		return nil, err
 	}
+	genesis.NonSigners, err = s.GetNonSigners()
+	if err != nil {
+		return nil, err
+	}
+	genesis.Supply, err = s.GetSupply()
+	if err != nil {
+		return nil, err
+	}
 	return genesis, nil
+}
+
+func (s *StateMachine) GenesisBlockHeader() (*lib.BlockHeader, lib.ErrorI) {
+	genesis, err := s.ReadGenesisFromFile()
+	if err != nil {
+		return nil, err
+	}
+
+	return &lib.BlockHeader{
+		Hash:              lib.MaxHash,
+		NetworkId:         s.Config.NetworkID,
+		Time:              genesis.Time,
+		LastBlockHash:     lib.MaxHash,
+		StateRoot:         lib.MaxHash,
+		TransactionRoot:   lib.MaxHash,
+		ValidatorRoot:     lib.MaxHash,
+		NextValidatorRoot: lib.MaxHash,
+		ProposerAddress:   lib.MaxAddress,
+	}, nil
 }

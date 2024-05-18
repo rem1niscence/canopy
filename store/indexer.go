@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
+	"math"
+	"time"
 )
 
 var _ lib.RWIndexerI = &Indexer{}
@@ -30,7 +32,7 @@ func (t *Indexer) IndexBlock(b *lib.BlockResult) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	hashKey, err := t.indexBlockByHash(crypto.Hash(bz), bz)
+	hashKey, err := t.indexBlockByHash(b.BlockHeader.Hash, bz)
 	if err != nil {
 		return err
 	}
@@ -70,6 +72,48 @@ func (t *Indexer) DeleteBlockForHeight(height uint64) lib.ErrorI {
 
 func (t *Indexer) GetBlockByHash(hash []byte) (*lib.BlockResult, lib.ErrorI) {
 	return t.getBlock(t.blockHashKey(hash))
+}
+
+func (t *Indexer) GetBlocks(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	it, err := t.db.RevIterator(blockHeightPrefix)
+	if err != nil {
+		return nil, err
+	}
+	defer it.Close()
+	skipIdx, page := p.SkipToIndex(), lib.NewPage(p)
+	page.Type = lib.BlockResultsPageName
+	blkResults := make(lib.BlockResults, 0)
+	for countOnly, i := false, 0; it.Valid(); func() { it.Next(); i++ }() {
+		page.TotalCount++
+		switch {
+		case i < skipIdx || countOnly:
+			continue
+		}
+		block, err := t.getBlock(it.Value())
+		if err != nil {
+			return nil, err
+		}
+		bz, err := lib.Marshal(block)
+		if err != nil {
+			return nil, err
+		}
+		block.Meta = &lib.BlockResultMeta{Size: uint64(len(bz))}
+		if page.Count != 0 {
+			nextBlock := blkResults[page.Count-1]
+			blockTime := block.BlockHeader.Time
+			nextBlkTime := nextBlock.BlockHeader.Time
+			nextBlock.Meta.Took = nextBlkTime.AsTime().Sub(blockTime.AsTime()).Truncate(time.Second).String()
+		}
+		if i == skipIdx+page.PerPage {
+			countOnly = true
+			continue
+		}
+		blkResults = append(blkResults, block)
+		page.Results = &blkResults
+		page.Count++
+	}
+	page.TotalPages = int(math.Ceil(float64(page.TotalCount) / float64(page.PerPage)))
+	return
 }
 
 func (t *Indexer) GetBlockByHeight(height uint64) (*lib.BlockResult, lib.ErrorI) {
@@ -164,16 +208,20 @@ func (t *Indexer) GetTxByHash(hash []byte) (*lib.TxResult, lib.ErrorI) {
 	return t.getTx(t.txHashKey(hash))
 }
 
-func (t *Indexer) GetTxsByHeight(height uint64, newestToOldest bool) ([]*lib.TxResult, lib.ErrorI) {
-	return t.getTxs(t.txHeightKey(height), newestToOldest)
+func (t *Indexer) GetTxsByHeight(height uint64, newestToOldest bool, p lib.PageParams) (*lib.Page, lib.ErrorI) {
+	return t.getTxs(t.txHeightKey(height), newestToOldest, p)
 }
 
-func (t *Indexer) GetTxsBySender(address crypto.AddressI, newestToOldest bool) ([]*lib.TxResult, lib.ErrorI) {
-	return t.getTxs(t.txSenderKey(address.Bytes(), nil), newestToOldest)
+func (t *Indexer) GetTxsByHeightNonPaginated(height uint64, newestToOldest bool) ([]*lib.TxResult, lib.ErrorI) {
+	return t.getTxsNonPaginated(t.txHeightKey(height), newestToOldest)
 }
 
-func (t *Indexer) GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]*lib.TxResult, lib.ErrorI) {
-	return t.getTxs(t.txSenderKey(address.Bytes(), nil), newestToOldest)
+func (t *Indexer) GetTxsBySender(address crypto.AddressI, newestToOldest bool, p lib.PageParams) (*lib.Page, lib.ErrorI) {
+	return t.getTxs(t.txSenderKey(address.Bytes(), nil), newestToOldest, p)
+}
+
+func (t *Indexer) GetTxsByRecipient(address crypto.AddressI, newestToOldest bool, p lib.PageParams) (*lib.Page, lib.ErrorI) {
+	return t.getTxs(t.txRecipientKey(address.Bytes(), nil), newestToOldest, p)
 }
 
 func (t *Indexer) DeleteTxsForHeight(height uint64) lib.ErrorI {
@@ -201,7 +249,7 @@ func (t *Indexer) getBlock(key []byte) (*lib.BlockResult, lib.ErrorI) {
 	if err = lib.Unmarshal(bz, ptr); err != nil {
 		return nil, err
 	}
-	txs, err := t.GetTxsByHeight(ptr.Height, false)
+	txs, err := t.GetTxsByHeightNonPaginated(ptr.Height, false)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +283,7 @@ func (t *Indexer) getTx(key []byte) (*lib.TxResult, lib.ErrorI) {
 	return ptr, nil
 }
 
-func (t *Indexer) getTxs(prefix []byte, newestToOldest bool) (result []*lib.TxResult, err lib.ErrorI) {
+func (t *Indexer) getTxsNonPaginated(prefix []byte, newestToOldest bool) (results []*lib.TxResult, err lib.ErrorI) {
 	var it lib.IteratorI
 	switch newestToOldest {
 	case true:
@@ -248,12 +296,48 @@ func (t *Indexer) getTxs(prefix []byte, newestToOldest bool) (result []*lib.TxRe
 	}
 	defer it.Close()
 	for ; it.Valid(); it.Next() {
-		tx, err := t.getTx(it.Key())
+		tx, err := t.getTx(it.Value())
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, tx)
+		results = append(results, tx)
 	}
+	return
+}
+
+func (t *Indexer) getTxs(prefix []byte, newestToOldest bool, p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	var it lib.IteratorI
+	switch newestToOldest {
+	case true:
+		it, err = t.db.RevIterator(prefix)
+	case false:
+		it, err = t.db.Iterator(prefix)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer it.Close()
+	skipIdx, page := p.SkipToIndex(), lib.NewPage(p)
+	page.Type = lib.TxResultsPageName
+	txResults := make(lib.TxResults, 0)
+	for countOnly, i := false, 0; it.Valid(); func() { it.Next(); i++ }() {
+		page.TotalCount++
+		switch {
+		case i < skipIdx || countOnly:
+			continue
+		case i == skipIdx+page.PerPage:
+			countOnly = true
+			continue
+		}
+		tx, err := t.getTx(it.Value())
+		if err != nil {
+			return nil, err
+		}
+		txResults = append(txResults, tx)
+		page.Results = &txResults
+		page.Count++
+	}
+	page.TotalPages = int(math.Ceil(float64(page.TotalCount) / float64(page.PerPage)))
 	return
 }
 
@@ -324,11 +408,11 @@ func (t *Indexer) txHeightKey(height uint64) []byte {
 }
 
 func (t *Indexer) txSenderKey(address, heightAndIndexKey []byte) []byte {
-	return t.key(txSenderPrefix, heightAndIndexKey, address)
+	return t.key(txSenderPrefix, address, heightAndIndexKey)
 }
 
 func (t *Indexer) txRecipientKey(address, heightAndIndexKey []byte) []byte {
-	return t.key(txRecipientPrefix, heightAndIndexKey, address)
+	return t.key(txRecipientPrefix, address, heightAndIndexKey)
 }
 
 func (t *Indexer) doubleSignersHeightKey(height uint64) []byte {
@@ -353,6 +437,9 @@ func (t *Indexer) key(prefix []byte, param1, param2 []byte) []byte {
 
 func multiAppendWithDelimiter(toAppend ...[]byte) (res []byte) {
 	for _, a := range toAppend {
+		if a == nil {
+			continue
+		}
 		res = append(res, append(a, delim...)...)
 	}
 	return

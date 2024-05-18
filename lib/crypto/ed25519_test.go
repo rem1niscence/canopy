@@ -8,12 +8,12 @@ import (
 func TestED25519Bytes(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		// private key testing
-		privateKey, err := NewPrivateKey()
+		privateKey, err := NewEd25519PrivateKey()
 		if err != nil {
 			t.Fatal(err)
 		}
 		privKeyBz := privateKey.Bytes()
-		privateKey2 := NewPrivateKeyFromBytes(privKeyBz)
+		privateKey2 := NewED25519PrivateKeyFromBytes(privKeyBz)
 		if !privateKey.Equals(privateKey2) {
 			t.Fatalf("wanted %s, got %s", privateKey, privateKey2)
 		}
@@ -36,7 +36,7 @@ func TestED25519Bytes(t *testing.T) {
 
 func TestED25519SignAndVerify(t *testing.T) {
 	for i := 0; i < 1000; i++ {
-		pk, err := NewPrivateKey()
+		pk, err := NewEd25519PrivateKey()
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -35,6 +35,29 @@ func (s *StateMachine) SlashAndResetNonSigners(params *types.ValidatorParams) li
 	return s.DeleteAll(keys)
 }
 
+func (s *StateMachine) GetNonSigners() (results types.NonSigners, e lib.ErrorI) {
+	it, e := s.Iterator(types.NonSignerPrefix())
+	if e != nil {
+		return nil, e
+	}
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		addr, err := types.AddressFromKey(it.Key())
+		if err != nil {
+			return nil, err
+		}
+		ptr := new(types.NonSignerInfo)
+		if err = lib.Unmarshal(it.Value(), ptr); err != nil {
+			return nil, err
+		}
+		results = append(results, &types.NonSigner{
+			Address: addr.Bytes(),
+			Counter: ptr.Counter,
+		})
+	}
+	return results, nil
+}
+
 func (s *StateMachine) IncrementNonSigners(nonSigners [][]byte) lib.ErrorI {
 	for _, nonSigner := range nonSigners {
 		key := types.KeyForNonSigner(nonSigner)

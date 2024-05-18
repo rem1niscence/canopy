@@ -4,6 +4,7 @@ import (
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
+	"math"
 )
 
 func (s *StateMachine) GetValidator(address crypto.AddressI) (*types.Validator, lib.ErrorI) {
@@ -40,6 +41,84 @@ func (s *StateMachine) GetValidators() ([]*types.Validator, lib.ErrorI) {
 		result = append(result, val)
 	}
 	return result, nil
+}
+
+func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	it, err := s.Iterator(types.ValidatorPrefix())
+	if err != nil {
+		return nil, err
+	}
+	defer it.Close()
+	skipIdx, page := p.SkipToIndex(), lib.NewPage(p)
+	page.Type = types.ValidatorsPageName
+	res := make(types.ValidatorPage, 0)
+	for i, countOnly := 0, false; it.Valid(); func() { it.Next(); i++ }() {
+		page.TotalCount++
+		switch {
+		case i < skipIdx || countOnly:
+			continue
+		case i == skipIdx+page.PerPage:
+			countOnly = true
+			continue
+		}
+		var val *types.Validator
+		val, err = s.unmarshalValidator(it.Value())
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, val)
+		page.Results = &res
+		page.Count++
+	}
+	page.TotalPages = int(math.Ceil(float64(page.TotalCount) / float64(page.PerPage)))
+	return
+}
+
+func (s *StateMachine) GetConsValidatorsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	params, err := s.GetParamsVal()
+	if err != nil {
+		return nil, err
+	}
+	it, err := s.RevIterator(types.ConsensusPrefix())
+	if err != nil {
+		return nil, err
+	}
+	defer it.Close()
+	skipIdx, page := uint64(p.SkipToIndex()), lib.NewPage(p)
+	page.Type = types.ConsValidatorsPageName
+	res := make(types.ConsValidatorPage, 0)
+	for i, countOnly := uint64(0), false; it.Valid() && i < params.ValidatorMaxCount; it.Next() {
+		page.TotalCount++
+		switch {
+		case i < skipIdx || countOnly:
+			continue
+		case i == skipIdx+uint64(page.PerPage):
+			countOnly = true
+			continue
+		}
+		addr, err := types.AddressFromKey(it.Key())
+		if err != nil {
+			return nil, err
+		}
+		val, err := s.GetValidator(addr)
+		if err != nil {
+			return nil, err
+		}
+		if val.MaxPausedHeight != 0 {
+			return nil, types.ErrValidatorPaused()
+		}
+		if val.UnstakingHeight != 0 {
+			return nil, types.ErrValidatorUnstaking()
+		}
+		res = append(res, &lib.ConsensusValidator{
+			PublicKey:   val.PublicKey,
+			VotingPower: val.StakedAmount,
+		})
+		page.Results = &res
+		page.Count++
+	}
+	page.TotalPages = int(math.Ceil(float64(page.TotalCount) / float64(page.PerPage)))
+	return
 }
 
 func (s *StateMachine) SetValidators(validators []*types.Validator, supply *types.Supply) lib.ErrorI {

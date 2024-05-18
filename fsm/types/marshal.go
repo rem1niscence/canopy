@@ -2,10 +2,47 @@ package types
 
 import (
 	"encoding/json"
+	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
 )
+
+const (
+	PoolPageName           = "pools"
+	AccountsPageName       = "accounts"
+	ValidatorsPageName     = "validators"
+	ConsValidatorsPageName = "consensus_validators"
+)
+
+func init() {
+	lib.RegisteredPageables[PoolPageName] = new(PoolPage)
+	lib.RegisteredPageables[AccountsPageName] = new(AccountPage)
+	lib.RegisteredPageables[ValidatorsPageName] = new(ValidatorPage)
+	lib.RegisteredPageables[ConsValidatorsPageName] = new(ConsValidatorPage)
+}
+
+type PoolPage []*Pool
+
+func (p *PoolPage) Len() int          { return len(*p) }
+func (p *PoolPage) New() lib.Pageable { return &PoolPage{} }
+
+type AccountPage []*Account
+
+func (p *AccountPage) Len() int          { return len(*p) }
+func (p *AccountPage) New() lib.Pageable { return &AccountPage{} }
+
+type ValidatorPage []*Validator
+
+func (p *ValidatorPage) Len() int          { return len(*p) }
+func (p *ValidatorPage) New() lib.Pageable { return &ValidatorPage{{}} }
+
+type ConsValidatorPage []*lib.ConsensusValidator
+
+func (p *ConsValidatorPage) Len() int          { return len(*p) }
+func (p *ConsValidatorPage) New() lib.Pageable { return &ConsValidatorPage{{}} }
+
+type NonSigners []*NonSigner
 
 type genesisState struct {
 	Time       string       `json:"time,omitempty"`
@@ -15,10 +52,49 @@ type genesisState struct {
 	Params     *Params      `protobuf:"bytes,5,opt,name=params,proto3" json:"params,omitempty"`
 }
 
+func (x *Account) ToString() string {
+	bz, _ := lib.JSONMarshalIndent(x)
+	return string(bz)
+}
+
+func (x *Validator) ToString() string {
+	bz, _ := lib.JSONMarshalIndent(x)
+	return string(bz)
+}
+
+func (x *Pool) ToString() string {
+	bz, _ := lib.JSONMarshalIndent(x)
+	return string(bz)
+}
+
+func (x *FeeParams) ToString() string {
+	bz, _ := lib.JSONMarshalIndent(x)
+	return string(bz)
+}
+
+func (x *ConsensusParams) ToString() string {
+	bz, _ := lib.JSONMarshalIndent(x)
+	return string(bz)
+}
+
+func (x *GovernanceParams) ToString() string {
+	bz, _ := lib.JSONMarshalIndent(x)
+	return string(bz)
+}
+
+func (x *ValidatorParams) ToString() string {
+	bz, _ := lib.JSONMarshalIndent(x)
+	return string(bz)
+}
+
 func (x *GenesisState) MarshalJSON() ([]byte, error) {
-	t := x.Time.AsTime()
+	var timeString string
+	if x.Time != nil {
+		t := x.Time.AsTime()
+		timeString = t.Format(time.DateTime)
+	}
 	return json.Marshal(genesisState{
-		Time:       t.Format(time.DateTime),
+		Time:       timeString,
 		Pools:      x.Pools,
 		Accounts:   x.Accounts,
 		Validators: x.Validators,
@@ -31,12 +107,14 @@ func (x *GenesisState) UnmarshalJSON(bz []byte) (err error) {
 	if err = json.Unmarshal(bz, ptr); err != nil {
 		return
 	}
-	t, err := time.Parse(time.DateTime, ptr.Time)
-	if err != nil {
-		return
+	if ptr.Time != "" {
+		t, e := time.Parse(time.DateTime, ptr.Time)
+		if e != nil {
+			return e
+		}
+		x.Time = timestamppb.New(t)
 	}
-	x.Time, x.Params = timestamppb.New(t), ptr.Params
-	x.Pools, x.Accounts, x.Validators = ptr.Pools, ptr.Accounts, ptr.Validators
+	x.Params, x.Pools, x.Accounts, x.Validators = ptr.Params, ptr.Pools, ptr.Accounts, ptr.Validators
 	return
 }
 

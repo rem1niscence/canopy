@@ -16,3 +16,8 @@ message Validator {
 message NonSignerInfo {
   uint64 counter = 1;
 }
+
+message NonSigner {
+  bytes address = 1;
+  uint64 counter = 2;
+}

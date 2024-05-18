@@ -33,6 +33,12 @@ message Block {
 message BlockResult {
   BlockHeader block_header = 1;
   repeated TxResult transactions = 2;
+  BlockResultMeta meta = 3;
+}
+
+message BlockResultMeta {
+  uint64 size = 1;
+  string took = 2;
 }
 
 message BeginBlockParams {

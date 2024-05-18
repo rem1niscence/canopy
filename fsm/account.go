@@ -4,6 +4,7 @@ import (
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
+	"math"
 )
 
 func (s *StateMachine) GetAccount(address crypto.AddressI) (*types.Account, lib.ErrorI) {
@@ -30,6 +31,37 @@ func (s *StateMachine) GetAccounts() ([]*types.Account, lib.ErrorI) {
 		result = append(result, acc)
 	}
 	return result, nil
+}
+
+func (s *StateMachine) GetAccountsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	it, err := s.Iterator(types.AccountPrefix())
+	if err != nil {
+		return nil, err
+	}
+	defer it.Close()
+	skipIdx, page := p.SkipToIndex(), lib.NewPage(p)
+	page.Type = types.AccountsPageName
+	res := make(types.AccountPage, 0)
+	for i, countOnly := 0, false; it.Valid(); func() { it.Next(); i++ }() {
+		page.TotalCount++
+		switch {
+		case i < skipIdx || countOnly:
+			continue
+		case i == skipIdx+page.PerPage:
+			countOnly = true
+			continue
+		}
+		var acc *types.Account
+		acc, err = s.unmarshalAccount(it.Value())
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, acc)
+		page.Results = &res
+		page.Count++
+	}
+	page.TotalPages = int(math.Ceil(float64(page.TotalCount) / float64(page.PerPage)))
+	return
 }
 
 func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (uint64, lib.ErrorI) {
@@ -155,6 +187,37 @@ func (s *StateMachine) GetPools() ([]*types.Pool, lib.ErrorI) {
 		result = append(result, acc)
 	}
 	return result, nil
+}
+
+func (s *StateMachine) GetPoolsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	it, err := s.Iterator(types.PoolPrefix())
+	if err != nil {
+		return nil, err
+	}
+	defer it.Close()
+	skipIdx, page := p.SkipToIndex(), lib.NewPage(p)
+	page.Type = types.PoolPageName
+	res := make(types.PoolPage, 0)
+	for i, countOnly := 0, false; it.Valid(); func() { it.Next(); i++ }() {
+		page.TotalCount++
+		switch {
+		case i < skipIdx || countOnly:
+			continue
+		case i == skipIdx+page.PerPage:
+			countOnly = true
+			continue
+		}
+		var acc *types.Pool
+		acc, err = s.unmarshalPool(it.Value())
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, acc)
+		page.Results = &res
+		page.Count++
+	}
+	page.TotalPages = int(math.Ceil(float64(page.TotalCount) / float64(page.PerPage)))
+	return
 }
 
 func (s *StateMachine) GetPoolBalance(name types.PoolID) (uint64, lib.ErrorI) {

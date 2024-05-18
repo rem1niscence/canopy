@@ -221,13 +221,14 @@ func (c *Consensus) StartListeners() {
 	go c.ListenForTx()
 }
 
-func (c *Consensus) NewTx(tx []byte) {
+func (c *Consensus) NewTx(tx []byte) lib.ErrorI {
 	if err := c.HandleTransaction(tx); err != nil {
-		return
+		return err
 	}
 	if err := c.P2P.SendToAll(Tx, &lib.TxMessage{Tx: tx}); err != nil {
 		c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
 	}
+	return nil
 }
 
 func (c *Consensus) validatePeerBlock(height uint64, m *lib.MessageWrapper, v lib.ValidatorSet) (max uint64, qc *QC, outOfSync bool, err lib.ErrorI) {

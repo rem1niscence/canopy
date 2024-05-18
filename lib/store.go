@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"github.com/dgraph-io/badger/v4"
 	"github.com/ginchuco/ginchu/lib/crypto"
 )
 
@@ -10,6 +11,7 @@ type StoreI interface {
 	RWIndexerI
 	NewTxn() StoreTxnI
 	Root() ([]byte, ErrorI)
+	DB() *badger.DB
 	Version() uint64
 	Copy() (StoreI, ErrorI)
 	NewReadOnly(version uint64) (StoreI, ErrorI)
@@ -47,11 +49,12 @@ type WIndexerI interface {
 
 type RIndexerI interface {
 	GetTxByHash(hash []byte) (*TxResult, ErrorI)
-	GetTxsByHeight(height uint64, newestToOldest bool) ([]*TxResult, ErrorI)
-	GetTxsBySender(address crypto.AddressI, newestToOldest bool) ([]*TxResult, ErrorI)
-	GetTxsByRecipient(address crypto.AddressI, newestToOldest bool) ([]*TxResult, ErrorI)
+	GetTxsByHeight(height uint64, newestToOldest bool, p PageParams) (*Page, ErrorI)
+	GetTxsBySender(address crypto.AddressI, newestToOldest bool, p PageParams) (*Page, ErrorI)
+	GetTxsByRecipient(address crypto.AddressI, newestToOldest bool, p PageParams) (*Page, ErrorI)
 	GetBlockByHash(hash []byte) (*BlockResult, ErrorI)
 	GetBlockByHeight(height uint64) (*BlockResult, ErrorI)
+	GetBlocks(p PageParams) (*Page, ErrorI)
 	GetDoubleSigners(height uint64) (*DoubleSigners, ErrorI)
 	GetQCByHeight(height uint64) (*QuorumCertificate, ErrorI)
 }

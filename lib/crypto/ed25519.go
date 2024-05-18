@@ -33,6 +33,19 @@ func (p *PrivateKeyED25519) PublicKey() PublicKeyI {
 func (p *PrivateKeyED25519) Equals(key PrivateKeyI) bool {
 	return p.PrivateKey.Equal(ed25519.PrivateKey(key.Bytes()))
 }
+func (p *PrivateKeyED25519) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
+func (p *PrivateKeyED25519) UnmarshalJSON(b []byte) (err error) {
+	var hexString string
+	if err = json.Unmarshal(b, &hexString); err != nil {
+		return
+	}
+	bz, err := hex.DecodeString(hexString)
+	if err != nil {
+		return
+	}
+	*p = *NewPrivateKeyED25519(bz)
+	return
+}
 
 // Public Key Below
 
