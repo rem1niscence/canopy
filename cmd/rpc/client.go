@@ -2,21 +2,25 @@ package rpc
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/json"
+	"github.com/ginchuco/ginchu/consensus"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/ginchu/p2p"
 	"io"
 	"net/http"
 )
 
 type Client struct {
-	rpcURL  string
-	rpcPort string
-	client  http.Client
+	rpcURL    string
+	rpcPort   string
+	adminPort string
+	client    http.Client
 }
 
-func NewClient(rpcURL, rpcPort string) *Client {
-	return &Client{rpcURL: rpcURL, rpcPort: rpcPort, client: http.Client{}}
+func NewClient(rpcURL, rpcPort, adminPort string) *Client {
+	return &Client{rpcURL: rpcURL, rpcPort: rpcPort, adminPort: adminPort, client: http.Client{}}
 }
 
 func (c *Client) Version() (version *string, err lib.ErrorI) {
@@ -52,6 +56,37 @@ func (c *Client) Blocks(params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 func (c *Client) Pending(params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
 	err = c.paginatedAddrRequest(PendingRouteName, "", params, p)
+	return
+}
+
+func (c *Client) Proposals() (p *types.Proposals, err lib.ErrorI) {
+	p = new(types.Proposals)
+	err = c.get(ProposalsRouteName, p)
+	return
+}
+
+func (c *Client) Poll() (p *types.Poll, err lib.ErrorI) {
+	p = new(types.Poll)
+	err = c.get(PollRouteName, p)
+	return
+}
+
+func (c *Client) AddVote(proposal json.RawMessage, approve bool) (p *voteRequest, err lib.ErrorI) {
+	p = new(voteRequest)
+	bz, err := lib.MarshalJSON(voteRequest{
+		Approve:  approve,
+		Proposal: proposal,
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = c.post(AddVoteRouteName, bz, p, true)
+	return
+}
+
+func (c *Client) DelVote(hash string) (p *hashRequest, err lib.ErrorI) {
+	p = new(hashRequest)
+	err = c.hashRequest(DelVoteRouteName, hash, p, true)
 	return
 }
 
@@ -115,9 +150,9 @@ func (c *Client) Validator(height uint64, address string) (p *types.Validator, e
 	return
 }
 
-func (c *Client) Validators(height uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
+func (c *Client) Validators(height uint64, params lib.PageParams, filter lib.ValidatorFilters) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(ValidatorsRouteName, height, params, p)
+	err = c.paginatedHeightRequest(ValidatorsRouteName, height, params, p, filter)
 	return
 }
 
@@ -175,10 +210,291 @@ func (c *Client) State(height uint64) (p *types.GenesisState, err lib.ErrorI) {
 	return
 }
 
-func (c *Client) paginatedHeightRequest(routeName string, height uint64, p lib.PageParams, ptr any) (err lib.ErrorI) {
-	bz, err := lib.JSONMarshal(paginatedHeightRequest{
-		heightRequest: heightRequest{height},
-		PageParams:    p,
+func (c *Client) StateDiff(height, startHeight uint64) (diff string, err lib.ErrorI) {
+	bz, err := lib.MarshalJSON(heightsRequest{heightRequest: heightRequest{height}, StartHeight: startHeight})
+	if err != nil {
+		return
+	}
+	resp, e := c.client.Post(c.url(StateDiffRouteName, false), ApplicationJSON, bytes.NewBuffer(bz))
+	if e != nil {
+		return "", ErrPostRequest(e)
+	}
+	bz, e = io.ReadAll(resp.Body)
+	if e != nil {
+		return "", ErrReadBody(e)
+	}
+	diff = string(bz)
+	return
+}
+
+func (c *Client) TransactionJSON(tx json.RawMessage) (hash *string, err lib.ErrorI) {
+	hash = new(string)
+	err = c.post(TxRouteName, tx, hash)
+	return
+}
+
+func (c *Client) Transaction(tx lib.TransactionI) (hash *string, err lib.ErrorI) {
+	bz, err := lib.MarshalJSON(tx)
+	if err != nil {
+		return nil, err
+	}
+	hash = new(string)
+	err = c.post(TxRouteName, bz, hash)
+	return
+}
+
+func (c *Client) Keystore() (keystore *crypto.Keystore, err lib.ErrorI) {
+	keystore = new(crypto.Keystore)
+	err = c.get(KeystoreRouteName, keystore, true)
+	return
+}
+func (c *Client) KeystoreNewKey(password string) (address crypto.AddressI, err lib.ErrorI) {
+	address = new(crypto.Address)
+	err = c.keystoreRequest(KeystoreNewKeyRouteName, keystoreRequest{
+		passwordRequest: passwordRequest{password},
+	}, address)
+	return
+}
+
+func (c *Client) KeystoreImport(address string, epk crypto.EncryptedPrivateKey) (returned crypto.AddressI, err lib.ErrorI) {
+	bz, err := lib.NewHexBytesFromString(address)
+	if err != nil {
+		return nil, err
+	}
+	returned = new(crypto.Address)
+	err = c.keystoreRequest(KeystoreImportRouteName, keystoreRequest{
+		addressRequest:      addressRequest{Address: bz},
+		EncryptedPrivateKey: epk,
+	}, returned)
+	return
+}
+
+func (c *Client) KeystoreImportRaw(privateKey, password string) (returned crypto.AddressI, err lib.ErrorI) {
+	bz, err := lib.NewHexBytesFromString(privateKey)
+	if err != nil {
+		return nil, err
+	}
+	returned = new(crypto.Address)
+	err = c.keystoreRequest(KeystoreImportRawRouteName, keystoreRequest{
+		PrivateKey:      bz,
+		passwordRequest: passwordRequest{Password: password},
+	}, returned)
+	return
+}
+
+func (c *Client) KeystoreDelete(address string) (returned crypto.AddressI, err lib.ErrorI) {
+	bz, err := lib.NewHexBytesFromString(address)
+	if err != nil {
+		return nil, err
+	}
+	returned = new(crypto.Address)
+	err = c.keystoreRequest(KeystoreDeleteRouteName, keystoreRequest{
+		addressRequest: addressRequest{bz},
+	}, returned)
+	return
+}
+
+func (c *Client) KeystoreGet(address, password string) (returned *crypto.KeyGroup, err lib.ErrorI) {
+	bz, err := lib.NewHexBytesFromString(address)
+	if err != nil {
+		return nil, err
+	}
+	returned = new(crypto.KeyGroup)
+	err = c.keystoreRequest(KeystoreGetRouteName, keystoreRequest{
+		addressRequest:  addressRequest{bz},
+		passwordRequest: passwordRequest{password},
+	}, returned)
+	return
+}
+
+func (c *Client) TxSend(from, rec string, amt uint64, pwd string, submit bool, optSeq, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxSendRouteName, txRequest{
+		Amount:          amt,
+		Output:          rec,
+		Sequence:        optSeq,
+		Fee:             optFee,
+		Submit:          submit,
+		addressRequest:  addressRequest{Address: fromHex},
+		passwordRequest: passwordRequest{Password: pwd},
+	})
+}
+
+func (c *Client) TxStake(from, netAddr string, amt uint64, output, pwd string, submit bool, optSeq, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txStake(from, netAddr, amt, output, pwd, submit, false, optSeq, optFee)
+}
+
+func (c *Client) TxEditStake(from, netAddr string, amt uint64, output, pwd string, submit bool, optSeq, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txStake(from, netAddr, amt, output, pwd, submit, true, optSeq, optFee)
+}
+
+func (c *Client) TxUnstake(from, pwd string, submit bool, optSeq, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txAddress(TxUnstakeRouteName, from, pwd, submit, optSeq, optFee)
+}
+
+func (c *Client) TxPause(from, pwd string, submit bool, optSeq, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txAddress(TxPauseRouteName, from, pwd, submit, optSeq, optFee)
+}
+
+func (c *Client) TxUnpause(from, pwd string, submit bool, optSeq, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txAddress(TxUnpauseRouteName, from, pwd, submit, optSeq, optFee)
+}
+
+func (c *Client) TxChangeParam(from, pSpace, pKey, pValue string, startBlk, endBlk uint64,
+	pwd string, submit bool, optSeq, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxChangeParamRouteName, txRequest{
+		Sequence:        optSeq,
+		Fee:             optFee,
+		Submit:          submit,
+		addressRequest:  addressRequest{Address: fromHex},
+		passwordRequest: passwordRequest{Password: pwd},
+		txChangeParamRequest: txChangeParamRequest{
+			ParamSpace: pSpace,
+			ParamKey:   pKey,
+			ParamValue: pValue,
+			StartBlock: startBlk,
+			EndBlock:   endBlk,
+		},
+	})
+}
+
+func (c *Client) TxDaoTransfer(from string, amt, startBlk, endBlk uint64,
+	pwd string, submit bool, optSeq, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxDAOTransferRouteName, txRequest{
+		Amount:          amt,
+		Sequence:        optSeq,
+		Fee:             optFee,
+		Submit:          submit,
+		addressRequest:  addressRequest{Address: fromHex},
+		passwordRequest: passwordRequest{Password: pwd},
+		txChangeParamRequest: txChangeParamRequest{
+			StartBlock: startBlk,
+			EndBlock:   endBlk,
+		},
+	})
+}
+
+func (c *Client) ResourceUsage() (returned *resourceUsageResponse, err lib.ErrorI) {
+	returned = new(resourceUsageResponse)
+	err = c.get(ResourceUsageRouteName, returned, true)
+	return
+}
+
+func (c *Client) PeerInfo() (returned *peerInfoResponse, err lib.ErrorI) {
+	returned = new(peerInfoResponse)
+	err = c.get(PeerInfoRouteName, returned, true)
+	return
+}
+
+func (c *Client) ConsensusInfo() (returned *consensus.Summary, err lib.ErrorI) {
+	returned = new(consensus.Summary)
+	err = c.get(ConsensusInfoRouteName, returned, true)
+	return
+}
+
+func (c *Client) PeerBook() (returned *[]*p2p.BookPeer, err lib.ErrorI) {
+	returned = new([]*p2p.BookPeer)
+	err = c.get(PeerBookRouteName, returned, true)
+	return
+}
+
+func (c *Client) Config() (returned *lib.Config, err lib.ErrorI) {
+	returned = new(lib.Config)
+	err = c.get(ConfigRouteName, returned, true)
+	return
+}
+
+func (c *Client) Logs() (logs string, err lib.ErrorI) {
+	resp, e := c.client.Get(c.url(LogsRouteName, true))
+	if e != nil {
+		return "", ErrGetRequest(err)
+	}
+	bz, e := io.ReadAll(resp.Body)
+	if e != nil {
+		return "", ErrGetRequest(e)
+	}
+	return string(bz), nil
+}
+
+func (c *Client) txAddress(route string, from, pwd string, submit bool, optSeq, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(route, txRequest{
+		Sequence:        optSeq,
+		Fee:             optFee,
+		Submit:          submit,
+		addressRequest:  addressRequest{Address: fromHex},
+		passwordRequest: passwordRequest{Password: pwd},
+	})
+}
+
+func (c *Client) txStake(from, netAddr string, amt uint64, output, pwd string, submit, edit bool, optSeq, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	route := TxStakeRouteName
+	if edit {
+		route = TxEditStakeRouteName
+	}
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(route, txRequest{
+		Amount:          amt,
+		NetAddress:      netAddr,
+		Output:          output,
+		Sequence:        optSeq,
+		Fee:             optFee,
+		Submit:          submit,
+		addressRequest:  addressRequest{Address: fromHex},
+		passwordRequest: passwordRequest{Password: pwd},
+	})
+}
+
+func (c *Client) transactionRequest(routeName string, txRequest txRequest) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	bz, err := lib.MarshalJSON(txRequest)
+	if err != nil {
+		return
+	}
+	if txRequest.Submit {
+		hash = new(string)
+		err = c.post(routeName, bz, hash, true)
+	} else {
+		tx = json.RawMessage{}
+		err = c.post(routeName, bz, &tx, true)
+	}
+	return
+}
+
+func (c *Client) keystoreRequest(routeName string, keystoreRequest keystoreRequest, ptr any) (err lib.ErrorI) {
+	bz, err := lib.MarshalJSON(keystoreRequest)
+	if err != nil {
+		return
+	}
+	err = c.post(routeName, bz, ptr, true)
+	return
+}
+
+func (c *Client) paginatedHeightRequest(routeName string, height uint64, p lib.PageParams, ptr any, filters ...lib.ValidatorFilters) (err lib.ErrorI) {
+	var vf lib.ValidatorFilters
+	if filters != nil {
+		vf = filters[0]
+	}
+	bz, err := lib.MarshalJSON(paginatedHeightRequest{
+		heightRequest:    heightRequest{height},
+		PageParams:       p,
+		ValidatorFilters: vf,
 	})
 	if err != nil {
 		return
@@ -192,7 +508,7 @@ func (c *Client) paginatedAddrRequest(routeName string, address string, p lib.Pa
 	if err != nil {
 		return err
 	}
-	bz, err := lib.JSONMarshal(paginatedAddressRequest{
+	bz, err := lib.MarshalJSON(paginatedAddressRequest{
 		addressRequest: addressRequest{addr},
 		PageParams:     p,
 	})
@@ -204,7 +520,7 @@ func (c *Client) paginatedAddrRequest(routeName string, address string, p lib.Pa
 }
 
 func (c *Client) heightRequest(routeName string, height uint64, ptr any) (err lib.ErrorI) {
-	bz, err := lib.JSONMarshal(heightRequest{Height: height})
+	bz, err := lib.MarshalJSON(heightRequest{Height: height})
 	if err != nil {
 		return
 	}
@@ -212,12 +528,12 @@ func (c *Client) heightRequest(routeName string, height uint64, ptr any) (err li
 	return
 }
 
-func (c *Client) hashRequest(routeName string, hash string, ptr any) (err lib.ErrorI) {
-	bz, err := lib.JSONMarshal(hashRequest{Hash: hash})
+func (c *Client) hashRequest(routeName string, hash string, ptr any, admin ...bool) (err lib.ErrorI) {
+	bz, err := lib.MarshalJSON(hashRequest{Hash: hash})
 	if err != nil {
 		return
 	}
-	err = c.post(routeName, bz, ptr)
+	err = c.post(routeName, bz, ptr, admin...)
 	return
 }
 
@@ -226,7 +542,7 @@ func (c *Client) heightAndAddressRequest(routeName string, height uint64, addres
 	if err != nil {
 		return err
 	}
-	bz, err := lib.JSONMarshal(heightAndAddressRequest{
+	bz, err := lib.MarshalJSON(heightAndAddressRequest{
 		heightRequest:  heightRequest{height},
 		addressRequest: addressRequest{addr},
 	})
@@ -238,7 +554,7 @@ func (c *Client) heightAndAddressRequest(routeName string, height uint64, addres
 }
 
 func (c *Client) heightAndNameRequest(routeName string, height uint64, name string, ptr any) (err lib.ErrorI) {
-	bz, err := lib.JSONMarshal(heightAndNameRequest{
+	bz, err := lib.MarshalJSON(heightAndNameRequest{
 		heightRequest: heightRequest{height},
 		nameRequest:   nameRequest{name},
 	})
@@ -249,31 +565,23 @@ func (c *Client) heightAndNameRequest(routeName string, height uint64, name stri
 	return
 }
 
-func (c *Client) Transaction(tx lib.TransactionI) (hash *string, err lib.ErrorI) {
-	bz, err := lib.JSONMarshal(tx)
-	if err != nil {
-		return nil, err
+func (c *Client) url(routeName string, admin ...bool) string {
+	if admin != nil && admin[0] {
+		return "http://" + localhost + colon + c.adminPort + router[routeName].Path
 	}
-	hash = new(string)
-	err = c.post(TxRouteName, bz, hash)
-	return
-}
-
-func (c *Client) url(routeName string) string {
-	fmt.Println(c.rpcURL + colon + c.rpcPort + router[routeName].Path)
 	return c.rpcURL + colon + c.rpcPort + router[routeName].Path
 }
 
-func (c *Client) post(routeName string, json []byte, ptr any) lib.ErrorI {
-	resp, err := c.client.Post(c.url(routeName), ApplicationJSON, bytes.NewBuffer(json))
+func (c *Client) post(routeName string, json []byte, ptr any, admin ...bool) lib.ErrorI {
+	resp, err := c.client.Post(c.url(routeName, admin...), ApplicationJSON, bytes.NewBuffer(json))
 	if err != nil {
 		return ErrPostRequest(err)
 	}
 	return c.unmarshal(resp, ptr)
 }
 
-func (c *Client) get(routeName string, ptr any) lib.ErrorI {
-	resp, err := c.client.Get(c.url(routeName))
+func (c *Client) get(routeName string, ptr any, admin ...bool) lib.ErrorI {
+	resp, err := c.client.Get(c.url(routeName, admin...))
 	if err != nil {
 		return ErrGetRequest(err)
 	}
@@ -288,5 +596,5 @@ func (c *Client) unmarshal(resp *http.Response, ptr any) lib.ErrorI {
 	if resp.StatusCode != http.StatusOK {
 		return ErrHttpStatus(resp.Status, resp.StatusCode, bz)
 	}
-	return lib.JSONUnmarshal(bz, ptr)
+	return lib.UnmarshalJSON(bz, ptr)
 }

@@ -20,7 +20,7 @@ func TestED25519Bytes(t *testing.T) {
 		// public key testing
 		pubKey := privateKey.PublicKey()
 		pubKeyBz := pubKey.Bytes()
-		pubKey2 := NewPublicKeyFromBytes(pubKeyBz)
+		pubKey2 := NewED25519PubKeyFromBytes(pubKeyBz)
 		if !pubKey.Equals(pubKey2) {
 			t.Fatalf("wanted %s got %s", pubKey, pubKey2)
 		}

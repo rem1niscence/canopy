@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"github.com/drand/kyber"
 	"github.com/drand/kyber/sign"
@@ -15,6 +16,37 @@ type KeyGroup struct {
 	Address    AddressI
 	PublicKey  PublicKeyI
 	PrivateKey PrivateKeyI
+}
+
+type keyGroupJson struct {
+	Address    string `json:"address"`
+	PublicKey  string `json:"publicKey"`
+	PrivateKey string `json:"privateKey"`
+}
+
+func (k *KeyGroup) UnmarshalJSON(b []byte) error {
+	j := new(keyGroupJson)
+	if err := json.Unmarshal(b, j); err != nil {
+		return err
+	}
+	address, err := NewAddressFromString(j.Address)
+	if err != nil {
+		return err
+	}
+	publicKey, err := NewPublicKeyFromString(j.PublicKey)
+	if err != nil {
+		return err
+	}
+	privateKey, err := NewPrivateKeyFromString(j.PrivateKey)
+	if err != nil {
+		return err
+	}
+	*k = KeyGroup{
+		Address:    address,
+		PublicKey:  publicKey,
+		PrivateKey: privateKey,
+	}
+	return nil
 }
 
 func NewKeyGroup(pk PrivateKeyI) *KeyGroup {
@@ -54,8 +86,24 @@ func NewED25519PublicKey() (PublicKeyI, error) {
 	return pk.PublicKey(), nil
 }
 
-func NewPublicKeyFromBytes(bz []byte) PublicKeyI {
+func NewED25519PubKeyFromBytes(bz []byte) PublicKeyI {
 	return NewPublicKeyED25519(bz)
+}
+
+func NewPublicKeyFromString(s string) (PublicKeyI, error) {
+	bz, err := hex.DecodeString(s)
+	if err != nil {
+		return nil, err
+	}
+	return NewPublicKeyFromBytes(bz)
+}
+
+func NewPublicKeyFromBytes(bz []byte) (PublicKeyI, error) {
+	if len(bz) == Ed25519PubKeySize {
+		return NewED25519PubKeyFromBytes(bz), nil
+	} else {
+		return NewBLSPublicKeyFromBytes(bz)
+	}
 }
 
 func NewED25519PublicKeyFromString(hexString string) (PublicKeyI, error) {
@@ -175,40 +223,51 @@ func NewMultiBLS(publicKeys [][]byte, bitmap []byte) (MultiPublicKeyI, error) {
 }
 
 func NewBLSPrivateKeyFromFile(filepath string) (PrivateKeyI, error) {
-	hexBytes, err := os.ReadFile(filepath)
+	jsonBytes, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, err
 	}
-	bz, err := hex.DecodeString(string(hexBytes))
-	if err != nil {
+	ptr := new(BLS12381PrivateKey)
+	if err = json.Unmarshal(jsonBytes, ptr); err != nil {
 		return nil, err
 	}
-	return NewBLSPrivateKeyFromBytes(bz)
+	return ptr, nil
 }
 
 func PrivateKeyToFile(key PrivateKeyI, filepath string) error {
-	return os.WriteFile(filepath, []byte(hex.EncodeToString(key.Bytes())), 0777)
+	bz, err := json.MarshalIndent(key, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath, bz, 0777)
 }
 
 func NewED25519PrivateKeyFromFile(filepath string) (PrivateKeyI, error) {
-	hexBytes, err := os.ReadFile(filepath)
+	jsonBytes, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, err
 	}
-	bz, err := hex.DecodeString(string(hexBytes))
+	ptr := new(ED25519PrivateKey)
+	if err = json.Unmarshal(jsonBytes, ptr); err != nil {
+		return nil, err
+	}
+	return ptr, nil
+}
+
+func NewPrivateKeyFromString(s string) (PrivateKeyI, error) {
+	bz, err := hex.DecodeString(s)
 	if err != nil {
 		return nil, err
 	}
-	if len(bz) != Ed25519PrivKeySize {
-		return nil, fmt.Errorf("wrong private key size")
-	}
-	return NewPrivateKeyED25519(bz), nil
+	return NewPrivateKeyFromBytes(bz)
 }
 
 func NewPrivateKeyFromBytes(bz []byte) (PrivateKeyI, error) {
 	if len(bz) == BLS12381PrivKeySize {
 		return NewBLSPrivateKeyFromBytes(bz)
-	} else {
+	} else if len(bz) == Ed25519PrivKeySize {
 		return NewED25519PrivateKeyFromBytes(bz), nil
+	} else {
+		return nil, fmt.Errorf("unknown private key size: %d", len(bz))
 	}
 }

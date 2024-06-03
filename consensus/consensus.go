@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/ginchuco/ginchu/fsm"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
@@ -441,7 +442,7 @@ func (c *Consensus) HandleMessage(message proto.Message) lib.ErrorI {
 			if partialQC {
 				return c.Proposals.AddPartialQC(msg)
 			}
-			return c.Proposals.AddProposal(msg)
+			return c.Proposals.AddProposal(msg, vs)
 		}
 	}
 	return ErrUnknownConsensusMsg(message)
@@ -606,6 +607,82 @@ func (c *Consensus) stopTimer(t *time.Timer) {
 		default:
 		}
 	}
+}
+
+func (c *Consensus) JSONSummary() ([]byte, lib.ErrorI) {
+	c.RLock()
+	defer c.RUnlock()
+	c.Votes.Lock()
+	defer c.Votes.Unlock()
+	c.Proposals.Lock()
+	defer c.Proposals.Unlock()
+	hash := lib.HexBytes{}
+	if c.Block != nil && c.Block.BlockHeader != nil {
+		hash = c.Block.BlockHeader.Hash
+	}
+	selfKey, err := crypto.NewPublicKeyFromBytes(c.PublicKey)
+	if err != nil {
+		return nil, ErrInvalidPublicKey()
+	}
+	var propAddress lib.HexBytes
+	if c.ProposerKey != nil {
+		propKey, _ := crypto.NewPublicKeyFromBytes(c.ProposerKey)
+		propAddress = propKey.Address().Bytes()
+	}
+	status := ""
+	switch c.View.Phase {
+	case Election, Propose, Precommit, Commit:
+		proposal := c.Proposals.getProposal(c.View)
+		if proposal == nil {
+			status = fmt.Sprintf("waiting for proposal")
+		} else {
+			status = fmt.Sprintf("received proposal")
+		}
+	default:
+		if bytes.Equal(c.ProposerKey, c.PublicKey) {
+			_, _, votedPercentage := c.Votes.getLeadingVote(c.View, c.ValidatorSet.TotalPower)
+			status = fmt.Sprintf("received %d%% of votes", votedPercentage)
+		} else {
+			status = fmt.Sprintf("voting on proposal")
+		}
+	}
+	return lib.MarshalJSONIndent(Summary{
+		Syncing:         c.syncing.Load(),
+		View:            *c.View,
+		BlockHash:       hash,
+		Locked:          c.Locked,
+		Address:         selfKey.Address().Bytes(),
+		PublicKey:       c.PublicKey,
+		ProposerAddress: propAddress,
+		Proposer:        c.ProposerKey,
+		Proposals: proposalsForHeight{
+			ProposalsByRound: c.Proposals.ProposalsByRound,
+			PartialQCs:       c.Proposals.PartialQCs,
+		},
+		Votes: votesByHeight{
+			VotesByRound:          c.Votes.VotesByRound,
+			PacemakerVotesByRound: c.Votes.PacemakerVotesByRound,
+		},
+		Status: status,
+	})
+}
+
+func phaseString(p Phase) string {
+	return fmt.Sprintf("%d_%s", p, lib.Phase_name[int32(p)])
+}
+
+type Summary struct {
+	Syncing         bool               `json:"syncing"`
+	View            lib.View           `json:"view"`
+	BlockHash       lib.HexBytes       `json:"blockHash"`
+	Locked          bool               `json:"locked"`
+	Address         lib.HexBytes       `json:"address"`
+	PublicKey       lib.HexBytes       `json:"publicKey"`
+	ProposerAddress lib.HexBytes       `json:"proposerAddress"`
+	Proposer        lib.HexBytes       `json:"proposer"`
+	Proposals       proposalsForHeight `json:"proposals"`
+	Votes           votesByHeight      `json:"votes"`
+	Status          string             `json:"status"`
 }
 
 type (

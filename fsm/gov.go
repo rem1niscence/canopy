@@ -130,10 +130,16 @@ func (s *StateMachine) ApproveProposal(msg types.Proposal) lib.ErrorI {
 		if err != nil {
 			return err
 		}
-		if crypto.Hash(bz) == nil {
+		if bz == nil {
 			return types.ErrRejectProposal()
 		}
-		// TODO lookup hash in file
+		proposals := make(types.Proposals)
+		if err = proposals.NewFromFile(s.Config.DataDirPath); err != nil {
+			return err
+		}
+		if _, ok := proposals[crypto.HashString(bz)]; !ok {
+			return types.ErrRejectProposal()
+		}
 		return nil
 	case types.RejectAllProposals:
 		return types.ErrRejectProposal()

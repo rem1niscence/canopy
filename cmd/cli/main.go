@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"flag"
+	"fmt"
 	"github.com/ginchuco/ginchu/cmd/rpc"
 	"github.com/ginchuco/ginchu/consensus"
 	"github.com/ginchuco/ginchu/fsm/types"
@@ -10,6 +12,8 @@ import (
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/ginchuco/ginchu/store"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
 	"os"
@@ -18,20 +22,27 @@ import (
 	"syscall"
 )
 
-var (
-	rootCmd = &cobra.Command{Use: "ginchu", Short: "ginchu is a generic blockchain implementation"}
-)
-
-var startCmd = &cobra.Command{
-	Use:   "start",
-	Short: "start the blockchain daemon",
-	Run: func(cmd *cobra.Command, args []string) {
-		Start()
-	},
+var rootCmd = &cobra.Command{
+	Use:     "ginchu",
+	Short:   "ginchu is a generic blockchain implementation",
+	Version: rpc.SoftwareVersion,
 }
 
+var (
+	client, config, l              = &rpc.Client{}, lib.Config{}, lib.LoggerI(nil)
+	dataDir, validatorKey, nodeKey = "", crypto.PrivateKeyI(nil), crypto.PrivateKeyI(nil)
+)
+
 func init() {
+	flag.Parse()
 	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(queryCmd)
+	rootCmd.AddCommand(adminCmd)
+	rootCmd.PersistentFlags().StringVar(&dataDir, "data-dir", lib.DefaultDataDirPath(), "custom data directory location")
+
+	config, validatorKey, nodeKey = InitializeDataDirectory(dataDir, lib.NewDefaultLogger())
+	l = lib.NewLogger(lib.LoggerConfig{Level: config.GetLogLevel()})
+	client = rpc.NewClient(config.RPCUrl, config.RPCPort, config.AdminPort)
 }
 
 func main() {
@@ -40,15 +51,25 @@ func main() {
 	}
 }
 
+var startCmd = &cobra.Command{
+	Use:   "start",
+	Short: "start the blockchain software",
+	Run: func(cmd *cobra.Command, args []string) {
+		Start()
+	},
+}
+
 func Start() {
-	l := lib.NewDefaultLogger()
-	c, valKey, nodeKey, db := InitializeDataDirectory("", l)
-	app, err := consensus.New(c, valKey, nodeKey, db, l)
+	db, err := store.New(config, l)
+	if err != nil {
+		l.Fatal(err.Error())
+	}
+	app, err := consensus.New(config, validatorKey, nodeKey, db, l)
 	if err != nil {
 		l.Fatal(err.Error())
 	}
 	app.Start()
-	rpc.StartRPC(app, c, l)
+	rpc.StartRPC(app, config, l)
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGABRT)
 	s := <-stop
@@ -58,11 +79,7 @@ func Start() {
 
 }
 
-func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config, privateValKey, privateNodeKey crypto.PrivateKeyI, db lib.StoreI) {
-	if dataDirPath == "" {
-		dataDirPath = lib.DefaultDataDirPath()
-	}
-	log.Infof("Reading data directory at %s", dataDirPath)
+func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config, privateValKey, privateNodeKey crypto.PrivateKeyI) {
 	if err := os.MkdirAll(dataDirPath, os.ModePerm); err != nil {
 		panic(err)
 	}
@@ -89,6 +106,25 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			panic(err)
 		}
 	}
+	proposalsFilePath := filepath.Join(dataDirPath, lib.ProposalsFilePath)
+	if _, err := os.Stat(proposalsFilePath); errors.Is(err, os.ErrNotExist) {
+		log.Infof("Creating %s file", lib.ProposalsFilePath)
+		proposals := make(types.Proposals)
+		a, _ := lib.NewAny(&lib.StringWrapper{Value: "example"})
+		if err = proposals.Add(&types.MessageChangeParameter{
+			ParameterSpace: types.ParamSpaceCons + "|" + types.ParamSpaceFee + "|" + types.ParamSpaceVal + "|" + types.ParamSpaceGov,
+			ParameterKey:   types.ParamProtocolVersion,
+			ParameterValue: a,
+			StartHeight:    1,
+			EndHeight:      1000000,
+			Signer:         lib.MaxHash,
+		}, true); err != nil {
+			panic(err)
+		}
+		if err = proposals.SaveToFile(dataDirPath); err != nil {
+			panic(err)
+		}
+	}
 	privateValKey, err := crypto.NewBLSPrivateKeyFromFile(privateValKeyPath)
 	if err != nil {
 		panic(err)
@@ -107,31 +143,48 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 		log.Infof("Creating %s file", lib.GenesisFilePath)
 		WriteDefaultGenesisFile(privateValKey, privateNodeKey, genesisFilePath)
 	}
-	db, err = store.New(c, log)
-	if err != nil {
-		panic(err)
-	}
 	return
 }
 
-func WriteDefaultGenesisFile(validatorPrivateKey, nodePrivateKey crypto.PrivateKeyI, genesisFilePath string) {
-	pubKey := nodePrivateKey.PublicKey()
-	address, consPubKey := pubKey.Address(), validatorPrivateKey.PublicKey()
+func WriteDefaultGenesisFile(validatorPrivateKey, _ crypto.PrivateKeyI, genesisFilePath string) {
+	consPubKey := validatorPrivateKey.PublicKey()
+	addr := consPubKey.Address()
 	j := &types.GenesisState{
 		Time:     timestamppb.Now(),
 		Pools:    []*types.Pool{{Id: types.PoolID_DAO}, {Id: types.PoolID_FeeCollector}},
-		Accounts: []*types.Account{{Address: address.Bytes(), Amount: 1000000}},
+		Accounts: []*types.Account{{Address: addr.Bytes(), Amount: 1000000}},
 		Validators: []*types.Validator{{
-			Address:      consPubKey.Address().Bytes(),
+			Address:      addr.Bytes(),
 			PublicKey:    consPubKey.Bytes(),
-			NetAddress:   "http://localhost:4000",
-			StakedAmount: 1000000,
-			Output:       address.Bytes(),
+			NetAddress:   "http://localhost:9000",
+			StakedAmount: 1000000000000000000,
+			Output:       addr.Bytes(),
 		}},
 		Params: types.DefaultParams(),
 	}
 	bz, _ := json.MarshalIndent(j, "", "  ")
 	if err := os.WriteFile(genesisFilePath, bz, 0777); err != nil {
 		panic(err)
+	}
+}
+
+func writeToConsole(a any, err error) {
+	if err != nil {
+		l.Fatal(err.Error())
+	}
+	switch a.(type) {
+	case int, uint32, uint64:
+		p := message.NewPrinter(language.English)
+		if _, err := p.Printf("%d\n", a); err != nil {
+			l.Fatal(err.Error())
+		}
+	case string, *string:
+		fmt.Println(a)
+	default:
+		s, err := lib.MarshalJSONIndentString(a)
+		if err != nil {
+			l.Fatal(err.Error())
+		}
+		fmt.Println(s)
 	}
 }

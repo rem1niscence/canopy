@@ -30,9 +30,12 @@ func (a *Address) UnmarshalJSON(b []byte) (err error) {
 func (a *Address) Bytes() []byte          { return (*a)[:] }
 func (a *Address) String() string         { return hex.EncodeToString(a.Bytes()) }
 func (a *Address) Equals(e AddressI) bool { return bytes.Equal(a.Bytes(), e.Bytes()) }
-
 func (a *Address) Marshal() ([]byte, error) {
 	return cdc.Marshal(ProtoAddress{
 		Address: a.Bytes(),
 	})
+}
+func NewAddress(b []byte) AddressI {
+	a := Address(b)
+	return &a
 }

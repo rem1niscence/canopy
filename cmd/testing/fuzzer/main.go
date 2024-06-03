@@ -4,7 +4,7 @@ import (
 	"github.com/ginchuco/ginchu/cmd/rpc"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -13,15 +13,22 @@ const (
 	localhost      = "http://localhost"
 	configFileName = "fuzzer.json"
 
-	SendMsgName = "send"
+	SendMsgName      = "send"
+	StakeMsgName     = "stake"
+	EditStakeMsgName = "edit_stake"
+	UnstakeMsgName   = "unstake"
+	PauseMsgName     = "pause"
+	UnpauseMsgName   = "unpause"
 
-	BadSigReason     = "bad signature"
-	BadSeqReason     = "bad sequence"
-	BadFeeReason     = "bad fee"
-	BadMessageReason = "bad msg"
-	BadSenderReason  = "bad sender"
-	BadRecReason     = "bad receiver"
-	BadAmountReason  = "bad amount"
+	BadSigReason        = "bad signature"
+	BadSeqReason        = "bad sequence"
+	BadFeeReason        = "bad fee"
+	BadMessageReason    = "bad msg"
+	BadSenderReason     = "bad sender"
+	BadRecReason        = "bad receiver"
+	BadAmountReason     = "bad amount"
+	BadNetAddrReason    = "bad net address"
+	BadOutputAddrReason = "bad output address"
 )
 
 func main() {
@@ -29,8 +36,31 @@ func main() {
 	go fuzzer.resetDependentStateLoop()
 	fuzzer.config.PercentInvalidTransactions = 0
 	for range time.Tick(100 * time.Millisecond) {
-		if err := fuzzer.SendTransaction(); err != nil {
-			fuzzer.log.Error(err.Error())
+		switch rand.Intn(4) {
+		case 0:
+			if err := fuzzer.SendTransaction(); err != nil {
+				fuzzer.log.Error(err.Error())
+			}
+		case 1:
+			if err := fuzzer.StakeTransaction(); err != nil {
+				fuzzer.log.Error(err.Error())
+			}
+		case 2:
+			if err := fuzzer.EditStakeTransaction(); err != nil {
+				fuzzer.log.Error(err.Error())
+			}
+		case 3:
+			if err := fuzzer.PauseTransaction(); err != nil {
+				fuzzer.log.Error(err.Error())
+			}
+		case 4:
+			if err := fuzzer.UnpauseTransaction(); err != nil {
+				fuzzer.log.Error(err.Error())
+			}
+		case 5:
+			if err := fuzzer.UnstakeTransaction(); err != nil {
+				fuzzer.log.Error(err.Error())
+			}
 		}
 	}
 }
@@ -44,36 +74,18 @@ type Fuzzer struct {
 
 func NewFuzzer() *Fuzzer {
 	log := lib.NewDefaultLogger()
-	config := new(Config).FromFile(log)
+	config := DefaultConfig().FromFile(log)
 	return &Fuzzer{
 		log:    log,
 		config: config,
-		client: rpc.NewClient(config.RPCUrl, config.RPCPort),
+		client: rpc.NewClient(config.RPCUrl, config.RPCPort, config.AdminRPCPort),
 		state: &DependentState{
 			RWMutex:  sync.RWMutex{},
 			height:   0,
 			accounts: make(map[string]*types.Account),
+			vals:     make(map[string]*types.Validator),
 		},
 	}
-}
-
-func (f *Fuzzer) getAccount(address crypto.AddressI) (acc *types.Account) {
-	if cached, ok := f.state.GetAccount(address); ok {
-		return cached
-	}
-	acc, err := f.client.Account(0, address.String())
-	if err != nil {
-		f.log.Fatal(err.Error())
-	}
-	return
-}
-
-func (f *Fuzzer) getFees() (p *types.FeeParams) {
-	p, err := f.client.FeeParams(0)
-	if err != nil {
-		f.log.Fatal(err.Error())
-	}
-	return
 }
 
 func (f *Fuzzer) resetDependentStateLoop() {

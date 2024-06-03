@@ -10,41 +10,49 @@ import (
 type (
 	ProposalsForHeight struct {
 		sync.Mutex
-		proposalsByRound ProposalsByRound
-		partialQCs       PartialQCsByPayload
+		proposalsForHeight
+	}
+	proposalsForHeight struct {
+		ProposalsByRound ProposalsByRound
+		PartialQCs       PartialQCsByPayload
 	}
 	ProposalsByRound map[uint64]RoundProposals
 	RoundProposals   struct {
-		Election []*Message
-		Messages ProposalsByPhase
+		Election []*Message       `json:"1_ELECTION,omitempty"`
+		Messages ProposalsByPhase `json:"messages,omitempty"`
 	}
-	ProposalsByPhase    map[Phase]*Message // PROPOSE, PRECOMMIT, COMMIT
+	ProposalsByPhase map[string]*Proposal // PROPOSE, PRECOMMIT, COMMIT
+	Proposal         struct {
+		Message          *Message `json:"message"`
+		TotalVotedPower  uint64   `json:"totalVotedPower"`
+		MinPowerFor23Maj uint64   `json:"minPowerFor23Maj"`
+	}
 	PartialQCsByPayload map[string]*QC
 )
 
 func NewProposalsForHeight() ProposalsForHeight {
-	return ProposalsForHeight{sync.Mutex{}, make(ProposalsByRound), make(PartialQCsByPayload)}
+	return ProposalsForHeight{sync.Mutex{}, proposalsForHeight{make(ProposalsByRound), make(PartialQCsByPayload)}}
 }
 
 func (p *ProposalsForHeight) NewHeight() {
 	p.Lock()
 	defer p.Unlock()
-	p.partialQCs = make(PartialQCsByPayload)
-	p.proposalsByRound = make(ProposalsByRound)
+	p.PartialQCs = make(PartialQCsByPayload)
+	p.ProposalsByRound = make(ProposalsByRound)
 }
 
 func (p *ProposalsForHeight) NewRound(round uint64) {
 	p.Lock()
 	defer p.Unlock()
-	rlm := p.proposalsByRound[round]
+	rlm := p.ProposalsByRound[round]
 	rlm.Election, rlm.Messages = make([]*Message, 0), make(ProposalsByPhase)
-	p.proposalsByRound[round] = rlm
+	p.ProposalsByRound[round] = rlm
 }
 
 func (p *ProposalsForHeight) GetElectionCandidates(round uint64, vs ValSet, d *SortitionData) (candidates []VRFCandidate, e lib.ErrorI) {
 	p.Lock()
 	defer p.Unlock()
-	rlm := p.proposalsByRound[round]
+	rlm := p.ProposalsByRound[round]
 	for _, m := range rlm.Election {
 		vrf := m.GetVrf()
 		v, err := vs.GetValidator(vrf.PublicKey)
@@ -67,10 +75,10 @@ func (p *ProposalsForHeight) GetElectionCandidates(round uint64, vs ValSet, d *S
 	return candidates, nil
 }
 
-func (p *ProposalsForHeight) AddProposal(message *Message) lib.ErrorI {
+func (p *ProposalsForHeight) AddProposal(message *Message, vs ValSet) lib.ErrorI {
 	p.Lock()
 	defer p.Unlock()
-	proposals, phase := p.proposalsByRound[message.Header.Round], message.Header.Phase
+	proposals, phase := p.ProposalsByRound[message.Header.Round], message.Header.Phase
 	if phase == Election {
 		for _, msg := range proposals.Election {
 			if bytes.Equal(msg.Signature.PublicKey, message.Signature.PublicKey) {
@@ -79,19 +87,36 @@ func (p *ProposalsForHeight) AddProposal(message *Message) lib.ErrorI {
 		}
 		proposals.Election = append(proposals.Election, message)
 	} else {
-		if _, found := proposals.Messages[phase]; found {
+		key := phaseString(phase)
+		if _, found := proposals.Messages[key]; found {
 			return ErrDuplicateProposerMessage()
 		}
-		proposals.Messages[phase] = message
+		_, totalSigned, min23Maj, err := message.Qc.Signature.GetSignerInfo(vs)
+		if err != nil {
+			return err
+		}
+		proposals.Messages[key] = &Proposal{
+			Message:          message,
+			TotalVotedPower:  totalSigned,
+			MinPowerFor23Maj: min23Maj,
+		}
 	}
-	p.proposalsByRound[message.Header.Round] = proposals
+	p.ProposalsByRound[message.Header.Round] = proposals
 	return nil
 }
 
 func (p *ProposalsForHeight) GetProposal(view *lib.View) *Message {
 	p.Lock()
 	defer p.Unlock()
-	return p.proposalsByRound[view.Round].Messages[view.Phase-1]
+	return p.getProposal(view)
+}
+
+func (p *ProposalsForHeight) getProposal(view *lib.View) *Message {
+	proposal, ok := p.ProposalsByRound[view.Round].Messages[phaseString(view.Phase-1)]
+	if !ok {
+		return nil
+	}
+	return proposal.Message
 }
 
 func (p *ProposalsForHeight) AddPartialQC(message *Message) (err lib.ErrorI) {
@@ -101,7 +126,7 @@ func (p *ProposalsForHeight) AddPartialQC(message *Message) (err lib.ErrorI) {
 	if err != nil {
 		return
 	}
-	p.partialQCs[lib.BytesToString(bz)] = message.Qc
+	p.PartialQCs[lib.BytesToString(bz)] = message.Qc
 	return
 }
 
@@ -159,19 +184,19 @@ func (p *ProposalsForHeight) addDSEByPartialQC(height uint64, vs ValSet,
 	minEvidenceHeight uint64, loadEvidence func(height uint64) (*lib.DoubleSigners, lib.ErrorI),
 	loadCertificate func(height uint64) (*lib.QuorumCertificate, lib.ErrorI),
 	dse lib.DoubleSignEvidences, loadValSet func(height uint64) (lib.ValidatorSet, lib.ErrorI)) {
-	for _, pQC := range p.partialQCs { // REPLICA with two proposer messages for same (H,R,P) - the partial is the malicious one
+	for _, pQC := range p.PartialQCs { // REPLICA with two proposer messages for same (H,R,P) - the partial is the malicious one
 		evidenceHeight := pQC.Header.Height
 		if evidenceHeight == height {
-			rlm := p.proposalsByRound[pQC.Header.Round]
+			rlm := p.ProposalsByRound[pQC.Header.Round]
 			if rlm.Messages == nil {
 				continue
 			}
-			message := rlm.Messages[pQC.Header.Phase]
-			if message == nil {
+			proposal := rlm.Messages[phaseString(pQC.Header.Phase)]
+			if proposal == nil || proposal.Message == nil {
 				continue
 			}
 			dse.Add(loadValSet, loadEvidence, vs, &lib.DoubleSignEvidence{
-				VoteA: message.Qc, // if both a partial and full exists
+				VoteA: proposal.Message.Qc, // if both a partial and full exists
 				VoteB: pQC,
 			}, minEvidenceHeight)
 		} else {
@@ -200,31 +225,32 @@ func (p *ProposalsForHeight) addDSEByCandidate(
 	loadValSet func(height uint64) (lib.ValidatorSet, lib.ErrorI), selfIsProposer bool) {
 	if !selfIsProposer { // CANDIDATE exposing double sign election
 		for r := uint64(0); r < view.Round-1; r++ {
-			rvs := hvs.votesByRound[r]
+			rvs := hvs.VotesByRound[r]
 			if rvs == nil {
 				continue
 			}
-			ev := rvs[ElectionVote]
+			ps := phaseString(ElectionVote)
+			ev := rvs[ps]
 			if ev == nil {
 				continue
 			}
-			rlm := p.proposalsByRound[r]
+			rlm := p.ProposalsByRound[r]
 			if rlm.Messages == nil {
 				continue
 			}
-			message := rlm.Messages[ElectionVote]
-			if message == nil {
+			proposal := rlm.Messages[ps]
+			if proposal == nil || proposal.Message == nil {
 				continue
 			}
 			for _, voteSet := range ev {
-				if voteSet.vote != nil {
-					valSet, err := loadValSet(voteSet.vote.Header.Height)
+				if voteSet.Vote != nil {
+					valSet, err := loadValSet(voteSet.Vote.Header.Height)
 					if err != nil {
 						continue
 					}
 					dse.Add(loadValSet, loadEvidence, valSet, &lib.DoubleSignEvidence{
-						VoteA: message.Qc,
-						VoteB: voteSet.vote.Qc,
+						VoteA: proposal.Message.Qc,
+						VoteB: voteSet.Vote.Qc,
 					}, minEvidenceHeight)
 				}
 			}

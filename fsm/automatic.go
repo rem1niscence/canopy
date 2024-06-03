@@ -4,6 +4,7 @@ import (
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
+	"math"
 )
 
 func (s *StateMachine) BeginBlock() lib.ErrorI {
@@ -39,18 +40,22 @@ func (s *StateMachine) EndBlock() (endBlock *lib.EndBlockParams, err lib.ErrorI)
 	return
 }
 
-func (s *StateMachine) GetConsensusValidators() (*lib.ConsensusValidators, lib.ErrorI) {
+func (s *StateMachine) GetConsensusValidators(all ...bool) (*lib.ConsensusValidators, lib.ErrorI) {
 	set := new(lib.ConsensusValidators)
 	params, err := s.GetParamsVal()
 	if err != nil {
 		return nil, err
 	}
+	valMaxCount := params.ValidatorMaxCount
 	it, err := s.RevIterator(types.ConsensusPrefix())
 	if err != nil {
 		return nil, err
 	}
 	defer it.Close()
-	for i := uint64(0); it.Valid() && i < params.ValidatorMaxCount; it.Next() {
+	if all != nil && all[0] == true {
+		valMaxCount = math.MaxUint64
+	}
+	for i := uint64(0); it.Valid() && i < valMaxCount; it.Next() {
 		addr, err := types.AddressFromKey(it.Key())
 		if err != nil {
 			return nil, err
@@ -68,6 +73,7 @@ func (s *StateMachine) GetConsensusValidators() (*lib.ConsensusValidators, lib.E
 		set.ValidatorSet = append(set.ValidatorSet, &lib.ConsensusValidator{
 			PublicKey:   val.PublicKey,
 			VotingPower: val.StakedAmount,
+			NetAddress:  val.NetAddress,
 		})
 	}
 	return set, nil

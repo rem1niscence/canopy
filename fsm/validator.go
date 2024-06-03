@@ -15,7 +15,12 @@ func (s *StateMachine) GetValidator(address crypto.AddressI) (*types.Validator, 
 	if bz == nil {
 		return nil, types.ErrValidatorNotExists()
 	}
-	return s.unmarshalValidator(bz)
+	val, err := s.unmarshalValidator(bz)
+	if err != nil {
+		return nil, err
+	}
+	val.Address = address.Bytes()
+	return val, nil
 }
 
 func (s *StateMachine) GetValidatorExists(address crypto.AddressI) (bool, lib.ErrorI) {
@@ -43,7 +48,7 @@ func (s *StateMachine) GetValidators() ([]*types.Validator, lib.ErrorI) {
 	return result, nil
 }
 
-func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorFilters) (page *lib.Page, err lib.ErrorI) {
 	it, err := s.Iterator(types.ValidatorPrefix())
 	if err != nil {
 		return nil, err
@@ -52,23 +57,50 @@ func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams) (page *lib.Page,
 	skipIdx, page := p.SkipToIndex(), lib.NewPage(p)
 	page.Type = types.ValidatorsPageName
 	res := make(types.ValidatorPage, 0)
-	for i, countOnly := 0, false; it.Valid(); func() { it.Next(); i++ }() {
-		page.TotalCount++
-		switch {
-		case i < skipIdx || countOnly:
-			continue
-		case i == skipIdx+page.PerPage:
-			countOnly = true
-			continue
+	if f.On() {
+		var filteredVals []*types.Validator
+		for ; it.Valid(); it.Next() {
+			var val *types.Validator
+			val, err = s.unmarshalValidator(it.Value())
+			if err != nil {
+				return nil, err
+			}
+			if val.PassesFilter(f) {
+				filteredVals = append(filteredVals, val)
+			}
 		}
-		var val *types.Validator
-		val, err = s.unmarshalValidator(it.Value())
-		if err != nil {
-			return nil, err
+		for i, countOnly := 0, false; i < len(filteredVals); i++ {
+			page.TotalCount++
+			switch {
+			case i < skipIdx || countOnly:
+				continue
+			case i == skipIdx+page.PerPage:
+				countOnly = true
+				continue
+			}
+			res = append(res, filteredVals[i])
+			page.Results = &res
+			page.Count++
 		}
-		res = append(res, val)
-		page.Results = &res
-		page.Count++
+	} else {
+		for i, countOnly := 0, false; it.Valid(); func() { it.Next(); i++ }() {
+			page.TotalCount++
+			switch {
+			case i < skipIdx || countOnly:
+				continue
+			case i == skipIdx+page.PerPage:
+				countOnly = true
+				continue
+			}
+			var val *types.Validator
+			val, err = s.unmarshalValidator(it.Value())
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, val)
+			page.Results = &res
+			page.Count++
+		}
 	}
 	page.TotalPages = int(math.Ceil(float64(page.TotalCount) / float64(page.PerPage)))
 	return
@@ -113,6 +145,7 @@ func (s *StateMachine) GetConsValidatorsPaginated(p lib.PageParams) (page *lib.P
 		res = append(res, &lib.ConsensusValidator{
 			PublicKey:   val.PublicKey,
 			VotingPower: val.StakedAmount,
+			NetAddress:  val.NetAddress,
 		})
 		page.Results = &res
 		page.Count++
@@ -163,7 +196,7 @@ func (s *StateMachine) DeleteConsensusValidator(address crypto.AddressI, stakeAm
 	if stakeAmount == 0 {
 		return nil
 	}
-	return s.Set(types.KeyForConsensus(address, stakeAmount), nil)
+	return s.Delete(types.KeyForConsensus(address, stakeAmount))
 }
 
 func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, height uint64) lib.ErrorI {

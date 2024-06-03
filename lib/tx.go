@@ -181,7 +181,7 @@ func (x Transaction) MarshalJSON() ([]byte, error) {
 	if !ok {
 		return nil, fmt.Errorf("couldn't convert %T to type MessageI", a)
 	}
-	bz, err := JSONMarshal(msg)
+	bz, err := MarshalJSON(msg)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (x *Transaction) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(j.Msg, msg); err != nil {
 		return err
 	}
-	a, err := ToAny(msg)
+	a, err := NewAny(msg)
 	if err != nil {
 		return err
 	}

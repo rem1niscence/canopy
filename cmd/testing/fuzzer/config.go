@@ -12,10 +12,44 @@ import (
 var dataDir = flag.String("data-dir", lib.DefaultConfig().DataDirPath, "")
 
 type Config struct {
-	RPCUrl                     string                     `json:"rpc_url"`
-	RPCPort                    string                     `json:"rpc_port"`
-	PrivateKeys                []crypto.PrivateKeyED25519 `json:"private_keys"`
-	PercentInvalidTransactions int                        `json:"percent_invalid_transactions"`
+	RPCUrl                     string                       `json:"rpc_url"`
+	RPCPort                    string                       `json:"rpc_port"`
+	AdminRPCPort               string                       `json:"admin_rpc_port"`
+	PrivateKeys                []*crypto.BLS12381PrivateKey `json:"private_keys"`
+	PercentInvalidTransactions int                          `json:"percent_invalid_transactions"`
+}
+
+func DefaultConfig() *Config {
+	configBz, err := os.ReadFile(filepath.Join(*dataDir, lib.ConfigFilePath))
+	if err != nil {
+		panic(err)
+	}
+	config := new(lib.Config)
+	if err = lib.UnmarshalJSON(configBz, config); err != nil {
+		if err != nil {
+			panic(err)
+		}
+	}
+	valKey, err := crypto.NewBLSPrivateKeyFromFile(filepath.Join(*dataDir, lib.ValKeyPath))
+	if err != nil {
+		panic(err)
+	}
+	privateKeys := make([]*crypto.BLS12381PrivateKey, 5)
+	for i := 0; i < 5; i++ {
+		if i == 0 {
+			privateKeys[i] = valKey.(*crypto.BLS12381PrivateKey)
+			continue
+		}
+		pk, _ := crypto.NewBLSPrivateKey()
+		privateKeys[i] = pk.(*crypto.BLS12381PrivateKey)
+	}
+	return &Config{
+		RPCUrl:                     localhost,
+		RPCPort:                    config.RPCPort,
+		AdminRPCPort:               config.AdminPort,
+		PrivateKeys:                privateKeys,
+		PercentInvalidTransactions: 10,
+	}
 }
 
 func (c *Config) FromFile(l lib.LoggerI) *Config {
@@ -35,7 +69,7 @@ func (c *Config) FromFile(l lib.LoggerI) *Config {
 	if err != nil {
 		l.Fatal(err.Error())
 	}
-	if err = lib.JSONUnmarshal(bz, c); err != nil {
+	if err = lib.UnmarshalJSON(bz, c); err != nil {
 		l.Fatal(err.Error())
 	}
 	if len(c.PrivateKeys) == 0 {
@@ -45,8 +79,7 @@ func (c *Config) FromFile(l lib.LoggerI) *Config {
 }
 
 func (c *Config) WriteToFile(filepath string) lib.ErrorI {
-	c.RPCUrl, c.RPCPort = localhost, lib.DefaultConfig().Port
-	bz, err := lib.JSONMarshalIndent(c)
+	bz, err := lib.MarshalJSONIndent(c)
 	if err != nil {
 		return err
 	}

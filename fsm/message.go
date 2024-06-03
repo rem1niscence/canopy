@@ -16,6 +16,8 @@ func (s *StateMachine) HandleMessage(msg lib.MessageI) lib.ErrorI {
 		return s.HandleMessageEditStake(x)
 	case *types.MessageUnstake:
 		return s.HandleMessageUnstake(x)
+	case *types.MessagePause:
+		return s.HandleMessagePause(x)
 	case *types.MessageUnpause:
 		return s.HandleMessageUnpause(x)
 	case *types.MessageChangeParameter:
@@ -62,7 +64,11 @@ func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]by
 	case *types.MessageDAOTransfer:
 		return [][]byte{x.Address}, nil
 	case *types.MessageStake:
-		validator, err = s.GetValidator(crypto.NewPublicKeyFromBytes(x.PublicKey).Address())
+		pubKey, e := crypto.NewPublicKeyFromBytes(x.PublicKey)
+		if e != nil {
+			return nil, types.ErrInvalidPublicKey(e)
+		}
+		validator, err = s.GetValidator(pubKey.Address())
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +100,10 @@ func (s *StateMachine) HandleMessageSend(msg *types.MessageSend) lib.ErrorI {
 }
 
 func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
-	publicKey := crypto.NewPublicKeyFromBytes(msg.PublicKey)
+	publicKey, e := crypto.NewPublicKeyFromBytes(msg.PublicKey)
+	if e != nil {
+		return types.ErrInvalidPublicKey(e)
+	}
 	address := publicKey.Address()
 	// check if below minimum stake
 	params, err := s.GetParamsVal()
@@ -211,6 +220,9 @@ func (s *StateMachine) HandleMessagePause(msg *types.MessagePause) lib.ErrorI {
 	if validator.MaxPausedHeight != 0 {
 		return types.ErrValidatorPaused()
 	}
+	if validator.UnstakingHeight != 0 {
+		return types.ErrValidatorUnstaking()
+	}
 	params, err := s.GetParamsVal()
 	if err != nil {
 		return err
@@ -230,6 +242,9 @@ func (s *StateMachine) HandleMessageUnpause(msg *types.MessageUnpause) lib.Error
 	// ensure already paused
 	if validator.MaxPausedHeight == 0 {
 		return types.ErrValidatorNotPaused()
+	}
+	if validator.UnstakingHeight != 0 {
+		return types.ErrValidatorUnstaking()
 	}
 	// set validator unpaused
 	return s.SetValidatorUnpaused(address, validator)

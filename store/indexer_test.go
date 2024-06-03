@@ -47,7 +47,7 @@ func newTestTxResult(t *testing.T) (r *lib.TxResult, tx *lib.Transaction, hash [
 		Root:   []byte("root"),
 	}
 	address = pk.PublicKey().Address()
-	a, err := lib.ToAny(msg)
+	a, err := lib.NewAny(msg)
 	require.NoError(t, err)
 	tx = &lib.Transaction{
 		Type:     "commit_id",

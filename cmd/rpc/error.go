@@ -10,7 +10,7 @@ func ErrServerTimeout() lib.ErrorI {
 }
 
 func ErrInvalidParams(err error) lib.ErrorI {
-	bz, _ := lib.JSONMarshal(err)
+	bz, _ := lib.MarshalJSON(err)
 	return lib.NewError(lib.CodeInvalidParams, lib.RPCModule, fmt.Sprintf("invalid params: %s", string(bz)))
 }
 

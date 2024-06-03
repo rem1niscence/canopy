@@ -101,6 +101,10 @@ func (s *StateMachine) ExportState() (genesis *types.GenesisState, err lib.Error
 	if err != nil {
 		return nil, err
 	}
+	genesis.ConsValidators, err = s.GetConsensusValidators(true)
+	if err != nil {
+		return nil, err
+	}
 	genesis.Params, err = s.GetParams()
 	if err != nil {
 		return nil, err

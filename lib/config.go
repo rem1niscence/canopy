@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Config struct {
+	MainConfig
 	RPCConfig
 	StateMachineConfig
 	StoreConfig
@@ -26,15 +28,38 @@ func DefaultConfig() Config {
 	}
 }
 
+type MainConfig struct {
+	LogLevel string `json:"logLevel"`
+}
+
+func (m *MainConfig) GetLogLevel() int32 {
+	switch {
+	case strings.Contains(strings.ToLower(m.LogLevel), "deb"):
+		return DebugLevel
+	case strings.Contains(strings.ToLower(m.LogLevel), "inf"):
+		return InfoLevel
+	case strings.Contains(strings.ToLower(m.LogLevel), "war"):
+		return WarnLevel
+	case strings.Contains(strings.ToLower(m.LogLevel), "err"):
+		return ErrorLevel
+	default:
+		return DebugLevel
+	}
+}
+
 type RPCConfig struct {
-	Port     string
-	TimeoutS int
+	RPCPort   string
+	AdminPort string
+	RPCUrl    string
+	TimeoutS  int
 }
 
 func DefaultRPCConfig() RPCConfig {
 	return RPCConfig{
-		Port:     "6001",
-		TimeoutS: 3,
+		RPCPort:   "6001",
+		AdminPort: "6002",
+		RPCUrl:    "http://localhost",
+		TimeoutS:  3,
 	}
 }
 
@@ -93,7 +118,7 @@ type P2PConfig struct {
 
 func DefaultP2PConfig() P2PConfig {
 	return P2PConfig{
-		ListenAddress:   "0.0.0.0:3000",
+		ListenAddress:   "0.0.0.0:9000",
 		ExternalAddress: "",
 		MaxInbound:      21,
 		MaxOutbound:     7,
@@ -132,16 +157,17 @@ func NewConfigFromFile(filepath string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	c := new(Config)
-	if err = json.Unmarshal(bz, c); err != nil {
+	c := DefaultConfig()
+	if err = json.Unmarshal(bz, &c); err != nil {
 		return Config{}, err
 	}
-	return *c, nil
+	return c, nil
 }
 
 const (
-	ConfigFilePath  = "config.json"
-	ValKeyPath      = "validator_key.json"
-	NodeKeyPath     = "node_key.json"
-	GenesisFilePath = "genesis.json"
+	ConfigFilePath    = "config.json"
+	ValKeyPath        = "validator_key.json"
+	NodeKeyPath       = "node_key.json"
+	GenesisFilePath   = "genesis.json"
+	ProposalsFilePath = "proposals.json"
 )

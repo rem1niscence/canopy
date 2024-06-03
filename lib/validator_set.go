@@ -138,25 +138,35 @@ func (x *AggregateSignature) Check(sb SignByte, vs ValidatorSet) (isPartialQC bo
 	if err = x.CheckBasic(sb, vs); err != nil {
 		return false, err
 	}
-	// check 2/3 maj
-	key := vs.Key.Copy()
-	if er := key.SetBitmap(x.Bitmap); er != nil {
-		return false, ErrInvalidSignerBitmap(er)
+	_, totalSignedPower, min23Maj, err := x.GetSignerInfo(vs)
+	if err != nil {
+		return false, err
 	}
-	totalSignedPower := uint64(0)
-	for i, val := range vs.ValidatorSet.ValidatorSet {
-		signed, er := key.SignerEnabledAt(i)
-		if er != nil {
-			return false, ErrInvalidSignerBitmap(er)
-		}
-		if signed {
-			totalSignedPower += val.VotingPower
-		}
-	}
-	if totalSignedPower < vs.MinimumMaj23 {
+	if totalSignedPower < min23Maj {
 		return true, nil
 	}
 	return false, nil
+}
+
+func (x *AggregateSignature) GetSignerInfo(vs ValidatorSet) (signers []HexBytes, totalSigned, min23Maj uint64, err ErrorI) {
+	key := vs.Key.Copy()
+	if er := key.SetBitmap(x.Bitmap); er != nil {
+		err = ErrInvalidSignerBitmap(er)
+		return
+	}
+	totalSigned, min23Maj = uint64(0), vs.MinimumMaj23
+	for i, val := range vs.ValidatorSet.ValidatorSet {
+		signed, er := key.SignerEnabledAt(i)
+		if er != nil {
+			err = ErrInvalidSignerBitmap(er)
+			return
+		}
+		if signed {
+			signers = append(signers, val.PublicKey)
+			totalSigned += val.VotingPower
+		}
+	}
+	return
 }
 
 func (x *AggregateSignature) GetDoubleSigners(y *AggregateSignature, vs ValidatorSet) (doubleSigners [][]byte, err ErrorI) {

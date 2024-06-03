@@ -19,6 +19,7 @@ type PrivateKeyI interface {
 type AddressI interface {
 	Marshal() ([]byte, error)
 	MarshalJSON() ([]byte, error)
+	UnmarshalJSON([]byte) error
 	Bytes() []byte
 	String() string
 	Equals(AddressI) bool

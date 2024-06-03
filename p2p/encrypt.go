@@ -208,7 +208,7 @@ func receiveKey(conn io.ReadWriter, ephemeralPublicKey *[]byte) lib.ErrorI {
 	if _, err := conn.Read(buffer); err != nil {
 		return ErrFailedRead(err)
 	}
-	var key *crypto.ProtoPubKey
+	key := new(crypto.ProtoPubKey)
 	if err := lib.Unmarshal(buffer, key); err != nil {
 		return err
 	}

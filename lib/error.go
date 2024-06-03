@@ -47,6 +47,7 @@ const (
 	CodeNewMultiPubKey       ErrorCode   = 30
 	CodeStringToBigFloat     ErrorCode   = 31
 	CodeWriteFile            ErrorCode   = 32
+	CodeReadFile             ErrorCode   = 33
 
 	ConsensusModule              ErrorModule = "consensus"
 	CodeDuplicateTransaction     ErrorCode   = 6
@@ -150,6 +151,9 @@ const (
 	CodeInsufficientSupply      ErrorCode   = 60
 	CodeUnknownMsgName          ErrorCode   = 61
 	CodeUnknownPageable         ErrorCode   = 62
+	CodePollValidator           ErrorCode   = 63
+	CodeInvalidBlockRange       ErrorCode   = 64
+	CodeInvalidPublicKey        ErrorCode   = 65
 
 	P2PModule                 ErrorModule = "p2p"
 	CodeUnknownP2PMessage     ErrorCode   = 1
@@ -454,6 +458,10 @@ func ErrTxFoundInMempool(hash string) ErrorI {
 
 func ErrWriteFile(err error) ErrorI {
 	return NewError(CodeWriteFile, MainModule, fmt.Sprintf("os.WriteFile() failed with err: %s", err.Error()))
+}
+
+func ErrReadFile(err error) ErrorI {
+	return NewError(CodeReadFile, MainModule, fmt.Sprintf("os.ReadFile() failed with err: %s", err.Error()))
 }
 
 func ErrUnknownMessageName(s string) ErrorI {

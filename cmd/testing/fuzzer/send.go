@@ -1,11 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
-	"google.golang.org/protobuf/proto"
 	"math"
 	"math/rand"
 )
@@ -46,6 +44,9 @@ func (f *Fuzzer) SendTransaction() lib.ErrorI {
 			tx, err = f.invalidSendAmount(from, to, account, fee)
 			reason = BadAmountReason
 		}
+		if err != nil {
+			return err
+		}
 		_, err = f.client.Transaction(tx)
 		if err == nil {
 			return ErrInvalidParams(SendMsgName, reason)
@@ -55,11 +56,9 @@ func (f *Fuzzer) SendTransaction() lib.ErrorI {
 	return nil
 }
 
-func (f *Fuzzer) validSendTransaction(from, to *crypto.KeyGroup, account *types.Account, fee uint64) lib.ErrorI {
+func (f *Fuzzer) validSendTransaction(from, to *crypto.KeyGroup, account types.Account, fee uint64) lib.ErrorI {
 	amountToSend := f.getRandomAmountUpTo(account.Amount - fee)
-	fmt.Printf("sending amount: %d\n", amountToSend+fee)
 	account.Amount -= amountToSend + fee
-	f.state.SetAccount(account)
 	tx, err := types.NewSendTransaction(from.PrivateKey, to.Address, amountToSend, account.Sequence, fee)
 	if err != nil {
 		return err
@@ -69,92 +68,42 @@ func (f *Fuzzer) validSendTransaction(from, to *crypto.KeyGroup, account *types.
 		return err
 	}
 	f.log.Infof("Executed valid send transaction: %s", *hash)
+	f.state.SetAccount(account)
 	return nil
 }
 
-func (f *Fuzzer) invalidSendSignature(from, to *crypto.KeyGroup, account *types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
+func (f *Fuzzer) invalidSendSignature(from, to *crypto.KeyGroup, account types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
 	return newTransactionBadSignature(from.PrivateKey, &types.MessageSend{
 		FromAddress: from.Address.Bytes(),
 		ToAddress:   to.Address.Bytes(),
-		Amount:      f.getRandomAmountUpTo(account.Amount),
+		Amount:      f.getRandomAmountUpTo(account.Amount - fee),
 	}, account.Sequence, fee)
 }
 
-func (f *Fuzzer) invalidSendSequence(from, to *crypto.KeyGroup, account *types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
-	var sequence uint64
-	switch rand.Intn(3) {
-	case 0:
-		sequence = account.Sequence - 1
-	default:
-		sequence = 0
-	}
-	tx, err = types.NewSendTransaction(from.PrivateKey, to.Address, f.getRandomAmountUpTo(account.Amount), sequence, fee)
+func (f *Fuzzer) invalidSendSequence(from, to *crypto.KeyGroup, account types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
+	tx, err = types.NewSendTransaction(from.PrivateKey, to.Address, f.getRandomAmountUpTo(account.Amount-fee), f.getBadSequence(account), fee)
 	return
 }
 
-func (f *Fuzzer) invalidSendFee(from, to *crypto.KeyGroup, account *types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
-	switch rand.Intn(3) {
-	case 0:
-		fee -= 1
-	case 1:
-		fee = math.MaxUint64
-	case 2:
-		fee = 0
-	}
-	tx, err = types.NewSendTransaction(from.PrivateKey, to.Address, f.getRandomAmountUpTo(account.Amount), account.Sequence, math.MaxUint64)
+func (f *Fuzzer) invalidSendFee(from, to *crypto.KeyGroup, account types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
+	tx, err = types.NewSendTransaction(from.PrivateKey, to.Address, f.getRandomAmountUpTo(account.Amount-fee), account.Sequence, f.getBadFee(fee))
 	return
 }
 
-func (f *Fuzzer) invalidSendMsg(from, _ *crypto.KeyGroup, account *types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
-	var msg proto.Message
-	switch rand.Intn(2) {
-	case 0:
-		msg = nil
-	case 1:
-		msg = &lib.UInt64Wrapper{}
-	}
-	a, err := lib.ToAny(msg)
-	if err != nil {
-		return nil, err
-	}
-	tx = &lib.Transaction{
-		Type:      types.MessageSendName,
-		Msg:       a,
-		Signature: nil,
-		Sequence:  account.Sequence,
-		Fee:       fee,
-	}
-	err = tx.(*lib.Transaction).Sign(from.PrivateKey)
+func (f *Fuzzer) invalidSendMsg(from, _ *crypto.KeyGroup, account types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
+	return f.getTxBadMessage(from, types.MessageSendName, account, fee)
+}
+
+func (f *Fuzzer) invalidSendSender(from, to *crypto.KeyGroup, account types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
+	tx, err = types.NewTransaction(from.PrivateKey, &types.MessageSend{
+		FromAddress: f.getBadAddress(from).Bytes(),
+		ToAddress:   to.Address.Bytes(),
+		Amount:      f.getRandomAmountUpTo(account.Amount - fee),
+	}, account.Sequence, fee)
 	return
 }
 
-func (f *Fuzzer) invalidSendSender(from, to *crypto.KeyGroup, account *types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
-	switch rand.Intn(4) {
-	case 0:
-		pk, _ := crypto.NewEd25519PrivateKey()
-		tx, err = types.NewTransaction(from.PrivateKey, &types.MessageSend{
-			FromAddress: pk.PublicKey().Address().Bytes(),
-			ToAddress:   to.Address.Bytes(),
-			Amount:      f.getRandomAmountUpTo(account.Amount),
-		}, account.Sequence, fee)
-	case 1:
-		tx, err = types.NewTransaction(from.PrivateKey, &types.MessageSend{
-			FromAddress: nil,
-			ToAddress:   to.Address.Bytes(),
-			Amount:      f.getRandomAmountUpTo(account.Amount),
-		}, account.Sequence, fee)
-	case 2:
-		pk, _ := crypto.NewEd25519PrivateKey()
-		tx, err = types.NewTransaction(pk, &types.MessageSend{
-			FromAddress: from.Address.Bytes(),
-			ToAddress:   to.Address.Bytes(),
-			Amount:      f.getRandomAmountUpTo(account.Amount),
-		}, account.Sequence, fee)
-	}
-	return
-}
-
-func (f *Fuzzer) invalidSendRecipient(from, to *crypto.KeyGroup, account *types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
+func (f *Fuzzer) invalidSendRecipient(from, to *crypto.KeyGroup, account types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
 	var toAddress []byte
 	switch rand.Intn(3) {
 	case 0:
@@ -167,12 +116,12 @@ func (f *Fuzzer) invalidSendRecipient(from, to *crypto.KeyGroup, account *types.
 	tx, err = types.NewTransaction(from.PrivateKey, &types.MessageSend{
 		FromAddress: from.Address.Bytes(),
 		ToAddress:   toAddress,
-		Amount:      f.getRandomAmountUpTo(account.Amount),
+		Amount:      f.getRandomAmountUpTo(account.Amount - fee),
 	}, account.Sequence, fee)
 	return
 }
 
-func (f *Fuzzer) invalidSendAmount(from, to *crypto.KeyGroup, account *types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
+func (f *Fuzzer) invalidSendAmount(from, to *crypto.KeyGroup, account types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
 	tx, err = types.NewTransaction(from.PrivateKey, &types.MessageSend{
 		FromAddress: from.Address.Bytes(),
 		ToAddress:   to.Address.Bytes(),

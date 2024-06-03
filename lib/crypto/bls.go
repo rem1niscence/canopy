@@ -56,6 +56,28 @@ func (b *BLS12381PrivateKey) String() string {
 	return hex.EncodeToString(b.Bytes())
 }
 
+func (b *BLS12381PrivateKey) MarshalJSON() ([]byte, error) { return json.Marshal(b.String()) }
+func (b *BLS12381PrivateKey) UnmarshalJSON(bz []byte) (err error) {
+	var hexString string
+	if err = json.Unmarshal(bz, &hexString); err != nil {
+		return
+	}
+	bz, err = hex.DecodeString(hexString)
+	if err != nil {
+		return
+	}
+	pk, err := NewBLSPrivateKeyFromBytes(bz)
+	if err != nil {
+		return err
+	}
+	bls, ok := pk.(*BLS12381PrivateKey)
+	if !ok {
+		return errors.New("invalid bls key")
+	}
+	*b = *bls
+	return
+}
+
 type BLS12381PublicKey struct {
 	kyber.Point
 	scheme *bdn.Scheme

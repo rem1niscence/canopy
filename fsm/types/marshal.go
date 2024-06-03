@@ -45,45 +45,47 @@ func (p *ConsValidatorPage) New() lib.Pageable { return &ConsValidatorPage{{}} }
 type NonSigners []*NonSigner
 
 type genesisState struct {
-	Time       string       `json:"time,omitempty"`
-	Pools      []*Pool      `json:"pools,omitempty"`
-	Accounts   []*Account   `protobuf:"bytes,3,rep,name=accounts,proto3" json:"accounts,omitempty"`
-	Validators []*Validator `protobuf:"bytes,4,rep,name=validators,proto3" json:"validators,omitempty"`
-	Params     *Params      `protobuf:"bytes,5,opt,name=params,proto3" json:"params,omitempty"`
+	Time           string                   `json:"time,omitempty"`
+	Pools          []*Pool                  `json:"pools,omitempty"`
+	Accounts       []*Account               `protobuf:"bytes,3,rep,name=accounts,proto3" json:"accounts,omitempty"`
+	ConsValidators *lib.ConsensusValidators `json:"consValidators"`
+	Validators     []*Validator             `protobuf:"bytes,4,rep,name=validators,proto3" json:"validators,omitempty"`
+	Params         *Params                  `protobuf:"bytes,5,opt,name=params,proto3" json:"params,omitempty"`
+	Supply         *Supply                  `json:"supply"`
 }
 
 func (x *Account) ToString() string {
-	bz, _ := lib.JSONMarshalIndent(x)
+	bz, _ := lib.MarshalJSONIndent(x)
 	return string(bz)
 }
 
 func (x *Validator) ToString() string {
-	bz, _ := lib.JSONMarshalIndent(x)
+	bz, _ := lib.MarshalJSONIndent(x)
 	return string(bz)
 }
 
 func (x *Pool) ToString() string {
-	bz, _ := lib.JSONMarshalIndent(x)
+	bz, _ := lib.MarshalJSONIndent(x)
 	return string(bz)
 }
 
 func (x *FeeParams) ToString() string {
-	bz, _ := lib.JSONMarshalIndent(x)
+	bz, _ := lib.MarshalJSONIndent(x)
 	return string(bz)
 }
 
 func (x *ConsensusParams) ToString() string {
-	bz, _ := lib.JSONMarshalIndent(x)
+	bz, _ := lib.MarshalJSONIndent(x)
 	return string(bz)
 }
 
 func (x *GovernanceParams) ToString() string {
-	bz, _ := lib.JSONMarshalIndent(x)
+	bz, _ := lib.MarshalJSONIndent(x)
 	return string(bz)
 }
 
 func (x *ValidatorParams) ToString() string {
-	bz, _ := lib.JSONMarshalIndent(x)
+	bz, _ := lib.MarshalJSONIndent(x)
 	return string(bz)
 }
 
@@ -94,11 +96,13 @@ func (x *GenesisState) MarshalJSON() ([]byte, error) {
 		timeString = t.Format(time.DateTime)
 	}
 	return json.Marshal(genesisState{
-		Time:       timeString,
-		Pools:      x.Pools,
-		Accounts:   x.Accounts,
-		Validators: x.Validators,
-		Params:     x.Params,
+		Time:           timeString,
+		Pools:          x.Pools,
+		Accounts:       x.Accounts,
+		ConsValidators: x.ConsValidators,
+		Validators:     x.Validators,
+		Params:         x.Params,
+		Supply:         x.Supply,
 	})
 }
 
@@ -114,18 +118,19 @@ func (x *GenesisState) UnmarshalJSON(bz []byte) (err error) {
 		}
 		x.Time = timestamppb.New(t)
 	}
-	x.Params, x.Pools, x.Accounts, x.Validators = ptr.Params, ptr.Pools, ptr.Accounts, ptr.Validators
+	x.Params, x.Pools, x.Supply = ptr.Params, ptr.Pools, ptr.Supply
+	x.Accounts, x.Validators, x.ConsValidators = ptr.Accounts, ptr.Validators, ptr.ConsValidators
 	return
 }
 
 type account struct {
-	Address  *crypto.Address `json:"address,omitempty"`
-	Amount   uint64          `json:"amount,omitempty"`
-	Sequence uint64          `json:"sequence,omitempty"`
+	Address  lib.HexBytes `json:"address,omitempty"`
+	Amount   uint64       `json:"amount,omitempty"`
+	Sequence uint64       `json:"sequence,omitempty"`
 }
 
 func (x *Account) MarshalJSON() ([]byte, error) {
-	return json.Marshal(account{crypto.NewAddressFromBytes(x.Address).(*crypto.Address), x.Amount, x.Sequence})
+	return json.Marshal(account{x.Address, x.Amount, x.Sequence})
 }
 
 func (x *Account) UnmarshalJSON(bz []byte) (err error) {
@@ -133,7 +138,7 @@ func (x *Account) UnmarshalJSON(bz []byte) (err error) {
 	if err = json.Unmarshal(bz, a); err != nil {
 		return err
 	}
-	x.Address, x.Amount, x.Sequence = a.Address.Bytes(), a.Amount, a.Sequence
+	x.Address, x.Amount, x.Sequence = a.Address, a.Amount, a.Sequence
 	return
 }
 
@@ -191,4 +196,28 @@ func (x *Validator) UnmarshalJSON(bz []byte) error {
 	x.StakedAmount, x.NetAddress, x.Output = val.StakedAmount, val.NetAddress, val.Output.Bytes()
 	x.MaxPausedHeight, x.UnstakingHeight = val.MaxPausedHeight, val.UnstakingHeight
 	return nil
+}
+
+func (x *Validator) PassesFilter(f lib.ValidatorFilters) (ok bool) {
+	switch {
+	case f.Unstaking == lib.Yes:
+		if x.UnstakingHeight == 0 {
+			return
+		}
+	case f.Unstaking == lib.No:
+		if x.UnstakingHeight != 0 {
+			return
+		}
+	}
+	switch {
+	case f.Paused == lib.Yes:
+		if x.MaxPausedHeight == 0 {
+			return
+		}
+	case f.Paused == lib.No:
+		if x.MaxPausedHeight != 0 {
+			return
+		}
+	}
+	return true
 }

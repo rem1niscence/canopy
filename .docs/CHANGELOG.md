@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [Unreleased] - 06/03/2024
+- Added `web wallet` first implementation
+- Added `rpc server functionallity`
+- Added `rpc client functionality`
+- Added `cli functionality`
+- Added `msg pause`
+- Added all tx types to `fuzzer`
+- Fixed various bugs
+
 ## [Unreleased] - 05/18/2024
 
 - Added `block explorer` first implementation

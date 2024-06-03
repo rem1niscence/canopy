@@ -8,8 +8,8 @@ type ByzantineEvidence struct {
 }
 
 type DoubleSignEvidences struct {
-	DSE       []*DoubleSignEvidence
-	Duplicate map[string]struct{}
+	DSE       []*DoubleSignEvidence `json:"DSE,omitempty"`
+	Duplicate map[string]struct{}   `json:"Duplicate,omitempty"`
 }
 
 func NewDSE(dse []*DoubleSignEvidence) DoubleSignEvidences {
@@ -118,8 +118,8 @@ func (e DoubleSignEvidences) Equals(b DoubleSignEvidences) bool {
 }
 
 type BadProposerEvidences struct {
-	BPE       []*BadProposerEvidence
-	Duplicate map[string]struct{}
+	BPE       []*BadProposerEvidence `json:"BPE,omitempty"`
+	Duplicate map[string]struct{}    `json:"Duplicate,omitempty"`
 }
 
 func NewBPE(bpe []*BadProposerEvidence) BadProposerEvidences {

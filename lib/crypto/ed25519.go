@@ -14,27 +14,27 @@ const (
 
 // Private Key Below
 
-type PrivateKeyED25519 struct{ ed25519.PrivateKey }
+type ED25519PrivateKey struct{ ed25519.PrivateKey }
 
-func NewPrivateKeyED25519(privateKey ed25519.PrivateKey) *PrivateKeyED25519 {
-	return &PrivateKeyED25519{PrivateKey: privateKey}
+func NewPrivateKeyED25519(privateKey ed25519.PrivateKey) *ED25519PrivateKey {
+	return &ED25519PrivateKey{PrivateKey: privateKey}
 }
 
-var _ PrivateKeyI = &PrivateKeyED25519{}
+var _ PrivateKeyI = &ED25519PrivateKey{}
 
-func (p *PrivateKeyED25519) String() string         { return hex.EncodeToString(p.Bytes()) }
-func (p *PrivateKeyED25519) Bytes() []byte          { return p.PrivateKey }
-func (p *PrivateKeyED25519) Sign(msg []byte) []byte { return ed25519.Sign(p.PrivateKey, msg) }
+func (p *ED25519PrivateKey) String() string         { return hex.EncodeToString(p.Bytes()) }
+func (p *ED25519PrivateKey) Bytes() []byte          { return p.PrivateKey }
+func (p *ED25519PrivateKey) Sign(msg []byte) []byte { return ed25519.Sign(p.PrivateKey, msg) }
 
-func (p *PrivateKeyED25519) PublicKey() PublicKeyI {
+func (p *ED25519PrivateKey) PublicKey() PublicKeyI {
 	return &PublicKeyED25519{p.PrivateKey.Public().(ed25519.PublicKey)}
 }
 
-func (p *PrivateKeyED25519) Equals(key PrivateKeyI) bool {
+func (p *ED25519PrivateKey) Equals(key PrivateKeyI) bool {
 	return p.PrivateKey.Equal(ed25519.PrivateKey(key.Bytes()))
 }
-func (p *PrivateKeyED25519) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
-func (p *PrivateKeyED25519) UnmarshalJSON(b []byte) (err error) {
+func (p *ED25519PrivateKey) MarshalJSON() ([]byte, error) { return json.Marshal(p.String()) }
+func (p *ED25519PrivateKey) UnmarshalJSON(b []byte) (err error) {
 	var hexString string
 	if err = json.Unmarshal(b, &hexString); err != nil {
 		return

@@ -1,10 +1,17 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/alecthomas/units"
 	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/proto"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -15,10 +22,10 @@ const (
 	ParamPrefixFee  = "/f/"
 	ParamPrefixGov  = "/g/"
 
-	ParamSpaceCons = "consensus"
-	ParamSpaceVal  = "validator"
+	ParamSpaceCons = "cons"
+	ParamSpaceVal  = "val"
 	ParamSpaceFee  = "fee"
-	ParamSpaceGov  = "governance"
+	ParamSpaceGov  = "gov"
 
 	Delimiter = "/"
 
@@ -37,6 +44,147 @@ type Proposal interface {
 	proto.Message
 	GetStartHeight() uint64
 	GetEndHeight() uint64
+}
+
+type ProposalWithVote struct {
+	Proposal Proposal `json:"proposal"`
+	Approve  bool     `json:"approve"`
+}
+
+type Poll map[string]PollResult
+
+type PollResult struct {
+	ProposalJSON      json.RawMessage          `json:"proposalJSON"`
+	ApprovedPower     uint64                   `json:"approvedPower"`
+	ApprovedPercent   uint64                   `json:"approvedPercent"`
+	RejectedPercent   uint64                   `json:"rejectedPercent"`
+	TotalVotedPercent uint64                   `json:"totalVotedPercent"`
+	RejectedPower     uint64                   `json:"rejectedPower"`
+	TotalVotedPower   uint64                   `json:"totalVotedPower"`
+	TotalPower        uint64                   `json:"totalPower"`
+	ApproveVotes      []lib.ConsensusValidator `json:"approveVotes"`
+	RejectVotes       []lib.ConsensusValidator `json:"rejectVotes"`
+}
+
+func PollValidators(vals *lib.ConsensusValidators, path string, logger lib.LoggerI) (poll Poll) {
+	poll = make(Poll)
+	validatorSet, e := lib.NewValidatorSet(vals)
+	if e != nil {
+		logger.Error(ErrPollValidator(e).Error())
+		return
+	}
+	for _, v := range vals.ValidatorSet {
+		p := make(Proposals)
+		u, err := lib.ReplaceURLPort(v.NetAddress, lib.DefaultRPCConfig().RPCPort)
+		if err != nil {
+			logger.Error(ErrPollValidator(err).Error())
+			continue
+		}
+		u, err = url.JoinPath(u, path)
+		if err != nil {
+			logger.Error(ErrPollValidator(err).Error())
+			continue
+		}
+		resp, err := http.Get(u)
+		if err != nil {
+			logger.Error(ErrPollValidator(err).Error())
+			continue
+		}
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			logger.Error(ErrPollValidator(err).Error())
+			continue
+		}
+		if err = lib.UnmarshalJSON(data, &p); err != nil {
+			logger.Error(ErrPollValidator(err).Error())
+			continue
+		}
+		for hash, propWithVote := range p {
+			state := poll[hash]
+			if len(state.ProposalJSON) == 0 {
+				data, err = lib.MarshalJSON(propWithVote.Proposal)
+				if err != nil {
+					logger.Error(ErrPollValidator(err).Error())
+					continue
+				}
+				state.ProposalJSON = data
+				state.TotalPower = validatorSet.TotalPower
+			}
+			if propWithVote.Approve {
+				state.ApproveVotes = append(state.ApproveVotes, *v)
+				state.ApprovedPower += v.VotingPower
+				state.TotalVotedPower += v.VotingPower
+				state.ApprovedPercent = lib.Uint64PercentageDiv(state.ApprovedPower, state.TotalVotedPower)
+			} else {
+				state.RejectVotes = append(state.ApproveVotes, *v)
+				state.RejectedPower += v.VotingPower
+				state.TotalVotedPower += v.VotingPower
+				state.RejectedPercent = lib.Uint64PercentageDiv(state.RejectedPower, state.TotalVotedPower)
+			}
+			state.TotalVotedPercent = lib.Uint64PercentageDiv(state.TotalVotedPower, state.TotalPower)
+			poll[hash] = state
+		}
+	}
+	return
+}
+
+type Proposals map[string]ProposalWithVote
+
+func (p Proposals) NewFromFile(dataDirPath string) lib.ErrorI {
+	bz, err := os.ReadFile(filepath.Join(dataDirPath, lib.ProposalsFilePath))
+	if err != nil {
+		return lib.ErrReadFile(err)
+	}
+	return lib.UnmarshalJSON(bz, &p)
+}
+
+func (p Proposals) Add(proposal Proposal, approve bool) lib.ErrorI {
+	bz, err := lib.Marshal(proposal)
+	if err != nil {
+		return err
+	}
+	p[crypto.HashString(bz)] = ProposalWithVote{proposal, approve}
+	return nil
+}
+
+func (p Proposals) Del(proposal Proposal) {
+	bz, _ := lib.Marshal(proposal)
+	delete(p, crypto.HashString(bz))
+}
+
+func (p Proposals) SaveToFile(dataDirPath string) lib.ErrorI {
+	bz, err := lib.MarshalJSONIndent(p)
+	if err != nil {
+		return err
+	}
+	if e := os.WriteFile(filepath.Join(dataDirPath, lib.ProposalsFilePath), bz, os.ModePerm); e != nil {
+		return lib.ErrWriteFile(e)
+	}
+	return nil
+}
+
+func NewProposalFromBytes(b []byte) (Proposal, lib.ErrorI) {
+	cp, dt := new(MessageChangeParameter), new(MessageDAOTransfer)
+	if err := lib.UnmarshalJSON(b, cp); err != nil {
+		if err = lib.UnmarshalJSON(b, dt); err != nil {
+			return nil, err
+		}
+		return dt, nil
+	}
+	return cp, nil
+}
+
+func (p *ProposalWithVote) UnmarshalJSON(b []byte) (err error) {
+	j := new(struct {
+		Proposal json.RawMessage `json:"proposal"`
+		Approve  bool            `json:"approve"`
+	})
+	if err = json.Unmarshal(b, &j); err != nil {
+		return
+	}
+	p.Approve = j.Approve
+	p.Proposal, err = NewProposalFromBytes(j.Proposal)
+	return
 }
 
 func DefaultParams() *Params {
@@ -165,6 +313,62 @@ func CheckProtocolVersion(v string) (*ProtocolVersion, lib.ErrorI) {
 
 func NewProtocolVersion(height uint64, version uint64) string {
 	return fmt.Sprintf("%d%s%d", version, Delimiter, height)
+}
+
+func FormatParamSpace(paramSpace string) string {
+	paramSpace = strings.ToLower(paramSpace)
+	switch {
+	case strings.Contains(paramSpace, "con"):
+		return ParamSpaceCons
+	case strings.Contains(paramSpace, "gov"):
+		return ParamSpaceGov
+	case strings.Contains(paramSpace, "fee"):
+		return ParamSpaceFee
+	case strings.Contains(paramSpace, "val"):
+		return ParamSpaceVal
+	}
+	return paramSpace
+}
+
+func IsStringParam(paramSpace, paramKey string) (bool, lib.ErrorI) {
+	testValueStr, testValue := NewProtocolVersion(1, 1), uint64(2)
+	params := DefaultParams()
+	switch paramSpace {
+	case ParamSpaceVal:
+		if err := params.Validator.SetString(paramKey, testValueStr); err != nil {
+			if err = params.Validator.SetUint64(paramKey, testValue); err != nil {
+				return false, err
+			}
+			return false, nil
+		}
+		return true, nil
+	case ParamSpaceCons:
+		if err := params.Consensus.SetString(paramKey, testValueStr); err != nil {
+			if err = params.Consensus.SetUint64(paramKey, testValue); err != nil {
+				return false, err
+			}
+			return false, nil
+		}
+		return true, nil
+	case ParamSpaceGov:
+		if err := params.Governance.SetString(paramKey, testValueStr); err != nil {
+			if err = params.Governance.SetUint64(paramKey, testValue); err != nil {
+				return false, err
+			}
+			return false, nil
+		}
+		return true, nil
+	case ParamSpaceFee:
+		if err := params.Fee.SetString(paramKey, testValueStr); err != nil {
+			if err = params.Fee.SetUint64(paramKey, testValue); err != nil {
+				return false, err
+			}
+			return false, nil
+		}
+		return true, nil
+	default:
+		return false, ErrUnknownParamSpace()
+	}
 }
 
 // validator param space

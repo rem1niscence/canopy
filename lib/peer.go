@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"encoding/json"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"net"
@@ -70,4 +71,43 @@ func (x *PeerInfo) Copy() *PeerInfo {
 func (x *PeerInfo) FromString(s string) ErrorI {
 	x.Address = new(PeerAddress)
 	return x.Address.FromString(s)
+}
+
+type peerInfoJSON struct {
+	Address     *PeerAddress `json:"Address"`
+	IsOutbound  bool         `json:"is_outbound"`
+	IsValidator bool         `json:"is_validator"`
+	IsTrusted   bool         `json:"is_trusted"`
+	Reputation  int32        `json:"reputation"`
+}
+
+func (x *PeerInfo) MarshalJSON() ([]byte, error) {
+	return json.Marshal(peerInfoJSON{
+		Address:     x.Address,
+		IsOutbound:  x.IsOutbound,
+		IsValidator: x.IsValidator,
+		IsTrusted:   x.IsTrusted,
+		Reputation:  x.Reputation,
+	})
+}
+
+type peerAddressJSON struct {
+	PublicKey  HexBytes `json:"public_key,omitempty"`
+	NetAddress string   `json:"net_address,omitempty"`
+}
+
+func (x *PeerAddress) MarshalJSON() ([]byte, error) {
+	return json.Marshal(peerAddressJSON{
+		PublicKey:  x.PublicKey,
+		NetAddress: x.NetAddress,
+	})
+}
+
+func (x *PeerAddress) UnmarshalJSON(bz []byte) error {
+	j := new(peerAddressJSON)
+	if err := json.Unmarshal(bz, j); err != nil {
+		return err
+	}
+	x.PublicKey, x.NetAddress = j.PublicKey, j.NetAddress
+	return nil
 }

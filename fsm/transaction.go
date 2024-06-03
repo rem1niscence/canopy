@@ -71,14 +71,17 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (cr
 	if tx.Signature == nil {
 		return nil, types.ErrEmptySignature()
 	}
-	if len(tx.Signature.Signature) == 0 || len(tx.Signature.PublicKey) != crypto.Ed25519PubKeySize {
+	if len(tx.Signature.Signature) == 0 {
 		return nil, types.ErrEmptySignature()
 	}
 	signBytes, err := tx.GetSignBytes()
 	if err != nil {
 		return nil, types.ErrTxSignBytes(err)
 	}
-	publicKey := crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey)
+	publicKey, e := crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey)
+	if e != nil {
+		return nil, types.ErrInvalidPublicKey(e)
+	}
 	if !publicKey.VerifyBytes(signBytes, tx.Signature.Signature) {
 		return nil, types.ErrInvalidSignature()
 	}
@@ -96,11 +99,15 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (cr
 }
 
 func (s *StateMachine) CheckAccount(tx *lib.Transaction) lib.ErrorI {
-	txCount, err := s.GetAccountSequence(crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey).Address())
+	publicKey, e := crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey)
+	if e != nil {
+		return types.ErrInvalidPublicKey(e)
+	}
+	seq, err := s.GetAccountSequence(publicKey.Address())
 	if err != nil {
 		return err
 	}
-	if tx.GetSequence() <= txCount {
+	if tx.GetSequence() <= seq {
 		return types.ErrInvalidTxSequence()
 	}
 	return nil

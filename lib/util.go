@@ -5,11 +5,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"github.com/ginchuco/ginchu/lib/codec"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"math/big"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -30,6 +32,15 @@ func NewPage(p PageParams) *Page {
 type PageParams struct {
 	PageNumber int `json:"pageNumber"`
 	PerPage    int `json:"perPage"`
+}
+
+type ValidatorFilters struct {
+	Unstaking FilterOption `json:"unstaking"`
+	Paused    FilterOption `json:"paused"`
+}
+
+func (v ValidatorFilters) On() bool {
+	return v.Unstaking != 0 || v.Paused != 0
 }
 
 func (p *PageParams) SkipToIndex() int {
@@ -173,13 +184,16 @@ func Marshal(message any) ([]byte, ErrorI) {
 }
 
 func Unmarshal(data []byte, ptr any) ErrorI {
+	if data == nil || ptr == nil {
+		return nil
+	}
 	if err := proto.Unmarshal(data, ptr.(proto.Message)); err != nil {
 		return ErrUnmarshal(err)
 	}
 	return nil
 }
 
-func JSONMarshal(message any) ([]byte, ErrorI) {
+func MarshalJSON(message any) ([]byte, ErrorI) {
 	bz, err := json.Marshal(message)
 	if err != nil {
 		return nil, ErrJSONMarshal(err)
@@ -187,7 +201,7 @@ func JSONMarshal(message any) ([]byte, ErrorI) {
 	return bz, nil
 }
 
-func JSONMarshalIndent(message any) ([]byte, ErrorI) {
+func MarshalJSONIndent(message any) ([]byte, ErrorI) {
 	bz, err := json.MarshalIndent(message, "", "  ")
 	if err != nil {
 		return nil, ErrJSONMarshal(err)
@@ -195,19 +209,19 @@ func JSONMarshalIndent(message any) ([]byte, ErrorI) {
 	return bz, nil
 }
 
-func JSONMarshalIndentString(message any) (string, ErrorI) {
-	bz, err := JSONMarshalIndent(message)
+func MarshalJSONIndentString(message any) (string, ErrorI) {
+	bz, err := MarshalJSONIndent(message)
 	return string(bz), err
 }
 
-func JSONUnmarshal(bz []byte, ptr any) ErrorI {
+func UnmarshalJSON(bz []byte, ptr any) ErrorI {
 	if err := json.Unmarshal(bz, ptr); err != nil {
 		return ErrJSONUnmarshal(err)
 	}
 	return nil
 }
 
-func ToAny(message proto.Message) (*anypb.Any, ErrorI) {
+func NewAny(message proto.Message) (*anypb.Any, ErrorI) {
 	a, err := anypb.New(message)
 	if err != nil {
 		return nil, ErrToAny(err)
@@ -243,6 +257,7 @@ func BzToTruncStr(b []byte) string {
 func StringToBytes(s string) ([]byte, ErrorI) {
 	b, err := hex.DecodeString(s)
 	if err != nil {
+		fmt.Println(s)
 		return nil, ErrStringToBytes(err)
 	}
 	return b, nil
@@ -296,6 +311,14 @@ func Uint64ToBigFloat(u uint64) *big.Float {
 
 type HexBytes []byte
 
+func NewHexBytesFromString(s string) (HexBytes, ErrorI) {
+	bz, err := hex.DecodeString(s)
+	if err != nil {
+		return nil, ErrJSONUnmarshal(err)
+	}
+	return bz, nil
+}
+
 func (x HexBytes) String() string {
 	return BytesToString(x)
 }
@@ -314,4 +337,22 @@ func (x *HexBytes) UnmarshalJSON(b []byte) (err error) {
 
 var (
 	MaxHash, MaxAddress = []byte(strings.Repeat("F", crypto.HashSize)), []byte(strings.Repeat("F", crypto.AddressSize))
+)
+
+func ReplaceURLPort(rawURL, replacementPort string) (returned string, err error) {
+	u, err := url.Parse(rawURL)
+	port := u.Port()
+	if port == "" {
+		return rawURL + ":" + replacementPort, nil
+	}
+	returned = strings.ReplaceAll(rawURL, u.Port(), replacementPort)
+	return
+}
+
+type FilterOption int
+
+const (
+	Both FilterOption = 0
+	Yes               = 1
+	No                = 2
 )

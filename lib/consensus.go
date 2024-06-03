@@ -227,6 +227,33 @@ func (x *View) ToString() string {
 	return fmt.Sprintf("(H:%d, R:%d, P:%s)", x.Height, x.Round, x.Phase)
 }
 
+type jsonView struct {
+	Height uint64 `json:"height"`
+	Round  uint64 `json:"round"`
+	Phase  string `json:"phase"`
+}
+
+func (x View) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonView{
+		Height: x.Height,
+		Round:  x.Round,
+		Phase:  Phase_name[int32(x.Phase)],
+	})
+}
+
+func (x *Phase) MarshalJSON() ([]byte, error) {
+	return json.Marshal(Phase_name[int32(*x)])
+}
+
+func (x *Phase) UnmarshalJSON(b []byte) (err error) {
+	j := new(string)
+	if err = json.Unmarshal(b, j); err != nil {
+		return
+	}
+	*x = Phase(Phase_value[*j])
+	return
+}
+
 type jsonAggregateSig struct {
 	Signature HexBytes `json:"signature,omitempty"`
 	Bitmap    HexBytes `json:"bitmap,omitempty"`

@@ -206,7 +206,7 @@ func (c *MultiConn) receive(reader bufio.Reader, m *limiter.Monitor) (proto.Mess
 }
 
 func (c *MultiConn) send(message proto.Message, m *limiter.Monitor) (err lib.ErrorI) {
-	a, err := lib.ToAny(message)
+	a, err := lib.NewAny(message)
 	if err != nil {
 		return err
 	}

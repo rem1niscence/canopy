@@ -266,6 +266,9 @@ func (x *MessageChangeParameter) Check() lib.ErrorI {
 	if x.ParameterValue == nil {
 		return ErrParamValueEmpty()
 	}
+	if err := checkStartEndHeight(x); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -308,7 +311,7 @@ func (x *MessageChangeParameter) UnmarshalJSON(b []byte) (err error) {
 	default:
 		return fmt.Errorf("unknown parameter type %T", p)
 	}
-	a, err := lib.ToAny(parameterValue)
+	a, err := lib.NewAny(parameterValue)
 	if err != nil {
 		return
 	}
@@ -341,6 +344,9 @@ var _ lib.MessageI = &MessageDAOTransfer{}
 
 func (x *MessageDAOTransfer) Check() lib.ErrorI {
 	if err := checkAddress(x.Address); err != nil {
+		return err
+	}
+	if err := checkStartEndHeight(x); err != nil {
 		return err
 	}
 	return checkAmount(x.Amount)
@@ -421,8 +427,16 @@ func checkPubKey(publicKey []byte) lib.ErrorI {
 	if publicKey == nil {
 		return ErrPublicKeyEmpty()
 	}
-	if len(publicKey) != crypto.Ed25519PubKeySize {
+	if len(publicKey) != crypto.BLS12381PubKeySize {
 		return ErrPublicKeySize()
+	}
+	return nil
+}
+
+func checkStartEndHeight(proposal Proposal) lib.ErrorI {
+	blockRange := proposal.GetEndHeight() - proposal.GetStartHeight()
+	if 100 > blockRange || blockRange <= 0 {
+		return ErrInvalidBlockRange()
 	}
 	return nil
 }

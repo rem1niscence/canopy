@@ -44,7 +44,7 @@ func NewUnpauseTx(from crypto.PrivateKeyI, seq, fee uint64) (lib.TransactionI, l
 }
 
 func NewChangeParamTxUint64(from crypto.PrivateKeyI, space, key string, value, start, end, seq, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	a, err := lib.ToAny(&lib.UInt64Wrapper{Value: value})
+	a, err := lib.NewAny(&lib.UInt64Wrapper{Value: value})
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func NewChangeParamTxUint64(from crypto.PrivateKeyI, space, key string, value, s
 }
 
 func NewChangeParamTxString(from crypto.PrivateKeyI, space, key, value string, start, end, seq, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	a, err := lib.ToAny(&lib.StringWrapper{Value: value})
+	a, err := lib.NewAny(&lib.StringWrapper{Value: value})
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func NewDAOTransferTx(from crypto.PrivateKeyI, amount, start, end, seq, fee uint
 }
 
 func NewTransaction(pk crypto.PrivateKeyI, msg lib.MessageI, seq, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	a, err := lib.ToAny(msg)
+	a, err := lib.NewAny(msg)
 	if err != nil {
 		return nil, err
 	}

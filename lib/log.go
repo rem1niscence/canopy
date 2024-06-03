@@ -1,10 +1,18 @@
 package lib
 
 import (
+	"errors"
 	"fmt"
+	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
+)
+
+const (
+	LogDirectory = "logs"
+	LogFileName  = "log"
 )
 
 type LoggerI interface {
@@ -85,9 +93,26 @@ func (l *Logger) write(msg string) {
 	}
 }
 
-func NewLogger(config LoggerConfig) LoggerI {
+func NewLogger(config LoggerConfig, dataDirPath ...string) LoggerI {
 	if config.Out == nil {
-		config.Out = os.Stdout
+		if dataDirPath == nil || dataDirPath[0] == "" {
+			dataDirPath = make([]string, 1)
+			dataDirPath[0] = DefaultDataDirPath()
+		}
+		logPath := filepath.Join(dataDirPath[0], LogDirectory, LogFileName)
+		if _, err := os.Stat(logPath); errors.Is(err, os.ErrNotExist) {
+			if err = os.MkdirAll(filepath.Join(dataDirPath[0], LogDirectory), os.ModePerm); err != nil {
+				panic(err)
+			}
+		}
+		logFile := &lumberjack.Logger{
+			Filename:   logPath,
+			MaxSize:    1, // megabyte
+			MaxBackups: 1500,
+			MaxAge:     14, // days
+			Compress:   true,
+		}
+		config.Out = io.MultiWriter(os.Stdout, logFile)
 	}
 	return &Logger{
 		config: config,

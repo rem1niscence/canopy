@@ -224,3 +224,15 @@ func ErrWrongStoreType() lib.ErrorI {
 func ErrMaxBlockSize() lib.ErrorI {
 	return lib.NewError(lib.CodeMaxBlockSize, lib.StateMachineModule, "max block size")
 }
+
+func ErrPollValidator(err error) lib.ErrorI {
+	return lib.NewError(lib.CodePollValidator, lib.StateMachineModule, fmt.Sprintf("an error occurred polling the validator: %s", err.Error()))
+}
+
+func ErrInvalidBlockRange() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidBlockRange, lib.StateMachineModule, "proposal block range is invalid")
+}
+
+func ErrInvalidPublicKey(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidPublicKey, lib.StateMachineModule, "public key is invalid: "+err.Error())
+}

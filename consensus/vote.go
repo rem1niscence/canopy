@@ -10,49 +10,53 @@ import (
 type (
 	VotesForHeight struct {
 		sync.Mutex
-		votesByRound          VotesByRound
-		pacemakerVotesByRound []*VoteSet // one set of view votes per height; round -> seenRoundVote
+		votesByHeight
 	}
-
-	VotesByRound   map[uint64]VotesByPhase  // round -> VotesByPhase
-	VotesByPhase   map[Phase]VotesByPayload // phase -> VotesByPayload
-	VotesByPayload map[string]*VoteSet      // payload -> VoteSet
+	votesByHeight struct {
+		VotesByRound          VotesByRound `json:"votesByRound"`
+		PacemakerVotesByRound []*VoteSet   // one set of view votes per height; round -> seenRoundVote
+	}
+	VotesByRound   map[uint64]VotesByPhase   // round -> VotesByPhase
+	VotesByPhase   map[string]VotesByPayload // phase -> VotesByPayload
+	VotesByPayload map[string]*VoteSet       // payload -> VoteSet
 	VoteSet        struct {
-		vote              *Message
-		lastDoubleSigners lib.DoubleSignEvidences
-		badProposers      lib.BadProposerEvidences
-		highQC            *QC
+		Vote              *Message                 `json:"vote,omitempty"`
+		LastDoubleSigners lib.DoubleSignEvidences  `json:"lastDoubleSigners,omitempty"`
+		BadProposers      lib.BadProposerEvidences `json:"badProposers,omitempty"`
+		HighQC            *QC                      `json:"highQC,omitempty"`
+		TotalVotedPower   uint64                   `json:"totalVotedPower,omitempty"`
+		MinPowerFor23Maj  uint64                   `json:"minPowerFor23Maj,omitempty"`
 		multiKey          crypto.MultiPublicKeyI
-		totalVotedPower   uint64
-		minPowerFor23Maj  uint64
 	}
 )
 
 func NewVotesForHeight() VotesForHeight {
 	const maxRounds = 1000
 	return VotesForHeight{
-		Mutex:                 sync.Mutex{},
-		votesByRound:          make(VotesByRound),
-		pacemakerVotesByRound: make([]*VoteSet, maxRounds),
+		Mutex: sync.Mutex{},
+		votesByHeight: votesByHeight{
+			VotesByRound:          make(VotesByRound),
+			PacemakerVotesByRound: make([]*VoteSet, maxRounds),
+		},
 	}
 }
 
 func (v *VotesForHeight) NewHeight() {
 	v.Lock()
 	defer v.Unlock()
-	v.votesByRound = make(VotesByRound)
-	v.pacemakerVotesByRound = make([]*VoteSet, 0)
+	v.VotesByRound = make(VotesByRound)
+	v.PacemakerVotesByRound = make([]*VoteSet, 0)
 }
 
 func (v *VotesForHeight) NewRound(round uint64) {
 	v.Lock()
 	defer v.Unlock()
 	rvs := make(VotesByPhase)
-	rvs[ElectionVote] = make(VotesByPayload)
-	rvs[ProposeVote] = make(VotesByPayload)
-	rvs[PrecommitVote] = make(VotesByPayload)
-	v.votesByRound[round] = rvs
-	v.pacemakerVotesByRound = make([]*VoteSet, 0)
+	rvs[phaseString(ElectionVote)] = make(VotesByPayload)
+	rvs[phaseString(ProposeVote)] = make(VotesByPayload)
+	rvs[phaseString(PrecommitVote)] = make(VotesByPayload)
+	v.VotesByRound[round] = rvs
+	v.PacemakerVotesByRound = make([]*VoteSet, 0)
 }
 
 func (v *VotesForHeight) AddVote(proposer []byte, height uint64, vote *Message,
@@ -63,7 +67,7 @@ func (v *VotesForHeight) AddVote(proposer []byte, height uint64, vote *Message,
 	if vote.Qc.Header.Phase == RoundInterrupt {
 		return v.addPacemakerVote(vote, vals)
 	}
-	vs, err := v.getVoteSet(vote)
+	vs, err := v.getVoteSet(vote, vals.MinimumMaj23)
 	if err != nil {
 		return err
 	}
@@ -79,10 +83,10 @@ func (v *VotesForHeight) AddVote(proposer []byte, height uint64, vote *Message,
 func (v *VotesForHeight) GetMaj23(view *lib.View) (m *Message, sig *lib.AggregateSignature, err lib.ErrorI) {
 	v.Lock()
 	defer v.Unlock()
-	for _, vs := range v.votesByRound[view.Round][view.Phase-1] {
-		if has23maj := vs.totalVotedPower >= vs.minPowerFor23Maj; has23maj {
-			m = vs.vote
-			m.HighQc, m.LastDoubleSignEvidence, m.BadProposerEvidence = vs.highQC, vs.lastDoubleSigners.DSE, vs.badProposers.BPE
+	for _, vs := range v.VotesByRound[view.Round][phaseString(view.Phase-1)] {
+		if has23maj := vs.TotalVotedPower >= vs.MinPowerFor23Maj; has23maj {
+			m = vs.Vote
+			m.HighQc, m.LastDoubleSignEvidence, m.BadProposerEvidence = vs.HighQC, vs.LastDoubleSigners.DSE, vs.BadProposers.BPE
 			signature, er := vs.multiKey.AggregateSignatures()
 			if er != nil {
 				return nil, nil, ErrAggregateSignature(er)
@@ -93,31 +97,41 @@ func (v *VotesForHeight) GetMaj23(view *lib.View) (m *Message, sig *lib.Aggregat
 	return nil, nil, lib.ErrNoMaj23()
 }
 
+func (v *VotesForHeight) getLeadingVote(view *lib.View, totalPower uint64) (m *Message, maxVotePercent uint64, maxVotes uint64) {
+	maxVotes, maxVotePercent = 0, 0
+	for _, vs := range v.VotesByRound[view.Round][phaseString(view.Phase-1)] {
+		if vs.TotalVotedPower >= maxVotes {
+			m, maxVotes, maxVotePercent = vs.Vote, vs.TotalVotedPower, lib.Uint64PercentageDiv(vs.TotalVotedPower, totalPower)
+		}
+	}
+	return
+}
+
 // Pacemaker returns the highest round where 2/3rds majority have previously signed they were on
 func (v *VotesForHeight) Pacemaker() (round uint64) {
 	v.Lock()
 	defer v.Unlock()
-	for i := len(v.pacemakerVotesByRound) - 1; i >= 0; i-- {
-		vs := v.pacemakerVotesByRound[i]
+	for i := len(v.PacemakerVotesByRound) - 1; i >= 0; i-- {
+		vs := v.PacemakerVotesByRound[i]
 		if vs == nil {
 			continue
 		}
-		if has23maj := vs.totalVotedPower >= vs.minPowerFor23Maj; has23maj {
+		if has23maj := vs.TotalVotedPower >= vs.MinPowerFor23Maj; has23maj {
 			return round
 		}
 	}
 	return 0
 }
 
-func (v *VotesForHeight) getVoteSet(vote *Message) (*VoteSet, lib.ErrorI) {
-	r, p := vote.Qc.Header.Round, vote.Qc.Header.Phase
-	if _, ok := v.votesByRound[r]; !ok {
-		v.votesByRound[r] = make(VotesByPhase)
+func (v *VotesForHeight) getVoteSet(vote *Message, min23Maj uint64) (vs *VoteSet, err lib.ErrorI) {
+	r, p := vote.Qc.Header.Round, phaseString(vote.Qc.Header.Phase)
+	if _, ok := v.VotesByRound[r]; !ok {
+		v.VotesByRound[r] = make(VotesByPhase)
 	}
-	rvs := v.votesByRound[r]
+	rvs := v.VotesByRound[r]
 	bz, err := vote.SignBytes()
 	if err != nil {
-		return nil, err
+		return
 	}
 	key := lib.BytesToString(bz)
 	if _, ok := rvs[p]; !ok {
@@ -127,7 +141,11 @@ func (v *VotesForHeight) getVoteSet(vote *Message) (*VoteSet, lib.ErrorI) {
 	if _, ok := pvs[key]; !ok {
 		pvs[key] = new(VoteSet)
 	}
-	return pvs[key], nil
+	vs = pvs[key]
+	if vs.MinPowerFor23Maj == 0 {
+		vs.MinPowerFor23Maj = min23Maj
+	}
+	return
 }
 
 func (v *VotesForHeight) addVote(vote *Message, vs *VoteSet, vals ValSet) lib.ErrorI {
@@ -145,11 +163,11 @@ func (v *VotesForHeight) addVote(vote *Message, vs *VoteSet, vals ValSet) lib.Er
 	if enabled {
 		return ErrDuplicateVote()
 	}
-	vs.totalVotedPower += val.VotingPower
+	vs.TotalVotedPower += val.VotingPower
 	if er = vs.multiKey.AddSigner(vote.Signature.Signature, val.Index); er != nil {
 		return ErrUnableToAddSigner(er)
 	}
-	vs.vote = vote
+	vs.Vote = vote
 	return nil
 }
 
@@ -163,8 +181,8 @@ func (v *VotesForHeight) handleHighQCAndEvidence(proposer []byte, height uint64,
 			if err := vote.HighQc.CheckHighQC(height, vals); err != nil {
 				return err
 			}
-			if vs.highQC == nil || vs.highQC.Header.Less(vote.Header) {
-				vs.highQC = vote.HighQc
+			if vs.HighQC == nil || vs.HighQC.Header.Less(vote.Header) {
+				vs.HighQC = vote.HighQc
 			}
 		}
 		for _, evidence := range vote.LastDoubleSignEvidence {
@@ -175,21 +193,21 @@ func (v *VotesForHeight) handleHighQCAndEvidence(proposer []byte, height uint64,
 			if err != nil {
 				continue
 			}
-			vs.lastDoubleSigners.Add(loadValSet, loadEvidence, valSet, evidence, minEvidenceHeight)
+			vs.LastDoubleSigners.Add(loadValSet, loadEvidence, valSet, evidence, minEvidenceHeight)
 		}
 		for _, evidence := range vote.BadProposerEvidence {
-			vs.badProposers.Add(proposer, height, vals, evidence)
+			vs.BadProposers.Add(proposer, height, vals, evidence)
 		}
 	}
 	return nil
 }
 
 func (v *VotesForHeight) addPacemakerVote(vote *Message, vals ValSet) (err lib.ErrorI) {
-	vs := v.pacemakerVotesByRound[vote.Qc.Header.Round]
+	vs := v.PacemakerVotesByRound[vote.Qc.Header.Round]
 	err = v.addVote(vote, vs, vals)
 	if err != nil {
 		return err
 	}
-	v.pacemakerVotesByRound[vote.Qc.Header.Round] = vs
+	v.PacemakerVotesByRound[vote.Qc.Header.Round] = vs
 	return
 }

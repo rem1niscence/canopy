@@ -121,6 +121,26 @@ func (ps *PeerSet) GetPeerInfo(publicKey []byte) (*lib.PeerInfo, lib.ErrorI) {
 	return peer.PeerInfo.Copy(), nil
 }
 
+func (ps *PeerSet) GetAllInfos() (res []*lib.PeerInfo, numInbound, numOutbound int) {
+	ps.RLock()
+	defer ps.RUnlock()
+	for _, p := range ps.m {
+		if p.IsOutbound {
+			numOutbound++
+		} else {
+			numInbound++
+		}
+		res = append(res, p.PeerInfo.Copy())
+	}
+	return
+}
+
+func (ps *PeerSet) GetBookPeers() []*BookPeer {
+	ps.Lock()
+	defer ps.Unlock()
+	return ps.book.GetAll()
+}
+
 func (ps *PeerSet) SendToPeer(topic lib.Topic, msg proto.Message) (*lib.PeerInfo, lib.ErrorI) {
 	ps.RLock()
 	defer ps.RUnlock()
@@ -173,7 +193,7 @@ func (ps *PeerSet) Has(publicKey []byte) bool {
 }
 
 func (ps *PeerSet) send(peer *Peer, topic lib.Topic, msg proto.Message) lib.ErrorI {
-	a, err := lib.ToAny(msg)
+	a, err := lib.NewAny(msg)
 	if err != nil {
 		return err
 	}

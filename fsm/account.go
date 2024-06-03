@@ -12,7 +12,12 @@ func (s *StateMachine) GetAccount(address crypto.AddressI) (*types.Account, lib.
 	if err != nil {
 		return nil, err
 	}
-	return s.unmarshalAccount(bz)
+	acc, err := s.unmarshalAccount(bz)
+	if err != nil {
+		return nil, err
+	}
+	acc.Address = address.Bytes()
+	return acc, nil
 }
 
 func (s *StateMachine) GetAccounts() ([]*types.Account, lib.ErrorI) {
@@ -168,7 +173,12 @@ func (s *StateMachine) GetPool(name types.PoolID) (*types.Pool, lib.ErrorI) {
 	if err != nil {
 		return nil, err
 	}
-	return s.unmarshalPool(bz)
+	pool, err := s.unmarshalPool(bz)
+	if err != nil {
+		return nil, err
+	}
+	pool.Id = name
+	return pool, nil
 }
 
 func (s *StateMachine) GetPools() ([]*types.Pool, lib.ErrorI) {

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"golang.org/x/crypto/argon2"
 	"os"
 	"path/filepath"
@@ -18,7 +19,7 @@ const (
 
 type Keystore map[string]*EncryptedPrivateKey // address -> EncryptedPrivateKey
 
-func NewInMemory() *Keystore {
+func NewKeystoreInMemory() *Keystore {
 	ks := make(Keystore)
 	return &ks
 }
@@ -26,7 +27,7 @@ func NewInMemory() *Keystore {
 func NewKeystoreFromFile(dataDirPath string) (*Keystore, error) {
 	path := filepath.Join(dataDirPath, KeyStoreName)
 	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		return NewInMemory(), nil
+		return NewKeystoreInMemory(), nil
 	}
 	ksBz, err := os.ReadFile(path)
 	if err != nil {
@@ -36,29 +37,51 @@ func NewKeystoreFromFile(dataDirPath string) (*Keystore, error) {
 	return ks, json.Unmarshal(ksBz, ks)
 }
 
-func (ks *Keystore) AddKey(privateKey PrivateKeyI, password string) error {
-	encrypted, err := EncryptPrivateKey(privateKey.Bytes(), []byte(password))
-	if err != nil {
-		return err
-	}
-	(*ks)[privateKey.PublicKey().Address().String()] = encrypted
+func (ks *Keystore) Import(address []byte, encrypted *EncryptedPrivateKey) error {
+	(*ks)[hex.EncodeToString(address)] = encrypted
 	return nil
 }
 
-func (ks *Keystore) GetKey(address, password string) (PrivateKeyI, error) {
-	return DecryptPrivateKey((*ks)[address], []byte(password))
+func (ks *Keystore) ImportRaw(privateKeyBytes []byte, password string) (address string, err error) {
+	privateKey, err := NewPrivateKeyFromBytes(privateKeyBytes)
+	if err != nil {
+		return
+	}
+	publicKey := privateKey.PublicKey()
+	encrypted, err := EncryptPrivateKey(publicKey.Bytes(), privateKeyBytes, []byte(password))
+	if err != nil {
+		return
+	}
+	address = publicKey.Address().String()
+	(*ks)[address] = encrypted
+	return
 }
 
-func (ks *Keystore) GetPublicKey(address, password string) (PublicKeyI, error) {
-	private, err := ks.GetKey(address, password)
+func (ks *Keystore) GetKey(address []byte, password string) (PrivateKeyI, error) {
+	v, ok := (*ks)[hex.EncodeToString(address)]
+	if !ok {
+		return nil, fmt.Errorf("key not found")
+	}
+	return DecryptPrivateKey(v, []byte(password))
+}
+
+func (ks *Keystore) GetKeyGroup(address []byte, password string) (*KeyGroup, error) {
+	v, ok := (*ks)[hex.EncodeToString(address)]
+	if !ok {
+		return nil, fmt.Errorf("key not found")
+	}
+	if password == "" {
+		return nil, fmt.Errorf("invalid password")
+	}
+	pk, err := DecryptPrivateKey(v, []byte(password))
 	if err != nil {
 		return nil, err
 	}
-	return private.PublicKey(), nil
+	return NewKeyGroup(pk), err
 }
 
-func (ks *Keystore) DeleteKey(address string) {
-	delete(*ks, address)
+func (ks *Keystore) DeleteKey(address []byte) {
+	delete(*ks, hex.EncodeToString(address))
 }
 
 func (ks *Keystore) SaveToFile(dataDirPath string) error {
@@ -70,11 +93,12 @@ func (ks *Keystore) SaveToFile(dataDirPath string) error {
 }
 
 type EncryptedPrivateKey struct {
+	PublicKey string `json:"publicKey"`
 	Salt      string `json:"salt"`
 	Encrypted string `json:"encrypted"`
 }
 
-func EncryptPrivateKey(privateKey, password []byte) (*EncryptedPrivateKey, error) {
+func EncryptPrivateKey(publicKey, privateKey, password []byte) (*EncryptedPrivateKey, error) {
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
 		return nil, err
@@ -84,6 +108,7 @@ func EncryptPrivateKey(privateKey, password []byte) (*EncryptedPrivateKey, error
 		return nil, err
 	}
 	return &EncryptedPrivateKey{
+		PublicKey: hex.EncodeToString(publicKey),
 		Salt:      hex.EncodeToString(salt),
 		Encrypted: hex.EncodeToString(gcm.Seal(nil, nonce, privateKey, nil)),
 	}, nil

@@ -268,6 +268,14 @@ func (p *P2P) Close() {
 		p.log.Error(err.Error())
 	}
 }
+func (p *P2P) ID() *lib.PeerAddress {
+	p.Lock()
+	defer p.Unlock()
+	return &lib.PeerAddress{
+		PublicKey:  p.privateKey.PublicKey().Bytes(),
+		NetAddress: p.config.ExternalAddress,
+	}
+}
 func (p *P2P) filter(conn net.Conn) (*lib.PeerAddress, lib.ErrorI) {
 	remoteAddr := conn.RemoteAddr()
 	tcpAddr, ok := remoteAddr.(*net.TCPAddr)
