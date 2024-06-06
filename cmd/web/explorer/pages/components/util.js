@@ -1,8 +1,7 @@
 import Tooltip from "react-bootstrap/Tooltip";
-import {MDBRipple} from "mdb-react-ui-kit";
 import OverlayTrigger from "react-bootstrap/OverlayTrigger";
 import React from 'react';
-import {Pagination, Toast, ToastContainer} from "react-bootstrap";
+import {Pagination} from "react-bootstrap";
 
 export function formatNumberWCommas(x) {
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
