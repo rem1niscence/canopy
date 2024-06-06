@@ -99,6 +99,23 @@ a {
     text-decoration: none;
 }
 
+#container {
+    z-index: 0;
+    background-color: white;
+    width: 100%;
+    height: 100vh;
+}
+
+#pageContent {
+    position: fixed;
+    right: 0;
+    width: 95%;
+    height: 100vh;
+    background-color: white;
+    padding: 100px 15% 10px 15%;
+    overflow: scroll;
+}
+
 input::placeholder {
     color: #A0AAB2 !important;
     font-family: Arial, Helvetica, sans-serif;
@@ -159,17 +176,20 @@ a:active {
     }
 }
 
-/* Sidebar */
 .sidebar {
     position: fixed;
     top: 0;
     bottom: 0;
     left: 0;
     padding: 58px 0 0;
-    /* Height of navbar */
     box-shadow: 0 2px 5px 0 rgb(0 0 0 / 5%), 0 2px 10px 0 rgb(0 0 0 / 5%);
-    width: 240px;
-    /* z-index: 600; */
+    background: #f1f5f9;
+    width: 5%;
+    margin: 0;
+}
+
+.sidebar-list {
+    margin-top: 25px;
 }
 
 .sidebar.show {
@@ -194,22 +214,59 @@ a:active {
     padding-top: 0.5rem;
     overflow-x: hidden;
     overflow-y: auto;
-    /* Scrollable contents if viewport is shorter than content. */
 }
 
 .sidebar-icon-container {
-    width: 40px;
+    width: 65%;
     height: 40px;
-    margin-bottom: 20px;
+    margin: 0 auto;
+    margin-bottom: 35px;
 }
 
 .sidebar-icon {
-    background-size: cover;
+    background-size: contain;
+    background-repeat: no-repeat;
     background-position: center;
     margin: 0 auto;
     width: 75%;
     height: 75%;
     transition: all .1s ease-in-out;
+}
+
+.card-image {
+    width: 25px;
+    height: 25px;
+    margin-right: 10px;
+    background-size: cover;
+    background-repeat: no-repeat;
+    float: left;
+}
+
+.card-title {
+    font-size: 12px !important;
+    font-weight: bold !important;
+    padding-top: 10px;
+}
+
+.card-body {
+    text-align: left;
+    cursor: pointer;
+}
+
+.card-info-3 {
+    float: right;
+    font-size: 12px;
+    padding-top: 5px;
+}
+
+.card-info-4 {
+    font-size: 9px;
+    color: #222222;
+    font-weight: bold;
+}
+
+.card-footer {
+    font-size: 12px;
 }
 
 .modal-body {
@@ -219,10 +276,10 @@ a:active {
 
 .modal-header {
     padding: 0 0 0 0;
-    color:black;
+    color: black;
 }
 
-.modal-card-container {
+.modal-cards {
     padding: 0 0 0 0;
 }
 
@@ -235,12 +292,40 @@ a:active {
     cursor: pointer;
     padding: 5px 0 0 10px !important;
     margin: 0 0 0 0 !important;
-    height:50px;
+    height: 50px;
 }
 
 .modal-header {
     font-weight: 150;
-    color:black;
+    color: black;
+}
+
+.copy-img {
+    height: 10px;
+    width: 10px;
+    float: right;
+    position: relative;
+    right: 5px;
+    bottom: 10px;
+}
+
+.search-toast {
+    position: fixed;
+    margin-top: 15px;
+    margin-left: 50px;
+}
+
+.search-toast-body {
+    font-weight: bold;
+    color: darkred;
+}
+
+.open-acc-details-btn {
+    display: block !important;
+    margin: 0 auto !important;
+    width: 75%;
+    margin-top: 25px !important;
+    margin-bottom: 25px !important;
 }
 
 .detail-table-title {
@@ -264,8 +349,39 @@ a:active {
     font-size: 10px;
 }
 
-.rb-tab{
+.rb-tab {
     display: table
+}
+
+.data-table {
+    overflow: scroll;
+}
+
+.data-table-content {
+    margin: 20px 20px 20px 10px;
+}
+
+.data-table-head {
+    font-weight: bold;
+}
+
+.pagination {
+    float: right;
+}
+
+.table-col {
+    max-width: 200px !important;;
+    font-size: 13px !important;;
+    padding-left: 10px !important;;
+    padding-top: 15px !important;;
+    padding-bottom: 15px !important;;
+}
+
+.table-head {
+    padding-left: 10px !important;
+    padding-top: 15px !important;;
+    padding-bottom: 15px !important;;
+    font-size: 12px !important;;
 }
 
 .modal-header-icon {
@@ -276,7 +392,11 @@ a:active {
     background-repeat: no-repeat;
     background-image: url("../public/info.png");
     float: left;
-    margin-right:10px
+    margin-right: 10px
+}
+
+.modal-card-group {
+    margin: 20px 0 20px 0;
 }
 
 .modal-card-title {
@@ -291,6 +411,33 @@ a:active {
     font-size: 10px;
 }
 
+.nav-bar {
+    position: fixed !important;
+    background: #f1f5f9;
+    width: 100%;
+}
+
+.nav-bar-brand {
+    font-weight: bold;
+    color: black;
+    cursor: pointer;
+}
+
+.nav-bar-brand-highlight {
+    color: #32908F;
+}
+
+.nav-bar-center {
+    margin: 0 auto;
+    width: 50%;
+    text-align: center;
+}
+
+.nav-bar-search {
+    width: 100% !important;
+    text-align: center !important;
+}
+
 .nav-link.active {
     color: #32908f !important;
     background-color: white !important;
@@ -302,7 +449,7 @@ a:active {
 
 .nav-link {
     color: #32908f !important;
-    background-color: white!important;
+    background-color: white !important;
     opacity: 50%;
     border: 0 !important;
     transition: all .2s ease-in-out !important;
@@ -312,7 +459,9 @@ a:active {
     opacity: 100%;
 }
 
+
 .sidebar-icon:hover {
+    cursor: pointer;
     transform: scale(1.2);
 }
 
@@ -325,6 +474,15 @@ a:active {
 }
 
 #sidebar-social {
+    background-size: 50%;
+    background-repeat: no-repeat;
+    background-position: center;
+    position: absolute;
+    bottom: 0;
+    margin: 0 auto;
+    width: 100%;
+    height: 50px;
+    padding-bottom: 100px;
     transition: all .3s ease-in-out;
 }
 
@@ -334,10 +492,40 @@ a:active {
 
 .nav-social-icon {
     transition: all .3s ease-in-out;
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+
+#nav-social-icon1 {
+    background-image: url("../public/discord-filled.png");
+    margin-right: 10px;
+    margin-top: 3px;
+    width: 30px;
+    height: 30px;
+}
+
+#nav-social-icon2 {
+    background-image: url("../public/twitter.png");
+    width: 25px;
+    height: 25px;
+
 }
 
 .nav-social-icon:hover {
     transform: scale(1.3);
+}
+
+#spinner {
+    display: block;
+    margin: 0 auto;
+    margin-top: 200px;
+    height: 100px;
+    width: 100px;
+}
+
+#toast {
+    width: 100px;
+    color: white;
 }
 
 @media (prefers-color-scheme: dark) {

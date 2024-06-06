@@ -137,7 +137,7 @@
     border: 1px solid lightgray;
     cursor: pointer;
     transition: ease-in-out .2s;
-    width: 75%;
+    width: 100%;
 }
 
 .account-summary-info-content-container:hover {

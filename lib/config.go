@@ -56,8 +56,8 @@ type RPCConfig struct {
 
 func DefaultRPCConfig() RPCConfig {
 	return RPCConfig{
-		RPCPort:   "6001",
-		AdminPort: "6002",
+		RPCPort:   "50002",
+		AdminPort: "50003",
 		RPCUrl:    "http://localhost",
 		TimeoutS:  3,
 	}

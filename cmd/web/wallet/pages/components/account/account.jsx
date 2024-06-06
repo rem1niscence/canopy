@@ -209,7 +209,8 @@ function Accounts({keygroup, accountWithTxs, validator}) {
     const [privateKey, setPrivateKey] = useState({})
     const [showToast, setShowToast] = useState(false)
     const [showSpinner, setShowSpinner] = useState(false)
-    if (!keygroup || Object.keys(keygroup).length === 0) {
+    console.log(accountWithTxs)
+    if (!keygroup || Object.keys(keygroup).length === 0 || !accountWithTxs.account) {
         return <>
             <Modal show={true} size="lg" animation={false}>
                 <Form onSubmit={onImportOrGenerateSubmit}>

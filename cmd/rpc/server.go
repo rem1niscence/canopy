@@ -172,7 +172,7 @@ var (
 
 func StartRPC(a *consensus.Consensus, c lib.Config, l lib.LoggerI) {
 	cor := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:3000"},
+		AllowedOrigins: []string{"http://localhost:50000", "http://localhost:50001"},
 		AllowedMethods: []string{"GET", "OPTIONS", "POST"},
 	})
 	s, timeout := a.FSM.Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
