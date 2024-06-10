@@ -19,27 +19,27 @@ const supplyPath = "/v1/query/supply"
 
 
 function heightRequest(height) {
-    return `{"height":` + height + `}`
+    return JSON.stringify({height: height})
 }
 
 function hashRequest(hash) {
-    return `{"hash":"` + hash + `"}`
+    return JSON.stringify({hash: hash})
 }
 
 function pageAddrReq(page, addr) {
-    return `{"address":"` + addr + `", "pageNumber":` + page + `, "perPage":10}`
+    return JSON.stringify({pageNumber: page, perPage: 10, address: addr})
 }
 
 function heightAndAddrRequest(height, address) {
-    return `{"height":` + height + `, "address":"` + address + `"}`
+    return JSON.stringify({height: height, address: address})
 }
 
 function heightAndNameRequest(height, name) {
-    return `{"height":` + height + `, "name":"` + name + `"}`
+    return JSON.stringify({height: height, name: name})
 }
 
 function pageHeightReq(page, height) {
-    return `{"height":` + height + `, "pageNumber":` + page + `, "perPage":10}`
+    return JSON.stringify({pageNumber: page, perPage: 10, height: height})
 }
 
 export async function POST(request, path) {

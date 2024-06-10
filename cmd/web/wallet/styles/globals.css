@@ -1,3 +1,64 @@
+#container {
+    z-index: 0;
+    width: 100%;
+    height: 100vh;
+}
+
+#pageContent {
+    margin: 0 auto;
+    width: 95%;
+    height: 100vh;
+    overflow: scroll;
+}
+
+#nav-bar {
+    background: white;
+    border-bottom: 1px solid lightgray;
+    padding-bottom: 15px;
+    position: fixed;
+    width: 100%;
+}
+
+#nav-bar-container {
+    padding-left: 20px;
+}
+
+#nav-bar-brand {
+    font-weight: bold;
+    color: black;
+    cursor: pointer;
+}
+
+#nav-bar-brand-highlight {
+    color: #32908F;
+}
+
+#nav-bar-select {
+    border: 0;
+}
+
+#nav-bar-select-container {
+    margin: 0 auto;
+    width: 25%;
+}
+
+#spinner {
+    display: block;
+    margin: 0 auto;
+    margin-top: 200px;
+    height: 100px;
+    width: 100px;
+}
+
+#toast {
+    width: 100px;
+    color: white;
+}
+
+.modal-body {
+    overflow-wrap: break-word;
+}
+
 .nav-link.active {
     color: #32908f !important;
     background-color: white !important;
@@ -64,6 +125,17 @@
 
 .nav-social-icon {
     transition: all .3s ease-in-out;
+    background-size: cover;
+    background-repeat: no-repeat;
+    width: 25px;
+    height: 25px;
+}
+
+#nav-social-icon-discord {
+    margin-right: 10px;
+    margin-top: 3px;
+    width: 30px;
+    height: 30px;
 }
 
 .nav-social-icon:hover {
@@ -83,6 +155,19 @@
     font-weight: 800;
     font-size: 65px;
     margin: 0 auto;
+}
+
+.input-text {
+    width: 125px;
+}
+
+#dashboard-container {
+    background-color: #000;
+    mix-blend-mode: difference;
+}
+
+#dashboard-inner {
+    margin-bottom: 20px;
 }
 
 .send-receive-button-container {
@@ -141,7 +226,7 @@
 }
 
 .account-summary-info-content-container:hover {
-   scale: 1.05;
+    scale: 1.05;
 }
 
 .account-summary-info-content {
@@ -162,14 +247,14 @@
     margin: 0 auto;
 }
 
-#import-pk-button {
-    color:#32908f;
+#pk-button {
+    color: #32908f;
     border-color: #32908f;
     margin: 20px;
 }
 
-#import-pk-button:hover {
-    color:white;
+#pk-button:hover {
+    color: white;
     background-color: #32908f;
 }
 
@@ -192,7 +277,7 @@
     margin: 10px;
 }
 
-.recent-transactions-table{
+.recent-transactions-table {
     margin: 0 auto;
     width: 70%;
     text-align: center;
@@ -210,11 +295,11 @@
 
 .logs-button-container {
     alignment: left;
-    width:20px;
-    height:20px;
-    position:relative;
-    top:27px;
-    left:42px;
+    width: 20px;
+    height: 20px;
+    position: relative;
+    top: 27px;
+    left: 42px;
     cursor: pointer;
     transition: ease-in-out .2s;
 }
@@ -225,7 +310,7 @@
 
 .logs {
     text-align: left;
-    height:350px;
+    height: 350px;
 }
 
 .logs-button-container:hover {
@@ -233,8 +318,8 @@
 }
 
 .logs-button {
-    width:25px;
-    height:25px;
+    width: 25px;
+    height: 25px;
 }
 
 .col {
@@ -248,7 +333,7 @@
 }
 
 .container {
-    align-content: center  !important;;
+    align-content: center !important;;
     align-items: center !important;
 }
 
@@ -265,6 +350,60 @@
     display: inline-block;
     vertical-align: middle;
     line-height: normal;
+    background: black !important;
+    color: white !important;
+}
+
+.carousel-item-title {
+    font-size: 18px;
+    font-weight: 800 !important;
+}
+
+.carousel-item-detail {
+    width: 50%;
+    margin: 0 auto;
+    font-size: 14px;
+    font-weight: 400;
+    margin-bottom: 10px;
+    color: #7b7b7b;
+}
+
+#carousel-item-detail-title {
+    font-weight: bold;
+    color: yellowgreen;
+}
+
+#dashboard-hr {
+    border: 1px dashed white;
+    margin: 0 auto;
+    width: 25%;
+}
+
+#lazy-log {
+    text-align: left;
+    height: 300px !important;
+    margin-bottom: 50px;
+    border: 2px solid #222222;
+    background-color: #000;
+    filter: grayscale(100%);
+}
+
+#charts-container {
+    margin-top: 350px;
+    margin-bottom: 50px;
+}
+
+.area-chart {
+    border: 2px solid #222222;
+    border-radius: 6px;
+    margin: 0 auto;
+    margin-bottom: 20px;
+}
+
+.carousel-btn {
+    font-weight: bold;
+    font-size: 14px;
+    margin: 5px;
 }
 
 #propose-title {
@@ -273,18 +412,111 @@
     margin: 0 auto;
 }
 
+#propose-subtitle {
+    font-weight: bold;
+    font-size: 18px;
+    color: #32908f;
+}
+
 .governance-header-image {
-    width:50px;
-    height:50px;
-    position:relative;
-    top:-10px;
-    left:-10px;
+    width: 50px;
+    height: 50px;
+    position: relative;
+    top: -10px;
+    left: -10px;
+}
+
+.gov-header-hr {
+    border: 1px dashed black;
+    border-radius: 5px;
+    width: 80%;
+    margin: 0 auto;
+}
+
+.poll-carousel {
+    height: 320px;
+    width: 80%;
+}
+
+.poll-carousel-container {
+    width: 80% !important;
+}
+
+.poll-column {
+    width: 50% !important;
+}
+
+.pi-label {
+    font-weight: 800;
+    font-size: 14px;
+}
+
+.pi-cell {
+    filter: drop-shadow(0px 0px 1px black);
+}
+
+.vote-table {
+    width: 500px !important;
+    margin: 0 auto !important;
+    margin-bottom: 20px !important;
+}
+
+.vote-table-col {
+    max-width: 300px !important;
+    margin: 0 auto !important;
+}
+
+.accord {
+    display: block;
+    text-align: center;
+    justify-content: center;
+}
+
+.accord-item {
+    margin: 0 auto;
+    width: 50%;
+    font-weight: 800;
+}
+
+.accord-body-container {
+    width: 400px !important;
+    height: 200px !important;
+    margin: 0 auto !important;
+}
+
+.poll-prop-name {
+    width: 100%;
+    margin: 0 auto;
+    margin-top: 70px;
+    font-weight: 800;
+}
+
+.poll-container {
+    margin: 0 auto;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.poll-form {
+    width: 100%;
+    height: 200px;
+    margin: 0 auto;
+    font-size: 14px !important;
+    background: #222222 !important;
+    color: white !important;
+    cursor: pointer;
 }
 
 .propose-button {
     font-weight: 800 !important;
-    width:300px;
+    width: 300px;
     margin: 20px;
+    margin-bottom: 0;
+}
+
+.param-input {
+    width: 125px;
 }
 
 .accordion-button {
@@ -293,6 +525,7 @@
     text-align: center !important;
     border: 1px solid black !important;
 }
+
 .accordion-button:hover {
     color: white;
     background-color: black;

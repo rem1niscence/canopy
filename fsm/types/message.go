@@ -308,6 +308,8 @@ func (x *MessageChangeParameter) UnmarshalJSON(b []byte) (err error) {
 		parameterValue = &lib.StringWrapper{Value: p}
 	case uint64:
 		parameterValue = &lib.UInt64Wrapper{Value: p}
+	case float64:
+		parameterValue = &lib.UInt64Wrapper{Value: uint64(p)}
 	default:
 		return fmt.Errorf("unknown parameter type %T", p)
 	}

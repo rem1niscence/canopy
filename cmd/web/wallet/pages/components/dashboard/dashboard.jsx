@@ -1,399 +1,186 @@
-import {Button, Card, Carousel, Col, Row, Table} from "react-bootstrap";
-import Container from "react-bootstrap/Container";
-import react, {useEffect, useState} from "react";
+import {useEffect, useState} from "react";
 import dynamic from "next/dynamic";
-import {
-    adminRPCURL,
-    configPath,
-    ConsensusInfo,
-    consensusInfoPath,
-    Logs, logsPath, peerBookPath, PeerInfo, peerInfoPath,
-    Resource,
-} from "@/pages/components/api";
 import Truncate from 'react-truncate-inside';
+import {formatNumber, getRatio} from "@/pages/components/util";
+import Container from "react-bootstrap/Container";
+import {Button, Card, Carousel, Col, Row, Spinner} from "react-bootstrap";
+import {YAxis, Tooltip, Legend, AreaChart, Area,} from 'recharts';
 import {
-    YAxis,
-    Tooltip,
-    Legend,
-    AreaChart,
-    Area,
-} from 'recharts';
+    adminRPCURL, configPath, ConsensusInfo, consensusInfoPath, Logs, logsPath,
+    peerBookPath, PeerInfo, peerInfoPath, Resource,
+} from "@/pages/components/api";
 
+const LazyLog = dynamic(() => import('react-lazylog').then((mod) => mod.LazyLog), {ssr: false})
 
-const LazyLog = dynamic(() => import('react-lazylog').then((mod) => mod.LazyLog), {
-    ssr: false,
-});
+export default function Dashboard() {
+    const [state, setState] = useState({logs: "retrieving logs...", pauseLogs: false, resource: [], consensusInfo: {}, peerInfo: {}})
 
-
-function numberWithCommas(x) {
-    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-
-function formatNumber(nString, cutoff) {
-    if (nString == null) {
-        return "zero"
-    }
-    if (Number(nString) < cutoff) {
-        return numberWithCommas(nString)
-    }
-    return Intl.NumberFormat("en", {notation: "compact", maximumSignificantDigits: 8}).format(nString)
-}
-
-function getRatio(a, b) {
-    if (a > b) {
-        var bg = a;
-        var sm = b;
-    } else {
-        var bg = b;
-        var sm = a;
-    }
-    for (var i = 1; i < 1000000; i++) {
-        var d = sm / i;
-        var res = bg / d;
-        var howClose = Math.abs(res - res.toFixed(0));
-        if (howClose < .1) {
-            if (a > b) {
-                return res.toFixed(0) + ':' + i;
-            } else {
-                return i + ':' + res.toFixed(0);
-            }
+    const queryAPI = () => {
+        let promises = [ConsensusInfo(), PeerInfo(), Resource()]
+        if (!state.pauseLogs) {
+            promises.push(Logs())
         }
-    }
-}
-
-function getRoundProgress(consensusInfo) {
-    switch (consensusInfo.view.phase){
-        case "ELECTION":
-            return Number(0/8*100)
-        case "ELECTION-VOTE":
-            return Number(1/8*100)
-        case "PROPOSE":
-            return Number(2/8*100)
-        case "PROPOSE-VOTE":
-            return Number(3/8*100)
-        case "PRECOMMIT":
-            return Number(4/8*100)
-        case "PRECOMMIT-VOTE":
-            return Number(5/8*100)
-        case "COMMIT":
-            return Number(6/8*100)
-        case "COMMIT-PROCESS":
-            return Number(7/8*100)
-    }
-    return 100
-}
-
-function Dashboard() {
-    const [logs, setLogs] = useState("retrieving logs...")
-    const [pauseLogs, setPauseLogs] = useState(false)
-    const [resource, setResource] = useState([])
-    const [consensusInfo, setConsensusInfo] = useState({})
-    const [peerInfo, setPeerInfo] = useState({})
-    async function queryAPI() {
-        await ConsensusInfo().then(res => {
-            setConsensusInfo(res)
-        })
-        await PeerInfo().then(res => {
-            setPeerInfo(res)
-        })
-        await Resource().then(res => {
-            if (resource.length >= 30) {
-                let [first, ...nextResource] = resource;
-                setResource([...nextResource, res])
+        Promise.all(promises).then((v) => {
+            let res
+            if (state.resource.length >= 30) {
+                const [del, ...nextResource] = state.resource;
+                res = [...nextResource, v[2]]
             } else {
-                setResource([...resource, res])
+                res = [...state.resource, v[2]]
             }
+            if (!state.pauseLogs) {
+                setState({...state, consensusInfo: v[0], peerInfo: v[1], logs: v[3].toString(), resource: res})
+                return
+            }
+            setState({...state, consensusInfo: v[0], peerInfo: v[1], resource: res})
         })
     }
+
+    const getRoundProgress = (consensusInfo) => {
+        switch (consensusInfo.view.phase) {
+            case "ELECTION":
+                return Number(0 / 8 * 100)
+            case "ELECTION-VOTE":
+                return Number(1 / 8 * 100)
+            case "PROPOSE":
+                return Number(2 / 8 * 100)
+            case "PROPOSE-VOTE":
+                return Number(3 / 8 * 100)
+            case "PRECOMMIT":
+                return Number(4 / 8 * 100)
+            case "PRECOMMIT-VOTE":
+                return Number(5 / 8 * 100)
+            case "COMMIT":
+                return Number(6 / 8 * 100)
+            case "COMMIT-PROCESS":
+                return Number(7 / 8 * 100)
+        }
+        return 100
+    }
+
     useEffect(() => {
         const interval = setInterval(() => {
-            if (!pauseLogs) {
-                Logs().then(res => {
-                    setLogs(res.toString())
-                })
-            }
             queryAPI()
         }, 1000);
         return () => clearInterval(interval);
     });
-
-    let text = logs.replace("\n", '');
-
-    if (consensusInfo.view == null || peerInfo.id == null) {
+    if (state.consensusInfo.view == null || state.peerInfo.id == null) {
         queryAPI()
-        return <>Loading...</>
+        return <Spinner id="spinner"/>
     }
-    let inboundCount = Number(peerInfo.numInbound)?Number(peerInfo.numInbound):0
-    let outboundCount = Number(peerInfo.numOutbound)?Number(peerInfo.numOutbound):0
-    let ioPeer = "INBOUND: "+ inboundCount + ", OUTBOUND: " + outboundCount
-    let ioRatio = getRatio(inboundCount, outboundCount)
-    return <>
-        <div className="content-container" style={{backgroundColor: "#000", mixBlendMode: "difference"}}>
-            <Container style={{marginBottom: "20px"}} fluid>
-                <Row>
-                    <Col>
-                        <Carousel slide={false} interval={null} className="carousel">
-                            <Carousel.Item>
-                                <Card className="carousel-item-container"
-                                      style={{backgroundColor: "black", color: "white"}}>
-                                    <Card.Body>
-                                        <Card.Title style={{fontSize: "18px", fontWeight: "800"}}><span
-                                            style={{color: "white"}}>{consensusInfo.syncing?"SYNCING":"SYNCED"}</span></Card.Title>
-                                        <div style={{fontWeight: "bold", fontSize: "14px"}}>
-                                            <p style={{
-                                                width: "50%",
-                                                margin: "0 auto",
-                                                color: "yellowgreen",
-                                                marginBottom: "10px",
-                                                textAlign: "left"
-                                            }}>{"H: " + formatNumber(consensusInfo.view.height, 1000000000)+", R: "+consensusInfo.view.round+", P: " + consensusInfo.view.phase}</p>
-                                            <p style={{
-                                                width: "50%",
-                                                margin: "0 auto",
-                                                marginBottom: "10px",
-                                                textAlign: "left",
-                                                fontWeight: "400",
-                                                color: "#7b7b7b"
-                                            }}><Truncate text={consensusInfo.proposer===""?"PROP: UNDECIDED":"PROP: " + consensusInfo.proposer}/></p>
-                                            <p style={{
-                                                width: "50%",
-                                                margin: "0 auto",
-                                                marginBottom: "10px",
-                                                textAlign: "left",
-                                                fontWeight: "400",
-                                                color: "#7b7b7b"
-                                            }}><Truncate
-                                                text={consensusInfo.blockHash===""?"BLK: WAITING":"BLK: " + consensusInfo.blockHash}/>
-                                            </p>
-                                            <p>{consensusInfo.status}</p>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Carousel.Item>
-                            <Carousel.Item>
-                                <Card className="carousel-item-container"
-                                      style={{backgroundColor: "black", color: "white"}}>
-                                    <Card.Body>
-                                        <Card.Title
-                                            style={{fontSize: "18px", fontWeight: ""}}><span>{"ROUND PROGRESS: "+ getRoundProgress(consensusInfo) +"%"}</span></Card.Title>
-                                        <div style={{fontWeight: "bold", fontSize: "14px"}}>
-                                            <p style={{
-                                                width: "50%",
-                                                margin: "0 auto",
-                                                marginBottom: "10px",
-                                                fontWeight: "normal",
-                                                color: "yellowgreen"
-                                            }}><Truncate text={"ADDRESS: "+consensusInfo.address}/></p>
-                                            {/*<p style={{fontWeight: "bold"}}><Truncate text="VP: 670000/1000000"/></p>*/}
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Carousel.Item>
-                            <Carousel.Item>
-                                <Card className="carousel-item-container"
-                                      style={{backgroundColor: "black", color: "white"}}>
-                                    <Card.Body>
-                                        <Card.Title style={{fontSize: "18px", fontWeight: "300"}}><span
-                                            style={{color: ""}}>EXPLORE RAW JSON</span></Card.Title>
-                                        <div style={{fontWeight: "bold", fontSize: "14px",}}>
-                                            <Button style={{margin: "5"}} onClick={()=>window.open(adminRPCURL+consensusInfoPath, "_blank", "noreferrer")} variant="outline-secondary">QUORUM</Button>
-                                            <Button style={{margin: "5"}} onClick={()=>window.open(adminRPCURL+configPath, "_blank", "noreferrer")} variant="outline-secondary">CONFIG</Button>
-                                            <Button style={{margin: "5"}} onClick={()=>window.open(adminRPCURL+logsPath, "_blank", "noreferrer")} variant="outline-secondary">LOGGER</Button>
-                                            <br/><br/>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Carousel.Item>
-                        </Carousel>
-                    </Col>
-                    <Col>
-                        <Carousel slide={false} interval={null} className="carousel">
-                            <Carousel.Item>
-                                <Card className="carousel-item-container"
-                                      style={{backgroundColor: "black", color: "white"}}>
-                                    <Card.Body>
-                                        <div style={{fontWeight: "bold", fontSize: "14px"}}>
-                                            <p style={{
-                                                width: "50%",
-                                                margin: "0 auto",
-                                                fontSize: "18px",
-                                                fontWeight: "800",
-                                                marginBottom: "10px",
-                                                color: "white"
-                                            }}>{peerInfo.numPeers == null?"TOTAL PEERS: 0":"TOTAL PEERS: " +peerInfo.numPeers}</p>
-                                            <p style={{
-                                                width: "50%",
-                                                margin: "0 auto",
-                                                color: "yellowgreen",
-                                                marginBottom: "10px",
-                                            }}>{ioPeer}</p>
-                                            <p style={{
-                                                width: "50%",
-                                                margin: "0 auto",
-                                                marginBottom: "10px",
-                                                textAlign: "left",
-                                                fontWeight: "400",
-                                                color: "#7b7b7b"
-                                            }}><Truncate
-                                                text={"ID: " + peerInfo.id.public_key}/>
-                                            </p>
-                                            <p style={{
-                                                width: "50%",
-                                                margin: "0 auto",
-                                                marginBottom: "10px",
-                                                fontWeight: "400",
-                                                color: "#7b7b7b"
-                                            }}><Truncate
-                                                text={peerInfo.id.net_address?"NET ADDR: "+ peerInfo.id.net_address:"NET ADDR: External Address Not Set"}/>
-                                            </p>
-                                            <p style={{fontWeight: "600"}}>{ioRatio?"I / O RATIO "+ ioRatio: "I / O RATIO 0:0"}</p>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Carousel.Item><Carousel.Item>
-                            <Card className="carousel-item-container"
-                                  style={{backgroundColor: "black", color: "white"}}>
-                                <Card.Body>
-                                    <Card.Title style={{fontSize: "18px", fontWeight: "300"}}><span
-                                        style={{color: ""}}>EXPLORE RAW JSON</span></Card.Title>
-                                    <div style={{fontWeight: "bold", fontSize: "14px",}}>
-                                        <Button style={{margin: "5"}} onClick={()=>window.open(adminRPCURL+peerBookPath, "_blank", "noreferrer")}variant="outline-secondary">PEER BOOK</Button>
-                                        <Button style={{margin: "5"}} onClick={()=>window.open(adminRPCURL+peerInfoPath, "_blank", "noreferrer")}variant="outline-secondary">PEER INFO</Button>
-                                        <br/><br/>
-                                    </div>
-                                </Card.Body>
-                            </Card>
-                        </Carousel.Item>
 
+    let inPeer = Number(state.peerInfo.numInbound), ouPeer = Number(state.peerInfo.numOutbound), v = state.consensusInfo.view
+    inPeer = inPeer ? inPeer : 0
+    ouPeer = ouPeer ? ouPeer : 0
+    const ioRatio = getRatio(inPeer, ouPeer), carouselItems = [{
+        slides:
+            [{
+                title: state.consensusInfo.syncing ? "SYNCING" : "SYNCED",
+                dT: "H: " + formatNumber(v.height, false) + ", R: " + v.round + ", P: " + v.phase,
+                d1: "PROP: " + (state.consensusInfo.proposer === "" ? "UNDECIDED" : state.consensusInfo.proposer),
+                d2: "BLK: " + (state.consensusInfo.blockHash === "" ? "WAITING" : state.consensusInfo.blockHash),
+                d3: state.consensusInfo.status
+            }, {
+                title: "ROUND PROGRESS: " + getRoundProgress(state.consensusInfo) + "%",
+                dT: "ADDRESS: " + state.consensusInfo.address, d1: "", d2: "", d3: ""
+            },],
+        btnSlides: [
+            {url: adminRPCURL + consensusInfoPath, title: "QUORUM"},
+            {url: adminRPCURL + configPath, title: "CONFIG"},
+            {url: adminRPCURL + logsPath, title: "LOGGER"}
+        ]
+    }, {
+        slides:
+            [{
+                title: "TOTAL PEERS: " + (state.peerInfo.numPeers == null ? "0" : state.peerInfo.numPeers),
+                dT: "INBOUND: " + inPeer + ", OUTBOUND: " + ouPeer,
+                d1: "ID: " + state.peerInfo.id.public_key,
+                d2: "NET ADDR: " + (state.peerInfo.id.net_address ? state.peerInfo.id.net_address : "External Address Not Set"),
+                d3: "I / O RATIO " + (ioRatio ? ioRatio : "0:0")
+            }],
+        btnSlides: [
+            {url: adminRPCURL + peerBookPath, title: "PEER BOOK"},
+            {url: adminRPCURL + peerInfoPath, title: "PEER INFO"},
+        ]
+    }]
+
+    const renderButtonCarouselItem = (props) => {
+        return (
+            <Carousel.Item>
+                <Card className="carousel-item-container">
+                    <Card.Body>
+                        <Card.Title>EXPLORE RAW JSON</Card.Title>
+                        <div>
+                            {props.map((k, i) => (
+                                <Button key={i} className="carousel-btn" onClick={() => window.open(k.url, "_blank")} variant="outline-secondary">
+                                    {k.title}
+                                </Button>
+                            ))}
+                            <br/><br/>
+                        </div>
+                    </Card.Body>
+                </Card>
+            </Carousel.Item>
+        )
+    }
+
+    return <div className="content-container" id="dashboard-container">
+        <Container id="dashboard-inner" fluid>
+            <Row>
+                {carouselItems.map((k, i) => (
+                    <Col key={i}>
+                        <Carousel slide={false} interval={null} className="carousel">
+                            {k.slides.map((k, i) => (
+                                <Carousel.Item key={i}>
+                                    <Card className="carousel-item-container">
+                                        <Card.Body>
+                                            <Card.Title className="carousel-item-title"><span className="text-white">{k.title}</span>
+                                            </Card.Title>
+                                            <p id="carousel-item-detail-title" className="carousel-item-detail">{<Truncate text={k.dT}/>}</p>
+                                            <p className="carousel-item-detail"><Truncate text={k.d1}/></p>
+                                            <p className="carousel-item-detail"><Truncate text={k.d2}/></p>
+                                            <p>{k.d3}</p>
+                                        </Card.Body>
+                                    </Card>
+                                </Carousel.Item>
+                            ))}
+                            {renderButtonCarouselItem(k.btnSlides)}
                         </Carousel>
                     </Col>
-                </Row>
-            </Container>
-            <hr style={{
-                border: "1px dashed white",
-                marginBottom: "10px",
-                borderRadius: "5px",
-                width: "25%",
-                margin: "0 auto"
-            }}/>
-            <div onClick={() => setPauseLogs(!pauseLogs)} className="logs-button-container">
-                {!pauseLogs ? <img className="logs-button" alt="pause" src="./pause_filled.png"/> :
-                    <img className="logs-button" alt="play" src="./unpause_filled.png"/>}
-            </div>
-            <LazyLog enableSearch={true} style={{
-                textAlign: "left",
-                height: "300px",
-                marginBottom: "50px",
-                border: "2px solid #222222",
-                backgroundColor: "#000",
-                filter: "grayscale(100%)"
-            }} text={text}/>
-            <div style={{height: "350px", width: "100%"}}/>
-            <Container style={{marginBottom: "50px"}}>
-                <Row>
-                    <Col>
-                        <AreaChart width={600} height={250} data={resource}
-                                   style={{border: "2px solid #222222", borderRadius: "6px", margin: "0 auto"}}
-                                   margin={{top: 40, right: 40, left: 20, bottom: 20}}
-                        >
-                            <YAxis tickCount={1} label={{value: "PROCESS", angle: -90}}/>
-                            <Area name="CPU %" type="monotone" dataKey="process.usedCPUPercent" stroke="#eeeeee"
-                                  fillOpacity={1} fill="url(#ram)"/>
-                            <Area name="RAM %" type="monotone" dataKey="process.usedMemoryPercent" stroke="#848484"
-                                  fillOpacity={1} fill="url(#cpu)"/>
-                            <Tooltip contentStyle={{backgroundColor: "#222222"}}/>
-                            <Legend/>
-                        </AreaChart>
-                    </Col>
-                    <Col>
-                        <AreaChart width={600} height={250} data={resource}
-                                   style={{border: "2px solid #222222", borderRadius: "6px", margin: "0 auto"}}
-                                   margin={{top: 30, right: 30, left: 0, bottom: 0}}>
-                            <YAxis tickCount={1} label={{value: "SYSTEM", angle: -90}}/>
-                            <Area name="CPU %" type="monotone" dataKey="system.usedCPUPercent" stroke="#eeeeee"
-                                  fillOpacity={1} fill="url(#cpu)"/>
-                            <Area name="RAM %" type="monotone" dataKey="system.usedRAMPercent" stroke="#848484"
-                                  fillOpacity={1} fill="url(#ram)"/>
-                            <Tooltip contentStyle={{backgroundColor: "#222222"}}/>
-                            <Legend/>
-                        </AreaChart>
-                    </Col>
-                </Row>
-                <Row>
-                    <Col>
-                        <AreaChart width={600} height={250} data={resource}
-                                   style={{
-                                       border: "2px solid #222222",
-                                       borderTop: "none",
-                                       borderRadius: "6px",
-                                       margin: "0 auto"
-                                   }}
-                                   margin={{top: 30, right: 30, left: 0, bottom: 0}}>
-                            <YAxis tickCount={1} label={{value: "DISK", angle: -90}}/>
-                            <Area name="Disk %" type="monotone" dataKey="system.usedDiskPercent" stroke="#eeeeee"
-                                  fillOpacity={1} fill="url(#cpu)"/>
-                            <Tooltip contentStyle={{backgroundColor: "#222222"}}/>
-                            <Legend/>
-                        </AreaChart>
-                    </Col>
-                    <Col>
-                        <AreaChart width={600} height={250} data={resource}
-                                   style={{
-                                       border: "2px solid #222222",
-                                       borderTop: "none",
-                                       borderRadius: "6px",
-                                       margin: "0 auto"
-                                   }}
-                                   margin={{top: 30, right: 30, left: 0, bottom: 0}}>
-                            <YAxis tick={false} label={{value: "IN OUT", angle: -90}}/>
-                            <Area name="Received" type="monotone" dataKey="system.ReceivedBytesIO" stroke="#eeeeee"
-                                  fillOpacity={1} fill="url(#ram)"/>
-                            <Area name="Written" type="monotone" dataKey="system.WrittenBytesIO" stroke="#848484"
-                                  fillOpacity={1} fill="url(#cpu)"/>
-                            <Tooltip contentStyle={{backgroundColor: "#222222"}}/>
-                            <Legend/>
-                        </AreaChart>
-                    </Col>
-                </Row>
-                <Row>
-                    <Col>
-                        <AreaChart width={600} height={250} data={resource}
-                                   style={{
-                                       border: "2px solid #222222",
-                                       borderTop: "none",
-                                       borderRadius: "6px",
-                                       margin: "0 auto"
-                                   }}
-                                   margin={{top: 30, right: 30, left: 0, bottom: 0}}>
-                            <YAxis tickCount={1} label={{value: "IN OUT", angle: -90}}/>
-                            <Area name="Received" type="monotone" dataKey="process.threadCount" stroke="#eeeeee"
-                                  fillOpacity={1} fill="url(#ram)"/>
-                            <Tooltip contentStyle={{backgroundColor: "#222222"}}/>
-                            <Legend/>
-                        </AreaChart>
-                    </Col>
-                    <Col>
-                        <AreaChart width={600} height={250} data={resource}
-                                   style={{
-                                       border: "2px solid #222222",
-                                       borderTop: "none",
-                                       borderRadius: "6px",
-                                       margin: "0 auto"
-                                   }}
-                                   margin={{top: 30, right: 30, left: 0, bottom: 0}}>
-                            <YAxis tickCount={1} label={{value: "PROCESS", angle: -90}}/>
-                            <Area name="File Descriptors" type="monotone" dataKey="process.fdCount" stroke="#eeeeee"
-                                  fillOpacity={1} fill="url(#cpu)"/>
-                            <Tooltip contentStyle={{backgroundColor: "#222222"}}/>
-                            <Legend/>
-                        </AreaChart>
-                    </Col>
-                </Row>
-            </Container>
-            <div style={{height: "50px", width: "100%"}}/>
+                ))}
+            </Row>
+        </Container>
+        <hr id="dashboard-hr"/>
+        <div onClick={() => setState({...state, pauseLogs: !state.pauseLogs})} className="logs-button-container">
+            <img className="logs-button" alt="play-pause-btn" src={state.pauseLogs ? "./unpause_filled.png" : "./pause_filled.png"}/>
         </div>
-
-    </>
+        <LazyLog enableSearch={true} id="lazy-log" text={state.logs.replace("\n", '')}/>
+        <Container id="charts-container">
+            {[
+                [{yax: "PROCESS", n1: "CPU %", d1: "process.usedCPUPercent", n2: "RAM %", d2: "process.usedMemoryPercent"},
+                    {yax: "SYSTEM", n1: "CPU %", d1: "system.usedCPUPercent", n2: "RAM %", d2: "system.usedRAMPercent"}],
+                [{yax: "DISK", n1: "Disk %", d1: "system.usedDiskPercent", n2: ""},
+                    {yax: "IN OUT", removeTick: true, n1: "Received", d1: "system.ReceivedBytesIO", n2: "Written", d2: "system.WrittenBytesIO"}],
+                [{yax: "THREADS", n1: "Thread Count", d1: "process.threadCount", n2: ""},
+                    {yax: "FILES", n1: "File Descriptors", d1: "process.fdCount", n2: ""}],
+            ].map((k, i) => (
+                <Row key={i}>
+                    {[...Array(2)].map((_, i) => {
+                        let line2 = k[i].n2 === "" ?
+                            <></> : <Area name={k[i].n2} type="monotone" dataKey={k[i].d2} stroke="#848484" fillOpacity={1} fill="url(#cpu)"/>
+                        return <Col>
+                            <AreaChart className="area-chart" width={600} height={250} data={state.resource} margin={{top: 40, right: 40}}>
+                                <YAxis tick={!k[i].removeTick} tickCount={1} label={{value: k[i].yax, angle: -90}}/>
+                                <Area name={k[i].n1} type="monotone" dataKey={k[i].d1} stroke="#eeeeee" fillOpacity={1} fill="url(#ram)"/>
+                                {line2}
+                                <Tooltip contentStyle={{backgroundColor: "#222222"}}/>
+                                <Legend/>
+                            </AreaChart>
+                        </Col>
+                    })}
+                </Row>
+            ))}
+        </Container>
+        <div style={{height: "50px", width: "100%"}}/>
+    </div>
 }
-
-export default Dashboard;

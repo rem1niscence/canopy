@@ -71,32 +71,23 @@ export async function POST(url, path, request) {
 }
 
 function heightAndAddrRequest(height, address) {
-    return `{"height":` + height + `, "address":"` + address + `"}`
+    return JSON.stringify({height: height, address: address})
 }
 
 function pageAddrReq(page, addr) {
-    return `{"address":"` + addr + `", "pageNumber":` + page + `, "perPage":5}`
+    return JSON.stringify({pageNumber: page, address: addr, perPage: 5})
 }
 
 function voteRequest(json, approve) {
-    const request = {}
-    request.approve = approve
-    request.proposal = json
-    return JSON.stringify(request)
+    return JSON.stringify({approve: approve, proposal: json})
 }
 
 function addressAndPwdRequest(address, password) {
-    const request = {}
-    request.address = address
-    request.password = password
-    return JSON.stringify(request)
+    return JSON.stringify({address: address, password: password})
 }
 
 function pkAndPwdRequest(pk, password) {
-    const request = {}
-    request.privateKey = pk
-    request.password = password
-    return JSON.stringify(request)
+    return JSON.stringify({privateKey: pk, password: password})
 }
 
 function newTxRequest(address, netAddress, amount, output, sequence, fee, submit, password) {
@@ -230,7 +221,6 @@ export async function TxUnpause(address, sequence, fee, password, submit) {
 }
 
 export async function TxChangeParameter(address, paramSpace, paramKey, paramValue, startBlock, endBlock, sequence, fee, password, submit) {
-    console.log(newGovTxRequest(address, 0, paramSpace, paramKey, paramValue, Number(startBlock), Number(endBlock), Number(sequence), Number(fee), submit, password))
     return POST(adminRPCURL, txChangeParamPath, newGovTxRequest(address, 0, paramSpace, paramKey, paramValue, Number(startBlock), Number(endBlock), Number(sequence), Number(fee), submit, password))
 }
 
@@ -239,7 +229,6 @@ export async function TxDAOTransfer(address, amount, startBlock, endBlock, seque
 }
 
 export async function RawTx(json) {
-    console.log(json)
     return POST(rpcURL, txPath, json)
 }
 
