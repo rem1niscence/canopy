@@ -48,14 +48,19 @@ type MultiConn struct {
 	onError       func([]byte)
 	error         sync.Once
 	p2p           *P2P
+	log           lib.LoggerI
 }
 
-func NewConnection(conn net.Conn, streams map[lib.Topic]*Stream, p2p *P2P, onError func([]byte), privateKey crypto.PrivateKeyI) (*MultiConn, lib.ErrorI) {
-	eConn, err := NewHandshake(conn, privateKey)
+func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
+	eConn, err := NewHandshake(conn, p.privateKey)
+	if err != nil {
+		return nil, err
+	}
+	streams := p.NewStreams()
 	for _, s := range streams {
 		s.conn = eConn
 	}
-	return &MultiConn{
+	c := &MultiConn{
 		conn:          eConn,
 		peerPublicKey: eConn.peerPubKey.Bytes(),
 		streams:       streams,
@@ -63,10 +68,15 @@ func NewConnection(conn net.Conn, streams map[lib.Topic]*Stream, p2p *P2P, onErr
 		quitReceiving: make(chan struct{}, maxChannelCalls),
 		sendPong:      make(chan struct{}, maxChannelCalls),
 		receivedPong:  make(chan struct{}, maxChannelCalls),
-		onError:       onError,
+		onError:       p.OnPeerError,
 		error:         sync.Once{},
-		p2p:           p2p,
-	}, err
+		p2p:           p,
+		log:           p.log,
+	}
+	_ = c.conn.SetReadDeadline(time.Time{})
+	_ = c.conn.SetWriteDeadline(time.Time{})
+	c.Start()
+	return c, err
 }
 
 func (c *MultiConn) Start() {
@@ -75,7 +85,7 @@ func (c *MultiConn) Start() {
 }
 
 func (c *MultiConn) Stop() {
-	c.p2p.log.Warnf("Stopping peer %s@%s", c.peerPublicKey, c.conn.RemoteAddr().String())
+	c.p2p.log.Warnf("Stopping peer %s@%s", lib.BytesToString(c.peerPublicKey), c.conn.RemoteAddr().String())
 	c.quitReceiving <- struct{}{}
 	c.quitSending <- struct{}{}
 	close(c.quitSending)
@@ -100,7 +110,7 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 
 func (c *MultiConn) startSendLoop() {
 	defer c.catchPanic()
-	send, m := time.NewTimer(sendInterval), limiter.New(0, 0)
+	send, m := time.NewTicker(sendInterval), limiter.New(0, 0)
 	ping, err := time.NewTicker(pingInterval), lib.ErrorI(nil)
 	pongTimer, didntReceivePong := new(time.Timer), make(chan struct{}, maxChannelCalls)
 	defer func() { close(didntReceivePong); pongTimer.Stop(); ping.Stop(); send.Stop(); m.Done() }()
@@ -130,6 +140,7 @@ func (c *MultiConn) startSendLoop() {
 			return
 		}
 		if err != nil {
+			c.log.Error(err.Error())
 			c.Error()
 			return
 		}
@@ -145,6 +156,7 @@ func (c *MultiConn) startReceiveLoop() {
 		default:
 			msg, err := c.receive(reader, m)
 			if err != nil {
+				c.log.Error(err.Error())
 				c.Error()
 				return
 			}
@@ -199,7 +211,7 @@ func (c *MultiConn) receive(reader bufio.Reader, m *limiter.Monitor) (proto.Mess
 	if er != nil {
 		return nil, ErrFailedRead(er)
 	}
-	if err := lib.Unmarshal(buffer, msg); err != nil {
+	if err := lib.Unmarshal(buffer[:n], msg); err != nil {
 		return nil, err
 	}
 	return lib.FromAny(msg.Payload)
@@ -210,12 +222,9 @@ func (c *MultiConn) send(message proto.Message, m *limiter.Monitor) (err lib.Err
 	if err != nil {
 		return err
 	}
-	bz, err := lib.Marshal(Envelope{
+	bz, err := lib.Marshal(&Envelope{
 		Payload: a,
 	})
-	if err != nil {
-		return
-	}
 	m.Limit(maxPacketSize, int64(sendRatePerS), true)
 	n, er := c.conn.Write(bz)
 	if er != nil {

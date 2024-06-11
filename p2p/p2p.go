@@ -149,11 +149,11 @@ func (p *P2P) Listen(listenAddress *lib.PeerAddress) {
 }
 
 func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) lib.ErrorI {
-	connection, err := NewConnection(conn, p.NewStreams(), p, p.OnPeerError, p.privateKey)
+	connection, err := p.NewConnection(conn)
 	if err != nil {
 		return err
 	}
-	p.log.Infof("Adding peer: %s@%s", connection.peerPublicKey, info.Address.NetAddress)
+	p.log.Infof("Adding peer: %s@%s", lib.BytesToString(connection.peerPublicKey), info.Address.NetAddress)
 	if info.Address.PublicKey != nil && !bytes.Equal(connection.peerPublicKey, info.Address.PublicKey) {
 		return ErrMismatchPeerPublicKey(info.Address.PublicKey, connection.peerPublicKey)
 	}
@@ -264,8 +264,10 @@ func (p *P2P) MaxPossiblePeers() int {
 func (p *P2P) ReceiveChannel(topic lib.Topic) chan *lib.MessageWrapper { return p.channels[topic] }
 func (p *P2P) ValidatorsReceiver() chan []*lib.PeerAddress             { return p.validatorsReceiver }
 func (p *P2P) Close() {
-	if err := p.listener.Close(); err != nil {
-		p.log.Error(err.Error())
+	if p.listener != nil {
+		if err := p.listener.Close(); err != nil {
+			p.log.Error(err.Error())
+		}
 	}
 }
 func (p *P2P) ID() *lib.PeerAddress {

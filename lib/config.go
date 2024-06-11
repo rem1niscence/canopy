@@ -167,7 +167,6 @@ func NewConfigFromFile(filepath string) (Config, error) {
 const (
 	ConfigFilePath    = "config.json"
 	ValKeyPath        = "validator_key.json"
-	NodeKeyPath       = "node_key.json"
 	GenesisFilePath   = "genesis.json"
 	ProposalsFilePath = "proposals.json"
 )

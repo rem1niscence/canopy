@@ -174,6 +174,8 @@ const (
 	CodeFailedDial            ErrorCode   = 18
 	CodeMismatchPeerPublicKey ErrorCode   = 19
 	CodeFailedListen          ErrorCode   = 20
+	CodeInvalidPeerPublicKey  ErrorCode   = 21
+	CodeSignatureSwap         ErrorCode   = 22
 
 	CodeIPLookup                     ErrorCode = 22
 	CodeBannedIP                     ErrorCode = 23
@@ -240,11 +242,16 @@ func (p *Error) Module() ErrorModule { return p.EModule }
 func (p *Error) String() string      { return p.Error() }
 
 func (p *Error) Error() string {
-	_, file, no, ok := runtime.Caller(1)
-	if ok {
-		return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s\n%s L%d", p.EModule, p.ECode, p.Msg, file, no)
+	stack, pc := "", make([]uintptr, 1000)
+	_ = runtime.Callers(1, pc)
+	frames := runtime.CallersFrames(pc)
+	if frames == nil {
+		return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s\n", p.EModule, p.ECode, p.Msg)
 	}
-	return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s\n", p.EModule, p.ECode, p.Msg)
+	for f, again := frames.Next(); again; f, again = frames.Next() {
+		stack += fmt.Sprintf("\n%s L%d", f.File, f.Line)
+	}
+	return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s\nStack: %s", p.EModule, p.ECode, p.Msg, stack)
 }
 
 // error implementations below for the `types` package

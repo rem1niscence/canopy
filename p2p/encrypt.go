@@ -3,7 +3,6 @@ package p2p
 import (
 	"crypto/cipher"
 	"encoding/binary"
-	"github.com/alecthomas/units"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	pool "github.com/libp2p/go-buffer-pool"
@@ -38,12 +37,13 @@ type internalState struct {
 }
 
 func NewHandshake(conn net.Conn, privateKey crypto.PrivateKeyI) (c *EncryptedConn, e lib.ErrorI) {
-	ephemeralPublic, ephemeralPrivate := crypto.GenerateCurve25519Keypair()
+	ephemeralPrivate, _ := crypto.NewEd25519PrivateKey()
+	ephemeralPublic := ephemeralPrivate.PublicKey().Bytes()
 	peerEphemeralPublic, e := keySwap(conn, ephemeralPublic)
 	if e != nil {
 		return
 	}
-	secret, err := crypto.SharedSecret(peerEphemeralPublic, ephemeralPrivate)
+	secret, err := crypto.SharedSecret(peerEphemeralPublic, ephemeralPrivate.Bytes())
 	if err != nil {
 		return nil, ErrFailedDiffieHellman(err)
 	}
@@ -56,18 +56,18 @@ func NewHandshake(conn net.Conn, privateKey crypto.PrivateKeyI) (c *EncryptedCon
 		receive: newInternalState(receiveAEAD),
 		send:    newInternalState(sendAEAD),
 	}
-	peer, err := signatureSwap(c, &lib.Signature{
+	peerSig, err := signatureSwap(c, &lib.Signature{
 		PublicKey: privateKey.PublicKey().Bytes(),
 		Signature: privateKey.Sign(challenge[:]),
 	})
 	if err != nil {
-		return
+		return nil, ErrFailedSignatureSwap(err)
 	}
-	c.peerPubKey, err = lib.PublicKeyFromBytes(peer.PublicKey)
+	c.peerPubKey, err = crypto.NewPublicKeyFromBytes(peerSig.PublicKey)
 	if err != nil {
-		return
+		return nil, ErrInvalidPublicKey(err)
 	}
-	if !c.peerPubKey.VerifyBytes(challenge[:], peer.Signature) {
+	if !c.peerPubKey.VerifyBytes(challenge[:], peerSig.Signature) {
 		return nil, ErrFailedChallenge()
 	}
 	return
@@ -149,7 +149,7 @@ func (c *EncryptedConn) SetDeadline(t time.Time) error      { return c.conn.SetD
 func (c *EncryptedConn) SetReadDeadline(t time.Time) error  { return c.conn.SetReadDeadline(t) }
 func (c *EncryptedConn) SetWriteDeadline(t time.Time) error { return c.conn.SetWriteDeadline(t) }
 
-func keySwap(conn io.ReadWriter, ephemeralPublicKey []byte) (peerPublic []byte, err lib.ErrorI) {
+func keySwap(conn net.Conn, ephemeralPublicKey []byte) (peerPublic []byte, err lib.ErrorI) {
 	var g errgroup.Group
 	peerEphemeralPublic := &[]byte{}
 	g.Go(func() error { return sendKey(conn, ephemeralPublicKey) })
@@ -162,6 +162,7 @@ func keySwap(conn io.ReadWriter, ephemeralPublicKey []byte) (peerPublic []byte, 
 
 func signatureSwap(conn io.ReadWriter, signature *lib.Signature) (peerSig *lib.Signature, err lib.ErrorI) {
 	var g errgroup.Group
+	peerSig = new(lib.Signature)
 	g.Go(func() error { return sendSig(conn, signature) })
 	g.Go(func() error { return receiveSig(conn, peerSig) })
 	if er := g.Wait(); er != nil {
@@ -182,7 +183,7 @@ func sendSig(conn io.ReadWriter, signature *lib.Signature) lib.ErrorI {
 }
 
 func receiveSig(conn io.ReadWriter, signature *lib.Signature) lib.ErrorI {
-	buffer := make([]byte, units.Megabyte)
+	buffer := make([]byte, 148)
 	if _, err := conn.Read(buffer); err != nil {
 		return ErrFailedRead(err)
 	}
@@ -192,7 +193,7 @@ func receiveSig(conn io.ReadWriter, signature *lib.Signature) lib.ErrorI {
 	return nil
 }
 
-func sendKey(conn io.ReadWriter, ephemeralPublicKey []byte) lib.ErrorI {
+func sendKey(conn net.Conn, ephemeralPublicKey []byte) lib.ErrorI {
 	bz, err := lib.Marshal(&crypto.ProtoPubKey{Pubkey: ephemeralPublicKey[:]})
 	if err != nil {
 		return err
@@ -203,8 +204,11 @@ func sendKey(conn io.ReadWriter, ephemeralPublicKey []byte) lib.ErrorI {
 	return nil
 }
 
-func receiveKey(conn io.ReadWriter, ephemeralPublicKey *[]byte) lib.ErrorI {
-	buffer := make([]byte, units.Megabyte)
+func receiveKey(conn net.Conn, ephemeralPublicKey *[]byte) lib.ErrorI {
+	buffer := make([]byte, 34)
+	if err := conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		return ErrFailedRead(err)
+	}
 	if _, err := conn.Read(buffer); err != nil {
 		return ErrFailedRead(err)
 	}

@@ -58,8 +58,16 @@ func ErrFailedChallenge() lib.ErrorI {
 	return lib.NewError(lib.CodeFailedChallenge, lib.P2PModule, "failed challenge")
 }
 
+func ErrInvalidPublicKey(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidPeerPublicKey, lib.P2PModule, fmt.Sprintf("invalid public key: %s", err.Error()))
+}
+
 func ErrFailedDiffieHellman(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeFailedDiffieHellman, lib.P2PModule, fmt.Sprintf("diffie hellman failed with err: %s", err.Error()))
+}
+
+func ErrFailedSignatureSwap(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeSignatureSwap, lib.P2PModule, fmt.Sprintf("signature swap failed with err: %s", err.Error()))
 }
 
 func ErrFailedHKDF(err error) lib.ErrorI {

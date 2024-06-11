@@ -91,21 +91,6 @@ func DecryptMessage(key []byte, message string) (string, error) {
 	return string(cipherText), nil
 }
 
-func GenerateCurve25519Keypair() (public, private []byte) {
-	publicKey := new([32]byte)
-	privateKey := new([32]byte)
-	if _, err := io.ReadFull(rand.Reader, privateKey[:]); err != nil {
-		publicKey = nil
-		privateKey = nil
-		return
-	}
-	curve25519.ScalarBaseMult(publicKey, privateKey)
-	if CheckBlacklist(publicKey[:]) {
-		GenerateCurve25519Keypair()
-	}
-	return publicKey[:], privateKey[:]
-}
-
 var blacklist = [][32]byte{
 	// 0 (order 4)
 	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

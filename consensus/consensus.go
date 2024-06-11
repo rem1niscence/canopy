@@ -42,7 +42,7 @@ type Consensus struct {
 	syncing  atomic.Bool
 }
 
-func New(c lib.Config, valKey, nodeKey crypto.PrivateKeyI, db lib.StoreI, l lib.LoggerI) (*Consensus, lib.ErrorI) {
+func New(c lib.Config, valKey crypto.PrivateKeyI, db lib.StoreI, l lib.LoggerI) (*Consensus, lib.ErrorI) {
 	sm, err := fsm.New(c, db, l)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func New(c lib.Config, valKey, nodeKey crypto.PrivateKeyI, db lib.StoreI, l lib.
 		Proposals:        NewProposalsForHeight(),
 		PublicKey:        valKey.PublicKey().Bytes(),
 		PrivateKey:       valKey,
-		P2P:              p2p.New(nodeKey, maxVals, c, l),
+		P2P:              p2p.New(valKey, maxVals, c, l),
 		Config:           c,
 		log:              l,
 		FSM:              sm,

@@ -29,8 +29,8 @@ var rootCmd = &cobra.Command{
 }
 
 var (
-	client, config, l              = &rpc.Client{}, lib.Config{}, lib.LoggerI(nil)
-	dataDir, validatorKey, nodeKey = "", crypto.PrivateKeyI(nil), crypto.PrivateKeyI(nil)
+	client, config, l     = &rpc.Client{}, lib.Config{}, lib.LoggerI(nil)
+	dataDir, validatorKey = "", crypto.PrivateKeyI(nil)
 )
 
 func init() {
@@ -40,7 +40,7 @@ func init() {
 	rootCmd.AddCommand(adminCmd)
 	rootCmd.PersistentFlags().StringVar(&dataDir, "data-dir", lib.DefaultDataDirPath(), "custom data directory location")
 
-	config, validatorKey, nodeKey = InitializeDataDirectory(dataDir, lib.NewDefaultLogger())
+	config, validatorKey = InitializeDataDirectory(dataDir, lib.NewDefaultLogger())
 	l = lib.NewLogger(lib.LoggerConfig{Level: config.GetLogLevel()})
 	client = rpc.NewClient(config.RPCUrl, config.RPCPort, config.AdminPort)
 }
@@ -64,7 +64,7 @@ func Start() {
 	if err != nil {
 		l.Fatal(err.Error())
 	}
-	app, err := consensus.New(config, validatorKey, nodeKey, db, l)
+	app, err := consensus.New(config, validatorKey, db, l)
 	if err != nil {
 		l.Fatal(err.Error())
 	}
@@ -79,7 +79,7 @@ func Start() {
 
 }
 
-func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config, privateValKey, privateNodeKey crypto.PrivateKeyI) {
+func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config, privateValKey crypto.PrivateKeyI) {
 	if err := os.MkdirAll(dataDirPath, os.ModePerm); err != nil {
 		panic(err)
 	}
@@ -95,14 +95,6 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 		blsPrivateKey, _ := crypto.NewBLSPrivateKey()
 		log.Infof("Creating %s file", lib.ValKeyPath)
 		if err = crypto.PrivateKeyToFile(blsPrivateKey, privateValKeyPath); err != nil {
-			panic(err)
-		}
-	}
-	privateNodeKeyPath := filepath.Join(dataDirPath, lib.NodeKeyPath)
-	if _, err := os.Stat(privateNodeKeyPath); errors.Is(err, os.ErrNotExist) {
-		ed25519PrivateKey, _ := crypto.NewEd25519PrivateKey()
-		log.Infof("Creating %s file", lib.NodeKeyPath)
-		if err = crypto.PrivateKeyToFile(ed25519PrivateKey, privateNodeKeyPath); err != nil {
 			panic(err)
 		}
 	}
@@ -125,15 +117,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			panic(err)
 		}
 	}
-	privateValKey, err := crypto.NewBLSPrivateKeyFromFile(privateValKeyPath)
-	if err != nil {
-		panic(err)
-	}
-	privateNodeKey, err = crypto.NewED25519PrivateKeyFromFile(privateNodeKeyPath)
-	if err != nil {
-		panic(err)
-	}
-	c, err = lib.NewConfigFromFile(configFilePath)
+	c, err := lib.NewConfigFromFile(configFilePath)
 	if err != nil {
 		panic(err)
 	}
@@ -141,12 +125,12 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 	genesisFilePath := filepath.Join(dataDirPath, lib.GenesisFilePath)
 	if _, err = os.Stat(genesisFilePath); errors.Is(err, os.ErrNotExist) {
 		log.Infof("Creating %s file", lib.GenesisFilePath)
-		WriteDefaultGenesisFile(privateValKey, privateNodeKey, genesisFilePath)
+		WriteDefaultGenesisFile(privateValKey, genesisFilePath)
 	}
 	return
 }
 
-func WriteDefaultGenesisFile(validatorPrivateKey, _ crypto.PrivateKeyI, genesisFilePath string) {
+func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFilePath string) {
 	consPubKey := validatorPrivateKey.PublicKey()
 	addr := consPubKey.Address()
 	j := &types.GenesisState{
