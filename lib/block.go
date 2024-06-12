@@ -136,10 +136,6 @@ func (x *BlockHeader) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-	var badProposers [][]byte
-	for _, bp := range x.BadProposers {
-		badProposers = append(badProposers, bp)
-	}
 	*x = BlockHeader{
 		Height:                j.Height,
 		Hash:                  j.Hash,
@@ -154,7 +150,7 @@ func (x *BlockHeader) UnmarshalJSON(b []byte) error {
 		NextValidatorRoot:     j.NextValidatorRoot,
 		ProposerAddress:       j.ProposerAddress,
 		Evidence:              j.Evidence,
-		BadProposers:          badProposers,
+		BadProposers:          x.BadProposers,
 		LastQuorumCertificate: j.LastQuorumCertificate,
 	}
 	return nil

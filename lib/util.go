@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/ginchuco/ginchu/lib/codec"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -170,10 +169,6 @@ func (c MessageCache) Add(msg *MessageWrapper) bool {
 	c.queue.PushFront(msg)
 	return true
 }
-
-var (
-	cdc = codec.Protobuf{}
-)
 
 func Marshal(message any) ([]byte, ErrorI) {
 	bz, err := proto.Marshal(message.(proto.Message))
@@ -351,6 +346,7 @@ func ReplaceURLPort(rawURL, replacementPort string) (returned string, err error)
 
 type FilterOption int
 
+// nolint:all
 const (
 	Both FilterOption = 0
 	Yes               = 1

@@ -3,7 +3,6 @@ package rpc
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/alecthomas/units"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/ginchuco/ginchu/consensus"
@@ -501,7 +500,6 @@ func KeystoreImport(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func KeystoreImportRaw(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		fmt.Println(ptr.PrivateKey.String())
 		address, err := k.ImportRaw(ptr.PrivateKey, ptr.Password)
 		if err != nil {
 			return nil, err

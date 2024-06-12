@@ -3,6 +3,7 @@ package p2p
 import (
 	"crypto/cipher"
 	"encoding/binary"
+	"github.com/alecthomas/units"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	pool "github.com/libp2p/go-buffer-pool"
@@ -110,7 +111,7 @@ func (c *EncryptedConn) Read(data []byte) (n int, err error) {
 	encryptedBuffer, plainTextBuffer := pool.Get(crypto.EncryptedFrameSize), pool.Get(crypto.FrameSize)
 	defer func() { pool.Put(plainTextBuffer); pool.Put(encryptedBuffer) }()
 	if _, er := io.ReadFull(c.conn, encryptedBuffer); er != nil {
-		return 0, ErrFailedReadFull(er)
+		return 0, er
 	}
 	if _, er := c.receive.aead.Open(plainTextBuffer[:0], c.receive.nonce[:], encryptedBuffer, nil); er != nil {
 		return n, ErrConnDecryptFailed(er)
@@ -183,12 +184,13 @@ func sendSig(conn io.ReadWriter, signature *lib.Signature) lib.ErrorI {
 }
 
 func receiveSig(conn io.ReadWriter, signature *lib.Signature) lib.ErrorI {
-	buffer := make([]byte, 148)
-	if _, err := conn.Read(buffer); err != nil {
+	buffer := make([]byte, units.KB)
+	n, err := conn.Read(buffer)
+	if err != nil {
 		return ErrFailedRead(err)
 	}
-	if err := lib.Unmarshal(buffer, signature); err != nil {
-		return err
+	if e := lib.Unmarshal(buffer[:n], signature); e != nil {
+		return e
 	}
 	return nil
 }
@@ -205,16 +207,17 @@ func sendKey(conn net.Conn, ephemeralPublicKey []byte) lib.ErrorI {
 }
 
 func receiveKey(conn net.Conn, ephemeralPublicKey *[]byte) lib.ErrorI {
-	buffer := make([]byte, 34)
+	buffer := make([]byte, units.KB)
 	if err := conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
 		return ErrFailedRead(err)
 	}
-	if _, err := conn.Read(buffer); err != nil {
+	n, err := conn.Read(buffer)
+	if err != nil {
 		return ErrFailedRead(err)
 	}
 	key := new(crypto.ProtoPubKey)
-	if err := lib.Unmarshal(buffer, key); err != nil {
-		return err
+	if e := lib.Unmarshal(buffer[:n], key); e != nil {
+		return e
 	}
 	*ephemeralPublicKey = key.Pubkey
 	if crypto.CheckBlacklist(*ephemeralPublicKey) {

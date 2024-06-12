@@ -59,9 +59,7 @@ func (p *PeerBook) GetRandom() *BookPeer {
 func (p *PeerBook) GetAll() (res []*BookPeer) {
 	p.RLock()
 	defer p.RUnlock()
-	for _, peer := range p.book {
-		res = append(res, peer)
-	}
+	res = append(res, p.book...)
 	return
 }
 

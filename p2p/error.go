@@ -4,10 +4,44 @@ import (
 	"fmt"
 	"github.com/ginchuco/ginchu/lib"
 	"google.golang.org/protobuf/proto"
+	"io"
+	"strings"
 )
+
+const (
+	ErrListenerClosed = "use of closed network connection"
+	ErrConnReset      = "connection reset by peer"
+	ErrEOF            = "EOF"
+	ErrPeer           = "Error peer"
+)
+
+func PeerError(publicKey []byte, remoteAddr string, err error) string {
+	newPeerErr := func(err string) string {
+		return fmt.Sprintf("%s %s@%s %s", ErrPeer, lib.BytesToString(publicKey), remoteAddr, err)
+	}
+	errString := err.Error()
+	if strings.Contains(errString, io.EOF.Error()) {
+		return newPeerErr(ErrEOF)
+	}
+	if strings.Contains(errString, ErrListenerClosed) {
+		return newPeerErr(ErrListenerClosed)
+	}
+	if strings.Contains(errString, ErrConnReset) {
+		return newPeerErr(ErrConnReset)
+	}
+	return newPeerErr(errString)
+}
 
 func ErrUnknownP2PMsg(t proto.Message) lib.ErrorI {
 	return lib.NewError(lib.CodeUnknownP2PMessage, lib.P2PModule, fmt.Sprintf("unknown p2p message: %T", t))
+}
+
+func ErrBadStream() lib.ErrorI {
+	return lib.NewError(lib.CodeBadStream, lib.P2PModule, "bad stream")
+}
+
+func ErrPanic() lib.ErrorI {
+	return lib.NewError(lib.CodePanic, lib.P2PModule, "panic caught")
 }
 
 func ErrFailedRead(err error) lib.ErrorI {

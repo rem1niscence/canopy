@@ -117,7 +117,11 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			panic(err)
 		}
 	}
-	c, err := lib.NewConfigFromFile(configFilePath)
+	privateValKey, err := crypto.NewBLSPrivateKeyFromFile(privateValKeyPath)
+	if err != nil {
+		panic(err)
+	}
+	c, err = lib.NewConfigFromFile(configFilePath)
 	if err != nil {
 		panic(err)
 	}

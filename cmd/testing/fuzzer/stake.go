@@ -1,3 +1,4 @@
+// nolint:all
 package main
 
 import (
@@ -375,11 +376,7 @@ func (f *Fuzzer) invalidEditStakeOutput(from *crypto.KeyGroup, val types.Validat
 }
 
 func (f *Fuzzer) invalidStakeAmount(from *crypto.KeyGroup, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	amount, err := f.getRandomStakeAmount(account, fee)
-	if err != nil {
-		return nil, err
-	}
-	return types.NewStakeTx(from.PrivateKey, f.getRandomOutputAddr(from), f.getRandomNetAddr(), amount, account.Sequence, fee)
+	return types.NewStakeTx(from.PrivateKey, f.getRandomOutputAddr(from), f.getRandomNetAddr(), f.getBadStakeAmount(), account.Sequence, fee)
 }
 
 func (f *Fuzzer) invalidEditStakeAmount(from *crypto.KeyGroup, val types.Validator, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {

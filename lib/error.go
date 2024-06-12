@@ -176,6 +176,8 @@ const (
 	CodeFailedListen          ErrorCode   = 20
 	CodeInvalidPeerPublicKey  ErrorCode   = 21
 	CodeSignatureSwap         ErrorCode   = 22
+	CodeBadStream             ErrorCode   = 23
+	CodePanic                 ErrorCode   = 24
 
 	CodeIPLookup                     ErrorCode = 22
 	CodeBannedIP                     ErrorCode = 23
@@ -204,15 +206,14 @@ const (
 	CodeCompactProof   ErrorCode   = 14
 
 	RPCModule         ErrorModule = "rpc"
-	CodeRPCTimeout                = 1
-	CodeInvalidParams             = 2
-	CodeNewFSM                    = 3
-	CodeTimeMachine               = 4
-	CodePostRequest               = 5
-	CodeGetRequest                = 6
-	CodeHttpStatus                = 7
-	CodeReadBody                  = 8
-	CodeNewStore                  = 9
+	CodeRPCTimeout    ErrorCode   = 1
+	CodeInvalidParams ErrorCode   = 2
+	CodeNewFSM        ErrorCode   = 3
+	CodeTimeMachine   ErrorCode   = 4
+	CodePostRequest   ErrorCode   = 5
+	CodeGetRequest    ErrorCode   = 6
+	CodeHttpStatus    ErrorCode   = 7
+	CodeReadBody      ErrorCode   = 8
 )
 
 type ErrorI interface {

@@ -233,6 +233,7 @@ type jsonView struct {
 	Phase  string `json:"phase"`
 }
 
+// nolint:all
 func (x View) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonView{
 		Height: x.Height,

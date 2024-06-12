@@ -463,16 +463,16 @@ func (c *Client) txStake(from, netAddr string, amt uint64, output, pwd string, s
 }
 
 func (c *Client) transactionRequest(routeName string, txRequest txRequest) (hash *string, tx json.RawMessage, e lib.ErrorI) {
-	bz, err := lib.MarshalJSON(txRequest)
-	if err != nil {
+	bz, e := lib.MarshalJSON(txRequest)
+	if e != nil {
 		return
 	}
 	if txRequest.Submit {
 		hash = new(string)
-		err = c.post(routeName, bz, hash, true)
+		e = c.post(routeName, bz, hash, true)
 	} else {
 		tx = json.RawMessage{}
-		err = c.post(routeName, bz, &tx, true)
+		e = c.post(routeName, bz, &tx, true)
 	}
 	return
 }

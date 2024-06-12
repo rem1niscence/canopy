@@ -2,12 +2,14 @@ package p2p
 
 import (
 	"bufio"
+	"errors"
 	"github.com/alecthomas/units"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	limiter "github.com/mxk/go-flowrate/flowrate"
 	"google.golang.org/protobuf/proto"
 	"net"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -45,7 +47,7 @@ type MultiConn struct {
 	quitReceiving chan struct{} // signal to quit
 	sendPong      chan struct{}
 	receivedPong  chan struct{}
-	onError       func([]byte)
+	onError       func(error, []byte, string)
 	error         sync.Once
 	p2p           *P2P
 	log           lib.LoggerI
@@ -112,7 +114,7 @@ func (c *MultiConn) startSendLoop() {
 	defer c.catchPanic()
 	send, m := time.NewTicker(sendInterval), limiter.New(0, 0)
 	ping, err := time.NewTicker(pingInterval), lib.ErrorI(nil)
-	pongTimer, didntReceivePong := new(time.Timer), make(chan struct{}, maxChannelCalls)
+	pongTimer, didntReceivePong := time.NewTimer(pongTimeoutDuration), make(chan struct{}, maxChannelCalls)
 	defer func() { close(didntReceivePong); pongTimer.Stop(); ping.Stop(); send.Stop(); m.Done() }()
 	for {
 		select {
@@ -129,19 +131,18 @@ func (c *MultiConn) startSendLoop() {
 			err = c.send(new(Pong), m)
 		case <-c.receivedPong:
 			_ = pongTimer.Stop()
-			pongTimer = new(time.Timer)
+			pongTimer = time.NewTimer(pongTimeoutDuration)
 		case <-didntReceivePong:
 			err = ErrPongTimeout()
 			if err != nil {
-				c.Error(noPongSlash)
+				c.Error(err, noPongSlash)
 				return
 			}
 		case <-c.quitSending:
 			return
 		}
 		if err != nil {
-			c.log.Error(err.Error())
-			c.Error()
+			c.Error(err)
 			return
 		}
 	}
@@ -156,20 +157,19 @@ func (c *MultiConn) startReceiveLoop() {
 		default:
 			msg, err := c.receive(reader, m)
 			if err != nil {
-				c.log.Error(err.Error())
-				c.Error()
+				c.Error(err)
 				return
 			}
 			switch x := msg.(type) {
 			case *Packet:
 				stream, ok := c.streams[x.StreamId]
 				if !ok {
-					c.Error(badStreamSlash)
+					c.Error(ErrBadStream(), badStreamSlash)
 					return
 				}
 				info, _ := c.p2p.GetPeerInfo(c.peerPublicKey)
 				if slash, er := stream.handlePacket(info, x); er != nil {
-					c.Error(slash)
+					c.Error(er, slash)
 					return
 				}
 			case *Ping:
@@ -177,8 +177,7 @@ func (c *MultiConn) startReceiveLoop() {
 			case *Pong:
 				c.receivedPong <- struct{}{}
 			default:
-				_ = ErrUnknownP2PMsg(x)
-				c.Error(unknownMessageSlash)
+				c.Error(ErrUnknownP2PMsg(x), unknownMessageSlash)
 				return
 			}
 		case <-c.quitReceiving:
@@ -187,11 +186,11 @@ func (c *MultiConn) startReceiveLoop() {
 	}
 }
 
-func (c *MultiConn) Error(reputationDelta ...int32) {
+func (c *MultiConn) Error(err error, reputationDelta ...int32) {
 	if len(reputationDelta) == 1 {
 		c.p2p.ChangeReputation(c.peerPublicKey, reputationDelta[0])
 	}
-	c.error.Do(func() { c.onError(c.peerPublicKey) })
+	c.error.Do(func() { c.onError(err, c.peerPublicKey, c.conn.RemoteAddr().String()) })
 }
 
 var (
@@ -247,7 +246,7 @@ func (c *MultiConn) getNextPacket() *Packet {
 
 func (c *MultiConn) catchPanic() {
 	if r := recover(); r != nil {
-		c.Error()
+		c.Error(errors.New(string(debug.Stack())))
 	}
 }
 

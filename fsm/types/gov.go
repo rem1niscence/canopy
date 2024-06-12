@@ -54,16 +54,16 @@ type ProposalWithVote struct {
 type Poll map[string]PollResult
 
 type PollResult struct {
-	ProposalJSON      json.RawMessage          `json:"proposalJSON"`
-	ApprovedPower     uint64                   `json:"approvedPower"`
-	ApprovedPercent   uint64                   `json:"approvedPercent"`
-	RejectedPercent   uint64                   `json:"rejectedPercent"`
-	TotalVotedPercent uint64                   `json:"totalVotedPercent"`
-	RejectedPower     uint64                   `json:"rejectedPower"`
-	TotalVotedPower   uint64                   `json:"totalVotedPower"`
-	TotalPower        uint64                   `json:"totalPower"`
-	ApproveVotes      []lib.ConsensusValidator `json:"approveVotes"`
-	RejectVotes       []lib.ConsensusValidator `json:"rejectVotes"`
+	ProposalJSON      json.RawMessage           `json:"proposalJSON"`
+	ApprovedPower     uint64                    `json:"approvedPower"`
+	ApprovedPercent   uint64                    `json:"approvedPercent"`
+	RejectedPercent   uint64                    `json:"rejectedPercent"`
+	TotalVotedPercent uint64                    `json:"totalVotedPercent"`
+	RejectedPower     uint64                    `json:"rejectedPower"`
+	TotalVotedPower   uint64                    `json:"totalVotedPower"`
+	TotalPower        uint64                    `json:"totalPower"`
+	ApproveVotes      []*lib.ConsensusValidator `json:"approveVotes"`
+	RejectVotes       []*lib.ConsensusValidator `json:"rejectVotes"`
 }
 
 func PollValidators(vals *lib.ConsensusValidators, path string, logger lib.LoggerI) (poll Poll) {
@@ -111,12 +111,12 @@ func PollValidators(vals *lib.ConsensusValidators, path string, logger lib.Logge
 				state.TotalPower = validatorSet.TotalPower
 			}
 			if propWithVote.Approve {
-				state.ApproveVotes = append(state.ApproveVotes, *v)
+				state.ApproveVotes = append(state.ApproveVotes, v)
 				state.ApprovedPower += v.VotingPower
 				state.TotalVotedPower += v.VotingPower
 				state.ApprovedPercent = lib.Uint64PercentageDiv(state.ApprovedPower, state.TotalVotedPower)
 			} else {
-				state.RejectVotes = append(state.ApproveVotes, *v)
+				state.RejectVotes = append(state.ApproveVotes, v)
 				state.RejectedPower += v.VotingPower
 				state.TotalVotedPower += v.VotingPower
 				state.RejectedPercent = lib.Uint64PercentageDiv(state.RejectedPower, state.TotalVotedPower)

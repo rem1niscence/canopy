@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/netutil"
 	"google.golang.org/protobuf/proto"
 	"net"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -218,10 +219,9 @@ func (p *P2P) InternalListenValidators(validatorsReceiver chan []*lib.PeerAddres
 	}
 }
 
-func (p *P2P) OnPeerError(publicKey []byte) {
-	if err := p.PeerSet.Remove(publicKey); err != nil {
-		fmt.Println(err.Error()) // handle error
-	}
+func (p *P2P) OnPeerError(err error, publicKey []byte, remoteAddr string) {
+	p.log.Warn(PeerError(publicKey, remoteAddr, err))
+	_ = p.PeerSet.Remove(publicKey) // peer may have disconnected before added
 }
 
 func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
@@ -258,8 +258,7 @@ func (p *P2P) SelfSend(fromPublicKey []byte, topic lib.Topic, payload proto.Mess
 	return nil
 }
 func (p *P2P) MaxPossiblePeers() int {
-	c := p.config
-	return c.MaxInbound + c.MaxOutbound + p.maxValidators + len(c.TrustedPeerIDs)
+	return p.config.MaxInbound + p.config.MaxOutbound + p.maxValidators + len(p.config.TrustedPeerIDs)
 }
 func (p *P2P) ReceiveChannel(topic lib.Topic) chan *lib.MessageWrapper { return p.channels[topic] }
 func (p *P2P) ValidatorsReceiver() chan []*lib.PeerAddress             { return p.validatorsReceiver }
@@ -300,7 +299,7 @@ func (p *P2P) filter(conn net.Conn) (*lib.PeerAddress, lib.ErrorI) {
 }
 func (p *P2P) catchPanic() {
 	if r := recover(); r != nil {
-		fmt.Println("recovered") // handle error
+		p.log.Error(string(debug.Stack()))
 	}
 }
 

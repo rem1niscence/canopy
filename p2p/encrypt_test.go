@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestHandshake(t *testing.T) {
+func TestEncryptedConn(t *testing.T) {
 	msg1, msg2 := []byte("foo"), []byte("bar")
 	p1, err := crypto.NewBLSPrivateKey()
 	require.NoError(t, err)
@@ -16,7 +16,7 @@ func TestHandshake(t *testing.T) {
 	require.NoError(t, err)
 	c1, c2 := net.Pipe()
 	defer func() { c1.Close(); c2.Close() }()
-	e1, e2 := new(EncryptedConn), new(EncryptedConn)
+	var e1, e2 *EncryptedConn
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {

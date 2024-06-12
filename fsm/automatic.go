@@ -52,7 +52,7 @@ func (s *StateMachine) GetConsensusValidators(all ...bool) (*lib.ConsensusValida
 		return nil, err
 	}
 	defer it.Close()
-	if all != nil && all[0] == true {
+	if all != nil && all[0] {
 		valMaxCount = math.MaxUint64
 	}
 	for i := uint64(0); it.Valid() && i < valMaxCount; it.Next() {

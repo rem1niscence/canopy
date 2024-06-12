@@ -3,10 +3,12 @@ package lib
 import (
 	"errors"
 	"fmt"
-	lumberjack "gopkg.in/natefinch/lumberjack.v2"
+	"github.com/fatih/color"
+	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -14,6 +16,10 @@ const (
 	LogDirectory = "logs"
 	LogFileName  = "log"
 )
+
+func init() {
+	color.NoColor = false
+}
 
 type LoggerI interface {
 	Debug(msg string)
@@ -36,12 +42,12 @@ const (
 	WarnLevel  int32 = 4
 	ErrorLevel int32 = 8
 
-	Reset  = "\033[0m"
-	RED    = "\033[31m"
-	GREEN  = "\033[32m"
-	YELLOW = "\033[33m"
-	BLUE   = "\033[34m"
-	GRAY   = "\033[37m"
+	Reset = iota
+	RED
+	GREEN
+	YELLOW
+	BLUE
+	GRAY
 )
 
 var (
@@ -126,7 +132,34 @@ func NewDefaultLogger() LoggerI {
 	})
 }
 
-func colorStringWithFormat(c string, format string, args ...interface{}) string {
-	return c + fmt.Sprintf(format, args...) + Reset
+func colorStringWithFormat(c int, format string, args ...interface{}) string {
+	return colorString(c, fmt.Sprintf(format, args...))
 }
-func colorString(c, msg string) string { return c + msg + Reset }
+func colorString(c int, msg string) (res string) {
+	arr := strings.Split(msg, "\n")
+	l := len(arr)
+	for i, part := range arr {
+		res += cString(c, part)
+		if i != l-1 {
+			res += "\n"
+		}
+	}
+	return
+}
+
+func cString(c int, msg string) string {
+	switch c {
+	case BLUE:
+		return color.BlueString(msg)
+	case RED:
+		return color.RedString(msg)
+	case YELLOW:
+		return color.YellowString(msg)
+	case GREEN:
+		return color.GreenString(msg)
+	case GRAY:
+		return color.HiBlackString(msg)
+	default:
+		return color.WhiteString(msg)
+	}
+}

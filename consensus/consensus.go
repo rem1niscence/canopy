@@ -634,21 +634,21 @@ func (c *Consensus) JSONSummary() ([]byte, lib.ErrorI) {
 	case Election, Propose, Precommit, Commit:
 		proposal := c.Proposals.getProposal(c.View)
 		if proposal == nil {
-			status = fmt.Sprintf("waiting for proposal")
+			status = "waiting for proposal"
 		} else {
-			status = fmt.Sprintf("received proposal")
+			status = "received proposal"
 		}
 	default:
 		if bytes.Equal(c.ProposerKey, c.PublicKey) {
 			_, _, votedPercentage := c.Votes.getLeadingVote(c.View, c.ValidatorSet.TotalPower)
 			status = fmt.Sprintf("received %d%% of votes", votedPercentage)
 		} else {
-			status = fmt.Sprintf("voting on proposal")
+			status = "voting on proposal"
 		}
 	}
 	return lib.MarshalJSONIndent(Summary{
 		Syncing:         c.syncing.Load(),
-		View:            *c.View,
+		View:            c.View,
 		BlockHash:       hash,
 		Locked:          c.Locked,
 		Address:         selfKey.Address().Bytes(),
@@ -673,7 +673,7 @@ func phaseString(p Phase) string {
 
 type Summary struct {
 	Syncing         bool               `json:"syncing"`
-	View            lib.View           `json:"view"`
+	View            *lib.View          `json:"view"`
 	BlockHash       lib.HexBytes       `json:"blockHash"`
 	Locked          bool               `json:"locked"`
 	Address         lib.HexBytes       `json:"address"`
