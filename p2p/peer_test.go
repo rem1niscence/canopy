@@ -1,8 +1,124 @@
+// nolint:all
 package p2p
 
-import "testing"
+import (
+	"github.com/ginchuco/ginchu/lib"
+	"github.com/stretchr/testify/require"
+	"net"
+	"sync"
+	"testing"
+)
 
-func TestPeerSetAdd(t *testing.T) {
-
+func TestPeerSetAddGetDel(t *testing.T) {
+	n1, n2 := newTestP2PNode(t), newTestP2PNode(t)
+	require.True(t, len(n1.PeerSet.m) == 0)
+	expected := &lib.PeerInfo{
+		Address: &lib.PeerAddress{
+			PublicKey:  n2.pub,
+			NetAddress: "pipe",
+		},
+		IsOutbound:  true,
+		IsValidator: true,
+		IsTrusted:   true,
+		Reputation:  10,
+	}
+	c1, c2 := net.Pipe()
+	defer c2.Close()
+	require.NoError(t, n1.PeerSet.Add(&Peer{PeerInfo: expected, conn: newTestMultiConnMock(t, n2.pub, c1, n1.P2P)}))
+	require.True(t, len(n1.PeerSet.m) == 1)
+	got, err := n1.PeerSet.GetPeerInfo(n2.pub)
+	require.NoError(t, err)
+	require.Equal(t, *expected, *got)
+	require.NoError(t, n1.PeerSet.Remove(n2.pub))
+	require.Error(t, n1.PeerSet.Remove(n2.pub))
+	_, err = n1.PeerSet.GetPeerInfo(n2.pub)
+	require.Error(t, err)
+	require.True(t, len(n1.PeerSet.m) == 0)
 }
 
+func TestUpdateValidators(t *testing.T) {
+	n1, n2, n3 := newTestP2PNode(t), newTestP2PNode(t), newTestP2PNode(t)
+	require.NoError(t, n1.Add(&Peer{
+		PeerInfo: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: n2.pub}},
+	}))
+	toDial := n1.UpdateValidators(n1.pub, []*lib.PeerAddress{
+		{PublicKey: n1.pub},
+		{PublicKey: n2.pub},
+		{PublicKey: n3.pub},
+	})
+	require.True(t, len(toDial) == 1)
+	require.Equal(t, toDial[0].PublicKey, n3.pub)
+	peerInfo, err := n1.PeerSet.GetPeerInfo(n2.pub)
+	require.NoError(t, err)
+	require.True(t, peerInfo.IsValidator)
+	_, err = n1.PeerSet.GetPeerInfo(n1.pub)
+	require.Error(t, err)
+	n1.UpdateValidators(n1.pub, []*lib.PeerAddress{
+		{PublicKey: n1.pub},
+		{PublicKey: n3.pub},
+	})
+	peerInfo, err = n1.PeerSet.GetPeerInfo(n2.pub)
+	require.NoError(t, err)
+	require.False(t, peerInfo.IsValidator)
+}
+
+func TestChangeReputation(t *testing.T) {
+	n1, n2, cleanup := newTestP2PPair(t)
+	defer cleanup()
+	n1.UpdateValidators(n1.pub, []*lib.PeerAddress{{PublicKey: n2.pub}})
+	peerInfo, err := n1.GetPeerInfo(n2.pub)
+	require.NoError(t, err)
+	require.True(t, peerInfo.IsValidator)
+	require.True(t, peerInfo.Reputation == 0)
+	n1.ChangeReputation(n2.pub, -11)
+	peerInfo, err = n1.GetPeerInfo(n2.pub)
+	require.NoError(t, err)
+	require.True(t, peerInfo.Reputation == -11)
+	_, err = n1.GetPeerInfo(n2.pub)
+	require.NoError(t, err)
+	n1.UpdateValidators(n1.pub, []*lib.PeerAddress{})
+	n1.ChangeReputation(n2.pub, 0)
+	_, err = n1.GetPeerInfo(n2.pub)
+	require.Error(t, err)
+}
+
+func TestGetAllInfosAndBookPeers(t *testing.T) {
+	n1, n2, cleanup := newTestP2PPair(t)
+	n3 := newTestP2PNode(t)
+	_, c := net.Pipe()
+	require.NoError(t, n1.Add(&Peer{
+		conn:     newTestMultiConnMock(t, n3.pub, c, n1.P2P),
+		PeerInfo: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: n3.pub}, IsOutbound: true},
+	}))
+	defer func() { cleanup() }()
+	infos, numInbound, numOutbound := n1.GetAllInfos()
+	require.True(t, len(infos) == 2)
+	require.True(t, numInbound == 1)
+	require.True(t, numOutbound == 1)
+	for _, i := range infos {
+		if i.IsOutbound {
+			require.Equal(t, n3.pub, i.Address.PublicKey)
+		} else {
+			require.Equal(t, n2.pub, i.Address.PublicKey)
+		}
+	}
+	bp := n1.GetBookPeers()
+	require.Len(t, bp, 1)
+	require.Equal(t, bp[0].Address.PublicKey, n2.pub)
+}
+
+func newTestMultiConnMock(_ *testing.T, peerPubKey []byte, conn net.Conn, p *P2P) *MultiConn {
+	return &MultiConn{
+		conn:          conn,
+		peerPublicKey: peerPubKey,
+		streams:       p.NewStreams(),
+		quitSending:   make(chan struct{}, maxChanSize),
+		quitReceiving: make(chan struct{}, maxChanSize),
+		sendPong:      make(chan struct{}, maxChanSize),
+		receivedPong:  make(chan struct{}, maxChanSize),
+		onError:       func(err error, bytes []byte, s string) { p.log.Error(err.Error()) },
+		error:         sync.Once{},
+		p2p:           p,
+		log:           p.log,
+	}
+}

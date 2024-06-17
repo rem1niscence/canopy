@@ -132,6 +132,13 @@ func NewDefaultLogger() LoggerI {
 	})
 }
 
+func NewNullLogger() LoggerI {
+	return NewLogger(LoggerConfig{
+		Level: DebugLevel,
+		Out:   io.Discard,
+	})
+}
+
 func colorStringWithFormat(c int, format string, args ...interface{}) string {
 	return colorString(c, fmt.Sprintf(format, args...))
 }

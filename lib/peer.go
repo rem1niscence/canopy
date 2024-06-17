@@ -16,6 +16,13 @@ type MessageWrapper struct {
 	Sender  *PeerInfo
 }
 
+func (x *MessageWrapper) WithHash() *MessageWrapper {
+	x.Hash = nil
+	bz, _ := MarshalJSON(x)
+	x.Hash = crypto.Hash(bz)
+	return x
+}
+
 const (
 	delimiter = "@"
 )
@@ -33,19 +40,16 @@ func (x *PeerAddress) FromString(s string) ErrorI {
 	if len(arr) != 2 {
 		return ErrInvalidNetAddrString(s)
 	}
-	pubKeyBytes, err := StringToBytes(arr[0])
+	pubKey, err := crypto.NewPublicKeyFromString(arr[0])
 	if err != nil {
-		return err
-	}
-	if len(pubKeyBytes) != crypto.Ed25519PubKeySize {
-		return ErrInvalidNetAddressPubKey(s)
+		return ErrInvalidNetAddressPubKey(arr[0])
 	}
 	host, port, er := net.SplitHostPort(arr[1])
 	if er != nil {
 		return ErrInvalidNetAddressHostAndPort(s)
 	}
 	x.NetAddress = net.JoinHostPort(host, port)
-	x.PublicKey = pubKeyBytes
+	x.PublicKey = pubKey.Bytes()
 	return nil
 }
 

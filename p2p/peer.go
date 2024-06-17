@@ -63,9 +63,13 @@ func (ps *PeerSet) UpdateValidators(selfPublicKey []byte, vs []*lib.PeerAddress)
 	ps.Lock()
 	defer ps.Unlock()
 	var selfIsValidator bool
+	for _, peer := range ps.m {
+		peer.IsValidator = false
+	}
 	for _, val := range vs {
 		if bytes.Equal(selfPublicKey, val.PublicKey) {
 			selfIsValidator = true
+			continue
 		}
 		publicKey := lib.BytesToString(val.PublicKey)
 		v, found := ps.m[publicKey]
@@ -141,7 +145,14 @@ func (ps *PeerSet) GetBookPeers() []*BookPeer {
 	return ps.book.GetAll()
 }
 
-func (ps *PeerSet) SendToPeer(topic lib.Topic, msg proto.Message) (*lib.PeerInfo, lib.ErrorI) {
+func (ps *PeerSet) GetBookSize() int {
+	ps.book.RLock()
+	defer ps.book.RUnlock()
+	return ps.book.bookSize
+}
+
+// send to any one peer
+func (ps *PeerSet) SendToRandPeer(topic lib.Topic, msg proto.Message) (*lib.PeerInfo, lib.ErrorI) {
 	ps.RLock()
 	defer ps.RUnlock()
 	for _, p := range ps.m {

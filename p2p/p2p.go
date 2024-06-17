@@ -53,9 +53,14 @@ type P2P struct {
 func New(p crypto.PrivateKeyI, maxValidators uint64, c lib.Config, l lib.LoggerI) *P2P {
 	channels := make(lib.Channels)
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
-		channels[i] = make(chan *lib.MessageWrapper, maxChannelCalls)
+		channels[i] = make(chan *lib.MessageWrapper, maxChanSize)
 	}
-	peerBook := &PeerBook{} // TODO load from file / write to file
+	peerBook := &PeerBook{
+		RWMutex:  sync.RWMutex{},
+		book:     make([]*BookPeer, 0),
+		bookSize: 0,
+		log:      l,
+	} // TODO load from file / write to file
 	if maxValidators == 0 {
 		maxValidators = defaultMaxValidators
 	}
@@ -74,7 +79,7 @@ func New(p crypto.PrivateKeyI, maxValidators uint64, c lib.Config, l lib.LoggerI
 		PeerSet:            NewPeerSet(c, peerBook),
 		book:               peerBook,
 		state:              State{RWMutex: sync.RWMutex{}},
-		validatorsReceiver: make(chan []*lib.PeerAddress, maxChannelCalls),
+		validatorsReceiver: make(chan []*lib.PeerAddress, maxChanSize),
 		maxValidators:      int(maxValidators),
 		bannedIPs:          bannedIPs,
 		log:                l,
@@ -85,22 +90,45 @@ func (p *P2P) Start() {
 	p.log.Info("Starting P2P 🤝 ")
 	go p.InternalListenValidators(p.validatorsReceiver)
 	go p.Listen(&lib.PeerAddress{NetAddress: p.config.ListenAddress})
-	go p.book.StartChurnManagement(p.DialAndDisconnect)
+	go p.StartPeerBookService()
+	go p.StartDialService()
+}
+
+func (p *P2P) Stop() {
+	if p.listener != nil {
+		if err := p.listener.Close(); err != nil {
+			p.log.Error(err.Error())
+		}
+	}
+	p.PeerSet.Stop()
+}
+
+func (p *P2P) StartDialService() {
 	go func() {
 		for _, peer := range p.config.DialPeers {
 			pi := new(lib.PeerAddress)
 			if err := pi.FromString(peer); err != nil {
-				// log error
+				p.log.Error(err.Error())
 				continue
 			}
-			p.DialWithBackoff(pi)
+			go p.DialWithBackoff(pi)
 		}
 	}()
-}
-
-func (p *P2P) Stop() {
-	p.Close()
-	p.PeerSet.Stop()
+	dialing := 0
+	for range time.NewTicker(dialTimeout).C {
+		if p.PeerSet.Outbound()+dialing >= p.config.MaxOutbound && p.GetBookSize() > 1 { // self
+			continue
+		}
+		rand := p.book.GetRandom()
+		if p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) {
+			continue
+		}
+		dialing++
+		if err := p.Dial(rand.Address, false); err != nil {
+			p.log.Warn(err.Error())
+		}
+		dialing--
+	}
 }
 
 func (p *P2P) Dial(address *lib.PeerAddress, disconnect bool) lib.ErrorI {
@@ -110,7 +138,6 @@ func (p *P2P) Dial(address *lib.PeerAddress, disconnect bool) lib.ErrorI {
 	p.log.Debugf("Dialing %s@%s", lib.BytesToString(address.PublicKey), address.NetAddress)
 	conn, er := net.DialTimeout(transport, address.NetAddress, dialTimeout)
 	if er != nil {
-		p.book.AddFailedDialAttempt(address.PublicKey)
 		return ErrFailedDial(er)
 	}
 	return p.AddPeer(conn, &lib.PeerInfo{
@@ -154,7 +181,7 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) lib.Er
 	if err != nil {
 		return err
 	}
-	p.log.Infof("Adding peer: %s@%s", lib.BytesToString(connection.peerPublicKey), info.Address.NetAddress)
+	p.log.Debugf("Try Add peer: %s@%s", lib.BytesToString(connection.peerPublicKey), info.Address.NetAddress)
 	if info.Address.PublicKey != nil && !bytes.Equal(connection.peerPublicKey, info.Address.PublicKey) {
 		return ErrMismatchPeerPublicKey(info.Address.PublicKey, connection.peerPublicKey)
 	}
@@ -192,6 +219,7 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) lib.Er
 			return ErrBannedID(pubKeyString)
 		}
 	}
+	p.log.Infof("Adding peer: %s@%s", lib.BytesToString(info.Address.PublicKey), info.Address.NetAddress)
 	p.book.Add(&BookPeer{Address: info.Address})
 	return p.PeerSet.Add(&Peer{
 		conn:     connection,
@@ -201,7 +229,13 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) lib.Er
 }
 
 func (p *P2P) DialWithBackoff(peerInfo *lib.PeerAddress) {
-	_ = backoff.Retry(func() error { return p.Dial(peerInfo, false) }, backoff.NewExponentialBackOff())
+	_ = backoff.Retry(func() error {
+		err := p.Dial(peerInfo, false)
+		if err != nil {
+			p.log.Errorf("Dial %s@%s failed: %s", peerInfo.PublicKey, peerInfo.NetAddress, err.Error())
+		}
+		return err
+	}, backoff.NewExponentialBackOff())
 }
 func (p *P2P) DialAndDisconnect(a *lib.PeerAddress) lib.ErrorI {
 	return p.Dial(a, true)
@@ -241,20 +275,15 @@ func (p *P2P) IsSelf(address *lib.PeerAddress) bool {
 }
 func (p *P2P) SelfSend(fromPublicKey []byte, topic lib.Topic, payload proto.Message) lib.ErrorI {
 	p.log.Debugf("Self sending %s message", topic)
-	msgBz, err := lib.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	p.ReceiveChannel(topic) <- &lib.MessageWrapper{
+	p.ReceiveChannel(topic) <- (&lib.MessageWrapper{
 		Message: payload,
-		Hash:    crypto.Hash(msgBz),
 		Sender: &lib.PeerInfo{
 			Address: &lib.PeerAddress{
 				PublicKey:  fromPublicKey,
 				NetAddress: "",
 			},
 		},
-	}
+	}).WithHash()
 	return nil
 }
 func (p *P2P) MaxPossiblePeers() int {
@@ -262,13 +291,6 @@ func (p *P2P) MaxPossiblePeers() int {
 }
 func (p *P2P) ReceiveChannel(topic lib.Topic) chan *lib.MessageWrapper { return p.channels[topic] }
 func (p *P2P) ValidatorsReceiver() chan []*lib.PeerAddress             { return p.validatorsReceiver }
-func (p *P2P) Close() {
-	if p.listener != nil {
-		if err := p.listener.Close(); err != nil {
-			p.log.Error(err.Error())
-		}
-	}
-}
 func (p *P2P) ID() *lib.PeerAddress {
 	p.Lock()
 	defer p.Unlock()

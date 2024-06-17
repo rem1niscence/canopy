@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/alecthomas/units"
 	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
 	limiter "github.com/mxk/go-flowrate/flowrate"
 	"google.golang.org/protobuf/proto"
 	"net"
@@ -25,7 +24,7 @@ const (
 	sendRatePerS        = 500 * units.KB
 	recRatePerS         = 500 * units.KB
 	maxMessageSize      = 50 * units.Megabyte
-	maxChannelCalls     = 10000
+	maxChanSize         = 100
 	maxQueueSize        = 100
 
 	maxMessageExceededSlash = -10
@@ -66,10 +65,10 @@ func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
 		conn:          eConn,
 		peerPublicKey: eConn.peerPubKey.Bytes(),
 		streams:       streams,
-		quitSending:   make(chan struct{}, maxChannelCalls),
-		quitReceiving: make(chan struct{}, maxChannelCalls),
-		sendPong:      make(chan struct{}, maxChannelCalls),
-		receivedPong:  make(chan struct{}, maxChannelCalls),
+		quitSending:   make(chan struct{}, maxChanSize),
+		quitReceiving: make(chan struct{}, maxChanSize),
+		sendPong:      make(chan struct{}, maxChanSize),
+		receivedPong:  make(chan struct{}, maxChanSize),
 		onError:       p.OnPeerError,
 		error:         sync.Once{},
 		p2p:           p,
@@ -87,7 +86,7 @@ func (c *MultiConn) Start() {
 }
 
 func (c *MultiConn) Stop() {
-	c.p2p.log.Warnf("Stopping peer %s@%s", lib.BytesToString(c.peerPublicKey), c.conn.RemoteAddr().String())
+	c.p2p.log.Warnf("Stopping peer %s", lib.BytesToString(c.peerPublicKey))
 	c.quitReceiving <- struct{}{}
 	c.quitSending <- struct{}{}
 	close(c.quitSending)
@@ -114,7 +113,7 @@ func (c *MultiConn) startSendLoop() {
 	defer c.catchPanic()
 	send, m := time.NewTicker(sendInterval), limiter.New(0, 0)
 	ping, err := time.NewTicker(pingInterval), lib.ErrorI(nil)
-	pongTimer, didntReceivePong := time.NewTimer(pongTimeoutDuration), make(chan struct{}, maxChannelCalls)
+	pongTimer, didntReceivePong := time.NewTimer(pongTimeoutDuration), make(chan struct{}, maxChanSize)
 	defer func() { close(didntReceivePong); pongTimer.Stop(); ping.Stop(); send.Stop(); m.Done() }()
 	for {
 		select {
@@ -314,11 +313,11 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		if err != nil {
 			return badPacketSlash, err
 		}
-		s.receive <- &lib.MessageWrapper{
+		wrapper := (&lib.MessageWrapper{
 			Message: payload,
-			Hash:    crypto.Hash(s.receiving),
 			Sender:  peerInfo,
-		}
+		}).WithHash()
+		s.receive <- wrapper
 		s.receiving = make([]byte, 0, maxMessageSize)
 	}
 	return 0, nil
