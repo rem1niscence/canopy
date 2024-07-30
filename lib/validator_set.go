@@ -39,7 +39,7 @@ func NewValidatorSet(validators *ConsensusValidators) (vs ValidatorSet, err Erro
 		totalPower += v.VotingPower
 		count++
 	}
-	minimumPowerForQuorum := Uint64ReducePercentage(totalPower, 33)
+	minimumPowerForQuorum := Uint64ReducePercentage(totalPower, 100*float64(1)/float64(3)) + 1
 	if err != nil {
 		return
 	}
@@ -124,11 +124,7 @@ func (x *AggregateSignature) CheckBasic(sb SignByte, vs ValidatorSet) ErrorI {
 	if er := key.SetBitmap(x.Bitmap); er != nil {
 		return ErrInvalidSignerBitmap(er)
 	}
-	msg, err := sb.SignBytes()
-	if err != nil {
-		return err
-	}
-	if !key.VerifyBytes(msg, x.Signature) {
+	if !key.VerifyBytes(sb.SignBytes(), x.Signature) {
 		return ErrInvalidAggrSignature()
 	}
 	return nil

@@ -43,7 +43,6 @@ type WIndexerI interface {
 	IndexBlock(b *BlockResult) ErrorI
 	DeleteTxsForHeight(height uint64) ErrorI
 	DeleteBlockForHeight(height uint64) ErrorI
-	DeleteDoubleSignersForHeight(height uint64) ErrorI
 	DeleteQCForHeight(height uint64) ErrorI
 }
 
@@ -55,7 +54,6 @@ type RIndexerI interface {
 	GetBlockByHash(hash []byte) (*BlockResult, ErrorI)
 	GetBlockByHeight(height uint64) (*BlockResult, ErrorI)
 	GetBlocks(p PageParams) (*Page, ErrorI)
-	GetDoubleSigners(height uint64) (*DoubleSigners, ErrorI)
 	GetQCByHeight(height uint64) (*QuorumCertificate, ErrorI)
 }
 

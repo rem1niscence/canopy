@@ -11,14 +11,13 @@ import (
 var _ lib.RWIndexerI = &Indexer{}
 
 var (
-	txHashPrefix           = []byte{1}
-	txHeightPrefix         = []byte{2}
-	txSenderPrefix         = []byte{3}
-	txRecipientPrefix      = []byte{4}
-	blockHashPrefix        = []byte{5}
-	blockHeightPrefix      = []byte{6}
-	doubleSignersPrefixKey = []byte{7} // This is required since evidence is store in QC and QCs are maleable by a malicious leader. Ensure that evidence can't be unfairly replayed
-	qcHeightPrefix         = []byte{8}
+	txHashPrefix      = []byte{1}
+	txHeightPrefix    = []byte{2}
+	txSenderPrefix    = []byte{3}
+	txRecipientPrefix = []byte{4}
+	blockHashPrefix   = []byte{5}
+	blockHeightPrefix = []byte{6}
+	qcHeightPrefix    = []byte{7}
 
 	delim = []byte("/") // TODO test for things like height collisions ex: iterating txHeightPrefix/10 and capturing txHeightPrefix/100/0 etc.
 )
@@ -44,11 +43,6 @@ func (t *Indexer) IndexBlock(b *lib.BlockResult) lib.ErrorI {
 			return err
 		}
 	}
-	for _, evidence := range b.BlockHeader.Evidence {
-		if err = t.IndexDoubleSigners(b.BlockHeader.Height, evidence); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -62,9 +56,6 @@ func (t *Indexer) DeleteBlockForHeight(height uint64) lib.ErrorI {
 		return err
 	}
 	if err = t.DeleteTxsForHeight(height); err != nil {
-		return err
-	}
-	if err = t.DeleteDoubleSignersForHeight(height); err != nil {
 		return err
 	}
 	return t.db.Delete(hashKey)
@@ -133,7 +124,11 @@ func (t *Indexer) GetQCByHeight(height uint64) (*lib.QuorumCertificate, lib.Erro
 	if err != nil {
 		return nil, err
 	}
-	qc.Block, err = blkResult.ToBlock()
+	block, err := blkResult.ToBlock()
+	if err != nil {
+		return nil, err
+	}
+	qc.Proposal, err = lib.Marshal(block)
 	if err != nil {
 		return nil, err
 	}
@@ -146,39 +141,15 @@ func (t *Indexer) DeleteQCForHeight(height uint64) lib.ErrorI {
 
 func (t *Indexer) IndexQC(qc *lib.QuorumCertificate) lib.ErrorI {
 	bz, err := lib.Marshal(&lib.QuorumCertificate{
-		Header:      qc.Header,
-		BlockHash:   qc.BlockHash,
-		ProposerKey: qc.ProposerKey,
-		Signature:   qc.Signature,
+		Header:       qc.Header,
+		ProposalHash: qc.ProposalHash,
+		ProposerKey:  qc.ProposerKey,
+		Signature:    qc.Signature,
 	})
 	if err != nil {
 		return err
 	}
 	return t.indexQCByHeight(qc.Header.Height, bz)
-}
-
-func (t *Indexer) IndexDoubleSigners(height uint64, evidence *lib.DoubleSignEvidence) lib.ErrorI {
-	doubleSigners, err := t.GetDoubleSigners(height)
-	if err != nil {
-		return err
-	}
-	if doubleSigners == nil {
-		doubleSigners = new(lib.DoubleSigners)
-	}
-	doubleSigners.DoubleSigners = append(doubleSigners.DoubleSigners, evidence.DoubleSigners...)
-	bz, err := lib.Marshal(doubleSigners)
-	if err != nil {
-		return err
-	}
-	return t.indexDoubleSignersByHeight(height, bz)
-}
-
-func (t *Indexer) GetDoubleSigners(height uint64) (*lib.DoubleSigners, lib.ErrorI) {
-	return t.getDoubleSigners(t.doubleSignersHeightKey(height))
-}
-
-func (t *Indexer) DeleteDoubleSignersForHeight(height uint64) lib.ErrorI {
-	return t.deleteAll(t.doubleSignersHeightKey(height))
 }
 
 func (t *Indexer) IndexTx(result *lib.TxResult) lib.ErrorI {
@@ -257,18 +228,6 @@ func (t *Indexer) getBlock(key []byte) (*lib.BlockResult, lib.ErrorI) {
 		BlockHeader:  ptr,
 		Transactions: txs,
 	}, nil
-}
-
-func (t *Indexer) getDoubleSigners(key []byte) (*lib.DoubleSigners, lib.ErrorI) {
-	bz, err := t.db.Get(key)
-	if err != nil {
-		return nil, err
-	}
-	ptr := new(lib.DoubleSigners)
-	if err = lib.Unmarshal(bz, ptr); err != nil {
-		return nil, err
-	}
-	return ptr, nil
 }
 
 func (t *Indexer) getTx(key []byte) (*lib.TxResult, lib.ErrorI) {
@@ -378,10 +337,6 @@ func (t *Indexer) indexTxByRecipient(recipient, heightAndIndexKey []byte, bz []b
 	return t.db.Set(t.txRecipientKey(recipient, heightAndIndexKey), bz)
 }
 
-func (t *Indexer) indexDoubleSignersByHeight(height uint64, bz []byte) lib.ErrorI {
-	return t.db.Set(t.doubleSignersHeightKey(height), bz)
-}
-
 func (t *Indexer) indexQCByHeight(height uint64, bz []byte) lib.ErrorI {
 	return t.db.Set(t.qcHeightKey(height), bz)
 }
@@ -413,10 +368,6 @@ func (t *Indexer) txSenderKey(address, heightAndIndexKey []byte) []byte {
 
 func (t *Indexer) txRecipientKey(address, heightAndIndexKey []byte) []byte {
 	return t.key(txRecipientPrefix, address, heightAndIndexKey)
-}
-
-func (t *Indexer) doubleSignersHeightKey(height uint64) []byte {
-	return t.key(doubleSignersPrefixKey, t.encodeBigEndian(height), nil)
 }
 
 func (t *Indexer) blockHashKey(hash []byte) []byte {

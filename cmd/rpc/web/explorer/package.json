@@ -1,0 +1,24 @@
+{
+  "name": "explorer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 50001",
+    "build": "next build",
+    "start": "npx serve@latest out -p 50001",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@textea/json-viewer": "^3.4.1",
+    "bootstrap": "^5.3.3",
+    "eslint": "8.57.0",
+    "eslint-config-next": "14.2.3",
+    "mdb-react-ui-kit": "^8.0.0",
+    "next": "14.2.3",
+    "react": "18.3.1",
+    "react-bootstrap": "^2.10.2",
+    "react-dom": "18.3.1",
+    "react-middle-ellipsis": "^1.2.2",
+    "react-truncate-inside": "^1.0.3"
+  }
+}

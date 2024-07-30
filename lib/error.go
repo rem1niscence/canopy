@@ -21,13 +21,14 @@ const (
 	// to avoid consensus level issues
 
 	MainModule               ErrorModule = "main"
+	CodeInvalidAddress       ErrorCode   = 6
 	CodeJSONMarshal          ErrorCode   = 7
 	CodeJSONUnmarshal        ErrorCode   = 8
 	CodeUnmarshal            ErrorCode   = 9
 	CodeMarshal              ErrorCode   = 10
 	CodeFromAny              ErrorCode   = 11
 	CodeToAny                ErrorCode   = 12
-	CodeStringToBigInt       ErrorCode   = 13
+	CodeNilProposal          ErrorCode   = 13
 	CodeStringToBytes        ErrorCode   = 14
 	CodeNilBlock             ErrorCode   = 15
 	CodeNilBlockHeader       ErrorCode   = 16
@@ -52,7 +53,7 @@ const (
 	ConsensusModule              ErrorModule = "consensus"
 	CodeDuplicateTransaction     ErrorCode   = 6
 	CodeTxFoundInMempool         ErrorCode   = 7
-	CodeMismatchBlockHash        ErrorCode   = 8
+	CodeMismatchProposalHash     ErrorCode   = 8
 	CodeDuplicateProposerMessage ErrorCode   = 9
 	CodeDuplicateVote            ErrorCode   = 10
 	CodeInvalidSignatureLength   ErrorCode   = 11
@@ -80,7 +81,7 @@ const (
 	CodeAggregateSignature              ErrorCode = 36
 	CodeEmptyQuorumCertificate          ErrorCode = 37
 	CodeEvidenceTooOld                  ErrorCode = 38
-	CodeMismatchBlocks                  ErrorCode = 39
+	CodeMismatchProposals               ErrorCode = 39
 	CodeFailedSafeNode                  ErrorCode = 40
 	CodeInvalidValidatorIndex           ErrorCode = 41
 	CodeUnableToAddSigner               ErrorCode = 42
@@ -93,67 +94,69 @@ const (
 	CodeMismatchBadProposerCount        ErrorCode = 49
 	CodeWrongMaxHeight                  ErrorCode = 50
 
-	StateMachineModule          ErrorModule = "state_machine"
-	CodeReadGenesisFile         ErrorCode   = 1
-	CodeFeeBelowState           ErrorCode   = 2
-	CodeUnauthorizedTx          ErrorCode   = 3
-	CodeEmptySignature          ErrorCode   = 4
-	CodeTxSignBytes             ErrorCode   = 5
-	CodeInvalidTxMessage        ErrorCode   = 6
-	CodeInvalidTxSequence       ErrorCode   = 7
-	CodeMaxBlockSize            ErrorCode   = 8
-	CodeRejectProposal          ErrorCode   = 9
-	CodeInvalidNetAddressLen    ErrorCode   = 10
-	CodeInvalidSignature        ErrorCode   = 11
-	CodeAddressEmpty            ErrorCode   = 12
-	CodeAddressSize             ErrorCode   = 13
-	CodeRecipientAddressEmpty   ErrorCode   = 14
-	CodeRecipientAddressSize    ErrorCode   = 15
-	CodeOutputAddressEmpty      ErrorCode   = 20
-	CodeOutputAddressSize       ErrorCode   = 21
-	CodeInvalidAmount           ErrorCode   = 23
-	CodePubKeyEmpty             ErrorCode   = 24
-	CodePubKeySize              ErrorCode   = 25
-	CodeParamKeyEmpty           ErrorCode   = 26
-	CodeParamValEmpty           ErrorCode   = 27
-	CodeVoteEmpty               ErrorCode   = 28
-	CodeHashEmpty               ErrorCode   = 29
-	CodeHashSize                ErrorCode   = 30
-	CodeUnknownMsg              ErrorCode   = 31
-	CodeInsufficientFunds       ErrorCode   = 32
-	CodeValidatorExists         ErrorCode   = 33
-	CodeValidatorNotExists      ErrorCode   = 34
-	CodeValidatorUnstaking      ErrorCode   = 35
-	CodeValidatorPaused         ErrorCode   = 36
-	CodeValidatorNotPaused      ErrorCode   = 37
-	CodeEmptyConsParams         ErrorCode   = 38
-	CodeEmptyValParams          ErrorCode   = 39
-	CodeEmptyFeeParams          ErrorCode   = 40
-	CodeEmptyGovParams          ErrorCode   = 41
-	CodeUnknownParam            ErrorCode   = 42
-	CodeUnknownParamType        ErrorCode   = 43
-	CodeUnknownParamSpace       ErrorCode   = 44
-	CodeUnauthorizedParamChange ErrorCode   = 45
-	CodeBelowMinimumStake       ErrorCode   = 46
-	CodeInvalidSlashPercentage  ErrorCode   = 47
-	CodePublicKeysNotEqual      ErrorCode   = 48
-	CodeHeightsNotEqual         ErrorCode   = 49
-	CodeRoundsNotEqual          ErrorCode   = 50
-	CodeVoteTypesNotEqual       ErrorCode   = 51
-	CodeIdenticalVotes          ErrorCode   = 52
-	CodeInvalidParamOwner       ErrorCode   = 53
-	CodeInvalidParam            ErrorCode   = 54
-	CodeInvalidPoolName         ErrorCode   = 55
-	CodeInvalidProtocolVersion  ErrorCode   = 56
-	CodeInvalidAddressKey       ErrorCode   = 57
-	CodeWrongStoreType          ErrorCode   = 58
-	CodeUnmarshalGenesis        ErrorCode   = 59
-	CodeInsufficientSupply      ErrorCode   = 60
-	CodeUnknownMsgName          ErrorCode   = 61
-	CodeUnknownPageable         ErrorCode   = 62
-	CodePollValidator           ErrorCode   = 63
-	CodeInvalidBlockRange       ErrorCode   = 64
-	CodeInvalidPublicKey        ErrorCode   = 65
+	StateMachineModule           ErrorModule = "state_machine"
+	CodeReadGenesisFile          ErrorCode   = 1
+	CodeFeeBelowState            ErrorCode   = 2
+	CodeUnauthorizedTx           ErrorCode   = 3
+	CodeEmptySignature           ErrorCode   = 4
+	CodeTxSignBytes              ErrorCode   = 5
+	CodeInvalidTxMessage         ErrorCode   = 6
+	CodeInvalidTxSequence        ErrorCode   = 7
+	CodeMaxBlockSize             ErrorCode   = 8
+	CodeRejectProposal           ErrorCode   = 9
+	CodeInvalidNetAddressLen     ErrorCode   = 10
+	CodeInvalidSignature         ErrorCode   = 11
+	CodeAddressEmpty             ErrorCode   = 12
+	CodeAddressSize              ErrorCode   = 13
+	CodeRecipientAddressEmpty    ErrorCode   = 14
+	CodeRecipientAddressSize     ErrorCode   = 15
+	CodeOutputAddressEmpty       ErrorCode   = 20
+	CodeOutputAddressSize        ErrorCode   = 21
+	CodeInvalidAmount            ErrorCode   = 23
+	CodePubKeyEmpty              ErrorCode   = 24
+	CodePubKeySize               ErrorCode   = 25
+	CodeParamKeyEmpty            ErrorCode   = 26
+	CodeParamValEmpty            ErrorCode   = 27
+	CodeVoteEmpty                ErrorCode   = 28
+	CodeHashEmpty                ErrorCode   = 29
+	CodeHashSize                 ErrorCode   = 30
+	CodeUnknownMsg               ErrorCode   = 31
+	CodeInsufficientFunds        ErrorCode   = 32
+	CodeValidatorExists          ErrorCode   = 33
+	CodeValidatorNotExists       ErrorCode   = 34
+	CodeValidatorUnstaking       ErrorCode   = 35
+	CodeValidatorPaused          ErrorCode   = 36
+	CodeValidatorNotPaused       ErrorCode   = 37
+	CodeEmptyConsParams          ErrorCode   = 38
+	CodeEmptyValParams           ErrorCode   = 39
+	CodeEmptyFeeParams           ErrorCode   = 40
+	CodeEmptyGovParams           ErrorCode   = 41
+	CodeUnknownParam             ErrorCode   = 42
+	CodeUnknownParamType         ErrorCode   = 43
+	CodeUnknownParamSpace        ErrorCode   = 44
+	CodeUnauthorizedParamChange  ErrorCode   = 45
+	CodeBelowMinimumStake        ErrorCode   = 46
+	CodeInvalidSlashPercentage   ErrorCode   = 47
+	CodePublicKeysNotEqual       ErrorCode   = 48
+	CodeHeightsNotEqual          ErrorCode   = 49
+	CodeRoundsNotEqual           ErrorCode   = 50
+	CodeVoteTypesNotEqual        ErrorCode   = 51
+	CodeIdenticalVotes           ErrorCode   = 52
+	CodeInvalidParamOwner        ErrorCode   = 53
+	CodeInvalidParam             ErrorCode   = 54
+	CodeInvalidPoolName          ErrorCode   = 55
+	CodeInvalidProtocolVersion   ErrorCode   = 56
+	CodeInvalidAddressKey        ErrorCode   = 57
+	CodeWrongStoreType           ErrorCode   = 58
+	CodeUnmarshalGenesis         ErrorCode   = 59
+	CodeInsufficientSupply       ErrorCode   = 60
+	CodeUnknownMsgName           ErrorCode   = 61
+	CodeUnknownPageable          ErrorCode   = 62
+	CodePollValidator            ErrorCode   = 63
+	CodeInvalidBlockRange        ErrorCode   = 64
+	CodeInvalidPublicKey         ErrorCode   = 65
+	CodeInvalidDoubleSignHeights ErrorCode   = 66
+	CodeInvalidDoubleSigner      ErrorCode   = 67
 
 	P2PModule                 ErrorModule = "p2p"
 	CodeUnknownP2PMessage     ErrorCode   = 1
@@ -290,6 +293,10 @@ func ErrStringToBytes(err error) ErrorI {
 
 func ErrNilBlock() ErrorI {
 	return NewError(CodeNilBlock, MainModule, "block is nil")
+}
+
+func ErrNilProposal() ErrorI {
+	return NewError(CodeNilBlock, MainModule, "proposal is nil")
 }
 
 func ErrNilBlockHeader() ErrorI {
@@ -486,4 +493,16 @@ func ErrEmptyMessage() ErrorI {
 
 func ErrEmptySignature() ErrorI {
 	return NewError(CodeEmptySignature, StateMachineModule, "signature is empty")
+}
+
+func ErrInvalidAddress() ErrorI {
+	return NewError(CodeInvalidAddress, MainModule, "address is invalid")
+}
+
+func ErrInvalidDoubleSignHeights() ErrorI {
+	return NewError(CodeInvalidDoubleSignHeights, ConsensusModule, "double sign heights are invalid")
+}
+
+func ErrInvalidDoubleSigner() ErrorI {
+	return NewError(CodeInvalidDoubleSigner, ConsensusModule, "double signer is invalid")
 }

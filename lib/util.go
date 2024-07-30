@@ -286,16 +286,17 @@ func Uint64PercentageDiv(dividend, divisor uint64) (res uint64) {
 	b := Uint64ToBigFloat(divisor)
 	b.Quo(a, b)
 	b.Mul(b, big.NewFloat(100))
+	b.Add(b, big.NewFloat(.5)) // round ties away
 	res, _ = b.Uint64()
 	return
 }
 
-func Uint64ReducePercentage(amount uint64, percentage int8) (res uint64) {
+func Uint64ReducePercentage(amount uint64, percentage float64) (res uint64) {
 	a := Uint64ToBigFloat(amount)
-	b := Uint64ToBigFloat(100)
-	b.Sub(b, big.NewFloat(float64(percentage)))
+	b := big.NewFloat(100 - percentage)
 	b.Quo(b, big.NewFloat(100))
 	a.Mul(a, b)
+	a.Add(a, big.NewFloat(.5)) // round ties away
 	res, _ = a.Uint64()
 	return
 }

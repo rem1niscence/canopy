@@ -3,7 +3,7 @@ package rpc
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/ginchuco/ginchu/consensus"
+	bus "github.com/ginchuco/ginchu/app"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
@@ -397,8 +397,8 @@ func (c *Client) PeerInfo() (returned *peerInfoResponse, err lib.ErrorI) {
 	return
 }
 
-func (c *Client) ConsensusInfo() (returned *consensus.Summary, err lib.ErrorI) {
-	returned = new(consensus.Summary)
+func (c *Client) ConsensusInfo() (returned *bus.ConsensusSummary, err lib.ErrorI) {
+	returned = new(bus.ConsensusSummary)
 	err = c.get(ConsensusInfoRouteName, returned, true)
 	return
 }

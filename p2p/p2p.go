@@ -120,7 +120,7 @@ func (p *P2P) StartDialService() {
 			continue
 		}
 		rand := p.book.GetRandom()
-		if p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) {
+		if rand == nil || p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) {
 			continue
 		}
 		dialing++

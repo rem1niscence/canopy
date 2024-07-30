@@ -94,33 +94,33 @@ func (s *StateMachine) CheckProtocolVersion() lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) UpdateProducerKeys(publicKey []byte) lib.ErrorI {
+func (s *StateMachine) UpdateProposerKeys(publicKey []byte) lib.ErrorI {
 	keys, err := s.GetProducerKeys()
 	if err != nil {
 		return err
 	}
-	if keys == nil || len(keys.ProducerKeys) == 0 {
-		keys = new(lib.ProducerKeys)
-		keys.ProducerKeys = make([][]byte, 5)
+	if keys == nil || len(keys.ProposerKeys) == 0 {
+		keys = new(lib.ProposerKeys)
+		keys.ProposerKeys = make([][]byte, 5)
 	}
 	index := s.Height() % 5
-	keys.ProducerKeys[index] = publicKey
+	keys.ProposerKeys[index] = publicKey
 	return s.SetProducerKeys(keys)
 }
 
-func (s *StateMachine) GetProducerKeys() (*lib.ProducerKeys, lib.ErrorI) {
+func (s *StateMachine) GetProducerKeys() (*lib.ProposerKeys, lib.ErrorI) {
 	bz, err := s.Get(types.ProducersPrefix())
 	if err != nil {
 		return nil, err
 	}
-	ptr := new(lib.ProducerKeys)
+	ptr := new(lib.ProposerKeys)
 	if err = lib.Unmarshal(bz, ptr); err != nil {
 		return nil, err
 	}
 	return ptr, nil
 }
 
-func (s *StateMachine) SetProducerKeys(keys *lib.ProducerKeys) lib.ErrorI {
+func (s *StateMachine) SetProducerKeys(keys *lib.ProposerKeys) lib.ErrorI {
 	bz, err := lib.Marshal(keys)
 	if err != nil {
 		return err
@@ -141,7 +141,7 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI, nonSignerPercent 
 	if err != nil {
 		return err
 	}
-	if err = s.UpdateProducerKeys(validator.PublicKey); err != nil {
+	if err = s.UpdateProposerKeys(validator.PublicKey); err != nil {
 		return err
 	}
 	fee, err := s.GetPool(types.PoolID_FeeCollector)
@@ -149,9 +149,9 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI, nonSignerPercent 
 		return err
 	}
 	totalReward := fee.Amount + valParams.ValidatorBlockReward
-	afterDAOCut := lib.Uint64ReducePercentage(totalReward, int8(govParams.DaoRewardPercentage))
+	afterDAOCut := lib.Uint64ReducePercentage(totalReward, float64(govParams.DaoRewardPercentage))
 	daoCut := totalReward - afterDAOCut
-	proposerCut := lib.Uint64ReducePercentage(afterDAOCut, int8(nonSignerPercent))
+	proposerCut := lib.Uint64ReducePercentage(afterDAOCut, float64(nonSignerPercent))
 	if err = s.MintToPool(types.PoolID_DAO, daoCut); err != nil {
 		return err
 	}
@@ -172,10 +172,8 @@ func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams) (nonSig
 	if err = s.SlashBadProposers(params, block.BadProposers); err != nil {
 		return 0, err
 	}
-	for _, evidence := range beginBlock.BlockHeader.Evidence {
-		if err = s.SlashDoubleSigners(params, evidence.DoubleSigners); err != nil {
-			return 0, err
-		}
+	if err = s.HandleDoubleSigners(params, block.DoubleSigners); err != nil {
+		return 0, err
 	}
 	if s.height <= 2 {
 		return // height 2 would use height 1 as begin_block which uses genesis as lastQC

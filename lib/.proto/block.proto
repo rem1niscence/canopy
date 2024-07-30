@@ -20,7 +20,7 @@ message BlockHeader {
   bytes validator_root = 10;
   bytes next_validator_root = 11;
   bytes proposer_address = 12;
-  repeated DoubleSignEvidence evidence = 13;
+  map<string, DoubleSignHeights> double_signers = 13;
   repeated bytes bad_proposers = 14;
   QuorumCertificate last_quorum_certificate = 15;
 }
@@ -50,22 +50,12 @@ message EndBlockParams {
   ConsensusValidators validator_set = 1;
 }
 
-message ProducerKeys {
-  repeated bytes producer_keys = 1;
+message ProposerKeys {
+  repeated bytes proposer_keys = 1;
 }
 
-message DoubleSignEvidence {
-  QuorumCertificate vote_a = 1;
-  QuorumCertificate vote_b = 2;
-  repeated bytes double_signers = 3;
-}
-
-message DoubleSigners {
-  repeated bytes double_signers = 1;
-}
-
-message BadProposerEvidence {
-  QuorumCertificate election_vote_qc = 1;
+message DoubleSignHeights {
+  map<uint64, bool> heights = 1;
 }
 
 enum Phase {
@@ -84,8 +74,8 @@ enum Phase {
 
 message QuorumCertificate {
   View header = 1; // replica vote view
-  Block block = 2; // used for PROPOSE
-  bytes block_hash = 3; // used after PROPOSE
+  bytes proposal = 2; // used for PROPOSE
+  bytes proposal_hash = 3; // used after PROPOSE
   bytes proposer_key = 4; // only EV and PROPOSE
   AggregateSignature signature = 5; // aggregate signature from the current proposer message
 }

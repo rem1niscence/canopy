@@ -2,10 +2,12 @@ package rpc
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
+	"fmt"
 	"github.com/alecthomas/units"
 	"github.com/dgraph-io/badger/v4"
-	"github.com/ginchuco/ginchu/consensus"
+	app2 "github.com/ginchuco/ginchu/app"
 	"github.com/ginchuco/ginchu/fsm"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
@@ -20,6 +22,7 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -96,12 +99,14 @@ const (
 	LogsRouteName              = "logs"
 	AddVoteRouteName           = "add-vote"
 	DelVoteRouteName           = "del-vote"
+	ExplorerRouteName          = "explorer"
+	WalletRouteName            = "wallet"
 )
 
 const SoftwareVersion = "0.0.0-alpha"
 
 var (
-	app    *consensus.Consensus
+	app    *app2.Controller
 	db     *badger.DB
 	conf   lib.Config
 	logger lib.LoggerI
@@ -169,9 +174,20 @@ var (
 	}
 )
 
-func StartRPC(a *consensus.Consensus, c lib.Config, l lib.LoggerI) {
+//go:embed all:web/explorer/out
+var explorerFS embed.FS
+
+//go:embed all:web/wallet/out
+var walletFS embed.FS
+
+const (
+	walletStaticDir   = "web/wallet/out"
+	explorerStaticDir = "web/explorer/out"
+)
+
+func StartRPC(a *app2.Controller, c lib.Config, l lib.LoggerI) {
 	cor := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:50000", "http://localhost:50001"},
+		AllowedOrigins: []string{"http://localhost:" + c.WalletPort, "http://localhost:" + c.ExplorerPort},
 		AllowedMethods: []string{"GET", "OPTIONS", "POST"},
 	})
 	s, timeout := a.FSM.Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
@@ -190,6 +206,10 @@ func StartRPC(a *consensus.Consensus, c lib.Config, l lib.LoggerI) {
 			Handler: cor.Handler(http.TimeoutHandler(router.NewAdmin(), timeout, ErrServerTimeout().Error())),
 		}).ListenAndServe().Error())
 	}()
+	l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
+	runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
+	l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
+	runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
 	go pollValidators(time.Minute)
 	go resetSeqCacher(time.Second * 5)
 }
@@ -615,7 +635,7 @@ func TransactionDAOTransfer(w http.ResponseWriter, r *http.Request, _ httprouter
 }
 
 func ConsensusInfo(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	summary, err := app.JSONSummary()
+	summary, err := app.ConsensusSummary()
 	if err != nil {
 		write(w, err, http.StatusInternalServerError)
 		return
@@ -1303,6 +1323,19 @@ func debugHandler(routeName string) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		f(w, r)
 	}
+}
+
+func runStaticFileServer(fileSys fs.FS, dir, port string) {
+	distFS, err := fs.Sub(fileSys, dir)
+	if err != nil {
+		logger.Error(fmt.Sprintf("an error occurred running the static file server for %s: %s", dir, err.Error()))
+		return
+	}
+	mux := http.NewServeMux()
+	mux.Handle("/", http.FileServer(http.FS(distFS)))
+	go func() {
+		logger.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), mux).Error())
+	}()
 }
 
 func logsHandler() httprouter.Handle {

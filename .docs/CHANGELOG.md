@@ -1,6 +1,46 @@
 # CHANGELOG
 
+## [Unreleased] - 07/30/2024
+
+- Refactored `DSE` and `BPE` to `DoubleSignEvidences` and `BadProposerEvidences` respectively
+
+## [Unreleased] - 07/22/2024
+
+- Contained `DSE` and `BPE` to `bft package`
+- Changed `BlockHeader` structure to be without the actual `DSE`
+
+## [Unreleased] - 07/18/2024
+
+- Simplified `evidence` collection
+
+## [Unreleased] - 07/15/2024
+
+- Added `bft` unit tests
+
+## [Unreleased] - 06/30/2024
+
+- Simplified `bft.vote` code
+
+## [Unreleased] - 06/29/2024
+
+- Simplified `bft.proposal` code
+
+## [Unreleased] - 06/18/2024
+
+- Refactored `producer/block` to `proposer/proposal` to be generic for other types of apps
+
+## [Unreleased] - 06/17/2024
+
+- Split `consensus` package into `bft` and `app`
+- Modularized `bft` package
+
+## [Unreleased] - 06/15/2024
+
+- Added `block explorer` hosting to rpc
+- Added `web wallet` hosting to rpc
+
 ## [Unreleased] - 06/03/2024
+
 - Added `web wallet` first implementation
 - Added `rpc server functionallity`
 - Added `rpc client functionality`

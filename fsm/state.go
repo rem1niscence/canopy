@@ -1,11 +1,9 @@
 package fsm
 
 import (
-	"bytes"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
-	"time"
 )
 
 // TODO unstaking limitations and force unstake for slash below minimum stake
@@ -121,7 +119,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 		TransactionRoot:       txRoot,
 		ValidatorRoot:         validatorRoot,
 		NextValidatorRoot:     nextValidatorRoot,
-		Evidence:              b.BlockHeader.Evidence,
+		DoubleSigners:         b.BlockHeader.DoubleSigners,
 		ProposerAddress:       b.BlockHeader.ProposerAddress,
 		BadProposers:          b.BlockHeader.BadProposers,
 		LastQuorumCertificate: b.BlockHeader.LastQuorumCertificate,
@@ -130,64 +128,6 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 		return nil, nil, nil, err
 	}
 	return &header, txResults, eb.ValidatorSet, nil
-}
-
-func (s *StateMachine) ValidateBlock(header *lib.BlockHeader, compare *lib.BlockHeader, evidence *lib.ByzantineEvidence, isCandidateBlock bool) lib.ErrorI {
-	hash, err := compare.SetHash()
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(hash, header.Hash) {
-		return lib.ErrUnequalBlockHash()
-	}
-	vs, err := lib.NewValidatorSet(s.BeginBlockParams.ValidatorSet)
-	if err != nil {
-		return err
-	}
-	if header.Height > 2 {
-		isPartialQC, err := header.LastQuorumCertificate.Check(header.Height-1, vs)
-		if err != nil {
-			return err
-		}
-		if isPartialQC {
-			return lib.ErrNoMaj23()
-		}
-	}
-	if err = s.validateBlockTime(header); err != nil {
-		return err
-	}
-	if isCandidateBlock {
-		var minimumEvidenceAge uint64
-		minimumEvidenceAge, err = s.GetMinimumEvidenceHeight()
-		if err != nil {
-			return err
-		}
-		if err = header.ValidateByzantineEvidence(s.LoadValSet, s.store.(lib.StoreI).GetDoubleSigners, evidence, minimumEvidenceAge); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *StateMachine) ApplyAndValidateBlock(b *lib.Block, evidence *lib.ByzantineEvidence, isCandidateBlock bool) (*lib.BlockResult, *lib.ConsensusValidators, lib.ErrorI) {
-	blockHash, blockHeight := lib.BytesToString(b.BlockHeader.Hash), b.BlockHeader.Height
-	if err := b.Check(); err != nil {
-		return nil, nil, err
-	}
-	s.log.Debugf("Applying block %s for height %d", blockHash, blockHeight)
-	header, txResults, valSet, err := s.ApplyBlock(b)
-	if err != nil {
-		return nil, nil, err
-	}
-	s.log.Debugf("Validating block %s for height %d", blockHash, blockHeight)
-	if err = s.ValidateBlock(b.BlockHeader, header, evidence, isCandidateBlock); err != nil {
-		return nil, nil, err
-	}
-	s.log.Infof("Block %s is valid for height %d ✅ ", blockHash, blockHeight)
-	return &lib.BlockResult{
-		BlockHeader:  b.BlockHeader,
-		Transactions: txResults,
-	}, valSet, nil
 }
 
 func (s *StateMachine) ApplyTransactions(block *lib.Block) (results []*lib.TxResult, root []byte, n int, er lib.ErrorI) {
@@ -283,10 +223,6 @@ func (s *StateMachine) LoadValSet(height uint64) (lib.ValidatorSet, lib.ErrorI) 
 	return lib.NewValidatorSet(vs)
 }
 
-func (s *StateMachine) LoadEvidence(height uint64) (*lib.DoubleSigners, lib.ErrorI) {
-	return s.store.(lib.StoreI).GetDoubleSigners(height)
-}
-
 func (s *StateMachine) GetMaxValidators() (uint64, lib.ErrorI) {
 	valParams, err := s.GetParamsVal()
 	if err != nil {
@@ -316,7 +252,7 @@ func (s *StateMachine) LoadCertificate(height uint64) (*lib.QuorumCertificate, l
 	if err != nil {
 		return nil, err
 	}
-	qc.Block = nil
+	qc.Proposal = nil
 	return qc, nil
 }
 
@@ -347,14 +283,6 @@ func (s *StateMachine) SetStore(store lib.RWStoreI)                      { s.sto
 func (s *StateMachine) Height() uint64                                   { return s.height }
 func (s *StateMachine) Reset()                                           { s.store.(lib.StoreI).Reset() }
 func (s *StateMachine) SetProposalVoteConfig(c types.ProposalVoteConfig) { s.proposeVoteConfig = c }
-func (s *StateMachine) validateBlockTime(header *lib.BlockHeader) lib.ErrorI {
-	now := time.Now()
-	maxTime, minTime, t := now.Add(time.Hour), now.Add(-time.Hour), header.Time.AsTime()
-	if minTime.Compare(t) > 0 || maxTime.Compare(t) < 0 {
-		return lib.ErrInvalidBlockTime()
-	}
-	return nil
-}
 func (s *StateMachine) ResetToBeginBlock() {
 	s.Reset()
 	if err := s.BeginBlock(); err != nil {

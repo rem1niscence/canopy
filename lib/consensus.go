@@ -6,22 +6,19 @@ import (
 	"fmt"
 )
 
-func (x *QuorumCertificate) SignBytes() (signBytes []byte, err ErrorI) {
-	aggregateSignature := x.Signature
-	block := x.Block
-	x.Block = nil
-	x.Signature = nil
-	signBytes, err = Marshal(x)
-	x.Signature = aggregateSignature
-	x.Block = block
+func (x *QuorumCertificate) SignBytes() (signBytes []byte) {
+	proposal, aggregateSignature := x.Proposal, x.Signature
+	x.Proposal, x.Signature = nil, nil
+	signBytes, _ = Marshal(x)
+	x.Proposal, x.Signature = proposal, aggregateSignature
 	return
 }
 
-func (x *QuorumCertificate) Check(height uint64, vs ValidatorSet) (isPartialQC bool, error ErrorI) {
+func (x *QuorumCertificate) Check(vs ValidatorSet, height ...uint64) (isPartialQC bool, error ErrorI) {
 	if x == nil {
 		return false, ErrEmptyQuorumCertificate()
 	}
-	if err := x.Header.Check(height); err != nil {
+	if err := x.Header.Check(height...); err != nil {
 		return false, err
 	}
 	return x.Signature.Check(x, vs)
@@ -34,11 +31,11 @@ func (x *QuorumCertificate) CheckHighQC(height uint64, vs ValidatorSet) ErrorI {
 	if err := x.Header.Check(height); err != nil {
 		return err
 	}
-	if x.Header.Phase != Phase_PRECOMMIT {
+	if x.Header.Phase != Phase_PRECOMMIT_VOTE {
 		return ErrWrongPhase()
 	}
-	if err := x.Block.Check(); err != nil {
-		return err
+	if x.Proposal == nil {
+		return ErrNilProposal()
 	}
 	isPartialQC, err := x.Signature.Check(x, vs)
 	if err != nil {
@@ -60,7 +57,7 @@ func (x *QuorumCertificate) Equals(qc *QuorumCertificate) bool {
 	if !bytes.Equal(x.ProposerKey, qc.ProposerKey) {
 		return false
 	}
-	if !x.Block.Equals(qc.Block) {
+	if !bytes.Equal(x.Proposal, qc.Proposal) {
 		return false
 	}
 	return x.Signature.Equals(qc.Signature)
@@ -83,104 +80,38 @@ type jsonQC struct {
 
 // nolint:all
 func (x QuorumCertificate) MarshalJSON() ([]byte, error) {
+	block := new(Block)
+	_ = Unmarshal(x.Proposal, block)
 	return json.Marshal(jsonQC{
 		Header:      x.Header,
-		Block:       x.Block,
-		BlockHash:   x.BlockHash,
+		Block:       block,
+		BlockHash:   x.ProposalHash,
 		ProposerKey: x.ProposerKey,
 		Signature:   x.Signature,
 	})
 }
 
-func (x *QuorumCertificate) UnmarshalJSON(b []byte) error {
+func (x *QuorumCertificate) UnmarshalJSON(b []byte) (err error) {
 	var j jsonQC
-	if err := json.Unmarshal(b, &j); err != nil {
-		return err
+	if err = json.Unmarshal(b, &j); err != nil {
+		return
 	}
-	x.Header, x.Block, x.BlockHash = j.Header, j.Block, j.BlockHash
+	x.Proposal, _ = Marshal(j.Block)
+	x.Header, x.ProposalHash = j.Header, j.BlockHash
 	x.ProposerKey, x.Signature = j.ProposerKey, j.Signature
 	return nil
 }
 
-func (x *DoubleSignEvidence) CheckBasic() ErrorI {
-	if x == nil {
-		return ErrEmptyEvidence()
-	}
-	if x.VoteA == nil || x.VoteB == nil || x.VoteA.Header == nil || x.VoteB.Header == nil {
-		return ErrEmptyQuorumCertificate()
-	}
-	if !x.VoteA.Header.Equals(x.VoteB.Header) {
-		return ErrMismatchEvidenceAndHeader()
-	}
-	if x.VoteA.Header.Round >= MaxRound {
-		return ErrWrongRound()
-	}
-	return nil
-}
-
-func (x *DoubleSignEvidence) Check(vs ValidatorSet, minimumEvidenceHeight uint64) ErrorI {
-	if x.VoteA.Header.Height < minimumEvidenceHeight {
-		return ErrEvidenceTooOld()
-	}
-	if _, err := x.VoteA.Check(x.VoteA.Header.Height, vs); err != nil {
-		return err
-	}
-	if _, err := x.VoteB.Check(x.VoteB.Header.Height, vs); err != nil {
-		return err
-	}
-	if x.VoteA.Header.Equals(x.VoteB.Header) && !x.VoteA.Equals(x.VoteB) {
-		return ErrInvalidEvidence() // different heights
-	}
-	voteASignBytes, err := x.VoteA.SignBytes()
-	if err != nil {
-		return err
-	}
-	voteBSignBytes, err := x.VoteB.SignBytes()
-	if err != nil {
-		return err
-	}
-	if bytes.Equal(voteBSignBytes, voteASignBytes) {
-		return ErrInvalidEvidence() // same payloads
-	}
-	return ErrInvalidEvidence()
-}
-
-func (x *DoubleSignEvidence) Equals(y *DoubleSignEvidence) bool {
-	if x == nil || y == nil {
-		return false
-	}
-	if x.VoteA.Equals(y.VoteA) && x.VoteB.Equals(y.VoteB) {
-		return true
-	}
-	if x.VoteB.Equals(y.VoteA) && x.VoteA.Equals(y.VoteB) {
-		return true
-	}
-	return false
-}
-
-func (x *DoubleSignEvidence) FlippedBytes() (bz []byte) {
-	// flip it
-	voteA := x.VoteA
-	x.VoteA = x.VoteB
-	x.VoteB = voteA
-	bz, _ = Marshal(x)
-	// flip it back
-	voteA = x.VoteA
-	x.VoteA = x.VoteB
-	x.VoteB = voteA
-	return
-}
-
 const MaxRound = 1000
 
-func (x *View) Check(height uint64) ErrorI {
+func (x *View) Check(height ...uint64) ErrorI {
 	if x == nil {
 		return ErrEmptyView()
 	}
 	if x.Round >= MaxRound {
 		return ErrWrongRound()
 	}
-	if height != 0 && x.Height != height {
+	if height != nil && x.Height != height[0] {
 		return ErrWrongHeight()
 	}
 	return nil

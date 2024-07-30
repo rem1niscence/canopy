@@ -85,21 +85,21 @@ func (x *BlockHeader) Check() ErrorI {
 }
 
 type jsonBlockHeader struct {
-	Height                uint64                `json:"height,omitempty"`
-	Hash                  HexBytes              `json:"hash,omitempty"`
-	NetworkId             uint32                `json:"network_id,omitempty"`
-	Time                  string                `json:"time,omitempty"`
-	NumTxs                uint64                `json:"num_txs,omitempty"`
-	TotalTxs              uint64                `json:"total_txs,omitempty"`
-	LastBlockHash         HexBytes              `json:"last_block_hash,omitempty"`
-	StateRoot             HexBytes              `json:"state_root,omitempty"`
-	TransactionRoot       HexBytes              `json:"transaction_root,omitempty"`
-	ValidatorRoot         HexBytes              `json:"validator_root,omitempty"`
-	NextValidatorRoot     HexBytes              `json:"next_validator_root,omitempty"`
-	ProposerAddress       HexBytes              `json:"proposer_address,omitempty"`
-	Evidence              []*DoubleSignEvidence `json:"evidence,omitempty"`
-	BadProposers          []HexBytes            `json:"bad_proposers,omitempty"`
-	LastQuorumCertificate *QuorumCertificate    `json:"last_quorum_certificate,omitempty"`
+	Height                uint64                        `json:"height,omitempty"`
+	Hash                  HexBytes                      `json:"hash,omitempty"`
+	NetworkId             uint32                        `json:"network_id,omitempty"`
+	Time                  string                        `json:"time,omitempty"`
+	NumTxs                uint64                        `json:"num_txs,omitempty"`
+	TotalTxs              uint64                        `json:"total_txs,omitempty"`
+	LastBlockHash         HexBytes                      `json:"last_block_hash,omitempty"`
+	StateRoot             HexBytes                      `json:"state_root,omitempty"`
+	TransactionRoot       HexBytes                      `json:"transaction_root,omitempty"`
+	ValidatorRoot         HexBytes                      `json:"validator_root,omitempty"`
+	NextValidatorRoot     HexBytes                      `json:"next_validator_root,omitempty"`
+	ProposerAddress       HexBytes                      `json:"proposer_address,omitempty"`
+	DoubleSigners         map[string]*DoubleSignHeights `json:"double_signers,omitempty"`
+	BadProposers          []HexBytes                    `json:"bad_proposers,omitempty"`
+	LastQuorumCertificate *QuorumCertificate            `json:"last_quorum_certificate,omitempty"`
 }
 
 // nolint:all
@@ -121,7 +121,7 @@ func (x BlockHeader) MarshalJSON() ([]byte, error) {
 		ValidatorRoot:         x.ValidatorRoot,
 		NextValidatorRoot:     x.NextValidatorRoot,
 		ProposerAddress:       x.ProposerAddress,
-		Evidence:              x.Evidence,
+		DoubleSigners:         x.DoubleSigners,
 		BadProposers:          badProposers,
 		LastQuorumCertificate: x.LastQuorumCertificate,
 	})
@@ -149,7 +149,7 @@ func (x *BlockHeader) UnmarshalJSON(b []byte) error {
 		ValidatorRoot:         j.ValidatorRoot,
 		NextValidatorRoot:     j.NextValidatorRoot,
 		ProposerAddress:       j.ProposerAddress,
-		Evidence:              j.Evidence,
+		DoubleSigners:         j.DoubleSigners,
 		BadProposers:          x.BadProposers,
 		LastQuorumCertificate: j.LastQuorumCertificate,
 	}
@@ -196,67 +196,17 @@ func (x *BlockHeader) Equals(b *BlockHeader) bool {
 	if !bytes.Equal(x.ProposerAddress, b.ProposerAddress) {
 		return false
 	}
-	if !NewDSE(x.Evidence).Equals(NewDSE(b.Evidence)) {
-		return false
+	for addr, heights := range x.DoubleSigners {
+		if _, err := crypto.NewAddressFromString(addr); err != nil {
+			return false
+		}
+		if heights == nil || len(heights.Heights) < 1 {
+			return false
+		}
 	}
 	qc1Bz, _ := Marshal(x.LastQuorumCertificate)
 	qc2Bz, _ := Marshal(b.LastQuorumCertificate)
 	return bytes.Equal(qc1Bz, qc2Bz)
-}
-
-func (x *BlockHeader) ValidateByzantineEvidence(getValSet func(height uint64) (ValidatorSet, ErrorI),
-	getEvByHeight func(height uint64) (*DoubleSigners, ErrorI), be *ByzantineEvidence, minimumEvidenceHeight uint64) ErrorI {
-	if be == nil {
-		return nil
-	}
-	if x.Evidence != nil {
-		d := NewDSE(x.Evidence)
-		if !d.Equals(NewDSE(be.DSE)) {
-			return ErrMismatchEvidenceAndHeader()
-		}
-		for _, evidence := range x.Evidence {
-			if err := evidence.CheckBasic(); err != nil {
-				return err
-			}
-			height := evidence.VoteA.Header.Height
-			vs, err := getValSet(height)
-			if err != nil {
-				return err
-			}
-			if err = evidence.Check(vs, minimumEvidenceHeight); err != nil {
-				return err
-			}
-			doubleSigners := evidence.GetBadSigners(getEvByHeight, getValSet)
-			if len(doubleSigners) != len(evidence.DoubleSigners) {
-				return ErrMismatchDoubleSignerCount()
-			}
-			for i, ds := range evidence.DoubleSigners {
-				if !bytes.Equal(doubleSigners[i], ds) {
-					return ErrMismatchEvidenceAndHeader()
-				}
-			}
-		}
-	}
-	if x.BadProposers != nil {
-		bpe := NewBPE(be.BPE)
-		vs, err := getValSet(x.Height)
-		if err != nil {
-			return err
-		}
-		if !bpe.IsValid(nil, x.Height, vs) {
-			return ErrInvalidEvidence()
-		}
-		badProposers := bpe.GetBadProposers()
-		if len(badProposers) != len(x.BadProposers) {
-			return ErrMismatchBadProducerCount()
-		}
-		for i, bp := range x.BadProposers {
-			if !bytes.Equal(badProposers[i], bp) {
-				return ErrMismatchEvidenceAndHeader()
-			}
-		}
-	}
-	return nil
 }
 
 func (x *Block) Equals(b *Block) bool {

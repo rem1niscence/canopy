@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"bytes"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
@@ -81,6 +82,35 @@ func (s *StateMachine) IncrementNonSigners(nonSigners [][]byte) lib.ErrorI {
 	return nil
 }
 
+func (s *StateMachine) HandleDoubleSigners(params *types.ValidatorParams, doubleSigners map[string]*lib.DoubleSignHeights) lib.ErrorI {
+	var doubleSignersList [][]byte
+	for addr, heights := range doubleSigners {
+		address, e := crypto.NewAddressFromString(addr)
+		if e != nil {
+			return lib.ErrInvalidAddress()
+		}
+		if heights == nil || len(heights.Heights) < 1 {
+			return lib.ErrInvalidDoubleSignHeights()
+		}
+		for height := range heights.Heights {
+			if !s.IsValidDoubleSigner(height, address.Bytes()) {
+				return lib.ErrInvalidDoubleSigner()
+			}
+			if err := s.Set(types.KeyForDoubleSigner(height, address.Bytes()), types.DoubleSignerEnabledByte()); err != nil {
+				return err
+			}
+			doubleSignersList = append(doubleSignersList, address.Bytes())
+		}
+	}
+	return s.SlashDoubleSigners(params, doubleSignersList)
+}
+
+func (s *StateMachine) IsValidDoubleSigner(height uint64, address []byte) bool {
+	key := types.KeyForDoubleSigner(height, address)
+	bz, _ := s.Get(key)
+	return !bytes.Equal(bz, types.DoubleSignerEnabledByte())
+}
+
 func (s *StateMachine) SlashNonSigners(params *types.ValidatorParams, nonSigners [][]byte) lib.ErrorI {
 	return s.SlashValidators(nonSigners, params.ValidatorNonSignSlashPercentage, params)
 }
@@ -137,7 +167,7 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, percent uint64
 		return types.ErrInvalidSlashPercentage()
 	}
 	oldStake := validator.StakedAmount
-	validator.StakedAmount = lib.Uint64ReducePercentage(validator.StakedAmount, int8(percent))
+	validator.StakedAmount = lib.Uint64ReducePercentage(validator.StakedAmount, float64(percent))
 	if err := s.SubFromStakedSupply(oldStake - validator.StakedAmount); err != nil {
 		return err
 	}
@@ -150,7 +180,7 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, percent uint64
 	return s.SetValidator(validator)
 }
 
-func (s *StateMachine) GetMinimumEvidenceHeight() (uint64, lib.ErrorI) {
+func (s *StateMachine) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) {
 	valParams, err := s.GetParamsVal()
 	if err != nil {
 		return 0, err

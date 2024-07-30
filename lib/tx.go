@@ -159,7 +159,7 @@ type Signable interface {
 	Sign(p crypto.PrivateKeyI) ErrorI
 }
 
-type SignByte interface{ SignBytes() ([]byte, ErrorI) }
+type SignByte interface{ SignBytes() []byte }
 
 var RegisteredMessages map[string]MessageI
 

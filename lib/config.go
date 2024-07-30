@@ -48,18 +48,22 @@ func (m *MainConfig) GetLogLevel() int32 {
 }
 
 type RPCConfig struct {
-	RPCPort   string
-	AdminPort string
-	RPCUrl    string
-	TimeoutS  int
+	RPCPort      string
+	WalletPort   string
+	ExplorerPort string
+	AdminPort    string
+	RPCUrl       string
+	TimeoutS     int
 }
 
 func DefaultRPCConfig() RPCConfig {
 	return RPCConfig{
-		RPCPort:   "50002",
-		AdminPort: "50003",
-		RPCUrl:    "http://localhost",
-		TimeoutS:  3,
+		WalletPort:   "50000",
+		ExplorerPort: "50001",
+		RPCPort:      "50002",
+		AdminPort:    "50003",
+		RPCUrl:       "http://localhost",
+		TimeoutS:     3,
 	}
 }
 
