@@ -17,6 +17,7 @@ const (
 	MessageUnpauseName         = "unpause"
 	MessageChangeParameterName = "change_parameter"
 	MessageDAOTransferName     = "dao_transfer"
+	MessageEquityGrantName     = "equity_grant"
 )
 
 func init() {
@@ -29,6 +30,7 @@ func init() {
 	lib.RegisteredMessages[MessageUnpauseName] = new(MessageUnpause)
 	lib.RegisteredMessages[MessageChangeParameterName] = new(MessageChangeParameter)
 	lib.RegisteredMessages[MessageDAOTransferName] = new(MessageDAOTransfer)
+	lib.RegisteredMessages[MessageEquityGrantName] = new(MessageEquityGrant)
 }
 
 var _ lib.MessageI = &MessageSend{}
@@ -91,6 +93,9 @@ func (x *MessageStake) Check() lib.ErrorI {
 	if err := checkPubKey(x.PublicKey); err != nil {
 		return err
 	}
+	if err := checkCommittees(x.Committees); err != nil {
+		return err
+	}
 	return checkAmount(x.Amount)
 }
 
@@ -104,6 +109,7 @@ func (x MessageStake) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageStake{
 		PublicKey:     x.PublicKey,
 		Amount:        x.Amount,
+		Committees:    x.Committees,
 		NetAddress:    x.NetAddress,
 		OutputAddress: x.OutputAddress,
 	})
@@ -117,6 +123,7 @@ func (x *MessageStake) UnmarshalJSON(b []byte) (err error) {
 	*x = MessageStake{
 		PublicKey:     j.PublicKey,
 		Amount:        j.Amount,
+		Committees:    x.Committees,
 		NetAddress:    j.NetAddress,
 		OutputAddress: j.OutputAddress,
 	}
@@ -126,6 +133,7 @@ func (x *MessageStake) UnmarshalJSON(b []byte) (err error) {
 type jsonMessageStake struct {
 	PublicKey     lib.HexBytes `json:"public_key,omitempty"`
 	Amount        uint64       `json:"amount,omitempty"`
+	Committees    []*Committee `json:"committees,omitempty"`
 	NetAddress    string       `json:"net_address,omitempty"`
 	OutputAddress lib.HexBytes `json:"output_address,omitempty"`
 }
@@ -142,10 +150,10 @@ func (x *MessageEditStake) Check() lib.ErrorI {
 	if err := checkNetAddress(x.NetAddress); err != nil {
 		return err
 	}
-	if err := checkAmount(x.Amount); err != nil {
+	if err := checkCommittees(x.Committees); err != nil {
 		return err
 	}
-	return nil
+	return checkAmount(x.Amount)
 }
 
 func (x *MessageEditStake) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
@@ -158,6 +166,7 @@ func (x MessageEditStake) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageEditStake{
 		Address:       x.Address,
 		Amount:        x.Amount,
+		Committees:    x.Committees,
 		NetAddress:    x.NetAddress,
 		OutputAddress: x.OutputAddress,
 	})
@@ -171,6 +180,7 @@ func (x *MessageEditStake) UnmarshalJSON(b []byte) (err error) {
 	*x = MessageEditStake{
 		Address:       j.Address,
 		Amount:        j.Amount,
+		Committees:    x.Committees,
 		NetAddress:    j.NetAddress,
 		OutputAddress: j.OutputAddress,
 	}
@@ -180,6 +190,7 @@ func (x *MessageEditStake) UnmarshalJSON(b []byte) (err error) {
 type jsonMessageEditStake struct {
 	Address       lib.HexBytes `json:"address,omitempty"`
 	Amount        uint64       `json:"amount,omitempty"`
+	Committees    []*Committee `json:"committees,omitempty"`
 	NetAddress    string       `json:"net_address,omitempty"`
 	OutputAddress lib.HexBytes `json:"output_address,omitempty"`
 }
@@ -390,6 +401,54 @@ type jsonMessageDaoTransfer struct {
 	EndHeight   uint64       `json:"end_height,omitempty"`
 }
 
+var _ lib.MessageI = &MessageEquityGrant{}
+
+func (x *MessageEquityGrant) Check() lib.ErrorI {
+	if x.Equity == nil || x.Equity.Proposal != nil || x.Equity.ProposalHash != nil {
+		return ErrInvalidEquity()
+	}
+	if x.Equity.CommitteeId == DAO_Pool_ID || x.Equity.CommitteeId == FEE_Pool_ID {
+		return ErrInvalidCommitteeID()
+	}
+	if err := checkEquityPoints(x.Equity.EquityPoints); err != nil {
+		return err
+	}
+	if x.Equity.NumberOfSamples != 1 {
+		return ErrInvalidNumOfSamples()
+	}
+	return x.Qc.CheckBasic()
+}
+
+func (x *MessageEquityGrant) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
+func (x *MessageEquityGrant) Name() string                { return MessageEquityGrantName }
+func (x *MessageEquityGrant) New() lib.MessageI           { return new(MessageEquityGrant) }
+func (x *MessageEquityGrant) Recipient() []byte           { return nil }
+
+// nolint:all
+func (x MessageEquityGrant) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonMessageEquityGrant{
+		Equity: x.Equity,
+		Qc:     x.Qc,
+	})
+}
+
+func (x *MessageEquityGrant) UnmarshalJSON(b []byte) (err error) {
+	var j jsonMessageEquityGrant
+	if err = json.Unmarshal(b, &j); err != nil {
+		return
+	}
+	*x = MessageEquityGrant{
+		Equity: j.Equity,
+		Qc:     j.Qc,
+	}
+	return
+}
+
+type jsonMessageEquityGrant struct {
+	Equity *Equity                `json:"equity,omitempty"`
+	Qc     *lib.QuorumCertificate `json:"qc,omitempty"`
+}
+
 func checkAmount(amount uint64) lib.ErrorI {
 	if amount == 0 {
 		return ErrInvalidAmount()
@@ -431,6 +490,50 @@ func checkPubKey(publicKey []byte) lib.ErrorI {
 	}
 	if len(publicKey) != crypto.BLS12381PubKeySize {
 		return ErrPublicKeySize()
+	}
+	return nil
+}
+
+func checkCommittees(committees []*Committee) lib.ErrorI {
+	if len(committees) > 100 {
+		return ErrInvalidNumCommittees()
+	}
+	total := uint64(0)
+	for _, committee := range committees {
+		if committee == nil {
+			return ErrInvalidCommittee()
+		}
+		if committee.Id == DAO_Pool_ID || committee.Id == FEE_Pool_ID {
+			return ErrInvalidCommitteeID()
+		}
+		total += committee.StakePercent
+		if committee.StakePercent == 0 || total > 100 {
+			return ErrInvalidCommitteeStakeDistribution()
+		}
+	}
+	return nil
+}
+
+func checkEquityPoints(points []*EquityPoints) lib.ErrorI {
+	numEquityRecipients := len(points)
+	if numEquityRecipients == 0 || numEquityRecipients > 100 {
+		return ErrInvalidNumOfPointRecipients()
+	}
+	totalPoints := uint64(0)
+	for _, ep := range points {
+		if ep == nil {
+			return ErrInvalidPointAllocation()
+		}
+		if len(ep.Address) != crypto.AddressSize {
+			return ErrAddressSize()
+		}
+		if ep.Points == 0 {
+			return ErrInvalidPointAllocation()
+		}
+		totalPoints += ep.Points
+		if totalPoints > 10000 {
+			return ErrInvalidPointAllocation()
+		}
 	}
 	return nil
 }

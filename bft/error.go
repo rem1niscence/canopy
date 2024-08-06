@@ -57,7 +57,3 @@ func ErrFailedSafeNodePredicate() lib.ErrorI {
 func ErrAggregateSignature(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeAggregateSignature, lib.ConsensusModule, fmt.Sprintf("aggregateSignature() failed with err: %s", err.Error()))
 }
-
-func ErrMismatchProposalHash() lib.ErrorI {
-	return lib.NewError(lib.CodeMismatchProposalHash, lib.ConsensusModule, "mismatch proposal hash")
-}

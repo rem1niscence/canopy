@@ -110,7 +110,7 @@ func (x *AggregateSignature) Equals(a2 *AggregateSignature) bool {
 	return true
 }
 
-func (x *AggregateSignature) CheckBasic(sb SignByte, vs ValidatorSet) ErrorI {
+func (x *AggregateSignature) CheckBasic() ErrorI {
 	if x == nil {
 		return ErrEmptyAggregateSignature()
 	}
@@ -120,19 +120,19 @@ func (x *AggregateSignature) CheckBasic(sb SignByte, vs ValidatorSet) ErrorI {
 	if len(x.Bitmap) == 0 {
 		return ErrEmptySignerBitmap()
 	}
-	key := vs.Key.Copy()
-	if er := key.SetBitmap(x.Bitmap); er != nil {
-		return ErrInvalidSignerBitmap(er)
-	}
-	if !key.VerifyBytes(sb.SignBytes(), x.Signature) {
-		return ErrInvalidAggrSignature()
-	}
 	return nil
 }
 
 func (x *AggregateSignature) Check(sb SignByte, vs ValidatorSet) (isPartialQC bool, err ErrorI) {
-	if err = x.CheckBasic(sb, vs); err != nil {
+	if err = x.CheckBasic(); err != nil {
 		return false, err
+	}
+	key := vs.Key.Copy()
+	if er := key.SetBitmap(x.Bitmap); er != nil {
+		return false, ErrInvalidSignerBitmap(er)
+	}
+	if !key.VerifyBytes(sb.SignBytes(), x.Signature) {
+		return false, ErrInvalidAggrSignature()
 	}
 	_, totalSignedPower, min23Maj, err := x.GetSignerInfo(vs)
 	if err != nil {

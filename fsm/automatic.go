@@ -14,11 +14,18 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	if err := s.CheckProtocolVersion(); err != nil {
 		return err
 	}
-	nonSignerPercent, err := s.HandleByzantine(s.BeginBlockParams)
+	params, err := s.GetParamsVal()
+	if err != nil {
+		return err
+	}
+	nonSignerPercent, err := s.HandleByzantine(s.BeginBlockParams, params)
 	if err != nil {
 		return err
 	}
 	if err = s.RewardProposer(crypto.NewAddressFromBytes(s.BeginBlockParams.BlockHeader.ProposerAddress), nonSignerPercent); err != nil {
+		return err
+	}
+	if err = s.RewardCommittees(params); err != nil {
 		return err
 	}
 	return nil
@@ -144,7 +151,7 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI, nonSignerPercent 
 	if err = s.UpdateProposerKeys(validator.PublicKey); err != nil {
 		return err
 	}
-	fee, err := s.GetPool(types.PoolID_FeeCollector)
+	fee, err := s.GetPool(types.FEE_Pool_ID)
 	if err != nil {
 		return err
 	}
@@ -152,18 +159,53 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI, nonSignerPercent 
 	afterDAOCut := lib.Uint64ReducePercentage(totalReward, float64(govParams.DaoRewardPercentage))
 	daoCut := totalReward - afterDAOCut
 	proposerCut := lib.Uint64ReducePercentage(afterDAOCut, float64(nonSignerPercent))
-	if err = s.MintToPool(types.PoolID_DAO, daoCut); err != nil {
+	if err = s.MintToPool(types.DAO_Pool_ID, daoCut); err != nil {
 		return err
 	}
 	return s.MintToAccount(crypto.NewAddressFromBytes(validator.Output), proposerCut)
 }
 
-func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams) (nonSignerPercent int, err lib.ErrorI) {
-	block := beginBlock.BlockHeader
-	params, err := s.GetParamsVal()
+func (s *StateMachine) RewardCommittees(params *types.ValidatorParams) lib.ErrorI {
+	ids, err := s.GetRewardedCommittees()
 	if err != nil {
-		return 0, err
+		return err
 	}
+	// mintPerCommittee = reward / num_committees
+	mintPerCommittee := lib.RoundFloatToUint64(float64(params.ValidatorCommitteeReward) / float64(len(ids)))
+	for _, id := range ids {
+		if err = s.MintToPool(id, mintPerCommittee); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *StateMachine) DistributeCommitteeReward() lib.ErrorI {
+	eq, err := s.GetEquityByCommittee()
+	if err != nil {
+		return err
+	}
+	for _, equity := range eq.EquityByCommittee {
+		rewardPool, e := s.GetPool(equity.CommitteeId)
+		if e != nil {
+			return e
+		}
+		for _, ep := range equity.EquityPoints {
+			rewardAmount := float64(rewardPool.Amount) * float64(ep.Points) / float64(equity.NumberOfSamples*10000)
+			if err = s.MintToAccount(crypto.NewAddress(ep.Address), uint64(rewardAmount)); err != nil {
+				return err
+			}
+		}
+		rewardPool.Amount = 0
+		if err = s.SetPool(rewardPool); err != nil {
+			return err
+		}
+	}
+	return s.ClearEquityByCommittee()
+}
+
+func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams, params *types.ValidatorParams) (nonSignerPercent int, err lib.ErrorI) {
+	block := beginBlock.BlockHeader
 	if s.Height()%params.ValidatorNonSignWindow == 0 {
 		if err = s.SlashAndResetNonSigners(params); err != nil {
 			return 0, err

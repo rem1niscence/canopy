@@ -85,21 +85,21 @@ func (x *BlockHeader) Check() ErrorI {
 }
 
 type jsonBlockHeader struct {
-	Height                uint64                        `json:"height,omitempty"`
-	Hash                  HexBytes                      `json:"hash,omitempty"`
-	NetworkId             uint32                        `json:"network_id,omitempty"`
-	Time                  string                        `json:"time,omitempty"`
-	NumTxs                uint64                        `json:"num_txs,omitempty"`
-	TotalTxs              uint64                        `json:"total_txs,omitempty"`
-	LastBlockHash         HexBytes                      `json:"last_block_hash,omitempty"`
-	StateRoot             HexBytes                      `json:"state_root,omitempty"`
-	TransactionRoot       HexBytes                      `json:"transaction_root,omitempty"`
-	ValidatorRoot         HexBytes                      `json:"validator_root,omitempty"`
-	NextValidatorRoot     HexBytes                      `json:"next_validator_root,omitempty"`
-	ProposerAddress       HexBytes                      `json:"proposer_address,omitempty"`
-	DoubleSigners         map[string]*DoubleSignHeights `json:"double_signers,omitempty"`
-	BadProposers          []HexBytes                    `json:"bad_proposers,omitempty"`
-	LastQuorumCertificate *QuorumCertificate            `json:"last_quorum_certificate,omitempty"`
+	Height                uint64             `json:"height,omitempty"`
+	Hash                  HexBytes           `json:"hash,omitempty"`
+	NetworkId             uint32             `json:"network_id,omitempty"`
+	Time                  string             `json:"time,omitempty"`
+	NumTxs                uint64             `json:"num_txs,omitempty"`
+	TotalTxs              uint64             `json:"total_txs,omitempty"`
+	LastBlockHash         HexBytes           `json:"last_block_hash,omitempty"`
+	StateRoot             HexBytes           `json:"state_root,omitempty"`
+	TransactionRoot       HexBytes           `json:"transaction_root,omitempty"`
+	ValidatorRoot         HexBytes           `json:"validator_root,omitempty"`
+	NextValidatorRoot     HexBytes           `json:"next_validator_root,omitempty"`
+	ProposerAddress       HexBytes           `json:"proposer_address,omitempty"`
+	DoubleSigners         []*DoubleSigners   `json:"double_signers,omitempty"`
+	BadProposers          []HexBytes         `json:"bad_proposers,omitempty"`
+	LastQuorumCertificate *QuorumCertificate `json:"last_quorum_certificate,omitempty"`
 }
 
 // nolint:all
@@ -196,11 +196,11 @@ func (x *BlockHeader) Equals(b *BlockHeader) bool {
 	if !bytes.Equal(x.ProposerAddress, b.ProposerAddress) {
 		return false
 	}
-	for addr, heights := range x.DoubleSigners {
-		if _, err := crypto.NewAddressFromString(addr); err != nil {
+	for _, ds := range x.DoubleSigners {
+		if len(ds.PubKey) != crypto.AddressSize {
 			return false
 		}
-		if heights == nil || len(heights.Heights) < 1 {
+		if ds.Heights == nil || len(ds.Heights) < 1 {
 			return false
 		}
 	}
@@ -271,4 +271,13 @@ func (x *Block) UnmarshalJSON(b []byte) error {
 	}
 	x.BlockHeader, x.Transactions = j.BlockHeader, txs
 	return nil
+}
+
+func (x *DoubleSigners) AddHeight(height uint64) {
+	for _, h := range x.Heights {
+		if h == height {
+			return
+		}
+	}
+	x.Heights = append(x.Heights, height)
 }

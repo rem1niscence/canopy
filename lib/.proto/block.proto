@@ -20,9 +20,14 @@ message BlockHeader {
   bytes validator_root = 10;
   bytes next_validator_root = 11;
   bytes proposer_address = 12;
-  map<string, DoubleSignHeights> double_signers = 13;
+  repeated DoubleSigners double_signers = 13;
   repeated bytes bad_proposers = 14;
   QuorumCertificate last_quorum_certificate = 15;
+}
+
+message DoubleSigners {
+  bytes pubKey = 1;
+  repeated uint64 heights = 2;
 }
 
 message Block {
@@ -52,10 +57,6 @@ message EndBlockParams {
 
 message ProposerKeys {
   repeated bytes proposer_keys = 1;
-}
-
-message DoubleSignHeights {
-  map<uint64, bool> heights = 1;
 }
 
 enum Phase {

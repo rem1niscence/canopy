@@ -1,4 +1,4 @@
-package app
+package controller
 
 import (
 	"bytes"
@@ -23,7 +23,6 @@ type Controller struct {
 	Mempool    *Mempool
 	PublicKey  []byte
 	PrivateKey crypto.PrivateKeyI
-	resetBFT   chan time.Duration
 	syncing    *atomic.Bool
 	Config     lib.Config
 	log        lib.LoggerI
@@ -78,8 +77,7 @@ func (c *Controller) proposalToBlock(proposal []byte) (block *lib.Block, err lib
 	return
 }
 
-func (c *Controller) ResetBFTChan() chan time.Duration { return c.resetBFT }
-func (c *Controller) Syncing() *atomic.Bool            { return c.syncing }
+func (c *Controller) Syncing() *atomic.Bool { return c.syncing }
 
 func New(c lib.Config, valKey crypto.PrivateKeyI, db lib.StoreI, l lib.LoggerI) (*Controller, lib.ErrorI) {
 	sm, err := fsm.New(c, db, l)
@@ -110,7 +108,6 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, db lib.StoreI, l lib.LoggerI) 
 		PublicKey:  valKey.PublicKey().Bytes(),
 		PrivateKey: valKey,
 		Mutex:      sync.Mutex{},
-		resetBFT:   make(chan time.Duration, 1),
 		syncing:    &atomic.Bool{},
 		Config:     c,
 		log:        l,

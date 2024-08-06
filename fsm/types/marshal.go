@@ -143,13 +143,12 @@ func (x *Account) UnmarshalJSON(bz []byte) (err error) {
 }
 
 type pool struct {
-	Name   string `json:"name"`
+	ID     uint64 `json:"id"`
 	Amount uint64 `json:"amount"`
 }
 
 func (x *Pool) MarshalJSON() ([]byte, error) {
-	name := PoolID_name[int32(x.Id)]
-	return json.Marshal(pool{name, x.Amount})
+	return json.Marshal(pool{x.Id, x.Amount})
 }
 
 func (x *Pool) UnmarshalJSON(bz []byte) (err error) {
@@ -157,7 +156,7 @@ func (x *Pool) UnmarshalJSON(bz []byte) (err error) {
 	if err = json.Unmarshal(bz, a); err != nil {
 		return err
 	}
-	x.Id, x.Amount = PoolID(PoolID_value[a.Name]), a.Amount
+	x.Id, x.Amount = a.ID, a.Amount
 	return
 }
 
@@ -219,5 +218,36 @@ func (x *Validator) PassesFilter(f lib.ValidatorFilters) (ok bool) {
 			return
 		}
 	}
+	switch {
+	case f.Delegate == lib.Yes:
+		if !x.Delegate {
+			return
+		}
+	case f.Delegate == lib.No:
+		if x.Delegate {
+			return
+		}
+	}
 	return true
+}
+
+func (x *EquityPoints) MarshalJSON() ([]byte, error) {
+	return json.Marshal(equityPoints{
+		Address: x.Address,
+		Points:  x.Points,
+	})
+}
+
+func (x *EquityPoints) UnmarshalJSON(b []byte) error {
+	var ep equityPoints
+	if err := json.Unmarshal(b, &ep); err != nil {
+		return err
+	}
+	x.Address, x.Points = ep.Address, ep.Points
+	return nil
+}
+
+type equityPoints struct {
+	Address lib.HexBytes `json:"address"`
+	Points  uint64       `json:"points"`
 }

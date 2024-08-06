@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/alecthomas/units"
 	"github.com/dgraph-io/badger/v4"
-	app2 "github.com/ginchuco/ginchu/app"
+	app2 "github.com/ginchuco/ginchu/controller"
 	"github.com/ginchuco/ginchu/fsm"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
@@ -386,8 +386,8 @@ func Accounts(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func Pool(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	heightAndNameParams(w, r, func(s *fsm.StateMachine, n string) (interface{}, lib.ErrorI) {
-		return s.GetPool(types.PoolID(types.PoolID_value[n]))
+	heightAndNameParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
+		return s.GetPool(id)
 	})
 }
 
@@ -944,13 +944,13 @@ func heightAndAddressParams(w http.ResponseWriter, r *http.Request, callback fun
 	write(w, p, http.StatusOK)
 }
 
-func heightAndNameParams(w http.ResponseWriter, r *http.Request, callback func(*fsm.StateMachine, string) (any, lib.ErrorI)) {
+func heightAndNameParams(w http.ResponseWriter, r *http.Request, callback func(*fsm.StateMachine, uint64) (any, lib.ErrorI)) {
 	req := new(heightAndNameRequest)
 	state, ok := getStateMachineFromHeightParams(w, r, req)
 	if !ok {
 		return
 	}
-	p, err := callback(state, req.Name)
+	p, err := callback(state, req.ID)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
@@ -1065,8 +1065,8 @@ type heightsRequest struct {
 	StartHeight uint64 `json:"startHeight"`
 }
 
-type nameRequest struct {
-	Name string `json:"name"`
+type idRequest struct {
+	ID uint64 `json:"id"`
 }
 type passwordRequest struct {
 	Password string `json:"password"`
@@ -1094,7 +1094,7 @@ type heightAndAddressRequest struct {
 
 type heightAndNameRequest struct {
 	heightRequest
-	nameRequest
+	idRequest
 }
 
 type keystoreRequest struct {

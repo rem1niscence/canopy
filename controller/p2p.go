@@ -1,4 +1,4 @@
-package app
+package controller
 
 import (
 	"bytes"
@@ -154,7 +154,7 @@ func (c *Controller) ListenForBlock() {
 			if err = c.commitBlock(qc); err != nil {
 				c.log.Fatalf("unable to commit block at height %d: %s", qc.Header.Height, err.Error())
 			}
-			c.resetBFT <- time.Since(startTime)
+			c.Consensus.ResetBFTChan() <- time.Since(startTime)
 			c.notifyP2P(c.Consensus.ValidatorSet.ValidatorSet)
 			c.GossipCertificate(qc)
 		}()
@@ -314,7 +314,7 @@ func (c *Controller) validatePeerBlock(height uint64, m *lib.MessageWrapper, v l
 	hash, _ := block.BlockHeader.SetHash()
 	if !bytes.Equal(qc.ProposalHash, hash) {
 		c.P2P.ChangeReputation(senderID, InvalidJustifyRep)
-		err = bft.ErrMismatchProposalHash()
+		err = lib.ErrMismatchProposalHash()
 		return
 	}
 	max = response.MaxHeight
@@ -415,7 +415,7 @@ func (c *Controller) pollMaxHeight(backoff int) (maxHeight uint64, maxHeights ma
 
 func (c *Controller) syncingDone(maxHeight uint64) bool {
 	if c.GetHeight() >= maxHeight {
-		c.resetBFT <- time.Since(c.LoadLastCommitTime(maxHeight))
+		c.Consensus.ResetBFTChan() <- time.Since(c.LoadLastCommitTime(maxHeight))
 		c.syncing.Store(false)
 		go c.ListenForBlock()
 		return true

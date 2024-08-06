@@ -14,35 +14,36 @@ func (x *QuorumCertificate) SignBytes() (signBytes []byte) {
 	return
 }
 
-func (x *QuorumCertificate) Check(vs ValidatorSet, height ...uint64) (isPartialQC bool, error ErrorI) {
+func (x *QuorumCertificate) CheckBasic(height ...uint64) ErrorI {
 	if x == nil {
-		return false, ErrEmptyQuorumCertificate()
+		return ErrEmptyQuorumCertificate()
 	}
 	if err := x.Header.Check(height...); err != nil {
+		return err
+	}
+	return x.Signature.CheckBasic()
+}
+
+func (x *QuorumCertificate) Check(vs ValidatorSet, height ...uint64) (isPartialQC bool, error ErrorI) {
+	if err := x.CheckBasic(height...); err != nil {
 		return false, err
 	}
 	return x.Signature.Check(x, vs)
 }
 
 func (x *QuorumCertificate) CheckHighQC(height uint64, vs ValidatorSet) ErrorI {
-	if x == nil {
-		return ErrEmptyQuorumCertificate()
-	}
-	if err := x.Header.Check(height); err != nil {
+	isPartialQC, err := x.Check(vs, height)
+	if err != nil {
 		return err
+	}
+	if isPartialQC {
+		return ErrNoMaj23()
 	}
 	if x.Header.Phase != Phase_PRECOMMIT_VOTE {
 		return ErrWrongPhase()
 	}
 	if x.Proposal == nil {
 		return ErrNilProposal()
-	}
-	isPartialQC, err := x.Signature.Check(x, vs)
-	if err != nil {
-		return err
-	}
-	if isPartialQC {
-		return ErrNoMaj23()
 	}
 	return nil
 }

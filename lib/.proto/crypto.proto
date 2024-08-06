@@ -1,5 +1,5 @@
 syntax = "proto3";
-package cli;
+package types;
 
 option go_package = "github.com/ginchuco/ginchu/lib/crypto";
 

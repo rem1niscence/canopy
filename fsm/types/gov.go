@@ -204,6 +204,8 @@ func DefaultParams() *Params {
 			ValidatorMaxNonSign:                 4,
 			ValidatorNonSignWindow:              10,
 			ValidatorBlockReward:                1000000,
+			ValidatorMaxCommittees:              15,
+			ValidatorMaxCommitteeSize:           100,
 		},
 		Fee: &FeeParams{
 			MessageSendFee:            10000,
@@ -386,6 +388,8 @@ const (
 	ParamValidatorNonSignWindow             = "validator_non_sign_window"
 	ParamValidatorDoubleSignSlashPercentage = "validator_double_sign_slash_percentage"
 	ParamValidatorBlockReward               = "validator_block_reward"
+	ParamValidatorMaxCommittees             = "validator_max_committees"
+	ParamValidatorMaxCommitteeSize          = "validator_max_committee_size"
 )
 
 func (x *ValidatorParams) Validate() lib.ErrorI {
@@ -419,6 +423,12 @@ func (x *ValidatorParams) Validate() lib.ErrorI {
 	if x.ValidatorBlockReward == 0 {
 		return ErrInvalidParam(ParamValidatorBlockReward)
 	}
+	if x.ValidatorMaxCommittees > 100 {
+		return ErrInvalidParam(ParamValidatorMaxCommittees)
+	}
+	if x.ValidatorMaxCommitteeSize == 0 {
+		return ErrInvalidParam(ParamValidatorMaxCommitteeSize)
+	}
 	return nil
 }
 
@@ -444,6 +454,10 @@ func (x *ValidatorParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.ValidatorMinStake = value
 	case ParamValidatorBlockReward:
 		x.ValidatorBlockReward = value
+	case ParamValidatorMaxCommittees:
+		x.ValidatorMaxCommittees = value
+	case ParamValidatorMaxCommitteeSize:
+		x.ValidatorMaxCommitteeSize = value
 	default:
 		return ErrUnknownParam()
 	}

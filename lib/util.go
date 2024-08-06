@@ -36,6 +36,7 @@ type PageParams struct {
 type ValidatorFilters struct {
 	Unstaking FilterOption `json:"unstaking"`
 	Paused    FilterOption `json:"paused"`
+	Delegate  FilterOption `json:"delegate"`
 }
 
 func (v ValidatorFilters) On() bool {
@@ -291,6 +292,16 @@ func Uint64PercentageDiv(dividend, divisor uint64) (res uint64) {
 	return
 }
 
+func Uint64Percentage(amount uint64, percentage uint64) (res uint64) {
+	a := Uint64ToBigFloat(amount)
+	b := big.NewFloat(float64(percentage))
+	b.Quo(b, big.NewFloat(100))
+	a.Mul(a, b)
+	a.Add(a, big.NewFloat(.5)) // round ties away
+	res, _ = a.Uint64()
+	return
+}
+
 func Uint64ReducePercentage(amount uint64, percentage float64) (res uint64) {
 	a := Uint64ToBigFloat(amount)
 	b := big.NewFloat(100 - percentage)
@@ -303,6 +314,13 @@ func Uint64ReducePercentage(amount uint64, percentage float64) (res uint64) {
 
 func Uint64ToBigFloat(u uint64) *big.Float {
 	return new(big.Float).SetUint64(u)
+}
+
+func RoundFloatToUint64(f float64) uint64 {
+	if f < 0 {
+		return uint64(f)
+	}
+	return uint64(f + .5) // Round ties away
 }
 
 type HexBytes []byte

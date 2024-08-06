@@ -8,9 +8,16 @@ message Validator {
   bytes public_key = 2;
   string net_address = 3;
   uint64 staked_amount = 4;
-  uint64 max_paused_height = 5;
-  uint64 unstaking_height = 6;
-  bytes output = 7;
+  repeated Committee committees = 5;
+  uint64 max_paused_height = 6;
+  uint64 unstaking_height = 7;
+  bytes output = 8;
+  bool delegate = 9;
+}
+
+message Committee {
+  uint64 id = 1;
+  uint64 stake_percent = 2;
 }
 
 message NonSignerInfo {

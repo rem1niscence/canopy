@@ -49,7 +49,11 @@ func (s *StateMachine) GetValidators() ([]*types.Validator, lib.ErrorI) {
 }
 
 func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorFilters) (page *lib.Page, err lib.ErrorI) {
-	it, err := s.Iterator(types.ValidatorPrefix())
+	return s.getValidatorsPaginated(p, f, types.ValidatorPrefix())
+}
+
+func (s *StateMachine) getValidatorsPaginated(p lib.PageParams, f lib.ValidatorFilters, prefix []byte) (page *lib.Page, err lib.ErrorI) {
+	it, err := s.Iterator(prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -106,6 +110,42 @@ func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorF
 	return
 }
 
+func (s *StateMachine) SetValidators(validators []*types.Validator, supply *types.Supply) lib.ErrorI {
+	for _, val := range validators {
+		supply.Total += val.StakedAmount
+		supply.Staked += val.StakedAmount
+		if err := s.SetValidator(val); err != nil {
+			return err
+		}
+		if val.MaxPausedHeight == 0 && val.UnstakingHeight == 0 {
+			if err := s.SetConsensusValidator(crypto.NewAddressFromBytes(val.Address), val.StakedAmount); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s *StateMachine) SetValidator(validator *types.Validator) lib.ErrorI {
+	bz, err := s.marshalValidator(validator)
+	if err != nil {
+		return err
+	}
+	if err = s.Set(types.KeyForValidator(crypto.NewAddressFromBytes(validator.Address)), bz); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *StateMachine) DeleteValidator(address crypto.AddressI) lib.ErrorI {
+	if err := s.Delete(types.KeyForValidator(address)); err != nil {
+		return err
+	}
+	return nil
+}
+
+// CONSENSUS VALIDATORS BELOW
+
 func (s *StateMachine) GetConsValidatorsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 	params, err := s.GetParamsVal()
 	if err != nil {
@@ -154,36 +194,12 @@ func (s *StateMachine) GetConsValidatorsPaginated(p lib.PageParams) (page *lib.P
 	return
 }
 
-func (s *StateMachine) SetValidators(validators []*types.Validator, supply *types.Supply) lib.ErrorI {
-	for _, val := range validators {
-		supply.Total += val.StakedAmount
-		supply.Staked += val.StakedAmount
-		if err := s.SetValidator(val); err != nil {
-			return err
-		}
-		if val.MaxPausedHeight == 0 && val.UnstakingHeight == 0 {
-			if err := s.SetConsensusValidator(crypto.NewAddressFromBytes(val.Address), val.StakedAmount); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (s *StateMachine) SetValidator(validator *types.Validator) lib.ErrorI {
-	bz, err := s.marshalValidator(validator)
-	if err != nil {
+func (s *StateMachine) UpdateConsensusValidator(address crypto.AddressI, oldValidator *types.Validator, newStake uint64) lib.ErrorI {
+	if err := s.DeleteConsensusValidator(address, oldValidator.StakedAmount); err != nil {
 		return err
 	}
-	if err = s.Set(types.KeyForValidator(crypto.NewAddressFromBytes(validator.Address)), bz); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *StateMachine) UpdateConsensusValidator(address crypto.AddressI, oldStake, newStake uint64) lib.ErrorI {
-	if err := s.DeleteConsensusValidator(address, oldStake); err != nil {
-		return err
+	if oldValidator.MaxPausedHeight != 0 {
+		return nil // don't set if paused
 	}
 	return s.SetConsensusValidator(address, newStake)
 }
@@ -199,71 +215,26 @@ func (s *StateMachine) DeleteConsensusValidator(address crypto.AddressI, stakeAm
 	return s.Delete(types.KeyForConsensus(address, stakeAmount))
 }
 
+// UNSTAKING VALIDATORS BELOW
+
 func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, height uint64) lib.ErrorI {
 	if err := s.Set(types.KeyForUnstaking(height, address), nil); err != nil {
 		return err
 	}
-	if err := s.DeleteConsensusValidator(address, validator.StakedAmount); err != nil {
-		return err
+	if validator.Delegate {
+		if err := s.DeleteDelegations(address, validator.StakedAmount, validator.Committees); err != nil {
+			return err
+		}
+	} else {
+		if err := s.DeleteConsensusValidator(address, validator.StakedAmount); err != nil {
+			return err
+		}
+		if err := s.DeleteCommittees(address, validator.StakedAmount, validator.Committees); err != nil {
+			return err
+		}
 	}
 	validator.UnstakingHeight = height
 	return s.SetValidator(validator)
-}
-
-func (s *StateMachine) SetValidatorsPaused(params *types.ValidatorParams, addresses [][]byte) lib.ErrorI {
-	maxPausedHeight := s.Height() + params.ValidatorMaxPauseBlocks
-	for _, addr := range addresses {
-		address := crypto.NewAddressFromBytes(addr)
-		validator, err := s.GetValidator(address)
-		if err != nil {
-			return err
-		}
-		if validator.MaxPausedHeight != 0 {
-			return types.ErrValidatorPaused()
-		}
-		if err = s.SetValidatorPaused(address, validator, maxPausedHeight); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *types.Validator, maxPausedHeight uint64) lib.ErrorI {
-	if err := s.Set(types.KeyForPaused(maxPausedHeight, address), nil); err != nil {
-		return err
-	}
-	if err := s.DeleteConsensusValidator(address, validator.StakedAmount); err != nil {
-		return err
-	}
-	validator.MaxPausedHeight = maxPausedHeight
-	return s.SetValidator(validator)
-}
-
-func (s *StateMachine) SetValidatorUnpaused(address crypto.AddressI, validator *types.Validator) lib.ErrorI {
-	if err := s.Delete(types.KeyForPaused(validator.MaxPausedHeight, address)); err != nil {
-		return err
-	}
-	if err := s.SetConsensusValidator(address, validator.StakedAmount); err != nil {
-		return err
-	}
-	validator.MaxPausedHeight = 0
-	return s.SetValidator(validator)
-}
-
-func (s *StateMachine) DeletePaused(height uint64) lib.ErrorI {
-	var keys [][]byte
-	setValidatorUnstakingCallback := func(key, _ []byte) lib.ErrorI {
-		keys = append(keys, key)
-		addr, err := types.AddressFromKey(key)
-		if err != nil {
-			return err
-		}
-		return s.ForceUnstakeValidator(addr)
-	}
-	if err := s.IterateAndExecute(types.PausedPrefix(height), setValidatorUnstakingCallback); err != nil {
-		return err
-	}
-	return s.DeleteAll(keys)
 }
 
 func (s *StateMachine) DeleteUnstaking(height uint64) lib.ErrorI {
@@ -292,11 +263,60 @@ func (s *StateMachine) DeleteUnstaking(height uint64) lib.ErrorI {
 	return s.DeleteAll(keys)
 }
 
-func (s *StateMachine) DeleteValidator(address crypto.AddressI) lib.ErrorI {
-	if err := s.Delete(types.KeyForValidator(address)); err != nil {
-		return err
+// PAUSED VALIDATORS BELOW
+
+func (s *StateMachine) SetValidatorsPaused(addresses [][]byte) lib.ErrorI {
+	for _, addr := range addresses {
+		if err := s.HandleMessagePause(&types.MessagePause{Address: addr}); err != nil {
+			s.log.Debugf("can't pause validator %s with err %s", lib.BytesToString(addr), err.Error())
+			continue
+		}
 	}
 	return nil
+}
+
+func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *types.Validator, maxPausedHeight uint64) lib.ErrorI {
+	if err := s.Set(types.KeyForPaused(maxPausedHeight, address), nil); err != nil {
+		return err
+	}
+	if err := s.DeleteConsensusValidator(address, validator.StakedAmount); err != nil {
+		return err
+	}
+	if err := s.DeleteCommittees(address, validator.StakedAmount, validator.Committees); err != nil {
+		return err
+	}
+	validator.MaxPausedHeight = maxPausedHeight
+	return s.SetValidator(validator)
+}
+
+func (s *StateMachine) SetValidatorUnpaused(address crypto.AddressI, validator *types.Validator) lib.ErrorI {
+	if err := s.Delete(types.KeyForPaused(validator.MaxPausedHeight, address)); err != nil {
+		return err
+	}
+	if err := s.SetConsensusValidator(address, validator.StakedAmount); err != nil {
+		return err
+	}
+	if err := s.SetCommittees(address, validator.StakedAmount, validator.Committees); err != nil {
+		return err
+	}
+	validator.MaxPausedHeight = 0
+	return s.SetValidator(validator)
+}
+
+func (s *StateMachine) DeletePaused(height uint64) lib.ErrorI {
+	var keys [][]byte
+	setValidatorUnstakingCallback := func(key, _ []byte) lib.ErrorI {
+		keys = append(keys, key)
+		addr, err := types.AddressFromKey(key)
+		if err != nil {
+			return err
+		}
+		return s.ForceUnstakeValidator(addr)
+	}
+	if err := s.IterateAndExecute(types.PausedPrefix(height), setValidatorUnstakingCallback); err != nil {
+		return err
+	}
+	return s.DeleteAll(keys)
 }
 
 func (s *StateMachine) marshalValidator(validator *types.Validator) ([]byte, lib.ErrorI) {

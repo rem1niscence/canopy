@@ -93,7 +93,7 @@ func (c *Consensus) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.
 			}
 		} else {
 			if !bytes.Equal(x.Qc.ProposalHash, c.HashProposal(c.Proposal)) {
-				return false, ErrMismatchProposalHash()
+				return false, lib.ErrMismatchProposalHash()
 			}
 		}
 	}
@@ -122,7 +122,7 @@ func (c *Consensus) CheckReplicaMessage(x *Message) lib.ErrorI {
 		}
 	} else {
 		if !bytes.Equal(x.Qc.ProposalHash, c.HashProposal(c.Proposal)) {
-			return ErrMismatchProposalHash()
+			return lib.ErrMismatchProposalHash()
 		}
 	}
 	return nil

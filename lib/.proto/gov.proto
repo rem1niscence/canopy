@@ -31,6 +31,9 @@ message ValidatorParams {
   uint64 validator_max_non_sign = 9;
   uint64 validator_non_sign_window = 10;
   uint64 validator_block_reward = 11;
+  uint64 validator_max_committees = 12;
+  uint64 validator_max_committee_size = 13;
+  uint64 validator_committee_reward = 14;
 }
 
 message FeeParams {

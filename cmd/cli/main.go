@@ -5,8 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/ginchuco/ginchu/app"
 	"github.com/ginchuco/ginchu/cmd/rpc"
+	"github.com/ginchuco/ginchu/controller"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
@@ -64,7 +64,7 @@ func Start() {
 	if err != nil {
 		l.Fatal(err.Error())
 	}
-	app, err := app.New(config, validatorKey, db, l)
+	app, err := controller.New(config, validatorKey, db, l)
 	if err != nil {
 		l.Fatal(err.Error())
 	}

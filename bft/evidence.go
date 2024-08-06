@@ -3,7 +3,7 @@ package bft
 import (
 	"bytes"
 	"github.com/ginchuco/ginchu/lib"
-	"reflect"
+	"slices"
 )
 
 type ByzantineEvidence struct {
@@ -24,12 +24,14 @@ func (c *Consensus) ValidateByzantineEvidence(x *lib.BlockHeader, be *ByzantineE
 		if len(doubleSigners) != len(x.DoubleSigners) {
 			return lib.ErrInvalidEvidence()
 		}
-		for address, heights := range doubleSigners {
-			checkHeights, ok := x.DoubleSigners[address]
-			if !ok {
-				return lib.ErrInvalidEvidence()
+		for _, ds1 := range doubleSigners {
+			valid := false
+			for _, ds2 := range x.DoubleSigners {
+				if bytes.Equal(ds1.PubKey, ds2.PubKey) && slices.Equal(ds1.Heights, ds2.Heights) {
+					valid = true
+				}
 			}
-			if !reflect.DeepEqual(heights.Heights, checkHeights.Heights) {
+			if !valid {
 				return lib.ErrInvalidEvidence()
 			}
 		}
@@ -65,8 +67,8 @@ func NewDSE(dse ...[]*DoubleSignEvidence) DoubleSignEvidences {
 	}
 }
 
-func (c *Consensus) ProcessDSE(dse ...*DoubleSignEvidence) (results map[string]*lib.DoubleSignHeights, e lib.ErrorI) {
-	results = make(map[string]*lib.DoubleSignHeights)
+func (c *Consensus) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.DoubleSigners, e lib.ErrorI) {
+	results = make([]*lib.DoubleSigners, 0)
 	for _, x := range dse {
 		if err := x.CheckBasic(); err != nil {
 			return nil, err
@@ -94,15 +96,19 @@ func (c *Consensus) ProcessDSE(dse ...*DoubleSignEvidence) (results map[string]*
 		if err != nil {
 			return nil, err
 		}
-		for _, ds := range doubleSigners {
-			if c.IsValidDoubleSigner(height, ds) {
-				addressKey := lib.BytesToString(ds)
-				heights, ok := results[addressKey]
-				if !ok {
-					heights = &lib.DoubleSignHeights{Heights: make(map[uint64]bool)}
+	out:
+		for _, pubKey := range doubleSigners {
+			if c.IsValidDoubleSigner(height, pubKey) {
+				for i, doubleSigner := range results {
+					if bytes.Equal(doubleSigner.PubKey, pubKey) {
+						results[i].AddHeight(height)
+						continue out
+					}
 				}
-				heights.Heights[height] = true
-				results[addressKey] = heights
+				results = append(results, &lib.DoubleSigners{
+					PubKey:  pubKey,
+					Heights: []uint64{height},
+				})
 			}
 		}
 	}

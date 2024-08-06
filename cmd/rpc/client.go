@@ -3,7 +3,7 @@ package rpc
 import (
 	"bytes"
 	"encoding/json"
-	bus "github.com/ginchuco/ginchu/app"
+	bus "github.com/ginchuco/ginchu/controller"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
@@ -132,9 +132,9 @@ func (c *Client) Accounts(height uint64, params lib.PageParams) (p *lib.Page, er
 	return
 }
 
-func (c *Client) Pool(height uint64, name string) (p *types.Pool, err lib.ErrorI) {
+func (c *Client) Pool(height uint64, id uint64) (p *types.Pool, err lib.ErrorI) {
 	p = new(types.Pool)
-	err = c.heightAndNameRequest(PoolRouteName, height, name, p)
+	err = c.heightAndNameRequest(PoolRouteName, height, id, p)
 	return
 }
 
@@ -553,10 +553,10 @@ func (c *Client) heightAndAddressRequest(routeName string, height uint64, addres
 	return
 }
 
-func (c *Client) heightAndNameRequest(routeName string, height uint64, name string, ptr any) (err lib.ErrorI) {
+func (c *Client) heightAndNameRequest(routeName string, height, id uint64, ptr any) (err lib.ErrorI) {
 	bz, err := lib.MarshalJSON(heightAndNameRequest{
 		heightRequest: heightRequest{height},
-		nameRequest:   nameRequest{name},
+		idRequest:     idRequest{id},
 	})
 	if err != nil {
 		return

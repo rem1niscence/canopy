@@ -27,7 +27,7 @@ func (s *StateMachine) SlashAndResetNonSigners(params *types.ValidatorParams) li
 	if err := s.IterateAndExecute(types.NonSignerPrefix(), callback); err != nil {
 		return err
 	}
-	if err := s.SetValidatorsPaused(params, addrs); err != nil {
+	if err := s.SetValidatorsPaused(addrs); err != nil {
 		return err
 	}
 	if err := s.SlashNonSigners(params, addrs); err != nil {
@@ -82,24 +82,20 @@ func (s *StateMachine) IncrementNonSigners(nonSigners [][]byte) lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) HandleDoubleSigners(params *types.ValidatorParams, doubleSigners map[string]*lib.DoubleSignHeights) lib.ErrorI {
+func (s *StateMachine) HandleDoubleSigners(params *types.ValidatorParams, doubleSigners []*lib.DoubleSigners) lib.ErrorI {
 	var doubleSignersList [][]byte
-	for addr, heights := range doubleSigners {
-		address, e := crypto.NewAddressFromString(addr)
-		if e != nil {
-			return lib.ErrInvalidAddress()
-		}
-		if heights == nil || len(heights.Heights) < 1 {
+	for _, doubleSigner := range doubleSigners {
+		if doubleSigner.Heights == nil || len(doubleSigner.Heights) < 1 {
 			return lib.ErrInvalidDoubleSignHeights()
 		}
-		for height := range heights.Heights {
-			if !s.IsValidDoubleSigner(height, address.Bytes()) {
+		for _, height := range doubleSigner.Heights {
+			if !s.IsValidDoubleSigner(height, doubleSigner.PubKey) {
 				return lib.ErrInvalidDoubleSigner()
 			}
-			if err := s.Set(types.KeyForDoubleSigner(height, address.Bytes()), types.DoubleSignerEnabledByte()); err != nil {
+			if err := s.Set(types.KeyForDoubleSigner(height, doubleSigner.PubKey), types.DoubleSignerEnabledByte()); err != nil {
 				return err
 			}
-			doubleSignersList = append(doubleSignersList, address.Bytes())
+			doubleSignersList = append(doubleSignersList, doubleSigner.PubKey)
 		}
 	}
 	return s.SlashDoubleSigners(params, doubleSignersList)
@@ -127,11 +123,13 @@ func (s *StateMachine) ForceUnstakeValidator(address crypto.AddressI) lib.ErrorI
 	// get validator
 	validator, err := s.GetValidator(address)
 	if err != nil {
-		return nil // TODO log only. Validator already deleted
+		s.log.Warnf("validator %s is not found to be force unstaked", address.String())
+		return nil
 	}
 	// check if already unstaking
 	if validator.UnstakingHeight != 0 {
-		return nil // TODO log only. Validator already unstaking
+		s.log.Warnf("validator %s is already unstaking can't be forced to begin unstaking", address.String())
+		return nil
 	}
 	// get params for unstaking blocks
 	p, err := s.GetParamsVal()
@@ -166,17 +164,20 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, percent uint64
 	if percent > 100 {
 		return types.ErrInvalidSlashPercentage()
 	}
-	oldStake := validator.StakedAmount
-	validator.StakedAmount = lib.Uint64ReducePercentage(validator.StakedAmount, float64(percent))
-	if err := s.SubFromStakedSupply(oldStake - validator.StakedAmount); err != nil {
+	addr, newStake := crypto.NewAddressFromBytes(validator.Address), lib.Uint64ReducePercentage(validator.StakedAmount, float64(percent))
+	if err := s.SubFromStakedSupply(validator.StakedAmount - newStake); err != nil {
 		return err
 	}
 	if validator.StakedAmount < p.ValidatorMinStake {
-		return s.forceUnstakeValidator(crypto.NewAddressFromBytes(validator.Address), validator, p)
+		return s.forceUnstakeValidator(addr, validator, p)
 	}
-	if err := s.UpdateConsensusValidator(crypto.NewAddressFromBytes(validator.Address), oldStake, validator.StakedAmount); err != nil {
+	if err := s.UpdateConsensusValidator(addr, validator, newStake); err != nil {
 		return err
 	}
+	if err := s.UpdateCommittees(addr, validator, newStake, validator.Committees); err != nil {
+		return err
+	}
+	validator.StakedAmount = newStake
 	return s.SetValidator(validator)
 }
 

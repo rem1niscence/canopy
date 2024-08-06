@@ -57,7 +57,7 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, height uint64, vs, lastVS ValS
 		log:               l,
 		Controller:        con,
 		App:               app,
-		resetBFT:          con.ResetBFTChan(),
+		resetBFT:          make(chan time.Duration, 1),
 		syncing:           con.Syncing(),
 	}, nil
 }
@@ -521,6 +521,8 @@ func (c *Consensus) stopTimer(t *time.Timer) {
 	}
 }
 
+func (c *Consensus) ResetBFTChan() chan time.Duration { return c.resetBFT }
+
 func phaseToString(p Phase) string {
 	return fmt.Sprintf("%d_%s", p, lib.Phase_name[int32(p)])
 }
@@ -535,7 +537,6 @@ type (
 		HashProposal(proposal []byte) []byte
 		CheckProposal(proposal []byte) lib.ErrorI
 		ValidateProposal(proposal []byte, evidence *ByzantineEvidence) lib.ErrorI
-		ResetBFTChan() chan time.Duration
 	}
 	Controller interface {
 		Lock()
@@ -548,7 +549,6 @@ type (
 		GossipCertificate(certificate *lib.QuorumCertificate)
 		SendToReplicas(msg lib.Signable)
 		SendToProposer(msg lib.Signable)
-		ResetBFTChan() chan time.Duration // TODO controller should tell the BFT to stop and start
 		Syncing() *atomic.Bool
 	}
 )

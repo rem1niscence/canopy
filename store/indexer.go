@@ -387,11 +387,14 @@ func (t *Indexer) key(prefix []byte, param1, param2 []byte) []byte {
 }
 
 func multiAppendWithDelimiter(toAppend ...[]byte) (res []byte) {
+	// fn("tx", "10", nil)
+	// return "tx/10/"
 	for _, a := range toAppend {
 		if a == nil {
 			continue
 		}
-		res = append(res, append(a, delim...)...)
+		withTerminatingDelim := append(a, delim...)
+		res = append(res, withTerminatingDelim...)
 	}
 	return
 }

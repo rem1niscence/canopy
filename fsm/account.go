@@ -111,7 +111,7 @@ func (s *StateMachine) AccountDeductFees(address crypto.AddressI, fee uint64) li
 	if err := s.AccountSub(address, fee); err != nil {
 		return err
 	}
-	return s.PoolAdd(types.PoolID_FeeCollector, fee)
+	return s.PoolAdd(types.FEE_Pool_ID, fee)
 }
 
 func (s *StateMachine) MintToAccount(address crypto.AddressI, amount uint64) lib.ErrorI {
@@ -168,8 +168,8 @@ func (s *StateMachine) marshalAccount(account *types.Account) ([]byte, lib.Error
 
 // Pool logic below
 
-func (s *StateMachine) GetPool(name types.PoolID) (*types.Pool, lib.ErrorI) {
-	bz, err := s.Get(types.KeyForPool(name))
+func (s *StateMachine) GetPool(id uint64) (*types.Pool, lib.ErrorI) {
+	bz, err := s.Get(types.KeyForPool(id))
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (s *StateMachine) GetPool(name types.PoolID) (*types.Pool, lib.ErrorI) {
 	if err != nil {
 		return nil, err
 	}
-	pool.Id = name
+	pool.Id = id
 	return pool, nil
 }
 
@@ -230,8 +230,8 @@ func (s *StateMachine) GetPoolsPaginated(p lib.PageParams) (page *lib.Page, err 
 	return
 }
 
-func (s *StateMachine) GetPoolBalance(name types.PoolID) (uint64, lib.ErrorI) {
-	pool, err := s.GetPool(name)
+func (s *StateMachine) GetPoolBalance(id uint64) (uint64, lib.ErrorI) {
+	pool, err := s.GetPool(id)
 	if err != nil {
 		return 0, err
 	}
@@ -259,15 +259,15 @@ func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) MintToPool(name types.PoolID, amount uint64) lib.ErrorI {
+func (s *StateMachine) MintToPool(id uint64, amount uint64) lib.ErrorI {
 	if err := s.AddToTotalSupply(amount); err != nil {
 		return err
 	}
-	return s.PoolAdd(name, amount)
+	return s.PoolAdd(id, amount)
 }
 
-func (s *StateMachine) PoolAdd(name types.PoolID, amountToAdd uint64) lib.ErrorI {
-	pool, err := s.GetPool(name)
+func (s *StateMachine) PoolAdd(id uint64, amountToAdd uint64) lib.ErrorI {
+	pool, err := s.GetPool(id)
 	if err != nil {
 		return err
 	}
@@ -275,8 +275,8 @@ func (s *StateMachine) PoolAdd(name types.PoolID, amountToAdd uint64) lib.ErrorI
 	return s.SetPool(pool)
 }
 
-func (s *StateMachine) PoolSub(name types.PoolID, amountToSub uint64) lib.ErrorI {
-	pool, err := s.GetPool(name)
+func (s *StateMachine) PoolSub(id uint64, amountToSub uint64) lib.ErrorI {
+	pool, err := s.GetPool(id)
 	if err != nil {
 		return err
 	}
@@ -319,6 +319,48 @@ func (s *StateMachine) AddToTotalSupply(amount uint64) lib.ErrorI {
 	return s.SetSupply(supply)
 }
 
+func (s *StateMachine) AddToCommitteeStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	targetIdx, committee := 0, &types.Pool{}
+	for i, c := range supply.CommitteesWithDelegations {
+		if c.Id == committeeId {
+			committee, targetIdx = c, i
+			break
+		}
+	}
+	if committee == nil || committee.Amount < amount {
+		return types.ErrInsufficientSupply()
+	}
+	committee.Amount += amount
+	supply.CommitteesWithDelegations[targetIdx] = committee
+	supply.SortCommittees()
+	return s.SetSupply(supply)
+}
+
+func (s *StateMachine) AddToDelegateStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	targetIdx, delegations := 0, &types.Pool{}
+	for i, c := range supply.DelegationsOnly {
+		if c.Id == committeeId {
+			delegations, targetIdx = c, i
+			break
+		}
+	}
+	if delegations == nil || delegations.Amount < amount {
+		return types.ErrInsufficientSupply()
+	}
+	delegations.Amount += amount
+	supply.DelegationsOnly[targetIdx] = delegations
+	supply.SortCommittees()
+	return s.SetSupply(supply)
+}
+
 func (s *StateMachine) SubFromTotalSupply(amount uint64) lib.ErrorI {
 	supply, err := s.GetSupply()
 	if err != nil {
@@ -340,6 +382,48 @@ func (s *StateMachine) SubFromStakedSupply(amount uint64) lib.ErrorI {
 		return types.ErrInsufficientSupply()
 	}
 	supply.Staked -= amount
+	return s.SetSupply(supply)
+}
+
+func (s *StateMachine) SubFromCommitteeStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	targetIdx, committee := 0, &types.Pool{}
+	for i, c := range supply.CommitteesWithDelegations {
+		if c.Id == committeeId {
+			committee, targetIdx = c, i
+			break
+		}
+	}
+	if committee == nil || committee.Amount < amount {
+		return types.ErrInsufficientSupply()
+	}
+	committee.Amount -= amount
+	supply.CommitteesWithDelegations[targetIdx] = committee
+	supply.SortCommittees()
+	return s.SetSupply(supply)
+}
+
+func (s *StateMachine) SubFromDelegateStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	targetIdx, delegations := 0, &types.Pool{}
+	for i, c := range supply.CommitteesWithDelegations {
+		if c.Id == committeeId {
+			delegations, targetIdx = c, i
+			break
+		}
+	}
+	if delegations == nil || delegations.Amount < amount {
+		return types.ErrInsufficientSupply()
+	}
+	delegations.Amount -= amount
+	supply.CommitteesWithDelegations[targetIdx] = delegations
+	supply.SortDelegations()
 	return s.SetSupply(supply)
 }
 

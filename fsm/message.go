@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"bytes"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
@@ -24,6 +25,8 @@ func (s *StateMachine) HandleMessage(msg lib.MessageI) lib.ErrorI {
 		return s.HandleMessageChangeParameter(x)
 	case *types.MessageDAOTransfer:
 		return s.HandleMessageDAOTransfer(x)
+	case *types.MessageEquityGrant:
+		return s.HandleMessageEquityGrant(x)
 	default:
 		return types.ErrUnknownMessage(x)
 	}
@@ -126,12 +129,24 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	if exists {
 		return types.ErrValidatorExists()
 	}
-	// set validator sorted by stake
-	if err = s.SetConsensusValidator(address, msg.Amount); err != nil {
-		return err
-	}
+	// track total staked tokens
 	if err = s.AddToStakedSupply(msg.Amount); err != nil {
 		return err
+	}
+	if msg.Delegate {
+		// set delegated validator in each committee
+		if err = s.SetDelegations(address, msg.Amount, msg.Committees); err != nil {
+			return err
+		}
+	} else {
+		// set validator sorted by stake
+		if err = s.SetConsensusValidator(address, msg.Amount); err != nil {
+			return err
+		}
+		// set validator in each committee
+		if err = s.SetCommittees(address, msg.Amount, msg.Committees); err != nil {
+			return err
+		}
 	}
 	// set validator
 	return s.SetValidator(&types.Validator{
@@ -139,7 +154,9 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 		PublicKey:    publicKey.Bytes(),
 		NetAddress:   msg.NetAddress,
 		StakedAmount: msg.Amount,
+		Committees:   msg.Committees,
 		Output:       msg.OutputAddress,
+		Delegate:     msg.Delegate,
 	})
 }
 
@@ -171,9 +188,19 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 	}
 	// update validator stake amount
 	newStakedAmount := val.StakedAmount + amountToAdd
-	// updated sorted validator set
-	if err = s.UpdateConsensusValidator(address, val.StakedAmount, newStakedAmount); err != nil {
-		return err
+	// use validator.delegate value -> not allowed to change delegation status
+	if val.Delegate {
+		if err = s.UpdateDelegations(address, val, msg.Amount, msg.Committees); err != nil {
+			return err
+		}
+	} else {
+		// updated sorted validator set
+		if err = s.UpdateConsensusValidator(address, val, newStakedAmount); err != nil {
+			return err
+		}
+		if err = s.UpdateCommittees(address, val, msg.Amount, msg.Committees); err != nil {
+			return err
+		}
 	}
 	// set validator
 	return s.SetValidator(&types.Validator{
@@ -181,9 +208,11 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 		PublicKey:       val.PublicKey,
 		NetAddress:      msg.NetAddress,
 		StakedAmount:    newStakedAmount,
+		Committees:      msg.Committees,
 		MaxPausedHeight: val.MaxPausedHeight,
 		UnstakingHeight: val.UnstakingHeight,
 		Output:          msg.OutputAddress,
+		Delegate:        val.Delegate,
 	})
 }
 
@@ -222,6 +251,9 @@ func (s *StateMachine) HandleMessagePause(msg *types.MessagePause) lib.ErrorI {
 	}
 	if validator.UnstakingHeight != 0 {
 		return types.ErrValidatorUnstaking()
+	}
+	if validator.Delegate {
+		return types.ErrInvalidDelegationStatus()
 	}
 	params, err := s.GetParamsVal()
 	if err != nil {
@@ -265,8 +297,30 @@ func (s *StateMachine) HandleMessageDAOTransfer(msg *types.MessageDAOTransfer) l
 	if err := s.ApproveProposal(msg); err != nil {
 		return types.ErrRejectProposal()
 	}
-	if err := s.PoolSub(types.PoolID_DAO, msg.Amount); err != nil {
+	if err := s.PoolSub(types.DAO_Pool_ID, msg.Amount); err != nil {
 		return err
 	}
 	return s.AccountAdd(crypto.NewAddressFromBytes(msg.Address), msg.Amount)
+}
+
+func (s *StateMachine) HandleMessageEquityGrant(msg *types.MessageEquityGrant) lib.ErrorI {
+	committee, err := s.GetCommittee(msg.Equity.CommitteeId)
+	if err != nil {
+		return err
+	}
+	isPartialQC, err := msg.Qc.Check(committee, s.Height())
+	if err != nil {
+		return err
+	}
+	if isPartialQC {
+		return lib.ErrNoMaj23()
+	}
+	equityBz, err := lib.Marshal(msg.Equity)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(msg.Qc.ProposalHash, crypto.Hash(equityBz)) {
+		return lib.ErrMismatchProposalHash()
+	}
+	return s.SetCommitteeEquity(msg.Equity)
 }

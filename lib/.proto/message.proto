@@ -1,9 +1,12 @@
 syntax = "proto3";
-package utility;
+package types;
 
 option go_package = "github.com/ginchuco/ginchu/fsm/types";
 
 import "google/protobuf/any.proto";
+import "account.proto";
+import "block.proto";
+import "validator.proto";
 
 message MessageSend {
   bytes from_address = 1;
@@ -14,15 +17,19 @@ message MessageSend {
 message MessageStake {
   bytes public_key = 1;
   uint64 amount = 2;
-  string net_address = 3;
-  bytes output_address = 4;
+  repeated Committee committees = 3;
+  string net_address = 4;
+  bytes output_address = 5;
+  bool delegate = 6;
 }
 
 message MessageEditStake {
   bytes address = 1;
   uint64 amount = 2;
-  string net_address = 3;
-  bytes output_address = 4;
+  repeated Committee committees = 3;
+  string net_address = 4;
+  bytes output_address = 5;
+  bool delegate = 6;
 }
 
 message MessageUnstake {
@@ -51,4 +58,9 @@ message MessageDAOTransfer {
   uint64 amount = 2;
   uint64 start_height = 4;
   uint64 end_height = 5;
+}
+
+message MessageEquityGrant {
+  Equity equity = 1;
+  QuorumCertificate qc = 2;
 }

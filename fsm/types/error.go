@@ -225,6 +225,10 @@ func ErrMaxBlockSize() lib.ErrorI {
 	return lib.NewError(lib.CodeMaxBlockSize, lib.StateMachineModule, "max block size")
 }
 
+func ErrMaxTxSize() lib.ErrorI {
+	return lib.NewError(lib.CodeMaxTxSize, lib.StateMachineModule, "max tx size")
+}
+
 func ErrPollValidator(err error) lib.ErrorI {
 	return lib.NewError(lib.CodePollValidator, lib.StateMachineModule, fmt.Sprintf("an error occurred polling the validator: %s", err.Error()))
 }
@@ -235,4 +239,40 @@ func ErrInvalidBlockRange() lib.ErrorI {
 
 func ErrInvalidPublicKey(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidPublicKey, lib.StateMachineModule, "public key is invalid: "+err.Error())
+}
+
+func ErrInvalidNumCommittees() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidNumCommittees, lib.StateMachineModule, "committees length is invalid")
+}
+
+func ErrInvalidCommitteeStakeDistribution() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidCommitteeStakeDistribution, lib.StateMachineModule, "committees stake distribution is invalid")
+}
+
+func ErrInvalidDelegationStatus() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidDelegationStatus, lib.StateMachineModule, "invalid delegation status")
+}
+
+func ErrInvalidCommittee() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidCommittee, lib.StateMachineModule, "invalid committee")
+}
+
+func ErrInvalidCommitteeID() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidCommitteeID, lib.StateMachineModule, "invalid committee id")
+}
+
+func ErrInvalidNumOfSamples() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidNumberOfSamples, lib.StateMachineModule, "invalid number of samples")
+}
+
+func ErrInvalidPointAllocation() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidPointAllocation, lib.StateMachineModule, "invalid point allocation")
+}
+
+func ErrInvalidNumOfPointRecipients() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidNumPointRecipients, lib.StateMachineModule, "invalid num point recipients")
+}
+
+func ErrInvalidEquity() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidEquity, lib.StateMachineModule, "invalid equity")
 }

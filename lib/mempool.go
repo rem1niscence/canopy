@@ -3,6 +3,7 @@ package lib
 import (
 	"bytes"
 	"github.com/alecthomas/units"
+	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"sort"
 	"sync"
@@ -38,12 +39,14 @@ func NewMempool(config MempoolConfig) Mempool {
 type MempoolConfig struct {
 	MaxTransactionBytes uint64
 	MaxTransactions     uint32
+	MaxTransactionSize  uint32
 	DropPercentage      int
 }
 
 func DefaultMempoolConfig() MempoolConfig {
 	return MempoolConfig{
 		MaxTransactionBytes: uint64(units.MB),
+		MaxTransactionSize:  uint32(4 * units.Kilobyte),
 		MaxTransactions:     5000,
 		DropPercentage:      35,
 	}
@@ -56,13 +59,17 @@ func (f *FeeMempool) AddTransaction(tx []byte, fee uint64) (recheck bool, err Er
 	if _, ok := f.hashMap[hash]; ok {
 		return false, ErrTxFoundInMempool(hash)
 	}
+	txBytes := len(tx)
+	if uint32(txBytes) >= f.config.MaxTransactionSize {
+		return false, types.ErrMaxTxSize()
+	}
 	recheck = f.pool.Insert(MempoolTx{
 		Tx:  tx,
 		Fee: fee,
 	})
 	f.hashMap[hash] = struct{}{}
 	f.size++
-	f.transactionBytes += len(tx)
+	f.transactionBytes += txBytes
 	var dropped []MempoolTx
 	if uint32(f.size) >= f.config.MaxTransactions || uint64(f.transactionBytes) >= f.config.MaxTransactionBytes {
 		dropped = f.pool.Drop(f.config.DropPercentage)
