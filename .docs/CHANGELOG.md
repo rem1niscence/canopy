@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [Unreleased] - 08/06/2024
+- FSM changes for `committees`
+- FSM changes for `message_equity_grant`
+- Proto changes to remove non-determinism i.e `maps`
+
 ## [Unreleased] - 07/30/2024
 
 - Refactored `DSE` and `BPE` to `DoubleSignEvidences` and `BadProposerEvidences` respectively
