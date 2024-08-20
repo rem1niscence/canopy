@@ -120,7 +120,7 @@ func (s *StateMachine) GetParamsFee() (ptr *types.FeeParams, err lib.ErrorI) {
 	return
 }
 
-func (s *StateMachine) ApproveProposal(msg types.Proposal) lib.ErrorI {
+func (s *StateMachine) ApproveProposal(msg types.GovProposal) lib.ErrorI {
 	if msg.GetStartHeight() <= s.Height() && s.Height() <= msg.GetEndHeight() {
 		return types.ErrRejectProposal()
 	}
@@ -133,7 +133,7 @@ func (s *StateMachine) ApproveProposal(msg types.Proposal) lib.ErrorI {
 		if bz == nil {
 			return types.ErrRejectProposal()
 		}
-		proposals := make(types.Proposals)
+		proposals := make(types.GovProposals)
 		if err = proposals.NewFromFile(s.Config.DataDirPath); err != nil {
 			return err
 		}

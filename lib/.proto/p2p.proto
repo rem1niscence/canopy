@@ -5,11 +5,14 @@ option go_package = "github.com/ginchuco/ginchu/p2p";
 import "peer.proto";
 import "google/protobuf/any.proto";
 
-
+// A generic wrapper over a proto.message for the P2P module to handle
+// Envelopes are first used to wrap bytes into a Packet, Ping, or Pong
+// Then again are used to wrap a Packet.bytes into proto.Message
 message Envelope {
   google.protobuf.Any payload = 1;
 }
 
+// A partial or full 'Message' with a Stream Topic designation and an EOF signal
 message Packet{
   Topic stream_id = 1;
   bool eof = 2;

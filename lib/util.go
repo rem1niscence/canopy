@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"math/big"
 	"net/url"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -155,14 +156,14 @@ func NewMessageCache() MessageCache {
 	}
 }
 
-func (c MessageCache) Add(msg *MessageWrapper) bool {
+func (c MessageCache) Add(msg *MessageAndMetadata) bool {
 	k := BytesToString(msg.Hash)
 	if _, found := c.m[k]; found {
 		return false
 	}
 	if c.queue.Len() >= MaxMessageCacheSize {
 		e := c.queue.Front()
-		message := e.Value.(*MessageWrapper)
+		message := e.Value.(*MessageAndMetadata)
 		delete(c.m, BytesToString(message.Hash))
 		c.queue.Remove(e)
 	}
@@ -361,6 +362,32 @@ func ReplaceURLPort(rawURL, replacementPort string) (returned string, err error)
 	}
 	returned = strings.ReplaceAll(rawURL, u.Port(), replacementPort)
 	return
+}
+
+func NewTimer() *time.Timer {
+	t := time.NewTimer(0)
+	<-t.C
+	return t
+}
+
+func ResetTimer(t *time.Timer, d time.Duration) {
+	StopTimer(t)
+	t.Reset(d)
+}
+
+func StopTimer(t *time.Timer) {
+	if !t.Stop() {
+		select {
+		case <-t.C:
+		default:
+		}
+	}
+}
+
+func CatchPanic(l LoggerI) {
+	if r := recover(); r != nil {
+		l.Errorf(string(debug.Stack()))
+	}
 }
 
 type FilterOption int

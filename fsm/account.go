@@ -77,14 +77,6 @@ func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (uint64, lib.E
 	return account.Amount, nil
 }
 
-func (s *StateMachine) GetAccountSequence(address crypto.AddressI) (uint64, lib.ErrorI) {
-	account, err := s.GetAccount(address)
-	if err != nil {
-		return 0, err
-	}
-	return account.Sequence, nil
-}
-
 func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
 	bz, err := s.marshalAccount(account)
 	if err != nil {
@@ -119,18 +111,6 @@ func (s *StateMachine) MintToAccount(address crypto.AddressI, amount uint64) lib
 		return err
 	}
 	return s.AccountAdd(address, amount)
-}
-
-func (s *StateMachine) AccountSetSequence(address crypto.AddressI, sequence uint64) lib.ErrorI {
-	acc, err := s.GetAccount(address)
-	if err != nil {
-		return err
-	}
-	if acc.Sequence >= sequence {
-		return types.ErrInvalidTxSequence()
-	}
-	acc.Sequence = sequence
-	return s.SetAccount(acc)
 }
 
 func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd uint64) lib.ErrorI {

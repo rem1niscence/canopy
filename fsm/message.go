@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"bytes"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
@@ -25,8 +24,10 @@ func (s *StateMachine) HandleMessage(msg lib.MessageI) lib.ErrorI {
 		return s.HandleMessageChangeParameter(x)
 	case *types.MessageDAOTransfer:
 		return s.HandleMessageDAOTransfer(x)
-	case *types.MessageEquityGrant:
-		return s.HandleMessageEquityGrant(x)
+	case *types.MessageProposal:
+		return s.HandleMessageProposal(x)
+	case *types.MessageSubsidy:
+		return s.HandleMessageSubsidy(x)
 	default:
 		return types.ErrUnknownMessage(x)
 	}
@@ -52,6 +53,10 @@ func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee uint64, err lib.E
 		return feeParams.MessageChangeParameterFee, nil
 	case *types.MessageDAOTransfer:
 		return feeParams.MessageDaoTransferFee, nil
+	case *types.MessageProposal:
+		return feeParams.MessageProposalFee, nil
+	case *types.MessageSubsidy:
+		return feeParams.MessageSubsidyFee, nil
 	default:
 		return 0, types.ErrUnknownMessage(x)
 	}
@@ -81,6 +86,18 @@ func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]by
 		validator, err = s.GetValidator(crypto.NewAddressFromBytes(x.Address))
 	case *types.MessageUnpause:
 		validator, err = s.GetValidator(crypto.NewAddressFromBytes(x.Address))
+	case *types.MessageSubsidy:
+		return [][]byte{x.Address}, nil
+	case *types.MessageProposal:
+		committee, e := s.GetCommittee(x.Qc.Proposal.Meta.CommitteeId)
+		if e != nil {
+			return nil, e
+		}
+		for _, member := range committee.ValidatorSet.ValidatorSet {
+			pk, _ := crypto.NewPublicKeyFromBytes(member.PublicKey)
+			signers = append(signers, pk.Address().Bytes())
+		}
+		return
 	default:
 		return nil, types.ErrUnknownMessage(x)
 	}
@@ -139,10 +156,6 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 			return err
 		}
 	} else {
-		// set validator sorted by stake
-		if err = s.SetConsensusValidator(address, msg.Amount); err != nil {
-			return err
-		}
 		// set validator in each committee
 		if err = s.SetCommittees(address, msg.Amount, msg.Committees); err != nil {
 			return err
@@ -194,10 +207,6 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 			return err
 		}
 	} else {
-		// updated sorted validator set
-		if err = s.UpdateConsensusValidator(address, val, newStakedAmount); err != nil {
-			return err
-		}
 		if err = s.UpdateCommittees(address, val, msg.Amount, msg.Committees); err != nil {
 			return err
 		}
@@ -303,24 +312,56 @@ func (s *StateMachine) HandleMessageDAOTransfer(msg *types.MessageDAOTransfer) l
 	return s.AccountAdd(crypto.NewAddressFromBytes(msg.Address), msg.Amount)
 }
 
-func (s *StateMachine) HandleMessageEquityGrant(msg *types.MessageEquityGrant) lib.ErrorI {
-	committee, err := s.GetCommittee(msg.Equity.CommitteeId)
+func (s *StateMachine) HandleMessageProposal(msg *types.MessageProposal) lib.ErrorI {
+	proposal := msg.Qc.Proposal
+	pool, err := s.GetPool(proposal.Meta.CommitteeId)
 	if err != nil {
 		return err
 	}
-	isPartialQC, err := msg.Qc.Check(committee, s.Height())
+	if pool.Amount == 0 {
+		return types.ErrNonPaidCommittee()
+	}
+	if err = msg.Qc.CheckBasic(); err != nil {
+		return err
+	}
+	height := msg.Qc.Header.Height
+	if height != s.Height() && height != s.Height()-1 {
+		return lib.ErrWrongHeight()
+	}
+	sm, err := s.TimeMachine(height)
+	if err != nil {
+		return err
+	}
+	committee, err := sm.GetCommittee(proposal.Meta.CommitteeId)
+	if err != nil {
+		return err
+	}
+	isPartialQC, err := msg.Qc.Check(committee)
 	if err != nil {
 		return err
 	}
 	if isPartialQC {
 		return lib.ErrNoMaj23()
 	}
-	equityBz, err := lib.Marshal(msg.Equity)
+	validatorParams, err := s.GetParamsVal()
 	if err != nil {
 		return err
 	}
-	if !bytes.Equal(msg.Qc.ProposalHash, crypto.Hash(equityBz)) {
-		return lib.ErrMismatchProposalHash()
+	nonSignerPercent, err := s.HandleByzantine(proposal, msg.Qc, committee.ValidatorSet, validatorParams)
+	if err != nil {
+		return err
 	}
-	return s.SetCommitteeEquity(msg.Equity)
+	for i, p := range proposal.RewardRecipients.PaymentPercents {
+		proposal.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, float64(nonSignerPercent))
+	}
+	return s.UpsertProposal(proposal)
+}
+
+func (s *StateMachine) HandleMessageSubsidy(msg *types.MessageSubsidy) lib.ErrorI {
+	// subtract from sender
+	if err := s.AccountSub(crypto.NewAddressFromBytes(msg.Address), msg.Amount); err != nil {
+		return err
+	}
+	// add to recipient committee
+	return s.PoolAdd(msg.CommitteeId, msg.Amount)
 }

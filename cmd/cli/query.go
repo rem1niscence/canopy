@@ -13,7 +13,7 @@ var queryCmd = &cobra.Command{
 }
 
 var (
-	height, startHeight, pageNumber, perPage, unstaking, delegate, paused = uint64(0), uint64(0), 0, 0, "", "", ""
+	height, startHeight, pageNumber, perPage, unstaking, delegated, paused = uint64(0), uint64(0), 0, 0, "", "", ""
 )
 
 func init() {
@@ -23,7 +23,7 @@ func init() {
 	queryCmd.PersistentFlags().IntVar(&perPage, "per-page", 0, "number of items per page on a paginated call")
 	queryCmd.PersistentFlags().StringVar(&unstaking, "unstaking", "", "yes = only unstaking validators, no = only non-unstaking validators")
 	queryCmd.PersistentFlags().StringVar(&paused, "paused", "", "yes = only paused validators, no = only unpaused validators")
-	queryCmd.PersistentFlags().StringVar(&delegate, "delegate", "", "yes = only delegate validators, no = only non-delegate validators")
+	queryCmd.PersistentFlags().StringVar(&delegated, "delegated", "", "yes = only delegated validators, no = only non-delegated validators")
 	queryCmd.AddCommand(heightCmd)
 	queryCmd.AddCommand(accountCmd)
 	queryCmd.AddCommand(accountsCmd)
@@ -77,11 +77,11 @@ var (
 	}
 
 	poolCmd = &cobra.Command{
-		Use:   "pool <address> --height=1",
+		Use:   "pool <committee_id> --height=1",
 		Short: "query a pool on the blockchain",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeToConsole(client.Pool(getAddressArgs(args)))
+			writeToConsole(client.Pool(getPoolArgs(args)))
 		},
 	}
 
@@ -259,11 +259,9 @@ var (
 	}
 )
 
-func getAddressArgs(args []string) (height uint64, address string) {
-	address = args[0]
-	if len(args) == 2 {
-		height = uint64(argToInt(args[1]))
-	}
+func getPoolArgs(args []string) (h uint64, id uint64) {
+	h = height
+	id = uint64(argToInt(args[0]))
 	return
 }
 
@@ -291,9 +289,9 @@ func getFilterArgs() (h uint64, params lib.PageParams, filters lib.ValidatorFilt
 		filters.Paused = lib.No
 	}
 	switch {
-	case strings.Contains(strings.ToLower(delegate), "y"):
+	case strings.Contains(strings.ToLower(delegated), "y"):
 		filters.Delegate = lib.Yes
-	case strings.Contains(strings.ToLower(delegate), "n"):
+	case strings.Contains(strings.ToLower(delegated), "n"):
 		filters.Delegate = lib.No
 	}
 	return

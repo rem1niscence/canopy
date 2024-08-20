@@ -6,7 +6,7 @@ import (
 )
 
 // PROPOSALS RECEIVED FROM PROPOSER FOR CURRENT HEIGHT
-type ProposalsForHeight map[uint64]map[string][]*Message // [ROUND][PHASE] -> Proposal(s) < ELECTION is multi-proposals >
+type ProposalsForHeight map[uint64]map[string][]*Message // [ROUND][PHASE] -> Block(s) < ELECTION is multi-proposals >
 
 // AddProposal saves a validated proposal from the Leader in memory
 func (c *Consensus) AddProposal(m *Message) lib.ErrorI {

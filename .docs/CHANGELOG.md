@@ -1,6 +1,25 @@
 # CHANGELOG
 
+## [Unreleased] - 08/16/2024
+
+- Fully documented the P2P module
+- Update the peer book functionality
+- Added saving routine for `book.json`
+
+## [Unreleased] - 08/12/2024
+
+- Added `Canopy` specific functionality
+- Made `Canopy` just like every other chain
+- Move to `plugin` model
+- Added subsidy txn
+
+## [Unreleased] - 08/10/2024
+
+- Changed bft proposals from `Block` to `Proposal`
+- `message_equity_grant` -> `message_proposal`
+
 ## [Unreleased] - 08/06/2024
+
 - FSM changes for `committees`
 - FSM changes for `message_equity_grant`
 - Proto changes to remove non-determinism i.e `maps`

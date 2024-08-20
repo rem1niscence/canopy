@@ -18,13 +18,6 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	nonSignerPercent, err := s.HandleByzantine(s.BeginBlockParams, params)
-	if err != nil {
-		return err
-	}
-	if err = s.RewardProposer(crypto.NewAddressFromBytes(s.BeginBlockParams.BlockHeader.ProposerAddress), nonSignerPercent); err != nil {
-		return err
-	}
 	if err = s.RewardCommittees(params); err != nil {
 		return err
 	}
@@ -35,15 +28,13 @@ func (s *StateMachine) IsGenesis() bool {
 	return s.Height() <= 1 // height 1 will have a nil last qc
 }
 
-func (s *StateMachine) EndBlock() (endBlock *lib.EndBlockParams, err lib.ErrorI) {
-	endBlock = new(lib.EndBlockParams)
+func (s *StateMachine) EndBlock() (err lib.ErrorI) {
 	if err = s.DeletePaused(s.Height()); err != nil {
 		return
 	}
 	if err = s.DeleteUnstaking(s.Height()); err != nil {
 		return
 	}
-	endBlock.ValidatorSet, err = s.GetConsensusValidators()
 	return
 }
 
@@ -53,8 +44,8 @@ func (s *StateMachine) GetConsensusValidators(all ...bool) (*lib.ConsensusValida
 	if err != nil {
 		return nil, err
 	}
-	valMaxCount := params.ValidatorMaxCount
-	it, err := s.RevIterator(types.ConsensusPrefix())
+	valMaxCount := params.ValidatorMaxCommitteeSize
+	it, err := s.RevIterator(types.CommitteePrefix(lib.CANOPY_COMMITTEE_ID))
 	if err != nil {
 		return nil, err
 	}
@@ -166,14 +157,18 @@ func (s *StateMachine) RewardProposer(address crypto.AddressI, nonSignerPercent 
 }
 
 func (s *StateMachine) RewardCommittees(params *types.ValidatorParams) lib.ErrorI {
-	ids, err := s.GetRewardedCommittees()
+	ids, totalPaidStake, err := s.GetRewardedCommittees()
 	if err != nil {
 		return err
 	}
-	// mintPerCommittee = reward / num_committees
-	mintPerCommittee := lib.RoundFloatToUint64(float64(params.ValidatorCommitteeReward) / float64(len(ids)))
-	for _, id := range ids {
-		if err = s.MintToPool(id, mintPerCommittee); err != nil {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	totalReward := params.ValidatorCommitteeReward
+	for i, committeeId := range ids {
+		committee := supply.CommitteesWithDelegations[i]
+		if err = s.MintToPool(committeeId, uint64(float64(totalReward)*float64(committee.Amount)/float64(totalPaidStake))); err != nil {
 			return err
 		}
 	}
@@ -181,17 +176,17 @@ func (s *StateMachine) RewardCommittees(params *types.ValidatorParams) lib.Error
 }
 
 func (s *StateMachine) DistributeCommitteeReward() lib.ErrorI {
-	eq, err := s.GetEquityByCommittee()
+	p, err := s.GetProposals()
 	if err != nil {
 		return err
 	}
-	for _, equity := range eq.EquityByCommittee {
-		rewardPool, e := s.GetPool(equity.CommitteeId)
+	for i, proposal := range p.Proposals {
+		rewardPool, e := s.GetPool(proposal.Meta.CommitteeId)
 		if e != nil {
 			return e
 		}
-		for _, ep := range equity.EquityPoints {
-			rewardAmount := float64(rewardPool.Amount) * float64(ep.Points) / float64(equity.NumberOfSamples*10000)
+		for _, ep := range proposal.RewardRecipients.PaymentPercents {
+			rewardAmount := float64(rewardPool.Amount) * float64(ep.Percent) / float64(proposal.RewardRecipients.NumberOfSamples*100)
 			if err = s.MintToAccount(crypto.NewAddress(ep.Address), uint64(rewardAmount)); err != nil {
 				return err
 			}
@@ -200,27 +195,34 @@ func (s *StateMachine) DistributeCommitteeReward() lib.ErrorI {
 		if err = s.SetPool(rewardPool); err != nil {
 			return err
 		}
+		// clear structure
+		p.Proposals[i] = &lib.Proposal{
+			Meta: &lib.ProposalMeta{
+				CommitteeId:     proposal.Meta.CommitteeId,
+				CommitteeHeight: proposal.Meta.CommitteeHeight,
+				ChainHeight:     proposal.Meta.ChainHeight,
+			},
+		}
 	}
-	return s.ClearEquityByCommittee()
+	return s.SetProposals(p)
 }
 
-func (s *StateMachine) HandleByzantine(beginBlock *lib.BeginBlockParams, params *types.ValidatorParams) (nonSignerPercent int, err lib.ErrorI) {
-	block := beginBlock.BlockHeader
+func (s *StateMachine) HandleByzantine(proposal *lib.Proposal, qc *lib.QuorumCertificate, vs *lib.ConsensusValidators, params *types.ValidatorParams) (nonSignerPercent int, err lib.ErrorI) {
 	if s.Height()%params.ValidatorNonSignWindow == 0 {
 		if err = s.SlashAndResetNonSigners(params); err != nil {
 			return 0, err
 		}
 	}
-	if err = s.SlashBadProposers(params, block.BadProposers); err != nil {
+	if err = s.SlashBadProposers(params, proposal.Meta.BadProposers); err != nil {
 		return 0, err
 	}
-	if err = s.HandleDoubleSigners(params, block.DoubleSigners); err != nil {
+	if err = s.HandleDoubleSigners(params, proposal.Meta.CommitteeId, proposal.Meta.DoubleSigners); err != nil {
 		return 0, err
 	}
 	if s.height <= 2 {
 		return // height 2 would use height 1 as begin_block which uses genesis as lastQC
 	}
-	nonSigners, nonSignerPercent, err := block.LastQuorumCertificate.GetNonSigners(beginBlock.ValidatorSet)
+	nonSigners, nonSignerPercent, err := qc.GetNonSigners(vs)
 	if err != nil {
 		return 0, err
 	}

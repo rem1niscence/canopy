@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/ginchuco/ginchu/lib/crypto"
 )
 
 func (x *QuorumCertificate) SignBytes() (signBytes []byte) {
@@ -15,11 +16,20 @@ func (x *QuorumCertificate) SignBytes() (signBytes []byte) {
 }
 
 func (x *QuorumCertificate) CheckBasic(height ...uint64) ErrorI {
-	if x == nil {
+	if x == nil || (x.ProposalHash == nil && x.ProposerKey == nil) {
 		return ErrEmptyQuorumCertificate()
 	}
 	if err := x.Header.Check(height...); err != nil {
 		return err
+	}
+	if x.Proposal != nil {
+		sb, err := x.Proposal.SignBytes()
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(x.ProposalHash, crypto.Hash(sb)) {
+			return ErrMismatchProposalHash()
+		}
 	}
 	return x.Signature.CheckBasic()
 }
@@ -58,7 +68,7 @@ func (x *QuorumCertificate) Equals(qc *QuorumCertificate) bool {
 	if !bytes.Equal(x.ProposerKey, qc.ProposerKey) {
 		return false
 	}
-	if !bytes.Equal(x.Proposal, qc.Proposal) {
+	if !x.Proposal.Equals(qc.Proposal) {
 		return false
 	}
 	return x.Signature.Equals(qc.Signature)
@@ -72,23 +82,21 @@ func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) ([][]byte, in
 }
 
 type jsonQC struct {
-	Header      *View               `json:"header,omitempty"`
-	Block       *Block              `json:"block,omitempty"`
-	BlockHash   HexBytes            `json:"block_hash,omitempty"`
-	ProposerKey HexBytes            `json:"proposer_key,omitempty"`
-	Signature   *AggregateSignature `json:"signature,omitempty"`
+	Header       *View               `json:"header,omitempty"`
+	Proposal     *Proposal           `json:"block,omitempty"`
+	ProposalHash HexBytes            `json:"block_hash,omitempty"`
+	ProposerKey  HexBytes            `json:"proposer_key,omitempty"`
+	Signature    *AggregateSignature `json:"signature,omitempty"`
 }
 
 // nolint:all
 func (x QuorumCertificate) MarshalJSON() ([]byte, error) {
-	block := new(Block)
-	_ = Unmarshal(x.Proposal, block)
 	return json.Marshal(jsonQC{
-		Header:      x.Header,
-		Block:       block,
-		BlockHash:   x.ProposalHash,
-		ProposerKey: x.ProposerKey,
-		Signature:   x.Signature,
+		Header:       x.Header,
+		Proposal:     x.Proposal,
+		ProposalHash: x.ProposalHash,
+		ProposerKey:  x.ProposerKey,
+		Signature:    x.Signature,
 	})
 }
 
@@ -97,8 +105,8 @@ func (x *QuorumCertificate) UnmarshalJSON(b []byte) (err error) {
 	if err = json.Unmarshal(b, &j); err != nil {
 		return
 	}
-	x.Proposal, _ = Marshal(j.Block)
-	x.Header, x.ProposalHash = j.Header, j.BlockHash
+	x.Proposal = j.Proposal
+	x.Header, x.ProposalHash = j.Header, j.ProposalHash
 	x.ProposerKey, x.Signature = j.ProposerKey, j.Signature
 	return nil
 }

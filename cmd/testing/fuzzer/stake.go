@@ -11,7 +11,6 @@ import (
 func (f *Fuzzer) StakeTransaction() lib.ErrorI {
 	from := f.getRandomKeyGroup()
 	account, val := f.getAccount(from.Address), f.getValidator(from.Address)
-	account.Sequence++
 	if val.Address != nil {
 		return nil
 	}
@@ -25,7 +24,6 @@ func (f *Fuzzer) StakeTransaction() lib.ErrorI {
 func (f *Fuzzer) EditStakeTransaction() lib.ErrorI {
 	from := f.getRandomKeyGroup()
 	account, val := f.getAccount(from.Address), f.getValidator(from.Address)
-	account.Sequence++
 	if val.Address == nil || val.UnstakingHeight != 0 {
 		return nil
 	}
@@ -45,7 +43,6 @@ func (f *Fuzzer) UnstakeTransaction() lib.ErrorI {
 	if val.Address == nil || val.UnstakingHeight != 0 {
 		return nil
 	}
-	account.Sequence++
 	return f.handleUnstakeTransaction(from, account, val)
 }
 
@@ -63,8 +60,8 @@ func (f *Fuzzer) handleStakeTransaction(from *crypto.KeyGroup, account types.Acc
 		case 0: // invalid signature
 			tx, err = f.invalidStakeSignature(from, account, fee)
 			reason = BadSigReason
-		case 1: // invalid sequence
-			tx, err = f.invalidStakeSequence(from, account, fee)
+		case 1: // invalid time
+			tx, err = f.invalidStakeTime(from, account, fee)
 			reason = BadSeqReason
 		case 2: // invalid fee
 			tx, err = f.invalidStakeFee(from, account, fee)
@@ -111,8 +108,8 @@ func (f *Fuzzer) handleEditStakeTransaction(from *crypto.KeyGroup, account types
 		case 0: // invalid signature
 			tx, err = f.invalidEditStakeSignature(from, val, account, fee)
 			reason = BadSigReason
-		case 1: // invalid sequence
-			tx, err = f.invalidEditStakeSequence(from, val, account, fee)
+		case 1: // invalid time
+			tx, err = f.invalidEditStakeTime(from, val, account, fee)
 			reason = BadSeqReason
 		case 2: // invalid fee
 			tx, err = f.invalidEditStakeFee(from, val, account, fee)
@@ -158,7 +155,7 @@ func (f *Fuzzer) handleUnstakeTransaction(from *crypto.KeyGroup, account types.A
 			tx, err = f.invalidUnstakeSignature(from, account, val, fee)
 			reason = BadSigReason
 		case 1: // invalid sequence
-			tx, err = f.invalidUnstakeSequence(from, account, val, fee)
+			tx, err = f.invalidUnstakeTime(from, account, val, fee)
 			reason = BadSeqReason
 		case 2: // invalid fee
 			tx, err = f.invalidUnstakeFee(from, account, val, fee)
@@ -196,7 +193,7 @@ func (f *Fuzzer) validStakeTransaction(from *crypto.KeyGroup, acc types.Account,
 		StakedAmount: amount,
 		Output:       output.Bytes(),
 	}
-	tx, err := types.NewStakeTx(from.PrivateKey, output, val.NetAddress, val.StakedAmount, acc.Sequence, fee)
+	tx, err := types.NewStakeTx(from.PrivateKey, output, val.NetAddress, val.StakedAmount, f.getTxTime(), fee)
 	if err != nil {
 		return err
 	}
@@ -220,7 +217,7 @@ func (f *Fuzzer) validEditStakeTx(from *crypto.KeyGroup, val types.Validator, ac
 		pub, _ := crypto.NewED25519PublicKey()
 		output = pub.Address()
 	}
-	tx, err := types.NewEditStakeTx(from.PrivateKey, output, f.getRandomNetAddr(), amountToStake, acc.Sequence, fee)
+	tx, err := types.NewEditStakeTx(from.PrivateKey, output, f.getRandomNetAddr(), amountToStake, f.getTxTime(), fee)
 	if err != nil {
 		return err
 	}
@@ -236,7 +233,7 @@ func (f *Fuzzer) validEditStakeTx(from *crypto.KeyGroup, val types.Validator, ac
 
 func (f *Fuzzer) validUnstakeTransaction(from *crypto.KeyGroup, acc types.Account, val types.Validator, fee uint64) lib.ErrorI {
 	val.UnstakingHeight = 1
-	tx, err := types.NewUnstakeTx(from.PrivateKey, acc.Sequence, fee)
+	tx, err := types.NewUnstakeTx(from.PrivateKey, f.getTxTime(), fee)
 	if err != nil {
 		return err
 	}
@@ -260,7 +257,7 @@ func (f *Fuzzer) invalidStakeSignature(from *crypto.KeyGroup, account types.Acco
 		Amount:        amount,
 		NetAddress:    f.getRandomNetAddr(),
 		OutputAddress: f.getRandomOutputAddr(from).Bytes(),
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidEditStakeSignature(from *crypto.KeyGroup, val types.Validator, account types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
@@ -269,29 +266,29 @@ func (f *Fuzzer) invalidEditStakeSignature(from *crypto.KeyGroup, val types.Vali
 		Amount:        val.StakedAmount,
 		NetAddress:    val.NetAddress,
 		OutputAddress: val.Output,
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidUnstakeSignature(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return newTransactionBadSignature(from.PrivateKey, &types.MessageUnstake{
 		Address: from.Address.Bytes(),
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 }
 
-func (f *Fuzzer) invalidStakeSequence(from *crypto.KeyGroup, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
+func (f *Fuzzer) invalidStakeTime(from *crypto.KeyGroup, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	amount, err := f.getRandomStakeAmount(account, fee)
 	if err != nil {
 		return nil, err
 	}
-	return types.NewStakeTx(from.PrivateKey, f.getRandomOutputAddr(from), f.getRandomNetAddr(), amount, f.getBadSequence(account), f.getBadFee(fee))
+	return types.NewStakeTx(from.PrivateKey, f.getRandomOutputAddr(from), f.getRandomNetAddr(), amount, f.getInvalidTxTime(), f.getBadFee(fee))
 }
 
-func (f *Fuzzer) invalidEditStakeSequence(from *crypto.KeyGroup, val types.Validator, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return types.NewEditStakeTx(from.PrivateKey, crypto.NewAddress(val.Output), val.NetAddress, val.StakedAmount, f.getBadSequence(account), f.getBadFee(fee))
+func (f *Fuzzer) invalidEditStakeTime(from *crypto.KeyGroup, val types.Validator, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
+	return types.NewEditStakeTx(from.PrivateKey, crypto.NewAddress(val.Output), val.NetAddress, val.StakedAmount, f.getInvalidTxTime(), f.getBadFee(fee))
 }
 
-func (f *Fuzzer) invalidUnstakeSequence(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return types.NewUnstakeTx(from.PrivateKey, f.getBadSequence(account), f.getBadFee(fee))
+func (f *Fuzzer) invalidUnstakeTime(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
+	return types.NewUnstakeTx(from.PrivateKey, f.getInvalidTxTime(), f.getBadFee(fee))
 }
 
 func (f *Fuzzer) invalidStakeFee(from *crypto.KeyGroup, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
@@ -299,16 +296,16 @@ func (f *Fuzzer) invalidStakeFee(from *crypto.KeyGroup, account types.Account, f
 	if err != nil {
 		return nil, err
 	}
-	return types.NewStakeTx(from.PrivateKey, f.getRandomOutputAddr(from), f.getRandomNetAddr(), amount, account.Sequence, fee)
+	return types.NewStakeTx(from.PrivateKey, f.getRandomOutputAddr(from), f.getRandomNetAddr(), amount, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidEditStakeFee(from *crypto.KeyGroup, val types.Validator, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	output := crypto.Address(val.Output)
-	return types.NewEditStakeTx(from.PrivateKey, &output, val.NetAddress, val.StakedAmount, account.Sequence, f.getBadFee(fee))
+	return types.NewEditStakeTx(from.PrivateKey, &output, val.NetAddress, val.StakedAmount, f.getTxTime(), f.getBadFee(fee))
 }
 
 func (f *Fuzzer) invalidUnstakeFee(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return types.NewUnstakeTx(from.PrivateKey, account.Sequence, f.getBadFee(fee))
+	return types.NewUnstakeTx(from.PrivateKey, f.getTxTime(), f.getBadFee(fee))
 }
 
 func (f *Fuzzer) invalidStakeMsg(from *crypto.KeyGroup, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
@@ -333,7 +330,7 @@ func (f *Fuzzer) invalidStakeAddress(from *crypto.KeyGroup, account types.Accoun
 		Amount:        amount,
 		NetAddress:    f.getRandomNetAddr(),
 		OutputAddress: f.getRandomOutputAddr(from).Bytes(),
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidEditStakeAddress(from *crypto.KeyGroup, val types.Validator, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
@@ -342,13 +339,13 @@ func (f *Fuzzer) invalidEditStakeAddress(from *crypto.KeyGroup, val types.Valida
 		Amount:        val.StakedAmount,
 		NetAddress:    val.NetAddress,
 		OutputAddress: val.Output,
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidUnstakeSender(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return types.NewTransaction(from.PrivateKey, &types.MessageUnstake{
 		Address: f.getBadAddress(from).Bytes(),
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidStakeNetAddress(from *crypto.KeyGroup, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
@@ -356,11 +353,11 @@ func (f *Fuzzer) invalidStakeNetAddress(from *crypto.KeyGroup, account types.Acc
 	if err != nil {
 		return nil, err
 	}
-	return types.NewStakeTx(from.PrivateKey, f.getRandomOutputAddr(from), f.getBadNetAddr(), amount, account.Sequence, fee)
+	return types.NewStakeTx(from.PrivateKey, f.getRandomOutputAddr(from), f.getBadNetAddr(), amount, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidEditStakeNetAddress(from *crypto.KeyGroup, val types.Validator, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return types.NewEditStakeTx(from.PrivateKey, crypto.NewAddress(val.Output), f.getBadNetAddr(), val.StakedAmount, account.Sequence, fee)
+	return types.NewEditStakeTx(from.PrivateKey, crypto.NewAddress(val.Output), f.getBadNetAddr(), val.StakedAmount, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidStakeOutput(from *crypto.KeyGroup, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
@@ -368,17 +365,17 @@ func (f *Fuzzer) invalidStakeOutput(from *crypto.KeyGroup, account types.Account
 	if err != nil {
 		return nil, err
 	}
-	return types.NewStakeTx(from.PrivateKey, f.getBadOutputAddress(from), f.getRandomNetAddr(), amount, account.Sequence, fee)
+	return types.NewStakeTx(from.PrivateKey, f.getBadOutputAddress(from), f.getRandomNetAddr(), amount, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidEditStakeOutput(from *crypto.KeyGroup, val types.Validator, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return types.NewEditStakeTx(from.PrivateKey, f.getBadOutputAddress(from), f.getRandomNetAddr(), val.StakedAmount, account.Sequence, fee)
+	return types.NewEditStakeTx(from.PrivateKey, f.getBadOutputAddress(from), f.getRandomNetAddr(), val.StakedAmount, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidStakeAmount(from *crypto.KeyGroup, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return types.NewStakeTx(from.PrivateKey, f.getRandomOutputAddr(from), f.getRandomNetAddr(), f.getBadStakeAmount(), account.Sequence, fee)
+	return types.NewStakeTx(from.PrivateKey, f.getRandomOutputAddr(from), f.getRandomNetAddr(), f.getBadStakeAmount(), f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidEditStakeAmount(from *crypto.KeyGroup, val types.Validator, account types.Account, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return types.NewEditStakeTx(from.PrivateKey, crypto.NewAddress(val.Output), f.getRandomNetAddr(), val.StakedAmount, account.Sequence, fee)
+	return types.NewEditStakeTx(from.PrivateKey, crypto.NewAddress(val.Output), f.getRandomNetAddr(), val.StakedAmount, f.getTxTime(), fee)
 }

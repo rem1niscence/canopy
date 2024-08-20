@@ -82,17 +82,17 @@ func (s *StateMachine) IncrementNonSigners(nonSigners [][]byte) lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) HandleDoubleSigners(params *types.ValidatorParams, doubleSigners []*lib.DoubleSigners) lib.ErrorI {
+func (s *StateMachine) HandleDoubleSigners(params *types.ValidatorParams, committeeID uint64, doubleSigners []*lib.DoubleSigners) lib.ErrorI {
 	var doubleSignersList [][]byte
 	for _, doubleSigner := range doubleSigners {
 		if doubleSigner.Heights == nil || len(doubleSigner.Heights) < 1 {
 			return lib.ErrInvalidDoubleSignHeights()
 		}
 		for _, height := range doubleSigner.Heights {
-			if !s.IsValidDoubleSigner(height, doubleSigner.PubKey) {
+			if !s.IsValidDoubleSigner(height, committeeID, doubleSigner.PubKey) {
 				return lib.ErrInvalidDoubleSigner()
 			}
-			if err := s.Set(types.KeyForDoubleSigner(height, doubleSigner.PubKey), types.DoubleSignerEnabledByte()); err != nil {
+			if err := s.Set(types.KeyForDoubleSigner(height, committeeID, doubleSigner.PubKey), types.DoubleSignerEnabledByte()); err != nil {
 				return err
 			}
 			doubleSignersList = append(doubleSignersList, doubleSigner.PubKey)
@@ -101,8 +101,8 @@ func (s *StateMachine) HandleDoubleSigners(params *types.ValidatorParams, double
 	return s.SlashDoubleSigners(params, doubleSignersList)
 }
 
-func (s *StateMachine) IsValidDoubleSigner(height uint64, address []byte) bool {
-	key := types.KeyForDoubleSigner(height, address)
+func (s *StateMachine) IsValidDoubleSigner(height, committeeID uint64, address []byte) bool {
+	key := types.KeyForDoubleSigner(height, committeeID, address)
 	bz, _ := s.Get(key)
 	return !bytes.Equal(bz, types.DoubleSignerEnabledByte())
 }
@@ -170,9 +170,6 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, percent uint64
 	}
 	if validator.StakedAmount < p.ValidatorMinStake {
 		return s.forceUnstakeValidator(addr, validator, p)
-	}
-	if err := s.UpdateConsensusValidator(addr, validator, newStake); err != nil {
-		return err
 	}
 	if err := s.UpdateCommittees(addr, validator, newStake, validator.Committees); err != nil {
 		return err

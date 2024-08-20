@@ -149,17 +149,6 @@ func (f *Fuzzer) getRandomOutputAddr(from *crypto.KeyGroup) crypto.AddressI {
 	return output
 }
 
-func (f *Fuzzer) getBadSequence(account types.Account) uint64 {
-	var sequence uint64
-	switch rand.Intn(3) {
-	case 0:
-		sequence = account.Sequence - 1
-	default:
-		sequence = 0
-	}
-	return sequence
-}
-
 func (f *Fuzzer) getBadFee(fee uint64) uint64 {
 	switch rand.Intn(3) {
 	case 0:
@@ -185,10 +174,10 @@ func (f *Fuzzer) getTxBadMessage(from *crypto.KeyGroup, msgType string, account 
 		return nil, err
 	}
 	tx = &lib.Transaction{
-		Type:     msgType,
-		Msg:      a,
-		Sequence: account.Sequence,
-		Fee:      fee,
+		Type: msgType,
+		Msg:  a,
+		Time: f.getTxTime(),
+		Fee:  fee,
 	}
 	err = tx.(*lib.Transaction).Sign(from.PrivateKey)
 	return
@@ -218,15 +207,15 @@ func (f *Fuzzer) getBadOutputAddress(from *crypto.KeyGroup) crypto.AddressI {
 	return nil
 }
 
-func newTransactionBadSignature(pk crypto.PrivateKeyI, msg proto.Message, seq, fee uint64) (lib.TransactionI, lib.ErrorI) {
+func newTransactionBadSignature(pk crypto.PrivateKeyI, msg proto.Message, time, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	a, err := lib.NewAny(msg)
 	if err != nil {
 		return nil, err
 	}
 	tx := &lib.Transaction{
-		Msg:      a,
-		Sequence: seq,
-		Fee:      fee,
+		Msg:  a,
+		Time: time,
+		Fee:  fee,
 	}
 	bz, err := tx.GetSignBytes()
 	if err != nil {

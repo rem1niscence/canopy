@@ -7,10 +7,9 @@ import "account.proto";
 import "validator.proto";
 import "validators.proto";
 import "gov.proto";
-import "google/protobuf/timestamp.proto";
 
 message GenesisState {
-  google.protobuf.Timestamp time = 1;
+  uint64 time = 1;
   repeated Pool pools = 2;
   repeated Account accounts = 3;
   repeated Validator validators = 4;

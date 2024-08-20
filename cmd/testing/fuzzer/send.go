@@ -15,7 +15,6 @@ func (f *Fuzzer) SendTransaction() lib.ErrorI {
 	if account.Amount < fee {
 		return nil
 	}
-	account.Sequence++
 	if i := rand.Intn(100); i >= f.config.PercentInvalidTransactions {
 		return f.validSendTransaction(from, to, account, fee)
 	} else {
@@ -26,8 +25,8 @@ func (f *Fuzzer) SendTransaction() lib.ErrorI {
 		case 0: // invalid signature
 			tx, err = f.invalidSendSignature(from, to, account, fee)
 			reason = BadSigReason
-		case 1: // invalid sequence
-			tx, err = f.invalidSendSequence(from, to, account, fee)
+		case 1: // invalid time
+			tx, err = f.invalidSendTime(from, to, account, fee)
 			reason = BadSeqReason
 		case 2: // invalid fee
 			tx, err = f.invalidSendFee(from, to, account, fee)
@@ -60,7 +59,7 @@ func (f *Fuzzer) SendTransaction() lib.ErrorI {
 func (f *Fuzzer) validSendTransaction(from, to *crypto.KeyGroup, account types.Account, fee uint64) lib.ErrorI {
 	amountToSend := f.getRandomAmountUpTo(account.Amount - fee)
 	account.Amount -= amountToSend + fee
-	tx, err := types.NewSendTransaction(from.PrivateKey, to.Address, amountToSend, account.Sequence, fee)
+	tx, err := types.NewSendTransaction(from.PrivateKey, to.Address, amountToSend, f.getTxTime(), fee)
 	if err != nil {
 		return err
 	}
@@ -78,16 +77,16 @@ func (f *Fuzzer) invalidSendSignature(from, to *crypto.KeyGroup, account types.A
 		FromAddress: from.Address.Bytes(),
 		ToAddress:   to.Address.Bytes(),
 		Amount:      f.getRandomAmountUpTo(account.Amount - fee),
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 }
 
-func (f *Fuzzer) invalidSendSequence(from, to *crypto.KeyGroup, account types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
-	tx, err = types.NewSendTransaction(from.PrivateKey, to.Address, f.getRandomAmountUpTo(account.Amount-fee), f.getBadSequence(account), fee)
+func (f *Fuzzer) invalidSendTime(from, to *crypto.KeyGroup, account types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
+	tx, err = types.NewSendTransaction(from.PrivateKey, to.Address, f.getRandomAmountUpTo(account.Amount-fee), f.getInvalidTxTime(), fee)
 	return
 }
 
 func (f *Fuzzer) invalidSendFee(from, to *crypto.KeyGroup, account types.Account, fee uint64) (tx lib.TransactionI, err lib.ErrorI) {
-	tx, err = types.NewSendTransaction(from.PrivateKey, to.Address, f.getRandomAmountUpTo(account.Amount-fee), account.Sequence, f.getBadFee(fee))
+	tx, err = types.NewSendTransaction(from.PrivateKey, to.Address, f.getRandomAmountUpTo(account.Amount-fee), f.getTxTime(), f.getBadFee(fee))
 	return
 }
 
@@ -100,7 +99,7 @@ func (f *Fuzzer) invalidSendSender(from, to *crypto.KeyGroup, account types.Acco
 		FromAddress: f.getBadAddress(from).Bytes(),
 		ToAddress:   to.Address.Bytes(),
 		Amount:      f.getRandomAmountUpTo(account.Amount - fee),
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 	return
 }
 
@@ -118,7 +117,7 @@ func (f *Fuzzer) invalidSendRecipient(from, to *crypto.KeyGroup, account types.A
 		FromAddress: from.Address.Bytes(),
 		ToAddress:   toAddress,
 		Amount:      f.getRandomAmountUpTo(account.Amount - fee),
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 	return
 }
 
@@ -127,6 +126,6 @@ func (f *Fuzzer) invalidSendAmount(from, to *crypto.KeyGroup, account types.Acco
 		FromAddress: from.Address.Bytes(),
 		ToAddress:   to.Address.Bytes(),
 		Amount:      math.MaxUint64,
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 	return
 }

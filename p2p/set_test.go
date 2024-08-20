@@ -17,10 +17,10 @@ func TestPeerSetAddGetDel(t *testing.T) {
 			PublicKey:  n2.pub,
 			NetAddress: "pipe",
 		},
-		IsOutbound:  true,
-		IsValidator: true,
-		IsTrusted:   true,
-		Reputation:  10,
+		IsOutbound:    true,
+		IsMustConnect: true,
+		IsTrusted:     true,
+		Reputation:    10,
 	}
 	c1, c2 := net.Pipe()
 	defer c2.Close()
@@ -29,46 +29,40 @@ func TestPeerSetAddGetDel(t *testing.T) {
 	got, err := n1.PeerSet.GetPeerInfo(n2.pub)
 	require.NoError(t, err)
 	require.Equal(t, *expected, *got)
-	require.NoError(t, n1.PeerSet.Remove(n2.pub))
-	require.Error(t, n1.PeerSet.Remove(n2.pub))
+	_, err = n1.PeerSet.Remove(n2.pub)
+	require.NoError(t, err)
+	_, err = n1.PeerSet.Remove(n2.pub)
+	require.Error(t, err)
 	_, err = n1.PeerSet.GetPeerInfo(n2.pub)
 	require.Error(t, err)
 	require.True(t, len(n1.PeerSet.m) == 0)
 }
 
-func TestUpdateValidators(t *testing.T) {
+func TestUpdateMustConnects(t *testing.T) {
 	n1, n2, n3 := newTestP2PNode(t), newTestP2PNode(t), newTestP2PNode(t)
 	require.NoError(t, n1.Add(&Peer{
-		PeerInfo: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: n2.pub}},
+		PeerInfo: &lib.PeerInfo{Address: n2.ID()},
 	}))
-	toDial := n1.UpdateValidators(n1.pub, []*lib.PeerAddress{
-		{PublicKey: n1.pub},
-		{PublicKey: n2.pub},
-		{PublicKey: n3.pub},
+	toDial := n1.UpdateMustConnects([]*lib.PeerAddress{
+		n2.ID(),
+		n3.ID(),
 	})
 	require.True(t, len(toDial) == 1)
 	require.Equal(t, toDial[0].PublicKey, n3.pub)
 	peerInfo, err := n1.PeerSet.GetPeerInfo(n2.pub)
 	require.NoError(t, err)
-	require.True(t, peerInfo.IsValidator)
+	require.True(t, peerInfo.IsMustConnect)
 	_, err = n1.PeerSet.GetPeerInfo(n1.pub)
 	require.Error(t, err)
-	n1.UpdateValidators(n1.pub, []*lib.PeerAddress{
-		{PublicKey: n1.pub},
-		{PublicKey: n3.pub},
-	})
-	peerInfo, err = n1.PeerSet.GetPeerInfo(n2.pub)
-	require.NoError(t, err)
-	require.False(t, peerInfo.IsValidator)
 }
 
 func TestChangeReputation(t *testing.T) {
 	n1, n2, cleanup := newTestP2PPair(t)
 	defer cleanup()
-	n1.UpdateValidators(n1.pub, []*lib.PeerAddress{{PublicKey: n2.pub}})
+	n1.UpdateMustConnects([]*lib.PeerAddress{{PublicKey: n2.pub}})
 	peerInfo, err := n1.GetPeerInfo(n2.pub)
 	require.NoError(t, err)
-	require.True(t, peerInfo.IsValidator)
+	require.True(t, peerInfo.IsMustConnect)
 	require.True(t, peerInfo.Reputation == 0)
 	n1.ChangeReputation(n2.pub, -11)
 	peerInfo, err = n1.GetPeerInfo(n2.pub)
@@ -76,7 +70,7 @@ func TestChangeReputation(t *testing.T) {
 	require.True(t, peerInfo.Reputation == -11)
 	_, err = n1.GetPeerInfo(n2.pub)
 	require.NoError(t, err)
-	n1.UpdateValidators(n1.pub, []*lib.PeerAddress{})
+	n1.PeerSet.m[lib.BytesToString(peerInfo.Address.PublicKey)].IsMustConnect = false
 	n1.ChangeReputation(n2.pub, 0)
 	_, err = n1.GetPeerInfo(n2.pub)
 	require.Error(t, err)
@@ -87,8 +81,10 @@ func TestGetAllInfosAndBookPeers(t *testing.T) {
 	n3 := newTestP2PNode(t)
 	_, c := net.Pipe()
 	require.NoError(t, n1.Add(&Peer{
-		conn:     newTestMultiConnMock(t, n3.pub, c, n1.P2P),
-		PeerInfo: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: n3.pub}, IsOutbound: true},
+		conn: newTestMultiConnMock(t, n3.pub, c, n1.P2P),
+		PeerInfo: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: n3.pub, PeerMeta: &lib.PeerMeta{
+			Chains: []uint64{0, 1},
+		}}, IsOutbound: true},
 	}))
 	defer func() { cleanup() }()
 	infos, numInbound, numOutbound := n1.GetAllInfos()
@@ -109,8 +105,14 @@ func TestGetAllInfosAndBookPeers(t *testing.T) {
 
 func newTestMultiConnMock(_ *testing.T, peerPubKey []byte, conn net.Conn, p *P2P) *MultiConn {
 	return &MultiConn{
-		conn:          conn,
-		peerPublicKey: peerPubKey,
+		conn: conn,
+		Address: &lib.PeerAddress{
+			PublicKey:  peerPubKey,
+			NetAddress: "",
+			PeerMeta: &lib.PeerMeta{
+				Chains: []uint64{0, 1},
+			},
+		},
 		streams:       p.NewStreams(),
 		quitSending:   make(chan struct{}, maxChanSize),
 		quitReceiving: make(chan struct{}, maxChanSize),

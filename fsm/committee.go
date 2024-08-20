@@ -6,22 +6,12 @@ import (
 	"github.com/ginchuco/ginchu/lib/crypto"
 )
 
-// TODO bft package can select winner of stake weighted random selection by using the same sortition parameters as input but using the delegation set instead
-// - Create public function for controller to get the delegate set and their weighted stakes in the form of a Validator Set
-// TODO bft package can select the proposer by using the same sortition parameters as input but using the committee set instead
-// - Create public function for controller to get the committee set and their weighted stakes in the form of a Validator Set
-// TODO [x] create mint mechanism and parameters (any unused should be burned)
-// TODO [x] create state holding place for pending 'claims' that get satisfied each block
-// TODO [x] create the 'reward summary tx' using a Quorum certificate as the base
-// - Should have a
-// TODO non-signers and double signers of these transactions should be punished the same way Canopy consensus proper is handled
-
 // COMMITTEES BELOW
 
-func (s *StateMachine) GetRewardedCommittees() (paidIDs []uint64, err lib.ErrorI) {
+func (s *StateMachine) GetRewardedCommittees() (paidIDs []uint64, totalStakeFromPaidCommittes uint64, err lib.ErrorI) {
 	supply, err := s.GetSupply()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	committees := supply.CommitteesWithDelegations
 	totalStakeFromAllCommittees, numCommittees := uint64(0), len(committees)
@@ -31,9 +21,10 @@ func (s *StateMachine) GetRewardedCommittees() (paidIDs []uint64, err lib.ErrorI
 	// We don't know how many of the chains are paid
 	// We can't pre-pick a percentage ^ because we don't know how many paid chains there are
 	// Given a distribution of stake between committees find a cutoff where committees stop receiving mint
-	var totalPercent float64
+	totalPercent, totalStakeFromPaidCommittees := float64(0), uint64(0)
 	for i, committee := range committees {
 		paidIDs = append(paidIDs, committee.Id)
+		totalStakeFromPaidCommittees += committee.Amount
 		// basic hyperbolic ceiling function: Σ (n / (n + 1)), for n from 1 to N
 		// that requires each paid committee to be similar in stake percentage to its paid peers
 		// this approach is superior over an average as it fairly allows the most significant
@@ -50,70 +41,11 @@ func (s *StateMachine) GetRewardedCommittees() (paidIDs []uint64, err lib.ErrorI
 			alternate := committees[altIdx]
 			if committee.Amount/alternate.Amount <= 2 {
 				paidIDs = append(paidIDs, alternate.Id)
+				totalStakeFromPaidCommittees += committee.Amount
 			}
 			return
 		}
 	}
-	return
-}
-
-func (s *StateMachine) SetCommitteeEquity(equity *types.Equity) lib.ErrorI {
-	e, equityPoints, err := s.getCommitteeEquity(equity.CommitteeId)
-	if err = equityPoints.Combine(equity); err != nil {
-		return err
-	}
-	e.EquityByCommittee[equity.CommitteeId] = equityPoints
-	return s.SetEquityByCommittee(e)
-}
-
-func (s *StateMachine) GetCommitteeEquity(committeeID uint64) (*types.Equity, lib.ErrorI) {
-	_, ep, err := s.getCommitteeEquity(committeeID)
-	if err != nil {
-		return nil, err
-	}
-	return ep, nil
-}
-
-func (s *StateMachine) ClearEquityByCommittee() lib.ErrorI {
-	return s.SetEquityByCommittee(&types.EquityByCommittee{
-		EquityByCommittee: make([]*types.Equity, 0),
-	})
-}
-
-func (s *StateMachine) getCommitteeEquity(committeeID uint64) (*types.EquityByCommittee, *types.Equity, lib.ErrorI) {
-	e, err := s.GetEquityByCommittee()
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, equity := range e.EquityByCommittee {
-		if equity.CommitteeId == committeeID {
-			return e, equity, nil
-		}
-	}
-	return e, &types.Equity{
-		CommitteeId:     committeeID,
-		EquityPoints:    make([]*types.EquityPoints, 0),
-		NumberOfSamples: 0,
-	}, nil
-}
-
-func (s *StateMachine) SetEquityByCommittee(ep *types.EquityByCommittee) lib.ErrorI {
-	bz, err := lib.Marshal(ep)
-	if err != nil {
-		return err
-	}
-	return s.Set(types.EquityPrefix(), bz)
-}
-
-func (s *StateMachine) GetEquityByCommittee() (e *types.EquityByCommittee, err lib.ErrorI) {
-	bz, err := s.Get(types.EquityPrefix())
-	if err != nil {
-		return nil, err
-	}
-	e = &types.EquityByCommittee{
-		EquityByCommittee: make([]*types.Equity, 0),
-	}
-	err = lib.Unmarshal(bz, e)
 	return
 }
 
@@ -240,4 +172,74 @@ func (s *StateMachine) SetDelegate(address crypto.AddressI, committeeID, stakeFo
 
 func (s *StateMachine) DeleteDelegate(address crypto.AddressI, committeeID, stakeForCommittee uint64) lib.ErrorI {
 	return s.Delete(types.KeyForDelegate(committeeID, address, stakeForCommittee))
+}
+
+// PROPOSALS BELOW
+
+func (s *StateMachine) UpsertProposal(upsert *lib.Proposal) lib.ErrorI {
+	p, proposal, idx, err := s.getProposal(upsert.Meta.CommitteeId)
+	if upsert.Meta.CommitteeHeight <= proposal.Meta.CommitteeHeight && upsert.Meta.ChainHeight <= proposal.Meta.ChainHeight {
+		return types.ErrInvalidProposal()
+	}
+	if err = proposal.Combine(upsert); err != nil {
+		return err
+	}
+	p.Proposals[idx] = proposal
+	return s.SetProposals(p)
+}
+
+func (s *StateMachine) GetProposal(committeeID uint64) (*lib.Proposal, lib.ErrorI) {
+	_, p, _, err := s.getProposal(committeeID)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (s *StateMachine) getProposal(committeeID uint64) (p *lib.Proposals, e *lib.Proposal, idx int, err lib.ErrorI) {
+	p, err = s.GetProposals()
+	if err != nil {
+		return
+	}
+	for i, proposal := range p.Proposals {
+		if proposal.Meta.CommitteeId == committeeID {
+			return p, proposal, i, nil
+		}
+	}
+	idx = len(p.Proposals)
+	e = &lib.Proposal{
+		RewardRecipients: &lib.RewardRecipients{
+			PaymentPercents: make([]*lib.PaymentPercents, 0),
+			NumberOfSamples: 0,
+		},
+		Meta: &lib.ProposalMeta{
+			CommitteeId:     committeeID,
+			CommitteeHeight: 0,
+			ChainHeight:     0,
+			DoubleSigners:   nil,
+			BadProposers:    nil,
+		},
+	}
+	p.Proposals = append(p.Proposals, e)
+	return
+}
+
+func (s *StateMachine) SetProposals(p *lib.Proposals) lib.ErrorI {
+	bz, err := lib.Marshal(p)
+	if err != nil {
+		return err
+	}
+	return s.Set(types.ProposalsPrefix(), bz)
+}
+
+func (s *StateMachine) GetProposals() (p *lib.Proposals, err lib.ErrorI) {
+	bz, err := s.Get(types.ProposalsPrefix())
+	if err != nil {
+		return nil, err
+	}
+	p = &lib.Proposals{
+		Proposals: make([]*lib.Proposal, 0),
+	}
+	err = lib.Unmarshal(bz, p)
+	return
 }

@@ -225,10 +225,6 @@ func ErrMaxBlockSize() lib.ErrorI {
 	return lib.NewError(lib.CodeMaxBlockSize, lib.StateMachineModule, "max block size")
 }
 
-func ErrMaxTxSize() lib.ErrorI {
-	return lib.NewError(lib.CodeMaxTxSize, lib.StateMachineModule, "max tx size")
-}
-
 func ErrPollValidator(err error) lib.ErrorI {
 	return lib.NewError(lib.CodePollValidator, lib.StateMachineModule, fmt.Sprintf("an error occurred polling the validator: %s", err.Error()))
 }
@@ -265,14 +261,26 @@ func ErrInvalidNumOfSamples() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidNumberOfSamples, lib.StateMachineModule, "invalid number of samples")
 }
 
-func ErrInvalidPointAllocation() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidPointAllocation, lib.StateMachineModule, "invalid point allocation")
+func ErrInvalidProposal() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidProposal, lib.StateMachineModule, "invalid proposal")
 }
 
-func ErrInvalidNumOfPointRecipients() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidNumPointRecipients, lib.StateMachineModule, "invalid num point recipients")
+func ErrInvalidSubisdy() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidSubsidy, lib.StateMachineModule, "invalid subsidy")
 }
 
-func ErrInvalidEquity() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidEquity, lib.StateMachineModule, "invalid equity")
+func ErrInvalidOpcode() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidOpcode, lib.StateMachineModule, "invalid opcode")
+}
+
+func ErrInvalidProposalHash() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidProposalHash, lib.StateMachineModule, "invalid proposal hash")
+}
+
+func ErrNonPaidCommittee() lib.ErrorI {
+	return lib.NewError(lib.CodeNonPaidCommittee, lib.StateMachineModule, "non paid committee")
+}
+
+func ErrInvalidTxTime() lib.ErrorI {
+	return lib.NewError(lib.CodeErrInvalidTxTime, lib.StateMachineModule, "invalid tx timestamp")
 }

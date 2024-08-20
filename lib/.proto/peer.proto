@@ -19,7 +19,7 @@ enum Topic {
 message PeerInfo {
   PeerAddress Address = 1;
   bool is_outbound = 2;
-  bool is_validator = 3;
+  bool is_must_connect = 3;
   bool is_trusted = 4;
   int32 reputation = 5;
 }
@@ -27,18 +27,33 @@ message PeerInfo {
 message PeerAddress {
   bytes public_key = 1;
   string net_address = 2;
+  PeerMeta peer_meta = 3;
+}
+
+message PeerMeta {
+  uint64 network_id = 1;
+  repeated uint64 chains = 2;
+  bytes signature = 3;
+}
+
+message ConsensusMessage {
+  uint64 committee_id = 1;
+  bytes message = 2;
 }
 
 message BlockRequestMessage {
-  uint64 height = 1;
-  bool height_only = 2;
+  uint64 committee_id = 1;
+  uint64 height = 2;
+  bool height_only = 3;
 }
 
 message BlockResponseMessage {
-  uint64 max_height = 1;
-  QuorumCertificate BlockAndCertificate = 2;
+  uint64 committee_id = 1;
+  uint64 max_height = 2;
+  QuorumCertificate BlockAndCertificate = 3;
 }
 
 message TxMessage {
-  bytes Tx = 1;
+  uint64 committee_id = 1;
+  bytes tx = 2;
 }

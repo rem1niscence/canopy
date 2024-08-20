@@ -11,22 +11,22 @@ type ByzantineEvidence struct {
 	BPE BadProposerEvidences
 }
 
-func (c *Consensus) ValidateByzantineEvidence(x *lib.BlockHeader, be *ByzantineEvidence) lib.ErrorI {
+func (c *Consensus) ValidateByzantineEvidence(x *lib.Proposal, be *ByzantineEvidence) lib.ErrorI {
 	if be == nil {
 		return nil
 	}
-	if x.DoubleSigners != nil {
+	if x.Meta.DoubleSigners != nil {
 		doubleSigners, err := c.ProcessDSE(be.DSE.Evidence...)
 		if err != nil {
 			return err
 		}
 		// check evidence amounts to the same double signer conclusion
-		if len(doubleSigners) != len(x.DoubleSigners) {
+		if len(doubleSigners) != len(x.Meta.DoubleSigners) {
 			return lib.ErrInvalidEvidence()
 		}
 		for _, ds1 := range doubleSigners {
 			valid := false
-			for _, ds2 := range x.DoubleSigners {
+			for _, ds2 := range x.Meta.DoubleSigners {
 				if bytes.Equal(ds1.PubKey, ds2.PubKey) && slices.Equal(ds1.Heights, ds2.Heights) {
 					valid = true
 				}
@@ -36,16 +36,16 @@ func (c *Consensus) ValidateByzantineEvidence(x *lib.BlockHeader, be *ByzantineE
 			}
 		}
 	}
-	if x.BadProposers != nil {
+	if x.Meta.BadProposers != nil {
 		badProposers, err := c.ProcessBPE(be.BPE.Evidence...)
 		if err != nil {
 			return err
 		}
 		// check evidence amounts to the same bad proposer conclusion
-		if len(badProposers) != len(x.BadProposers) {
+		if len(badProposers) != len(x.Meta.BadProposers) {
 			return lib.ErrMismatchBadProducerCount()
 		}
-		for i, bp := range x.BadProposers {
+		for i, bp := range x.Meta.BadProposers {
 			if !bytes.Equal(badProposers[i], bp) {
 				return lib.ErrMismatchEvidenceAndHeader()
 			}
@@ -73,7 +73,7 @@ func (c *Consensus) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.Doubl
 		if err := x.CheckBasic(); err != nil {
 			return nil, err
 		}
-		vs, err := c.LoadValSet(x.VoteA.Header.Height)
+		vs, err := c.LoadCommittee(c.CommitteeID, x.VoteA.Header.Height)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +88,7 @@ func (c *Consensus) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.Doubl
 			return nil, err
 		}
 		sig1, sig2, height := x.VoteA.Signature, x.VoteB.Signature, x.VoteA.Header.Height
-		valSet, err := c.LoadValSet(x.VoteA.Header.Height)
+		valSet, err := c.LoadCommittee(c.CommitteeID, x.VoteA.Header.Height)
 		if err != nil {
 			return nil, err
 		}
@@ -217,7 +217,7 @@ func (c *Consensus) addDSEByPartialQC(dse *DoubleSignEvidences) {
 			if pQC.Header.Phase != PrecommitVote {
 				continue // historically can only process precommit vote
 			}
-			certificate, err := c.LoadCertificate(evidenceHeight)
+			certificate, err := c.LoadCertificate(c.CommitteeID, evidenceHeight)
 			if err != nil {
 				continue
 			}

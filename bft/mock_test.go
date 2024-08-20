@@ -9,7 +9,6 @@ import (
 )
 
 var _ Controller = &testController{}
-var _ App = &testController{}
 
 type testController struct {
 	sync.Mutex

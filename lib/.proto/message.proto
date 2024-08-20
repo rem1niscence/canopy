@@ -4,7 +4,6 @@ package types;
 option go_package = "github.com/ginchuco/ginchu/fsm/types";
 
 import "google/protobuf/any.proto";
-import "account.proto";
 import "block.proto";
 import "validator.proto";
 
@@ -60,7 +59,13 @@ message MessageDAOTransfer {
   uint64 end_height = 5;
 }
 
-message MessageEquityGrant {
-  Equity equity = 1;
-  QuorumCertificate qc = 2;
+message MessageProposal {
+  QuorumCertificate qc = 1;
+}
+
+message MessageSubsidy {
+  bytes address = 1;
+  uint64 committee_id = 2;
+  uint64 amount = 3;
+  string opcode = 4;
 }

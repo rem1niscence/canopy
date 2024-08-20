@@ -6,6 +6,7 @@ import (
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"math/rand"
+	"time"
 )
 
 func (f *Fuzzer) PauseTransaction() lib.ErrorI {
@@ -14,7 +15,6 @@ func (f *Fuzzer) PauseTransaction() lib.ErrorI {
 	if val.Address == nil || val.UnstakingHeight != 0 {
 		return nil
 	}
-	account.Sequence++
 	if val.MaxPausedHeight == 0 {
 		return nil
 	}
@@ -31,7 +31,6 @@ func (f *Fuzzer) UnpauseTransaction() lib.ErrorI {
 	if val.Address == nil || val.UnstakingHeight != 0 {
 		return nil
 	}
-	account.Sequence++
 	if val.MaxPausedHeight != 0 {
 		return nil
 	}
@@ -53,8 +52,8 @@ func (f *Fuzzer) handlePauseTransaction(from *crypto.KeyGroup, account types.Acc
 		case 0: // invalid signature
 			tx, err = f.invalidPauseSignature(from, account, val, fee)
 			reason = BadSigReason
-		case 1: // invalid sequence
-			tx, err = f.invalidPauseSequence(from, account, val, fee)
+		case 1: // invalid time
+			tx, err = f.invalidPauseTime(from, account, val, fee)
 			reason = BadSeqReason
 		case 2: // invalid fee
 			tx, err = f.invalidPauseFee(from, account, val, fee)
@@ -89,8 +88,8 @@ func (f *Fuzzer) handleUnpauseTransaction(from *crypto.KeyGroup, account types.A
 		case 0: // invalid signature
 			tx, err = f.invalidUnpauseSignature(from, account, val, fee)
 			reason = BadSigReason
-		case 1: // invalid sequence
-			tx, err = f.invalidUnpauseSequence(from, account, val, fee)
+		case 1: // invalid time
+			tx, err = f.invalidUnpauseTime(from, account, val, fee)
 			reason = BadSeqReason
 		case 2: // invalid fee
 			tx, err = f.invalidUnpauseFee(from, account, val, fee)
@@ -116,7 +115,7 @@ func (f *Fuzzer) handleUnpauseTransaction(from *crypto.KeyGroup, account types.A
 
 func (f *Fuzzer) validPauseTransaction(from *crypto.KeyGroup, acc types.Account, val types.Validator, fee uint64) lib.ErrorI {
 	val.MaxPausedHeight = 1
-	tx, err := types.NewPauseTx(from.PrivateKey, acc.Sequence, fee)
+	tx, err := types.NewPauseTx(from.PrivateKey, f.getTxTime(), fee)
 	if err != nil {
 		return err
 	}
@@ -132,7 +131,7 @@ func (f *Fuzzer) validPauseTransaction(from *crypto.KeyGroup, acc types.Account,
 
 func (f *Fuzzer) validUnpauseTransaction(from *crypto.KeyGroup, acc types.Account, val types.Validator, fee uint64) lib.ErrorI {
 	val.MaxPausedHeight = 0
-	tx, err := types.NewUnpauseTx(from.PrivateKey, acc.Sequence, fee)
+	tx, err := types.NewUnpauseTx(from.PrivateKey, f.getTxTime(), fee)
 	if err != nil {
 		return err
 	}
@@ -149,29 +148,29 @@ func (f *Fuzzer) validUnpauseTransaction(from *crypto.KeyGroup, acc types.Accoun
 func (f *Fuzzer) invalidPauseSignature(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return newTransactionBadSignature(from.PrivateKey, &types.MessagePause{
 		Address: from.Address.Bytes(),
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidUnpauseSignature(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return newTransactionBadSignature(from.PrivateKey, &types.MessageUnpause{
 		Address: from.Address.Bytes(),
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 }
 
-func (f *Fuzzer) invalidPauseSequence(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return types.NewPauseTx(from.PrivateKey, f.getBadSequence(account), f.getBadFee(fee))
+func (f *Fuzzer) invalidPauseTime(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
+	return types.NewPauseTx(from.PrivateKey, f.getInvalidTxTime(), f.getBadFee(fee))
 }
 
-func (f *Fuzzer) invalidUnpauseSequence(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return types.NewUnpauseTx(from.PrivateKey, f.getBadSequence(account), f.getBadFee(fee))
+func (f *Fuzzer) invalidUnpauseTime(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
+	return types.NewUnpauseTx(from.PrivateKey, f.getInvalidTxTime(), f.getBadFee(fee))
 }
 
 func (f *Fuzzer) invalidPauseFee(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return types.NewPauseTx(from.PrivateKey, account.Sequence, f.getBadFee(fee))
+	return types.NewPauseTx(from.PrivateKey, f.getTxTime(), f.getBadFee(fee))
 }
 
 func (f *Fuzzer) invalidUnpauseFee(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return types.NewUnpauseTx(from.PrivateKey, account.Sequence, f.getBadFee(fee))
+	return types.NewUnpauseTx(from.PrivateKey, f.getTxTime(), f.getBadFee(fee))
 }
 
 func (f *Fuzzer) invalidPauseMsg(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
@@ -185,11 +184,19 @@ func (f *Fuzzer) invalidUnpauseMsg(from *crypto.KeyGroup, account types.Account,
 func (f *Fuzzer) invalidPauseSender(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return types.NewTransaction(from.PrivateKey, &types.MessagePause{
 		Address: f.getBadAddress(from).Bytes(),
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
 }
 
 func (f *Fuzzer) invalidUnpauseSender(from *crypto.KeyGroup, account types.Account, _ types.Validator, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return types.NewTransaction(from.PrivateKey, &types.MessageUnpause{
 		Address: f.getBadAddress(from).Bytes(),
-	}, account.Sequence, fee)
+	}, f.getTxTime(), fee)
+}
+
+func (f *Fuzzer) getTxTime() uint64 {
+	return uint64(time.Now().UnixMicro())
+}
+
+func (f *Fuzzer) getInvalidTxTime() uint64 {
+	return uint64(time.Now().Add(6 * time.Hour).UnixMicro())
 }

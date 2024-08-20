@@ -9,7 +9,7 @@ message Transaction {
   string type = 1;
   google.protobuf.Any msg = 2;
   Signature signature = 3;
-  uint64 sequence = 4;
+  uint64 time = 4;
   uint64 fee = 5;
 }
 

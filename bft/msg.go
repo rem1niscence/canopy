@@ -70,7 +70,7 @@ func (c *Consensus) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.
 		if x.Qc.Header == nil {
 			return false, lib.ErrEmptyView()
 		}
-		vals, err = c.LoadValSet(x.Qc.Header.Height) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
+		vals, err = c.LoadCommittee(c.CommitteeID, x.Qc.Header.Height) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
 		if err != nil {
 			return false, err
 		}
@@ -85,14 +85,14 @@ func (c *Consensus) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.
 			return false, lib.ErrWrongHeight()
 		}
 		if x.Header.Phase == Propose {
-			if err = c.CheckProposal(x.Qc.Proposal); err != nil {
+			if err = c.CheckProposal(c.CommitteeID, x.Qc.Proposal); err != nil {
 				return
 			}
 			if len(x.Qc.ProposerKey) != crypto.BLS12381PubKeySize {
 				return false, lib.ErrInvalidProposerPubKey()
 			}
 		} else {
-			if !bytes.Equal(x.Qc.ProposalHash, c.HashProposal(c.Proposal)) {
+			if !bytes.Equal(x.Qc.ProposalHash, c.Proposal.Hash()) {
 				return false, lib.ErrMismatchProposalHash()
 			}
 		}
@@ -121,7 +121,7 @@ func (c *Consensus) CheckReplicaMessage(x *Message) lib.ErrorI {
 			return lib.ErrInvalidProposerPubKey()
 		}
 	} else {
-		if !bytes.Equal(x.Qc.ProposalHash, c.HashProposal(c.Proposal)) {
+		if !bytes.Equal(x.Qc.ProposalHash, c.Proposal.Hash()) {
 			return lib.ErrMismatchProposalHash()
 		}
 	}

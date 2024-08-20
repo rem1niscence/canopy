@@ -118,7 +118,7 @@ func (s *StateMachine) SetValidators(validators []*types.Validator, supply *type
 			return err
 		}
 		if val.MaxPausedHeight == 0 && val.UnstakingHeight == 0 {
-			if err := s.SetConsensusValidator(crypto.NewAddressFromBytes(val.Address), val.StakedAmount); err != nil {
+			if err := s.SetCommittees(crypto.NewAddressFromBytes(val.Address), val.StakedAmount, val.Committees); err != nil {
 				return err
 			}
 		}
@@ -144,77 +144,6 @@ func (s *StateMachine) DeleteValidator(address crypto.AddressI) lib.ErrorI {
 	return nil
 }
 
-// CONSENSUS VALIDATORS BELOW
-
-func (s *StateMachine) GetConsValidatorsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
-	params, err := s.GetParamsVal()
-	if err != nil {
-		return nil, err
-	}
-	it, err := s.RevIterator(types.ConsensusPrefix())
-	if err != nil {
-		return nil, err
-	}
-	defer it.Close()
-	skipIdx, page := uint64(p.SkipToIndex()), lib.NewPage(p)
-	page.Type = types.ConsValidatorsPageName
-	res := make(types.ConsValidatorPage, 0)
-	for i, countOnly := uint64(0), false; it.Valid() && i < params.ValidatorMaxCount; it.Next() {
-		page.TotalCount++
-		switch {
-		case i < skipIdx || countOnly:
-			continue
-		case i == skipIdx+uint64(page.PerPage):
-			countOnly = true
-			continue
-		}
-		addr, err := types.AddressFromKey(it.Key())
-		if err != nil {
-			return nil, err
-		}
-		val, err := s.GetValidator(addr)
-		if err != nil {
-			return nil, err
-		}
-		if val.MaxPausedHeight != 0 {
-			return nil, types.ErrValidatorPaused()
-		}
-		if val.UnstakingHeight != 0 {
-			return nil, types.ErrValidatorUnstaking()
-		}
-		res = append(res, &lib.ConsensusValidator{
-			PublicKey:   val.PublicKey,
-			VotingPower: val.StakedAmount,
-			NetAddress:  val.NetAddress,
-		})
-		page.Results = &res
-		page.Count++
-	}
-	page.TotalPages = int(math.Ceil(float64(page.TotalCount) / float64(page.PerPage)))
-	return
-}
-
-func (s *StateMachine) UpdateConsensusValidator(address crypto.AddressI, oldValidator *types.Validator, newStake uint64) lib.ErrorI {
-	if err := s.DeleteConsensusValidator(address, oldValidator.StakedAmount); err != nil {
-		return err
-	}
-	if oldValidator.MaxPausedHeight != 0 {
-		return nil // don't set if paused
-	}
-	return s.SetConsensusValidator(address, newStake)
-}
-
-func (s *StateMachine) SetConsensusValidator(address crypto.AddressI, stakeAmount uint64) lib.ErrorI {
-	return s.Set(types.KeyForConsensus(address, stakeAmount), nil)
-}
-
-func (s *StateMachine) DeleteConsensusValidator(address crypto.AddressI, stakeAmount uint64) lib.ErrorI {
-	if stakeAmount == 0 {
-		return nil
-	}
-	return s.Delete(types.KeyForConsensus(address, stakeAmount))
-}
-
 // UNSTAKING VALIDATORS BELOW
 
 func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, height uint64) lib.ErrorI {
@@ -226,9 +155,6 @@ func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator 
 			return err
 		}
 	} else {
-		if err := s.DeleteConsensusValidator(address, validator.StakedAmount); err != nil {
-			return err
-		}
 		if err := s.DeleteCommittees(address, validator.StakedAmount, validator.Committees); err != nil {
 			return err
 		}
@@ -279,9 +205,6 @@ func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *ty
 	if err := s.Set(types.KeyForPaused(maxPausedHeight, address), nil); err != nil {
 		return err
 	}
-	if err := s.DeleteConsensusValidator(address, validator.StakedAmount); err != nil {
-		return err
-	}
 	if err := s.DeleteCommittees(address, validator.StakedAmount, validator.Committees); err != nil {
 		return err
 	}
@@ -291,9 +214,6 @@ func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *ty
 
 func (s *StateMachine) SetValidatorUnpaused(address crypto.AddressI, validator *types.Validator) lib.ErrorI {
 	if err := s.Delete(types.KeyForPaused(validator.MaxPausedHeight, address)); err != nil {
-		return err
-	}
-	if err := s.SetConsensusValidator(address, validator.StakedAmount); err != nil {
 		return err
 	}
 	if err := s.SetCommittees(address, validator.StakedAmount, validator.Committees); err != nil {

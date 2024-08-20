@@ -19,7 +19,7 @@ var (
 	blockHeightPrefix = []byte{6}
 	qcHeightPrefix    = []byte{7}
 
-	delim = []byte("/") // TODO test for things like height collisions ex: iterating txHeightPrefix/10 and capturing txHeightPrefix/100/0 etc.
+	delim = []byte("/")
 )
 
 type Indexer struct {
@@ -91,9 +91,9 @@ func (t *Indexer) GetBlocks(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 		block.Meta = &lib.BlockResultMeta{Size: uint64(len(bz))}
 		if page.Count != 0 {
 			nextBlock := blkResults[page.Count-1]
-			blockTime := block.BlockHeader.Time
-			nextBlkTime := nextBlock.BlockHeader.Time
-			nextBlock.Meta.Took = nextBlkTime.AsTime().Sub(blockTime.AsTime()).Truncate(time.Second).String()
+			blockTime := time.UnixMicro(int64(block.BlockHeader.Time))
+			nextBlkTime := time.UnixMicro(int64(nextBlock.BlockHeader.Time))
+			nextBlock.Meta.Took = nextBlkTime.Sub(blockTime).Truncate(time.Second).String()
 		}
 		if i == skipIdx+page.PerPage {
 			countOnly = true
@@ -128,11 +128,11 @@ func (t *Indexer) GetQCByHeight(height uint64) (*lib.QuorumCertificate, lib.Erro
 	if err != nil {
 		return nil, err
 	}
-	qc.Proposal, err = lib.Marshal(block)
+	qc.Proposal.Block, err = lib.Marshal(block)
 	if err != nil {
 		return nil, err
 	}
-	return qc, nil
+	return qc, err
 }
 
 func (t *Indexer) DeleteQCForHeight(height uint64) lib.ErrorI {
@@ -140,8 +140,10 @@ func (t *Indexer) DeleteQCForHeight(height uint64) lib.ErrorI {
 }
 
 func (t *Indexer) IndexQC(qc *lib.QuorumCertificate) lib.ErrorI {
+	qc.Proposal.Block = nil
 	bz, err := lib.Marshal(&lib.QuorumCertificate{
 		Header:       qc.Header,
+		Proposal:     qc.Proposal,
 		ProposalHash: qc.ProposalHash,
 		ProposerKey:  qc.ProposerKey,
 		Signature:    qc.Signature,

@@ -22,6 +22,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// A generic wrapper over a proto.message for the P2P module to handle
 type Envelope struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -69,6 +70,7 @@ func (x *Envelope) GetPayload() *anypb.Any {
 	return nil
 }
 
+// A partial or full 'Message' with a Stream Topic designation and an EOF signal
 type Packet struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

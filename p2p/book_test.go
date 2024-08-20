@@ -12,15 +12,15 @@ func TestStartPeerBookService(t *testing.T) {
 	n1, n2, cleanup := newTestP2PPair(t)
 	defer cleanup()
 	n3, n4 := newTestP2PNode(t), newTestP2PNode(t)
-	n1.book.Add(&BookPeer{Address: &lib.PeerAddress{PublicKey: n3.pub}})
-	n2.book.Add(&BookPeer{Address: &lib.PeerAddress{PublicKey: n4.pub}})
+	n1.book.Add(&BookPeer{Address: n3.ID()})
+	n2.book.Add(&BookPeer{Address: n4.ID()})
 	n1.StartPeerBookService()
 	n2.StartPeerBookService()
 	for {
 		select {
 		case <-time.NewTicker(time.Millisecond * 100).C:
 			bp := n1.GetBookPeers()
-			if len(bp) <= 3 {
+			if len(bp) < 3 {
 				continue
 			}
 			hasN4 := false
@@ -32,7 +32,7 @@ func TestStartPeerBookService(t *testing.T) {
 			}
 			require.True(t, hasN4)
 			bp = n2.GetBookPeers()
-			if len(bp) <= 3 {
+			if len(bp) < 3 {
 				continue
 			}
 			hasN3 := false
@@ -52,9 +52,16 @@ func TestStartPeerBookService(t *testing.T) {
 
 func TestGetRandom(t *testing.T) {
 	n1, n2 := newTestP2PNode(t), newTestP2PNode(t)
-	require.Nil(t, n1.book.GetRandom())
-	n1.book.Add(&BookPeer{Address: &lib.PeerAddress{PublicKey: n2.pub}})
-	got := n1.book.GetRandom()
+	require.Nil(t, n1.book.GetRandom(0))
+	require.Nil(t, n1.book.GetRandom(1))
+	n1.book.Add(&BookPeer{Address: &lib.PeerAddress{
+		PublicKey:  n2.pub,
+		NetAddress: "",
+		PeerMeta:   &lib.PeerMeta{Chains: []uint64{0, 1}},
+	}})
+	got := n1.book.GetRandom(0)
+	require.Equal(t, got.Address.PublicKey, n2.pub)
+	got = n1.book.GetRandom(1)
 	require.Equal(t, got.Address.PublicKey, n2.pub)
 }
 
@@ -86,18 +93,18 @@ func TestAddFailedDialAttempt(t *testing.T) {
 	n1, n2, n3 := newTestP2PNode(t), newTestP2PNode(t), newTestP2PNode(t)
 	require.Len(t, n1.book.GetAll(), 0)
 	n1.book.Add(&BookPeer{
-		Address:               &lib.PeerAddress{PublicKey: n2.pub},
+		Address:               &lib.PeerAddress{PublicKey: n2.pub, PeerMeta: &lib.PeerMeta{Chains: []uint64{0, 1}}},
 		ConsecutiveFailedDial: startConsecutiveFailedDialAttempt,
 	})
-	peer := n1.book.GetRandom()
+	peer := n1.book.GetRandom(0)
 	require.Equal(t, peer.Address.PublicKey, n2.pub)
 	require.Equal(t, peer.ConsecutiveFailedDial, startConsecutiveFailedDialAttempt)
 	n1.book.AddFailedDialAttempt(n3.pub)
-	peer = n1.book.GetRandom()
+	peer = n1.book.GetRandom(0)
 	require.Equal(t, peer.Address.PublicKey, n2.pub)
 	require.Equal(t, peer.ConsecutiveFailedDial, startConsecutiveFailedDialAttempt)
 	n1.book.AddFailedDialAttempt(n2.pub)
-	peer = n1.book.GetRandom()
+	peer = n1.book.GetRandom(0)
 	require.Equal(t, peer.Address.PublicKey, n2.pub)
 	require.Equal(t, peer.ConsecutiveFailedDial, startConsecutiveFailedDialAttempt+1)
 	n1.book.AddFailedDialAttempt(n2.pub)
@@ -109,15 +116,23 @@ func TestResetFailedDialAttempt(t *testing.T) {
 	n1, n2 := newTestP2PNode(t), newTestP2PNode(t)
 	require.Len(t, n1.book.GetAll(), 0)
 	n1.book.Add(&BookPeer{
-		Address:               &lib.PeerAddress{PublicKey: n2.pub},
+		Address:               &lib.PeerAddress{PublicKey: n2.pub, PeerMeta: &lib.PeerMeta{Chains: []uint64{0, 1}}},
 		ConsecutiveFailedDial: startConsecutiveFailedDialAttempt,
 	})
-	peer := n1.book.GetRandom()
+	peer := n1.book.GetRandom(0)
 	require.Equal(t, peer.Address.PublicKey, n2.pub)
 	require.Equal(t, peer.ConsecutiveFailedDial, startConsecutiveFailedDialAttempt)
 	n1.book.ResetFailedDialAttempts(n2.pub)
 	require.True(t, n1.book.Has(n2.pub))
-	peer = n1.book.GetRandom()
+	peer = n1.book.GetRandom(0)
 	require.Equal(t, peer.Address.PublicKey, n2.pub)
 	require.Equal(t, peer.ConsecutiveFailedDial, int32(0))
+}
+
+// Has() returns if the
+func (p *PeerBook) Has(publicKey []byte) bool {
+	p.l.Lock()
+	defer p.l.Unlock()
+	_, found := p.getIndex(publicKey)
+	return found
 }

@@ -3,7 +3,6 @@ package lib
 import (
 	"bytes"
 	"github.com/alecthomas/units"
-	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"sort"
 	"sync"
@@ -61,7 +60,7 @@ func (f *FeeMempool) AddTransaction(tx []byte, fee uint64) (recheck bool, err Er
 	}
 	txBytes := len(tx)
 	if uint32(txBytes) >= f.config.MaxTransactionSize {
-		return false, types.ErrMaxTxSize()
+		return false, ErrMaxTxSize()
 	}
 	recheck = f.pool.Insert(MempoolTx{
 		Tx:  tx,

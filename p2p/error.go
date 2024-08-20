@@ -104,6 +104,14 @@ func ErrFailedSignatureSwap(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeSignatureSwap, lib.P2PModule, fmt.Sprintf("signature swap failed with err: %s", err.Error()))
 }
 
+func ErrFailedMetaSwap(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeMetaSwap, lib.P2PModule, fmt.Sprintf("meta swap failed with err: %s", err.Error()))
+}
+
+func ErrIncompatiblePeer() lib.ErrorI {
+	return lib.NewError(lib.CodeIncompatiblePeer, lib.P2PModule, "the peer is incompatible")
+}
+
 func ErrFailedHKDF(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeFailedHKDF, lib.P2PModule, fmt.Sprintf("hkdf failed with err: %s", err.Error()))
 }
@@ -126,6 +134,10 @@ func ErrIPLookup(err error) lib.ErrorI {
 
 func ErrBannedIP(s string) lib.ErrorI {
 	return lib.NewError(lib.CodeBannedIP, lib.P2PModule, fmt.Sprintf("banned IP attempted to connect: %s", s))
+}
+
+func ErrBannedCountry(s string) lib.ErrorI {
+	return lib.NewError(lib.CodeBannedCountry, lib.P2PModule, fmt.Sprintf("banned country attempted to connect: %s", s))
 }
 
 func ErrBannedID(s string) lib.ErrorI {

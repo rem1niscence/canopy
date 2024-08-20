@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"net"
@@ -20,15 +21,15 @@ func TestEncryptedConn(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		e1, err = NewHandshake(c1, p1)
+		e1, err = NewHandshake(c1, &lib.PeerMeta{Chains: []uint64{0, 1}}, p1)
 		wg.Done()
 		require.NoError(t, err)
 	}()
-	e2, err = NewHandshake(c2, p2)
+	e2, err = NewHandshake(c2, &lib.PeerMeta{Chains: []uint64{0, 1}}, p2)
 	require.NoError(t, err)
 	wg.Wait()
-	require.True(t, e1.peerPubKey.Equals(p2.PublicKey()))
-	require.True(t, e2.peerPubKey.Equals(p1.PublicKey()))
+	require.Equal(t, e1.Address.PublicKey, p2.PublicKey().Bytes())
+	require.Equal(t, e2.Address.PublicKey, p1.PublicKey().Bytes())
 	go func() {
 		_, err = e1.Write(msg1)
 		require.NoError(t, err)

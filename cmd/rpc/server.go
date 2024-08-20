@@ -91,6 +91,7 @@ const (
 	TxUnpauseRouteName         = "tx-unpause"
 	TxChangeParamRouteName     = "tx-change-param"
 	TxDAOTransferRouteName     = "tx-dao-transfer"
+	TxSubsidyRouteName         = "tx-subsidy"
 	ResourceUsageRouteName     = "resource-usage"
 	PeerInfoRouteName          = "peer-info"
 	ConsensusInfoRouteName     = "consensus-info"
@@ -112,37 +113,36 @@ var (
 	logger lib.LoggerI
 
 	router = routes{
-		VersionRouteName:        {Method: http.MethodGet, Path: "/v1/", HandlerFunc: Version},
-		TxRouteName:             {Method: http.MethodPost, Path: "/v1/tx", HandlerFunc: Transaction},
-		HeightRouteName:         {Method: http.MethodPost, Path: "/v1/query/height", HandlerFunc: Height},
-		AccountRouteName:        {Method: http.MethodPost, Path: "/v1/query/account", HandlerFunc: Account},
-		AccountsRouteName:       {Method: http.MethodPost, Path: "/v1/query/accounts", HandlerFunc: Accounts},
-		PoolRouteName:           {Method: http.MethodPost, Path: "/v1/query/pool", HandlerFunc: Pool},
-		PoolsRouteName:          {Method: http.MethodPost, Path: "/v1/query/pools", HandlerFunc: Pools},
-		ValidatorRouteName:      {Method: http.MethodPost, Path: "/v1/query/validator", HandlerFunc: Validator},
-		ValidatorsRouteName:     {Method: http.MethodPost, Path: "/v1/query/validators", HandlerFunc: Validators},
-		ConsValidatorsRouteName: {Method: http.MethodPost, Path: "/v1/query/cons-validators", HandlerFunc: ConsValidators},
-		NonSignersRouteName:     {Method: http.MethodPost, Path: "/v1/query/non-signers", HandlerFunc: NonSigners},
-		ParamRouteName:          {Method: http.MethodPost, Path: "/v1/query/params", HandlerFunc: Params},
-		SupplyRouteName:         {Method: http.MethodPost, Path: "/v1/query/supply", HandlerFunc: Supply},
-		FeeParamRouteName:       {Method: http.MethodPost, Path: "/v1/query/fee-params", HandlerFunc: FeeParams},
-		GovParamRouteName:       {Method: http.MethodPost, Path: "/v1/query/gov-params", HandlerFunc: GovParams},
-		ConParamsRouteName:      {Method: http.MethodPost, Path: "/v1/query/con-params", HandlerFunc: ConParams},
-		ValParamRouteName:       {Method: http.MethodPost, Path: "/v1/query/val-params", HandlerFunc: ValParams},
-		StateRouteName:          {Method: http.MethodPost, Path: "/v1/query/state", HandlerFunc: State},
-		StateDiffRouteName:      {Method: http.MethodPost, Path: "/v1/query/state-diff", HandlerFunc: StateDiff},
-		StateDiffGetRouteName:   {Method: http.MethodGet, Path: "/v1/query/state-diff", HandlerFunc: StateDiff},
-		CertByHeightRouteName:   {Method: http.MethodPost, Path: "/v1/query/cert-by-height", HandlerFunc: CertByHeight},
-		BlockByHeightRouteName:  {Method: http.MethodPost, Path: "/v1/query/block-by-height", HandlerFunc: BlockByHeight},
-		BlocksRouteName:         {Method: http.MethodPost, Path: "/v1/query/blocks", HandlerFunc: Blocks},
-		BlockByHashRouteName:    {Method: http.MethodPost, Path: "/v1/query/block-by-hash", HandlerFunc: BlockByHash},
-		TxsByHeightRouteName:    {Method: http.MethodPost, Path: "/v1/query/txs-by-height", HandlerFunc: TransactionsByHeight},
-		TxsBySenderRouteName:    {Method: http.MethodPost, Path: "/v1/query/txs-by-sender", HandlerFunc: TransactionsBySender},
-		TxsByRecRouteName:       {Method: http.MethodPost, Path: "/v1/query/txs-by-rec", HandlerFunc: TransactionsByRecipient},
-		TxByHashRouteName:       {Method: http.MethodPost, Path: "/v1/query/tx-by-hash", HandlerFunc: TransactionByHash},
-		PendingRouteName:        {Method: http.MethodPost, Path: "/v1/query/pending", HandlerFunc: Pending},
-		ProposalsRouteName:      {Method: http.MethodGet, Path: "/v1/gov/proposals", HandlerFunc: Proposals},
-		PollRouteName:           {Method: http.MethodGet, Path: "/v1/gov/poll", HandlerFunc: Poll},
+		VersionRouteName:       {Method: http.MethodGet, Path: "/v1/", HandlerFunc: Version},
+		TxRouteName:            {Method: http.MethodPost, Path: "/v1/tx", HandlerFunc: Transaction},
+		HeightRouteName:        {Method: http.MethodPost, Path: "/v1/query/height", HandlerFunc: Height},
+		AccountRouteName:       {Method: http.MethodPost, Path: "/v1/query/account", HandlerFunc: Account},
+		AccountsRouteName:      {Method: http.MethodPost, Path: "/v1/query/accounts", HandlerFunc: Accounts},
+		PoolRouteName:          {Method: http.MethodPost, Path: "/v1/query/pool", HandlerFunc: Pool},
+		PoolsRouteName:         {Method: http.MethodPost, Path: "/v1/query/pools", HandlerFunc: Pools},
+		ValidatorRouteName:     {Method: http.MethodPost, Path: "/v1/query/validator", HandlerFunc: Validator},
+		ValidatorsRouteName:    {Method: http.MethodPost, Path: "/v1/query/validators", HandlerFunc: Validators},
+		NonSignersRouteName:    {Method: http.MethodPost, Path: "/v1/query/non-signers", HandlerFunc: NonSigners},
+		ParamRouteName:         {Method: http.MethodPost, Path: "/v1/query/params", HandlerFunc: Params},
+		SupplyRouteName:        {Method: http.MethodPost, Path: "/v1/query/supply", HandlerFunc: Supply},
+		FeeParamRouteName:      {Method: http.MethodPost, Path: "/v1/query/fee-params", HandlerFunc: FeeParams},
+		GovParamRouteName:      {Method: http.MethodPost, Path: "/v1/query/gov-params", HandlerFunc: GovParams},
+		ConParamsRouteName:     {Method: http.MethodPost, Path: "/v1/query/con-params", HandlerFunc: ConParams},
+		ValParamRouteName:      {Method: http.MethodPost, Path: "/v1/query/val-params", HandlerFunc: ValParams},
+		StateRouteName:         {Method: http.MethodPost, Path: "/v1/query/state", HandlerFunc: State},
+		StateDiffRouteName:     {Method: http.MethodPost, Path: "/v1/query/state-diff", HandlerFunc: StateDiff},
+		StateDiffGetRouteName:  {Method: http.MethodGet, Path: "/v1/query/state-diff", HandlerFunc: StateDiff},
+		CertByHeightRouteName:  {Method: http.MethodPost, Path: "/v1/query/cert-by-height", HandlerFunc: CertByHeight},
+		BlockByHeightRouteName: {Method: http.MethodPost, Path: "/v1/query/block-by-height", HandlerFunc: BlockByHeight},
+		BlocksRouteName:        {Method: http.MethodPost, Path: "/v1/query/blocks", HandlerFunc: Blocks},
+		BlockByHashRouteName:   {Method: http.MethodPost, Path: "/v1/query/block-by-hash", HandlerFunc: BlockByHash},
+		TxsByHeightRouteName:   {Method: http.MethodPost, Path: "/v1/query/txs-by-height", HandlerFunc: TransactionsByHeight},
+		TxsBySenderRouteName:   {Method: http.MethodPost, Path: "/v1/query/txs-by-sender", HandlerFunc: TransactionsBySender},
+		TxsByRecRouteName:      {Method: http.MethodPost, Path: "/v1/query/txs-by-rec", HandlerFunc: TransactionsByRecipient},
+		TxByHashRouteName:      {Method: http.MethodPost, Path: "/v1/query/tx-by-hash", HandlerFunc: TransactionByHash},
+		PendingRouteName:       {Method: http.MethodPost, Path: "/v1/query/pending", HandlerFunc: Pending},
+		ProposalsRouteName:     {Method: http.MethodGet, Path: "/v1/gov/proposals", HandlerFunc: Proposals},
+		PollRouteName:          {Method: http.MethodGet, Path: "/v1/gov/poll", HandlerFunc: Poll},
 		// debug
 		DebugBlockedRouteName: {Method: http.MethodPost, Path: "/debug/blocked", HandlerFunc: debugHandler(DebugBlockedRouteName)},
 		DebugHeapRouteName:    {Method: http.MethodPost, Path: "/debug/heap", HandlerFunc: debugHandler(DebugHeapRouteName)},
@@ -163,6 +163,7 @@ var (
 		TxUnpauseRouteName:         {Method: http.MethodPost, Path: "/v1/admin/tx-unpause", HandlerFunc: TransactionUnpause, AdminOnly: true},
 		TxChangeParamRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-change-param", HandlerFunc: TransactionChangeParam, AdminOnly: true},
 		TxDAOTransferRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-dao-transfer", HandlerFunc: TransactionDAOTransfer, AdminOnly: true},
+		TxSubsidyRouteName:         {Method: http.MethodPost, Path: "/v1/admin/subsidy", HandlerFunc: TransactionSubsidy, AdminOnly: true},
 		ResourceUsageRouteName:     {Method: http.MethodGet, Path: "/v1/admin/resource-usage", HandlerFunc: ResourceUsage, AdminOnly: true},
 		PeerInfoRouteName:          {Method: http.MethodGet, Path: "/v1/admin/peer-info", HandlerFunc: PeerInfo, AdminOnly: true},
 		ConsensusInfoRouteName:     {Method: http.MethodGet, Path: "/v1/admin/consensus-info", HandlerFunc: ConsensusInfo, AdminOnly: true},
@@ -211,7 +212,6 @@ func StartRPC(a *app2.Controller, c lib.Config, l lib.LoggerI) {
 	l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
 	runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
 	go pollValidators(time.Minute)
-	go resetSeqCacher(time.Second * 5)
 }
 
 func Version(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -313,7 +313,7 @@ func pollValidators(frequency time.Duration) {
 }
 
 func AddVote(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	proposals := make(types.Proposals)
+	proposals := make(types.GovProposals)
 	if err := proposals.NewFromFile(conf.DataDirPath); err != nil {
 		write(w, err, http.StatusInternalServerError)
 		return
@@ -339,7 +339,7 @@ func AddVote(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func DelVote(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	proposals := make(types.Proposals)
+	proposals := make(types.GovProposals)
 	if err := proposals.NewFromFile(conf.DataDirPath); err != nil {
 		write(w, err, http.StatusInternalServerError)
 		return
@@ -418,12 +418,6 @@ func Validator(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 func Validators(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	heightPaginated(w, r, func(s *fsm.StateMachine, p *paginatedHeightRequest) (interface{}, lib.ErrorI) {
 		return s.GetValidatorsPaginated(p.PageParams, p.ValidatorFilters)
-	})
-}
-
-func ConsValidators(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	heightPaginated(w, r, func(s *fsm.StateMachine, p *paginatedHeightRequest) (interface{}, lib.ErrorI) {
-		return s.GetConsValidatorsPaginated(p.PageParams)
 	})
 }
 
@@ -545,12 +539,14 @@ type txRequest struct {
 	Amount     uint64 `json:"amount"`
 	NetAddress string `json:"netAddress"`
 	Output     string `json:"output"`
-	Sequence   uint64 `json:"sequence"`
+	OpCode     string `json:"opCode"`
 	Fee        uint64 `json:"fee"`
+	Delegate   bool   `json:"delegate"`
 	Submit     bool   `json:"submit"`
 	addressRequest
 	passwordRequest
 	txChangeParamRequest
+	committeesRequest
 }
 
 type txChangeParamRequest struct {
@@ -567,7 +563,7 @@ func TransactionSend(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		if err != nil {
 			return nil, err
 		}
-		return types.NewSendTransaction(p, toAddress, ptr.Amount, ptr.Sequence, ptr.Fee)
+		return types.NewSendTransaction(p, toAddress, ptr.Amount, ptr.Fee)
 	})
 }
 
@@ -577,7 +573,11 @@ func TransactionStake(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		if err != nil {
 			return nil, err
 		}
-		return types.NewStakeTx(p, outputAddress, ptr.NetAddress, ptr.Amount, ptr.Sequence, ptr.Fee)
+		committees, err := StringToCommittees(ptr.committees)
+		if err != nil {
+			return nil, err
+		}
+		return types.NewStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate)
 	})
 }
 
@@ -587,25 +587,29 @@ func TransactionEditStake(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if err != nil {
 			return nil, err
 		}
-		return types.NewEditStakeTx(p, outputAddress, ptr.NetAddress, ptr.Amount, ptr.Sequence, ptr.Fee)
+		committees, err := StringToCommittees(ptr.committees)
+		if err != nil {
+			return nil, err
+		}
+		return types.NewEditStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate)
 	})
 }
 
 func TransactionUnstake(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewUnstakeTx(p, ptr.Sequence, ptr.Fee)
+		return types.NewUnstakeTx(p, ptr.Fee)
 	})
 }
 
 func TransactionPause(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewPauseTx(p, ptr.Sequence, ptr.Fee)
+		return types.NewPauseTx(p, ptr.Fee)
 	})
 }
 
 func TransactionUnpause(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewUnpauseTx(p, ptr.Sequence, ptr.Fee)
+		return types.NewUnpauseTx(p, ptr.Fee)
 	})
 }
 
@@ -617,25 +621,39 @@ func TransactionChangeParam(w http.ResponseWriter, r *http.Request, _ httprouter
 			return nil, err
 		}
 		if isString {
-			return types.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, ptr.Sequence, ptr.Fee)
+			return types.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, ptr.Fee)
 		} else {
 			paramValue, err := strconv.ParseUint(ptr.ParamValue, 10, 64)
 			if err != nil {
 				return nil, err
 			}
-			return types.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, ptr.Sequence, ptr.Fee)
+			return types.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, ptr.Fee)
 		}
 	})
 }
 
 func TransactionDAOTransfer(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewDAOTransferTx(p, ptr.Amount, ptr.StartBlock, ptr.EndBlock, ptr.Sequence, ptr.Fee)
+		return types.NewDAOTransferTx(p, ptr.Amount, ptr.StartBlock, ptr.EndBlock, ptr.Fee)
 	})
 }
 
-func ConsensusInfo(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	summary, err := app.ConsensusSummary()
+func TransactionSubsidy(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		committeeId := uint64(0)
+		if c, err := StringToCommittees(ptr.committees); err == nil {
+			committeeId = c[0].Id
+		}
+		return types.NewSubsidyTx(p, ptr.Amount, committeeId, ptr.OpCode, ptr.Fee)
+	})
+}
+
+func ConsensusInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	if err := r.ParseForm(); err != nil {
+		write(w, err, http.StatusBadRequest)
+		return
+	}
+	summary, err := app.ConsensusSummary(parseUint64FromString(r.Form.Get("id")))
 	if err != nil {
 		write(w, err, http.StatusInternalServerError)
 		return
@@ -797,72 +815,6 @@ func ResourceUsage(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) 
 	}, http.StatusOK)
 }
 
-var (
-	seqCache  = map[string]uint64{}
-	seqCacheL = sync.Mutex{}
-)
-
-func resetSeqCacher(duration time.Duration) {
-	height := uint64(0)
-	for range time.Tick(duration) {
-		func() {
-			s, err := store.NewStoreWithDB(db, logger)
-			if err != nil {
-				logger.Error(err.Error())
-				return
-			}
-			defer s.Discard()
-			if s.Version() == height {
-				return
-			}
-			state, err := fsm.New(conf, s, logger)
-			if err != nil {
-				logger.Error(err.Error())
-				return
-			}
-			seqCacheL.Lock()
-			for a, seq := range seqCache {
-				addr, _ := crypto.NewAddressFromString(a)
-				acc, e := state.GetAccount(addr)
-				if e == nil && acc.Sequence >= seq {
-					delete(seqCache, a)
-				}
-			}
-			seqCacheL.Unlock()
-			height = s.Version()
-		}()
-	}
-}
-
-func setSequence(state *fsm.StateMachine, address crypto.AddressI, ptr *txRequest) {
-	account, err := state.GetAccount(address)
-	if err == nil {
-		if ptr.Sequence == 0 {
-			addrString := lib.BytesToString(account.Address)
-			seqCacheL.Lock()
-			cachedSeq := seqCache[addrString]
-			if cachedSeq > account.Sequence {
-				ptr.Sequence = cachedSeq + 1
-			} else {
-				ptr.Sequence = account.Sequence + 1
-			}
-			if ptr.Submit {
-				seqCache[addrString] = ptr.Sequence
-			}
-			seqCacheL.Unlock()
-		}
-	}
-}
-
-func decSequence(address crypto.AddressI) {
-	addr := lib.BytesToString(address.Bytes())
-	seqCacheL.Lock()
-	if _, ok := seqCache[addr]; ok {
-		seqCache[addr]--
-	}
-	seqCacheL.Unlock()
-}
-
 func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error)) {
 	ptr := new(txRequest)
 	if ok := unmarshal(w, r, ptr); !ok {
@@ -889,17 +841,13 @@ func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey 
 		}
 		ptr.Fee = feeParams.MessageSendFee
 	}
-	addr := privateKey.PublicKey().Address()
-	setSequence(state, addr, ptr)
 	p, err := callback(privateKey, ptr)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
 	if ptr.Submit {
-		if !submitTx(w, p) {
-			decSequence(addr)
-		}
+		submitTx(w, p)
 	} else {
 		bz, e := lib.MarshalJSONIndent(p)
 		if e != nil {
@@ -1056,6 +1004,33 @@ type addressRequest struct {
 	Address lib.HexBytes `json:"address"`
 }
 
+type committeesRequest struct {
+	committees string
+}
+
+func StringToCommittees(s string) (committees []*types.Committee, err error) {
+	i, err := strconv.Atoi(s) // single int is an option for subsidy txn
+	if err == nil {
+		committees = append(committees, &types.Committee{Id: uint64(i)})
+		return
+	}
+	commaSeparatedArr := strings.Split(strings.ReplaceAll(s, " ", ""), ",")
+	if len(commaSeparatedArr) == 0 {
+		return nil, ErrStringToCommittee(s)
+	}
+	for _, s := range commaSeparatedArr {
+		committeeSplit := strings.Split(s, "=")
+		if len(committeeSplit) != 2 {
+			return nil, ErrStringToCommittee(s)
+		}
+		committees = append(committees, &types.Committee{
+			Id:           parseUint64FromString(committeeSplit[0]),
+			StakePercent: parseUint64FromString(committeeSplit[1]),
+		})
+	}
+	return
+}
+
 type heightRequest struct {
 	Height uint64 `json:"height"`
 }
@@ -1173,7 +1148,7 @@ func submitTx(w http.ResponseWriter, tx any) (ok bool) {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
-	if err = app.NewTx(bz); err != nil {
+	if err = app.SendTxMsg(lib.CANOPY_COMMITTEE_ID, bz); err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
 	}

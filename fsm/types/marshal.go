@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
 )
 
@@ -90,13 +89,8 @@ func (x *ValidatorParams) ToString() string {
 }
 
 func (x *GenesisState) MarshalJSON() ([]byte, error) {
-	var timeString string
-	if x.Time != nil {
-		t := x.Time.AsTime()
-		timeString = t.Format(time.DateTime)
-	}
 	return json.Marshal(genesisState{
-		Time:           timeString,
+		Time:           time.UnixMicro(int64(x.Time)).Format(time.DateTime),
 		Pools:          x.Pools,
 		Accounts:       x.Accounts,
 		ConsValidators: x.ConsValidators,
@@ -111,26 +105,23 @@ func (x *GenesisState) UnmarshalJSON(bz []byte) (err error) {
 	if err = json.Unmarshal(bz, ptr); err != nil {
 		return
 	}
-	if ptr.Time != "" {
-		t, e := time.Parse(time.DateTime, ptr.Time)
-		if e != nil {
-			return e
-		}
-		x.Time = timestamppb.New(t)
+	t, e := time.Parse(time.DateTime, ptr.Time)
+	if e != nil {
+		return e
 	}
+	x.Time = uint64(t.UnixMicro())
 	x.Params, x.Pools, x.Supply = ptr.Params, ptr.Pools, ptr.Supply
 	x.Accounts, x.Validators, x.ConsValidators = ptr.Accounts, ptr.Validators, ptr.ConsValidators
 	return
 }
 
 type account struct {
-	Address  lib.HexBytes `json:"address,omitempty"`
-	Amount   uint64       `json:"amount,omitempty"`
-	Sequence uint64       `json:"sequence,omitempty"`
+	Address lib.HexBytes `json:"address,omitempty"`
+	Amount  uint64       `json:"amount,omitempty"`
 }
 
 func (x *Account) MarshalJSON() ([]byte, error) {
-	return json.Marshal(account{x.Address, x.Amount, x.Sequence})
+	return json.Marshal(account{x.Address, x.Amount})
 }
 
 func (x *Account) UnmarshalJSON(bz []byte) (err error) {
@@ -138,7 +129,7 @@ func (x *Account) UnmarshalJSON(bz []byte) (err error) {
 	if err = json.Unmarshal(bz, a); err != nil {
 		return err
 	}
-	x.Address, x.Amount, x.Sequence = a.Address, a.Amount, a.Sequence
+	x.Address, x.Amount = a.Address, a.Amount
 	return
 }
 
@@ -229,25 +220,4 @@ func (x *Validator) PassesFilter(f lib.ValidatorFilters) (ok bool) {
 		}
 	}
 	return true
-}
-
-func (x *EquityPoints) MarshalJSON() ([]byte, error) {
-	return json.Marshal(equityPoints{
-		Address: x.Address,
-		Points:  x.Points,
-	})
-}
-
-func (x *EquityPoints) UnmarshalJSON(b []byte) error {
-	var ep equityPoints
-	if err := json.Unmarshal(b, &ep); err != nil {
-		return err
-	}
-	x.Address, x.Points = ep.Address, ep.Points
-	return nil
-}
-
-type equityPoints struct {
-	Address lib.HexBytes `json:"address"`
-	Points  uint64       `json:"points"`
 }

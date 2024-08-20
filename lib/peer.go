@@ -5,18 +5,19 @@ import (
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"net"
+	"slices"
 	"strings"
 )
 
-type Channels map[Topic]chan *MessageWrapper
+type Channels map[Topic]chan *MessageAndMetadata
 
-type MessageWrapper struct {
+type MessageAndMetadata struct {
 	Message proto.Message
 	Hash    []byte
 	Sender  *PeerInfo
 }
 
-func (x *MessageWrapper) WithHash() *MessageWrapper {
+func (x *MessageAndMetadata) WithHash() *MessageAndMetadata {
 	x.Hash = nil
 	bz, _ := MarshalJSON(x)
 	x.Hash = crypto.Hash(bz)
@@ -24,7 +25,7 @@ func (x *MessageWrapper) WithHash() *MessageWrapper {
 }
 
 const (
-	delimiter = "@"
+	at = "@"
 )
 
 func (x *PeerInfo) AddressString() string {
@@ -32,11 +33,11 @@ func (x *PeerInfo) AddressString() string {
 }
 
 func (x *PeerAddress) AddressString() string {
-	return BytesToString(x.PublicKey) + delimiter + x.NetAddress
+	return BytesToString(x.PublicKey) + at + x.NetAddress
 }
 
 func (x *PeerAddress) FromString(s string) ErrorI {
-	arr := strings.Split(s, delimiter)
+	arr := strings.Split(s, at)
 	if len(arr) != 2 {
 		return ErrInvalidNetAddrString(s)
 	}
@@ -53,28 +54,57 @@ func (x *PeerAddress) FromString(s string) ErrorI {
 	return nil
 }
 
+func (x *PeerMeta) Sign(key crypto.PrivateKeyI) *PeerMeta {
+	x.Signature = key.Sign(x.SignBytes())
+	return x
+}
+
+func (x *PeerMeta) HasChain(id uint64) bool {
+	for _, c := range x.Chains {
+		if c == id {
+			return true
+		}
+	}
+	return false
+}
+
+func (x *PeerMeta) SignBytes() []byte {
+	sig := x.Signature
+	x.Signature = nil
+	bz, _ := Marshal(x)
+	x.Signature = sig
+	return bz
+}
+func (x *PeerMeta) Copy() *PeerMeta {
+	if x == nil {
+		return nil
+	}
+	return &PeerMeta{
+		NetworkId: x.NetworkId,
+		Chains:    slices.Clone(x.Chains),
+		Signature: slices.Clone(x.Signature),
+	}
+}
+func (x *PeerAddress) HasChain(id uint64) bool { return x.PeerMeta.HasChain(id) }
+
 func (x *PeerAddress) Copy() *PeerAddress {
 	pkCopy := make([]byte, len(x.PublicKey))
 	copy(pkCopy, x.PublicKey)
 	return &PeerAddress{
 		PublicKey:  pkCopy,
 		NetAddress: x.NetAddress,
+		PeerMeta:   x.PeerMeta.Copy(),
 	}
 }
-
+func (x *PeerInfo) HasChain(id uint64) bool { return x.Address.HasChain(id) }
 func (x *PeerInfo) Copy() *PeerInfo {
 	return &PeerInfo{
-		Address:     x.Address.Copy(),
-		IsOutbound:  x.IsOutbound,
-		IsValidator: x.IsValidator,
-		IsTrusted:   x.IsTrusted,
-		Reputation:  x.Reputation,
+		Address:       x.Address.Copy(),
+		IsOutbound:    x.IsOutbound,
+		IsMustConnect: x.IsMustConnect,
+		IsTrusted:     x.IsTrusted,
+		Reputation:    x.Reputation,
 	}
-}
-
-func (x *PeerInfo) FromString(s string) ErrorI {
-	x.Address = new(PeerAddress)
-	return x.Address.FromString(s)
 }
 
 type peerInfoJSON struct {
@@ -89,7 +119,7 @@ func (x *PeerInfo) MarshalJSON() ([]byte, error) {
 	return json.Marshal(peerInfoJSON{
 		Address:     x.Address,
 		IsOutbound:  x.IsOutbound,
-		IsValidator: x.IsValidator,
+		IsValidator: x.IsMustConnect,
 		IsTrusted:   x.IsTrusted,
 		Reputation:  x.Reputation,
 	})

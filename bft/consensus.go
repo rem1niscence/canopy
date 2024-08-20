@@ -11,6 +11,7 @@ import (
 )
 
 type Consensus struct {
+	CommitteeID uint64
 	*lib.View
 	Votes         VotesForHeight
 	Proposals     ProposalsForHeight
@@ -18,7 +19,7 @@ type Consensus struct {
 	ValidatorSet  ValSet
 	HighQC        *QC
 	Locked        bool // TODO walk through the resubmission of the lock cause not sure
-	Proposal      []byte
+	Proposal      *lib.Proposal
 	SortitionData *SortitionData
 
 	ByzantineEvidence *ByzantineEvidence
@@ -32,14 +33,14 @@ type Consensus struct {
 	log        lib.LoggerI
 
 	Controller
-	App
 	resetBFT chan time.Duration
 	syncing  *atomic.Bool
 }
 
-func New(c lib.Config, valKey crypto.PrivateKeyI, height uint64, vs, lastVS ValSet,
-	con Controller, app App, l lib.LoggerI) (*Consensus, lib.ErrorI) {
+func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, height uint64, vs, lastVS ValSet,
+	con Controller, l lib.LoggerI) (*Consensus, lib.ErrorI) {
 	return &Consensus{
+		CommitteeID:  committeeID,
 		View:         &lib.View{Height: height},
 		Votes:        make(VotesForHeight),
 		Proposals:    make(ProposalsForHeight),
@@ -56,7 +57,6 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, height uint64, vs, lastVS ValS
 		Config:            c,
 		log:               l,
 		Controller:        con,
-		App:               app,
 		resetBFT:          make(chan time.Duration, 1),
 		syncing:           con.Syncing(),
 	}, nil
@@ -139,7 +139,7 @@ func (c *Consensus) StartElectionPhase() {
 		PrivateKey:    c.PrivateKey,
 	})
 	if isCandidate {
-		c.SendToReplicas(&Message{
+		c.SendConsMsgToReplicas(c.CommitteeID, c.ValidatorSet, &Message{
 			Header: c.View.Copy(),
 			Vrf:    vrf,
 		})
@@ -152,7 +152,7 @@ func (c *Consensus) StartElectionVotePhase() {
 	c.ProposerKey = SelectProposerFromCandidates(c.GetElectionCandidates(), c.SortitionData, c.ValidatorSet.ValidatorSet)
 	defer func() { c.ProposerKey = nil }()
 	// SEND VOTE TO PROPOSER
-	c.SendToProposer(&Message{
+	c.SendConsMsgToProposer(c.CommitteeID, &Message{
 		Qc: &QC{
 			Header:      c.View.Copy(),
 			ProposerKey: c.ProposerKey,
@@ -172,14 +172,14 @@ func (c *Consensus) StartProposePhase() {
 	}
 	// PRODUCE BLOCK OR USE HQC BLOCK
 	if c.HighQC == nil {
-		c.Proposal, err = c.ProduceProposal(c.ByzantineEvidence)
+		c.Proposal, err = c.ProduceProposal(c.CommitteeID, c.ByzantineEvidence)
 		if err != nil {
 			c.log.Error(err.Error())
 			return
 		}
 	}
 	// SEND MSG TO REPLICAS
-	c.SendToReplicas(&Message{
+	c.SendConsMsgToReplicas(c.CommitteeID, c.ValidatorSet, &Message{
 		Header: c.View.Copy(),
 		Qc: &QC{
 			Header:      vote.Qc.Header,
@@ -215,7 +215,7 @@ func (c *Consensus) StartProposeVotePhase() {
 		BPE: NewBPE(msg.BadProposerEvidence),
 	}
 	// CHECK CANDIDATE BLOCK AGAINST STATE MACHINE
-	if err := c.ValidateProposal(msg.Qc.Proposal, byzantineEvidence); err != nil {
+	if err := c.ValidateProposal(c.CommitteeID, msg.Qc.Proposal, byzantineEvidence); err != nil {
 		c.log.Error(err.Error())
 		c.RoundInterrupt()
 		return
@@ -223,10 +223,10 @@ func (c *Consensus) StartProposeVotePhase() {
 	c.Proposal = msg.Qc.Proposal
 	c.ByzantineEvidence = byzantineEvidence // BE stored in case of round interrupt and replicas locked on a proposal with BE
 	// SEND VOTE TO PROPOSER
-	c.SendToProposer(&Message{
+	c.SendConsMsgToProposer(c.CommitteeID, &Message{
 		Qc: &QC{
 			Header:       c.View.Copy(),
-			ProposalHash: c.HashProposal(c.Proposal),
+			ProposalHash: c.Proposal.Hash(),
 		},
 	})
 }
@@ -241,11 +241,11 @@ func (c *Consensus) StartPrecommitPhase() {
 		c.log.Error(err.Error())
 		return
 	}
-	c.SendToReplicas(&Message{
+	c.SendConsMsgToReplicas(c.CommitteeID, c.ValidatorSet, &Message{
 		Header: c.Copy(),
 		Qc: &QC{
 			Header:       vote.Qc.Header,
-			ProposalHash: c.HashProposal(c.Proposal),
+			ProposalHash: c.Proposal.Hash(),
 			Signature:    as,
 		},
 	})
@@ -268,10 +268,10 @@ func (c *Consensus) StartPrecommitVotePhase() {
 	c.HighQC.Proposal = c.Proposal
 	c.Locked = true
 	// SEND VOTE TO PROPOSER
-	c.SendToProposer(&Message{
+	c.SendConsMsgToProposer(c.CommitteeID, &Message{
 		Qc: &QC{
 			Header:       c.View.Copy(),
-			ProposalHash: c.HashProposal(c.Proposal),
+			ProposalHash: c.Proposal.Hash(),
 		},
 	})
 }
@@ -287,11 +287,11 @@ func (c *Consensus) StartCommitPhase() {
 		return
 	}
 	// SEND MSG TO REPLICAS
-	c.SendToReplicas(&Message{
+	c.SendConsMsgToReplicas(c.CommitteeID, c.ValidatorSet, &Message{
 		Header: c.Copy(), // header
 		Qc: &QC{
-			Header:       vote.Qc.Header,             // vote view
-			ProposalHash: c.HashProposal(c.Proposal), // vote block
+			Header:       vote.Qc.Header,    // vote view
+			ProposalHash: c.Proposal.Hash(), // vote block
 			Signature:    as,
 		},
 	})
@@ -317,14 +317,18 @@ func (c *Consensus) StartCommitProcessPhase() {
 		BPE: c.GetBPE(),
 	}
 	// GOSSIP COMMITTED BLOCK MESSAGE TO PEERS AND SELF
-	c.GossipCertificate(msg.Qc)
+	c.SendCertMsg(c.CommitteeID, msg.Qc)
+	// IF PROPOSER: SEND PROPOSAL TRANSACTION
+	if c.SelfIsProposer() {
+		c.SendProposalTx(c.CommitteeID, msg.Qc)
+	}
 }
 
 func (c *Consensus) RoundInterrupt() {
 	c.log.Warn(c.View.ToString())
 	c.Phase = RoundInterrupt
 	// send pacemaker message
-	c.SendToReplicas(&Message{
+	c.SendConsMsgToReplicas(c.CommitteeID, c.ValidatorSet, &Message{
 		Qc: &lib.QuorumCertificate{
 			Header: c.View.Copy(),
 		},
@@ -389,7 +393,7 @@ func (c *Consensus) CheckProposerAndBlock(msg *Message) (interrupt bool) {
 	}
 
 	// CONFIRM BLOCK
-	if !bytes.Equal(c.HashProposal(c.Proposal), msg.Qc.ProposalHash) {
+	if !bytes.Equal(c.Proposal.Hash(), msg.Qc.ProposalHash) {
 		c.log.Error(ErrMismatchedProposals().Error())
 		return true
 	}
@@ -424,13 +428,13 @@ func (c *Consensus) NewHeight() {
 // - May unlock if new proposer:
 //   - SAFETY: uses the same value the replica is locked on (safe because it will match the value that may have been committed by others)
 //   - LIVENESS: uses a lock with a higher round (safe because replica is convinced no other replica committed to their locked value as +2/3rds locked on a higher round)
-func (c *Consensus) SafeNode(proposerHQC *QC, msgProposal []byte) lib.ErrorI {
+func (c *Consensus) SafeNode(proposerHQC *QC, msgProposal *lib.Proposal) lib.ErrorI {
 	hqcCandidate, hqcView := proposerHQC.ProposalHash, proposerHQC.Header
-	if !bytes.Equal(c.HashProposal(msgProposal), hqcCandidate) {
+	if !bytes.Equal(msgProposal.Hash(), hqcCandidate) {
 		return ErrMismatchedProposals() // PROPOSAL IN MSG MUST BE JUSTIFIED WITH HIGH-QC
 	}
 	lockedCandidate, lockedView := c.HighQC.Proposal, c.HighQC.Header
-	if bytes.Equal(c.HashProposal(lockedCandidate), hqcCandidate) {
+	if bytes.Equal(lockedCandidate.Hash(), hqcCandidate) {
 		return nil // SAFETY (SAME PROPOSAL AS LOCKED)
 	}
 	if hqcView.Round > lockedView.Round {
@@ -508,17 +512,8 @@ func (c *Consensus) newTimer() (timer *time.Timer) {
 }
 
 func (c *Consensus) resetTimer(t *time.Timer, duration time.Duration) {
-	c.stopTimer(t)
+	lib.StopTimer(t)
 	t.Reset(duration)
-}
-
-func (c *Consensus) stopTimer(t *time.Timer) {
-	if !t.Stop() {
-		select {
-		case <-t.C:
-		default:
-		}
-	}
 }
 
 func (c *Consensus) ResetBFTChan() chan time.Duration { return c.resetBFT }
@@ -528,27 +523,24 @@ func phaseToString(p Phase) string {
 }
 
 type (
-	QC     = lib.QuorumCertificate
-	Phase  = lib.Phase
-	ValSet = lib.ValidatorSet
-
-	App interface {
-		ProduceProposal(be *ByzantineEvidence) (proposal []byte, err lib.ErrorI)
-		HashProposal(proposal []byte) []byte
-		CheckProposal(proposal []byte) lib.ErrorI
-		ValidateProposal(proposal []byte, evidence *ByzantineEvidence) lib.ErrorI
-	}
+	QC         = lib.QuorumCertificate
+	Phase      = lib.Phase
+	ValSet     = lib.ValidatorSet
 	Controller interface {
 		Lock()
 		Unlock()
-		LoadValSet(height uint64) (lib.ValidatorSet, lib.ErrorI)
-		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
+		ProduceProposal(committeeID uint64, be *ByzantineEvidence) (proposal *lib.Proposal, err lib.ErrorI)
+		CheckProposal(committeeID uint64, proposal *lib.Proposal) lib.ErrorI
+		ValidateProposal(committeeID uint64, proposal *lib.Proposal, evidence *ByzantineEvidence) lib.ErrorI
+		LoadCommittee(committeeID uint64, height uint64) (lib.ValidatorSet, lib.ErrorI)
+		LoadCertificate(committeeID uint64, height uint64) (*lib.QuorumCertificate, lib.ErrorI)
 		LoadProposerKeys() *lib.ProposerKeys
 		LoadMinimumEvidenceHeight() (uint64, lib.ErrorI)
 		IsValidDoubleSigner(height uint64, address []byte) bool
-		GossipCertificate(certificate *lib.QuorumCertificate)
-		SendToReplicas(msg lib.Signable)
-		SendToProposer(msg lib.Signable)
+		SendCertMsg(committeeID uint64, certificate *lib.QuorumCertificate)
+		SendProposalTx(committeeID uint64, certificate *lib.QuorumCertificate)
+		SendConsMsgToReplicas(committeeID uint64, replicas lib.ValidatorSet, msg lib.Signable)
+		SendConsMsgToProposer(committeeID uint64, msg lib.Signable)
 		Syncing() *atomic.Bool
 	}
 )

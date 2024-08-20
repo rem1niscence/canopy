@@ -125,7 +125,6 @@ func (s *StateMachine) GenesisBlockHeader() (*lib.BlockHeader, lib.ErrorI) {
 	if err != nil {
 		return nil, err
 	}
-
 	return &lib.BlockHeader{
 		Hash:              lib.MaxHash,
 		NetworkId:         s.Config.NetworkID,

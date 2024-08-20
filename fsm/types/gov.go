@@ -29,9 +29,9 @@ const (
 
 	Delimiter = "/"
 
-	AcceptAllProposals  = ProposalVoteConfig_ACCEPT_ALL
-	ProposalApproveList = ProposalVoteConfig_APPROVE_LIST
-	RejectAllProposals  = ProposalVoteConfig_REJECT_ALL
+	AcceptAllProposals  = GovProposalVoteConfig_ACCEPT_ALL
+	ProposalApproveList = GovProposalVoteConfig_APPROVE_LIST
+	RejectAllProposals  = GovProposalVoteConfig_REJECT_ALL
 )
 
 type ParamSpace interface {
@@ -40,15 +40,15 @@ type ParamSpace interface {
 	SetUint64(paramName string, value uint64) lib.ErrorI
 }
 
-type Proposal interface {
+type GovProposal interface {
 	proto.Message
 	GetStartHeight() uint64
 	GetEndHeight() uint64
 }
 
-type ProposalWithVote struct {
-	Proposal Proposal `json:"proposal"`
-	Approve  bool     `json:"approve"`
+type GovProposalWithVote struct {
+	Proposal GovProposal `json:"proposal"`
+	Approve  bool        `json:"approve"`
 }
 
 type Poll map[string]PollResult
@@ -74,7 +74,7 @@ func PollValidators(vals *lib.ConsensusValidators, path string, logger lib.Logge
 		return
 	}
 	for _, v := range vals.ValidatorSet {
-		p := make(Proposals)
+		p := make(GovProposals)
 		u, err := lib.ReplaceURLPort(v.NetAddress, lib.DefaultRPCConfig().RPCPort)
 		if err != nil {
 			logger.Error(ErrPollValidator(err).Error())
@@ -128,9 +128,9 @@ func PollValidators(vals *lib.ConsensusValidators, path string, logger lib.Logge
 	return
 }
 
-type Proposals map[string]ProposalWithVote
+type GovProposals map[string]GovProposalWithVote
 
-func (p Proposals) NewFromFile(dataDirPath string) lib.ErrorI {
+func (p GovProposals) NewFromFile(dataDirPath string) lib.ErrorI {
 	bz, err := os.ReadFile(filepath.Join(dataDirPath, lib.ProposalsFilePath))
 	if err != nil {
 		return lib.ErrReadFile(err)
@@ -138,21 +138,21 @@ func (p Proposals) NewFromFile(dataDirPath string) lib.ErrorI {
 	return lib.UnmarshalJSON(bz, &p)
 }
 
-func (p Proposals) Add(proposal Proposal, approve bool) lib.ErrorI {
+func (p GovProposals) Add(proposal GovProposal, approve bool) lib.ErrorI {
 	bz, err := lib.Marshal(proposal)
 	if err != nil {
 		return err
 	}
-	p[crypto.HashString(bz)] = ProposalWithVote{proposal, approve}
+	p[crypto.HashString(bz)] = GovProposalWithVote{proposal, approve}
 	return nil
 }
 
-func (p Proposals) Del(proposal Proposal) {
+func (p GovProposals) Del(proposal GovProposal) {
 	bz, _ := lib.Marshal(proposal)
 	delete(p, crypto.HashString(bz))
 }
 
-func (p Proposals) SaveToFile(dataDirPath string) lib.ErrorI {
+func (p GovProposals) SaveToFile(dataDirPath string) lib.ErrorI {
 	bz, err := lib.MarshalJSONIndent(p)
 	if err != nil {
 		return err
@@ -163,7 +163,7 @@ func (p Proposals) SaveToFile(dataDirPath string) lib.ErrorI {
 	return nil
 }
 
-func NewProposalFromBytes(b []byte) (Proposal, lib.ErrorI) {
+func NewProposalFromBytes(b []byte) (GovProposal, lib.ErrorI) {
 	cp, dt := new(MessageChangeParameter), new(MessageDAOTransfer)
 	if err := lib.UnmarshalJSON(b, cp); err != nil {
 		if err = lib.UnmarshalJSON(b, dt); err != nil {
@@ -174,7 +174,7 @@ func NewProposalFromBytes(b []byte) (Proposal, lib.ErrorI) {
 	return cp, nil
 }
 
-func (p *ProposalWithVote) UnmarshalJSON(b []byte) (err error) {
+func (p *GovProposalWithVote) UnmarshalJSON(b []byte) (err error) {
 	j := new(struct {
 		Proposal json.RawMessage `json:"proposal"`
 		Approve  bool            `json:"approve"`
@@ -216,6 +216,8 @@ func DefaultParams() *Params {
 			MessageUnpauseFee:         10000,
 			MessageChangeParameterFee: 10000,
 			MessageDaoTransferFee:     10000,
+			MessageProposalFee:        0,
+			MessageSubsidyFee:         10000,
 		},
 		Governance: &GovernanceParams{DaoRewardPercentage: 10},
 	}
@@ -481,6 +483,8 @@ const (
 	ParamMessageUnpauseFee         = "message_unpause_fee"
 	ParamMessageChangeParameterFee = "message_change_parameter_fee"
 	ParamMessageDAOTransferFee     = "message_dao_transfer_fee"
+	ParamMessageProposalFee        = "message_proposal_fee"
+	ParamMessageSubsidyFee         = "message_subsidy_fee"
 )
 
 func (x *FeeParams) Validate() lib.ErrorI {
@@ -508,6 +512,13 @@ func (x *FeeParams) Validate() lib.ErrorI {
 	if x.MessageDaoTransferFee == 0 {
 		return ErrInvalidParam(ParamMessageDAOTransferFee)
 	}
+	//if x.MessageProposalFee == 0 { // Message proposal fee can be zero fee
+	//	return ErrInvalidParam(ParamMessageDAOTransferFee)
+	//}
+
+	if x.MessageSubsidyFee == 0 {
+		return ErrInvalidParam(ParamMessageSubsidyFee)
+	}
 	return nil
 }
 
@@ -533,6 +544,10 @@ func (x *FeeParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.MessageChangeParameterFee = value
 	case ParamMessageDAOTransferFee:
 		x.MessageDaoTransferFee = value
+	case ParamMessageProposalFee:
+		x.MessageProposalFee = value
+	case ParamMessageSubsidyFee:
+		x.MessageSubsidyFee = value
 	default:
 		return ErrUnknownParam()
 	}

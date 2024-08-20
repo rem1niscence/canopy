@@ -5,14 +5,12 @@ import (
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/types/known/anypb"
+	"time"
 )
 
 func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash string) (*lib.TxResult, lib.ErrorI) {
 	result, err := s.CheckTx(transaction)
 	if err != nil {
-		return nil, err
-	}
-	if err = s.AccountSetSequence(result.sender, result.tx.Sequence); err != nil {
 		return nil, err
 	}
 	if err = s.AccountDeductFees(result.sender, result.tx.Fee); err != nil {
@@ -40,7 +38,7 @@ func (s *StateMachine) CheckTx(transaction []byte) (result *CheckTxResult, err l
 	if err = tx.Check(); err != nil {
 		return
 	}
-	if err = s.CheckAccount(tx); err != nil {
+	if err = s.CheckTimestamp(tx); err != nil {
 		return
 	}
 	msg, err := s.CheckMessage(tx.Msg)
@@ -98,17 +96,17 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (cr
 	return nil, types.ErrUnauthorizedTx()
 }
 
-func (s *StateMachine) CheckAccount(tx *lib.Transaction) lib.ErrorI {
-	publicKey, e := crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey)
-	if e != nil {
-		return types.ErrInvalidPublicKey(e)
-	}
-	seq, err := s.GetAccountSequence(publicKey.Address())
+func (s *StateMachine) CheckTimestamp(tx *lib.Transaction) lib.ErrorI {
+	block, err := s.LoadBlock(s.Height())
 	if err != nil {
 		return err
 	}
-	if tx.GetSequence() <= seq {
-		return types.ErrInvalidTxSequence()
+	// this gives us a safe mempool to block acceptance while providing a safe tx indexer prune time
+	clockVarianceAcceptancePolicy := 6 * time.Hour
+	txTime, lastBlockTime := time.UnixMicro(int64(tx.Time)), time.UnixMicro(int64(block.BlockHeader.Time))
+	minimumTime, maximumTime := lastBlockTime.Add(-1*clockVarianceAcceptancePolicy), lastBlockTime.Add(clockVarianceAcceptancePolicy)
+	if txTime.Before(minimumTime) || txTime.After(maximumTime) {
+		return types.ErrInvalidTxTime()
 	}
 	return nil
 }

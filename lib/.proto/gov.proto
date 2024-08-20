@@ -45,13 +45,15 @@ message FeeParams {
   uint64 message_unpause_fee = 6;
   uint64 message_change_parameter_fee = 7;
   uint64 message_dao_transfer_fee = 8;
+  uint64 message_proposal_fee = 9;
+  uint64 message_subsidy_fee = 10;
 }
 
 message GovernanceParams {
   uint64 dao_reward_percentage = 1;
 }
 
-enum ProposalVoteConfig {
+enum GovProposalVoteConfig {
   ACCEPT_ALL = 0;
   APPROVE_LIST = 1;
   REJECT_ALL = 2;

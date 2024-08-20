@@ -10,21 +10,22 @@ import (
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/ginchu/plugin/canopy"
 	"github.com/ginchuco/ginchu/store"
 	"github.com/spf13/cobra"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 )
 
 var rootCmd = &cobra.Command{
-	Use:     "ginchu",
-	Short:   "ginchu is a generic blockchain implementation",
+	Use:     "canopy",
+	Short:   "the canopy blockchain software",
 	Version: rpc.SoftwareVersion,
 }
 
@@ -64,7 +65,10 @@ func Start() {
 	if err != nil {
 		l.Fatal(err.Error())
 	}
-	app, err := controller.New(config, validatorKey, db, l)
+	if err = canopy.RegisterNew(config, validatorKey, db, l); err != nil {
+		l.Fatal(err.Error())
+	}
+	app, err := controller.New(config, validatorKey, l)
 	if err != nil {
 		l.Fatal(err.Error())
 	}
@@ -101,7 +105,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 	proposalsFilePath := filepath.Join(dataDirPath, lib.ProposalsFilePath)
 	if _, err := os.Stat(proposalsFilePath); errors.Is(err, os.ErrNotExist) {
 		log.Infof("Creating %s file", lib.ProposalsFilePath)
-		proposals := make(types.Proposals)
+		proposals := make(types.GovProposals)
 		a, _ := lib.NewAny(&lib.StringWrapper{Value: "example"})
 		if err = proposals.Add(&types.MessageChangeParameter{
 			ParameterSpace: types.ParamSpaceCons + "|" + types.ParamSpaceFee + "|" + types.ParamSpaceVal + "|" + types.ParamSpaceGov,
@@ -138,8 +142,8 @@ func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFile
 	consPubKey := validatorPrivateKey.PublicKey()
 	addr := consPubKey.Address()
 	j := &types.GenesisState{
-		Time:     timestamppb.Now(),
-		Pools:    []*types.Pool{{Id: types.PoolID_DAO}, {Id: types.PoolID_FeeCollector}},
+		Time:     uint64(time.Now().UnixMicro()),
+		Pools:    []*types.Pool{{Id: types.DAO_Pool_ID}, {Id: types.FEE_Pool_ID}},
 		Accounts: []*types.Account{{Address: addr.Bytes(), Amount: 1000000}},
 		Validators: []*types.Validator{{
 			Address:      addr.Bytes(),

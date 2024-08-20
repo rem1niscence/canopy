@@ -57,6 +57,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.33.1 // indirect
+	github.com/phuslu/iploc v1.0.20240731 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect

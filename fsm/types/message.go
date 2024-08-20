@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/ginchuco/ginchu/lib"
@@ -17,7 +18,8 @@ const (
 	MessageUnpauseName         = "unpause"
 	MessageChangeParameterName = "change_parameter"
 	MessageDAOTransferName     = "dao_transfer"
-	MessageEquityGrantName     = "equity_grant"
+	MessageProposalName        = "proposal"
+	MessageSubsidyName         = "subsidy"
 )
 
 func init() {
@@ -30,7 +32,8 @@ func init() {
 	lib.RegisteredMessages[MessageUnpauseName] = new(MessageUnpause)
 	lib.RegisteredMessages[MessageChangeParameterName] = new(MessageChangeParameter)
 	lib.RegisteredMessages[MessageDAOTransferName] = new(MessageDAOTransfer)
-	lib.RegisteredMessages[MessageEquityGrantName] = new(MessageEquityGrant)
+	lib.RegisteredMessages[MessageProposalName] = new(MessageProposal)
+	lib.RegisteredMessages[MessageSubsidyName] = new(MessageSubsidy)
 }
 
 var _ lib.MessageI = &MessageSend{}
@@ -401,52 +404,116 @@ type jsonMessageDaoTransfer struct {
 	EndHeight   uint64       `json:"end_height,omitempty"`
 }
 
-var _ lib.MessageI = &MessageEquityGrant{}
+var _ lib.MessageI = &MessageProposal{}
 
-func (x *MessageEquityGrant) Check() lib.ErrorI {
-	if x.Equity == nil || x.Equity.Proposal != nil || x.Equity.ProposalHash != nil {
-		return ErrInvalidEquity()
+func (x *MessageProposal) Check() lib.ErrorI {
+	if x == nil {
+		return ErrInvalidProposal()
 	}
-	if x.Equity.CommitteeId == DAO_Pool_ID || x.Equity.CommitteeId == FEE_Pool_ID {
-		return ErrInvalidCommitteeID()
-	}
-	if err := checkEquityPoints(x.Equity.EquityPoints); err != nil {
+	if err := x.Qc.CheckBasic(); err != nil {
 		return err
 	}
-	if x.Equity.NumberOfSamples != 1 {
+	proposal := x.Qc.Proposal
+	if proposal == nil || proposal.Block != nil {
+		return ErrInvalidProposal()
+	}
+	if len(x.Qc.ProposalHash) != crypto.HashSize || !bytes.Equal(x.Qc.ProposalHash, x.Qc.Proposal.Hash()) {
+		return ErrInvalidProposalHash()
+	}
+	blockHashLen := len(proposal.BlockHash)
+	if blockHashLen != 0 && blockHashLen != crypto.HashSize { // hash size may be zero for external chains
+		return ErrInvalidProposal()
+	}
+	for _, reserved := range ReservedIDs {
+		if proposal.Meta.CommitteeId == reserved {
+			return ErrInvalidCommitteeID()
+		}
+	}
+	if err := lib.CheckPaymentPercents(proposal.RewardRecipients.PaymentPercents); err != nil {
+		return err
+	}
+	if proposal.RewardRecipients.NumberOfSamples != 0 {
 		return ErrInvalidNumOfSamples()
 	}
-	return x.Qc.CheckBasic()
+	return nil
 }
 
-func (x *MessageEquityGrant) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessageEquityGrant) Name() string                { return MessageEquityGrantName }
-func (x *MessageEquityGrant) New() lib.MessageI           { return new(MessageEquityGrant) }
-func (x *MessageEquityGrant) Recipient() []byte           { return nil }
+func (x *MessageProposal) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
+func (x *MessageProposal) Name() string                { return MessageProposalName }
+func (x *MessageProposal) New() lib.MessageI           { return new(MessageProposal) }
+func (x *MessageProposal) Recipient() []byte           { return nil }
 
 // nolint:all
-func (x MessageEquityGrant) MarshalJSON() ([]byte, error) {
-	return json.Marshal(jsonMessageEquityGrant{
-		Equity: x.Equity,
-		Qc:     x.Qc,
+func (x MessageProposal) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonMessageProposal{
+		Qc: x.Qc,
 	})
 }
 
-func (x *MessageEquityGrant) UnmarshalJSON(b []byte) (err error) {
-	var j jsonMessageEquityGrant
+func (x *MessageProposal) UnmarshalJSON(b []byte) (err error) {
+	var j jsonMessageProposal
 	if err = json.Unmarshal(b, &j); err != nil {
 		return
 	}
-	*x = MessageEquityGrant{
-		Equity: j.Equity,
-		Qc:     j.Qc,
+	*x = MessageProposal{
+		Qc: j.Qc,
 	}
 	return
 }
 
-type jsonMessageEquityGrant struct {
-	Equity *Equity                `json:"equity,omitempty"`
-	Qc     *lib.QuorumCertificate `json:"qc,omitempty"`
+type jsonMessageProposal struct {
+	Qc *lib.QuorumCertificate `json:"qc,omitempty"`
+}
+
+var _ lib.MessageI = &MessageSubsidy{}
+
+func (x *MessageSubsidy) Check() lib.ErrorI {
+	if x == nil {
+		return ErrInvalidSubisdy()
+	}
+	if err := checkAddress(x.Address); err != nil {
+		return err
+	}
+	if len(x.Opcode) > 100 {
+		return ErrInvalidOpcode()
+	}
+	return nil
+}
+
+func (x *MessageSubsidy) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
+func (x *MessageSubsidy) Name() string                { return MessageSubsidyName }
+func (x *MessageSubsidy) New() lib.MessageI           { return new(MessageSubsidy) }
+func (x *MessageSubsidy) Recipient() []byte           { return nil }
+
+// nolint:all
+func (x MessageSubsidy) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonMessageSubsidy{
+		Address:     x.Address,
+		CommitteeId: x.CommitteeId,
+		Amount:      x.Amount,
+		Opcode:      x.Opcode,
+	})
+}
+
+func (x *MessageSubsidy) UnmarshalJSON(b []byte) (err error) {
+	var j jsonMessageSubsidy
+	if err = json.Unmarshal(b, &j); err != nil {
+		return
+	}
+	*x = MessageSubsidy{
+		Address:     x.Address,
+		CommitteeId: j.CommitteeId,
+		Amount:      j.Amount,
+		Opcode:      j.Opcode,
+	}
+	return
+}
+
+type jsonMessageSubsidy struct {
+	Address     lib.HexBytes `json:"address,omitempty"`
+	CommitteeId uint64       `json:"committee_id,omitempty"`
+	Amount      uint64       `json:"amount,omitempty"`
+	Opcode      string       `json:"opcode,omitempty"`
 }
 
 func checkAmount(amount uint64) lib.ErrorI {
@@ -495,7 +562,8 @@ func checkPubKey(publicKey []byte) lib.ErrorI {
 }
 
 func checkCommittees(committees []*Committee) lib.ErrorI {
-	if len(committees) > 100 {
+	numCommittees := len(committees)
+	if numCommittees > 100 || numCommittees == 0 {
 		return ErrInvalidNumCommittees()
 	}
 	total := uint64(0)
@@ -503,8 +571,10 @@ func checkCommittees(committees []*Committee) lib.ErrorI {
 		if committee == nil {
 			return ErrInvalidCommittee()
 		}
-		if committee.Id == DAO_Pool_ID || committee.Id == FEE_Pool_ID {
-			return ErrInvalidCommitteeID()
+		for _, reserved := range ReservedIDs {
+			if committee.Id == reserved {
+				return ErrInvalidCommitteeID()
+			}
 		}
 		total += committee.StakePercent
 		if committee.StakePercent == 0 || total > 100 {
@@ -514,31 +584,7 @@ func checkCommittees(committees []*Committee) lib.ErrorI {
 	return nil
 }
 
-func checkEquityPoints(points []*EquityPoints) lib.ErrorI {
-	numEquityRecipients := len(points)
-	if numEquityRecipients == 0 || numEquityRecipients > 100 {
-		return ErrInvalidNumOfPointRecipients()
-	}
-	totalPoints := uint64(0)
-	for _, ep := range points {
-		if ep == nil {
-			return ErrInvalidPointAllocation()
-		}
-		if len(ep.Address) != crypto.AddressSize {
-			return ErrAddressSize()
-		}
-		if ep.Points == 0 {
-			return ErrInvalidPointAllocation()
-		}
-		totalPoints += ep.Points
-		if totalPoints > 10000 {
-			return ErrInvalidPointAllocation()
-		}
-	}
-	return nil
-}
-
-func checkStartEndHeight(proposal Proposal) lib.ErrorI {
+func checkStartEndHeight(proposal GovProposal) lib.ErrorI {
 	blockRange := proposal.GetEndHeight() - proposal.GetStartHeight()
 	if 100 > blockRange || blockRange <= 0 {
 		return ErrInvalidBlockRange()

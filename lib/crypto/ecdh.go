@@ -26,8 +26,7 @@ func SharedSecret(public, private []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	zero := new([32]byte)
-	if subtle.ConstantTimeCompare(secret[:], zero[:]) == 1 {
+	if subtle.ConstantTimeCompare(secret[:], new([32]byte)[:]) == 1 {
 		return nil, fmt.Errorf("all zero shared secret")
 	}
 	return secret, nil
@@ -124,7 +123,7 @@ var blacklist = [][32]byte{
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f},
 }
 
-func CheckBlacklist(pubKey []byte) bool {
+func PubIsBlacklisted(pubKey []byte) bool {
 	for _, bl := range blacklist {
 		if subtle.ConstantTimeCompare(pubKey[:], bl[:]) == 1 {
 			return true

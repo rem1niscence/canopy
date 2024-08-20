@@ -6,6 +6,7 @@ import (
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+	"time"
 )
 
 var _ TransactionI = &Transaction{}
@@ -24,7 +25,7 @@ type TransactionI interface {
 	proto.Message
 	GetMsg() *anypb.Any
 	GetSig() SignatureI
-	GetSequence() uint64
+	GetTime() uint64
 	GetBytes() ([]byte, ErrorI)
 	GetSignBytes() ([]byte, ErrorI)
 	GetHash() ([]byte, ErrorI)
@@ -62,7 +63,7 @@ func (x *Transaction) GetSignBytes() ([]byte, ErrorI) {
 	return Marshal(&Transaction{
 		Msg:       x.Msg,
 		Signature: nil,
-		Sequence:  x.Sequence,
+		Time:      x.Time,
 	})
 }
 
@@ -167,7 +168,7 @@ type jsonTx struct {
 	Type      string          `json:"type,omitempty"`
 	Msg       json.RawMessage `json:"msg,omitempty"`
 	Signature *Signature      `json:"signature,omitempty"`
-	Sequence  uint64          `json:"sequence,omitempty"`
+	Time      string          `json:"time,omitempty"`
 	Fee       uint64          `json:"fee,omitempty"`
 }
 
@@ -189,7 +190,7 @@ func (x Transaction) MarshalJSON() ([]byte, error) {
 		Type:      x.Type,
 		Msg:       bz,
 		Signature: x.Signature,
-		Sequence:  x.Sequence,
+		Time:      time.UnixMicro(int64(x.Time)).Format(time.DateTime),
 		Fee:       x.Fee,
 	})
 }
@@ -212,11 +213,15 @@ func (x *Transaction) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
+	t, e := time.Parse(time.DateTime, j.Time)
+	if e != nil {
+		return e
+	}
 	*x = Transaction{
 		Type:      j.Type,
 		Msg:       a,
 		Signature: j.Signature,
-		Sequence:  j.Sequence,
+		Time:      uint64(t.UnixMicro()),
 		Fee:       j.Fee,
 	}
 	return nil

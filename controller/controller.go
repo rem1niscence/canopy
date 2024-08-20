@@ -8,19 +8,19 @@ import (
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/ginchuco/ginchu/p2p"
+	"github.com/ginchuco/ginchu/plugin"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
 var _ bft.Controller = new(Controller)
-var _ bft.App = new(Controller)
 
 type Controller struct {
-	Consensus  *bft.Consensus
+	Plugins    map[uint64]plugin.Plugin
+	Consensus  map[uint64]*bft.Consensus
 	P2P        *p2p.P2P
 	FSM        *fsm.StateMachine
-	Mempool    *Mempool
 	PublicKey  []byte
 	PrivateKey crypto.PrivateKeyI
 	syncing    *atomic.Bool
@@ -29,12 +29,16 @@ type Controller struct {
 	sync.Mutex
 }
 
-func (c *Controller) LoadValSet(height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	return c.FSM.LoadValSet(height)
+func (c *Controller) LoadCommittee(committeeID uint64, height uint64) (lib.ValidatorSet, lib.ErrorI) {
+	return c.FSM.LoadCommittee(committeeID, height)
 }
 
-func (c *Controller) LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
-	return c.FSM.LoadCertificate(height)
+func (c *Controller) LoadCertificate(committeeID uint64, height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
+	plug, _, err := c.GetPluginAndConsensus(committeeID)
+	if err != nil {
+		return nil, err
+	}
+	return plug.LoadCertificate(height)
 }
 
 func (c *Controller) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) {
@@ -42,24 +46,16 @@ func (c *Controller) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) {
 }
 
 func (c *Controller) IsValidDoubleSigner(height uint64, address []byte) bool {
-	return c.FSM.IsValidDoubleSigner(height, address)
+	return c.FSM.IsValidDoubleSigner(height, lib.CANOPY_COMMITTEE_ID, address) // may only be charged once per height per chain
 }
 
-func (c *Controller) LoadLastCommitTime(height uint64) time.Time {
-	cert, err := c.FSM.LoadCertificate(height - 1)
+func (c *Controller) LoadLastCommitTime(committeeID, height uint64) time.Time {
+	plug, _, err := c.GetPluginAndConsensus(committeeID)
 	if err != nil {
 		c.log.Error(err.Error())
 		return time.Time{}
 	}
-	block, err := c.proposalToBlock(cert.Proposal)
-	if err != nil {
-		c.log.Error(err.Error())
-		return time.Time{}
-	}
-	if block.BlockHeader == nil {
-		return time.Time{}
-	}
-	return block.BlockHeader.Time.AsTime()
+	return plug.LoadLastCommitTime(height - 1)
 }
 
 func (c *Controller) LoadProposerKeys() *lib.ProposerKeys {
@@ -71,56 +67,48 @@ func (c *Controller) LoadProposerKeys() *lib.ProposerKeys {
 	return &lib.ProposerKeys{ProposerKeys: keys.ProposerKeys}
 }
 
-func (c *Controller) proposalToBlock(proposal []byte) (block *lib.Block, err lib.ErrorI) {
-	block = new(lib.Block)
-	err = lib.Unmarshal(proposal, block)
-	return
-}
-
 func (c *Controller) Syncing() *atomic.Bool { return c.syncing }
 
-func New(c lib.Config, valKey crypto.PrivateKeyI, db lib.StoreI, l lib.LoggerI) (*Controller, lib.ErrorI) {
-	sm, err := fsm.New(c, db, l)
-	if err != nil {
-		return nil, err
-	}
+func New(c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (*Controller, lib.ErrorI) {
+	sm := plugin.RegisteredPlugins[lib.CANOPY_COMMITTEE_ID].(plugin.CanopyPlugin).GetFSM()
 	height := sm.Height()
-	valSet, err := sm.LoadValSet(height)
-	if err != nil {
-		return nil, err
-	}
-	lastVS, err := sm.LoadValSet(height - 1)
-	if err != nil {
-		return nil, err
-	}
-	maxVals, err := sm.GetMaxValidators()
-	if err != nil {
-		return nil, err
-	}
-	mempool, err := NewMempool(sm, c.MempoolConfig, l)
+	maxMembersPerCommittee, err := sm.GetMaxValidators()
 	if err != nil {
 		return nil, err
 	}
 	controller := &Controller{
-		P2P:        p2p.New(valKey, maxVals, c, l),
+		Plugins:    plugin.RegisteredPlugins,
+		Consensus:  make(map[uint64]*bft.Consensus),
+		P2P:        p2p.New(valKey, maxMembersPerCommittee, c, l),
 		FSM:        sm,
-		Mempool:    mempool,
 		PublicKey:  valKey.PublicKey().Bytes(),
 		PrivateKey: valKey,
-		Mutex:      sync.Mutex{},
 		syncing:    &atomic.Bool{},
 		Config:     c,
 		log:        l,
+		Mutex:      sync.Mutex{},
 	}
-	controller.Consensus, err = bft.New(c, valKey, height, valSet, lastVS, controller, controller, l)
+	for id := range controller.Plugins {
+		valSet, e := sm.LoadCommittee(id, height)
+		if e != nil {
+			return nil, e
+		}
+		lastVS, e := sm.LoadCommittee(id, height-1)
+		if e != nil {
+			return nil, e
+		}
+		controller.Consensus[id], err = bft.New(c, valKey, id, height, valSet, lastVS, controller, l)
+	}
 	return controller, err
 }
 
 func (c *Controller) Start() {
 	c.P2P.Start()
 	c.StartListeners()
-	go c.Sync()
-	go c.Consensus.Start()
+	for id, cons := range c.Consensus {
+		go c.Sync(id)
+		go cons.Start()
+	}
 }
 
 func (c *Controller) Stop() {
@@ -132,46 +120,48 @@ func (c *Controller) Stop() {
 	c.P2P.Stop()
 }
 
-func (c *Controller) GetHeight() uint64 {
+func (c *Controller) GetHeight(committeeID uint64) (uint64, lib.ErrorI) {
 	c.Lock()
 	defer c.Unlock()
-	return c.Consensus.Height
+	_, cons, err := c.GetPluginAndConsensus(committeeID)
+	if err != nil {
+		return 0, err
+	}
+	return cons.Height, nil
 }
 
-func (c *Controller) GetValSet() lib.ValidatorSet {
-	c.Lock()
-	defer c.Unlock()
-	return c.Consensus.ValidatorSet
-}
-
-func (c *Controller) ConsensusSummary() ([]byte, lib.ErrorI) {
+func (c *Controller) ConsensusSummary(committeeID uint64) ([]byte, lib.ErrorI) {
 	c.Lock()
 	defer c.Unlock()
 	hash := lib.HexBytes{}
-	if c.Consensus.Proposal != nil {
-		hash = c.HashProposal(c.Consensus.Proposal)
+	_, cons, e := c.GetPluginAndConsensus(committeeID)
+	if e != nil {
+		return nil, e
+	}
+	if cons.Proposal != nil {
+		hash = cons.Proposal.Hash()
 	}
 	selfKey, err := crypto.NewPublicKeyFromBytes(c.PublicKey)
 	if err != nil {
 		return nil, bft.ErrInvalidPublicKey()
 	}
 	var propAddress lib.HexBytes
-	if c.Consensus.ProposerKey != nil {
-		propKey, _ := crypto.NewPublicKeyFromBytes(c.Consensus.ProposerKey)
+	if cons.ProposerKey != nil {
+		propKey, _ := crypto.NewPublicKeyFromBytes(cons.ProposerKey)
 		propAddress = propKey.Address().Bytes()
 	}
 	status := ""
-	switch c.Consensus.View.Phase {
+	switch cons.View.Phase {
 	case bft.Election, bft.Propose, bft.Precommit, bft.Commit:
-		proposal := c.Consensus.GetProposal()
+		proposal := cons.GetProposal()
 		if proposal == nil {
 			status = "waiting for proposal"
 		} else {
 			status = "received proposal"
 		}
 	default:
-		if bytes.Equal(c.Consensus.ProposerKey, c.PublicKey) {
-			_, _, votedPercentage := c.Consensus.GetLeadingVote()
+		if bytes.Equal(cons.ProposerKey, c.PublicKey) {
+			_, _, votedPercentage := cons.GetLeadingVote()
 			status = fmt.Sprintf("received %d%% of votes", votedPercentage)
 		} else {
 			status = "voting on proposal"
@@ -179,18 +169,18 @@ func (c *Controller) ConsensusSummary() ([]byte, lib.ErrorI) {
 	}
 	return lib.MarshalJSONIndent(ConsensusSummary{
 		Syncing:              c.syncing.Load(),
-		View:                 c.Consensus.View,
+		View:                 cons.View,
 		ProposalHash:         hash,
-		Locked:               c.Consensus.Locked,
+		Locked:               cons.Locked,
 		Address:              selfKey.Address().Bytes(),
 		PublicKey:            c.PublicKey,
 		ProposerAddress:      propAddress,
-		Proposer:             c.Consensus.ProposerKey,
-		Proposals:            c.Consensus.Proposals,
-		Votes:                c.Consensus.Votes,
-		PartialQCs:           c.Consensus.PartialQCs,
-		MinimumPowerFor23Maj: c.Consensus.ValidatorSet.MinimumMaj23,
-		PacemakerVotes:       c.Consensus.PacemakerMessages,
+		Proposer:             cons.ProposerKey,
+		Proposals:            cons.Proposals,
+		Votes:                cons.Votes,
+		PartialQCs:           cons.PartialQCs,
+		MinimumPowerFor23Maj: cons.ValidatorSet.MinimumMaj23,
+		PacemakerVotes:       cons.PacemakerMessages,
 		Status:               status,
 	})
 }

@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/ginchuco/ginchu/lib/crypto"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"slices"
 	"time"
 )
 
 const (
-	BlockResultsPageName = "block-results-page"
+	BlockResultsPageName      = "block-results-page"
+	CANOPY_COMMITTEE_ID       = 0
+	CANOPY_MAINNET_NETWORK_ID = 0
 )
 
 func init() {
@@ -75,7 +77,7 @@ func (x *BlockHeader) Check() ErrorI {
 	if x.LastQuorumCertificate == nil {
 		return ErrNilQuorumCertificate()
 	}
-	if x.Time.Seconds == 0 {
+	if x.Time == 0 {
 		return ErrNilBlockTime()
 	}
 	if x.NetworkId == 0 {
@@ -97,22 +99,16 @@ type jsonBlockHeader struct {
 	ValidatorRoot         HexBytes           `json:"validator_root,omitempty"`
 	NextValidatorRoot     HexBytes           `json:"next_validator_root,omitempty"`
 	ProposerAddress       HexBytes           `json:"proposer_address,omitempty"`
-	DoubleSigners         []*DoubleSigners   `json:"double_signers,omitempty"`
-	BadProposers          []HexBytes         `json:"bad_proposers,omitempty"`
 	LastQuorumCertificate *QuorumCertificate `json:"last_quorum_certificate,omitempty"`
 }
 
 // nolint:all
 func (x BlockHeader) MarshalJSON() ([]byte, error) {
-	var badProposers []HexBytes
-	for _, b := range x.BadProposers {
-		badProposers = append(badProposers, b)
-	}
 	return json.Marshal(jsonBlockHeader{
 		Height:                x.Height,
 		Hash:                  x.Hash,
 		NetworkId:             x.NetworkId,
-		Time:                  x.Time.AsTime().Format(time.DateTime),
+		Time:                  time.UnixMicro(int64(x.Time)).Format(time.DateTime),
 		NumTxs:                x.NumTxs,
 		TotalTxs:              x.TotalTxs,
 		LastBlockHash:         x.LastBlockHash,
@@ -121,8 +117,6 @@ func (x BlockHeader) MarshalJSON() ([]byte, error) {
 		ValidatorRoot:         x.ValidatorRoot,
 		NextValidatorRoot:     x.NextValidatorRoot,
 		ProposerAddress:       x.ProposerAddress,
-		DoubleSigners:         x.DoubleSigners,
-		BadProposers:          badProposers,
 		LastQuorumCertificate: x.LastQuorumCertificate,
 	})
 }
@@ -140,7 +134,7 @@ func (x *BlockHeader) UnmarshalJSON(b []byte) error {
 		Height:                j.Height,
 		Hash:                  j.Hash,
 		NetworkId:             j.NetworkId,
-		Time:                  timestamppb.New(t),
+		Time:                  uint64(t.UnixMicro()),
 		NumTxs:                j.NumTxs,
 		TotalTxs:              j.TotalTxs,
 		LastBlockHash:         j.LastBlockHash,
@@ -149,8 +143,6 @@ func (x *BlockHeader) UnmarshalJSON(b []byte) error {
 		ValidatorRoot:         j.ValidatorRoot,
 		NextValidatorRoot:     j.NextValidatorRoot,
 		ProposerAddress:       j.ProposerAddress,
-		DoubleSigners:         j.DoubleSigners,
-		BadProposers:          x.BadProposers,
 		LastQuorumCertificate: j.LastQuorumCertificate,
 	}
 	return nil
@@ -195,14 +187,6 @@ func (x *BlockHeader) Equals(b *BlockHeader) bool {
 	}
 	if !bytes.Equal(x.ProposerAddress, b.ProposerAddress) {
 		return false
-	}
-	for _, ds := range x.DoubleSigners {
-		if len(ds.PubKey) != crypto.AddressSize {
-			return false
-		}
-		if ds.Heights == nil || len(ds.Heights) < 1 {
-			return false
-		}
 	}
 	qc1Bz, _ := Marshal(x.LastQuorumCertificate)
 	qc2Bz, _ := Marshal(b.LastQuorumCertificate)
@@ -273,6 +257,322 @@ func (x *Block) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (x *Proposal) CheckBasic(committeeId, height uint64) ErrorI {
+	if err := x.Meta.CheckBasic(committeeId, height); err != nil {
+		return err
+	}
+	if err := x.RewardRecipients.CheckBasic(); err != nil {
+		return err
+	}
+	if crypto.HashSize != len(x.BlockHash) {
+		return ErrUnequalBlockHash()
+	}
+	return nil
+}
+
+func (x *RewardRecipients) CheckBasic() ErrorI {
+	return CheckPaymentPercents(x.PaymentPercents)
+}
+
+func (x *ProposalMeta) CheckBasic(committeeId, height uint64) ErrorI {
+	if x.CommitteeId != committeeId {
+		return ErrWrongCommitteeID()
+	}
+	if x.CommitteeHeight != height {
+		return ErrWrongHeight()
+	}
+	return nil
+}
+
+func (x *Proposal) Check(committeeId, height uint64) (block *Block, err ErrorI) {
+	if err = x.CheckBasic(committeeId, height); err != nil {
+		return
+	}
+	if x.Block != nil {
+		block = new(Block)
+		if err = Unmarshal(x.Block, block); err != nil {
+			return
+		}
+		err = block.Check()
+		blockHash, e := block.Hash()
+		if e != nil {
+			return nil, e
+		}
+		if bytes.Equal(x.BlockHash, blockHash) {
+			return nil, ErrMismatchBlockHash()
+		}
+	}
+	return
+}
+
+func (x *Proposal) Hash() []byte {
+	bz, _ := x.SignBytes()
+	return crypto.Hash(bz)
+}
+
+func (x *Proposal) SignBytes() (bz []byte, err ErrorI) {
+	block := x.Block
+	x.Block = nil
+	bz, err = Marshal(x)
+	x.Block = block
+	return
+}
+
+func (x *Proposal) Equals(p *Proposal) bool {
+	if x == nil && p == nil {
+		return true
+	}
+	if x == nil || p == nil {
+		return false
+	}
+	if !x.Meta.Equals(p.Meta) {
+		return false
+	}
+	return x.RewardRecipients.Equals(p.RewardRecipients)
+}
+
+func (x *RewardRecipients) Equals(p *RewardRecipients) bool {
+	if x == nil && p == nil {
+		return true
+	}
+	if x == nil || p == nil {
+		return false
+	}
+	if !slices.Equal(x.PaymentPercents, p.PaymentPercents) {
+		return false
+	}
+	return x.NumberOfSamples == p.NumberOfSamples
+}
+
+func (x *ProposalMeta) Equals(p *ProposalMeta) bool {
+	if x == nil && p == nil {
+		return true
+	}
+	if x == nil || p == nil {
+		return false
+	}
+	if x.ChainHeight != p.ChainHeight {
+		return false
+	}
+	if x.CommitteeHeight != p.CommitteeHeight {
+		return false
+	}
+	if x.CommitteeId != p.CommitteeId {
+		return false
+	}
+	if !slices.EqualFunc(x.BadProposers, p.BadProposers, func(a []byte, b []byte) bool {
+		return bytes.Equal(a, b)
+	}) {
+		return false
+	}
+	return slices.EqualFunc(x.DoubleSigners, p.DoubleSigners, func(a *DoubleSigners, b *DoubleSigners) bool {
+		return a.Equals(b)
+	})
+}
+
+func (x *Proposal) Combine(p *Proposal) ErrorI {
+	if p == nil {
+		return nil
+	}
+	for _, ep := range p.RewardRecipients.PaymentPercents {
+		x.addPercents(ep.Address, ep.Percent)
+	}
+	*x = Proposal{
+		Block:     p.Block,
+		BlockHash: p.BlockHash,
+		RewardRecipients: &RewardRecipients{
+			PaymentPercents: x.RewardRecipients.PaymentPercents,
+			NumberOfSamples: x.RewardRecipients.NumberOfSamples + 1,
+		},
+		Meta: &ProposalMeta{
+			CommitteeId:     p.Meta.CommitteeId,
+			CommitteeHeight: p.Meta.CommitteeHeight,
+			ChainHeight:     p.Meta.ChainHeight,
+		},
+	}
+	return nil
+}
+
+func (x *Proposal) AwardPercents(percents []*PaymentPercents) ErrorI {
+	x.RewardRecipients.NumberOfSamples++
+	for _, ep := range percents {
+		x.addPercents(ep.Address, ep.Percent)
+	}
+	return nil
+}
+
+func (x *Proposal) addPercents(address []byte, basisPercents uint64) {
+	for i, ep := range x.RewardRecipients.PaymentPercents {
+		if bytes.Equal(address, ep.Address) {
+			x.RewardRecipients.PaymentPercents[i].Percent += ep.Percent
+			return
+		}
+	}
+	x.RewardRecipients.PaymentPercents = append(x.RewardRecipients.PaymentPercents, &PaymentPercents{
+		Address: address,
+		Percent: basisPercents,
+	})
+}
+
+func (x *Proposal) MarshalJSON() ([]byte, error) {
+	var badProposers []HexBytes
+	for _, b := range x.Meta.BadProposers {
+		badProposers = append(badProposers, b)
+	}
+	return json.Marshal(jsonProposal{
+		Block:            x.Block,
+		BlockHash:        x.BlockHash,
+		RewardRecipients: x.RewardRecipients,
+		Meta:             x.Meta,
+	})
+}
+
+func (x *Proposal) UnmarshalJSON(b []byte) error {
+	j := new(jsonProposal)
+	if err := json.Unmarshal(b, j); err != nil {
+		return err
+	}
+	*x = Proposal{
+		Block:            j.Block,
+		BlockHash:        j.BlockHash,
+		RewardRecipients: j.RewardRecipients,
+		Meta:             j.Meta,
+	}
+	return nil
+}
+
+func ProposalToBlock(p *Proposal) (block *Block, err ErrorI) {
+	block = new(Block)
+	err = Unmarshal(p.Block, block)
+	return
+}
+
+func UnmarshalProposal(proposal []byte) (p *Proposal, err ErrorI) {
+	p = new(Proposal)
+	err = Unmarshal(proposal, p)
+	return
+}
+
+type jsonProposal struct {
+	// BLOCK
+	Block     []byte `protobuf:"bytes,1,opt,name=block,proto3" json:"block,omitempty"`                          // Carries the block, omitted in txn form
+	BlockHash []byte `protobuf:"bytes,2,opt,name=block_hash,json=blockHash,proto3" json:"block_hash,omitempty"` // Maintain the block hash, included in the canopy proper blockchain
+	// PAYMENT PERCENTS
+	RewardRecipients *RewardRecipients `json:"reward_recipients,omitempty"`
+	// SECURITY INFO
+	Meta *ProposalMeta `json:"Meta,omitempty"`
+}
+
+type jsonRewardRecipients struct {
+	PaymentPercents []*PaymentPercents `json:"payment_percents,omitempty"` // recipients of the block reward by percentage
+	NumberOfSamples uint64             `json:"number_of_samples,omitempty"`
+}
+
+func (x *RewardRecipients) UnmarshalJSON(i []byte) error {
+	j := new(jsonRewardRecipients)
+	if err := json.Unmarshal(i, j); err != nil {
+		return err
+	}
+	*x = RewardRecipients{
+		PaymentPercents: j.PaymentPercents,
+		NumberOfSamples: j.NumberOfSamples,
+	}
+	return nil
+}
+
+func (x *RewardRecipients) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonRewardRecipients{
+		PaymentPercents: x.PaymentPercents,
+		NumberOfSamples: x.NumberOfSamples,
+	})
+}
+
+type jsonProposalMeta struct {
+	CommitteeId     uint64           `json:"committee_id,omitempty"`
+	CommitteeHeight uint64           `json:"committee_height,omitempty"` // Needed to allow integrated-chains to validate the proposal
+	ChainHeight     uint64           `json:"chain_height,omitempty"`     // Needed to prevent replay attacks
+	DoubleSigners   []*DoubleSigners `json:"double_signers,omitempty"`   // who did the bft decide was a double signer
+	BadProposers    []HexBytes       `json:"bad_proposers,omitempty"`    // who did the bft decide was a bad proposer
+}
+
+func (x *ProposalMeta) UnmarshalJSON(i []byte) error {
+	j := new(jsonProposalMeta)
+	if err := json.Unmarshal(i, j); err != nil {
+		return err
+	}
+	var badProposers [][]byte
+	for _, bp := range j.BadProposers {
+		badProposers = append(badProposers, bp)
+	}
+	*x = ProposalMeta{
+		CommitteeId:     j.CommitteeId,
+		CommitteeHeight: j.CommitteeHeight,
+		ChainHeight:     j.ChainHeight,
+		DoubleSigners:   j.DoubleSigners,
+		BadProposers:    badProposers,
+	}
+	return nil
+}
+
+func (x *ProposalMeta) MarshalJSON() ([]byte, error) {
+	var badProposers []HexBytes
+	for _, bp := range x.BadProposers {
+		badProposers = append(badProposers, bp)
+	}
+	return json.Marshal(jsonProposalMeta{
+		CommitteeId:     x.CommitteeId,
+		CommitteeHeight: x.CommitteeHeight,
+		ChainHeight:     x.ChainHeight,
+		DoubleSigners:   x.DoubleSigners,
+		BadProposers:    badProposers,
+	})
+}
+
+func CheckPaymentPercents(percent []*PaymentPercents) ErrorI {
+	numProposalRecipients := len(percent)
+	if numProposalRecipients == 0 || numProposalRecipients > 100 {
+		return ErrInvalidNumOfRecipients()
+	}
+	totalPercent := uint64(0)
+	for _, ep := range percent {
+		if ep == nil {
+			return ErrInvalidPercentAllocation()
+		}
+		if len(ep.Address) != crypto.AddressSize {
+			return ErrInvalidAddress()
+		}
+		if ep.Percent == 0 {
+			return ErrInvalidPercentAllocation()
+		}
+		totalPercent += ep.Percent
+		if totalPercent > 100 {
+			return ErrInvalidPercentAllocation()
+		}
+	}
+	return nil
+}
+
+func (x *PaymentPercents) MarshalJSON() ([]byte, error) {
+	return json.Marshal(paymentPercents{
+		Address:  x.Address,
+		Percents: x.Percent,
+	})
+}
+
+func (x *PaymentPercents) UnmarshalJSON(b []byte) error {
+	var ep paymentPercents
+	if err := json.Unmarshal(b, &ep); err != nil {
+		return err
+	}
+	x.Address, x.Percent = ep.Address, ep.Percents
+	return nil
+}
+
+type paymentPercents struct {
+	Address  HexBytes `json:"address"`
+	Percents uint64   `json:"percents"`
+}
+
 func (x *DoubleSigners) AddHeight(height uint64) {
 	for _, h := range x.Heights {
 		if h == height {
@@ -280,4 +580,17 @@ func (x *DoubleSigners) AddHeight(height uint64) {
 		}
 	}
 	x.Heights = append(x.Heights, height)
+}
+
+func (x *DoubleSigners) Equals(d *DoubleSigners) bool {
+	if x == nil && d == nil {
+		return true
+	}
+	if x == nil || d == nil {
+		return false
+	}
+	if !bytes.Equal(x.PubKey, d.PubKey) {
+		return false
+	}
+	return slices.Equal(x.Heights, d.Heights)
 }

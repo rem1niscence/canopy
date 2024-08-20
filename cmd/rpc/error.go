@@ -41,3 +41,7 @@ func ErrHttpStatus(status string, statusCode int, body []byte) lib.ErrorI {
 func ErrReadBody(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeReadBody, lib.RPCModule, fmt.Sprintf("io.ReadAll(http.ResponseBody) failed with err: %s", err.Error()))
 }
+
+func ErrStringToCommittee(s string) lib.ErrorI {
+	return lib.NewError(lib.CodeStringToCommittee, lib.RPCModule, fmt.Sprintf("committee arg %s is invalid, requires a comma separated list of <committeeID>=<percent> ex. 0=50,21=25,99=25", s))
+}

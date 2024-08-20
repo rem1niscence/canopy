@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"runtime"
@@ -66,6 +67,7 @@ const (
 	CodeWrongPhase               ErrorCode   = 18
 	CodePartialSignatureEmpty    ErrorCode   = 19
 	CodeInvalidPartialSignature  ErrorCode   = 20
+	CodeMismatchBlockHash        ErrorCode   = 21
 
 	CodeInvalidProposerPubKey           ErrorCode = 24
 	CodeNoMaj23                         ErrorCode = 25
@@ -163,10 +165,16 @@ const (
 	CodeInvalidDelegationStatus           ErrorCode   = 70
 	CodeInvalidCommittee                  ErrorCode   = 71
 	CodeInvalidCommitteeID                ErrorCode   = 72
-	CodeInvalidPointAllocation            ErrorCode   = 73
-	CodeInvalidNumPointRecipients         ErrorCode   = 74
-	CodeInvalidEquity                     ErrorCode   = 75
+	CodeInvalidPercentAllocation          ErrorCode   = 73
+	CodeInvalidNumRecipients              ErrorCode   = 74
+	CodeInvalidProposal                   ErrorCode   = 75
 	CodeInvalidNumberOfSamples            ErrorCode   = 76
+	CodeNonPaidCommittee                  ErrorCode   = 77
+	CodeInvalidProposalHash               ErrorCode   = 78
+	CodeWrongCommitteeID                  ErrorCode   = 79
+	CodeInvalidOpcode                     ErrorCode   = 80
+	CodeInvalidSubsidy                    ErrorCode   = 81
+	CodeErrInvalidTxTime                  ErrorCode   = 82
 
 	P2PModule                 ErrorModule = "p2p"
 	CodeUnknownP2PMessage     ErrorCode   = 1
@@ -189,9 +197,11 @@ const (
 	CodeFailedListen          ErrorCode   = 20
 	CodeInvalidPeerPublicKey  ErrorCode   = 21
 	CodeSignatureSwap         ErrorCode   = 22
-	CodeBadStream             ErrorCode   = 23
-	CodePanic                 ErrorCode   = 24
+	CodeMetaSwap              ErrorCode   = 23
+	CodeBadStream             ErrorCode   = 24
+	CodePanic                 ErrorCode   = 25
 
+	CodeBannedCountry                ErrorCode = 21
 	CodeIPLookup                     ErrorCode = 22
 	CodeBannedIP                     ErrorCode = 23
 	CodeNonTCPAddr                   ErrorCode = 24
@@ -201,6 +211,7 @@ const (
 	CodeMaxOutbound                  ErrorCode = 28
 	CodeMaxInbound                   ErrorCode = 29
 	CodeBannedID                     ErrorCode = 30
+	CodeIncompatiblePeer             ErrorCode = 31
 
 	StorageModule      ErrorModule = "store"
 	CodeOpenDB         ErrorCode   = 1
@@ -218,15 +229,16 @@ const (
 	CodeProve          ErrorCode   = 13
 	CodeCompactProof   ErrorCode   = 14
 
-	RPCModule         ErrorModule = "rpc"
-	CodeRPCTimeout    ErrorCode   = 1
-	CodeInvalidParams ErrorCode   = 2
-	CodeNewFSM        ErrorCode   = 3
-	CodeTimeMachine   ErrorCode   = 4
-	CodePostRequest   ErrorCode   = 5
-	CodeGetRequest    ErrorCode   = 6
-	CodeHttpStatus    ErrorCode   = 7
-	CodeReadBody      ErrorCode   = 8
+	RPCModule             ErrorModule = "rpc"
+	CodeRPCTimeout        ErrorCode   = 1
+	CodeInvalidParams     ErrorCode   = 2
+	CodeNewFSM            ErrorCode   = 3
+	CodeTimeMachine       ErrorCode   = 4
+	CodePostRequest       ErrorCode   = 5
+	CodeGetRequest        ErrorCode   = 6
+	CodeHttpStatus        ErrorCode   = 7
+	CodeReadBody          ErrorCode   = 8
+	CodeStringToCommittee ErrorCode   = 9
 )
 
 type ErrorI interface {
@@ -519,4 +531,27 @@ func ErrInvalidDoubleSigner() ErrorI {
 
 func ErrMismatchProposalHash() ErrorI {
 	return NewError(CodeMismatchProposalHash, ConsensusModule, "mismatch proposal hash")
+}
+
+func ErrMismatchBlockHash() ErrorI {
+	return NewError(CodeMismatchBlockHash, ConsensusModule, "mismatch block hash")
+}
+
+func ErrInvalidPercentAllocation() ErrorI {
+	return NewError(CodeInvalidPercentAllocation, StateMachineModule, "invalid percent allocation")
+}
+
+func ErrInvalidNumOfRecipients() ErrorI {
+	return NewError(CodeInvalidNumRecipients, StateMachineModule, "invalid num payment recipients")
+}
+
+func ErrWrongCommitteeID() ErrorI {
+	return NewError(CodeWrongCommitteeID, StateMachineModule, "wrong committee id")
+}
+func ErrDuplicateTx(hash []byte) ErrorI {
+	return NewError(CodeDuplicateTransaction, ConsensusModule, fmt.Sprintf("tx %s is a duplicate", hex.EncodeToString(hash)))
+}
+
+func ErrMaxTxSize() ErrorI {
+	return NewError(CodeMaxTxSize, StateMachineModule, "max tx size")
 }

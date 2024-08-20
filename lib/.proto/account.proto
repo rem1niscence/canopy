@@ -6,7 +6,6 @@ option go_package = "github.com/ginchuco/ginchu/fsm/types";
 message Account {
   bytes address = 1;
   uint64 amount = 2;
-  uint64 sequence = 3;
 }
 
 message Pool {
@@ -19,21 +18,4 @@ message Supply {
   uint64 staked = 2;
   repeated Pool committees_with_delegations = 3; // supplies of committees
   repeated Pool delegations_only = 4; // supplies of delegations towards committees
-}
-
-message Equity {
-  uint64 committee_id = 1;
-  repeated EquityPoints equity_points = 2;
-  bytes proposal = 3; // IGNORE: in the future this will carry and then omit the integrated-chain block
-  bytes proposal_hash = 4; // IGNORE: in the future this will maintain the integrated-chain block hash
-  uint64 number_of_samples = 5;
-}
-
-message EquityPoints {
-  bytes address = 1;
-  uint64 points = 2;
-}
-
-message EquityByCommittee {
-  repeated Equity equity_by_committee = 1;
 }

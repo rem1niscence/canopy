@@ -15,16 +15,19 @@ type Config struct {
 	P2PConfig
 	ConsensusConfig
 	MempoolConfig
+	PluginsConfig
 }
 
 func DefaultConfig() Config {
 	return Config{
+		MainConfig:         DefaultMainConfig(),
 		RPCConfig:          DefaultRPCConfig(),
 		StateMachineConfig: DefaultStateMachineConfig(),
 		StoreConfig:        DefaultStoreConfig(),
 		P2PConfig:          DefaultP2PConfig(),
 		ConsensusConfig:    DefaultConsensusConfig(),
 		MempoolConfig:      DefaultMempoolConfig(),
+		PluginsConfig:      DefaultPluginConfig(),
 	}
 }
 
@@ -45,6 +48,10 @@ func (m *MainConfig) GetLogLevel() int32 {
 	default:
 		return DebugLevel
 	}
+}
+
+func DefaultMainConfig() MainConfig {
+	return MainConfig{"info"}
 }
 
 type RPCConfig struct {
@@ -110,18 +117,20 @@ func DefaultConsensusConfig() ConsensusConfig {
 }
 
 type P2PConfig struct {
+	NetworkID       uint64   // the ID for the peering network
 	ListenAddress   string   // listen for incoming connection
 	ExternalAddress string   // advertise for external dialing
 	MaxInbound      int      // max inbound peers
 	MaxOutbound     int      // max outbound peers
 	TrustedPeerIDs  []string // trusted public keys
-	DialPeers       []string // peers to consistently dial (format pubkey@ip:port)
+	DialPeers       []string // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
 	BannedPeerIDs   []string // banned public keys
 	BannedIPs       []string // banned IPs
 }
 
 func DefaultP2PConfig() P2PConfig {
 	return P2PConfig{
+		NetworkID:       CANOPY_MAINNET_NETWORK_ID,
 		ListenAddress:   "0.0.0.0:9000",
 		ExternalAddress: "",
 		MaxInbound:      21,
@@ -146,6 +155,34 @@ func DefaultStoreConfig() StoreConfig {
 		DBName:      "ginchu",
 		InMemory:    false,
 	}
+}
+
+type PluginsConfig struct {
+	Plugins []PluginConfig
+}
+
+type PluginConfig struct {
+	ID        uint64
+	Name      string
+	URL       string
+	BasicAuth BasicAuth
+}
+
+type BasicAuth struct {
+	Username string
+	Password string
+}
+
+func DefaultPluginConfig() PluginsConfig {
+	return PluginsConfig{Plugins: []PluginConfig{{
+		ID:   0,
+		Name: "example_name",
+		URL:  "http://example-of-my-fullnode.fake",
+		BasicAuth: BasicAuth{
+			Username: "user",
+			Password: "pass",
+		},
+	}}}
 }
 
 func (c Config) WriteToFile(filepath string) error {
