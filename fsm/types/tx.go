@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// NewSendTransaction() creates a SendTransaction object in the interface form of TransactionI
 func NewSendTransaction(from crypto.PrivateKeyI, to crypto.AddressI, amount, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageSend{
 		FromAddress: from.PublicKey().Address().Bytes(),
@@ -14,7 +15,8 @@ func NewSendTransaction(from crypto.PrivateKeyI, to crypto.AddressI, amount, fee
 	}, fee)
 }
 
-func NewStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netAddress string, committees []*Committee, amount, fee uint64, delegate bool) (lib.TransactionI, lib.ErrorI) {
+// NewStakeTx() creates a StakeTransaction object in the interface form of TransactionI
+func NewStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netAddress string, committees []uint64, amount, fee uint64, delegate, earlyWithdrawal bool) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageStake{
 		PublicKey:     from.PublicKey().Bytes(),
 		Amount:        amount,
@@ -22,10 +24,12 @@ func NewStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netAddre
 		NetAddress:    netAddress,
 		OutputAddress: outputAddress.Bytes(),
 		Delegate:      delegate,
+		Compound:      !earlyWithdrawal,
 	}, fee)
 }
 
-func NewEditStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netAddress string, committees []*Committee, amount, fee uint64, delegate bool) (lib.TransactionI, lib.ErrorI) {
+// NewEditStakeTx() creates a EditStakeTransaction object in the interface form of TransactionI
+func NewEditStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netAddress string, committees []uint64, amount, fee uint64, delegate, earlyWithdrawal bool) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageEditStake{
 		Address:       from.PublicKey().Address().Bytes(),
 		Amount:        amount,
@@ -33,21 +37,26 @@ func NewEditStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netA
 		NetAddress:    netAddress,
 		OutputAddress: outputAddress.Bytes(),
 		Delegate:      delegate,
+		Compound:      !earlyWithdrawal,
 	}, fee)
 }
 
+// NewUnstakeTx() creates a UnstakeTransaction object in the interface form of TransactionI
 func NewUnstakeTx(from crypto.PrivateKeyI, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageUnstake{Address: from.PublicKey().Address().Bytes()}, fee)
 }
 
+// NewPauseTx() creates a PauseTransaction object in the interface form of TransactionI
 func NewPauseTx(from crypto.PrivateKeyI, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessagePause{Address: from.PublicKey().Address().Bytes()}, fee)
 }
 
+// NewUnpauseTx() creates a UnpauseTransaction object in the interface form of TransactionI
 func NewUnpauseTx(from crypto.PrivateKeyI, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageUnpause{Address: from.PublicKey().Address().Bytes()}, fee)
 }
 
+// NewChangeParamTxUint64() creates a ChangeParamTransaction object (for uint64s) in the interface form of TransactionI
 func NewChangeParamTxUint64(from crypto.PrivateKeyI, space, key string, value, start, end, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	a, err := lib.NewAny(&lib.UInt64Wrapper{Value: value})
 	if err != nil {
@@ -63,6 +72,7 @@ func NewChangeParamTxUint64(from crypto.PrivateKeyI, space, key string, value, s
 	}, fee)
 }
 
+// NewChangeParamTxString() creates a ChangeParamTransaction object (for strings) in the interface form of TransactionI
 func NewChangeParamTxString(from crypto.PrivateKeyI, space, key, value string, start, end, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	a, err := lib.NewAny(&lib.StringWrapper{Value: value})
 	if err != nil {
@@ -78,6 +88,7 @@ func NewChangeParamTxString(from crypto.PrivateKeyI, space, key, value string, s
 	}, fee)
 }
 
+// NewDAOTransferTx() creates a DAOTransferTransaction object in the interface form of TransactionI
 func NewDAOTransferTx(from crypto.PrivateKeyI, amount, start, end, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageDAOTransfer{
 		Address:     from.PublicKey().Address().Bytes(),
@@ -87,12 +98,15 @@ func NewDAOTransferTx(from crypto.PrivateKeyI, amount, start, end, fee uint64) (
 	}, fee)
 }
 
-func NewProposalTx(from crypto.PrivateKeyI, qc *lib.QuorumCertificate, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	return NewTransaction(from, &MessageProposal{
+// NewCertificateResultsTx() creates a CertificateResultsTransaction object in the interface form of TransactionI
+func NewCertificateResultsTx(from crypto.PrivateKeyI, qc *lib.QuorumCertificate, fee uint64) (lib.TransactionI, lib.ErrorI) {
+	qc.Block = nil // omit the block
+	return NewTransaction(from, &MessageCertificateResults{
 		Qc: qc,
 	}, fee)
 }
 
+// NewSubsidyTx() creates a SubsidyTransaction object in the interface form of TransactionI
 func NewSubsidyTx(from crypto.PrivateKeyI, amount, committeeId uint64, opCode string, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageSubsidy{
 		Address:     from.PublicKey().Address().Bytes(),
@@ -102,6 +116,7 @@ func NewSubsidyTx(from crypto.PrivateKeyI, amount, committeeId uint64, opCode st
 	}, fee)
 }
 
+// NewTransaction() creates a Transaction object from a message in the interface form of TransactionI
 func NewTransaction(pk crypto.PrivateKeyI, msg lib.MessageI, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	a, err := lib.NewAny(msg)
 	if err != nil {
@@ -111,7 +126,7 @@ func NewTransaction(pk crypto.PrivateKeyI, msg lib.MessageI, fee uint64) (lib.Tr
 		Type:      msg.Name(),
 		Msg:       a,
 		Signature: nil,
-		Time:      uint64(time.Now().UnixMicro()),
+		Time:      uint64(time.Now().UnixMicro()), // stateless, prune friendly - replay / hash-collision protection
 		Fee:       fee,
 	}
 	return tx, tx.Sign(pk)

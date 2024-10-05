@@ -7,211 +7,259 @@ import (
 	"runtime"
 )
 
+type ErrorI interface {
+	Code() ErrorCode     // Returns the error code
+	Module() ErrorModule // Returns the error module
+	error                // Implements the built-in error interface
+}
+
+var _ ErrorI = &Error{} // Ensures *Error implements ErrorI
+
+type ErrorCode uint32 // Defines a type for error codes
+
+type ErrorModule string // Defines a type for error modules
+
+type Error struct {
+	ECode   ErrorCode   `json:"Code"`   // Error code
+	EModule ErrorModule `json:"Module"` // Error module
+	Msg     string      `json:"Msg"`    // Error message
+}
+
+func NewError(code ErrorCode, module ErrorModule, msg string) *Error {
+	// Constructs a new Error instance
+	return &Error{ECode: code, EModule: module, Msg: msg}
+}
+
+// Code() returns the associated error code
+func (p *Error) Code() ErrorCode { return p.ECode }
+
+// Module() returns module field
+func (p *Error) Module() ErrorModule { return p.EModule }
+
+// String() calls Error()
+func (p *Error) String() string { return p.Error() }
+
+// Error() returns a formatted string including module, code, message, and stack trace
+func (p *Error) Error() string {
+	stack, pc := "", make([]uintptr, 1000)
+	_ = runtime.Callers(1, pc)
+	frames := runtime.CallersFrames(pc)
+	if frames == nil {
+		return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s\n", p.EModule, p.ECode, p.Msg)
+	}
+	for f, again := frames.Next(); again; f, again = frames.Next() {
+		stack += fmt.Sprintf("\n%s L%d", f.File, f.Line)
+	}
+	return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s\nStack: %s", p.EModule, p.ECode, p.Msg, stack)
+}
+
 const (
-
-	// error codes
-	// any error with code='noCode' is a non-protocol
-	// level error; all protocol level errors must have a code
-	// assigned for consensus level issues
-
 	NoCode ErrorCode = math.MaxUint32
 
-	// error module
-	// helps segment the error codes
-	// the combination of error code + module must be conflict free
-	// to avoid consensus level issues
+	// Main Module
+	MainModule ErrorModule = "main"
 
-	MainModule               ErrorModule = "main"
-	CodeInvalidAddress       ErrorCode   = 6
-	CodeJSONMarshal          ErrorCode   = 7
-	CodeJSONUnmarshal        ErrorCode   = 8
-	CodeUnmarshal            ErrorCode   = 9
-	CodeMarshal              ErrorCode   = 10
-	CodeFromAny              ErrorCode   = 11
-	CodeToAny                ErrorCode   = 12
-	CodeNilProposal          ErrorCode   = 13
-	CodeStringToBytes        ErrorCode   = 14
-	CodeNilBlock             ErrorCode   = 15
-	CodeNilBlockHeader       ErrorCode   = 16
-	CodeNilBlockProposer     ErrorCode   = 17
-	CodeNilQuorumCertificate ErrorCode   = 18
-	CodeNilBlockHash         ErrorCode   = 19
-	CodeNilBlockTime         ErrorCode   = 20
-	CodeNilLastBlockHash     ErrorCode   = 21
-	CodeNilNetworkID         ErrorCode   = 22
-	CodeNilStateRoot         ErrorCode   = 23
-	CodeNilTxRoot            ErrorCode   = 24
-	CodeNilValRoot           ErrorCode   = 25
-	CodeNilNextValRoot       ErrorCode   = 26
-	CodeMerkleTree           ErrorCode   = 27
-	CodeUnequalBlockHash     ErrorCode   = 28
-	CodeNewPubKeyFromBytes   ErrorCode   = 29
-	CodeNewMultiPubKey       ErrorCode   = 30
-	CodeStringToBigFloat     ErrorCode   = 31
-	CodeWriteFile            ErrorCode   = 32
-	CodeReadFile             ErrorCode   = 33
+	// Main Module Error Codes
+	CodeInvalidAddress              ErrorCode = 1
+	CodeJSONMarshal                 ErrorCode = 2
+	CodeJSONUnmarshal               ErrorCode = 3
+	CodeUnmarshal                   ErrorCode = 4
+	CodeMarshal                     ErrorCode = 5
+	CodeFromAny                     ErrorCode = 6
+	CodeToAny                       ErrorCode = 7
+	CodeStringToBytes               ErrorCode = 8
+	CodeNilBlock                    ErrorCode = 9
+	CodeNilBlockHeader              ErrorCode = 10
+	CodeInvalidBlockProposerAddress ErrorCode = 11
+	CodeInvalidBlockHash            ErrorCode = 12
+	CodeNilBlockHash                ErrorCode = 13
+	CodeNilBlockTime                ErrorCode = 14
+	CodeNilLastBlockHash            ErrorCode = 15
+	CodeNilNetworkID                ErrorCode = 16
+	CodeNilStateRoot                ErrorCode = 17
+	CodeNilTxRoot                   ErrorCode = 18
+	CodeNilValRoot                  ErrorCode = 19
+	CodeNilNextValRoot              ErrorCode = 20
+	CodeMerkleTree                  ErrorCode = 21
+	CodeUnequalBlockHash            ErrorCode = 22
+	CodeNewPubKeyFromBytes          ErrorCode = 23
+	CodeNewMultiPubKey              ErrorCode = 24
+	CodeWriteFile                   ErrorCode = 25
+	CodeReadFile                    ErrorCode = 26
+	CodeInvalidArgument             ErrorCode = 27
+	CodeNilRewardRecipients         ErrorCode = 28
 
-	ConsensusModule              ErrorModule = "consensus"
-	CodeDuplicateTransaction     ErrorCode   = 6
-	CodeTxFoundInMempool         ErrorCode   = 7
-	CodeMismatchProposalHash     ErrorCode   = 8
-	CodeDuplicateProposerMessage ErrorCode   = 9
-	CodeDuplicateVote            ErrorCode   = 10
-	CodeInvalidSignatureLength   ErrorCode   = 11
-	CodeInvalidPubKey            ErrorCode   = 12
-	CodeEmptyView                ErrorCode   = 13
-	CodeUnknownConsensusMessage  ErrorCode   = 14
-	CodeValidatorNotInSet        ErrorCode   = 15
-	CodeWrongHeight              ErrorCode   = 16
-	CodeWrongRound               ErrorCode   = 17
-	CodeWrongPhase               ErrorCode   = 18
-	CodePartialSignatureEmpty    ErrorCode   = 19
-	CodeInvalidPartialSignature  ErrorCode   = 20
-	CodeMismatchBlockHash        ErrorCode   = 21
+	// Consensus Module
+	ConsensusModule ErrorModule = "consensus"
 
-	CodeInvalidProposerPubKey           ErrorCode = 24
-	CodeNoMaj23                         ErrorCode = 25
-	CodeEmptyAggregateSignature         ErrorCode = 26
-	CodeInvalidAggregateSignature       ErrorCode = 27
-	CodeInvalidAggregateSignatureLen    ErrorCode = 28
-	CodeEmptyAggregateSignatureBitmap   ErrorCode = 29
-	CodeInvalidAggregateSignatureBitmap ErrorCode = 30
+	// Consensus Module Error Codes
+	CodeDuplicateTransaction            ErrorCode = 1
+	CodeTxFoundInMempool                ErrorCode = 2
+	CodeMismatchResultsHash             ErrorCode = 3
+	CodeDuplicateProposerMessage        ErrorCode = 4
+	CodeDuplicateVote                   ErrorCode = 5
+	CodeInvalidSignatureLength          ErrorCode = 6
+	CodeInvalidPubKey                   ErrorCode = 7
+	CodeEmptyView                       ErrorCode = 8
+	CodeUnknownConsensusMessage         ErrorCode = 9
+	CodeValidatorNotInSet               ErrorCode = 10
+	CodeWrongHeight                     ErrorCode = 11
+	CodeWrongRound                      ErrorCode = 12
+	CodeWrongPhase                      ErrorCode = 13
+	CodePartialSignatureEmpty           ErrorCode = 14
+	CodeInvalidPartialSignature         ErrorCode = 15
+	CodeMismatchBlockHash               ErrorCode = 16
+	CodeInvalidProposerPubKey           ErrorCode = 17
+	CodeNoMaj23                         ErrorCode = 18
+	CodeEmptyAggregateSignature         ErrorCode = 19
+	CodeInvalidAggregateSignature       ErrorCode = 20
+	CodeInvalidAggregateSignatureLen    ErrorCode = 21
+	CodeEmptyAggregateSignatureBitmap   ErrorCode = 22
+	CodeInvalidAggregateSignatureBitmap ErrorCode = 23
+	CodeMismatchPublicKeys              ErrorCode = 24
+	CodeEmptyEvidence                   ErrorCode = 25
+	CodeAggregateSignature              ErrorCode = 26
+	CodeEmptyQuorumCertificate          ErrorCode = 27
+	CodeEvidenceTooOld                  ErrorCode = 28
+	CodeMismatchProposals               ErrorCode = 29
+	CodeFailedSafeNode                  ErrorCode = 30
+	CodeInvalidValidatorIndex           ErrorCode = 31
+	CodeUnableToAddSigner               ErrorCode = 32
+	CodeEmptyMessage                    ErrorCode = 33
+	CodeInvalidBlockTime                ErrorCode = 34
+	CodeInvalidEvidence                 ErrorCode = 35
+	CodeMismatchEvidenceAndHeader       ErrorCode = 36
+	CodeMismatchBadProposerCount        ErrorCode = 37
+	CodeWrongMaxHeight                  ErrorCode = 38
+	CodeExpectedBlockSizeLimit          ErrorCode = 39
+	CodeNonNilCertResults               ErrorCode = 40
+	CodeInvalidMemo                     ErrorCode = 41
+	CodeNilCertResults                  ErrorCode = 42
 
-	CodeMismatchPublicKeys              ErrorCode = 33
-	CodeEmptyPreviousAggregateSignature ErrorCode = 34
-	CodeEmptyEvidence                   ErrorCode = 35
-	CodeAggregateSignature              ErrorCode = 36
-	CodeEmptyQuorumCertificate          ErrorCode = 37
-	CodeEvidenceTooOld                  ErrorCode = 38
-	CodeMismatchProposals               ErrorCode = 39
-	CodeFailedSafeNode                  ErrorCode = 40
-	CodeInvalidValidatorIndex           ErrorCode = 41
-	CodeUnableToAddSigner               ErrorCode = 42
-	CodeEmptyMessage                    ErrorCode = 43
-	CodeInvalidBlockTime                ErrorCode = 44
-	CodeInvalidEvidence                 ErrorCode = 45
-	CodeDuplicateEvidence               ErrorCode = 46
-	CodeMismatchDoubleSignerCount       ErrorCode = 47
-	CodeMismatchEvidenceAndHeader       ErrorCode = 48
-	CodeMismatchBadProposerCount        ErrorCode = 49
-	CodeWrongMaxHeight                  ErrorCode = 50
+	// State Machine Module
+	StateMachineModule ErrorModule = "state_machine"
 
-	StateMachineModule                    ErrorModule = "state_machine"
-	CodeReadGenesisFile                   ErrorCode   = 1
-	CodeFeeBelowState                     ErrorCode   = 2
-	CodeUnauthorizedTx                    ErrorCode   = 3
-	CodeEmptySignature                    ErrorCode   = 4
-	CodeTxSignBytes                       ErrorCode   = 5
-	CodeInvalidTxMessage                  ErrorCode   = 6
-	CodeInvalidTxSequence                 ErrorCode   = 7
-	CodeMaxBlockSize                      ErrorCode   = 8
-	CodeMaxTxSize                         ErrorCode   = 9
-	CodeRejectProposal                    ErrorCode   = 9
-	CodeInvalidNetAddressLen              ErrorCode   = 10
-	CodeInvalidSignature                  ErrorCode   = 11
-	CodeAddressEmpty                      ErrorCode   = 12
-	CodeAddressSize                       ErrorCode   = 13
-	CodeRecipientAddressEmpty             ErrorCode   = 14
-	CodeRecipientAddressSize              ErrorCode   = 15
-	CodeOutputAddressEmpty                ErrorCode   = 20
-	CodeOutputAddressSize                 ErrorCode   = 21
-	CodeInvalidAmount                     ErrorCode   = 23
-	CodePubKeyEmpty                       ErrorCode   = 24
-	CodePubKeySize                        ErrorCode   = 25
-	CodeParamKeyEmpty                     ErrorCode   = 26
-	CodeParamValEmpty                     ErrorCode   = 27
-	CodeVoteEmpty                         ErrorCode   = 28
-	CodeHashEmpty                         ErrorCode   = 29
-	CodeHashSize                          ErrorCode   = 30
-	CodeUnknownMsg                        ErrorCode   = 31
-	CodeInsufficientFunds                 ErrorCode   = 32
-	CodeValidatorExists                   ErrorCode   = 33
-	CodeValidatorNotExists                ErrorCode   = 34
-	CodeValidatorUnstaking                ErrorCode   = 35
-	CodeValidatorPaused                   ErrorCode   = 36
-	CodeValidatorNotPaused                ErrorCode   = 37
-	CodeEmptyConsParams                   ErrorCode   = 38
-	CodeEmptyValParams                    ErrorCode   = 39
-	CodeEmptyFeeParams                    ErrorCode   = 40
-	CodeEmptyGovParams                    ErrorCode   = 41
-	CodeUnknownParam                      ErrorCode   = 42
-	CodeUnknownParamType                  ErrorCode   = 43
-	CodeUnknownParamSpace                 ErrorCode   = 44
-	CodeUnauthorizedParamChange           ErrorCode   = 45
-	CodeBelowMinimumStake                 ErrorCode   = 46
-	CodeInvalidSlashPercentage            ErrorCode   = 47
-	CodePublicKeysNotEqual                ErrorCode   = 48
-	CodeHeightsNotEqual                   ErrorCode   = 49
-	CodeRoundsNotEqual                    ErrorCode   = 50
-	CodeVoteTypesNotEqual                 ErrorCode   = 51
-	CodeIdenticalVotes                    ErrorCode   = 52
-	CodeInvalidParamOwner                 ErrorCode   = 53
-	CodeInvalidParam                      ErrorCode   = 54
-	CodeInvalidPoolName                   ErrorCode   = 55
-	CodeInvalidProtocolVersion            ErrorCode   = 56
-	CodeInvalidAddressKey                 ErrorCode   = 57
-	CodeWrongStoreType                    ErrorCode   = 58
-	CodeUnmarshalGenesis                  ErrorCode   = 59
-	CodeInsufficientSupply                ErrorCode   = 60
-	CodeUnknownMsgName                    ErrorCode   = 61
-	CodeUnknownPageable                   ErrorCode   = 62
-	CodePollValidator                     ErrorCode   = 63
-	CodeInvalidBlockRange                 ErrorCode   = 64
-	CodeInvalidPublicKey                  ErrorCode   = 65
-	CodeInvalidDoubleSignHeights          ErrorCode   = 66
-	CodeInvalidDoubleSigner               ErrorCode   = 67
-	CodeInvalidNumCommittees              ErrorCode   = 68
-	CodeInvalidCommitteeStakeDistribution ErrorCode   = 69
-	CodeInvalidDelegationStatus           ErrorCode   = 70
-	CodeInvalidCommittee                  ErrorCode   = 71
-	CodeInvalidCommitteeID                ErrorCode   = 72
-	CodeInvalidPercentAllocation          ErrorCode   = 73
-	CodeInvalidNumRecipients              ErrorCode   = 74
-	CodeInvalidProposal                   ErrorCode   = 75
-	CodeInvalidNumberOfSamples            ErrorCode   = 76
-	CodeNonPaidCommittee                  ErrorCode   = 77
-	CodeInvalidProposalHash               ErrorCode   = 78
-	CodeWrongCommitteeID                  ErrorCode   = 79
-	CodeInvalidOpcode                     ErrorCode   = 80
-	CodeInvalidSubsidy                    ErrorCode   = 81
-	CodeErrInvalidTxTime                  ErrorCode   = 82
+	// State Machine Module Error Codes
+	CodeReadGenesisFile                   ErrorCode = 1
+	CodeFeeBelowState                     ErrorCode = 2
+	CodeUnauthorizedTx                    ErrorCode = 3
+	CodeEmptySignature                    ErrorCode = 4
+	CodeTxSignBytes                       ErrorCode = 5
+	CodeInvalidTxMessage                  ErrorCode = 6
+	CodeErrInvalidTxTime                  ErrorCode = 7
+	CodeMaxBlockSize                      ErrorCode = 8
+	CodeMaxTxSize                         ErrorCode = 9
+	CodeRejectProposal                    ErrorCode = 10
+	CodeInvalidNetAddressLen              ErrorCode = 11
+	CodeInvalidSignature                  ErrorCode = 12
+	CodeAddressEmpty                      ErrorCode = 13
+	CodeAddressSize                       ErrorCode = 14
+	CodeRecipientAddressEmpty             ErrorCode = 15
+	CodeRecipientAddressSize              ErrorCode = 16
+	CodeOutputAddressEmpty                ErrorCode = 17
+	CodeOutputAddressSize                 ErrorCode = 18
+	CodeInvalidAmount                     ErrorCode = 19
+	CodePubKeyEmpty                       ErrorCode = 20
+	CodePubKeySize                        ErrorCode = 21
+	CodeParamKeyEmpty                     ErrorCode = 22
+	CodeParamValEmpty                     ErrorCode = 23
+	CodeInvalidSubsidy                    ErrorCode = 24
+	CodeInvalidOpcode                     ErrorCode = 25
+	CodeWrongCommitteeID                  ErrorCode = 26
+	CodeUnknownMsg                        ErrorCode = 27
+	CodeInsufficientFunds                 ErrorCode = 28
+	CodeValidatorExists                   ErrorCode = 29
+	CodeValidatorNotExists                ErrorCode = 30
+	CodeValidatorUnstaking                ErrorCode = 31
+	CodeValidatorPaused                   ErrorCode = 32
+	CodeValidatorNotPaused                ErrorCode = 33
+	CodeEmptyConsParams                   ErrorCode = 34
+	CodeEmptyValParams                    ErrorCode = 35
+	CodeEmptyFeeParams                    ErrorCode = 36
+	CodeEmptyGovParams                    ErrorCode = 37
+	CodeUnknownParam                      ErrorCode = 38
+	CodeUnknownParamType                  ErrorCode = 39
+	CodeUnknownParamSpace                 ErrorCode = 40
+	CodeInvalidProposalHash               ErrorCode = 41
+	CodeBelowMinimumStake                 ErrorCode = 42
+	CodeInvalidSlashPercentage            ErrorCode = 43
+	CodeNonSubsidizedCommittee            ErrorCode = 44
+	CodeInvalidNumberOfSamples            ErrorCode = 45
+	CodeInvalidCertificateResults         ErrorCode = 46
+	CodeInvalidNumRecipients              ErrorCode = 47
+	CodeInvalidPercentAllocation          ErrorCode = 48
+	CodeStringToInt                       ErrorCode = 49
+	CodeInvalidParam                      ErrorCode = 50
+	CodeInvalidPoolName                   ErrorCode = 51
+	CodeInvalidProtocolVersion            ErrorCode = 52
+	CodeInvalidDBKey                      ErrorCode = 53
+	CodeWrongStoreType                    ErrorCode = 54
+	CodeUnmarshalGenesis                  ErrorCode = 55
+	CodeInsufficientSupply                ErrorCode = 56
+	CodeUnknownMsgName                    ErrorCode = 57
+	CodeUnknownPageable                   ErrorCode = 58
+	CodePollValidator                     ErrorCode = 59
+	CodeInvalidBlockRange                 ErrorCode = 60
+	CodeInvalidPublicKey                  ErrorCode = 61
+	CodeInvalidDoubleSignHeights          ErrorCode = 62
+	CodeInvalidDoubleSigner               ErrorCode = 63
+	CodeInvalidNumCommittees              ErrorCode = 64
+	CodeInvalidCommitteeStakeDistribution ErrorCode = 65
+	CodeInvalidDelegationStatus           ErrorCode = 66
+	CodeInvalidCommittee                  ErrorCode = 67
+	CodeInvalidCommitteeID                ErrorCode = 68
+	CodeWrongNetworkID                    ErrorCode = 69
+	CodeInvalidSlashRecipients            ErrorCode = 70
+	CodeCommitteeHeight                   ErrorCode = 71
+	CodeInvalidQCCommitteeHeight          ErrorCode = 72
+	CodeInvalidBadProposer                ErrorCode = 73
+	CodeOrderNotFound                     ErrorCode = 74
+	CodeUnauthorizedOrderChange           ErrorCode = 75
+	CodeMinimumOrderSize                  ErrorCode = 76
+	CodeOrderAlreadyAccepted              ErrorCode = 77
+	CodeInvalidBuyOrder                   ErrorCode = 78
+	CodeDuplicateBuyOrder                 ErrorCode = 79
+	CodeInvalidBuyerDeadline              ErrorCode = 80
+	CodeInvalidCloseOrder                 ErrorCode = 81
+	CodeInvalidResetOrder                 ErrorCode = 82
+	CodeInvalidCheckpoint                 ErrorCode = 83
 
-	P2PModule                 ErrorModule = "p2p"
-	CodeUnknownP2PMessage     ErrorCode   = 1
-	CodeFailedRead            ErrorCode   = 2
-	CodeFailedWrite           ErrorCode   = 3
-	CodeFailedReadFull        ErrorCode   = 4
-	CodeMaxMessageSize        ErrorCode   = 7
-	CodePongTimeout           ErrorCode   = 8
-	CodeBlacklisted           ErrorCode   = 9
-	CodeErrorGroup            ErrorCode   = 10
-	CodeConnDecrypt           ErrorCode   = 11
-	CodeChunkLargerThanMax    ErrorCode   = 12
-	CodeFailedChallenge       ErrorCode   = 13
-	CodeFailedDiffieHellman   ErrorCode   = 14
-	CodeFailedHKDF            ErrorCode   = 15
-	CodePeerAlreadyExists     ErrorCode   = 16
-	CodePeerNotFound          ErrorCode   = 17
-	CodeFailedDial            ErrorCode   = 18
-	CodeMismatchPeerPublicKey ErrorCode   = 19
-	CodeFailedListen          ErrorCode   = 20
-	CodeInvalidPeerPublicKey  ErrorCode   = 21
-	CodeSignatureSwap         ErrorCode   = 22
-	CodeMetaSwap              ErrorCode   = 23
-	CodeBadStream             ErrorCode   = 24
-	CodePanic                 ErrorCode   = 25
+	// P2P Module
+	P2PModule ErrorModule = "p2p"
 
-	CodeBannedCountry                ErrorCode = 21
-	CodeIPLookup                     ErrorCode = 22
-	CodeBannedIP                     ErrorCode = 23
-	CodeNonTCPAddr                   ErrorCode = 24
-	CodeInvalidNetAddressString      ErrorCode = 25
-	CodeInvalidNetAddressPubKey      ErrorCode = 26
-	CodeInvalidNetAddressHostAndPort ErrorCode = 27
-	CodeMaxOutbound                  ErrorCode = 28
-	CodeMaxInbound                   ErrorCode = 29
-	CodeBannedID                     ErrorCode = 30
-	CodeIncompatiblePeer             ErrorCode = 31
+	// P2P Module Error Codes
+	CodeUnknownP2PMessage            ErrorCode = 1
+	CodeFailedRead                   ErrorCode = 2
+	CodeFailedWrite                  ErrorCode = 3
+	CodeMaxMessageSize               ErrorCode = 4
+	CodePongTimeout                  ErrorCode = 5
+	CodeBlacklisted                  ErrorCode = 6
+	CodeErrorGroup                   ErrorCode = 7
+	CodeConnDecrypt                  ErrorCode = 8
+	CodeChunkLargerThanMax           ErrorCode = 9
+	CodeFailedChallenge              ErrorCode = 10
+	CodeFailedDiffieHellman          ErrorCode = 11
+	CodeFailedHKDF                   ErrorCode = 12
+	CodePeerAlreadyExists            ErrorCode = 13
+	CodePeerNotFound                 ErrorCode = 14
+	CodeFailedDial                   ErrorCode = 15
+	CodeMismatchPeerPublicKey        ErrorCode = 16
+	CodeFailedListen                 ErrorCode = 17
+	CodeInvalidPeerPublicKey         ErrorCode = 18
+	CodeSignatureSwap                ErrorCode = 19
+	CodeMetaSwap                     ErrorCode = 20
+	CodeBadStream                    ErrorCode = 21
+	CodeBannedCountry                ErrorCode = 22
+	CodeIPLookup                     ErrorCode = 23
+	CodeBannedIP                     ErrorCode = 24
+	CodeNonTCPAddr                   ErrorCode = 25
+	CodeInvalidNetAddressString      ErrorCode = 26
+	CodeInvalidNetAddressPubKey      ErrorCode = 27
+	CodeInvalidNetAddressHostAndPort ErrorCode = 28
+	CodeMaxOutbound                  ErrorCode = 29
+	CodeMaxInbound                   ErrorCode = 30
+	CodeBannedID                     ErrorCode = 31
+	CodeIncompatiblePeer             ErrorCode = 32
 
 	StorageModule      ErrorModule = "store"
 	CodeOpenDB         ErrorCode   = 1
@@ -228,6 +276,7 @@ const (
 	CodeCommitTree     ErrorCode   = 12
 	CodeProve          ErrorCode   = 13
 	CodeCompactProof   ErrorCode   = 14
+	CodeInvalidKey     ErrorCode   = 15
 
 	RPCModule             ErrorModule = "rpc"
 	CodeRPCTimeout        ErrorCode   = 1
@@ -240,45 +289,6 @@ const (
 	CodeReadBody          ErrorCode   = 8
 	CodeStringToCommittee ErrorCode   = 9
 )
-
-type ErrorI interface {
-	Code() ErrorCode
-	Module() ErrorModule
-	error
-}
-
-var _ ErrorI = &Error{}
-
-type ErrorCode uint32
-
-type ErrorModule string
-
-type Error struct {
-	ECode   ErrorCode   `json:"Code"`
-	EModule ErrorModule `json:"Module"`
-	Msg     string      `json:"Msg"`
-}
-
-func NewError(code ErrorCode, module ErrorModule, msg string) *Error {
-	return &Error{ECode: code, EModule: module, Msg: msg}
-}
-
-func (p *Error) Code() ErrorCode     { return p.ECode }
-func (p *Error) Module() ErrorModule { return p.EModule }
-func (p *Error) String() string      { return p.Error() }
-
-func (p *Error) Error() string {
-	stack, pc := "", make([]uintptr, 1000)
-	_ = runtime.Callers(1, pc)
-	frames := runtime.CallersFrames(pc)
-	if frames == nil {
-		return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s\n", p.EModule, p.ECode, p.Msg)
-	}
-	for f, again := frames.Next(); again; f, again = frames.Next() {
-		stack += fmt.Sprintf("\n%s L%d", f.File, f.Line)
-	}
-	return fmt.Sprintf("\nModule:  %s\nCode:    %d\nMessage: %s\nStack: %s", p.EModule, p.ECode, p.Msg, stack)
-}
 
 // error implementations below for the `types` package
 func newLogError(err error) ErrorI {
@@ -321,16 +331,20 @@ func ErrNilProposal() ErrorI {
 	return NewError(CodeNilBlock, MainModule, "proposal is nil")
 }
 
+func ErrNilRewardRecipients() ErrorI {
+	return NewError(CodeNilRewardRecipients, MainModule, "reward recipients is nil")
+}
+
 func ErrNilBlockHeader() ErrorI {
 	return NewError(CodeNilBlockHeader, MainModule, "block.header is nil")
 }
 
-func ErrNilBlockProposer() ErrorI {
-	return NewError(CodeNilBlockProposer, MainModule, "block proposer is nil")
+func ErrInvalidBlockProposerAddress() ErrorI {
+	return NewError(CodeInvalidBlockProposerAddress, MainModule, "block proposer address is invalid")
 }
 
-func ErrNilQuorumCertificate() ErrorI {
-	return NewError(CodeNilQuorumCertificate, MainModule, "nil quorum certificate")
+func ErrInvalidBlockHash() ErrorI {
+	return NewError(CodeInvalidBlockHash, MainModule, "invalid block hash")
 }
 
 func ErrNilBlockHash() ErrorI {
@@ -385,6 +399,14 @@ func ErrWrongHeight() ErrorI {
 	return NewError(CodeWrongHeight, ConsensusModule, "wrong height")
 }
 
+func ErrWrongCommitteeHeight() ErrorI {
+	return NewError(CodeCommitteeHeight, ConsensusModule, "wrong committee height")
+}
+
+func ErrInvalidQCCommitteeHeight() ErrorI {
+	return NewError(CodeInvalidQCCommitteeHeight, ConsensusModule, "invalid certificate committee height")
+}
+
 func ErrWrongMaxHeight() ErrorI {
 	return NewError(CodeWrongMaxHeight, ConsensusModule, "wrong max height")
 }
@@ -405,16 +427,8 @@ func ErrEmptyQuorumCertificate() ErrorI {
 	return NewError(CodeEmptyQuorumCertificate, ConsensusModule, "empty quorum certificate")
 }
 
-func ErrDuplicateEvidence() ErrorI {
-	return NewError(CodeDuplicateEvidence, ConsensusModule, "duplicate evidence")
-}
-
 func ErrEmptyAggregateSignature() ErrorI {
 	return NewError(CodeEmptyAggregateSignature, ConsensusModule, "empty aggregate signature")
-}
-
-func ErrEmptyAggregatePreviousSignature() ErrorI {
-	return NewError(CodeEmptyPreviousAggregateSignature, ConsensusModule, "empty previous aggregate signature")
 }
 
 func ErrInvalidAggrSignatureLength() ErrorI {
@@ -449,6 +463,10 @@ func ErrInvalidBlockTime() ErrorI {
 	return NewError(CodeInvalidBlockTime, ConsensusModule, "invalid block time")
 }
 
+func ErrInvalidMemo() ErrorI {
+	return NewError(CodeInvalidMemo, ConsensusModule, "invalid memo")
+}
+
 func ErrEmptyEvidence() ErrorI {
 	return NewError(CodeEmptyEvidence, ConsensusModule, "evidence is empty")
 }
@@ -463,10 +481,6 @@ func ErrEvidenceTooOld() ErrorI {
 
 func ErrInvalidProposerPubKey() ErrorI {
 	return NewError(CodeInvalidProposerPubKey, ConsensusModule, "invalid proposer public key")
-}
-
-func ErrMismatchDoubleSignerCount() ErrorI {
-	return NewError(CodeMismatchDoubleSignerCount, ConsensusModule, "mismatch double signer count")
 }
 
 func ErrMismatchEvidenceAndHeader() ErrorI {
@@ -529,8 +543,12 @@ func ErrInvalidDoubleSigner() ErrorI {
 	return NewError(CodeInvalidDoubleSigner, ConsensusModule, "double signer is invalid")
 }
 
-func ErrMismatchProposalHash() ErrorI {
-	return NewError(CodeMismatchProposalHash, ConsensusModule, "mismatch proposal hash")
+func ErrInvalidBadProposer() ErrorI {
+	return NewError(CodeInvalidBadProposer, ConsensusModule, "bad proposer is invalid")
+}
+
+func ErrMismatchResultsHash() ErrorI {
+	return NewError(CodeMismatchResultsHash, ConsensusModule, "mismatch result hash")
 }
 
 func ErrMismatchBlockHash() ErrorI {
@@ -545,6 +563,10 @@ func ErrInvalidNumOfRecipients() ErrorI {
 	return NewError(CodeInvalidNumRecipients, StateMachineModule, "invalid num payment recipients")
 }
 
+func ErrWrongNetworkID() ErrorI {
+	return NewError(CodeWrongNetworkID, StateMachineModule, "wrong network id")
+}
+
 func ErrWrongCommitteeID() ErrorI {
 	return NewError(CodeWrongCommitteeID, StateMachineModule, "wrong committee id")
 }
@@ -554,4 +576,17 @@ func ErrDuplicateTx(hash []byte) ErrorI {
 
 func ErrMaxTxSize() ErrorI {
 	return NewError(CodeMaxTxSize, StateMachineModule, "max tx size")
+}
+func ErrInvalidArgument() ErrorI {
+	return NewError(CodeInvalidArgument, MainModule, "the argument is invalid")
+}
+
+func ErrExpectedMaxBlockSize() ErrorI {
+	return NewError(CodeExpectedBlockSizeLimit, MainModule, "the block size exceeds the expected limit")
+}
+func ErrNonNilCertResults() ErrorI {
+	return NewError(CodeNonNilCertResults, MainModule, "the certificate results is not empty")
+}
+func ErrNilCertResults() ErrorI {
+	return NewError(CodeNilCertResults, MainModule, "the certificate results is empty")
 }

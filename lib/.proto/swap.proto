@@ -1,0 +1,26 @@
+syntax = "proto3";
+package types;
+
+option go_package = "github.com/ginchuco/ginchu/fsm/types";
+
+
+message SellOrder {
+  uint64 Id = 1; // the unique identifier of the order
+  uint64 Committee = 2; // the id of the committee that is in-charge of escrow for the swap
+  uint64 AmountForSale = 3; // amount of CNPY for sale
+  uint64 RequestedAmount = 4; // amount of 'token' to receive
+  bytes SellerReceiveAddress = 5; // the external chain address to receive the 'token'
+  bytes BuyerReceiveAddress = 6; // the buyer Canopy address to receive the CNPY
+  uint64 BuyerChainDeadline = 7; // the external chain height deadline to send the 'tokens' to SellerReceiveAddress
+  uint64 OrderExpirationHeight = 8; // the height when the order expires
+  bytes SellersSellAddress = 9; // the address of seller who is selling the CNPY
+}
+
+message OrderBooks {
+  repeated OrderBook OrderBooks = 1;
+}
+
+message OrderBook {
+  uint64 committeeId = 1 ;
+  repeated SellOrder orders = 2;
+}

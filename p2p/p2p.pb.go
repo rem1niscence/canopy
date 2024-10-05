@@ -23,6 +23,8 @@ const (
 )
 
 // A generic wrapper over a proto.message for the P2P module to handle
+// Envelopes are first used to wrap bytes into a Packet, Ping, or Pong
+// Then again are used to wrap a Packet.bytes into proto.Message
 type Envelope struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

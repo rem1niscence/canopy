@@ -1,16 +1,19 @@
 package store
 
 import (
+	"bytes"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/ginchuco/ginchu/store/smt"
 )
 
+// SMTWrapper wraps the Sparse Merkle Tree implementation
 type SMTWrapper struct {
 	smt *smt.SMT
 	log lib.LoggerI
 }
 
+// NewSMTWrapper() creates a new instance of the wrapper
 func NewSMTWrapper(db *TxnWrapper, root []byte, log lib.LoggerI) *SMTWrapper {
 	store := &SMTWrapper{
 		log: log,
@@ -19,6 +22,7 @@ func NewSMTWrapper(db *TxnWrapper, root []byte, log lib.LoggerI) *SMTWrapper {
 	return store
 }
 
+// Set() updates the underlying sparse merkle tree, using the hash of the input key as the key
 func (s *SMTWrapper) Set(k, v []byte) lib.ErrorI {
 	if err := s.smt.Update(crypto.Hash(k), v); err != nil {
 		return ErrStoreSet(err)
@@ -26,6 +30,7 @@ func (s *SMTWrapper) Set(k, v []byte) lib.ErrorI {
 	return nil
 }
 
+// Delete() removes deletes from the underlying sparse merkle tree, gracefully handling the KeyNotPresent error
 func (s *SMTWrapper) Delete(key []byte) lib.ErrorI {
 	if err := s.smt.Delete(crypto.Hash(key)); err != nil && err != smt.ErrKeyNotPresent {
 		return ErrStoreDelete(err)
@@ -33,17 +38,20 @@ func (s *SMTWrapper) Delete(key []byte) lib.ErrorI {
 	return nil
 }
 
+// Commit() saves the version of to the immutable tree and returns the root of the tree
 func (s *SMTWrapper) Commit() ([]byte, lib.ErrorI) {
 	if err := s.smt.Commit(); err != nil {
 		return nil, ErrCommitTree(err)
 	}
-	return lib.CopyBytes(s.smt.LastSavedRoot()), nil
+	return bytes.Clone(s.smt.LastSavedRoot()), nil
 }
 
+// Root() returns a copy of the root hash of the SMT
 func (s *SMTWrapper) Root() ([]byte, lib.ErrorI) {
-	return lib.CopyBytes(s.smt.Root()), nil
+	return bytes.Clone(s.smt.Root()), nil
 }
 
+// setDB() initializes the SMT with a new or existing root based on the provided database
 func (s *SMTWrapper) setDB(db *TxnWrapper, root []byte) {
 	if root == nil {
 		s.smt = smt.NewSMT(NewMapStore(db), crypto.Hasher())
@@ -52,6 +60,7 @@ func (s *SMTWrapper) setDB(db *TxnWrapper, root []byte) {
 	}
 }
 
+// GetProof() generates a proof for the given key using the sparse Merkle tree
 func (s *SMTWrapper) GetProof(key []byte) ([]byte, []byte, lib.ErrorI) {
 	pr, err := s.smt.Prove(crypto.Hash(key))
 	if err != nil {
@@ -75,6 +84,7 @@ func (s *SMTWrapper) GetProof(key []byte) ([]byte, []byte, lib.ErrorI) {
 	return proof, nil, nil
 }
 
+// VerifyProof() verifies the validity of the proof for a given key-value pair
 func (s *SMTWrapper) VerifyProof(key, value, proof []byte) bool {
 	ptr := &SparseCompactMerkleProof{}
 	if err := lib.Unmarshal(proof, ptr); err != nil {
@@ -94,6 +104,8 @@ func (s *SMTWrapper) VerifyProof(key, value, proof []byte) bool {
 	}
 	return smt.VerifyProof(sparseMerkleProof, s.smt.Root(), crypto.Hash(key), value, &s.smt.BaseSMT)
 }
+
+// MapStore is an interface requirement of the Celestia SMT package
 
 var _ smt.MapStore = &MapStore{}
 

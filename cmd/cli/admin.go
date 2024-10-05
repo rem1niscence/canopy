@@ -8,7 +8,7 @@ import (
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"syscall"
+	"os"
 )
 
 var adminCmd = &cobra.Command{
@@ -17,10 +17,11 @@ var adminCmd = &cobra.Command{
 }
 
 var (
-	pwd      string
-	fee      uint64
-	delegate bool
-	sim      bool
+	pwd             string
+	fee             uint64
+	delegate        bool
+	earlyWithdrawal bool
+	sim             bool
 )
 
 func init() {
@@ -29,6 +30,8 @@ func init() {
 	adminCmd.PersistentFlags().Uint64Var(&fee, "fee", 0, "custom fee, by default will use the minimum fee")
 	txStakeCmd.PersistentFlags().BoolVar(&delegate, "delegate", false, "delegate tokens to committee(s) only without actual validator operation")
 	txEditStakeCmd.PersistentFlags().BoolVar(&delegate, "delegate", false, "delegate tokens to committee(s) only without actual validator operation")
+	txStakeCmd.PersistentFlags().BoolVar(&earlyWithdrawal, "early-withdrawal", false, "immediately withdrawal any rewards (with penalty) directly to output address instead of auto-compounding directly to stake")
+	txEditStakeCmd.PersistentFlags().BoolVar(&earlyWithdrawal, "early-withdrawal", false, "immediately withdrawal any rewards (with penalty) directly to output address instead of auto-compounding directly to stake")
 	adminCmd.AddCommand(ksCmd)
 	adminCmd.AddCommand(ksNewKeyCmd)
 	adminCmd.AddCommand(ksImportCmd)
@@ -123,24 +126,24 @@ var (
 	}
 
 	txStakeCmd = &cobra.Command{
-		Use:     "tx-stake <address> <net-address> <amount> <committees> <output> --delegated --fee=10000 --simulate=true",
+		Use:     "tx-stake <address> <net-address> <amount> <committees> <output> --delegated --early-withdrawal --fee=10000 --simulate=true",
 		Short:   "stake a validator",
-		Long:    "tx-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of <committeeId>=<designatedStakePercent> <address for rewards> --delegated --fee=10000 --simulate=true",
-		Example: "tx-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9000 100000000 0=50,21=25,22=25 dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
+		Long:    "tx-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of committeeIds> <address for rewards> --delegated --early-withdrawal  --fee=10000 --simulate=true",
+		Example: "tx-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9000 100000000 0,21,22 dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
 		Args:    cobra.MinimumNArgs(5),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxStake(argGetAddr(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), delegate, getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxStake(argGetAddr(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), delegate, earlyWithdrawal, getPassword(), !sim, fee))
 		},
 	}
 
 	txEditStakeCmd = &cobra.Command{
-		Use:     "tx-edit-stake <address> <net-address> <amount> <committees> <output> --delegated --fee=10000 --simulate=true",
+		Use:     "tx-edit-stake <address> <net-address> <amount> <committees> <output> --delegated --early-withdrawal --fee=10000 --simulate=true",
 		Short:   "edit-stake an active validator. Use the existing value to not edit a field",
-		Long:    "tx-edit-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of <committeeId>=<designatedStakePercent> <address for rewards> <address for rewards> --delegated --fee=10000 --simulate=true",
-		Example: "tx-edit-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9001 100000001 1=50,21=25,22=25 dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
+		Long:    "tx-edit-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of committeeIds> <address for rewards> <address for rewards> --delegated --early-withdrawal  --fee=10000 --simulate=true",
+		Example: "tx-edit-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9001 100000001 0,21,22 dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
 		Args:    cobra.MinimumNArgs(5),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxEditStake(argGetAddr(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), delegate, getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxEditStake(argGetAddr(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), delegate, earlyWithdrawal, getPassword(), !sim, fee))
 		},
 	}
 
@@ -306,7 +309,7 @@ func argToCommittees(arg string) string {
 func getPassword() string {
 	if pwd == "" {
 		fmt.Println("Enter password:")
-		password, err := term.ReadPassword(int(syscall.Stdin))
+		password, err := term.ReadPassword(int(os.Stdin))
 		if err != nil {
 			l.Fatal(err.Error())
 		}

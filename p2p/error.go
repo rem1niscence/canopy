@@ -40,16 +40,8 @@ func ErrBadStream() lib.ErrorI {
 	return lib.NewError(lib.CodeBadStream, lib.P2PModule, "bad stream")
 }
 
-func ErrPanic() lib.ErrorI {
-	return lib.NewError(lib.CodePanic, lib.P2PModule, "panic caught")
-}
-
 func ErrFailedRead(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeFailedRead, lib.P2PModule, fmt.Sprintf("read() failed with err: %s", err.Error()))
-}
-
-func ErrFailedReadFull(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeFailedReadFull, lib.P2PModule, fmt.Sprintf("readFull() failed with err: %s", err.Error()))
 }
 
 func ErrFailedWrite(err error) lib.ErrorI {

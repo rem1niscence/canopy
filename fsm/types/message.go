@@ -1,28 +1,33 @@
 package types
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/proto"
+	"net/url"
 )
 
 const (
-	MessageSendName            = "send"
-	MessageStakeName           = "stake"
-	MessageUnstakeName         = "unstake"
-	MessageEditStakeName       = "edit_stake"
-	MessagePauseName           = "pause"
-	MessageUnpauseName         = "unpause"
-	MessageChangeParameterName = "change_parameter"
-	MessageDAOTransferName     = "dao_transfer"
-	MessageProposalName        = "proposal"
-	MessageSubsidyName         = "subsidy"
+	// Names for each Transaction Message (payload) type
+	MessageSendName               = "send"
+	MessageStakeName              = "stake"
+	MessageUnstakeName            = "unstake"
+	MessageEditStakeName          = "edit_stake"
+	MessagePauseName              = "pause"
+	MessageUnpauseName            = "unpause"
+	MessageChangeParameterName    = "change_parameter"
+	MessageDAOTransferName        = "dao_transfer"
+	MessageCertificateResultsName = "certificate_results"
+	MessageSubsidyName            = "subsidy"
+	MessageCreateOrderName        = "create_order"
+	MessageEditOrderName          = "edit_order"
+	MessageDeleteOrderName        = "delete_order"
 )
 
 func init() {
+	// Register all messages types for conversion of bytes to the correct MessageI implementation
 	lib.RegisteredMessages = make(map[string]lib.MessageI)
 	lib.RegisteredMessages[MessageSendName] = new(MessageSend)
 	lib.RegisteredMessages[MessageStakeName] = new(MessageStake)
@@ -32,12 +37,16 @@ func init() {
 	lib.RegisteredMessages[MessageUnpauseName] = new(MessageUnpause)
 	lib.RegisteredMessages[MessageChangeParameterName] = new(MessageChangeParameter)
 	lib.RegisteredMessages[MessageDAOTransferName] = new(MessageDAOTransfer)
-	lib.RegisteredMessages[MessageProposalName] = new(MessageProposal)
+	lib.RegisteredMessages[MessageCertificateResultsName] = new(MessageCertificateResults)
 	lib.RegisteredMessages[MessageSubsidyName] = new(MessageSubsidy)
+	lib.RegisteredMessages[MessageCreateOrderName] = new(MessageCreateOrder)
+	lib.RegisteredMessages[MessageEditOrderName] = new(MessageEditOrder)
+	lib.RegisteredMessages[MessageDeleteOrderName] = new(MessageDeleteOrder)
 }
 
-var _ lib.MessageI = &MessageSend{}
+var _ lib.MessageI = &MessageSend{} // interface enforcement
 
+// Check() validates the Message structure
 func (x *MessageSend) Check() lib.ErrorI {
 	if err := checkAddress(x.FromAddress); err != nil {
 		return err
@@ -51,12 +60,11 @@ func (x *MessageSend) Check() lib.ErrorI {
 	return checkAmount(x.Amount)
 }
 
-func (x *MessageSend) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessageSend) Name() string                { return MessageSendName }
-func (x *MessageSend) New() lib.MessageI           { return new(MessageSend) }
-func (x *MessageSend) Recipient() []byte           { return crypto.NewAddressFromBytes(x.ToAddress).Bytes() }
+func (x *MessageSend) Name() string      { return MessageSendName }
+func (x *MessageSend) New() lib.MessageI { return new(MessageSend) }
+func (x *MessageSend) Recipient() []byte { return crypto.NewAddressFromBytes(x.ToAddress).Bytes() } // who is the receiver of the message
 
-// nolint:all
+// MarshalJSON() is the json.Marshaller implementation for MessageSend
 func (x MessageSend) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageSend{
 		FromAddress: x.FromAddress,
@@ -65,6 +73,7 @@ func (x MessageSend) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageSend
 func (x *MessageSend) UnmarshalJSON(b []byte) (err error) {
 	var j jsonMessageSend
 	if err = json.Unmarshal(b, &j); err != nil {
@@ -84,8 +93,9 @@ type jsonMessageSend struct {
 	Amount      uint64       `json:"amount,omitempty"`
 }
 
-var _ lib.MessageI = &MessageStake{}
+var _ lib.MessageI = &MessageStake{} // interface enforcement
 
+// Check() validates the Message structure
 func (x *MessageStake) Check() lib.ErrorI {
 	if err := checkOutputAddress(x.OutputAddress); err != nil {
 		return err
@@ -102,12 +112,11 @@ func (x *MessageStake) Check() lib.ErrorI {
 	return checkAmount(x.Amount)
 }
 
-func (x *MessageStake) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessageStake) Name() string                { return MessageStakeName }
-func (x *MessageStake) New() lib.MessageI           { return new(MessageStake) }
-func (x *MessageStake) Recipient() []byte           { return nil }
+func (x *MessageStake) Name() string      { return MessageStakeName }
+func (x *MessageStake) New() lib.MessageI { return new(MessageStake) }
+func (x *MessageStake) Recipient() []byte { return nil }
 
-// nolint:all
+// MarshalJSON() is the json.Marshaller implementation for MessageStake
 func (x MessageStake) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageStake{
 		PublicKey:     x.PublicKey,
@@ -118,6 +127,7 @@ func (x MessageStake) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageStake
 func (x *MessageStake) UnmarshalJSON(b []byte) (err error) {
 	var j jsonMessageStake
 	if err = json.Unmarshal(b, &j); err != nil {
@@ -136,13 +146,14 @@ func (x *MessageStake) UnmarshalJSON(b []byte) (err error) {
 type jsonMessageStake struct {
 	PublicKey     lib.HexBytes `json:"public_key,omitempty"`
 	Amount        uint64       `json:"amount,omitempty"`
-	Committees    []*Committee `json:"committees,omitempty"`
+	Committees    []uint64     `json:"committees,omitempty"`
 	NetAddress    string       `json:"net_address,omitempty"`
 	OutputAddress lib.HexBytes `json:"output_address,omitempty"`
 }
 
-var _ lib.MessageI = &MessageEditStake{}
+var _ lib.MessageI = &MessageEditStake{} // interface enforcement
 
+// Check() validates the Message structure
 func (x *MessageEditStake) Check() lib.ErrorI {
 	if err := checkAddress(x.Address); err != nil {
 		return err
@@ -159,12 +170,11 @@ func (x *MessageEditStake) Check() lib.ErrorI {
 	return checkAmount(x.Amount)
 }
 
-func (x *MessageEditStake) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessageEditStake) Name() string                { return MessageEditStakeName }
-func (x *MessageEditStake) New() lib.MessageI           { return new(MessageEditStake) }
-func (x *MessageEditStake) Recipient() []byte           { return nil }
+func (x *MessageEditStake) Name() string      { return MessageEditStakeName }
+func (x *MessageEditStake) New() lib.MessageI { return new(MessageEditStake) }
+func (x *MessageEditStake) Recipient() []byte { return nil }
 
-// nolint:all
+// MarshalJSON() is the json.Marshaller implementation for MessageEditStake
 func (x MessageEditStake) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageEditStake{
 		Address:       x.Address,
@@ -175,6 +185,7 @@ func (x MessageEditStake) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageEditStake
 func (x *MessageEditStake) UnmarshalJSON(b []byte) (err error) {
 	var j jsonMessageEditStake
 	if err = json.Unmarshal(b, &j); err != nil {
@@ -193,24 +204,25 @@ func (x *MessageEditStake) UnmarshalJSON(b []byte) (err error) {
 type jsonMessageEditStake struct {
 	Address       lib.HexBytes `json:"address,omitempty"`
 	Amount        uint64       `json:"amount,omitempty"`
-	Committees    []*Committee `json:"committees,omitempty"`
+	Committees    []uint64     `json:"committees,omitempty"`
 	NetAddress    string       `json:"net_address,omitempty"`
 	OutputAddress lib.HexBytes `json:"output_address,omitempty"`
 }
 
-var _ lib.MessageI = &MessageUnstake{}
+var _ lib.MessageI = &MessageUnstake{} // interface enforcement
 
-func (x *MessageUnstake) Check() lib.ErrorI           { return checkAddress(x.Address) }
-func (x *MessageUnstake) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessageUnstake) Name() string                { return MessageUnstakeName }
-func (x *MessageUnstake) New() lib.MessageI           { return new(MessageUnstake) }
-func (x *MessageUnstake) Recipient() []byte           { return nil }
+// Check() validates the Message structure
+func (x *MessageUnstake) Check() lib.ErrorI { return checkAddress(x.Address) }
+func (x *MessageUnstake) Name() string      { return MessageUnstakeName }
+func (x *MessageUnstake) New() lib.MessageI { return new(MessageUnstake) }
+func (x *MessageUnstake) Recipient() []byte { return nil }
 
-// nolint:all
+// MarshalJSON() is the json.Marshaller implementation for MessageUnstake
 func (x MessageUnstake) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonHexAddressMsg{Address: x.Address})
 }
 
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageUnstake
 func (x *MessageUnstake) UnmarshalJSON(b []byte) (err error) {
 	var j jsonHexAddressMsg
 	if err = json.Unmarshal(b, &j); err != nil {
@@ -224,19 +236,20 @@ type jsonHexAddressMsg struct {
 	Address lib.HexBytes `json:"address,omitempty"`
 }
 
-var _ lib.MessageI = &MessagePause{}
+var _ lib.MessageI = &MessagePause{} // interface enforcement
 
-func (x *MessagePause) Check() lib.ErrorI           { return checkAddress(x.Address) }
-func (x *MessagePause) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessagePause) Name() string                { return MessagePauseName }
-func (x *MessagePause) New() lib.MessageI           { return new(MessagePause) }
-func (x *MessagePause) Recipient() []byte           { return nil }
+// Check() validates the Message structure
+func (x *MessagePause) Check() lib.ErrorI { return checkAddress(x.Address) }
+func (x *MessagePause) Name() string      { return MessagePauseName }
+func (x *MessagePause) New() lib.MessageI { return new(MessagePause) }
+func (x *MessagePause) Recipient() []byte { return nil }
 
-// nolint:all
+// MarshalJSON() is the json.Marshaller implementation for MessagePause
 func (x MessagePause) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonHexAddressMsg{Address: x.Address})
 }
 
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessagePause
 func (x *MessagePause) UnmarshalJSON(b []byte) (err error) {
 	var j jsonHexAddressMsg
 	if err = json.Unmarshal(b, &j); err != nil {
@@ -246,19 +259,20 @@ func (x *MessagePause) UnmarshalJSON(b []byte) (err error) {
 	return
 }
 
-var _ lib.MessageI = &MessageUnpause{}
+var _ lib.MessageI = &MessageUnpause{} // interface enforcement
 
-func (x *MessageUnpause) Check() lib.ErrorI           { return checkAddress(x.Address) }
-func (x *MessageUnpause) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessageUnpause) Name() string                { return MessageUnpauseName }
-func (x *MessageUnpause) New() lib.MessageI           { return new(MessageUnpause) }
-func (x *MessageUnpause) Recipient() []byte           { return nil }
+// Check() validates the Message structure
+func (x *MessageUnpause) Check() lib.ErrorI { return checkAddress(x.Address) }
+func (x *MessageUnpause) Name() string      { return MessageUnpauseName }
+func (x *MessageUnpause) New() lib.MessageI { return new(MessageUnpause) }
+func (x *MessageUnpause) Recipient() []byte { return nil }
 
-// nolint:all
+// MarshalJSON() is the json.Marshaller implementation for MessageUnpause
 func (x MessageUnpause) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonHexAddressMsg{Address: x.Address})
 }
 
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageUnpause
 func (x *MessageUnpause) UnmarshalJSON(b []byte) (err error) {
 	var j jsonHexAddressMsg
 	if err = json.Unmarshal(b, &j); err != nil {
@@ -268,8 +282,9 @@ func (x *MessageUnpause) UnmarshalJSON(b []byte) (err error) {
 	return
 }
 
-var _ lib.MessageI = &MessageChangeParameter{}
+var _ lib.MessageI = &MessageChangeParameter{} // interface enforcement
 
+// Check() validates the Message structure
 func (x *MessageChangeParameter) Check() lib.ErrorI {
 	if err := checkAddress(x.Signer); err != nil {
 		return err
@@ -286,7 +301,7 @@ func (x *MessageChangeParameter) Check() lib.ErrorI {
 	return nil
 }
 
-// nolint:all
+// MarshalJSON() is the json.Marshaller implementation for MessageChangeParameter
 func (x MessageChangeParameter) MarshalJSON() ([]byte, error) {
 	a, err := lib.FromAny(x.ParameterValue)
 	if err != nil {
@@ -311,6 +326,7 @@ func (x MessageChangeParameter) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageChangeParameter
 func (x *MessageChangeParameter) UnmarshalJSON(b []byte) (err error) {
 	var j jsonMessageChangeParameter
 	if err = json.Unmarshal(b, &j); err != nil {
@@ -351,13 +367,13 @@ type jsonMessageChangeParameter struct {
 	Signer         lib.HexBytes `json:"signer,omitempty"`
 }
 
-func (x *MessageChangeParameter) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessageChangeParameter) Name() string                { return MessageChangeParameterName }
-func (x *MessageChangeParameter) New() lib.MessageI           { return new(MessageChangeParameter) }
-func (x *MessageChangeParameter) Recipient() []byte           { return nil }
+func (x *MessageChangeParameter) Name() string      { return MessageChangeParameterName }
+func (x *MessageChangeParameter) New() lib.MessageI { return new(MessageChangeParameter) }
+func (x *MessageChangeParameter) Recipient() []byte { return nil }
 
-var _ lib.MessageI = &MessageDAOTransfer{}
+var _ lib.MessageI = &MessageDAOTransfer{} // interface enforcement
 
+// Check() validates the Message structure
 func (x *MessageDAOTransfer) Check() lib.ErrorI {
 	if err := checkAddress(x.Address); err != nil {
 		return err
@@ -368,12 +384,11 @@ func (x *MessageDAOTransfer) Check() lib.ErrorI {
 	return checkAmount(x.Amount)
 }
 
-func (x *MessageDAOTransfer) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessageDAOTransfer) Name() string                { return MessageDAOTransferName }
-func (x *MessageDAOTransfer) New() lib.MessageI           { return new(MessageDAOTransfer) }
-func (x *MessageDAOTransfer) Recipient() []byte           { return nil }
+func (x *MessageDAOTransfer) Name() string      { return MessageDAOTransferName }
+func (x *MessageDAOTransfer) New() lib.MessageI { return new(MessageDAOTransfer) }
+func (x *MessageDAOTransfer) Recipient() []byte { return nil }
 
-// nolint:all
+// MarshalJSON() is the json.Marshaller implementation for MessageDAOTransfer
 func (x MessageDAOTransfer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageDaoTransfer{
 		Address:     x.Address,
@@ -383,6 +398,7 @@ func (x MessageDAOTransfer) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageDAOTransfer
 func (x *MessageDAOTransfer) UnmarshalJSON(b []byte) (err error) {
 	var j jsonMessageDaoTransfer
 	if err = json.Unmarshal(b, &j); err != nil {
@@ -404,69 +420,75 @@ type jsonMessageDaoTransfer struct {
 	EndHeight   uint64       `json:"end_height,omitempty"`
 }
 
-var _ lib.MessageI = &MessageProposal{}
+var _ lib.MessageI = &MessageCertificateResults{} // interface enforcement
 
-func (x *MessageProposal) Check() lib.ErrorI {
+// Check() validates the Message structure
+func (x *MessageCertificateResults) Check() lib.ErrorI {
 	if x == nil {
-		return ErrInvalidProposal()
+		return ErrInvalidCertificateResults()
 	}
 	if err := x.Qc.CheckBasic(); err != nil {
 		return err
 	}
-	proposal := x.Qc.Proposal
-	if proposal == nil || proposal.Block != nil {
-		return ErrInvalidProposal()
+	results := x.Qc.Results
+	if results == nil {
+		return ErrInvalidCertificateResults()
 	}
-	if len(x.Qc.ProposalHash) != crypto.HashSize || !bytes.Equal(x.Qc.ProposalHash, x.Qc.Proposal.Hash()) {
-		return ErrInvalidProposalHash()
+	if x.Qc.Block != nil {
+		return lib.ErrNilBlock()
 	}
-	blockHashLen := len(proposal.BlockHash)
-	if blockHashLen != 0 && blockHashLen != crypto.HashSize { // hash size may be zero for external chains
-		return ErrInvalidProposal()
-	}
-	for _, reserved := range ReservedIDs {
-		if proposal.Meta.CommitteeId == reserved {
-			return ErrInvalidCommitteeID()
-		}
-	}
-	if err := lib.CheckPaymentPercents(proposal.RewardRecipients.PaymentPercents); err != nil {
+	if err := checkCommitteeId(x.Qc.Header.CommitteeId); err != nil {
 		return err
 	}
-	if proposal.RewardRecipients.NumberOfSamples != 0 {
+	if err := lib.CheckPaymentPercentsSample(results.RewardRecipients.PaymentPercents); err != nil {
+		return err
+	}
+	if results.RewardRecipients.NumberOfSamples != 0 {
 		return ErrInvalidNumOfSamples()
 	}
-	return nil
+	if results.SlashRecipients != nil {
+		if len(results.SlashRecipients.DoubleSigners) > 33 || len(results.SlashRecipients.BadProposers) > 5 { // TODO enforce this at the evidence level to not exceed these limits
+			return ErrInvalidSlashRecipients()
+		}
+	}
+	if results.Checkpoint != nil {
+		if len(results.Checkpoint.BlockHash) > 100 {
+			return lib.ErrInvalidBlockHash()
+		}
+	}
+	return checkOrders(results.Orders)
 }
 
-func (x *MessageProposal) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessageProposal) Name() string                { return MessageProposalName }
-func (x *MessageProposal) New() lib.MessageI           { return new(MessageProposal) }
-func (x *MessageProposal) Recipient() []byte           { return nil }
+func (x *MessageCertificateResults) Name() string      { return MessageCertificateResultsName }
+func (x *MessageCertificateResults) New() lib.MessageI { return new(MessageCertificateResults) }
+func (x *MessageCertificateResults) Recipient() []byte { return nil }
 
-// nolint:all
-func (x MessageProposal) MarshalJSON() ([]byte, error) {
-	return json.Marshal(jsonMessageProposal{
+// MarshalJSON() is the json.Marshaller implementation for MessageProposal
+func (x MessageCertificateResults) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonMessageCertificateResults{
 		Qc: x.Qc,
 	})
 }
 
-func (x *MessageProposal) UnmarshalJSON(b []byte) (err error) {
-	var j jsonMessageProposal
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageProposal
+func (x *MessageCertificateResults) UnmarshalJSON(b []byte) (err error) {
+	var j jsonMessageCertificateResults
 	if err = json.Unmarshal(b, &j); err != nil {
 		return
 	}
-	*x = MessageProposal{
+	*x = MessageCertificateResults{
 		Qc: j.Qc,
 	}
 	return
 }
 
-type jsonMessageProposal struct {
+type jsonMessageCertificateResults struct {
 	Qc *lib.QuorumCertificate `json:"qc,omitempty"`
 }
 
-var _ lib.MessageI = &MessageSubsidy{}
+var _ lib.MessageI = &MessageSubsidy{} // interface enforcement
 
+// Check() validates the Message structure
 func (x *MessageSubsidy) Check() lib.ErrorI {
 	if x == nil {
 		return ErrInvalidSubisdy()
@@ -480,12 +502,11 @@ func (x *MessageSubsidy) Check() lib.ErrorI {
 	return nil
 }
 
-func (x *MessageSubsidy) Bytes() ([]byte, lib.ErrorI) { return lib.Marshal(x) }
-func (x *MessageSubsidy) Name() string                { return MessageSubsidyName }
-func (x *MessageSubsidy) New() lib.MessageI           { return new(MessageSubsidy) }
-func (x *MessageSubsidy) Recipient() []byte           { return nil }
+func (x *MessageSubsidy) Name() string      { return MessageSubsidyName }
+func (x *MessageSubsidy) New() lib.MessageI { return new(MessageSubsidy) }
+func (x *MessageSubsidy) Recipient() []byte { return nil }
 
-// nolint:all
+// MarshalJSON() is the json.Marshaller implementation for MessageSubsidy
 func (x MessageSubsidy) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageSubsidy{
 		Address:     x.Address,
@@ -495,6 +516,7 @@ func (x MessageSubsidy) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageSubsidy
 func (x *MessageSubsidy) UnmarshalJSON(b []byte) (err error) {
 	var j jsonMessageSubsidy
 	if err = json.Unmarshal(b, &j); err != nil {
@@ -516,6 +538,146 @@ type jsonMessageSubsidy struct {
 	Opcode      string       `json:"opcode,omitempty"`
 }
 
+var _ lib.MessageI = &MessageCreateOrder{} // interface enforcement
+
+func (x *MessageCreateOrder) New() lib.MessageI { return new(MessageCreateOrder) }
+func (x *MessageCreateOrder) Name() string      { return MessageCreateOrderName }
+func (x *MessageCreateOrder) Recipient() []byte { return nil }
+
+// Check() validates the Message structure
+func (x *MessageCreateOrder) Check() lib.ErrorI {
+	if err := checkCommitteeId(x.CommitteeId); err != nil {
+		return err
+	}
+	if x.AmountForSale == 0 || x.RequestedAmount == 0 {
+		return ErrInvalidAmount()
+	}
+	return checkExternalAddress(x.SellerReceiveAddress)
+}
+
+// MarshalJSON() is the json.Marshaller implementation for MessageCreateOrder
+func (x *MessageCreateOrder) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonMessageCreateOrder{
+		CommitteeId:          x.CommitteeId,
+		AmountForSale:        x.AmountForSale,
+		RequestedAmount:      x.RequestedAmount,
+		SellerReceiveAddress: x.SellerReceiveAddress,
+		SellersSellAddress:   x.SellersSellAddress,
+	})
+}
+
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageCreateOrder
+func (x *MessageCreateOrder) UnmarshalJSON(b []byte) (err error) {
+	var j jsonMessageCreateOrder
+	if err = json.Unmarshal(b, &j); err != nil {
+		return
+	}
+	*x = MessageCreateOrder{
+		CommitteeId:          j.CommitteeId,
+		AmountForSale:        j.AmountForSale,
+		RequestedAmount:      j.RequestedAmount,
+		SellerReceiveAddress: j.SellerReceiveAddress,
+		SellersSellAddress:   j.SellersSellAddress,
+	}
+	return
+}
+
+type jsonMessageCreateOrder struct {
+	CommitteeId          uint64       `json:"CommitteeId,omitempty"`
+	AmountForSale        uint64       `json:"AmountForSale,omitempty"`
+	RequestedAmount      uint64       `json:"RequestedAmount,omitempty"`
+	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress,omitempty"`
+	SellersSellAddress   lib.HexBytes `json:"SellersSellAddress,omitempty"`
+}
+
+var _ lib.MessageI = &MessageEditOrder{} // interface enforcement
+
+func (x *MessageEditOrder) New() lib.MessageI { return new(MessageEditOrder) }
+func (x *MessageEditOrder) Name() string      { return MessageEditOrderName }
+func (x *MessageEditOrder) Recipient() []byte { return nil }
+
+// Check() validates the Message structure
+func (x *MessageEditOrder) Check() lib.ErrorI {
+	if err := checkCommitteeId(x.CommitteeId); err != nil {
+		return err
+	}
+	if x.AmountForSale == 0 || x.RequestedAmount == 0 {
+		return ErrInvalidAmount()
+	}
+	return checkExternalAddress(x.SellerReceiveAddress)
+}
+
+// MarshalJSON() is the json.Marshaller implementation for MessageEditOrder
+func (x *MessageEditOrder) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonMessageEditOrder{
+		OrderId:              x.OrderId,
+		CommitteeId:          x.CommitteeId,
+		AmountForSale:        x.AmountForSale,
+		RequestedAmount:      x.RequestedAmount,
+		SellerReceiveAddress: x.SellerReceiveAddress,
+	})
+}
+
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageEditOrder
+func (x *MessageEditOrder) UnmarshalJSON(b []byte) (err error) {
+	var j jsonMessageEditOrder
+	if err = json.Unmarshal(b, &j); err != nil {
+		return
+	}
+	*x = MessageEditOrder{
+		OrderId:              j.OrderId,
+		CommitteeId:          j.CommitteeId,
+		AmountForSale:        j.AmountForSale,
+		RequestedAmount:      j.RequestedAmount,
+		SellerReceiveAddress: j.SellerReceiveAddress,
+	}
+	return
+}
+
+type jsonMessageEditOrder struct {
+	OrderId              uint64       `json:"OrderId,omitempty"`
+	CommitteeId          uint64       `json:"CommitteeId,omitempty"`
+	AmountForSale        uint64       `json:"AmountForSale,omitempty"`
+	RequestedAmount      uint64       `json:"RequestedAmount,omitempty"`
+	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress,omitempty"`
+}
+
+var _ lib.MessageI = &MessageDeleteOrder{} // interface enforcement
+
+func (x *MessageDeleteOrder) New() lib.MessageI { return new(MessageDeleteOrder) }
+func (x *MessageDeleteOrder) Name() string      { return MessageDeleteOrderName }
+func (x *MessageDeleteOrder) Recipient() []byte { return nil }
+
+// Check() validates the Message structure
+func (x *MessageDeleteOrder) Check() lib.ErrorI { return checkCommitteeId(x.CommitteeId) }
+
+// MarshalJSON() is the json.Marshaller implementation for MessageEditOrder
+func (x *MessageDeleteOrder) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonMessageDeleteOrder{
+		OrderId:     x.OrderId,
+		CommitteeId: x.CommitteeId,
+	})
+}
+
+// UnmarshalJSON() is the json.Unmarshaler implementation for MessageEditOrder
+func (x *MessageDeleteOrder) UnmarshalJSON(b []byte) (err error) {
+	var j jsonMessageDeleteOrder
+	if err = json.Unmarshal(b, &j); err != nil {
+		return
+	}
+	*x = MessageDeleteOrder{
+		OrderId:     j.OrderId,
+		CommitteeId: j.CommitteeId,
+	}
+	return
+}
+
+type jsonMessageDeleteOrder struct {
+	OrderId     uint64 `json:"OrderId,omitempty"`
+	CommitteeId uint64 `json:"CommitteeId,omitempty"`
+}
+
+// checkAmount() validates the amount sent in the Message
 func checkAmount(amount uint64) lib.ErrorI {
 	if amount == 0 {
 		return ErrInvalidAmount()
@@ -523,6 +685,7 @@ func checkAmount(amount uint64) lib.ErrorI {
 	return nil
 }
 
+// checkAddress() validates the address in the Message
 func checkAddress(address []byte) lib.ErrorI {
 	if address == nil {
 		return ErrAddressEmpty()
@@ -533,14 +696,34 @@ func checkAddress(address []byte) lib.ErrorI {
 	return nil
 }
 
+// checkExternalAddress() validates an address from an external blockchain
+func checkExternalAddress(address []byte) lib.ErrorI {
+	addressLen := len(address)
+	if addressLen < crypto.AddressSize || addressLen > crypto.BLS12381PubKeySize {
+		return ErrAddressSize()
+	}
+	return nil
+}
+
+// checkNetAddress() validates the p2p address in the Message
 func checkNetAddress(netAddress string) lib.ErrorI {
 	netAddressLen := len(netAddress)
 	if netAddressLen < 1 || netAddressLen > 50 {
 		return ErrInvalidNetAddressLen()
 	}
+	// ensure the net address has a port
+	result, err := lib.RemoveIPV4Port(netAddress)
+	if err != nil {
+		return err
+	}
+	// ensure the net address is a valid URL or IPV4
+	if _, e := url.Parse(result); e != nil {
+		return lib.ErrInvalidNetAddressHostAndPort(netAddress)
+	}
 	return nil
 }
 
+// checkOutputAddress() validates the rewards address in the Message
 func checkOutputAddress(output []byte) lib.ErrorI {
 	if output == nil {
 		return ErrOutputAddressEmpty()
@@ -551,6 +734,7 @@ func checkOutputAddress(output []byte) lib.ErrorI {
 	return nil
 }
 
+// checkPubKey() validates the public key in the Message
 func checkPubKey(publicKey []byte) lib.ErrorI {
 	if publicKey == nil {
 		return ErrPublicKeyEmpty()
@@ -561,33 +745,75 @@ func checkPubKey(publicKey []byte) lib.ErrorI {
 	return nil
 }
 
-func checkCommittees(committees []*Committee) lib.ErrorI {
+// checkCommittees() validates the committees list in the message
+func checkCommittees(committees []uint64) lib.ErrorI {
 	numCommittees := len(committees)
-	if numCommittees > 100 || numCommittees == 0 {
+	if numCommittees > 1000 || numCommittees == 0 {
 		return ErrInvalidNumCommittees()
 	}
-	total := uint64(0)
 	for _, committee := range committees {
-		if committee == nil {
-			return ErrInvalidCommittee()
-		}
-		for _, reserved := range ReservedIDs {
-			if committee.Id == reserved {
-				return ErrInvalidCommitteeID()
-			}
-		}
-		total += committee.StakePercent
-		if committee.StakePercent == 0 || total > 100 {
-			return ErrInvalidCommitteeStakeDistribution()
+		if err := checkCommitteeId(committee); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
+func checkCommitteeId(i uint64) lib.ErrorI {
+	for _, reserved := range ReservedIDs {
+		if i == reserved {
+			return ErrInvalidCommitteeID()
+		}
+	}
+	// NOTE: committeeIds should never be GTE MaxUint16, as the 'escrow pool' is just <committeeId + uint16>
+	if i >= EscrowPoolAddend {
+		return ErrInvalidCommitteeID()
+	}
+	return nil
+}
+
+// checkStartEndHeight() validates the start/end height of the message
 func checkStartEndHeight(proposal GovProposal) lib.ErrorI {
 	blockRange := proposal.GetEndHeight() - proposal.GetStartHeight()
 	if 100 > blockRange || blockRange <= 0 {
 		return ErrInvalidBlockRange()
+	}
+	return nil
+}
+
+func checkOrders(orders *lib.Orders) lib.ErrorI {
+	if orders != nil {
+		deDupe := make(map[uint64]struct{})
+		for _, buyOrder := range orders.BuyOrders {
+			if buyOrder == nil {
+				return ErrInvalidBuyOrder()
+			}
+			if _, found := deDupe[buyOrder.OrderId]; found {
+				return ErrDuplicateBuyOrder()
+			}
+			if err := checkAddress(buyOrder.BuyerReceiveAddress); err != nil {
+				return err
+			}
+			if buyOrder.BuyerChainDeadline == 0 {
+				return ErrInvalidBuyerDeadline()
+			}
+			deDupe[buyOrder.OrderId] = struct{}{}
+		}
+
+		deDupe = make(map[uint64]struct{})
+		for _, resetOrder := range orders.ResetOrders {
+			if _, found := deDupe[resetOrder]; found {
+				return ErrInvalidCloseOrder()
+			}
+			deDupe[resetOrder] = struct{}{}
+		}
+		deDupe = make(map[uint64]struct{})
+		for _, closeOrder := range orders.CloseOrders {
+			if _, found := deDupe[closeOrder]; found {
+				return ErrInvalidCloseOrder()
+			}
+			deDupe[closeOrder] = struct{}{}
+		}
 	}
 	return nil
 }

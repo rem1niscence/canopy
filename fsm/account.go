@@ -4,9 +4,11 @@ import (
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
-	"math"
 )
 
+// ACCOUNT CODE BELOW
+
+// GetAccount() returns an Account structure for a specific address
 func (s *StateMachine) GetAccount(address crypto.AddressI) (*types.Account, lib.ErrorI) {
 	bz, err := s.Get(types.KeyForAccount(address))
 	if err != nil {
@@ -20,6 +22,7 @@ func (s *StateMachine) GetAccount(address crypto.AddressI) (*types.Account, lib.
 	return acc, nil
 }
 
+// GetAccounts() returns all Account structures in the state
 func (s *StateMachine) GetAccounts() ([]*types.Account, lib.ErrorI) {
 	it, err := s.Iterator(types.AccountPrefix())
 	if err != nil {
@@ -38,37 +41,20 @@ func (s *StateMachine) GetAccounts() ([]*types.Account, lib.ErrorI) {
 	return result, nil
 }
 
+// GetAccountsPaginated() returns a page of Account structures in the state
 func (s *StateMachine) GetAccountsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
-	it, err := s.Iterator(types.AccountPrefix())
-	if err != nil {
-		return nil, err
-	}
-	defer it.Close()
-	skipIdx, page := p.SkipToIndex(), lib.NewPage(p)
-	page.Type = types.AccountsPageName
-	res := make(types.AccountPage, 0)
-	for i, countOnly := 0, false; it.Valid(); func() { it.Next(); i++ }() {
-		page.TotalCount++
-		switch {
-		case i < skipIdx || countOnly:
-			continue
-		case i == skipIdx+page.PerPage:
-			countOnly = true
-			continue
+	page, res := lib.NewPage(p, types.AccountsPageName), make(types.AccountPage, 0)
+	err = page.Load(types.AccountPrefix(), false, &res, s.store, func(b []byte) (err lib.ErrorI) {
+		acc, err := s.unmarshalAccount(b)
+		if err == nil {
+			res = append(res, acc)
 		}
-		var acc *types.Account
-		acc, err = s.unmarshalAccount(it.Value())
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, acc)
-		page.Results = &res
-		page.Count++
-	}
-	page.TotalPages = int(math.Ceil(float64(page.TotalCount) / float64(page.PerPage)))
+		return
+	})
 	return
 }
 
+// GetAccountBalance() returns the balance of an Account at a specific address
 func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (uint64, lib.ErrorI) {
 	account, err := s.GetAccount(address)
 	if err != nil {
@@ -77,6 +63,7 @@ func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (uint64, lib.E
 	return account.Amount, nil
 }
 
+// SetAccount() upserts an account into the state
 func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
 	bz, err := s.marshalAccount(account)
 	if err != nil {
@@ -89,6 +76,7 @@ func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
 	return nil
 }
 
+// SetAccount() upserts multiple accounts into the state
 func (s *StateMachine) SetAccounts(accounts []*types.Account, supply *types.Supply) lib.ErrorI {
 	for _, acc := range accounts {
 		supply.Total += acc.Amount
@@ -99,13 +87,15 @@ func (s *StateMachine) SetAccounts(accounts []*types.Account, supply *types.Supp
 	return nil
 }
 
+// AccountDeductFees() removes fees from a specific address and adds them to the Canopy reward pool
 func (s *StateMachine) AccountDeductFees(address crypto.AddressI, fee uint64) lib.ErrorI {
 	if err := s.AccountSub(address, fee); err != nil {
 		return err
 	}
-	return s.PoolAdd(types.FEE_Pool_ID, fee)
+	return s.PoolAdd(lib.CanopyCommitteeId, fee)
 }
 
+// MintToAccount() adds newly created tokens to an Account
 func (s *StateMachine) MintToAccount(address crypto.AddressI, amount uint64) lib.ErrorI {
 	if err := s.AddToTotalSupply(amount); err != nil {
 		return err
@@ -113,6 +103,7 @@ func (s *StateMachine) MintToAccount(address crypto.AddressI, amount uint64) lib
 	return s.AccountAdd(address, amount)
 }
 
+// AccountAdd() adds tokens to an Account
 func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd uint64) lib.ErrorI {
 	account, err := s.GetAccount(address)
 	if err != nil {
@@ -122,6 +113,7 @@ func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd uint64) l
 	return s.SetAccount(account)
 }
 
+// AccountSub() removes tokens from an Account
 func (s *StateMachine) AccountSub(address crypto.AddressI, amountToSub uint64) lib.ErrorI {
 	account, err := s.GetAccount(address)
 	if err != nil {
@@ -134,6 +126,7 @@ func (s *StateMachine) AccountSub(address crypto.AddressI, amountToSub uint64) l
 	return s.SetAccount(account)
 }
 
+// unmarshalAccount() converts bytes into an Account structure
 func (s *StateMachine) unmarshalAccount(bz []byte) (*types.Account, lib.ErrorI) {
 	acc := new(types.Account)
 	if err := lib.Unmarshal(bz, acc); err != nil {
@@ -142,12 +135,20 @@ func (s *StateMachine) unmarshalAccount(bz []byte) (*types.Account, lib.ErrorI) 
 	return acc, nil
 }
 
+// marshalAccount() converts an Account structure into bytes
 func (s *StateMachine) marshalAccount(account *types.Account) ([]byte, lib.ErrorI) {
 	return lib.Marshal(account)
 }
 
-// Pool logic below
+// POOL CODE BELOW
 
+/*
+	Pools are owner-less designation funds that are 'earmarked' for a purpose
+	NOTE: A distinct structure for pools are used instead of a 'hard-coded account address'
+	to simply prove that no-one owns the private key for that account
+*/
+
+// GetPool() returns a Pool structure for a specific ID
 func (s *StateMachine) GetPool(id uint64) (*types.Pool, lib.ErrorI) {
 	bz, err := s.Get(types.KeyForPool(id))
 	if err != nil {
@@ -161,6 +162,7 @@ func (s *StateMachine) GetPool(id uint64) (*types.Pool, lib.ErrorI) {
 	return pool, nil
 }
 
+// GetPools() returns all Pool structures in the state
 func (s *StateMachine) GetPools() ([]*types.Pool, lib.ErrorI) {
 	it, err := s.Iterator(types.PoolPrefix())
 	if err != nil {
@@ -179,37 +181,20 @@ func (s *StateMachine) GetPools() ([]*types.Pool, lib.ErrorI) {
 	return result, nil
 }
 
+// GetPoolsPaginated() returns a particular page of Pool structures in the state
 func (s *StateMachine) GetPoolsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
-	it, err := s.Iterator(types.PoolPrefix())
-	if err != nil {
-		return nil, err
-	}
-	defer it.Close()
-	skipIdx, page := p.SkipToIndex(), lib.NewPage(p)
-	page.Type = types.PoolPageName
-	res := make(types.PoolPage, 0)
-	for i, countOnly := 0, false; it.Valid(); func() { it.Next(); i++ }() {
-		page.TotalCount++
-		switch {
-		case i < skipIdx || countOnly:
-			continue
-		case i == skipIdx+page.PerPage:
-			countOnly = true
-			continue
+	res, page := make(types.PoolPage, 0), lib.NewPage(p, types.PoolPageName)
+	err = page.Load(types.PoolPrefix(), false, &res, s.store, func(b []byte) (err lib.ErrorI) {
+		acc, err := s.unmarshalPool(b)
+		if err == nil {
+			res = append(res, acc)
 		}
-		var acc *types.Pool
-		acc, err = s.unmarshalPool(it.Value())
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, acc)
-		page.Results = &res
-		page.Count++
-	}
-	page.TotalPages = int(math.Ceil(float64(page.TotalCount) / float64(page.PerPage)))
+		return
+	})
 	return
 }
 
+// GetPoolBalance() returns the balance of a Pool at an ID
 func (s *StateMachine) GetPoolBalance(id uint64) (uint64, lib.ErrorI) {
 	pool, err := s.GetPool(id)
 	if err != nil {
@@ -218,16 +203,7 @@ func (s *StateMachine) GetPoolBalance(id uint64) (uint64, lib.ErrorI) {
 	return pool.Amount, nil
 }
 
-func (s *StateMachine) SetPools(pools []*types.Pool, supply *types.Supply) lib.ErrorI {
-	for _, pool := range pools {
-		supply.Total += pool.Amount
-		if err := s.SetPool(pool); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
+// SetPool() upserts a Pool structure into the state
 func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
 	bz, err := s.marshalPool(pool)
 	if err != nil {
@@ -239,6 +215,18 @@ func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
 	return nil
 }
 
+// SetPools() upserts multiple Pool structures into the state
+func (s *StateMachine) SetPools(pools []*types.Pool, supply *types.Supply) lib.ErrorI {
+	for _, pool := range pools {
+		supply.Total += pool.Amount
+		if err := s.SetPool(pool); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// MintToPool() adds newly created tokens to the Pool structure
 func (s *StateMachine) MintToPool(id uint64, amount uint64) lib.ErrorI {
 	if err := s.AddToTotalSupply(amount); err != nil {
 		return err
@@ -246,6 +234,7 @@ func (s *StateMachine) MintToPool(id uint64, amount uint64) lib.ErrorI {
 	return s.PoolAdd(id, amount)
 }
 
+// PoolAdd() adds tokens to the Pool structure
 func (s *StateMachine) PoolAdd(id uint64, amountToAdd uint64) lib.ErrorI {
 	pool, err := s.GetPool(id)
 	if err != nil {
@@ -255,6 +244,7 @@ func (s *StateMachine) PoolAdd(id uint64, amountToAdd uint64) lib.ErrorI {
 	return s.SetPool(pool)
 }
 
+// PoolSub() removes tokens from the Pool structure
 func (s *StateMachine) PoolSub(id uint64, amountToSub uint64) lib.ErrorI {
 	pool, err := s.GetPool(id)
 	if err != nil {
@@ -267,6 +257,7 @@ func (s *StateMachine) PoolSub(id uint64, amountToSub uint64) lib.ErrorI {
 	return s.SetPool(pool)
 }
 
+// unmarshalPool() coverts bytes into a Pool structure
 func (s *StateMachine) unmarshalPool(bz []byte) (*types.Pool, lib.ErrorI) {
 	pool := new(types.Pool)
 	if err := lib.Unmarshal(bz, pool); err != nil {
@@ -275,12 +266,19 @@ func (s *StateMachine) unmarshalPool(bz []byte) (*types.Pool, lib.ErrorI) {
 	return pool, nil
 }
 
+// marshalPool() coverts a Pool structure into bytes
 func (s *StateMachine) marshalPool(pool *types.Pool) ([]byte, lib.ErrorI) {
 	return lib.Marshal(pool)
 }
 
-// supply logic below
+// SUPPLY CODE BELOW
 
+/*
+	Supply structure provides an organized view of the overall financial status,
+    showing both the total amount available and how it's distributed among various pools and purposes.
+*/
+
+// AddToStakedSupply() adds to the staked supply count
 func (s *StateMachine) AddToStakedSupply(amount uint64) lib.ErrorI {
 	supply, err := s.GetSupply()
 	if err != nil {
@@ -290,6 +288,7 @@ func (s *StateMachine) AddToStakedSupply(amount uint64) lib.ErrorI {
 	return s.SetSupply(supply)
 }
 
+// AddToTotalSupply() adds to the total supply count
 func (s *StateMachine) AddToTotalSupply(amount uint64) lib.ErrorI {
 	supply, err := s.GetSupply()
 	if err != nil {
@@ -299,48 +298,22 @@ func (s *StateMachine) AddToTotalSupply(amount uint64) lib.ErrorI {
 	return s.SetSupply(supply)
 }
 
+// AddToCommitteeStakedSupply() adds to the committee staked supply count
 func (s *StateMachine) AddToCommitteeStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
-	supply, err := s.GetSupply()
-	if err != nil {
-		return err
-	}
-	targetIdx, committee := 0, &types.Pool{}
-	for i, c := range supply.CommitteesWithDelegations {
-		if c.Id == committeeId {
-			committee, targetIdx = c, i
-			break
-		}
-	}
-	if committee == nil || committee.Amount < amount {
-		return types.ErrInsufficientSupply()
-	}
-	committee.Amount += amount
-	supply.CommitteesWithDelegations[targetIdx] = committee
-	supply.SortCommittees()
-	return s.SetSupply(supply)
+	return s.addToSupplyPool(committeeId, amount, 0)
 }
 
+// AddToDelegateStakedSupply() adds to the delegate staked supply count
 func (s *StateMachine) AddToDelegateStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
-	supply, err := s.GetSupply()
-	if err != nil {
-		return err
-	}
-	targetIdx, delegations := 0, &types.Pool{}
-	for i, c := range supply.DelegationsOnly {
-		if c.Id == committeeId {
-			delegations, targetIdx = c, i
-			break
-		}
-	}
-	if delegations == nil || delegations.Amount < amount {
-		return types.ErrInsufficientSupply()
-	}
-	delegations.Amount += amount
-	supply.DelegationsOnly[targetIdx] = delegations
-	supply.SortCommittees()
-	return s.SetSupply(supply)
+	return s.addToSupplyPool(committeeId, amount, 1)
 }
 
+// AddToEscrowedSupply() adds to the escrowed staked supply count
+func (s *StateMachine) AddToEscrowedSupply(committeeId uint64, amount uint64) lib.ErrorI {
+	return s.addToSupplyPool(committeeId, amount, 2)
+}
+
+// SubFromTotalSupply() removes from the total supply count
 func (s *StateMachine) SubFromTotalSupply(amount uint64) lib.ErrorI {
 	supply, err := s.GetSupply()
 	if err != nil {
@@ -353,6 +326,7 @@ func (s *StateMachine) SubFromTotalSupply(amount uint64) lib.ErrorI {
 	return s.SetSupply(supply)
 }
 
+// SubFromStakedSupply() removes from the staked supply count
 func (s *StateMachine) SubFromStakedSupply(amount uint64) lib.ErrorI {
 	supply, err := s.GetSupply()
 	if err != nil {
@@ -365,48 +339,22 @@ func (s *StateMachine) SubFromStakedSupply(amount uint64) lib.ErrorI {
 	return s.SetSupply(supply)
 }
 
+// SubFromCommitteeStakedSupply() removes from the committee staked supply count
 func (s *StateMachine) SubFromCommitteeStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
-	supply, err := s.GetSupply()
-	if err != nil {
-		return err
-	}
-	targetIdx, committee := 0, &types.Pool{}
-	for i, c := range supply.CommitteesWithDelegations {
-		if c.Id == committeeId {
-			committee, targetIdx = c, i
-			break
-		}
-	}
-	if committee == nil || committee.Amount < amount {
-		return types.ErrInsufficientSupply()
-	}
-	committee.Amount -= amount
-	supply.CommitteesWithDelegations[targetIdx] = committee
-	supply.SortCommittees()
-	return s.SetSupply(supply)
+	return s.subFromSupplyPool(committeeId, amount, 0)
 }
 
+// SubFromDelegateStakedSupply() removes from the delegate committee staked supply count
 func (s *StateMachine) SubFromDelegateStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
-	supply, err := s.GetSupply()
-	if err != nil {
-		return err
-	}
-	targetIdx, delegations := 0, &types.Pool{}
-	for i, c := range supply.CommitteesWithDelegations {
-		if c.Id == committeeId {
-			delegations, targetIdx = c, i
-			break
-		}
-	}
-	if delegations == nil || delegations.Amount < amount {
-		return types.ErrInsufficientSupply()
-	}
-	delegations.Amount -= amount
-	supply.CommitteesWithDelegations[targetIdx] = delegations
-	supply.SortDelegations()
-	return s.SetSupply(supply)
+	return s.subFromSupplyPool(committeeId, amount, 1)
 }
 
+// SubFromEscrowedSupply() removes from the delegate committee staked supply count
+func (s *StateMachine) SubFromEscrowedSupply(committeeId uint64, amount uint64) lib.ErrorI {
+	return s.subFromSupplyPool(committeeId, amount, 2)
+}
+
+// GetSupply() returns the Supply structure held in the state
 func (s *StateMachine) GetSupply() (*types.Supply, lib.ErrorI) {
 	bz, err := s.Get(types.SupplyPrefix())
 	if err != nil {
@@ -415,6 +363,7 @@ func (s *StateMachine) GetSupply() (*types.Supply, lib.ErrorI) {
 	return s.unmarshalSupply(bz)
 }
 
+// SetSupply() upserts the Supply structure into the state
 func (s *StateMachine) SetSupply(supply *types.Supply) lib.ErrorI {
 	bz, err := s.marshalSupply(supply)
 	if err != nil {
@@ -426,14 +375,79 @@ func (s *StateMachine) SetSupply(supply *types.Supply) lib.ErrorI {
 	return nil
 }
 
-func (s *StateMachine) marshalSupply(supply *types.Supply) ([]byte, lib.ErrorI) {
-	return lib.Marshal(supply)
-}
-
+// unmarshalSupply() converts bytes into the supply
 func (s *StateMachine) unmarshalSupply(bz []byte) (*types.Supply, lib.ErrorI) {
 	supply := new(types.Supply)
 	if err := lib.Unmarshal(bz, supply); err != nil {
 		return nil, err
 	}
 	return supply, nil
+}
+
+// marshalSupply() converts the Supply into bytes
+func (s *StateMachine) marshalSupply(supply *types.Supply) ([]byte, lib.ErrorI) {
+	return lib.Marshal(supply)
+}
+
+// addToSupplyPool() adds to a supply pool using an addition callback with 'executeOnSupplyPool'
+func (s *StateMachine) addToSupplyPool(committeeId, amount uint64, targetType int) lib.ErrorI {
+	return s.executeOnSupplyPool(committeeId, targetType, func(p *types.Pool) (err lib.ErrorI) {
+		p.Amount += amount
+		return
+	})
+}
+
+// subFromSupplyPool() subtracts from a supply pool using a subtraction callback with 'executeOnSupplyPool'
+func (s *StateMachine) subFromSupplyPool(committeeId, amount uint64, targetType int) lib.ErrorI {
+	return s.executeOnSupplyPool(committeeId, targetType, func(p *types.Pool) (err lib.ErrorI) {
+		if p == nil || p.Amount < amount {
+			return types.ErrInsufficientSupply()
+		}
+		p.Amount -= amount
+		return
+	})
+}
+
+// executeOnSupplyPool() finds a target pool using the target type and committeeId and executes a callback on it
+func (s *StateMachine) executeOnSupplyPool(committeeId uint64, targetType int, callback func(p *types.Pool) lib.ErrorI) lib.ErrorI {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	// determine the type of the target
+	var arr *[]*types.Pool
+	switch targetType {
+	case 0:
+		arr = &supply.CommitteesWithDelegations
+	case 1:
+		arr = &supply.DelegationsOnly
+	case 2:
+		arr = &supply.Escrowed
+	}
+	// locate the target pool
+	targetPool := s.findOrCreateSupplyPool(arr, committeeId)
+	// execute the business logic callback
+	if err = callback(targetPool); err != nil {
+		return err
+	}
+	// filter zeroes and sort the pool
+	// this prevents dead committees from bloating
+	// the supply structure
+	types.FilterAndSortPool(arr)
+	// finally set the supply
+	return s.SetSupply(supply)
+}
+
+// findOrCreateSupplyPool() searches for a pool by committeeId or creates a new one if not found
+func (s *StateMachine) findOrCreateSupplyPool(poolArr *[]*types.Pool, committeeId uint64) (pool *types.Pool) {
+	// iterate through the list looking for the supply pool
+	for _, pool = range *poolArr {
+		if pool.Id == committeeId {
+			return
+		}
+	}
+	// if pool not found, add it to the list
+	pool = &types.Pool{}
+	*poolArr = append(*poolArr, pool)
+	return
 }

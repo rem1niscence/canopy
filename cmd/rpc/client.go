@@ -323,12 +323,12 @@ func (c *Client) TxSend(from, rec string, amt uint64, pwd string, submit bool, o
 	})
 }
 
-func (c *Client) TxStake(from, netAddr string, amt uint64, committees, output string, delegate bool, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
-	return c.txStake(from, netAddr, amt, committees, output, delegate, pwd, submit, false, optFee)
+func (c *Client) TxStake(from, netAddr string, amt uint64, committees, output string, delegate, earlyWithdrawal bool, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txStake(from, netAddr, amt, committees, output, delegate, earlyWithdrawal, pwd, submit, false, optFee)
 }
 
-func (c *Client) TxEditStake(from, netAddr string, amt uint64, committees, output string, delegate bool, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
-	return c.txStake(from, netAddr, amt, committees, output, delegate, pwd, submit, true, optFee)
+func (c *Client) TxEditStake(from, netAddr string, amt uint64, committees, output string, delegate, earlyWithdrawal bool, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txStake(from, netAddr, amt, committees, output, delegate, earlyWithdrawal, pwd, submit, true, optFee)
 }
 
 func (c *Client) TxUnstake(from, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
@@ -456,7 +456,7 @@ func (c *Client) txAddress(route string, from, pwd string, submit bool, optFee u
 	})
 }
 
-func (c *Client) txStake(from, netAddr string, amt uint64, committees, output string, delegate bool, pwd string, submit, edit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+func (c *Client) txStake(from, netAddr string, amt uint64, committees, output string, delegate, earlyWithdrawal bool, pwd string, submit, edit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	route := TxStakeRouteName
 	if edit {
 		route = TxEditStakeRouteName
@@ -471,6 +471,7 @@ func (c *Client) txStake(from, netAddr string, amt uint64, committees, output st
 		Output:               output,
 		Fee:                  optFee,
 		Delegate:             delegate,
+		EarlyWithdrawal:      earlyWithdrawal,
 		Submit:               submit,
 		addressRequest:       addressRequest{Address: fromHex},
 		passwordRequest:      passwordRequest{Password: pwd},

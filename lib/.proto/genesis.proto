@@ -5,16 +5,18 @@ option go_package = "github.com/ginchuco/ginchu/fsm/types";
 
 import "account.proto";
 import "validator.proto";
-import "validators.proto";
+import "proposal.proto";
 import "gov.proto";
+import "swap.proto";
 
 message GenesisState {
   uint64 time = 1;
   repeated Pool pools = 2;
   repeated Account accounts = 3;
   repeated Validator validators = 4;
-  repeated NonSigner non_signers = 5; // only used for export debugging
-  ConsensusValidators cons_validators = 6; // only used for export debugging
-  Params params = 7;
-  Supply supply = 8; // only used for export debugging
+  repeated NonSigner non_signers = 5; // only used for export
+  repeated DoubleSigner double_signers = 6; // only used for export
+  OrderBooks order_books = 7;
+  Params params = 8;
+  Supply supply = 9; // only used for export
 }

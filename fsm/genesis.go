@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 )
 
+// NewFromGenesisFile() creates a new beginning state from a file
 func (s *StateMachine) NewFromGenesisFile() lib.ErrorI {
 	genesis, err := s.ReadGenesisFromFile()
 	if err != nil {
@@ -23,6 +24,7 @@ func (s *StateMachine) NewFromGenesisFile() lib.ErrorI {
 	return nil
 }
 
+// ReadGenesisFromFile() reads a GenesisState object from a file
 func (s *StateMachine) ReadGenesisFromFile() (genesis *types.GenesisState, e lib.ErrorI) {
 	genesis = new(types.GenesisState)
 	bz, err := os.ReadFile(filepath.Join(s.Config.DataDirPath, lib.GenesisFilePath))
@@ -36,6 +38,7 @@ func (s *StateMachine) ReadGenesisFromFile() (genesis *types.GenesisState, e lib
 	return
 }
 
+// NewStateFromGenesis() creates a new beginning state using a GenesisState object
 func (s *StateMachine) NewStateFromGenesis(genesis *types.GenesisState) lib.ErrorI {
 	supply := new(types.Supply)
 	if err := s.SetAccounts(genesis.Accounts, supply); err != nil {
@@ -47,14 +50,20 @@ func (s *StateMachine) NewStateFromGenesis(genesis *types.GenesisState) lib.Erro
 	if err := s.SetValidators(genesis.Validators, supply); err != nil {
 		return err
 	}
+	if genesis.OrderBooks != nil {
+		if err := s.SetOrderBooks(genesis.OrderBooks, supply); err != nil {
+			return err
+		}
+	}
 	if err := s.SetSupply(supply); err != nil {
 		return err
 	}
 	return s.SetParams(genesis.Params)
 }
 
+// ValidateGenesisState() validates a GenesisState object
 func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.ErrorI {
-	if err := genesis.Params.Validate(); err != nil {
+	if err := genesis.Params.Check(); err != nil {
 		return err
 	}
 	for _, val := range genesis.Validators {
@@ -87,6 +96,7 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.Err
 	return nil
 }
 
+// ExportState() creates a GenesisState object from the current state
 func (s *StateMachine) ExportState() (genesis *types.GenesisState, err lib.ErrorI) {
 	genesis = new(types.GenesisState)
 	genesis.Accounts, err = s.GetAccounts()
@@ -101,10 +111,6 @@ func (s *StateMachine) ExportState() (genesis *types.GenesisState, err lib.Error
 	if err != nil {
 		return nil, err
 	}
-	genesis.ConsValidators, err = s.GetConsensusValidators(true)
-	if err != nil {
-		return nil, err
-	}
 	genesis.Params, err = s.GetParams()
 	if err != nil {
 		return nil, err
@@ -113,27 +119,17 @@ func (s *StateMachine) ExportState() (genesis *types.GenesisState, err lib.Error
 	if err != nil {
 		return nil, err
 	}
+	genesis.DoubleSigners, err = s.GetDoubleSigners()
+	if err != nil {
+		return nil, err
+	}
+	genesis.OrderBooks, err = s.GetOrderBooks()
+	if err != nil {
+		return nil, err
+	}
 	genesis.Supply, err = s.GetSupply()
 	if err != nil {
 		return nil, err
 	}
 	return genesis, nil
-}
-
-func (s *StateMachine) GenesisBlockHeader() (*lib.BlockHeader, lib.ErrorI) {
-	genesis, err := s.ReadGenesisFromFile()
-	if err != nil {
-		return nil, err
-	}
-	return &lib.BlockHeader{
-		Hash:              lib.MaxHash,
-		NetworkId:         s.Config.NetworkID,
-		Time:              genesis.Time,
-		LastBlockHash:     lib.MaxHash,
-		StateRoot:         lib.MaxHash,
-		TransactionRoot:   lib.MaxHash,
-		ValidatorRoot:     lib.MaxHash,
-		NextValidatorRoot: lib.MaxHash,
-		ProposerAddress:   lib.MaxAddress,
-	}, nil
 }

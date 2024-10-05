@@ -4,6 +4,8 @@ package types;
 option go_package = "github.com/ginchuco/ginchu/lib";
 
 import "tx.proto";
+import "consensus.proto";
+
 
 message BlockHeader {
   uint64 height = 1;
@@ -12,12 +14,14 @@ message BlockHeader {
   uint64 time = 4;
   uint64 num_txs = 5;
   uint64 total_txs = 6;
-  bytes last_block_hash = 7;
-  bytes state_root = 8;
-  bytes transaction_root = 9;
-  bytes validator_root = 10;
-  bytes next_validator_root = 11;
-  bytes proposer_address = 12;
+  uint64 total_vdf_iterations = 7;
+  bytes last_block_hash = 8;
+  bytes state_root = 9;
+  bytes transaction_root = 10;
+  bytes validator_root = 11;
+  bytes next_validator_root = 12;
+  bytes proposer_address = 13;
+  VDF vdf = 14;
   QuorumCertificate last_quorum_certificate = 15;
 }
 
@@ -35,78 +39,4 @@ message BlockResult {
 message BlockResultMeta {
   uint64 size = 1;
   string took = 2;
-}
-
-message ProposerKeys {
-  repeated bytes proposer_keys = 1;
-}
-
-enum Phase {
-  UNKNOWN = 0;
-  ELECTION = 1;
-  ELECTION_VOTE = 2;
-  PROPOSE = 3;
-  PROPOSE_VOTE = 4;
-  PRECOMMIT = 5;
-  PRECOMMIT_VOTE = 6;
-  COMMIT = 7;
-  COMMIT_PROCESS = 8;
-  ROUND_INTERRUPT = 9;
-  PACEMAKER = 10;
-}
-
-message QuorumCertificate {
-  View header = 1; // replica vote view
-  Proposal proposal = 2; // used for PROPOSE
-  bytes proposal_hash = 3; // used after PROPOSE
-  bytes proposer_key = 4; // only EV and PROPOSE
-  AggregateSignature signature = 5; // aggregate signature from the current proposer message
-}
-
-message Proposal {
-  // BLOCK
-  bytes block = 1; // Carries the block, omitted in txn form
-  bytes block_hash = 2; // Maintain the block hash, included in the canopy proper blockchain
-  // PAYMENT PERCENTS
-  RewardRecipients reward_recipients = 3;
-  // SECURITY INFO
-  ProposalMeta Meta = 4;
-}
-
-message RewardRecipients {
-  repeated PaymentPercents payment_percents = 1; // recipients of the block reward by percentage
-  uint64 number_of_samples = 2;
-}
-
-message ProposalMeta {
-  uint64 committee_id = 1; // identifier
-  uint64 committee_height = 2; // Needed to allow integrated-chains to validate the proposal
-  uint64 chain_height = 3; // Needed to prevent replay attacks
-  repeated DoubleSigners double_signers = 4; // who did the bft decide was a double signer
-  repeated bytes bad_proposers = 5; // who did the bft decide was a bad proposer
-}
-
-message Proposals {
-  repeated Proposal proposals = 1;
-}
-
-message PaymentPercents {
-  bytes address = 1;
-  uint64 percent = 2;
-}
-
-message DoubleSigners {
-  bytes pubKey = 1;
-  repeated uint64 heights = 2;
-}
-
-message View {
-  uint64 height = 1;
-  uint64 round = 2;
-  Phase phase = 3;
-}
-
-message AggregateSignature {
-  bytes signature = 1;
-  bytes bitmap = 2;
 }

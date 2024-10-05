@@ -99,6 +99,16 @@ func NewPublicKeyFromString(s string) (PublicKeyI, error) {
 }
 
 func NewPublicKeyFromBytes(bz []byte) (PublicKeyI, error) {
+	switch len(bz) {
+	case Ed25519PubKeySize:
+		return NewED25519PubKeyFromBytes(bz), nil
+	case Secp256K1PubKeySize:
+		return NewPublicKeySecp256K1(bz)
+	case BLS12381PubKeySize:
+		return NewBLSPublicKeyFromBytes(bz)
+	default:
+
+	}
 	if len(bz) == Ed25519PubKeySize {
 		return NewED25519PubKeyFromBytes(bz), nil
 	} else {

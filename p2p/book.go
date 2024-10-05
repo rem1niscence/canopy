@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"sort"
 	"sync"
@@ -332,6 +333,10 @@ func (p *P2P) GetBookPeers() []*BookPeer { return p.book.GetAll() }
 func (p *PeerBook) WriteToFile() error {
 	configBz, err := json.MarshalIndent(p, "", "  ")
 	if err != nil {
+		return err
+	}
+	// create all necessary directories
+	if err = os.MkdirAll(filepath.Dir(p.path), os.ModePerm); err != nil {
 		return err
 	}
 	return os.WriteFile(p.path, configBz, os.ModePerm)

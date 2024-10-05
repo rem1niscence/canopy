@@ -22,18 +22,22 @@ message ConsensusParams {
 
 message ValidatorParams {
   uint64 validator_min_stake = 1;
-  uint64 validator_max_count = 2;
-  uint64 validator_unstaking_blocks = 3;
-  uint64 validator_max_pause_blocks = 5;
-  uint64 validator_double_sign_slash_percentage = 6;
-  uint64 validator_bad_proposal_slash_percentage = 7;
-  uint64 validator_non_sign_slash_percentage = 8;
-  uint64 validator_max_non_sign = 9;
-  uint64 validator_non_sign_window = 10;
-  uint64 validator_block_reward = 11;
-  uint64 validator_max_committees = 12;
-  uint64 validator_max_committee_size = 13;
-  uint64 validator_committee_reward = 14;
+  uint64 validator_unstaking_blocks = 2;
+  uint64 validator_max_pause_blocks = 3;
+  uint64 validator_double_sign_slash_percentage = 4;
+  uint64 validator_bad_proposal_slash_percentage = 5;
+  uint64 validator_non_sign_slash_percentage = 6;
+  uint64 validator_max_non_sign = 7;
+  uint64 validator_non_sign_window = 8;
+  uint64 validator_max_committees = 9;
+  uint64 validator_max_committee_size = 10;
+  uint64 validator_committee_reward = 11;
+  uint64 validator_early_withdrawal_penalty = 12;
+  uint64 validator_delegate_unstaking_blocks = 13;
+  uint64 validator_minimum_order_size = 14;
+  uint64 validator_order_expiration_blocks = 15;
+  uint64 validator_minimum_percent_for_paid_committee = 16;
+  uint64 validator_max_slash_per_committee = 17;
 }
 
 message FeeParams {
@@ -45,8 +49,11 @@ message FeeParams {
   uint64 message_unpause_fee = 6;
   uint64 message_change_parameter_fee = 7;
   uint64 message_dao_transfer_fee = 8;
-  uint64 message_proposal_fee = 9;
+  uint64 message_certificate_results_fee = 9;
   uint64 message_subsidy_fee = 10;
+  uint64 message_create_order_fee = 11;
+  uint64 message_edit_order_fee = 12;
+  uint64 message_delete_order_fee = 13;
 }
 
 message GovernanceParams {

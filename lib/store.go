@@ -5,58 +5,76 @@ import (
 	"github.com/ginchuco/ginchu/lib/crypto"
 )
 
+/*
+	Persistence interfaces
+*/
+
+// StoreI defines the interface for interacting with blockchain storage
 type StoreI interface {
-	RWStoreI
-	ProveStoreI
-	RWIndexerI
-	NewTxn() StoreTxnI
-	Root() ([]byte, ErrorI)
-	DB() *badger.DB
-	Version() uint64
-	Copy() (StoreI, ErrorI)
-	NewReadOnly(version uint64) (StoreI, ErrorI)
-	Commit() (root []byte, err ErrorI)
-	Discard()
-	Reset()
-	Close() ErrorI
+	RWStoreI                                     // reading and writing
+	ProveStoreI                                  // proving membership / non-membership
+	RWIndexerI                                   // reading and writing indexer
+	NewTxn() StoreTxnI                           // wrap the store in a discardable txn
+	Root() ([]byte, ErrorI)                      // get the merkle root from the store
+	DB() *badger.DB                              // retrieve the underlying badger db
+	Version() uint64                             // access the height of the store
+	Copy() (StoreI, ErrorI)                      // make a clone of the store
+	NewReadOnly(version uint64) (StoreI, ErrorI) // historical read only version of the store
+	Commit() (root []byte, err ErrorI)           // save the store and increment the height
+	Discard()                                    // discard the underlying writer
+	Reset()                                      // reset the underlying writer
+	Close() ErrorI                               // gracefully stop the database
 }
 
+// ReadOnlyStoreI defines a Read-Only interface for accessing the blockchain storage including membership and non-membership proofs
 type ReadOnlyStoreI interface {
 	ProveStoreI
 	RStoreI
 	RIndexerI
 }
 
+// RWStoreI defines the Read/Write interface for basic db CRUD operations
 type RWStoreI interface {
 	RStoreI
 	WStoreI
 }
 
+// RWIndexerI defines the Read/Write interface for indexing operations
 type RWIndexerI interface {
 	WIndexerI
 	RIndexerI
 }
 
+// WIndexerI defines the write interface for the indexing operations
 type WIndexerI interface {
-	IndexQC(qc *QuorumCertificate) ErrorI
-	IndexTx(result *TxResult) ErrorI
-	IndexBlock(b *BlockResult) ErrorI
-	DeleteTxsForHeight(height uint64) ErrorI
-	DeleteBlockForHeight(height uint64) ErrorI
-	DeleteQCForHeight(height uint64) ErrorI
+	IndexQC(qc *QuorumCertificate) ErrorI                              // save a quorum certificate by height
+	IndexTx(result *TxResult) ErrorI                                   // save a tx by hash, height.index, sender, and recipient
+	IndexBlock(b *BlockResult) ErrorI                                  // save a block by hash and height
+	IndexDoubleSigner(address []byte, height uint64) ErrorI            // save a double signer for a height
+	IndexCheckpoint(committeeId uint64, checkpoint *Checkpoint) ErrorI // save a checkpoint for a committee chain
+	DeleteTxsForHeight(height uint64) ErrorI                           // deletes all transactions for a height
+	DeleteBlockForHeight(height uint64) ErrorI                         // deletes a block and transaction data for a height
+	DeleteQCForHeight(height uint64) ErrorI                            // deletes a certificate for a height
 }
 
+// RIndexerI defines the read interface for the indexing operations
 type RIndexerI interface {
-	GetTxByHash(hash []byte) (*TxResult, ErrorI)
-	GetTxsByHeight(height uint64, newestToOldest bool, p PageParams) (*Page, ErrorI)
-	GetTxsBySender(address crypto.AddressI, newestToOldest bool, p PageParams) (*Page, ErrorI)
-	GetTxsByRecipient(address crypto.AddressI, newestToOldest bool, p PageParams) (*Page, ErrorI)
-	GetBlockByHash(hash []byte) (*BlockResult, ErrorI)
-	GetBlockByHeight(height uint64) (*BlockResult, ErrorI)
-	GetBlocks(p PageParams) (*Page, ErrorI)
-	GetQCByHeight(height uint64) (*QuorumCertificate, ErrorI)
+	GetTxByHash(hash []byte) (*TxResult, ErrorI)                                                  // get the tx by the Transaction hash
+	GetTxsByHeight(height uint64, newestToOldest bool, p PageParams) (*Page, ErrorI)              // get Transactions for a height
+	GetTxsBySender(address crypto.AddressI, newestToOldest bool, p PageParams) (*Page, ErrorI)    // get Transactions for a sender
+	GetTxsByRecipient(address crypto.AddressI, newestToOldest bool, p PageParams) (*Page, ErrorI) // get Transactions for a recipient
+	GetBlockByHash(hash []byte) (*BlockResult, ErrorI)                                            // get a block by hash
+	GetBlockByHeight(height uint64) (*BlockResult, ErrorI)                                        // get a block by height
+	GetBlocks(p PageParams) (*Page, ErrorI)                                                       // get a page of blocks within the page params
+	GetQCByHeight(height uint64) (*QuorumCertificate, ErrorI)                                     // get certificate for a height
+	GetDoubleSigners() ([]*DoubleSigner, ErrorI)                                                  // all double signers in the indexer
+	IsValidDoubleSigner(address []byte, height uint64) (bool, ErrorI)                             //  get if the DoubleSigner is already set for a height
+	GetCheckpoint(committeeId, height uint64) (blockHash []byte, err ErrorI)                      // get the checkpoint block hash for a certain committee and height combination
+	GetMostRecentCheckpoint(committeeId uint64) (checkpoint *Checkpoint, err ErrorI)              // get the most recent checkpoint for a committee
+	GetAllCheckpoints(committeeId uint64) (checkpoints []*Checkpoint, err ErrorI)                 // export all checkpoints for a committee
 }
 
+// StoreTxnI defines an interface for discardable
 type StoreTxnI interface {
 	WStoreI
 	RStoreI
@@ -64,26 +82,30 @@ type StoreTxnI interface {
 	Discard()
 }
 
+// WStoreI defines an interface for basic write operations
 type WStoreI interface {
-	Set(key, value []byte) ErrorI
+	Set(key, value []byte) ErrorI // set value bytes referenced by key bytes
 	Delete(key []byte) ErrorI
 }
 
+// WStoreI defines an interface for basic read operations
 type RStoreI interface {
-	Get(key []byte) ([]byte, ErrorI)
-	Iterator(prefix []byte) (IteratorI, ErrorI)
-	RevIterator(prefix []byte) (IteratorI, ErrorI)
+	Get(key []byte) ([]byte, ErrorI)               // access value bytes using key bytes
+	Iterator(prefix []byte) (IteratorI, ErrorI)    // iterate through the data one KV pair at a time in lexicographical order
+	RevIterator(prefix []byte) (IteratorI, ErrorI) // iterate through the date on KV pair at a time in reverse lexicographical order
 }
 
+// ProveStoreI defines an interface
 type ProveStoreI interface {
 	GetProof(key []byte) (proof, value []byte, err ErrorI) // Get gets the bytes for a compact merkle proof
 	VerifyProof(key, value, proof []byte) bool             // VerifyProof validates the merkle proof
 }
 
+// IteratorI defines an interface for iterating over key-value pairs in a data store
 type IteratorI interface {
-	Valid() bool
-	Next()
-	Key() (key []byte)
-	Value() (value []byte)
-	Close()
+	Valid() bool           // if the item the iterator is pointing at is valid
+	Next()                 // move to next item
+	Key() (key []byte)     // retrieve key
+	Value() (value []byte) // retrieve value
+	Close()                // close the iterator when done, ensuring proper resource management
 }

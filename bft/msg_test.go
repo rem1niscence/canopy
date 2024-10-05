@@ -2,6 +2,7 @@ package bft
 
 import (
 	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -57,6 +58,12 @@ func TestSignBytes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			c := newTestConsensus(t, test.phase, 3)
 			pub := c.valKeys[0].PublicKey().Bytes()
+			results := &lib.CertificateResult{
+				RewardRecipients: &lib.RewardRecipients{
+					PaymentPercents: []*lib.PaymentPercents{{Address: []byte("some address"), Percent: 100}},
+					NumberOfSamples: 0,
+				},
+			}
 			msg := &Message{
 				Header: &lib.View{
 					Height: 1,
@@ -73,9 +80,11 @@ func TestSignBytes(t *testing.T) {
 						Round:  0,
 						Phase:  test.phase,
 					},
-					Proposal:     []byte("some proposal"),
-					ProposalHash: c.c.HashProposal([]byte("some proposal")),
-					ProposerKey:  pub,
+					Block:       []byte("some proposal"),
+					BlockHash:   crypto.Hash([]byte("some proposal")),
+					Results:     results,
+					ResultsHash: results.Hash(),
+					ProposerKey: pub,
 					Signature: &lib.AggregateSignature{
 						Signature: []byte("some aggregate signature"),
 						Bitmap:    []byte("some bitmap"),
@@ -85,9 +94,9 @@ func TestSignBytes(t *testing.T) {
 					Header: &lib.View{
 						Phase: Precommit,
 					},
-					Proposal:     []byte("some hqc proposal"),
-					ProposalHash: c.c.HashProposal([]byte("some hqc proposal")),
-					ProposerKey:  pub,
+					BlockHash:   []byte("some hqc proposal"),
+					Block:       crypto.Hash([]byte("some hqc proposal")),
+					ProposerKey: pub,
 					Signature: &lib.AggregateSignature{
 						Signature: []byte("some hqc aggregate signature"),
 						Bitmap:    []byte("some hqc bitmap"),
@@ -113,23 +122,22 @@ func TestSignBytes(t *testing.T) {
 				}
 				if msg.Qc != nil {
 					expectedMsg.Qc = &QC{
-						Header:       msg.Qc.Header,
-						ProposalHash: msg.Qc.ProposalHash,
-						ProposerKey:  msg.Qc.ProposerKey,
-						Signature:    msg.Qc.Signature,
-					}
-					if expectedMsg.Header.Phase == Propose {
-						expectedMsg.Qc.Proposal = msg.Qc.Proposal
+						Header:      msg.Qc.Header,
+						BlockHash:   msg.Qc.BlockHash,
+						ResultsHash: msg.Qc.ResultsHash,
+						ProposerKey: msg.Qc.ProposerKey,
+						Signature:   msg.Qc.Signature,
 					}
 				}
 				expectedSignBytes, err = lib.Marshal(expectedMsg)
 			case ElectionVote, ProposeVote, PrecommitVote:
 				msg.Header = nil
-				expectedSignBytes, err = lib.Marshal(&QC{
-					Header:       msg.Qc.Header,
-					ProposalHash: msg.Qc.ProposalHash,
-					ProposerKey:  msg.Qc.ProposerKey,
-				})
+				expectedSignBytes = (&QC{
+					Header:      msg.Qc.Header,
+					BlockHash:   msg.Qc.BlockHash,
+					ResultsHash: msg.Qc.ResultsHash,
+					ProposerKey: msg.Qc.ProposerKey,
+				}).SignBytes()
 			case RoundInterrupt:
 				expectedSignBytes, err = lib.Marshal(&Message{Header: msg.Header})
 			default:

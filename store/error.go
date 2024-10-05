@@ -60,3 +60,7 @@ func ErrProve(err error) lib.ErrorI {
 func ErrCompactProof(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeCompactProof, lib.StorageModule, fmt.Sprintf("compactProof() failed with err: %s", err.Error()))
 }
+
+func ErrInvalidKey() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidKey, lib.StorageModule, "found store key is invalid")
+}

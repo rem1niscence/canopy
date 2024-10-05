@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -65,7 +66,7 @@ func Start() {
 	if err != nil {
 		l.Fatal(err.Error())
 	}
-	if err = canopy.RegisterNew(config, validatorKey, db, l); err != nil {
+	if err = canopy.RegisterNew(config, lib.CanopyCommitteeId, validatorKey, db, l); err != nil {
 		l.Fatal(err.Error())
 	}
 	app, err := controller.New(config, validatorKey, l)
@@ -113,7 +114,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			ParameterValue: a,
 			StartHeight:    1,
 			EndHeight:      1000000,
-			Signer:         lib.MaxHash,
+			Signer:         []byte(strings.Repeat("F", crypto.HashSize*2)),
 		}, true); err != nil {
 			panic(err)
 		}
@@ -143,7 +144,7 @@ func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFile
 	addr := consPubKey.Address()
 	j := &types.GenesisState{
 		Time:     uint64(time.Now().UnixMicro()),
-		Pools:    []*types.Pool{{Id: types.DAO_Pool_ID}, {Id: types.FEE_Pool_ID}},
+		Pools:    []*types.Pool{{Id: lib.DAOPoolID}},
 		Accounts: []*types.Account{{Address: addr.Bytes(), Amount: 1000000}},
 		Validators: []*types.Validator{{
 			Address:      addr.Bytes(),

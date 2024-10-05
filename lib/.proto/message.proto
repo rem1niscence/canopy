@@ -4,8 +4,7 @@ package types;
 option go_package = "github.com/ginchuco/ginchu/fsm/types";
 
 import "google/protobuf/any.proto";
-import "block.proto";
-import "validator.proto";
+import "consensus.proto";
 
 message MessageSend {
   bytes from_address = 1;
@@ -16,19 +15,21 @@ message MessageSend {
 message MessageStake {
   bytes public_key = 1;
   uint64 amount = 2;
-  repeated Committee committees = 3;
+  repeated uint64 committees = 3;
   string net_address = 4;
   bytes output_address = 5;
   bool delegate = 6;
+  bool compound = 7;
 }
 
 message MessageEditStake {
   bytes address = 1;
   uint64 amount = 2;
-  repeated Committee committees = 3;
+  repeated uint64 committees = 3;
   string net_address = 4;
   bytes output_address = 5;
   bool delegate = 6;
+  bool compound = 7;
 }
 
 message MessageUnstake {
@@ -59,7 +60,7 @@ message MessageDAOTransfer {
   uint64 end_height = 5;
 }
 
-message MessageProposal {
+message MessageCertificateResults {
   QuorumCertificate qc = 1;
 }
 
@@ -68,4 +69,25 @@ message MessageSubsidy {
   uint64 committee_id = 2;
   uint64 amount = 3;
   string opcode = 4;
+}
+
+message MessageCreateOrder {
+  uint64 CommitteeId = 1;
+  uint64 AmountForSale = 2;
+  uint64 RequestedAmount = 3;
+  bytes SellerReceiveAddress = 4;
+  bytes SellersSellAddress = 5;
+}
+
+message MessageEditOrder {
+  uint64 OrderId = 1;
+  uint64 CommitteeId = 2;
+  uint64 AmountForSale = 3;
+  uint64 RequestedAmount = 4;
+  bytes SellerReceiveAddress = 5;
+}
+
+message MessageDeleteOrder {
+  uint64 OrderId = 1;
+  uint64 CommitteeId = 2;
 }

@@ -5,6 +5,8 @@ import (
 	"github.com/ginchuco/ginchu/lib"
 )
 
+// This file defines errors for the State Machine module
+
 func ErrReadGenesisFile(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeReadGenesisFile, lib.StateMachineModule, fmt.Sprintf("read genesis file failed with err: %s", err.Error()))
 }
@@ -15,10 +17,6 @@ func ErrUnmarshalGenesis(err error) lib.ErrorI {
 
 func ErrUnauthorizedTx() lib.ErrorI {
 	return lib.NewError(lib.CodeUnauthorizedTx, lib.StateMachineModule, "unauthorized tx")
-}
-
-func ErrInvalidTxSequence() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidTxSequence, lib.StateMachineModule, "invalid sequence")
 }
 
 func ErrInvalidTxMessage() lib.ErrorI {
@@ -81,18 +79,6 @@ func ErrParamValueEmpty() lib.ErrorI {
 	return lib.NewError(lib.CodeParamValEmpty, lib.StateMachineModule, "the parameter value is empty")
 }
 
-func ErrVoteEmpty() lib.ErrorI {
-	return lib.NewError(lib.CodeVoteEmpty, lib.StateMachineModule, "vote is empty")
-}
-
-func ErrHashEmpty() lib.ErrorI {
-	return lib.NewError(lib.CodeHashEmpty, lib.StateMachineModule, "hash is empty")
-}
-
-func ErrHashSize() lib.ErrorI {
-	return lib.NewError(lib.CodeHashSize, lib.StateMachineModule, "hash size is invalid")
-}
-
 func ErrUnknownMessage(x lib.MessageI) lib.ErrorI {
 	return lib.NewError(lib.CodeUnknownMsg, lib.StateMachineModule, fmt.Sprintf("message %T is unknown", x))
 }
@@ -153,36 +139,12 @@ func ErrUnknownParamType(t any) lib.ErrorI {
 	return lib.NewError(lib.CodeUnknownParamType, lib.StateMachineModule, fmt.Sprintf("unknown param type %T", t))
 }
 
-func ErrUnauthorizedParamChange() lib.ErrorI {
-	return lib.NewError(lib.CodeUnauthorizedParamChange, lib.StateMachineModule, "unauthorized param change")
-}
-
 func ErrBelowMinimumStake() lib.ErrorI {
 	return lib.NewError(lib.CodeBelowMinimumStake, lib.StateMachineModule, "less than minimum stake")
 }
 
 func ErrInvalidSlashPercentage() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidSlashPercentage, lib.StateMachineModule, "slash percent invalid")
-}
-
-func ErrPublicKeysNotEqual() lib.ErrorI {
-	return lib.NewError(lib.CodePublicKeysNotEqual, lib.StateMachineModule, "public keys not equal")
-}
-
-func ErrHeightsNotEqual() lib.ErrorI {
-	return lib.NewError(lib.CodeHeightsNotEqual, lib.StateMachineModule, "heights not equal")
-}
-
-func ErrRoundsNotEqual() lib.ErrorI {
-	return lib.NewError(lib.CodeRoundsNotEqual, lib.StateMachineModule, "rounds not equal")
-}
-
-func ErrVoteTypesNotEqual() lib.ErrorI {
-	return lib.NewError(lib.CodeVoteTypesNotEqual, lib.StateMachineModule, "vote types not equal")
-}
-
-func ErrIdenticalVotes() lib.ErrorI {
-	return lib.NewError(lib.CodeIdenticalVotes, lib.StateMachineModule, "identical votes")
 }
 
 func ErrInvalidSignature() lib.ErrorI {
@@ -201,16 +163,16 @@ func ErrInvalidProtocolVersion() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidProtocolVersion, lib.StateMachineModule, "invalid protocol version")
 }
 
-func ErrInvalidAddressKey(key []byte) lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidAddressKey, lib.StateMachineModule, fmt.Sprintf("invalid address key: %s", key))
+func ErrInvalidKey(key []byte) lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidDBKey, lib.StateMachineModule, fmt.Sprintf("invalid key: %s", key))
 }
 
 func ErrInvalidParam(paramName string) lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidParam, lib.StateMachineModule, fmt.Sprintf("invalid param: %s", paramName))
 }
 
-func ErrInvalidOwner(paramName string) lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidParamOwner, lib.StateMachineModule, fmt.Sprintf("invalid owner for %s", paramName))
+func ErrStringToInt(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeStringToInt, lib.StateMachineModule, fmt.Sprintf("string to int failed with err: %s", err.Error()))
 }
 
 func ErrInvalidPoolName() lib.ErrorI {
@@ -257,12 +219,16 @@ func ErrInvalidCommitteeID() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidCommitteeID, lib.StateMachineModule, "invalid committee id")
 }
 
+func ErrInvalidSlashRecipients() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidSlashRecipients, lib.StateMachineModule, "invalid slash recipients")
+}
+
 func ErrInvalidNumOfSamples() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidNumberOfSamples, lib.StateMachineModule, "invalid number of samples")
 }
 
-func ErrInvalidProposal() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidProposal, lib.StateMachineModule, "invalid proposal")
+func ErrInvalidCertificateResults() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidCertificateResults, lib.StateMachineModule, "invalid certificate results")
 }
 
 func ErrInvalidSubisdy() lib.ErrorI {
@@ -273,14 +239,54 @@ func ErrInvalidOpcode() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidOpcode, lib.StateMachineModule, "invalid opcode")
 }
 
-func ErrInvalidProposalHash() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidProposalHash, lib.StateMachineModule, "invalid proposal hash")
+func ErrInvalidResultsHash() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidProposalHash, lib.StateMachineModule, "invalid results hash")
 }
 
-func ErrNonPaidCommittee() lib.ErrorI {
-	return lib.NewError(lib.CodeNonPaidCommittee, lib.StateMachineModule, "non paid committee")
+func ErrNonSubsidizedCommittee() lib.ErrorI {
+	return lib.NewError(lib.CodeNonSubsidizedCommittee, lib.StateMachineModule, "non subsidized committee")
 }
 
 func ErrInvalidTxTime() lib.ErrorI {
 	return lib.NewError(lib.CodeErrInvalidTxTime, lib.StateMachineModule, "invalid tx timestamp")
+}
+
+func ErrOrderNotFound(id int) lib.ErrorI {
+	return lib.NewError(lib.CodeOrderNotFound, lib.StateMachineModule, fmt.Sprintf("order with id %d not found", id))
+}
+
+func ErrUnauthorizedOrderChange() lib.ErrorI {
+	return lib.NewError(lib.CodeUnauthorizedOrderChange, lib.StateMachineModule, "unauthorized order change")
+}
+
+func ErrMinimumOrderSize() lib.ErrorI {
+	return lib.NewError(lib.CodeMinimumOrderSize, lib.StateMachineModule, "minimum order size")
+}
+
+func ErrOrderAlreadyAccepted() lib.ErrorI {
+	return lib.NewError(lib.CodeOrderAlreadyAccepted, lib.StateMachineModule, "order already accepted")
+}
+
+func ErrInvalidBuyOrder() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidBuyOrder, lib.StateMachineModule, "buy order invalid")
+}
+
+func ErrInvalidCloseOrder() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidCloseOrder, lib.StateMachineModule, "close order invalid")
+}
+
+func ErrInvalidResetOrder() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidResetOrder, lib.StateMachineModule, "reset order invalid")
+}
+
+func ErrDuplicateBuyOrder() lib.ErrorI {
+	return lib.NewError(lib.CodeDuplicateBuyOrder, lib.StateMachineModule, "buy order is a duplicate")
+}
+
+func ErrInvalidBuyerDeadline() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidBuyerDeadline, lib.StateMachineModule, "buy order deadline height is invalid")
+}
+
+func ErrInvalidCheckpoint() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidCheckpoint, lib.StateMachineModule, "checkpoint is invalid")
 }

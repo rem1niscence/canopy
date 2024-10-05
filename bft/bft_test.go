@@ -1,12 +1,10 @@
 package bft
 
 import (
-	"fmt"
+	"bytes"
 	"github.com/ginchuco/ginchu/lib"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/stretchr/testify/require"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -21,34 +19,35 @@ func TestStartElectionPhase(t *testing.T) {
 		detail          string
 		selfIsValidator bool
 		numValidators   int
-		expectsMessage  bool
+		isCandidate     bool
 	}{
 		{
 			name:            "self is leader",
 			detail:          `deterministic key set ensures 'self' is an election candidate with a set of 3 Validators`,
 			selfIsValidator: true,
 			numValidators:   3,
-			expectsMessage:  true,
+			isCandidate:     true,
 		},
 		{
 			name:            "self is not leader",
 			detail:          `deterministic key set ensures 'self' is an not election candidate with a set of 4 Validators`,
 			selfIsValidator: true,
 			numValidators:   4,
-			expectsMessage:  false,
+			isCandidate:     false,
 		},
 		{
 			name:            "self is not a validator",
 			detail:          `self is not a validator within the deterministic key`,
 			selfIsValidator: false,
 			numValidators:   3,
-			expectsMessage:  false,
+			isCandidate:     false,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// setup
 			c := newTestConsensus(t, Election, test.numValidators)
+			// use validator 0 as the test replica
 			pub, private := c.valKeys[0].PublicKey(), c.valKeys[0]
 			if !test.selfIsValidator {
 				pk, err := crypto.NewBLSPrivateKey()
@@ -57,28 +56,34 @@ func TestStartElectionPhase(t *testing.T) {
 			}
 			// deterministic key set ensures 'self' is not an election candidate with a set of 4 Validators
 			go c.bft.StartElectionPhase()
-			if !test.expectsMessage {
+			if !test.isCandidate {
+				// if not supposed to be a 'candidate', ensure no ELECTION message sent
 				select {
-				case <-c.c.sendToReplicasChan:
+				case <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
 					t.Fatal("unexpected message")
 				case <-time.After(100 * time.Millisecond):
 					return
 				}
-			}
-			expectedView := lib.View{
-				Height: 1,
-				Round:  0,
-				Phase:  Election,
-			}
-			select {
-			case <-time.After(testTimeout):
-				t.Fatal("timeout")
-			case m := <-c.c.sendToReplicasChan:
-				msg, ok := m.(*Message)
-				require.True(t, ok)
-				require.Equal(t, expectedView, *msg.Header)
-				require.Equal(t, pub.Bytes(), msg.Vrf.PublicKey)
-				require.Equal(t, private.Sign(formatInput(c.c.proposerKeys.ProposerKeys, expectedView.Height, expectedView.Round)), msg.Vrf.Signature)
+			} else {
+				// if supposed to be a 'candidate', validate the ELECTION message
+				expectedView := lib.View{
+					Height:          1,
+					Round:           0,
+					Phase:           Election,
+					CommitteeHeight: 1,
+					NetworkId:       0,
+					CommitteeId:     0,
+				}
+				select {
+				case <-time.After(testTimeout):
+					t.Fatal("timeout")
+				case m := <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
+					msg, ok := m.(*Message)
+					require.True(t, ok)
+					require.Equal(t, expectedView, *msg.Header)
+					require.Equal(t, pub.Bytes(), msg.Vrf.PublicKey)
+					require.Equal(t, private.Sign(formatInput(c.cont.proposers.Addresses, expectedView.Height, expectedView.Round)), msg.Vrf.Signature)
+				}
 			}
 		})
 	}
@@ -137,23 +142,24 @@ func TestStartElectionVotePhase(t *testing.T) {
 				}
 			}
 			pub, _, expectedView := c.valKeys[0].PublicKey(), c.valKeys[0], lib.View{
-				Height: 1,
-				Round:  0,
-				Phase:  ElectionVote,
+				Height:          1,
+				Round:           0,
+				CommitteeHeight: 1,
+				Phase:           ElectionVote,
 			}
 			go c.bft.StartElectionVotePhase()
 			select {
 			case <-time.After(testTimeout):
 				t.Fatal("timeout")
-			case m := <-c.c.sendToProposerChan:
+			case m := <-c.cont.sendToProposerChan[lib.CanopyCommitteeId]:
 				msg, ok := m.(*Message)
 				require.True(t, ok)
 				require.NotNil(t, msg.Qc)
 				require.Equal(t, *msg.Qc.Header, expectedView)
-				if !test.isElectionCandidate || test.noElectionCandidates {
-					require.Equal(t, msg.Qc.ProposerKey, c.valKeys[2].PublicKey().Bytes())
-				} else {
+				if test.isElectionCandidate || test.noElectionCandidates {
 					require.Equal(t, msg.Qc.ProposerKey, pub.Bytes())
+				} else {
+					require.Equal(t, msg.Qc.ProposerKey, c.valKeys[2].PublicKey().Bytes())
 				}
 				if test.hasBE {
 					require.NotNil(t, msg.BadProposerEvidence)
@@ -211,14 +217,16 @@ func TestStartProposePhase(t *testing.T) {
 			if test.receiveEVQC {
 				multiKey = c.simElectionVotePhase(t, 0, test.hasBE, test.hasLivenessHQC, test.hasSafetyHQC, 0)
 			}
-			_, _, expectedView, expectedQCView := c.valKeys[0].PublicKey(), c.valKeys[0], lib.View{
-				Height: 1,
-				Round:  0,
-				Phase:  Propose,
+			expectedView, expectedQCView := lib.View{
+				Height:          1,
+				Round:           0,
+				Phase:           Propose,
+				CommitteeHeight: 1,
 			}, lib.View{
-				Height: 1,
-				Round:  0,
-				Phase:  ElectionVote,
+				Height:          1,
+				Round:           0,
+				Phase:           ElectionVote,
+				CommitteeHeight: 1,
 			}
 			go c.bft.StartProposePhase()
 			select {
@@ -226,7 +234,7 @@ func TestStartProposePhase(t *testing.T) {
 				if test.receiveEVQC {
 					t.Fatal("timeout")
 				}
-			case m := <-c.c.sendToReplicasChan:
+			case m := <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
 				if !test.receiveEVQC {
 					t.Fatal("unexpected message")
 				}
@@ -235,8 +243,9 @@ func TestStartProposePhase(t *testing.T) {
 				require.Equal(t, expectedView, *msg.Header)
 				require.NotNil(t, msg.Qc)
 				require.Equal(t, expectedQCView.Phase, msg.Qc.Header.Phase)
-				expectedProposal, _ := c.c.ProduceProposal(nil)
-				require.Equal(t, expectedProposal, msg.Qc.Proposal)
+				block, results, _ := c.cont.ProduceProposal(lib.CanopyCommitteeId, nil, nil)
+				require.Equal(t, block, msg.Qc.Block)
+				require.Equal(t, results.Hash(), msg.Qc.Results.Hash())
 				expectedAggSig, err := multiKey.AggregateSignatures()
 				require.NoError(t, err)
 				require.Equal(t, expectedAggSig, msg.Qc.Signature.Signature)
@@ -247,7 +256,8 @@ func TestStartProposePhase(t *testing.T) {
 					require.True(t, expectedDSE[0].VoteB.Equals(msg.LastDoubleSignEvidence[0].VoteB))
 				}
 				if test.hasLivenessHQC || test.hasSafetyHQC {
-					require.Equal(t, msg.Qc.Proposal, c.newHighQC(t, test.hasLivenessHQC, false).Proposal)
+					require.Equal(t, msg.Qc.BlockHash, c.setupTestableHighQC(t, test.hasLivenessHQC, true).BlockHash)
+					require.Equal(t, msg.Qc.ResultsHash, c.setupTestableHighQC(t, test.hasLivenessHQC, true).ResultsHash)
 				}
 			}
 		})
@@ -301,18 +311,21 @@ func TestStartProposeVotePhase(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// setup
 			c := newTestConsensus(t, ProposeVote, 3)
-			highQC, dse, bpe := (*QC)(nil), DoubleSignEvidences{}, BadProposerEvidences{}
+			highQC, be := (*QC)(nil), ByzantineEvidence{}
 			if test.safetyLocked || test.livenessLocked || test.invalidHighQC {
-				highQC = c.newHighQC(t, test.livenessLocked, test.invalidHighQC)
+				highQC = c.setupTestableHighQC(t, test.livenessLocked, !test.invalidHighQC)
 			}
 			if test.hasBE {
-				dse.Evidence, bpe.Evidence = c.newTestDoubleSignEvidence(t), c.newTestBadProposerEvidence(t)
+				be.DSE.Evidence, be.BPE.Evidence = c.newTestDoubleSignEvidence(t), c.newTestBadProposerEvidence(t)
 			}
-			proposal := c.simProposePhase(t, 0, test.validProposal, dse, bpe, highQC, 0)
+			block, results := c.simProposePhase(t, 0, test.validProposal, be, highQC, 0)
 			expectedView := lib.View{
-				Height: 1,
-				Round:  0,
-				Phase:  ProposeVote,
+				Height:          1,
+				Round:           0,
+				Phase:           ProposeVote,
+				CommitteeHeight: 1,
+				NetworkId:       0,
+				CommitteeId:     0,
 			}
 			// valid proposal
 			go c.bft.StartProposeVotePhase()
@@ -321,7 +334,7 @@ func TestStartProposeVotePhase(t *testing.T) {
 				if test.validProposal {
 					t.Fatal("timeout")
 				}
-			case m := <-c.c.sendToProposerChan:
+			case m := <-c.cont.sendToProposerChan[lib.CanopyCommitteeId]:
 				if !test.validProposal || test.invalidHighQC {
 					t.Fatal("unexpected message")
 				}
@@ -329,14 +342,14 @@ func TestStartProposeVotePhase(t *testing.T) {
 				require.True(t, ok)
 				require.NotNil(t, msg.Qc)
 				require.Equal(t, *msg.Qc.Header, expectedView)
-				require.Equal(t, c.c.HashProposal(proposal), msg.Qc.ProposalHash)
-				require.Equal(t, c.bft.Proposal, proposal)
+				require.Equal(t, crypto.Hash(block), msg.Qc.BlockHash)
+				require.Equal(t, results.Hash(), msg.Qc.ResultsHash)
 				if test.hasBE {
-					require.NotNil(t, dse)
-					require.NotNil(t, bpe)
+					require.NotNil(t, be.DSE)
+					require.NotNil(t, be.BPE)
 				}
-				require.Equal(t, c.bft.ByzantineEvidence.DSE.Evidence, dse.Evidence)
-				require.Equal(t, c.bft.ByzantineEvidence.BPE.Evidence, bpe.Evidence)
+				require.Equal(t, c.bft.ByzantineEvidence.DSE.Evidence, be.DSE.Evidence)
+				require.Equal(t, c.bft.ByzantineEvidence.BPE.Evidence, be.BPE.Evidence)
 			}
 		})
 	}
@@ -368,18 +381,24 @@ func TestStartPrecommitPhase(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// setup
-			c, multiKey, proposalHash := newTestConsensus(t, Precommit, 3), crypto.MultiPublicKeyI(nil), []byte(nil)
+			c, multiKey, blockHash, resultsHash := newTestConsensus(t, Precommit, 3), crypto.MultiPublicKeyI(nil), []byte(nil), []byte(nil)
 			expectedView, expectedQCView := lib.View{
-				Height: 1,
-				Round:  0,
-				Phase:  Precommit,
+				Height:          1,
+				Round:           0,
+				Phase:           Precommit,
+				CommitteeHeight: 1,
+				NetworkId:       0,
+				CommitteeId:     0,
 			}, lib.View{
-				Height: 1,
-				Round:  0,
-				Phase:  ProposeVote,
+				Height:          1,
+				Round:           0,
+				Phase:           ProposeVote,
+				CommitteeHeight: 1,
+				NetworkId:       0,
+				CommitteeId:     0,
 			}
 			if test.has23MajPropVote {
-				multiKey, proposalHash = c.simProposeVotePhase(t, test.isProposer, true, 0)
+				multiKey, blockHash, resultsHash = c.simProposeVotePhase(t, test.isProposer, true, 0)
 			}
 			go c.bft.StartPrecommitPhase()
 			select {
@@ -387,7 +406,7 @@ func TestStartPrecommitPhase(t *testing.T) {
 				if test.has23MajPropVote {
 					t.Fatal("timeout")
 				}
-			case m := <-c.c.sendToReplicasChan:
+			case m := <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
 				if !test.has23MajPropVote {
 					t.Fatal("unexpected message")
 				}
@@ -396,7 +415,8 @@ func TestStartPrecommitPhase(t *testing.T) {
 				require.NotNil(t, msg.Qc)
 				require.Equal(t, msg.Qc.Header.Phase, expectedQCView.Phase)
 				require.Equal(t, *msg.Header, expectedView)
-				require.Equal(t, proposalHash, msg.Qc.ProposalHash)
+				require.Equal(t, blockHash, msg.Qc.BlockHash)
+				require.Equal(t, resultsHash, msg.Qc.ResultsHash)
 				expectedAggSig, err := multiKey.AggregateSignatures()
 				require.NoError(t, err)
 				require.Equal(t, expectedAggSig, msg.Qc.Signature.Signature)
@@ -440,20 +460,24 @@ func TestStartPrecommitVotePhase(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// setup
 			c := newTestConsensus(t, PrecommitVote, 3)
-			var proposal []byte
+			var (
+				block   []byte
+				results *lib.CertificateResult
+			)
 			if test.proposalReceived {
-				proposal = c.simPrecommitPhase(t, 0)
+				block, results = c.simPrecommitPhase(t, 0)
 			}
 			if !test.validProposal {
-				c.bft.Proposal = []byte("some other proposal") // mismatched proposals
+				c.bft.Block = []byte("some other block") // mismatched proposals
 			}
 			if !test.isProposer {
 				c.bft.ProposerKey = []byte("some other proposer")
 			}
 			expectedView := lib.View{
-				Height: 1,
-				Round:  0,
-				Phase:  PrecommitVote,
+				Height:          1,
+				Round:           0,
+				CommitteeHeight: 1,
+				Phase:           PrecommitVote,
 			}
 			go c.bft.StartPrecommitVotePhase()
 			select {
@@ -461,7 +485,7 @@ func TestStartPrecommitVotePhase(t *testing.T) {
 				if test.validProposal {
 					t.Fatal("timeout")
 				}
-			case m := <-c.c.sendToProposerChan:
+			case m := <-c.cont.sendToProposerChan[lib.CanopyCommitteeId]:
 				if !test.validProposal {
 					t.Fatal("unexpected message received")
 				}
@@ -469,10 +493,11 @@ func TestStartPrecommitVotePhase(t *testing.T) {
 				require.True(t, ok)
 				require.NotNil(t, msg.Qc)
 				require.Equal(t, *msg.Qc.Header, expectedView)
-				require.Equal(t, c.c.HashProposal(proposal), msg.Qc.ProposalHash)
-				require.True(t, c.bft.Locked)
-				require.Equal(t, c.bft.HighQC.ProposalHash, msg.Qc.ProposalHash)
-				require.Equal(t, c.bft.HighQC.Proposal, proposal)
+				require.Equal(t, crypto.Hash(block), msg.Qc.BlockHash)
+				require.Equal(t, results.Hash(), msg.Qc.ResultsHash)
+				require.Equal(t, c.bft.HighQC.BlockHash, msg.Qc.BlockHash)
+				require.Equal(t, c.bft.HighQC.Block, block)
+				require.Equal(t, c.bft.HighQC.ResultsHash, msg.Qc.ResultsHash)
 			}
 		})
 	}
@@ -505,21 +530,24 @@ func TestStartCommitPhase(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// setup
 			c := newTestConsensus(t, Commit, 3)
-			multiKey, proposalHash := crypto.MultiPublicKeyI(nil), []byte(nil)
+			multiKey, blockHash, resultsHash := crypto.MultiPublicKeyI(nil), []byte(nil), []byte(nil)
 			expectedView, expectedQCView := lib.View{
-				Height: 1,
-				Round:  0,
-				Phase:  Commit,
+				Height:          1,
+				Round:           0,
+				CommitteeHeight: 1,
+				Phase:           Commit,
 			}, lib.View{
-				Height: 1,
-				Round:  0,
-				Phase:  PrecommitVote,
+				Height:          1,
+				Round:           0,
+				CommitteeHeight: 1,
+				Phase:           PrecommitVote,
 			}
 			if !test.isProposer {
 				c.bft.ProposerKey = []byte("some other proposer")
 			}
 			if test.has23MajPropVote {
-				multiKey, proposalHash = c.simPrecommitVotePhase(t, 0)
+				multiKey, blockHash, resultsHash = c.simPrecommitVotePhase(t, 0)
+				c.bft.Block, c.bft.Results, _ = c.cont.ProduceProposal(lib.CanopyCommitteeId, nil, nil)
 			}
 			go c.bft.StartCommitPhase()
 			select {
@@ -527,13 +555,14 @@ func TestStartCommitPhase(t *testing.T) {
 				if test.has23MajPropVote {
 					t.Fatal("timeout")
 				}
-			case m := <-c.c.sendToReplicasChan:
+			case m := <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
 				msg, ok := m.(*Message)
 				require.True(t, ok)
 				require.NotNil(t, msg.Qc)
 				require.Equal(t, msg.Qc.Header.Phase, expectedQCView.Phase)
 				require.Equal(t, *msg.Header, expectedView)
-				require.Equal(t, proposalHash, msg.Qc.ProposalHash)
+				require.Equal(t, blockHash, msg.Qc.BlockHash)
+				require.Equal(t, resultsHash, msg.Qc.ResultsHash)
 				expectedAggSig, err := multiKey.AggregateSignatures()
 				require.NoError(t, err)
 				require.Equal(t, expectedAggSig, msg.Qc.Signature.Signature)
@@ -606,7 +635,7 @@ func TestStartCommitProcessPhase(t *testing.T) {
 			c := newTestConsensus(t, CommitProcess, 3)
 			if test.hasBPE {
 				c.bft.ProposerKey = nil
-				c.simProposePhase(t, 0, true, DoubleSignEvidences{}, BadProposerEvidences{}, nil, 0)
+				c.simProposePhase(t, 0, true, ByzantineEvidence{}, nil, 0)
 				c.bft.ProposerKey = c.valKeys[0].PublicKey().Bytes()
 			}
 			if test.hasPartialQCDSE {
@@ -614,24 +643,25 @@ func TestStartCommitProcessPhase(t *testing.T) {
 				c.newPartialQCDoubleSign(t, Precommit)
 			}
 			if test.hasEVDSE {
-				c.simProposePhase(t, 1, true, DoubleSignEvidences{}, BadProposerEvidences{}, nil, 1)
+				c.simProposePhase(t, 1, true, ByzantineEvidence{}, nil, 1)
 				c.newElectionVoteDoubleSign(t)
 			}
 			c.bft.Round++
-			multiKey, proposal := crypto.MultiPublicKeyI(nil), []byte(nil)
+			multiKey, block, results := crypto.MultiPublicKeyI(nil), []byte(nil), &lib.CertificateResult{}
 			if !test.isProposer {
 				c.bft.ProposerKey = []byte("some other proposer")
 			}
 			if !test.validProposal {
-				c.bft.Proposal = []byte("some other proposal")
+				c.bft.Block = []byte("some other proposal")
 			}
 			if test.proposalReceived {
-				multiKey, proposal = c.simCommitPhase(t, 1, 1)
+				multiKey, block, results = c.simCommitPhase(t, 1, 1)
 			}
 			expectedQCView := lib.View{
-				Height: 1,
-				Round:  1,
-				Phase:  PrecommitVote,
+				Height:          1,
+				Round:           1,
+				CommitteeHeight: 1,
+				Phase:           PrecommitVote,
 			}
 			if test.hasEVDSE {
 				c.bft.ProposerKey = c.valKeys[1].PublicKey().Bytes()
@@ -642,10 +672,11 @@ func TestStartCommitProcessPhase(t *testing.T) {
 				if test.validProposal {
 					t.Fatal("timeout")
 				}
-			case qc := <-c.c.gossipCertChan:
+			case qc := <-c.cont.gossipCertChan[lib.CanopyCommitteeId]:
 				require.Equal(t, qc.Header.Phase, expectedQCView.Phase)
-				require.Equal(t, qc.Proposal, proposal)
-				require.Equal(t, c.c.HashProposal(proposal), qc.ProposalHash)
+				require.Equal(t, qc.Block, block)
+				require.Equal(t, crypto.Hash(block), qc.BlockHash)
+				require.Equal(t, results.Hash(), qc.ResultsHash)
 				require.NotNil(t, qc.Signature)
 				expectedAggSig, err := multiKey.AggregateSignatures()
 				require.NoError(t, err)
@@ -668,13 +699,14 @@ func TestRoundInterrupt(t *testing.T) {
 	select {
 	case <-time.After(testTimeout):
 		t.Fatal("timeout")
-	case m := <-c.c.sendToReplicasChan:
+	case m := <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
 		msg, ok := m.(*Message)
 		require.True(t, ok)
 		require.EqualExportedValues(t, msg.Qc.Header, &lib.View{
-			Height: 1,
-			Round:  0,
-			Phase:  RoundInterrupt,
+			Height:          1,
+			Round:           0,
+			CommitteeHeight: 1,
+			Phase:           RoundInterrupt,
 		})
 		require.Equal(t, c.bft.Phase, RoundInterrupt)
 	}
@@ -769,24 +801,32 @@ func TestCheckProposerAndBlock(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c := newTestConsensus(t, Election, 1)
-			c.bft.Proposal, c.bft.ProposerKey = []byte("some proposal"), []byte("some proposer")
+			c := newTestConsensus(t, Precommit, 1)
+			c.bft.Block, c.bft.ProposerKey, c.bft.Results = []byte("some proposal"), bytes.Repeat([]byte("F"), crypto.BLS12381PubKeySize), &lib.CertificateResult{
+				RewardRecipients: &lib.RewardRecipients{
+					PaymentPercents: []*lib.PaymentPercents{{
+						Address: crypto.Hash([]byte("some address"))[:20],
+						Percent: 100,
+					}},
+				},
+			}
 			messageProposal, messageProposer := []byte("some other proposal"), []byte("some other proposer")
 			if test.validProposal {
-				messageProposal = c.bft.Proposal
+				messageProposal = c.bft.Block
 			}
 			if test.validProposer {
 				messageProposer = c.bft.ProposerKey
 			}
 			msg := &Message{
 				Qc: &lib.QuorumCertificate{
-					ProposalHash: crypto.Hash(messageProposal),
+					BlockHash:   crypto.Hash(messageProposal),
+					ResultsHash: c.bft.Results.Hash(),
 				},
 				Signature: &lib.Signature{
 					PublicKey: messageProposer,
 				},
 			}
-			require.Equal(t, !(test.validProposer && test.validProposal), c.bft.CheckProposerAndBlock(msg))
+			require.Equal(t, !(test.validProposer && test.validProposal), c.bft.CheckProposerAndProposal(msg))
 		})
 	}
 }
@@ -817,7 +857,7 @@ func TestNewRound(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			c := newTestConsensus(t, Election, 4)
 			c.simElectionPhase(t)
-			c.simProposePhase(t, 0, true, DoubleSignEvidences{}, BadProposerEvidences{}, nil, 0)
+			c.simProposePhase(t, 0, true, ByzantineEvidence{}, nil, 0)
 			c.simPrecommitPhase(t, 0)
 			c.simCommitPhase(t, 0, 0)
 			c.simPacemakerPhase(t)
@@ -928,7 +968,7 @@ func TestGetPhaseWaitTime(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			c := newTestConsensus(t, Election, 1)
-			require.Equal(t, c.bft.GetPhaseWaitTime(test.phase, test.round), test.expectedWaitTime)
+			require.Equal(t, c.bft.WaitTime(test.phase, test.round), test.expectedWaitTime)
 		})
 	}
 }
@@ -972,537 +1012,45 @@ func TestSafeNode(t *testing.T) {
 			c2.bft.Round++
 			c2.simPrecommitPhase(t, 1) // higher lock
 			go c2.bft.StartPrecommitVotePhase()
-			<-c2.c.sendToProposerChan
+			<-c2.cont.sendToProposerChan[lib.CanopyCommitteeId]
 			c.simPrecommitPhase(t, 0) // lock
 			go c.bft.StartPrecommitVotePhase()
-			<-c.c.sendToProposerChan
+			<-c.cont.sendToProposerChan[lib.CanopyCommitteeId]
 			var err lib.ErrorI
 			switch {
 			case test.unlockBySafety:
-				err = c.bft.SafeNode(c.bft.HighQC, c.bft.HighQC.Proposal)
+				err = c.bft.SafeNode(&Message{
+					Qc: &lib.QuorumCertificate{
+						Results: c.bft.Results,
+						Block:   c.bft.HighQC.Block,
+					},
+					HighQc: c.bft.HighQC,
+				})
 			case test.unlockByLiveness:
-				err = c.bft.SafeNode(c2.bft.HighQC, c2.bft.HighQC.Proposal)
+				err = c.bft.SafeNode(&Message{
+					Qc: &lib.QuorumCertificate{
+						Results: c2.bft.Results,
+						Block:   c2.bft.HighQC.Block,
+					},
+					HighQc: c2.bft.HighQC,
+				})
 			default:
 				msgProposal, highQCProposal := []byte("some proposal"), []byte("some other proposal")
 				if test.samePropInMsg {
 					highQCProposal = msgProposal
 				}
-				err = c.bft.SafeNode(&QC{
-					Header:       c.bft.HighQC.Header,
-					Proposal:     highQCProposal,
-					ProposalHash: c.c.HashProposal(highQCProposal),
-				}, msgProposal)
+				err = c.bft.SafeNode(&Message{
+					Qc: &QC{
+						Results: c.bft.HighQC.Results,
+						Block:   msgProposal,
+					},
+					HighQc: &QC{
+						Header:    c.bft.HighQC.Header,
+						BlockHash: crypto.Hash(highQCProposal),
+					},
+				})
 			}
 			require.Equal(t, test.err, err)
 		})
 	}
-}
-
-func (tc *testConsensus) newPartialQCDoubleSign(t *testing.T, phase Phase) {
-	// a partial QC and full QC for the same (H,R,P) sent to replica
-	qc := &lib.QuorumCertificate{
-		Header: &lib.View{
-			Height: 1,
-			Round:  1,
-			Phase:  phase - 1,
-		},
-		ProposalHash: crypto.Hash([]byte("some proposal")),
-	}
-	sb := qc.SignBytes()
-	mk := tc.valSet.Key.Copy()
-	for i, pk := range tc.valKeys {
-		if i == 1 || i == 2 {
-			val, e := tc.valSet.GetValidator(pk.PublicKey().Bytes())
-			require.NoError(t, e)
-			require.NoError(t, mk.AddSigner(pk.Sign(sb), val.Index))
-		}
-	}
-	as1, e := mk.AggregateSignatures()
-	require.NoError(t, e)
-	qc.Signature = &lib.AggregateSignature{
-		Signature: as1,
-		Bitmap:    mk.Bitmap(),
-	}
-	msg := &Message{
-		Header: &lib.View{
-			Height: 1,
-			Round:  1,
-			Phase:  phase,
-		},
-		Qc: qc,
-	}
-	require.NoError(t, msg.Sign(tc.valKeys[0]))
-	require.NoError(t, tc.bft.HandleMessage(msg))
-}
-
-func (tc *testConsensus) newElectionVoteDoubleSign(t *testing.T) {
-	// election candidate has conflicting signatures with the real proposers' election vote QC
-	msg := &Message{
-		Qc: &lib.QuorumCertificate{
-			Header: &lib.View{
-				Height: 1,
-				Round:  1,
-				Phase:  ElectionVote,
-			},
-			Proposal:     nil,
-			ProposalHash: nil,
-			ProposerKey:  tc.valKeys[0].PublicKey().Bytes(),
-			Signature:    nil,
-		},
-		Signature: nil,
-	}
-	for i, pk := range tc.valKeys {
-		if i == 1 || i == 2 {
-			require.NoError(t, msg.Sign(pk))
-			require.NoError(t, tc.bft.HandleMessage(msg))
-		}
-	}
-}
-
-func (tc *testConsensus) newTestDoubleSignEvidence(t *testing.T) []*DoubleSignEvidence {
-	qcA := &lib.QuorumCertificate{
-		Header: &lib.View{
-			Height: 1,
-			Round:  0,
-			Phase:  0,
-		},
-		ProposalHash: crypto.Hash([]byte("some proposal")),
-	}
-	qcB := &lib.QuorumCertificate{
-		Header: &lib.View{
-			Height: 1,
-			Round:  0,
-			Phase:  0,
-		},
-		ProposalHash: crypto.Hash([]byte("some other proposal")),
-	}
-	sbA, sbB := qcA.SignBytes(), qcB.SignBytes()
-	mk, mk2 := tc.valSet.Key.Copy(), tc.valSet.Key.Copy()
-	for _, pk := range tc.valKeys {
-		val, e := tc.valSet.GetValidator(pk.PublicKey().Bytes())
-		require.NoError(t, e)
-		require.NoError(t, mk.AddSigner(pk.Sign(sbA), val.Index))
-	}
-	for i, pk := range tc.valKeys {
-		if i == 1 || i == 2 {
-			val, e := tc.valSet.GetValidator(pk.PublicKey().Bytes())
-			require.NoError(t, e)
-			require.NoError(t, mk2.AddSigner(pk.Sign(sbB), val.Index))
-		}
-	}
-	as1, e := mk.AggregateSignatures()
-	require.NoError(t, e)
-	qcA.Signature = &lib.AggregateSignature{
-		Signature: as1,
-		Bitmap:    mk.Bitmap(),
-	}
-	as2, e := mk2.AggregateSignatures()
-	require.NoError(t, e)
-	qcB.Signature = &lib.AggregateSignature{
-		Signature: as2,
-		Bitmap:    mk2.Bitmap(),
-	}
-	return []*DoubleSignEvidence{{
-		VoteA: qcA,
-		VoteB: qcB,
-	}}
-}
-
-func (tc *testConsensus) newTestBadProposerEvidence(t *testing.T) []*BadProposerEvidence {
-	qcA := &lib.QuorumCertificate{
-		Header: &lib.View{
-			Height: 1,
-			Round:  0,
-			Phase:  ElectionVote,
-		},
-		ProposerKey: tc.valKeys[1].PublicKey().Bytes(),
-	}
-	mk := tc.valSet.Key.Copy()
-	for _, pk := range tc.valKeys {
-		val, e := tc.valSet.GetValidator(pk.PublicKey().Bytes())
-		require.NoError(t, e)
-		require.NoError(t, mk.AddSigner(pk.Sign(qcA.SignBytes()), val.Index))
-	}
-	as1, e := mk.AggregateSignatures()
-	require.NoError(t, e)
-	qcA.Signature = &lib.AggregateSignature{
-		Signature: as1,
-		Bitmap:    mk.Bitmap(),
-	}
-	NewBPE()
-	return []*BadProposerEvidence{{
-		ElectionVoteQc: qcA,
-	}}
-}
-
-func (tc *testConsensus) simElectionPhase(t *testing.T) {
-	tc.setSortitionData(t)
-	for _, k := range tc.valKeys {
-		msg := &Message{
-			Header: &lib.View{
-				Height: 1,
-				Round:  0,
-				Phase:  Election,
-			},
-			Vrf: VRF(tc.c.proposerKeys.ProposerKeys, 1, 0, k),
-		}
-		require.NoError(t, msg.Sign(k))
-		require.NoError(t, tc.bft.HandleMessage(msg))
-	}
-	return
-}
-
-func (tc *testConsensus) simElectionVotePhase(t *testing.T, proposerIdx int, hasBE, hasLivenessHQC, hasSafetyHQC bool, round uint64) crypto.MultiPublicKeyI {
-	multiKey := tc.valSet.Key.Copy()
-	for i, k := range tc.valKeys {
-		if i == len(tc.valKeys)-1 {
-			break // skip last signer
-		}
-		msg := &Message{
-			Qc: &lib.QuorumCertificate{
-				Header: &lib.View{
-					Height: 1,
-					Round:  round,
-					Phase:  ElectionVote,
-				},
-				ProposerKey: tc.valKeys[proposerIdx].PublicKey().Bytes(),
-			},
-		}
-		if hasBE && i == 1 {
-			msg.LastDoubleSignEvidence = tc.newTestDoubleSignEvidence(t)
-			msg.BadProposerEvidence = tc.newTestBadProposerEvidence(t)
-		}
-		if hasLivenessHQC || hasSafetyHQC && i == 1 {
-			msg.HighQc = tc.newHighQC(t, hasLivenessHQC, false)
-		}
-		require.NoError(t, msg.Sign(k))
-		require.NoError(t, multiKey.AddSigner(msg.Signature.Signature, i))
-		require.NoError(t, tc.bft.HandleMessage(msg))
-	}
-	return multiKey
-}
-
-func (tc *testConsensus) newHighQC(t *testing.T, liveness, invalid bool) *QC {
-	mockProposal, round, c := []byte("some proposal"), uint64(0), newTestConsensus(t, PrecommitVote, 3)
-	tc.bft.Locked, tc.bft.HighQC, tc.bft.Proposal = true, &QC{Header: &lib.View{Height: 1, Round: 0}, Proposal: mockProposal}, mockProposal
-	highQCProposal, err := tc.c.ProduceProposal(nil)
-	require.NoError(t, err)
-	if !invalid {
-		if liveness {
-			round = 1
-		} else { // safety
-			tc.bft.Proposal, tc.bft.HighQC.Proposal = highQCProposal, highQCProposal
-		}
-	}
-	mk, _ := c.simPrecommitVotePhase(t, 0, round)
-	aggSig, e := mk.AggregateSignatures()
-	require.NoError(t, e)
-	return &QC{
-		Header: &lib.View{
-			Height: 1,
-			Round:  round,
-			Phase:  PrecommitVote,
-		},
-		Proposal:     highQCProposal,
-		ProposalHash: tc.c.HashProposal(highQCProposal),
-		Signature: &lib.AggregateSignature{
-			Signature: aggSig,
-			Bitmap:    mk.Bitmap(),
-		},
-	}
-}
-
-func (tc *testConsensus) simProposePhase(t *testing.T, proposerIdx int, validProposal bool, dse DoubleSignEvidences, bpe BadProposerEvidences, highQC *QC, round uint64) (proposal []byte) {
-	proposer := tc.valKeys[proposerIdx]
-	proposal, err := tc.c.ProduceProposal(nil)
-	require.NoError(t, err)
-	if !validProposal {
-		proposal = []byte("invalid")
-	}
-	multiKey := tc.simElectionVotePhase(t, proposerIdx, false, false, false, round)
-	aggSig, e := multiKey.AggregateSignatures()
-	require.NoError(t, e)
-	msg := &Message{
-		Header: &lib.View{
-			Height: 1,
-			Round:  round,
-			Phase:  Propose,
-		},
-		Vrf: nil,
-		Qc: &QC{
-			Header: &lib.View{
-				Height: 1,
-				Round:  round,
-				Phase:  ElectionVote,
-			},
-			Proposal:    proposal,
-			ProposerKey: proposer.PublicKey().Bytes(),
-			Signature: &lib.AggregateSignature{
-				Signature: aggSig,
-				Bitmap:    multiKey.Bitmap(),
-			},
-		},
-		HighQc:                 highQC,
-		LastDoubleSignEvidence: dse.Evidence,
-		BadProposerEvidence:    bpe.Evidence,
-		Signature:              nil,
-	}
-	require.NoError(t, msg.Sign(proposer))
-	require.NoError(t, tc.bft.HandleMessage(msg))
-	return
-}
-
-func (tc *testConsensus) simProposeVotePhase(t *testing.T, isProposer, maj23 bool, round uint64) (crypto.MultiPublicKeyI, []byte) {
-	var err error
-	if isProposer {
-		tc.bft.ProposerKey = tc.bft.PublicKey
-	}
-	tc.bft.Proposal, err = tc.c.ProduceProposal(nil)
-	require.NoError(t, err)
-	proposalHash := tc.c.HashProposal(tc.bft.Proposal)
-	multiKey := tc.valSet.Key.Copy()
-	for i, k := range tc.valKeys {
-		if !maj23 && i == 0 {
-			continue // skip the first signer to ensure no 23 maj
-		}
-		if i == len(tc.valKeys)-1 {
-			break // skip last signer
-		}
-		msg := &Message{
-			Qc: &lib.QuorumCertificate{
-				Header: &lib.View{
-					Height: 1,
-					Round:  round,
-					Phase:  ProposeVote,
-				},
-				ProposalHash: proposalHash,
-			},
-		}
-		require.NoError(t, msg.Sign(k))
-		require.NoError(t, multiKey.AddSigner(msg.Signature.Signature, i))
-		require.NoError(t, tc.bft.HandleMessage(msg))
-	}
-	return multiKey, proposalHash
-}
-
-func (tc *testConsensus) simPrecommitPhase(t *testing.T, round uint64) (proposal []byte) {
-	proposer := tc.valKeys[0]
-	proposal, err := tc.c.ProduceProposal(nil)
-	require.NoError(t, err)
-	multiKey, _ := tc.simProposeVotePhase(t, true, true, round)
-	aggSig, e := multiKey.AggregateSignatures()
-	require.NoError(t, e)
-	msg := &Message{
-		Header: &lib.View{
-			Height: 1,
-			Round:  round,
-			Phase:  Precommit,
-		},
-		Qc: &QC{
-			Header: &lib.View{
-				Height: 1,
-				Round:  round,
-				Phase:  ProposeVote,
-			},
-			ProposalHash: tc.c.HashProposal(proposal),
-			Signature: &lib.AggregateSignature{
-				Signature: aggSig,
-				Bitmap:    multiKey.Bitmap(),
-			},
-		},
-	}
-	require.NoError(t, msg.Sign(proposer))
-	require.NoError(t, tc.bft.HandleMessage(msg))
-	return
-}
-
-func (tc *testConsensus) simPrecommitVotePhase(t *testing.T, proposerIdx int, round ...uint64) (crypto.MultiPublicKeyI, []byte) {
-	var err error
-	tc.bft.ProposerKey = tc.valKeys[proposerIdx].PublicKey().Bytes()
-	tc.bft.Proposal, err = tc.c.ProduceProposal(nil)
-	require.NoError(t, err)
-	proposalHash := tc.c.HashProposal(tc.bft.Proposal)
-	multiKey := tc.valSet.Key.Copy()
-	r := uint64(0)
-	if round != nil {
-		r = round[0]
-	}
-	for i, k := range tc.valKeys {
-		if i == len(tc.valKeys)-1 {
-			break // skip last signer
-		}
-		msg := &Message{
-			Qc: &lib.QuorumCertificate{
-				Header: &lib.View{
-					Height: 1,
-					Round:  r,
-					Phase:  PrecommitVote,
-				},
-				ProposalHash: proposalHash,
-			},
-		}
-		require.NoError(t, msg.Sign(k))
-		require.NoError(t, multiKey.AddSigner(msg.Signature.Signature, i))
-		require.NoError(t, tc.bft.HandleMessage(msg))
-	}
-	return multiKey, proposalHash
-}
-
-func (tc *testConsensus) simCommitPhase(t *testing.T, proposerIdx int, round uint64) (multiKey crypto.MultiPublicKeyI, proposal []byte) {
-	proposer := tc.valKeys[proposerIdx]
-	proposal, err := tc.c.ProduceProposal(nil)
-	require.NoError(t, err)
-	multiKey, _ = tc.simPrecommitVotePhase(t, proposerIdx, round)
-	aggSig, e := multiKey.AggregateSignatures()
-	require.NoError(t, e)
-	msg := &Message{
-		Header: &lib.View{
-			Height: 1,
-			Round:  round,
-			Phase:  Commit,
-		},
-		Qc: &QC{
-			Header: &lib.View{
-				Height: 1,
-				Round:  round,
-				Phase:  PrecommitVote,
-			},
-			ProposalHash: tc.c.HashProposal(proposal),
-			Signature: &lib.AggregateSignature{
-				Signature: aggSig,
-				Bitmap:    multiKey.Bitmap(),
-			},
-		},
-	}
-	require.NoError(t, msg.Sign(proposer))
-	require.NoError(t, tc.bft.HandleMessage(msg))
-	return
-}
-
-func (tc *testConsensus) simPacemakerPhase(t *testing.T) {
-	for i := 1; i < len(tc.valKeys); i++ {
-		pacemakerMsg := &Message{
-			Qc: &lib.QuorumCertificate{
-				Header: &lib.View{
-					Height: 1,
-					Round:  uint64(i + 2),
-					Phase:  RoundInterrupt,
-				},
-			},
-		}
-		require.NoError(t, pacemakerMsg.Sign(tc.valKeys[i]))
-		require.NoError(t, tc.bft.HandleMessage(pacemakerMsg))
-	}
-}
-
-func (tc *testConsensus) setSortitionData(t *testing.T) {
-	selfVal, err := tc.valSet.GetValidator(tc.valKeys[0].PublicKey().Bytes())
-	require.NoError(t, err)
-	tc.bft.SortitionData = &SortitionData{
-		LastProposersPublicKeys: tc.c.proposerKeys.ProposerKeys,
-		Height:                  1,
-		Round:                   0,
-		TotalValidators:         tc.valSet.NumValidators,
-		VotingPower:             selfVal.VotingPower,
-		TotalPower:              tc.valSet.TotalPower,
-	}
-}
-
-type testConsensus struct {
-	valKeys     []crypto.PrivateKeyI
-	valSet      ValSet
-	lastValKeys []crypto.PrivateKeyI
-	lastValSet  ValSet
-	bft         *Consensus
-	c           *testController
-}
-
-func newTestConsensus(t *testing.T, phase Phase, numValidators int, numLastValidators ...int) (tc *testConsensus) {
-	var err error
-	if numValidators <= 0 {
-		t.Fatalf("invalid number of validators")
-	}
-	tc, lastValidatorsCount := new(testConsensus), 0
-	if numLastValidators != nil {
-		lastValidatorsCount = numLastValidators[0]
-	} else {
-		lastValidatorsCount = numValidators
-	}
-	tc.lastValSet, tc.lastValKeys = newTestValSet(t, lastValidatorsCount)
-	consensusValidators := lib.ConsensusValidators{
-		ValidatorSet: make([]*lib.ConsensusValidator, lastValidatorsCount),
-	}
-	tc.valKeys = make([]crypto.PrivateKeyI, lastValidatorsCount)
-	copy(consensusValidators.ValidatorSet, tc.lastValSet.ValidatorSet.ValidatorSet)
-	copy(tc.valKeys, tc.lastValKeys)
-	diff := numValidators - lastValidatorsCount
-	switch {
-	case diff < 0:
-		tc.valKeys = tc.valKeys[:numValidators]
-		consensusValidators.ValidatorSet = consensusValidators.ValidatorSet[:numValidators]
-	case diff > 0:
-		nvs, nvk := newTestValSet(t, diff)
-		tc.valKeys = append(tc.valKeys, nvk...)
-		consensusValidators.ValidatorSet = append(consensusValidators.ValidatorSet, nvs.ValidatorSet.ValidatorSet...)
-	}
-	tc.valSet, err = lib.NewValidatorSet(&consensusValidators)
-	require.NoError(t, err)
-	var proposerKeys [][]byte
-	for _, k := range tc.valKeys {
-		proposerKeys = append(proposerKeys, k.PublicKey().Bytes())
-	}
-	tc.c = &testController{
-		Mutex:              sync.Mutex{},
-		minEvidenceHeight:  0,
-		proposerKeys:       &lib.ProposerKeys{ProposerKeys: proposerKeys},
-		lastCandidateTime:  time.Time{},
-		certificates:       nil,
-		valSet:             map[uint64]ValSet{0: tc.lastValSet, 1: tc.valSet},
-		resetBFTChan:       make(chan time.Duration, 1),
-		syncingDoneChan:    make(chan struct{}, 1),
-		syncing:            &atomic.Bool{},
-		gossipCertChan:     make(chan *lib.QuorumCertificate),
-		sendToProposerChan: make(chan lib.Signable),
-		sendToReplicasChan: make(chan lib.Signable),
-	}
-	tc.bft, err = New(lib.DefaultConfig(), tc.valKeys[0], 1, tc.valSet, tc.lastValSet, tc.c, tc.c, lib.NewDefaultLogger())
-	tc.bft.Phase = phase
-	require.NoError(t, err)
-	return
-}
-
-func newTestValSet(t *testing.T, numValidators int) (valSet ValSet, valKeys []crypto.PrivateKeyI) {
-	var err error
-	consensusValidators := lib.ConsensusValidators{}
-	for i := 0; i < numValidators; i++ {
-		votingPower := 1000000
-		if i == 0 {
-			votingPower = 1000002 // slightly weight the first validator so 2/3 validators can pass the +2/3 maj
-		}
-		key := newDeterministicConsensusKey(t, i)
-		consensusValidators.ValidatorSet = append(consensusValidators.ValidatorSet, &lib.ConsensusValidator{
-			PublicKey:   key.PublicKey().Bytes(),
-			VotingPower: uint64(votingPower),
-			NetAddress:  fmt.Sprintf("http://localhost:8%d", i),
-		})
-		valKeys = append(valKeys, key)
-	}
-	valSet, err = lib.NewValidatorSet(&consensusValidators)
-	require.NoError(t, err)
-	return
-}
-
-func newDeterministicConsensusKey(t *testing.T, i int) crypto.PrivateKeyI {
-	keys := []string{
-		"02853a101301cd7019b78ffa1186842dd93923e563b8ae22e2ab33ae889b23ee",
-		"1c6a244fbdf614acb5f0d00a2b56ffcbe2aa23dabd66365dffcd3f06491ae50f",
-		"2b38b94c10159d63a12cb26aca4b0e76070a987d49dd10fc5f526031e05801da",
-		"31e868f74134032eacba191ca529115c64aa849ac121b75ca79b37420a623036",
-		"479839d3edbd0eefa60111db569ded6a1a642cc84781600f0594bd8d4a429319",
-		"51eb5eb6eca0b47c8383652a6043aadc66ddbcbe240474d152f4d9a7439eae42",
-		"637cb8e916bba4c1773ed34d89ebc4cb86e85c145aea5653a58de930590a2aa4",
-		"7235e5757e6f52e6ae4f9e20726d9c514281e58e839e33a7f667167c524ff658"}
-	key, err := crypto.NewBLSPrivateKeyFromString(keys[i])
-	require.NoError(t, err)
-	return key
 }

@@ -3,13 +3,13 @@ package types;
 
 option go_package = "github.com/ginchuco/ginchu/lib";
 
-import "block.proto";
+import "consensus.proto";
 
 // ordered by stream priority
 enum Topic {
   CONSENSUS = 0;
-  BLOCK = 1;
-  BLOCK_REQUEST = 2;
+  CERTIFICATE = 1;
+  CERTIFICATE_REQUEST = 2;
   TX = 3;
   PEERS_RESPONSE = 4;
   PEERS_REQUEST = 5;
@@ -50,7 +50,8 @@ message BlockRequestMessage {
 message BlockResponseMessage {
   uint64 committee_id = 1;
   uint64 max_height = 2;
-  QuorumCertificate BlockAndCertificate = 3;
+  uint64 total_vdf_iterations = 3;
+  QuorumCertificate BlockAndCertificate = 4;
 }
 
 message TxMessage {

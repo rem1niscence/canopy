@@ -146,10 +146,15 @@ func TestStart(t *testing.T) {
 	n1 := newTestP2PNodeWithConfig(t, c)
 	// test churn process
 	random, _ := crypto.NewBLSPublicKey()
+	pm := &lib.PeerMeta{
+		NetworkId: 1,
+		Chains:    []uint64{1},
+	}
 	n1.book.Add(&BookPeer{
 		Address: &lib.PeerAddress{
 			PublicKey:  random.Bytes(),
 			NetAddress: n4.listener.Addr().String(),
+			PeerMeta:   pm,
 		},
 		ConsecutiveFailedDial: MaxFailedDialAttempts - 1,
 	})
@@ -157,6 +162,7 @@ func TestStart(t *testing.T) {
 	n1.MustConnectReceiver() <- []*lib.PeerAddress{{
 		PublicKey:  n2.pub,
 		NetAddress: n2.listener.Addr().String(),
+		PeerMeta:   pm,
 	}}
 	test := func() (ok bool, reason string) {
 		peerInfo, _ := n1.GetPeerInfo(n2.pub)
@@ -184,6 +190,7 @@ func TestStart(t *testing.T) {
 	require.NoError(t, n3.Dial(&lib.PeerAddress{
 		PublicKey:  n1.pub,
 		NetAddress: n1.listener.Addr().String(),
+		PeerMeta:   pm,
 	}, false))
 	for {
 		select {
@@ -314,7 +321,7 @@ func TestID(t *testing.T) {
 }
 
 func TestMaxPacketSize(t *testing.T) {
-	maxPacket, _ := lib.Marshal(&Packet{StreamId: lib.Topic_BLOCK, Eof: true, Bytes: make([]byte, maxDataChunkSize)})
+	maxPacket, _ := lib.Marshal(&Packet{StreamId: lib.Topic_CERTIFICATE, Eof: true, Bytes: make([]byte, maxDataChunkSize)})
 	require.Equal(t, len(maxPacket), maxPacketSize)
 }
 

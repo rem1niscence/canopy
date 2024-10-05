@@ -10,6 +10,31 @@ import (
 	"testing"
 )
 
+//func TestGC(t *testing.T) {
+//	db, err := badger.OpenManaged(badger.DefaultOptions("test_temp.db").WithMemTableSize(15 * int64(units.MB)).
+//		WithNumVersionsToKeep(math2.MaxInt).WithLoggingLevel(badger.ERROR))
+//	require.NoError(t, err)
+//	defer func() { db.Close(); os.RemoveAll("test_temp.db") }()
+//	for i := uint64(1); i < 1000; i++ {
+//		tx := db.NewTransactionAt(1, true)
+//		key, val := []byte("key"), append([]byte(fmt.Sprintf("%d/", i)), make([]byte, units.MB)...)
+//		require.NoError(t, tx.Set(key, val))
+//		require.NoError(t, tx.CommitAt(i, nil))
+//	}
+//	require.NoError(t, db.Flatten(1))
+//	db.RunValueLogGC(.01)
+//	for i := uint64(1); i < 1000; i++ {
+//		tx := db.NewTransactionAt(i, false)
+//		v, e := tx.Get([]byte("key"))
+//		require.NoError(t, e)
+//		require.NoError(t, v.Value(func(val []byte) error {
+//			require.Equal(t, strings.Split(string(val), "/")[0], fmt.Sprintf("%d", i))
+//			return nil
+//		}))
+//		tx.Discard()
+//	}
+//}
+
 func TestStoreSetGetDelete(t *testing.T) {
 	store, _, cleanup := testStore(t)
 	defer cleanup()

@@ -1,21 +1,24 @@
 package lib
 
 import (
-	"container/list"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+	"math"
 	"math/big"
-	"net/url"
+	"reflect"
 	"runtime/debug"
 	"strings"
 	"time"
 )
 
+// RegisteredPageables is a global slice of registered pageables for generic unmarshalling
+var RegisteredPageables = make(map[string]Pageable)
+
+// Page is a pagination wrapper over a slice of data
 type Page struct {
 	PageParams
 	Results    Pageable `json:"results"`
@@ -25,32 +28,22 @@ type Page struct {
 	TotalCount int      `json:"totalCount"`
 }
 
-func NewPage(p PageParams) *Page {
-	return &Page{PageParams: p}
-}
-
+// PageParams are the input parameters to calculate the proper page
 type PageParams struct {
 	PageNumber int `json:"pageNumber"`
 	PerPage    int `json:"perPage"`
 }
 
-type ValidatorFilters struct {
-	Unstaking FilterOption `json:"unstaking"`
-	Paused    FilterOption `json:"paused"`
-	Delegate  FilterOption `json:"delegate"`
-}
-
-func (v ValidatorFilters) On() bool {
-	return v.Unstaking != 0 || v.Paused != 0
-}
-
+// SkipToIndex() sanity checks params and then determines the first index of the page
 func (p *PageParams) SkipToIndex() int {
+	defaultPerPage, maxPerPage := 10, 5000
 	if p.PerPage == 0 {
-		p.PerPage = 10
+		p.PerPage = defaultPerPage
 	}
-	if p.PerPage > 5000 {
-		p.PerPage = 5000
+	if p.PerPage > maxPerPage {
+		p.PerPage = maxPerPage
 	}
+	// start page count at 1 not 0
 	if p.PageNumber == 0 {
 		p.PageNumber = 1
 	}
@@ -61,22 +54,90 @@ func (p *PageParams) SkipToIndex() int {
 	return lastPage * p.PerPage
 }
 
-type jsonPage struct {
-	PageParams
-	Results    json.RawMessage `json:"results"`
-	Type       string          `json:"type"`
-	Count      int             `json:"count"`
-	TotalPages int             `json:"totalPages"`
-	TotalCount int             `json:"totalCount"`
-}
-
+// Pageable() is a simple interface that represents Page structures
 type Pageable interface {
 	New() Pageable
 	Len() int
 }
 
-var RegisteredPageables = make(map[string]Pageable)
+// NewPage() returns a new instance of the Page object from the params and pageType
+// Load() or LoadArray() is the likely next function call
+func NewPage(p PageParams, pageType string) *Page { return &Page{PageParams: p, Type: pageType} }
 
+// Load() fills a page from an IteratorI
+func (p *Page) Load(storePrefix []byte, newestToOldest bool, results Pageable, db RStoreI, callback func(b []byte) ErrorI) (err ErrorI) {
+	// retrieve the iterator
+	var it IteratorI
+	// set the page results so that even if it's a zero page, it will have a castable type
+	p.Results = results
+	// prefix keys with numbers in big endian ensure that reverse iteration
+	// is newest to oldest and vise versa
+	switch newestToOldest {
+	case true:
+		it, err = db.RevIterator(storePrefix)
+	case false:
+		it, err = db.Iterator(storePrefix)
+	}
+	if err != nil {
+		return err
+	}
+	defer it.Close()
+	// skip to index makes the starting point appropriate based on the page params
+	pageStartIndex := p.SkipToIndex()
+	for countOnly, i := false, 0; it.Valid(); func() { it.Next(); i++ }() {
+		p.TotalCount++
+		if i < pageStartIndex || countOnly {
+			continue
+		}
+		// if reached end of the desired page
+		if i == pageStartIndex+p.PerPage {
+			countOnly = true // switch to only counts
+			continue
+		}
+		if e := callback(it.Value()); e != nil {
+			return e
+		}
+
+		p.Results = results
+		p.Count++
+	}
+	// calculate total pages
+	p.TotalPages = int(math.Ceil(float64(p.TotalCount) / float64(p.PerPage)))
+	return
+}
+
+// LoadArray() fills a page from a slice
+func (p *Page) LoadArray(slice any, results Pageable, callback func(i any) ErrorI) (err ErrorI) {
+	arr := reflect.ValueOf(slice)
+	if arr.Kind() != reflect.Slice {
+		return ErrInvalidArgument()
+	}
+	// skip to index makes the starting point appropriate based on the page params
+	pageStartIndex, size := p.SkipToIndex(), arr.Len()
+	for i, countOnly := 0, false; i < size; i++ {
+		p.TotalCount++
+		if i < pageStartIndex || countOnly {
+			continue
+		}
+		elem := arr.Index(i).Interface()
+		if e := callback(elem); e != nil {
+			return e
+		}
+		// if reached end of the desired page
+		if i == pageStartIndex+p.PerPage {
+			countOnly = true // switch to only counts
+			continue
+		}
+		p.Results = results
+		p.Count++
+	}
+	// calculate total pages
+	p.TotalPages = int(math.Ceil(float64(p.TotalCount) / float64(p.PerPage)))
+	return
+}
+
+// UnmarshalJSON() overrides the unmarshalling logic of the
+// Page for generic structure assignment (registered pageables) and custom formatting
 func (p *Page) UnmarshalJSON(b []byte) error {
 	var j jsonPage
 	if err := json.Unmarshal(b, &j); err != nil {
@@ -102,76 +163,17 @@ func (p *Page) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type SimpleLimiter struct {
-	requests        map[string]int
-	totalRequests   int
-	maxPerRequester int
-	maxRequests     int
-	reset           *time.Ticker
+// jsonPage is the internal structure for custom json for the Page structure
+type jsonPage struct {
+	PageParams
+	Results    json.RawMessage `json:"results"`
+	Type       string          `json:"type"`
+	Count      int             `json:"count"`
+	TotalPages int             `json:"totalPages"`
+	TotalCount int             `json:"totalCount"`
 }
 
-func NewLimiter(maxPerRequester, maxRequests, resetWindowS int) *SimpleLimiter {
-	return &SimpleLimiter{
-		requests:        map[string]int{},
-		maxPerRequester: maxPerRequester,
-		maxRequests:     maxRequests,
-		reset:           time.NewTicker(time.Duration(resetWindowS) * time.Second),
-	}
-}
-
-func (l *SimpleLimiter) NewRequest(requester string) (requesterBlock, totalBlock bool) {
-	if l.totalRequests >= l.maxRequests {
-		return false, true
-	}
-	if count := l.requests[requester]; count >= l.maxPerRequester {
-		return true, false
-	}
-	l.requests[requester]++
-	l.totalRequests++
-	return
-}
-
-func (l *SimpleLimiter) Reset() {
-	l.requests = map[string]int{}
-	l.totalRequests = 0
-}
-
-func (l *SimpleLimiter) C() <-chan time.Time {
-	return l.reset.C
-}
-
-const (
-	MaxMessageCacheSize = 10000
-)
-
-type MessageCache struct {
-	queue *list.List
-	m     map[string]struct{}
-}
-
-func NewMessageCache() MessageCache {
-	return MessageCache{
-		queue: list.New(),
-		m:     map[string]struct{}{},
-	}
-}
-
-func (c MessageCache) Add(msg *MessageAndMetadata) bool {
-	k := BytesToString(msg.Hash)
-	if _, found := c.m[k]; found {
-		return false
-	}
-	if c.queue.Len() >= MaxMessageCacheSize {
-		e := c.queue.Front()
-		message := e.Value.(*MessageAndMetadata)
-		delete(c.m, BytesToString(message.Hash))
-		c.queue.Remove(e)
-	}
-	c.m[k] = struct{}{}
-	c.queue.PushFront(msg)
-	return true
-}
-
+// Marshal() serializes a proto.Message into a byte slice
 func Marshal(message any) ([]byte, ErrorI) {
 	bz, err := proto.Marshal(message.(proto.Message))
 	if err != nil {
@@ -180,6 +182,7 @@ func Marshal(message any) ([]byte, ErrorI) {
 	return bz, nil
 }
 
+// Unmarshal() deserializes a byte slice into a proto.Message
 func Unmarshal(data []byte, ptr any) ErrorI {
 	if data == nil || ptr == nil {
 		return nil
@@ -190,6 +193,7 @@ func Unmarshal(data []byte, ptr any) ErrorI {
 	return nil
 }
 
+// MarshalJSON() serializes a message into a JSON byte slice
 func MarshalJSON(message any) ([]byte, ErrorI) {
 	bz, err := json.Marshal(message)
 	if err != nil {
@@ -198,6 +202,7 @@ func MarshalJSON(message any) ([]byte, ErrorI) {
 	return bz, nil
 }
 
+// MarshalJSONIndent() serializes a message into an indented JSON byte slice
 func MarshalJSONIndent(message any) ([]byte, ErrorI) {
 	bz, err := json.MarshalIndent(message, "", "  ")
 	if err != nil {
@@ -206,11 +211,13 @@ func MarshalJSONIndent(message any) ([]byte, ErrorI) {
 	return bz, nil
 }
 
+// MarshalJSONIndentString() serializes a message into an indented JSON string
 func MarshalJSONIndentString(message any) (string, ErrorI) {
 	bz, err := MarshalJSONIndent(message)
 	return string(bz), err
 }
 
+// UnmarshalJSON() deserializes a JSON byte slice into the specified object
 func UnmarshalJSON(bz []byte, ptr any) ErrorI {
 	if err := json.Unmarshal(bz, ptr); err != nil {
 		return ErrJSONUnmarshal(err)
@@ -218,6 +225,7 @@ func UnmarshalJSON(bz []byte, ptr any) ErrorI {
 	return nil
 }
 
+// NewAny() converts a proto.Message into an anypb.Any type
 func NewAny(message proto.Message) (*anypb.Any, ErrorI) {
 	a, err := anypb.New(message)
 	if err != nil {
@@ -226,6 +234,7 @@ func NewAny(message proto.Message) (*anypb.Any, ErrorI) {
 	return a, nil
 }
 
+// FromAny() converts an anypb.Any type back into a proto.Message
 func FromAny(any *anypb.Any) (proto.Message, ErrorI) {
 	msg, err := anypb.UnmarshalNew(any, proto.UnmarshalOptions{})
 	if err != nil {
@@ -234,16 +243,12 @@ func FromAny(any *anypb.Any) (proto.Message, ErrorI) {
 	return msg, nil
 }
 
-func ProtoEnumToBytes(i uint32) []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(i))
-	return b
-}
-
+// BytesToString() converts a byte slice to a hexadecimal string
 func BytesToString(b []byte) string {
 	return hex.EncodeToString(b)
 }
 
+// BzToTruncStr() converts a byte slice to a truncated hexadecimal string
 func BzToTruncStr(b []byte) string {
 	if len(b) > 10 {
 		return hex.EncodeToString(b[:10])
@@ -251,6 +256,7 @@ func BzToTruncStr(b []byte) string {
 	return hex.EncodeToString(b)
 }
 
+// StringToBytes() converts a hexadecimal string back into a byte slice
 func StringToBytes(s string) ([]byte, ErrorI) {
 	b, err := hex.DecodeString(s)
 	if err != nil {
@@ -260,6 +266,7 @@ func StringToBytes(s string) ([]byte, ErrorI) {
 	return b, nil
 }
 
+// PublicKeyFromBytes() converts a byte slice into a BLS public key
 func PublicKeyFromBytes(pubKey []byte) (crypto.PublicKeyI, ErrorI) {
 	publicKey, err := crypto.NewBLSPublicKeyFromBytes(pubKey)
 	if err != nil {
@@ -268,6 +275,7 @@ func PublicKeyFromBytes(pubKey []byte) (crypto.PublicKeyI, ErrorI) {
 	return publicKey, nil
 }
 
+// MerkleTree() generates a Merkle tree and its root from a list of items
 func MerkleTree(items [][]byte) (root []byte, tree [][]byte, err ErrorI) {
 	root, tree, er := crypto.MerkleTree(items)
 	if er != nil {
@@ -276,13 +284,13 @@ func MerkleTree(items [][]byte) (root []byte, tree [][]byte, err ErrorI) {
 	return
 }
 
-func CopyBytes(bz []byte) (dst []byte) {
-	dst = make([]byte, len(bz))
-	copy(dst, bz)
-	return
-}
+// BigGreater() compares two big.Int values and returns true if the first is greater
 func BigGreater(a *big.Int, b *big.Int) bool { return a.Cmp(b) == 1 }
 
+// BigLess() compares two big.Int values and returns true if the first is less
+func BigLess(a *big.Int, b *big.Int) bool { return a.Cmp(b) == -1 }
+
+// Uint64PercentageDiv() calculates the percentage from dividend/divisor
 func Uint64PercentageDiv(dividend, divisor uint64) (res uint64) {
 	a := Uint64ToBigFloat(dividend)
 	b := Uint64ToBigFloat(divisor)
@@ -293,6 +301,7 @@ func Uint64PercentageDiv(dividend, divisor uint64) (res uint64) {
 	return
 }
 
+// Uint64Percentage() calculates the result of a percentage of an amount
 func Uint64Percentage(amount uint64, percentage uint64) (res uint64) {
 	a := Uint64ToBigFloat(amount)
 	b := big.NewFloat(float64(percentage))
@@ -303,6 +312,7 @@ func Uint64Percentage(amount uint64, percentage uint64) (res uint64) {
 	return
 }
 
+// Uint64ReducePercentage() reduces an amount by a specified percentage
 func Uint64ReducePercentage(amount uint64, percentage float64) (res uint64) {
 	a := Uint64ToBigFloat(amount)
 	b := big.NewFloat(100 - percentage)
@@ -313,19 +323,15 @@ func Uint64ReducePercentage(amount uint64, percentage float64) (res uint64) {
 	return
 }
 
+// Uint64ToBigFloat() converts a uint64 to a big.Float
 func Uint64ToBigFloat(u uint64) *big.Float {
 	return new(big.Float).SetUint64(u)
 }
 
-func RoundFloatToUint64(f float64) uint64 {
-	if f < 0 {
-		return uint64(f)
-	}
-	return uint64(f + .5) // Round ties away
-}
-
+// HexBytes represents a byte slice that can be marshaled and unmarshalled as hex strings
 type HexBytes []byte
 
+// NewHexBytesFromString() converts a hexadecimal string into HexBytes
 func NewHexBytesFromString(s string) (HexBytes, ErrorI) {
 	bz, err := hex.DecodeString(s)
 	if err != nil {
@@ -334,13 +340,17 @@ func NewHexBytesFromString(s string) (HexBytes, ErrorI) {
 	return bz, nil
 }
 
+// String() returns the HexBytes as a hexadecimal string
 func (x HexBytes) String() string {
 	return BytesToString(x)
 }
 
+// MarshalJSON() serializes the HexBytes to a JSON byte slice
 func (x HexBytes) MarshalJSON() ([]byte, error) {
 	return json.Marshal(BytesToString(x))
 }
+
+// UnmarshalJSON() deserializes a JSON byte slice into HexBytes
 func (x *HexBytes) UnmarshalJSON(b []byte) (err error) {
 	var s string
 	if err = json.Unmarshal(b, &s); err != nil {
@@ -350,31 +360,33 @@ func (x *HexBytes) UnmarshalJSON(b []byte) (err error) {
 	return
 }
 
-var (
-	MaxHash, MaxAddress = []byte(strings.Repeat("F", crypto.HashSize)), []byte(strings.Repeat("F", crypto.AddressSize))
-)
-
-func ReplaceURLPort(rawURL, replacementPort string) (returned string, err error) {
-	u, err := url.Parse(rawURL)
-	port := u.Port()
-	if port == "" {
-		return rawURL + ":" + replacementPort, nil
+// RemoveIPV4Port() removes the port from an IP address or URL string
+func RemoveIPV4Port(address string) (string, ErrorI) {
+	split := strings.Split(address, ":")
+	switch len(split) {
+	case 2:
+		return split[0], nil
+	case 3:
+		return strings.Join(split[:2], ":"), nil
+	default:
+		return "", ErrInvalidArgument()
 	}
-	returned = strings.ReplaceAll(rawURL, u.Port(), replacementPort)
-	return
 }
 
+// NewTimer() creates a 0 value initialized instance of a timer
 func NewTimer() *time.Timer {
 	t := time.NewTimer(0)
 	<-t.C
 	return t
 }
 
+// ResetTimer() stops the existing timer, and resets with the new duration
 func ResetTimer(t *time.Timer, d time.Duration) {
 	StopTimer(t)
 	t.Reset(d)
 }
 
+// StopTimer() stops the existing timer
 func StopTimer(t *time.Timer) {
 	if !t.Stop() {
 		select {
@@ -384,17 +396,9 @@ func StopTimer(t *time.Timer) {
 	}
 }
 
+// CatchPanic() catches any panic in the function call or child function calls
 func CatchPanic(l LoggerI) {
 	if r := recover(); r != nil {
 		l.Errorf(string(debug.Stack()))
 	}
 }
-
-type FilterOption int
-
-// nolint:all
-const (
-	Both FilterOption = 0
-	Yes               = 1
-	No                = 2
-)

@@ -299,14 +299,14 @@ func pollValidators(frequency time.Duration) {
 			time.Sleep(frequency)
 			continue
 		}
-		vals, err := state.GetConsensusValidators()
+		vals, err := state.GetCanopyCommittee()
 		if err != nil {
 			logger.Error(err.Error())
 			time.Sleep(frequency)
 			continue
 		}
 		pollMux.Lock()
-		poll = types.PollValidators(vals, router[ProposalsRouteName].Path, logger)
+		poll = types.PollValidators(conf.NetworkID, vals, router[ProposalsRouteName].Path, logger)
 		pollMux.Unlock()
 		time.Sleep(frequency)
 	}
@@ -536,13 +536,14 @@ func KeystoreGetKeyGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 }
 
 type txRequest struct {
-	Amount     uint64 `json:"amount"`
-	NetAddress string `json:"netAddress"`
-	Output     string `json:"output"`
-	OpCode     string `json:"opCode"`
-	Fee        uint64 `json:"fee"`
-	Delegate   bool   `json:"delegate"`
-	Submit     bool   `json:"submit"`
+	Amount          uint64 `json:"amount"`
+	NetAddress      string `json:"netAddress"`
+	Output          string `json:"output"`
+	OpCode          string `json:"opCode"`
+	Fee             uint64 `json:"fee"`
+	Delegate        bool   `json:"delegate"`
+	EarlyWithdrawal bool   `json:"earlyWithdrawal"`
+	Submit          bool   `json:"submit"`
 	addressRequest
 	passwordRequest
 	txChangeParamRequest
@@ -577,7 +578,7 @@ func TransactionStake(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		if err != nil {
 			return nil, err
 		}
-		return types.NewStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate)
+		return types.NewStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal)
 	})
 }
 
@@ -591,7 +592,7 @@ func TransactionEditStake(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if err != nil {
 			return nil, err
 		}
-		return types.NewEditStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate)
+		return types.NewEditStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal)
 	})
 }
 
@@ -642,7 +643,7 @@ func TransactionSubsidy(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		committeeId := uint64(0)
 		if c, err := StringToCommittees(ptr.committees); err == nil {
-			committeeId = c[0].Id
+			committeeId = c[0]
 		}
 		return types.NewSubsidyTx(p, ptr.Amount, committeeId, ptr.OpCode, ptr.Fee)
 	})
@@ -1008,25 +1009,21 @@ type committeesRequest struct {
 	committees string
 }
 
-func StringToCommittees(s string) (committees []*types.Committee, err error) {
-	i, err := strconv.Atoi(s) // single int is an option for subsidy txn
+func StringToCommittees(s string) (committees []uint64, err error) {
+	i, err := strconv.ParseUint(s, 10, 64) // single int is an option for subsidy txn
 	if err == nil {
-		committees = append(committees, &types.Committee{Id: uint64(i)})
-		return
+		return []uint64{i}, nil
 	}
 	commaSeparatedArr := strings.Split(strings.ReplaceAll(s, " ", ""), ",")
 	if len(commaSeparatedArr) == 0 {
 		return nil, ErrStringToCommittee(s)
 	}
-	for _, s := range commaSeparatedArr {
-		committeeSplit := strings.Split(s, "=")
-		if len(committeeSplit) != 2 {
-			return nil, ErrStringToCommittee(s)
+	for _, c := range commaSeparatedArr {
+		ui, e := strconv.ParseUint(c, 10, 64)
+		if e != nil {
+			return nil, e
 		}
-		committees = append(committees, &types.Committee{
-			Id:           parseUint64FromString(committeeSplit[0]),
-			StakePercent: parseUint64FromString(committeeSplit[1]),
-		})
+		committees = append(committees, ui)
 	}
 	return
 }
@@ -1148,7 +1145,7 @@ func submitTx(w http.ResponseWriter, tx any) (ok bool) {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
-	if err = app.SendTxMsg(lib.CANOPY_COMMITTEE_ID, bz); err != nil {
+	if err = app.SendTxMsg(lib.CanopyCommitteeId, bz); err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
 	}

@@ -3,98 +3,105 @@ package controller
 import (
 	"bytes"
 	"fmt"
+	"github.com/ginchuco/ginchu/bft"
 	"github.com/ginchuco/ginchu/fsm/types"
 	"github.com/ginchuco/ginchu/lib"
+	"math/rand"
 	"time"
 )
 
-/*
-	Syncing Process:
-
-	1) Get the height and begin block params from the state_machine
-	2) Get peer max_height from P2P
-	3) Ask peers for a block at a time
-	4) Validate each block by checking if block was signed by +2/3 maj (COMMIT message)
-	5) Commit block against the state machine, if error fatal
-	5) Do this until reach the max-peer-height
-	6) Stay on top by listening to incoming block messages
-*/
-
 const (
-	SyncTimeoutS         = 5
-	MaxBlockReqPerWindow = 5
-	BlockReqWindowS      = 10
+	PollMaxHeightTimeoutS = 5  // wait time for polling the maximum height of the peers
+	SyncTimeoutS          = 5  // wait time to receive an individual block (certificate) from a peer during syncing
+	MaxBlockReqPerWindow  = 5  // maximum block (certificate) requests per window per requester
+	BlockReqWindowS       = 10 // the 'window of time' before resetting limits for block (certificate) requests
 
-	GoodBlockRep        = 3
-	GoodTxRep           = 3
-	TimeoutRep          = -1
-	UnexpectedBlockRep  = -1
-	InvalidTxRep        = -1
-	NotValRep           = -3
-	InvalidMsgRep       = -3
-	InvalidBlockRep     = -3
-	InvalidJustifyRep   = -3
-	BlockReqExceededRep = -3
+	GoodBlockRep        = 3  // rep boost for sending us a valid block (certificate)
+	GoodTxRep           = 3  // rep boost for sending us a valid transaction (certificate)
+	TimeoutRep          = -1 // rep slash for not responding in time
+	UnexpectedBlockRep  = -1 // rep slash for sending us a block we weren't expecting
+	InvalidTxRep        = -3 // rep slash for sending us an invalid transaction
+	NotValRep           = -3 // rep slash for sending us a validator only message but not being a validator
+	InvalidMsgRep       = -3 // rep slash for sending an invalid message
+	InvalidBlockRep     = -3 // rep slash for sending an invalid block (certificate) message
+	InvalidJustifyRep   = -3 // rep slash for sending an invalid certificate justification
+	BlockReqExceededRep = -3 // rep slash for over-requesting blocks (certificates)
 )
 
-func (c *Controller) SingleNodeNetwork(committeeID uint64) bool {
-	valSet, err := c.LoadCommittee(committeeID, c.FSM.Height())
-	if err != nil {
-		c.log.Error(err.Error())
-		return false
-	}
-	return len(valSet.ValidatorSet.ValidatorSet) == 1 &&
-		bytes.Equal(valSet.ValidatorSet.ValidatorSet[0].PublicKey, c.PublicKey)
-}
-
+// Sync() attempts to sync the blockchain for a specific CommitteeID
+// 1) Get the height and begin block params from the state_machine
+// 2) Get peer max_height from P2P
+// 3) Ask peers for a block at a time
+// 4) Check each block by checking if cert was signed by +2/3 maj (COMMIT message)
+// 5) Commit block against the state machine, if error fatal
+// 5) Do this until reach the max-peer-height
+// 6) Stay on top by listening to incoming cert messages
 func (c *Controller) Sync(committeeID uint64) {
-	var reqRecipient []byte
-	c.syncing.Store(true)
 	c.log.Infof("Sync started 🔄 for committee %d", committeeID)
-	if c.SingleNodeNetwork(committeeID) {
-		if c.syncingDone(committeeID, 0) {
-			return
-		}
+	// set isSyncing
+	c.isSyncing[committeeID].Store(true)
+	// initialize tracking variables
+	reqRecipient, maxHeight, minVDFIterations, syncingPeers := make([]byte, 0), uint64(0), uint64(0), make([]string, 0)
+	// initialize a callback for `pollMaxHeight`
+	pollMaxHeight := func() { maxHeight, minVDFIterations, syncingPeers = c.pollMaxHeight(committeeID, 1) }
+	// check if node is alone in the committee
+	if c.singleNodeNetwork(committeeID) {
+		c.finishSyncing(committeeID)
+		return
 	}
-	maxHeight, maxHeights := c.pollMaxHeight(committeeID, 1)
+	// poll max height of all peers
+	pollMaxHeight()
 	for {
-		if c.syncingDone(committeeID, maxHeight) {
+		if c.syncingDone(committeeID, maxHeight, minVDFIterations) {
+			c.finishSyncing(committeeID)
 			return
 		}
-		height := c.FSM.Height()
-		for p, m := range maxHeights {
-			if m > height+1 {
-				reqRecipient, _ = lib.StringToBytes(p)
-			}
-		}
-		c.SendBlockReqMsg(committeeID, false, reqRecipient)
+		// get a random peer to send to
+		reqRecipient, _ = lib.StringToBytes(syncingPeers[rand.Intn(len(syncingPeers))])
+		// send the request
+		c.SendCertReqMsg(committeeID, false, reqRecipient)
 		select {
-		case msg := <-c.P2P.Inbox(Block):
+		case msg := <-c.P2P.Inbox(Certificate): // got a response
+			// if the responder does not equal the requester
 			responder := msg.Sender.Address.PublicKey
 			if !bytes.Equal(responder, reqRecipient) {
 				c.P2P.ChangeReputation(responder, UnexpectedBlockRep)
+				// poll max height of all peers
+				pollMaxHeight()
 				continue
 			}
 			blkResponseMsg, ok := msg.Message.(*lib.BlockResponseMessage)
 			if !ok {
 				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, InvalidBlockRep)
+				// poll max height of all peers
+				pollMaxHeight()
 				return
 			}
+			// process the quorum certificate received by the peer
 			if _, _, err := c.handlePeerCert(msg.Sender.Address.PublicKey, blkResponseMsg); err != nil {
+				// poll max height of all peers
+				pollMaxHeight()
 				continue
 			}
-			if blkResponseMsg.MaxHeight > maxHeight {
-				maxHeight = blkResponseMsg.MaxHeight
+			// each peer is individually polled with each request as well
+			// if that poll max height has grown, we accept that as
+			// the new max height
+			if blkResponseMsg.MaxHeight > maxHeight && blkResponseMsg.TotalVdfIterations >= minVDFIterations {
+				maxHeight, minVDFIterations = blkResponseMsg.MaxHeight, blkResponseMsg.TotalVdfIterations
 			}
 			c.P2P.ChangeReputation(responder, GoodBlockRep)
-		case <-time.After(SyncTimeoutS * time.Second):
+		case <-time.After(SyncTimeoutS * time.Second): // timeout
 			c.P2P.ChangeReputation(reqRecipient, TimeoutRep)
-			maxHeight, maxHeights = c.pollMaxHeight(committeeID, 1)
+			// poll max height of all peers
+			pollMaxHeight()
 			continue
 		}
 	}
 }
 
+// PUBLISHERS BELOW
+
+// SendTxMsg() gossips a Transaction through the P2P network for a specific committeeID
 func (c *Controller) SendTxMsg(committeeID uint64, tx []byte) lib.ErrorI {
 	msg := &lib.TxMessage{Tx: tx, CommitteeId: committeeID}
 	if err := c.P2P.SelfSend(c.PublicKey, Tx, msg); err != nil {
@@ -106,76 +113,20 @@ func (c *Controller) SendTxMsg(committeeID uint64, tx []byte) lib.ErrorI {
 	return nil
 }
 
-func (c *Controller) SendCertMsg(committeeID uint64, qc *lib.QuorumCertificate) {
-	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(qc.ProposalHash))
-	blockMessage := &lib.BlockResponseMessage{
-		CommitteeId:         committeeID,
-		MaxHeight:           c.FSM.Height(),
-		BlockAndCertificate: qc,
-	}
-	if err := c.P2P.SendToChainPeers(committeeID, Block, blockMessage); err != nil {
-		c.log.Errorf("unable to gossip block with err: %s", err.Error())
-	}
-	if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
-		c.log.Errorf("unable to self-send block with err: %s", err.Error())
-	}
-	c.log.Debugf("gossiping done")
-}
-
-func (c *Controller) SendBlockRespMsg(committeeID, maxHeight uint64, blockAndCert *lib.QuorumCertificate, toPubKey ...[]byte) {
-	var err error
-	if len(toPubKey) == 0 {
-		if err = c.P2P.SendToChainPeers(committeeID, Block, &lib.BlockResponseMessage{
-			CommitteeId:         committeeID,
-			MaxHeight:           maxHeight,
-			BlockAndCertificate: blockAndCert,
-		}); err != nil {
-			c.log.Error(err.Error())
-		}
-	} else {
-		for _, pk := range toPubKey {
-			if err = c.P2P.SendTo(pk, Block, &lib.BlockResponseMessage{
-				CommitteeId:         committeeID,
-				MaxHeight:           maxHeight,
-				BlockAndCertificate: blockAndCert,
-			}); err != nil {
-				c.log.Error(err.Error())
-			}
-		}
-	}
-}
-
-func (c *Controller) SendBlockReqMsg(committeeID uint64, heightOnly bool, toPubKey ...[]byte) {
-	var err error
-	if len(toPubKey) == 0 {
-		if err = c.P2P.SendToChainPeers(committeeID, BlockRequest, &lib.BlockRequestMessage{
-			CommitteeId: committeeID,
-			Height:      c.FSM.Height(),
-			HeightOnly:  heightOnly,
-		}); err != nil {
-			c.log.Error(err.Error())
-		}
-	} else {
-		for _, pk := range toPubKey {
-			if err = c.P2P.SendTo(pk, BlockRequest, &lib.BlockRequestMessage{
-				CommitteeId: committeeID,
-				Height:      c.FSM.Height(),
-				HeightOnly:  heightOnly,
-			}); err != nil {
-				c.log.Error(err.Error())
-			}
-		}
-	}
-}
-
-func (c *Controller) SendProposalTx(committeeID uint64, qc *lib.QuorumCertificate) {
-	c.log.Debugf("Sending proposal txn for: %s", lib.BytesToString(qc.ProposalHash))
-	tx, err := types.NewProposalTx(c.PrivateKey, qc, 0)
+// SendCertificateResultsTx() originates and auto-sends a ProposalTx after successfully leading a Consensus height
+func (c *Controller) SendCertificateResultsTx(committeeID uint64, qc *lib.QuorumCertificate) {
+	c.log.Debugf("Sending certificate results txn for: %s", lib.BytesToString(qc.ResultsHash))
+	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, 0)
 	if err != nil {
-		c.log.Errorf("Creating auto-proposal-txn failed with err: %s", err.Error())
+		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return
 	}
-	bz, err := tx.GetBytes()
+	pool, err := c.FSM.GetPool(qc.Header.CommitteeId)
+	if err != nil || pool.Amount == 0 {
+		c.log.Errorf("Auto-proposal-txn stopped due to not subsidized")
+		return // not subsidized
+	}
+	bz, err := lib.Marshal(tx)
 	if err != nil {
 		c.log.Errorf("Marshalling auto-proposal-txn failed with err: %s", err.Error())
 		return
@@ -186,6 +137,73 @@ func (c *Controller) SendProposalTx(committeeID uint64, qc *lib.QuorumCertificat
 	}
 }
 
+// SendCertMsg() gossips a QuorumCertificate (with block) through the P2P network for a specific committeeID
+func (c *Controller) SendCertMsg(committeeID uint64, qc *lib.QuorumCertificate) {
+	qc.Results = nil // omit the results
+	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(qc.ResultsHash))
+	blockMessage := &lib.BlockResponseMessage{
+		CommitteeId:         committeeID,
+		MaxHeight:           c.FSM.Height(),
+		TotalVdfIterations:  c.FSM.TotalVDFIterations(),
+		BlockAndCertificate: qc,
+	}
+	if err := c.P2P.SendToChainPeers(committeeID, Certificate, blockMessage); err != nil {
+		c.log.Errorf("unable to gossip block with err: %s", err.Error())
+	}
+	c.log.Debugf("gossiping done")
+}
+
+// SendCertReqMsg() sends a QuorumCertificate request to peer(s) - `heightOnly` is a request for just the peer's max height
+func (c *Controller) SendCertReqMsg(committeeID uint64, heightOnly bool, sendTo ...[]byte) {
+	var err error
+	if len(sendTo) == 0 {
+		if err = c.P2P.SendToChainPeers(committeeID, CertificateRequest, &lib.BlockRequestMessage{
+			CommitteeId: committeeID,
+			Height:      c.FSM.Height(),
+			HeightOnly:  heightOnly,
+		}, true); err != nil {
+			c.log.Error(err.Error())
+		}
+	} else {
+		for _, pk := range sendTo {
+			if err = c.P2P.SendTo(pk, CertificateRequest, &lib.BlockRequestMessage{
+				CommitteeId: committeeID,
+				Height:      c.FSM.Height(),
+				HeightOnly:  heightOnly,
+			}); err != nil {
+				c.log.Error(err.Error())
+			}
+		}
+	}
+}
+
+// SendBlockRespMsg() responds to a `blockRequest` message to peer(s) - always sending the self.MaxHeight and sometimes sending the actual block and supporting QC
+func (c *Controller) SendBlockRespMsg(committeeID, maxHeight, vdfIterations uint64, blockAndCert *lib.QuorumCertificate, sendTo ...[]byte) {
+	var err error
+	if len(sendTo) == 0 {
+		if err = c.P2P.SendToChainPeers(committeeID, Certificate, &lib.BlockResponseMessage{
+			CommitteeId:         committeeID,
+			MaxHeight:           maxHeight,
+			TotalVdfIterations:  vdfIterations,
+			BlockAndCertificate: blockAndCert,
+		}); err != nil {
+			c.log.Error(err.Error())
+		}
+	} else {
+		for _, pk := range sendTo {
+			if err = c.P2P.SendTo(pk, Certificate, &lib.BlockResponseMessage{
+				CommitteeId:         committeeID,
+				MaxHeight:           maxHeight,
+				TotalVdfIterations:  vdfIterations,
+				BlockAndCertificate: blockAndCert,
+			}); err != nil {
+				c.log.Error(err.Error())
+			}
+		}
+	}
+}
+
+// SendConsMsgToReplicas() sends a bft message to a specific ValidatorSet (typically the Committee)
 func (c *Controller) SendConsMsgToReplicas(committeeID uint64, replicas lib.ValidatorSet, msg lib.Signable) {
 	if err := msg.Sign(c.PrivateKey); err != nil {
 		c.log.Error(err.Error())
@@ -212,6 +230,7 @@ func (c *Controller) SendConsMsgToReplicas(committeeID uint64, replicas lib.Vali
 	}
 }
 
+// SendConsMsgToProposer() sends a bft message to the leader of the Consensus round
 func (c *Controller) SendConsMsgToProposer(committeeID uint64, msg lib.Signable) {
 	if err := msg.Sign(c.PrivateKey); err != nil {
 		c.log.Error(err.Error())
@@ -243,11 +262,23 @@ func (c *Controller) SendConsMsgToProposer(committeeID uint64, msg lib.Signable)
 	}
 }
 
-func (c *Controller) ListenForBlock() {
+// LISTENERS BELOW
+
+// StartListeners() runs all listeners on separate threads
+func (c *Controller) StartListeners() {
+	c.log.Debug("Listening for inbound txs, block requests, and consensus messages")
+	go c.ListenForCertificateRequests()
+	go c.ListenForConsensus()
+	go c.ListenForTx()
+}
+
+// ListenForCertificate() subscribes to -> validates -> internally routes -> and gossips - inbound Quorum Certificate messages
+// - all nodes receive new blocks authorized by the quorum via this listener
+func (c *Controller) ListenForCertificate() {
 	c.log.Debug("Listening for inbound blocks")
 	cache := lib.NewMessageCache()
-	for msg := range c.P2P.Inbox(Block) {
-		ret := false
+	for msg := range c.P2P.Inbox(Certificate) {
+		quit := false
 		func() {
 			c.Lock()
 			defer c.Unlock()
@@ -265,7 +296,7 @@ func (c *Controller) ListenForBlock() {
 			if outOfSync {
 				c.log.Warnf("Node fell out of sync for committeeID: %d", blkResponseMsg.CommitteeId)
 				go c.Sync(blkResponseMsg.CommitteeId)
-				ret = true
+				quit = true
 				return
 			}
 			if err != nil {
@@ -273,19 +304,37 @@ func (c *Controller) ListenForBlock() {
 				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, InvalidBlockRep)
 				return
 			}
-			c.Consensus[blkResponseMsg.CommitteeId].ResetBFTChan() <- time.Since(startTime)
-			c.UpdateP2PMustConnect()
 			c.SendCertMsg(blkResponseMsg.CommitteeId, qc)
+			// NEW TARGET BLOCK MEANS NEW_HEIGHT FOR TARGET BFT
+			if blkResponseMsg.CommitteeId != lib.CanopyCommitteeId {
+				c.Consensus[blkResponseMsg.CommitteeId].ResetBFTChan() <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
+				return
+			}
+			// NEW CANOPY BLOCK = RESET ALL BFTs WITH UPDATED COMMITTEES TO PREVENT CONFLICTING VALIDATOR SETS AMONG PEERS
+			newCanopyHeight := c.FSM.Height()
+			for _, cons := range c.Consensus {
+				if cons.CommitteeId == lib.CanopyCommitteeId {
+					continue
+				}
+				valSet, e := c.LoadCommittee(cons.CommitteeId, newCanopyHeight)
+				if e != nil {
+					c.log.Error(e.Error())
+					continue
+				}
+				cons.ResetBFTChan() <- bft.ResetBFT{UpdatedCommitteeSet: valSet, UpdatedCommitteeHeight: newCanopyHeight}
+			}
+			c.UpdateP2PMustConnect()
 		}()
-		if ret {
+		if quit {
 			return
 		}
 	}
 }
 
+// ListenForConsensus() subscribes to -> validates -> and internally routes - inbound Consensus messages
 func (c *Controller) ListenForConsensus() {
 	for msg := range c.P2P.Inbox(Cons) {
-		if c.syncing.Load() {
+		if c.isAnySyncing() {
 			continue
 		}
 		func() {
@@ -321,13 +370,14 @@ func (c *Controller) ListenForConsensus() {
 	}
 }
 
+// ListenForTx() subscribes to -> validates -> internally routes -> and gossips - inbound Transaction messages
 func (c *Controller) ListenForTx() {
 	cache := lib.NewMessageCache()
 	for msg := range c.P2P.Inbox(Tx) {
 		func() {
 			c.Lock()
 			defer c.Unlock()
-			if !c.syncing.Load() {
+			if c.isAnySyncing() {
 				return
 			}
 			if ok := cache.Add(msg); !ok {
@@ -361,15 +411,16 @@ func (c *Controller) ListenForTx() {
 	}
 }
 
-func (c *Controller) ListenForBlockReq() {
+// ListenForCertificateRequests() subscribes to -> validates -> internally routes -> and responds to - inbound CertificateRequest messages
+func (c *Controller) ListenForCertificateRequests() {
 	l := lib.NewLimiter(MaxBlockReqPerWindow, c.P2P.MaxPossiblePeers()*MaxBlockReqPerWindow, BlockReqWindowS)
 	for {
 		select {
-		case msg := <-c.P2P.Inbox(BlockRequest):
+		case msg := <-c.P2P.Inbox(CertificateRequest):
 			func() {
 				c.Lock()
 				defer c.Unlock()
-				if c.syncing.Load() {
+				if c.isAnySyncing() {
 					return
 				}
 				senderID := msg.Sender.Address.PublicKey
@@ -398,7 +449,7 @@ func (c *Controller) ListenForBlockReq() {
 						return
 					}
 				}
-				c.SendBlockRespMsg(request.CommitteeId, plug.Height(), cert, senderID)
+				c.SendBlockRespMsg(request.CommitteeId, plug.Height(), plug.TotalVDFIterations(), cert, senderID)
 			}()
 		case <-l.C():
 			l.Reset()
@@ -406,84 +457,11 @@ func (c *Controller) ListenForBlockReq() {
 	}
 }
 
-func (c *Controller) StartListeners() {
-	c.log.Debug("Listening for inbound txs, block requests, and consensus messages")
-	go c.ListenForBlockReq()
-	go c.ListenForConsensus()
-	go c.ListenForTx()
-}
+// INTERNAL HELPERS BELOW
 
-func (c *Controller) handlePeerCert(senderID []byte, msg *lib.BlockResponseMessage) (qc *lib.QuorumCertificate, outOfSync bool, err lib.ErrorI) {
-	qc, consensus := msg.BlockAndCertificate, c.Consensus[msg.CommitteeId]
-	height, v := c.FSM.Height(), consensus.ValidatorSet
-	handleErr := func(err error) {
-		c.P2P.ChangeReputation(senderID, InvalidBlockRep)
-		c.log.Error(err.Error())
-	}
-	if err = c.checkPeerQC(height, v, senderID, msg.BlockAndCertificate); err != nil {
-		handleErr(err)
-		return
-	}
-	if err = qc.Proposal.CheckBasic(msg.CommitteeId, height); err != nil {
-		handleErr(err)
-		return
-	}
-	plug, cons, e := c.GetPluginAndConsensus(msg.CommitteeId)
-	if e != nil {
-		handleErr(e)
-		return
-	}
-	outOfSync, err = plug.CheckPeerProposal(msg.MaxHeight, qc.Proposal)
-	if err != nil {
-		handleErr(err)
-		return
-	}
-	if err = plug.CommitCertificate(qc); err != nil {
-		handleErr(err)
-		return
-	}
-	cons.Height = plug.Height() + 1
-	return
-}
-
-func (c *Controller) checkPeerQC(height uint64, v lib.ValidatorSet, senderID []byte, qc *lib.QuorumCertificate) lib.ErrorI {
-	isPartialQC, err := qc.Check(v, height)
-	if err != nil {
-		c.P2P.ChangeReputation(senderID, InvalidJustifyRep)
-		return err
-	}
-	if isPartialQC {
-		c.P2P.ChangeReputation(senderID, InvalidJustifyRep)
-		return lib.ErrNoMaj23()
-	}
-	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
-		c.P2P.ChangeReputation(senderID, InvalidJustifyRep)
-		return lib.ErrWrongPhase()
-	}
-	return nil
-}
-
+// UpdateP2PMustConnect() tells the P2P module which nodes must be connected to (usually fellow committee members or none if not in committee)
 func (c *Controller) UpdateP2PMustConnect() {
 	m, s := make(map[string]*lib.PeerAddress), make([]*lib.PeerAddress, 0)
-	validators, e := c.FSM.GetConsensusValidators()
-	if e != nil {
-		c.log.Errorf("unable to get must connect peers from consensus validators with error %s", e.Error())
-		return
-	}
-	selfId, selfIsValidator := c.PublicKey, false
-	for _, val := range validators.ValidatorSet {
-		if bytes.Equal(selfId, val.PublicKey) {
-			selfIsValidator = true
-			continue
-		}
-		m[lib.BytesToString(val.PublicKey)] = &lib.PeerAddress{
-			PublicKey:  val.PublicKey,
-			NetAddress: val.NetAddress,
-		}
-	}
-	if !selfIsValidator {
-		m = make(map[string]*lib.PeerAddress)
-	}
 	for committeeID := range c.Consensus {
 		committee, err := c.FSM.GetCommittee(committeeID)
 		if err != nil {
@@ -513,50 +491,182 @@ func (c *Controller) UpdateP2PMustConnect() {
 	c.P2P.MustConnectReceiver() <- s
 }
 
-func (c *Controller) pollMaxHeight(committeeID uint64, backoff int) (maxHeight uint64, maxHeights map[string]uint64) {
+// handlePeerCert() validates and handles inbound Quorum Certificates from remote peers
+func (c *Controller) handlePeerCert(senderID []byte, msg *lib.BlockResponseMessage) (qc *lib.QuorumCertificate, stillCatchingUp bool, err lib.ErrorI) {
+	// define an error handling function
+	handleErr, qc := func(err error) {
+		c.P2P.ChangeReputation(senderID, InvalidBlockRep)
+		c.log.Error(err.Error())
+	}, msg.BlockAndCertificate
+	// get the plugin and consensus module for the specific committee
+	plug, cons, e := c.GetPluginAndConsensus(msg.CommitteeId)
+	if e != nil {
+		handleErr(e)
+		return
+	}
+	v := cons.ValidatorSet
+	// validate the quorum certificate
+	if err = c.checkPeerQC(plug.LoadMaxBlockSize(), &lib.View{
+		Height:          plug.Height() + 1,
+		CommitteeHeight: c.LoadCommitteeHeightInState(msg.CommitteeId),
+		NetworkId:       c.Config.NetworkID,
+		CommitteeId:     msg.CommitteeId,
+	}, v, qc, senderID); err != nil {
+		handleErr(err)
+		return
+	}
+	// validates the 'block' and 'block hash' of the proposal
+	stillCatchingUp, err = plug.CheckPeerQC(msg.MaxHeight, qc)
+	if err != nil {
+		handleErr(err)
+		return
+	}
+	// attempts to commit the QC to persistence of chain by playing it against the state machine
+	if err = plug.CommitCertificate(qc); err != nil {
+		handleErr(err)
+		return
+	}
+	// increment the height of the consensus
+	cons.Height = plug.Height() + 1
+	return
+}
+
+// checkPeerQC() performs validity checks on a QuorumCertificate received from a peer
+func (c *Controller) checkPeerQC(maxBlockSize int, view *lib.View, v lib.ValidatorSet, qc *lib.QuorumCertificate, senderID []byte) lib.ErrorI {
+	isPartialQC, err := qc.Check(v, maxBlockSize, view, false)
+	if err != nil {
+		c.P2P.ChangeReputation(senderID, InvalidJustifyRep)
+		return err
+	}
+	if isPartialQC {
+		c.P2P.ChangeReputation(senderID, InvalidJustifyRep)
+		return lib.ErrNoMaj23()
+	}
+	if qc.Results != nil {
+		c.P2P.ChangeReputation(senderID, InvalidMsgRep)
+		return lib.ErrNonNilCertResults()
+	}
+	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
+		c.P2P.ChangeReputation(senderID, InvalidMsgRep)
+		return lib.ErrWrongPhase()
+	}
+	// enforce the target height
+	if qc.Header.Height != view.Height {
+		c.P2P.ChangeReputation(senderID, InvalidMsgRep)
+		return lib.ErrWrongHeight()
+	}
+	// enforce the last saved committee height as valid
+	// NOTE: historical committees are accepted up to the last saved height in the state
+	// else there's a potential for a long-range attack
+	if qc.Header.CommitteeHeight < view.CommitteeHeight {
+		c.P2P.ChangeReputation(senderID, InvalidJustifyRep)
+		return lib.ErrInvalidQCCommitteeHeight()
+	}
+	return nil
+}
+
+// pollMaxHeight() polls all peers for their local MaxHeight and totalVDFIterations for a specific committeeID
+// NOTE: unlike other P2P transmissions - SendCertReqMsg enforces a minimum reputation on `mustConnects`
+// to ensure a byzantine validator cannot cause syncing issues above max_height
+func (c *Controller) pollMaxHeight(committeeID uint64, backoff int) (maxHeight, minimumVDFIterations uint64, syncingPeers []string) {
+	// empty inbox to start fresh
+	c.emptyInbox(Certificate)
+	// ask all peers
 	c.log.Info("Polling all peers for max height")
-	maxHeights = make(map[string]uint64)
-	c.SendBlockReqMsg(committeeID, true)
+	syncingPeers = make([]string, 0)
+	// ask only for MaxHeight not the actual QC
+	c.SendCertReqMsg(committeeID, true)
 	for {
 		c.log.Debug("Waiting for peer max heights")
 		select {
-		case m := <-c.P2P.Inbox(Block):
+		case m := <-c.P2P.Inbox(Certificate):
 			response, ok := m.Message.(*lib.BlockResponseMessage)
 			if !ok {
 				c.P2P.ChangeReputation(m.Sender.Address.PublicKey, InvalidMsgRep)
 				continue
 			}
-			if response.MaxHeight > maxHeight {
-				maxHeight = response.MaxHeight
+			// don't listen to any peers below the minimumVDFIterations
+			if response.TotalVdfIterations < minimumVDFIterations {
+				continue
 			}
-			maxHeights[lib.BytesToString(m.Sender.Address.PublicKey)] = response.MaxHeight
-		case <-time.After(SyncTimeoutS * time.Second * time.Duration(backoff)):
-			c.log.Warn("No heights received from peers. Trying again")
+			// reset syncing variables if peer exceeds the previous minimumVDFIterations
+			if response.TotalVdfIterations > minimumVDFIterations {
+				maxHeight, minimumVDFIterations = response.MaxHeight, response.TotalVdfIterations
+				syncingPeers = make([]string, 0)
+			}
+			// add to syncing peer list
+			syncingPeers = append(syncingPeers, lib.BytesToString(c.PublicKey))
+		case <-time.After(PollMaxHeightTimeoutS * time.Second * time.Duration(backoff)):
 			if maxHeight == 0 { // genesis file is 0 and first height is 1
+				c.log.Warn("No heights received from peers. Trying again")
 				return c.pollMaxHeight(committeeID, backoff+1)
 			}
+			c.log.Debugf("Waiting peer max height is %d", maxHeight)
 			return
 		}
 	}
 }
 
-func (c *Controller) syncingDone(committeeID, maxHeight uint64) bool {
-	pluginHeight, err := c.GetHeight(committeeID)
+// singleNodeNetwork() returns true if there are no other participants in the committee besides self
+func (c *Controller) singleNodeNetwork(committeeID uint64) bool {
+	valSet, err := c.LoadCommittee(committeeID, c.FSM.Height())
+	if err != nil {
+		c.log.Error(err.Error())
+		return false
+	}
+	return len(valSet.ValidatorSet.ValidatorSet) == 1 &&
+		bytes.Equal(valSet.ValidatorSet.ValidatorSet[0].PublicKey, c.PublicKey)
+}
+
+// isAnySyncing() returns if any committee is currently syncing
+func (c *Controller) isAnySyncing() bool {
+	for _, b := range c.isSyncing {
+		if b.Load() == true {
+			return true
+		}
+	}
+	return false
+}
+
+// emptyInbox() discards all unread messages for a specific topic
+func (c *Controller) emptyInbox(topic lib.Topic) {
+	for len(c.P2P.Inbox(topic)) > 0 {
+		<-c.P2P.Inbox(topic)
+	}
+}
+
+// syncingDone() checks if the syncing loop may complete for a specific committeeID
+func (c *Controller) syncingDone(committeeID, maxHeight, minVDFIterations uint64) bool {
+	plug, _, err := c.GetPluginAndConsensus(committeeID)
 	if err != nil {
 		c.log.Error(err.Error())
 	}
-	if pluginHeight >= maxHeight {
-		c.Consensus[committeeID].ResetBFTChan() <- time.Since(c.LoadLastCommitTime(committeeID, pluginHeight))
-		c.syncing.Store(false)
-		go c.ListenForBlock()
+	if plug.Height() >= maxHeight {
+		// ensure node did not lie about VDF iterations in their chain
+		if plug.TotalVDFIterations() < minVDFIterations {
+			c.log.Fatalf("VDFIterations error: localVDFIterations: %d, minimumVDFIterations: %d", plug.TotalVDFIterations(), minVDFIterations)
+		}
 		return true
 	}
 	return false
 }
 
+// finishSyncing() is called when the syncing loop is completed for a specific committeeID
+func (c *Controller) finishSyncing(committeeID uint64) {
+	pluginHeight, err := c.GetHeight(committeeID)
+	if err != nil {
+		c.log.Error(err.Error())
+	}
+	c.Consensus[committeeID].ResetBFTChan() <- bft.ResetBFT{
+		ProcessTime: time.Since(c.LoadLastCommitTime(committeeID, pluginHeight)),
+	}
+	c.isSyncing[committeeID].Store(false)
+	go c.ListenForCertificate()
+}
+
 const (
-	BlockRequest = lib.Topic_BLOCK_REQUEST
-	Block        = lib.Topic_BLOCK
-	Tx           = lib.Topic_TX
-	Cons         = lib.Topic_CONSENSUS
+	CertificateRequest = lib.Topic_CERTIFICATE_REQUEST
+	Certificate        = lib.Topic_CERTIFICATE
+	Tx                 = lib.Topic_TX
+	Cons               = lib.Topic_CONSENSUS
 )

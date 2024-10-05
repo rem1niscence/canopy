@@ -193,7 +193,7 @@ func (f *Fuzzer) validStakeTransaction(from *crypto.KeyGroup, acc types.Account,
 		StakedAmount: amount,
 		Output:       output.Bytes(),
 	}
-	tx, err := types.NewStakeTx(from.PrivateKey, output, val.NetAddress, val.StakedAmount, f.getTxTime(), fee)
+	tx, err := types.NewStakeTx(from.PrivateKey, output, val.NetAddress, val.StakedAmount, f.getTxTime(), fee, false, false)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func (f *Fuzzer) validEditStakeTx(from *crypto.KeyGroup, val types.Validator, ac
 		pub, _ := crypto.NewED25519PublicKey()
 		output = pub.Address()
 	}
-	tx, err := types.NewEditStakeTx(from.PrivateKey, output, f.getRandomNetAddr(), amountToStake, f.getTxTime(), fee)
+	tx, err := types.NewEditStakeTx(from.PrivateKey, output, f.getRandomNetAddr(), amountToStake, f.getTxTime(), fee, , false, false)
 	if err != nil {
 		return err
 	}
@@ -233,7 +233,7 @@ func (f *Fuzzer) validEditStakeTx(from *crypto.KeyGroup, val types.Validator, ac
 
 func (f *Fuzzer) validUnstakeTransaction(from *crypto.KeyGroup, acc types.Account, val types.Validator, fee uint64) lib.ErrorI {
 	val.UnstakingHeight = 1
-	tx, err := types.NewUnstakeTx(from.PrivateKey, f.getTxTime(), fee)
+	tx, err := types.NewUnstakeTx(from.PrivateKey, fee)
 	if err != nil {
 		return err
 	}

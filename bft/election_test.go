@@ -2,6 +2,7 @@ package bft
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"math"
@@ -24,8 +25,8 @@ func TestSortitionAndVerifyCandidate(t *testing.T) {
 		},
 		{
 			name:        "isNotCandidate",
-			detail:      "deterministic key set ensures sortition results in not a candidate in a set of 7 validators",
-			totalVals:   7,
+			detail:      "deterministic key set ensures sortition results in not a candidate in a set of 6 validators",
+			totalVals:   4,
 			isCandidate: false,
 		},
 	}
@@ -38,7 +39,7 @@ func TestSortitionAndVerifyCandidate(t *testing.T) {
 				SortitionData: sortitionData,
 				PrivateKey:    privateKey,
 			})
-			require.Equal(t, VRF(sortitionData.LastProposersPublicKeys, sortitionData.Height, sortitionData.Round, privateKey), vrf)
+			require.Equal(t, VRF(sortitionData.LastProposerAddresses, sortitionData.Height, sortitionData.Round, privateKey), vrf)
 			require.Equal(t, crypto.Hash(vrf.Signature), out)
 			require.Equal(t, test.isCandidate, isCandidate)
 			outVerify, isCandidateFromVerify := VerifyCandidate(&SortitionVerifyParams{
@@ -52,26 +53,47 @@ func TestSortitionAndVerifyCandidate(t *testing.T) {
 	}
 }
 
+func TestWhenIsCandidate(t *testing.T) {
+	for i := 1; i < 8; i++ {
+		c := newTestConsensus(t, Election, i)
+		fmt.Println("NUM VALIDATORS ", i)
+		for j := 0; j < len(c.valKeys); j++ {
+			privateKey := c.valKeys[j]
+			sortitionData := newTestSortitionData(t, c)
+			_, _, isCandidate := Sortition(&SortitionParams{
+				SortitionData: sortitionData,
+				PrivateKey:    privateKey,
+			})
+			if isCandidate {
+				fmt.Printf("%d,", j)
+			}
+		}
+		fmt.Println()
+	}
+}
+
 func TestSortitionValidity(t *testing.T) {
 	privateKey, _ := crypto.NewBLSPrivateKey()
 	lastNProposers := [][]byte{[]byte("a"), []byte("b"), []byte("c")}
-	power, totalPower := 1000000, 2000000
+	power, totalPower := 1000000, 3000000
 	expectedAvg := float64(power) / float64(totalPower)
 	totalIterations := 1000
 	errorThreshold := .07
-	avg := uint64(0)
+	isCandCount := uint64(0)
 	for i := 0; i < totalIterations; i++ {
-		avg += vrfAndCDF(SortitionParams{
+		if isCand := vrfAndCDF(SortitionParams{
 			SortitionData: &SortitionData{
-				LastProposersPublicKeys: lastNProposers,
-				Height:                  uint64(rand.Intn(math.MaxUint32)),
-				VotingPower:             uint64(power),
-				TotalPower:              uint64(totalPower),
+				LastProposerAddresses: lastNProposers,
+				Height:                uint64(rand.Intn(math.MaxUint32)),
+				VotingPower:           uint64(power),
+				TotalPower:            uint64(totalPower),
 			},
 			PrivateKey: privateKey,
-		})
+		}); isCand {
+			isCandCount++
+		}
 	}
-	e := math.Abs(float64(avg)/float64(totalIterations) - expectedAvg)
+	e := math.Abs(float64(isCandCount)/float64(totalIterations) - expectedAvg)
 	require.True(t, e < errorThreshold)
 }
 
@@ -91,11 +113,11 @@ func TestSelectProposerFromCandidates(t *testing.T) {
 			expectedProposerIdx: 0,
 		},
 		{
-			name:                "3 candidates, highest index (2) is proposer",
-			detail:              "out = index, and select proposer from candidates should select the highest out",
+			name:                "3 candidates, lowest index (0) is the proposer",
+			detail:              "since out is set to index and the lowest out is the proposer, candidate 0 should be the proposer",
 			totalVals:           3,
 			totalCandidates:     3,
-			expectedProposerIdx: 2,
+			expectedProposerIdx: 0,
 		},
 	}
 	for _, test := range tests {
@@ -104,7 +126,7 @@ func TestSelectProposerFromCandidates(t *testing.T) {
 			var vrfCandidates []VRFCandidate
 			for i := uint64(0); i < test.totalCandidates; i++ {
 				out := make([]byte, 8)
-				binary.LittleEndian.PutUint64(out, i)
+				binary.BigEndian.PutUint64(out, i)
 				vrfCandidates = append(vrfCandidates, VRFCandidate{
 					PublicKey: c.valKeys[i].PublicKey(),
 					Out:       out,
@@ -119,22 +141,22 @@ func TestSelectProposerFromCandidates(t *testing.T) {
 func newTestSortitionData(t *testing.T, c *testConsensus) *SortitionData {
 	var lastNProposers [][]byte
 	for _, k := range c.valKeys {
-		lastNProposers = append(lastNProposers, k.PublicKey().Bytes())
+		lastNProposers = append(lastNProposers, k.PublicKey().Address().Bytes())
 	}
 	val, err := c.valSet.GetValidator(c.valKeys[0].PublicKey().Bytes())
 	require.NoError(t, err)
 	sortitionData := &SortitionData{
-		LastProposersPublicKeys: lastNProposers,
-		Height:                  1,
-		Round:                   0,
-		TotalValidators:         uint64(len(c.valKeys)),
-		VotingPower:             val.VotingPower,
-		TotalPower:              c.valSet.TotalPower,
+		LastProposerAddresses: lastNProposers,
+		Height:                1,
+		Round:                 0,
+		TotalValidators:       uint64(len(c.valKeys)),
+		VotingPower:           val.VotingPower,
+		TotalPower:            c.valSet.TotalPower,
 	}
 	return sortitionData
 }
 
-func vrfAndCDF(p SortitionParams) uint64 {
-	vrf := VRF(p.LastProposersPublicKeys, p.Height, p.Round, p.PrivateKey)
-	return CDF(p.VotingPower, p.TotalPower, 1, crypto.Hash(vrf.Signature))
+func vrfAndCDF(p SortitionParams) bool {
+	vrf := VRF(p.LastProposerAddresses, p.Height, p.Round, p.PrivateKey)
+	return IsCandidate(p.VotingPower, p.TotalPower, 1, crypto.Hash(vrf.Signature))
 }

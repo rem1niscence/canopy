@@ -11,6 +11,7 @@ message Transaction {
   Signature signature = 3;
   uint64 time = 4;
   uint64 fee = 5;
+  string memo = 6;
 }
 
 message TxResult {

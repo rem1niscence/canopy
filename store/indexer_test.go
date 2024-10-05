@@ -6,6 +6,7 @@ import (
 	"github.com/ginchuco/ginchu/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 const testHeight = 1
@@ -17,9 +18,9 @@ func TestGetTxByHash(t *testing.T) {
 	require.NoError(t, store.IndexTx(txRes))
 	txResult, err := store.GetTxByHash(hash)
 	require.NoError(t, err)
-	gotBytes, err := txResult.GetBytes()
+	gotBytes, err := lib.Marshal(txResult)
 	require.NoError(t, err)
-	wantedBytes, err := txRes.GetBytes()
+	wantedBytes, err := lib.Marshal(txRes)
 	require.NoError(t, err)
 	require.True(t, bytes.Equal(gotBytes, wantedBytes))
 }
@@ -32,9 +33,9 @@ func TestGetTxByHeight(t *testing.T) {
 	txResults, err := store.GetTxsByHeightNonPaginated(testHeight, true)
 	require.NoError(t, err)
 	require.Len(t, txResults, 1)
-	gotBytes, err := txResults[0].GetBytes()
+	gotBytes, err := lib.Marshal(txResults[0])
 	require.NoError(t, err)
-	wantedBytes, err := txRes.GetBytes()
+	wantedBytes, err := lib.Marshal(txRes)
 	require.NoError(t, err)
 	require.True(t, bytes.Equal(gotBytes, wantedBytes))
 }
@@ -50,10 +51,10 @@ func newTestTxResult(t *testing.T) (r *lib.TxResult, tx *lib.Transaction, hash [
 	a, err := lib.NewAny(msg)
 	require.NoError(t, err)
 	tx = &lib.Transaction{
-		Type:     "commit_id",
-		Msg:      a,
-		Sequence: 1,
-		Fee:      1,
+		Type: "commit_id",
+		Msg:  a,
+		Time: uint64(time.Now().UnixMicro()),
+		Fee:  1,
 	}
 	require.NoError(t, tx.Sign(pk))
 	hash, err = tx.GetHash()

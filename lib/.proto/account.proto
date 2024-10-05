@@ -18,4 +18,5 @@ message Supply {
   uint64 staked = 2;
   repeated Pool committees_with_delegations = 3; // supplies of committees
   repeated Pool delegations_only = 4; // supplies of delegations towards committees
+  repeated Pool escrowed = 5; // supplies of escrowed funds in committees
 }

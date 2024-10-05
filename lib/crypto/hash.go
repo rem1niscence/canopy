@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"hash"
@@ -8,6 +9,10 @@ import (
 
 const (
 	HashSize = sha256.Size
+)
+
+var (
+	MaxHash = bytes.Repeat([]byte{0xFF}, HashSize)
 )
 
 func Hasher() hash.Hash {

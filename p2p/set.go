@@ -58,20 +58,20 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 		return nil
 	}
 	// use a ptr to reference the inbound / outbound counters
-	ptr, maxErr := new(map[uint64]int), lib.ErrorI(nil)
+	peerCounts, maxErr := new(map[uint64]int), lib.ErrorI(nil)
 	if p.IsOutbound {
-		ptr, maxErr = &ps.outbound, ErrMaxOutbound()
+		peerCounts, maxErr = &ps.outbound, ErrMaxOutbound()
 	} else {
-		ptr, maxErr = &ps.inbound, ErrMaxInbound()
+		peerCounts, maxErr = &ps.inbound, ErrMaxInbound()
 	}
 	// limit inbound / outbound on non-trusted & non-must-connects
 	// for each chain the peer supports
 	for _, chain := range p.Address.PeerMeta.Chains {
 		// check if below limit and self hasChain
-		if count, selfHasChain := (*ptr)[chain]; selfHasChain && count < ps.config.MaxOutbound {
+		if count, selfHasChain := (*peerCounts)[chain]; selfHasChain && count < ps.config.MaxOutbound {
 			// increment counts
 			for _, c := range p.Address.PeerMeta.Chains {
-				(*ptr)[c]++
+				(*peerCounts)[c]++
 			}
 			// set the peer
 			ps.set(p)
@@ -90,7 +90,7 @@ func (ps *PeerSet) Remove(publicKey []byte) (peer *Peer, err lib.ErrorI) {
 	if err != nil {
 		return
 	}
-	ps.stopAndRemove(peer)
+	ps.remove(peer)
 	return
 }
 
@@ -100,12 +100,17 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 	ps.Lock()
 	defer ps.Unlock()
 	ps.mustConnect = mustConnect
+	for _, peer := range ps.m {
+		peer.IsMustConnect = false
+		ps.changeIOCount(false, peer.IsOutbound, peer.PeerInfo.Address.PeerMeta)
+	}
 	// for each must connect
 	for _, peer := range mustConnect {
 		publicKey := lib.BytesToString(peer.PublicKey)
 		// if has peer, just update metadata
-		if _, found := ps.m[publicKey]; found {
+		if p, found := ps.m[publicKey]; found {
 			ps.m[publicKey].IsMustConnect = true
+			ps.changeIOCount(true, p.IsOutbound, p.PeerInfo.Address.PeerMeta)
 		} else { // else add to 'ToDial' list
 			toDial = append(toDial, peer)
 		}
@@ -129,7 +134,10 @@ func (ps *PeerSet) ChangeReputation(publicKey []byte, delta int32) {
 	}
 	// if peer isn't trusted nor is 'must connect' and the reputation is below minimum
 	if !peer.IsTrusted && !peer.IsMustConnect && peer.Reputation < MinimumPeerReputation {
-		ps.stopAndRemove(peer)
+		peer.stop.Do(func() {
+			peer.conn.Stop()
+		})
+		ps.remove(peer)
 		return
 	}
 	// update the peer
@@ -184,11 +192,16 @@ func (ps *PeerSet) SendTo(publicKey []byte, topic lib.Topic, msg proto.Message) 
 }
 
 // SendToChainPeers() sends a message to all peers with the chainId
-func (ps *PeerSet) SendToChainPeers(chainId uint64, topic lib.Topic, msg proto.Message) lib.ErrorI {
+func (ps *PeerSet) SendToChainPeers(chainId uint64, topic lib.Topic, msg proto.Message, excludeBadRep ...bool) lib.ErrorI {
 	ps.RLock()
 	defer ps.RUnlock()
 	for _, p := range ps.m {
 		if p.HasChain(chainId) {
+			if len(excludeBadRep) == 1 && excludeBadRep[0] {
+				if p.Reputation < MinimumPeerReputation {
+					continue
+				}
+			}
 			if err := ps.send(p, topic, msg); err != nil {
 				return err
 			}
@@ -225,8 +238,8 @@ func (ps *PeerSet) send(peer *Peer, topic lib.Topic, msg proto.Message) lib.Erro
 	return nil
 }
 
-// stopAndRemove() stops the peer, decrements the in/out counters, and deletes it from the set
-func (ps *PeerSet) stopAndRemove(peer *Peer) {
+// remove() decrements the in/out counters, and deletes it from the set
+func (ps *PeerSet) remove(peer *Peer) {
 	if !peer.IsTrusted && !peer.IsMustConnect {
 		for _, chain := range peer.Address.PeerMeta.Chains {
 			if peer.IsOutbound {
@@ -241,6 +254,25 @@ func (ps *PeerSet) stopAndRemove(peer *Peer) {
 		}
 	}
 	ps.del(peer.PeerInfo.Address.PublicKey)
+}
+
+// changeIOCount() increments or decrements numInbound and numOutbound for each chain in the PeerMeta
+func (ps *PeerSet) changeIOCount(increment, outbound bool, meta *lib.PeerMeta) {
+	for _, c := range meta.Chains {
+		if outbound {
+			if increment {
+				ps.outbound[c]++
+			} else {
+				ps.outbound[c]--
+			}
+		} else {
+			if increment {
+				ps.inbound[c]++
+			} else {
+				ps.inbound[c]--
+			}
+		}
+	}
 }
 
 // map based CRUD operations below

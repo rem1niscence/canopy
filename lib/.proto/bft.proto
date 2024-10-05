@@ -1,0 +1,37 @@
+syntax = "proto3";
+package types;
+
+option go_package = "github.com/ginchuco/ginchu/bft";
+
+import "consensus.proto";
+import "tx.proto";
+
+message Message {
+  View header = 1;
+  Signature vrf = 2; // only ELECTION phase from proposer
+  QuorumCertificate qc = 3; // Proposers use this to aggregate replica messages, Replicas sign parts of this to vote
+  QuorumCertificate high_qc = 4; // only if a previous lock was seen: ELECTION-VOTE phase by replica and PROPOSE phase by proposer
+  repeated DoubleSignEvidence last_double_sign_evidence = 5; // evidence from height - 1 (required cause last round ds would not be caught otherwise)
+  repeated BadProposerEvidence bad_proposer_evidence = 6; // evidence from current height (last round is always good, so we can do same height)
+  VDF vdf = 7;
+  Signature signature = 8;
+}
+
+message DoubleSignEvidences {
+  repeated DoubleSignEvidence Evidence = 1;
+  map<string, bool> DeDuplicator = 2;
+}
+
+message DoubleSignEvidence {
+  QuorumCertificate vote_a = 1;
+  QuorumCertificate vote_b = 2;
+}
+
+message BadProposerEvidences {
+  repeated BadProposerEvidence Evidence = 1;
+  map<string, bool> DeDuplicator = 2;
+}
+
+message BadProposerEvidence {
+  QuorumCertificate election_vote_qc = 1;
+}

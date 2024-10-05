@@ -1,36 +1,66 @@
 syntax = "proto3";
 package types;
 
-option go_package = "github.com/ginchuco/ginchu/bft";
+option go_package = "github.com/ginchuco/ginchu/lib";
 
-import "block.proto";
-import "tx.proto";
+import "proposal.proto";
 
-message Message {
-  View header = 1;
-  Signature vrf = 2; // only ELECTION phase from proposer
-  QuorumCertificate qc = 3; // Proposers use this to aggregate replica messages, Replicas sign parts of this to vote
-  QuorumCertificate high_qc = 4; // only if a previous lock was seen: ELECTION-VOTE phase by replica and PROPOSE phase by proposer
-  repeated DoubleSignEvidence last_double_sign_evidence = 5; // evidence from height - 1 (required cause last round ds would not be caught otherwise)
-  repeated BadProposerEvidence bad_proposer_evidence = 6; // evidence from current height (last round is always good, so we can do same height)
-  Signature signature = 7;
+message Proposers {
+  repeated bytes addresses = 1;
 }
 
-message DoubleSignEvidences {
-  repeated DoubleSignEvidence Evidence = 1;
-  map<string, bool> DeDuplicator = 2;
+enum Phase {
+  UNKNOWN = 0;
+  ELECTION = 1;
+  ELECTION_VOTE = 2;
+  PROPOSE = 3;
+  PROPOSE_VOTE = 4;
+  PRECOMMIT = 5;
+  PRECOMMIT_VOTE = 6;
+  COMMIT = 7;
+  COMMIT_PROCESS = 8;
+  ROUND_INTERRUPT = 9;
+  PACEMAKER = 10;
 }
 
-message DoubleSignEvidence {
-  QuorumCertificate vote_a = 1;
-  QuorumCertificate vote_b = 2;
+message QuorumCertificate {
+  View header = 1; // replica vote view
+  CertificateResult results = 2; // used for PROPOSE
+  bytes results_hash = 3; // used after PROPOSE
+  bytes block = 4; // used for PROPOSE
+  bytes block_hash = 5; // used after PROPOSE
+  bytes proposer_key = 6; // only EV and PROPOSE
+  AggregateSignature signature = 7; // aggregate signature from the current proposer message
 }
 
-message BadProposerEvidences {
-  repeated BadProposerEvidence Evidence = 1;
-  map<string, bool> DeDuplicator = 2;
+message View {
+  // the height of the integrated chain
+  // number of committed blocks in the integrated blockchain
+  uint64 height = 1;
+  // step within the consensus protocol where validators attempt to agree on the next block
+  // each round a new Proposer is selected to lead the validators to agree on the next block
+  // if they fail, the round is incremented, more time is granted for consensus timeouts, and the
+  // cycle starts over
+  uint64 round = 2;
+  // represents the smallest unit in the consensus process. Each round consists of multiple phases, and these phases are
+  // executed sequentially to achieve consensus on the next block.
+  // ELECTION->ELECTION-VOTE->PROPOSE->PROPOSE-VOTE->PRECOMMIT->PRECOMMIT-VOTE->COMMIT->COMMIT-PROCESS
+  Phase phase = 3;
+  // the Canopy chain height also the height that the committee validator set may be verified
+  uint64 committee_height = 4;
+  // the identifier of the network preventing cross-play between different networks (testnet / mainnet / forks)
+  uint64 network_id = 5;
+  // maps to a specific committee on Canopy
+  uint64 committee_id = 6;
 }
 
-message BadProposerEvidence {
-  QuorumCertificate election_vote_qc = 1;
+// Verifiable Delay Function
+message VDF {
+  bytes proof = 1; // proof of function completion given a specific seed
+  uint64 iterations = 2; // number of iterations (proxy for time)
+}
+
+message AggregateSignature {
+  bytes signature = 1;
+  bytes bitmap = 2;
 }

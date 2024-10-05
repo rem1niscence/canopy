@@ -6,15 +6,23 @@ import (
 )
 
 // LEADER TRACKING AND AGGREGATING MESSAGES FROM REPLICAS
+
+// NOTE: A 'Vote' is a digital signature of SignBytes from a Replica Validator. By signing a message and sending it to the Leader,
+// the Replica is adding their Voting power (staked tokens) behind some aggregable Message. If the Leader is able to aggregate +2/3rds of the Voting Power,
+// the Leader is able to justify consensus on some Message to the entire set.
+
 type (
+	// VotesForHeight is exclusively used by the Leader to track votes from Replicas for each phase
 	VotesForHeight map[uint64]map[string]map[string]*VoteSet // [Round] -> [Phase] -> [Payload-Hash] -> VoteSet
-	VoteSet        struct {
+	// VoteSet holds the unique Vote Message, a power count of the Replicas who have voted for this, and an aggregation of the Replicas signatures to prove the vote count
+	VoteSet struct {
 		Vote            *Message               `json:"vote,omitempty"`
 		TotalVotedPower uint64                 `json:"totalVotedPower,omitempty"`
 		multiKey        crypto.MultiPublicKeyI // tracks and aggregates bls signatures from replicas
 	}
 )
 
+// NewRound() initializes the VoteSets for
 func (v *VotesForHeight) NewRound(round uint64) {
 	votesByPhase := make(map[string]map[string]*VoteSet)
 	votesByPhase[phaseToString(ElectionVote)] = make(map[string]*VoteSet)
@@ -23,9 +31,11 @@ func (v *VotesForHeight) NewRound(round uint64) {
 	(*v)[round] = votesByPhase
 }
 
-func (c *Consensus) GetMajorityVote() (m *Message, sig *lib.AggregateSignature, err lib.ErrorI) {
-	for _, voteSet := range c.Votes[c.View.Round][phaseToString(c.View.Phase-1)] {
-		if has23maj := voteSet.TotalVotedPower >= c.ValidatorSet.MinimumMaj23; has23maj {
+// GetMajorityVote() returns the Message and AggregateSignature with a VoteSet with a +2/3 majority from the Replicas
+// NOTE: Votes for a specific Height-Round-Phase are organized by `Payload Hash` to ensure that all Replicas are voting on the same proposal
+func (b *BFT) GetMajorityVote() (m *Message, sig *lib.AggregateSignature, err lib.ErrorI) {
+	for _, voteSet := range b.Votes[b.View.Round][phaseToString(b.View.Phase-1)] {
+		if has23maj := voteSet.TotalVotedPower >= b.ValidatorSet.MinimumMaj23; has23maj {
 			signature, e := voteSet.multiKey.AggregateSignatures()
 			if e != nil {
 				return nil, nil, ErrAggregateSignature(e)
@@ -36,51 +46,63 @@ func (c *Consensus) GetMajorityVote() (m *Message, sig *lib.AggregateSignature, 
 	return nil, nil, lib.ErrNoMaj23()
 }
 
-func (c *Consensus) GetLeadingVote() (m *Message, maxVotePercent uint64, maxVotes uint64) {
-	for _, voteSet := range c.Votes[c.View.Round][phaseToString(c.View.Phase-1)] {
+// GetLeadingVote() returns the unique Vote Message that has the most power behind it and the number and percent voted that voted for it
+func (b *BFT) GetLeadingVote() (m *Message, maxVotePercent uint64, maxVotes uint64) {
+	for _, voteSet := range b.Votes[b.View.Round][phaseToString(b.View.Phase-1)] {
 		if voteSet.TotalVotedPower >= maxVotes {
-			m, maxVotes, maxVotePercent = voteSet.Vote, voteSet.TotalVotedPower, lib.Uint64PercentageDiv(voteSet.TotalVotedPower, c.ValidatorSet.TotalPower)
+			m, maxVotes, maxVotePercent = voteSet.Vote, voteSet.TotalVotedPower, lib.Uint64PercentageDiv(voteSet.TotalVotedPower, b.ValidatorSet.TotalPower)
 		}
 	}
 	return
 }
 
-func (c *Consensus) AddVote(vote *Message) lib.ErrorI {
-	voteSet := c.getVoteSet(vote)
-	if err := c.handleHighQCAndEvidence(vote); err != nil {
+// AddVote() adds a Replica's vote to the VoteSet
+func (b *BFT) AddVote(vote *Message) lib.ErrorI {
+	voteSet := b.getVoteSet(vote)
+	// handle high qc and byzantine evidence (only applicable if ELECTION-VOTE)
+	if err := b.handleHighQCVDFAndEvidence(vote); err != nil {
 		return err
 	}
-	if err := c.addSigToVoteSet(vote, voteSet); err != nil {
+	// add the vote to the set
+	if err := b.addSigToVoteSet(vote, voteSet); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Consensus) getVoteSet(vote *Message) (voteSet *VoteSet) {
+// getVoteSet() returns the set of votes for the Round.Phase.Payload
+func (b *BFT) getVoteSet(vote *Message) (voteSet *VoteSet) {
+	// initialize helper variables
 	round, phase, ok := vote.Qc.Header.Round, phaseToString(vote.Qc.Header.Phase), false
-	if _, ok = c.Votes[round]; !ok {
-		c.Votes[round] = make(map[string]map[string]*VoteSet)
+	// ensure Votes for this Round are initialized
+	if _, ok = b.Votes[round]; !ok {
+		b.Votes[round] = make(map[string]map[string]*VoteSet)
 	}
-	if _, ok = c.Votes[round][phase]; !ok {
-		c.Votes[round][phase] = make(map[string]*VoteSet)
+	// ensure Votes for this Round.Phase are initialized
+	if _, ok = b.Votes[round][phase]; !ok {
+		b.Votes[round][phase] = make(map[string]*VoteSet)
 	}
+	// the string version of the SignBytes act as a unique key for Replicas to vote on
+	// the SignBytes also are the bytes the Replicas use to sign and Validate an Aggregate Signature
 	payload := crypto.HashString(vote.SignBytes())
-	if voteSet, ok = c.Votes[round][phase][payload]; !ok {
+	// if no VoteSet is created for this Round.Phase.Payload then create a new VoteSet
+	if voteSet, ok = b.Votes[round][phase][payload]; !ok {
 		voteSet = &VoteSet{
 			Vote:     vote,
-			multiKey: c.ValidatorSet.Key.Copy(),
+			multiKey: b.ValidatorSet.MultiKey.Copy(),
 		}
-		c.Votes[round][phase][payload] = voteSet
+		b.Votes[round][phase][payload] = voteSet
 	}
 	return
 }
 
-func (c *Consensus) addSigToVoteSet(vote *Message, voteSet *VoteSet) lib.ErrorI {
-	val, err := c.ValidatorSet.GetValidator(vote.Signature.PublicKey)
+// addSigToVoteSet() adds the digital signature from the Replica to the VoteSet
+func (b *BFT) addSigToVoteSet(vote *Message, voteSet *VoteSet) lib.ErrorI {
+	val, idx, err := b.ValidatorSet.GetValidatorAndIdx(vote.Signature.PublicKey)
 	if err != nil {
 		return err
 	}
-	enabled, er := voteSet.multiKey.SignerEnabledAt(val.Index)
+	enabled, er := voteSet.multiKey.SignerEnabledAt(idx)
 	if er != nil {
 		return lib.ErrInvalidValidatorIndex()
 	}
@@ -88,32 +110,63 @@ func (c *Consensus) addSigToVoteSet(vote *Message, voteSet *VoteSet) lib.ErrorI 
 		return ErrDuplicateVote()
 	}
 	voteSet.TotalVotedPower += val.VotingPower
-	if er = voteSet.multiKey.AddSigner(vote.Signature.Signature, val.Index); er != nil {
+	if er = voteSet.multiKey.AddSigner(vote.Signature.Signature, idx); er != nil {
 		return ErrUnableToAddSigner(er)
 	}
 	return nil
 }
 
-// LEADER AGGREGATION
-func (c *Consensus) handleHighQCAndEvidence(vote *Message) lib.ErrorI {
+// handleHighQCVDFAndEvidence() processes any 'highQC', 'vdf' or 'evidence' an ElectionVote from a Replica may have submitted
+func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 	// Replicas sending in highQC & evidences to proposer during election vote
 	if vote.Qc.Header.Phase == ElectionVote {
 		if vote.HighQc != nil {
-			if err := vote.HighQc.CheckHighQC(c.Height, c.ValidatorSet); err != nil {
+			// check the highQC for a valid header
+			if err := vote.HighQc.Header.Check(&lib.View{
+				Phase:       PrecommitVote,
+				NetworkId:   b.NetworkId,
+				CommitteeId: b.CommitteeId,
+			}, false); err != nil {
 				return err
 			}
-			if c.HighQC == nil || c.HighQC.Header.Less(vote.HighQc.Header) {
-				c.HighQC = vote.HighQc
-				c.Proposal = vote.HighQc.Proposal
+			// ensure the height of the HighQC isn't older than the stateCommitteeHeight of the committee
+			// as anything older is invalid and at risk of a 'long range attack'
+			stateCommitteeHeight := b.Controller.LoadCommitteeHeightInState(b.CommitteeId)
+			// ensure the highQC has a valid Quorum Certificate
+			vs, err := b.Controller.LoadCommittee(b.CommitteeId, vote.HighQc.Header.CommitteeHeight)
+			if err != nil {
+				return err
+			}
+			if err = vote.HighQc.CheckHighQC(0, b.View, stateCommitteeHeight, vs); err != nil {
+				return err
+			}
+			// save the highQC if it's higher than any the Leader currently is aware of
+			if b.HighQC == nil || b.HighQC.Header.Less(vote.HighQc.Header) {
+				b.HighQC = vote.HighQc
+				b.Block, b.Results = vote.Qc.Block, vote.Qc.Results
 			}
 		}
+		// handle VDF
+		if vote.Vdf != nil && vote.Vdf.Iterations != 0 {
+			if vote.Vdf.Iterations > b.HighVDF.Iterations {
+				ok, err := b.VerifyVDF(vote)
+				if err != nil {
+					return err
+				}
+				if ok {
+					b.HighVDF = vote.Vdf
+				}
+			}
+		}
+		// combine double sign evidence
 		for _, evidence := range vote.LastDoubleSignEvidence {
-			if err := c.AddDSE(&c.ByzantineEvidence.DSE, evidence); err != nil {
+			if err := b.AddDSE(&b.ByzantineEvidence.DSE, evidence); err != nil {
 				return err
 			}
 		}
+		// combine bad proposer evidence
 		for _, evidence := range vote.BadProposerEvidence {
-			if err := c.AddBPE(&c.ByzantineEvidence.BPE, evidence); err != nil {
+			if err := b.AddBPE(&b.ByzantineEvidence.BPE, evidence); err != nil {
 				return err
 			}
 		}

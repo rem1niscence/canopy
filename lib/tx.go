@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/ginchuco/ginchu/lib/crypto"
@@ -9,56 +10,104 @@ import (
 	"time"
 )
 
-var _ TransactionI = &Transaction{}
-
-const (
-	TxResultsPageName      = "tx-results-page"
-	PendingResultsPageName = "pending-results-page"
+var (
+	_ TransactionI = &Transaction{} // TransactionI interface enforcement of the Transaction struct
+	_ SignatureI   = &Signature{}   // SignatureI interface enforcement of the Signature struct
+	_ TxResultI    = &TxResult{}    // TxResultI interface enforcement of the TxResult struct
+	_ Pageable     = new(TxResults)
 )
 
+const (
+	TxResultsPageName      = "tx-results-page"      // the name of a page of transactions
+	PendingResultsPageName = "pending-results-page" //  the name of a page of mempool pending transactions
+)
+
+var RegisteredMessages map[string]MessageI
+
 func init() {
-	RegisteredPageables[TxResultsPageName] = new(TxResults)
-	RegisteredPageables[PendingResultsPageName] = new(TxResults)
+	RegisteredPageables[TxResultsPageName] = new(TxResults)      // preregister the page type for unmarshalling
+	RegisteredPageables[PendingResultsPageName] = new(TxResults) // preregister the page type for unmarshalling
 }
 
+// TRANSACTION INTERFACES BELOW
+
+// TxResultI is the model of a completed transaction object after execution
+type TxResultI interface {
+	proto.Message
+	GetSender() []byte
+	GetRecipient() []byte
+	GetMessageType() string
+	GetHeight() uint64
+	GetIndex() uint64
+	GetTxHash() string
+	GetTx() TransactionI
+}
+
+// TransactionI is the model of a transaction object (a record of an action or event)
 type TransactionI interface {
 	proto.Message
-	GetMsg() *anypb.Any
-	GetSig() SignatureI
-	GetTime() uint64
-	GetBytes() ([]byte, ErrorI)
-	GetSignBytes() ([]byte, ErrorI)
-	GetHash() ([]byte, ErrorI)
+	GetMsg() *anypb.Any             // message payload (send, stake, edit-stake, etc.)
+	GetSig() SignatureI             // digital signature allowing public key verification
+	GetTime() uint64                // a stateless - prune friendly, replay attack / hash collision defense (opposed to sequence)
+	GetSignBytes() ([]byte, ErrorI) // the canonical form the bytes were signed in
+	GetHash() ([]byte, ErrorI)      // the computed cryptographic hash of the transaction bytes
+	GetMemo() string                // an optional 100 character descriptive string - these are often used for polling
 }
 
+// SignatureI is the model of a signature object (a signature and public key bytes pair)
+type SignatureI interface {
+	proto.Message
+	GetPublicKey() []byte
+	GetSignature() []byte
+}
+
+// MessageI is the model of a message object (send, stake, edit-stake, etc.)
 type MessageI interface {
 	proto.Message
 
-	Check() ErrorI
-	Bytes() ([]byte, ErrorI)
-	Name() string
-	New() MessageI
+	New() MessageI     // new instance of the message type
+	Name() string      // name of the message
+	Check() ErrorI     // stateless validation of the message
 	Recipient() []byte // for transaction indexing by recipient
-	MarshalJSON() ([]byte, error)
-	UnmarshalJSON([]byte) error
+	json.Marshaler     // json encoding
+	json.Unmarshaler   // json decoding
 }
 
+// TRANSACTION CODE BELOW
+
+// Check() is a stateless validation function for a Transaction object
+func (x *Transaction) Check() ErrorI {
+	if x.Msg == nil {
+		return ErrEmptyMessage()
+	}
+	if x.Type == "" {
+		return ErrUnknownMessageName(x.Type)
+	}
+	if x.Signature == nil {
+		return ErrEmptySignature()
+	}
+	if x.Time == 0 {
+		return ErrInvalidBlockTime()
+	}
+	if len(x.Memo) > 100 {
+		return ErrInvalidMemo()
+	}
+	return nil
+}
+
+// GetHash() returns the cryptographic hash of the Transaction
 func (x *Transaction) GetHash() ([]byte, ErrorI) {
-	bz, err := x.GetBytes()
+	bz, err := Marshal(x)
 	if err != nil {
 		return nil, err
 	}
 	return crypto.Hash(bz), nil
 }
 
-func (x *Transaction) GetBytes() ([]byte, ErrorI) {
-	return Marshal(x)
-}
+// GetSig() accessor for signature field
+func (x *Transaction) GetSig() SignatureI { return x.Signature }
 
-func (x *Transaction) GetSig() SignatureI {
-	return x.Signature
-}
-
+// GetSignBytes() returns the canonical byte representation of the Transaction for signing and signature verification
 func (x *Transaction) GetSignBytes() ([]byte, ErrorI) {
 	return Marshal(&Transaction{
 		Msg:       x.Msg,
@@ -67,6 +116,7 @@ func (x *Transaction) GetSignBytes() ([]byte, ErrorI) {
 	})
 }
 
+// Sign() executes a digital signature on the transaction
 func (x *Transaction) Sign(pk crypto.PrivateKeyI) ErrorI {
 	bz, err := x.GetSignBytes()
 	if err != nil {
@@ -78,91 +128,6 @@ func (x *Transaction) Sign(pk crypto.PrivateKeyI) ErrorI {
 	}
 	return nil
 }
-
-func (x *Transaction) Check() ErrorI {
-	if x.Msg == nil {
-		return ErrEmptyMessage()
-	}
-	if x.Type == "" {
-		return ErrUnknownMessageName(x.Type)
-	}
-	if x.Signature == nil {
-		return ErrEmptySignature()
-	}
-	return nil
-}
-
-var _ SignatureI = &Signature{}
-
-type SignatureI interface {
-	proto.Message
-	GetPublicKey() []byte
-	GetSignature() []byte
-}
-
-var _ TxResultI = &TxResult{}
-
-func (x *TxResult) GetTx() TransactionI        { return x.Transaction }
-func (x *TxResult) GetBytes() ([]byte, ErrorI) { return Marshal(x) }
-
-type TxResultI interface {
-	proto.Message
-	GetSender() []byte
-	GetRecipient() []byte
-	GetMessageType() string
-	GetHeight() uint64
-	GetIndex() uint64
-	GetBytes() ([]byte, ErrorI)
-	GetTxHash() string
-	GetTx() TransactionI
-}
-
-func (x *Signature) Copy() *Signature {
-	return &Signature{
-		PublicKey: CopyBytes(x.PublicKey),
-		Signature: CopyBytes(x.Signature),
-	}
-}
-
-// nolint:all
-func (x Signature) MarshalJSON() ([]byte, error) {
-	return json.Marshal(jsonSignature{x.PublicKey, x.Signature})
-}
-
-func (x *Signature) UnmarshalJSON(b []byte) (err error) {
-	var j jsonSignature
-	if err = json.Unmarshal(b, &j); err != nil {
-		return err
-	}
-	x.PublicKey, x.Signature = j.PublicKey, j.Signature
-	return
-}
-
-type jsonSignature struct {
-	PublicKey HexBytes `json:"public_key,omitempty"`
-	Signature HexBytes `json:"signature,omitempty"`
-}
-
-type Mempool interface {
-	Contains(hash string) bool
-	AddTransaction(tx []byte, fee uint64) (recheck bool, err ErrorI)
-	DeleteTransaction(tx []byte)
-	GetTransactions(maxBytes uint64) (int, [][]byte)
-
-	Clear()
-	Size() int
-	TxsBytes() int
-	Iterator() IteratorI
-}
-
-type Signable interface {
-	proto.Message
-	Sign(p crypto.PrivateKeyI) ErrorI
-}
-
-type SignByte interface{ SignBytes() []byte }
-
-var RegisteredMessages map[string]MessageI
 
 type jsonTx struct {
 	Type      string          `json:"type,omitempty"`
@@ -227,6 +192,16 @@ func (x *Transaction) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// TRANSACTION RESULT CODE BELOW
+
+type TxResults []*TxResult
+
+func (t *TxResults) Len() int      { return len(*t) }
+func (t *TxResults) New() Pageable { return &TxResults{} }
+
+// GetTx() is an accessor for the Transaction field
+func (x *TxResult) GetTx() TransactionI { return x.Transaction }
+
 type jsonTxResult struct {
 	Sender      HexBytes     `json:"sender,omitempty"`
 	Recipient   HexBytes     `json:"recipient,omitempty"`
@@ -237,15 +212,7 @@ type jsonTxResult struct {
 	TxHash      string       `json:"tx_hash,omitempty"`
 }
 
-var _ Pageable = new(TxResults)
-
-type TxResults []*TxResult
-
-func (t *TxResults) Len() int { return len(*t) }
-
-func (t *TxResults) New() Pageable {
-	return &TxResults{}
-}
+// TxResult satisfies the json.Marshaller and json.Unmarshaler interfaces
 
 // nolint:all
 func (x TxResult) MarshalJSON() ([]byte, error) {
@@ -275,4 +242,42 @@ func (x *TxResult) UnmarshalJSON(b []byte) error {
 		TxHash:      j.TxHash,
 	}
 	return nil
+}
+
+// SIGNATURE CODE BELOW
+
+type Signable interface {
+	proto.Message
+	Sign(p crypto.PrivateKeyI) ErrorI
+}
+
+type SignByte interface{ SignBytes() []byte }
+
+// Copy() returns a clone of the Signature object
+func (x *Signature) Copy() *Signature {
+	return &Signature{
+		PublicKey: bytes.Clone(x.PublicKey),
+		Signature: bytes.Clone(x.Signature),
+	}
+}
+
+// Signature satisfies the json.Marshaller and json.Unmarshaler interfaces
+
+// nolint:all
+func (x Signature) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonSignature{x.PublicKey, x.Signature})
+}
+
+func (x *Signature) UnmarshalJSON(b []byte) (err error) {
+	var j jsonSignature
+	if err = json.Unmarshal(b, &j); err != nil {
+		return err
+	}
+	x.PublicKey, x.Signature = j.PublicKey, j.Signature
+	return
+}
+
+type jsonSignature struct {
+	PublicKey HexBytes `json:"public_key,omitempty"`
+	Signature HexBytes `json:"signature,omitempty"`
 }

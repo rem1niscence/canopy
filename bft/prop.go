@@ -3,33 +3,59 @@ package bft
 import (
 	"bytes"
 	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/ginchu/lib/crypto"
 )
 
 // PROPOSALS RECEIVED FROM PROPOSER FOR CURRENT HEIGHT
-type ProposalsForHeight map[uint64]map[string][]*Message // [ROUND][PHASE] -> Block(s) < ELECTION is multi-proposals >
 
-// AddProposal saves a validated proposal from the Leader in memory
-func (c *Consensus) AddProposal(m *Message) lib.ErrorI {
-	proposals, found := c.Proposals[m.Header.Round]
+// NOTE: A 'Proposal' is a message from the Leader (Proposer) asking for votes from Replicas.
+// The Proposal is valid (justified) if it is backed by either:
+//   - A Verifiable Random Function (VRF)
+//   - A Quorum Certificate, votes from +2/3rds of the Replica for the previous Phase
+// The Leader must gather these votes to organize consensus in the current Phase and lead the set through the stages of BFT.
+
+// ProposalsForHeight are an in-memory list of messages received from the Leader
+// [ROUND][PHASE] -> PROPOSAL(s)
+// NOTE: using an array of Messages as the ELECTION phase may require multiple proposals if there is multiple Candidates
+type ProposalsForHeight map[uint64]map[string][]*Message
+
+// AddProposal() saves a validated proposal from the Leader in memory
+func (b *BFT) AddProposal(m *Message) lib.ErrorI {
+	// load the list of Proposals for the round
+	// initialize if not yet created
+	roundProposal, found := b.Proposals[m.Header.Round]
 	if !found {
-		proposals = make(map[string][]*Message)
+		roundProposal = make(map[string][]*Message)
 	}
+	// define convenience variables
 	phase := m.Header.Phase
-	props := proposals[phaseToString(phase)]
-	for _, msg := range props {
-		if phase != Election || bytes.Equal(msg.Signature.PublicKey, m.Signature.PublicKey) {
+	phaseProposal := roundProposal[phaseToString(phase)]
+	// ensure no duplicate messages for leader
+	for _, msg := range phaseProposal {
+		if bytes.Equal(msg.Signature.PublicKey, m.Signature.PublicKey) {
 			return ErrDuplicateProposerMessage()
 		}
 	}
-	proposals[phaseToString(phase)] = append(props, m)
-	c.Proposals[m.Header.Round] = proposals
+	// if it's an Election Proposal, add to the list (multiple candidates)
+	// else overwrite the Proposal (this is ok because Proposer ID is previously authenticated after the ELECTION phase)
+	if m.Header.Phase == Election {
+		// add to the list
+		roundProposal[phaseToString(phase)] = append(phaseProposal, m)
+	} else {
+		// overwrite the proposal
+		roundProposal[phaseToString(phase)] = []*Message{m}
+	}
+	// add to the global list
+	b.Proposals[m.Header.Round] = roundProposal
 	return nil
 }
 
-// GetProposal retrieves a proposal from the leader at the latest View
-func (c *Consensus) GetProposal() *Message { return c.getProposal(c.Round, c.Phase) }
-func (c *Consensus) getProposal(round uint64, phase Phase) *Message {
-	proposal, found := c.Proposals[round][phaseToString(phase-1)]
+// GetProposal() retrieves a proposal from the leader at the latest View
+func (b *BFT) GetProposal() *Message { return b.getProposal(b.Round, b.Phase) }
+
+// getProposal() retrieves a proposal from the leader at the Round.Phase
+func (b *BFT) getProposal(round uint64, phase Phase) *Message {
+	proposal, found := b.Proposals[round][phaseToString(phase-1)]
 	if !found {
 		return nil
 	}
@@ -37,27 +63,35 @@ func (c *Consensus) getProposal(round uint64, phase Phase) *Message {
 }
 
 // GetElectionCandidates() retrieves ELECTION messages, verifies, and returns the candidate(s)
-func (c *Consensus) GetElectionCandidates() (candidates []VRFCandidate) {
-	roundProposal := c.Proposals[c.Round]
+func (b *BFT) GetElectionCandidates() (candidates []VRFCandidate) {
+	roundProposal := b.Proposals[b.Round]
+	// for each Election proposal message
+	// validate the VRF and verify is a candidate
 	for _, m := range roundProposal[phaseToString(Election)] {
+		// define convenience variable
 		vrf := m.GetVrf()
-		v, err := c.ValidatorSet.GetValidator(vrf.PublicKey)
+		// get the validator from the set
+		v, err := b.ValidatorSet.GetValidator(vrf.PublicKey)
 		if err != nil {
-			c.log.Errorf("an error occurred retrieving the Validator from the ValSet: %s", err.Error())
+			b.log.Errorf("an error occurred retrieving the Validator from the ValSet: %s", err.Error())
 			continue
 		}
-		c.SortitionData.VotingPower = v.VotingPower
+		publicKey, _ := crypto.NewPublicKeyFromBytes(v.PublicKey)
+		// validate the sortition and verify if is a candidate
+		b.SortitionData.VotingPower = v.VotingPower
 		out, isCandidate := VerifyCandidate(&SortitionVerifyParams{
-			SortitionData: c.SortitionData,
+			SortitionData: b.SortitionData,
 			Signature:     vrf.Signature,
-			PublicKey:     v.PublicKey,
+			PublicKey:     publicKey,
 		})
+		// add to candidates list
 		if isCandidate {
 			candidates = append(candidates, VRFCandidate{
-				PublicKey: v.PublicKey,
+				PublicKey: publicKey,
 				Out:       out,
 			})
 		}
 	}
+	// return list of candidates
 	return candidates
 }
