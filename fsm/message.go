@@ -55,6 +55,8 @@ func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee uint64, err lib.E
 		return feeParams.MessageEditStakeFee, nil
 	case *types.MessageUnstake:
 		return feeParams.MessageUnstakeFee, nil
+	case *types.MessagePause:
+		return feeParams.MessagePauseFee, nil
 	case *types.MessageUnpause:
 		return feeParams.MessageUnpauseFee, nil
 	case *types.MessageChangeParameter:
@@ -78,29 +80,27 @@ func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee uint64, err lib.E
 
 // GetAuthorizedSignersFor() returns the addresses that are authorized to sign for this message
 func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]byte, err lib.ErrorI) {
-	var validator *types.Validator
 	switch x := msg.(type) {
 	case *types.MessageSend:
 		return [][]byte{x.FromAddress}, nil
+	case *types.MessageStake:
+		address, e := s.validatorPubToAddr(x.PublicKey)
+		if e != nil {
+			return nil, e
+		}
+		return [][]byte{address, x.OutputAddress}, nil
+	case *types.MessageEditStake:
+		return s.GetAuthorizedSignersForValidator(x.Address)
+	case *types.MessageUnstake:
+		return s.GetAuthorizedSignersForValidator(x.Address)
+	case *types.MessagePause:
+		return s.GetAuthorizedSignersForValidator(x.Address)
+	case *types.MessageUnpause:
+		return s.GetAuthorizedSignersForValidator(x.Address)
 	case *types.MessageChangeParameter:
 		return [][]byte{x.Signer}, nil
 	case *types.MessageDAOTransfer:
 		return [][]byte{x.Address}, nil
-	case *types.MessageStake:
-		pubKey, e := crypto.NewPublicKeyFromBytes(x.PublicKey)
-		if e != nil {
-			return nil, types.ErrInvalidPublicKey(e)
-		}
-		validator, err = s.GetValidator(pubKey.Address())
-		if err != nil {
-			return nil, err
-		}
-	case *types.MessageEditStake:
-		validator, err = s.GetValidator(crypto.NewAddressFromBytes(x.Address))
-	case *types.MessageUnstake:
-		validator, err = s.GetValidator(crypto.NewAddressFromBytes(x.Address))
-	case *types.MessageUnpause:
-		validator, err = s.GetValidator(crypto.NewAddressFromBytes(x.Address))
 	case *types.MessageSubsidy:
 		return [][]byte{x.Address}, nil
 	case *types.MessageCreateOrder:
@@ -119,25 +119,21 @@ func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]by
 		return [][]byte{order.SellersSellAddress}, nil
 	case *types.MessageCertificateResults:
 		// any member may submit it - as the reward recipients are locked in the QC.ProposalHash
-		committee, e := s.GetCommittee(x.Qc.Header.CommitteeId)
+		committee, e := s.LoadCommittee(x.Qc.Header.CommitteeId, x.Qc.Header.Height)
 		if e != nil {
 			return nil, e
 		}
 		for _, member := range committee.ValidatorSet.ValidatorSet {
-			pk, _ := crypto.NewPublicKeyFromBytes(member.PublicKey)
-			signers = append(signers, pk.Address().Bytes())
+			address, er := s.validatorPubToAddr(member.PublicKey)
+			if er != nil {
+				return nil, er
+			}
+			signers = append(signers, address)
 		}
 		return
 	default:
 		return nil, types.ErrUnknownMessage(x)
 	}
-	if err != nil {
-		return nil, err
-	}
-	if validator == nil {
-		return nil, types.ErrValidatorNotExists()
-	}
-	return [][]byte{validator.Address, validator.Output}, nil
 }
 
 // HandleMessageSend() is the proper handler for a `Send` message
@@ -166,14 +162,6 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	if exists {
 		return types.ErrValidatorExists()
 	}
-	// check if below minimum stake
-	params, err := s.GetParamsVal()
-	if err != nil {
-		return err
-	}
-	if msg.Amount < params.ValidatorMinStake {
-		return types.ErrBelowMinimumStake()
-	}
 	// subtract from sender
 	if err = s.AccountSub(address, msg.Amount); err != nil {
 		return err
@@ -183,6 +171,10 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 		return err
 	}
 	if msg.Delegate {
+		// track total delegated tokens
+		if err = s.AddToDelegateSupply(msg.Amount); err != nil {
+			return err
+		}
 		// set delegated validator in each committee
 		if err = s.SetDelegations(address, msg.Amount, msg.Committees); err != nil {
 			return err
@@ -230,34 +222,19 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 	if err = s.AccountSub(address, amountToAdd); err != nil {
 		return err
 	}
-	if err = s.AddToStakedSupply(amountToAdd); err != nil {
-		return err
-	}
-	// update validator stake amount
-	newStakedAmount := val.StakedAmount + amountToAdd
-	// use validator.delegate value -> not allowed to change delegation status
-	if val.Delegate {
-		if err = s.UpdateDelegations(address, val, msg.Amount, msg.Committees); err != nil {
-			return err
-		}
-	} else {
-		if err = s.UpdateCommittees(address, val, msg.Amount, msg.Committees); err != nil {
-			return err
-		}
-	}
-	// set validator
-	return s.SetValidator(&types.Validator{
+	// update validator stake
+	return s.UpdateValidatorStake(&types.Validator{
 		Address:         val.Address,
 		PublicKey:       val.PublicKey,
 		NetAddress:      msg.NetAddress,
-		StakedAmount:    newStakedAmount,
-		Committees:      msg.Committees,
+		StakedAmount:    val.StakedAmount,
+		Committees:      val.Committees,
 		MaxPausedHeight: val.MaxPausedHeight,
 		UnstakingHeight: val.UnstakingHeight,
 		Output:          msg.OutputAddress,
 		Delegate:        val.Delegate,
 		Compound:        msg.Compound,
-	})
+	}, msg.Committees, amountToAdd)
 }
 
 // HandleMessageUnstake() is the proper handler for an `Unstake` message
@@ -464,18 +441,13 @@ func (s *StateMachine) HandleMessageCreateOrder(msg *types.MessageCreateOrder) (
 	if err = s.PoolAdd(msg.CommitteeId+uint64(types.EscrowPoolAddend), msg.AmountForSale); err != nil {
 		return
 	}
-	// count it in the 'supply' structure
-	if err = s.AddToEscrowedSupply(msg.CommitteeId, msg.AmountForSale); err != nil {
-		return
-	}
 	// save the order in state
 	_, err = s.CreateOrder(&types.SellOrder{
-		Committee:             msg.CommitteeId,
-		AmountForSale:         msg.AmountForSale,
-		RequestedAmount:       msg.RequestedAmount,
-		SellerReceiveAddress:  msg.SellerReceiveAddress,
-		SellersSellAddress:    msg.SellersSellAddress,
-		OrderExpirationHeight: s.Height() + valParams.ValidatorOrderExpirationBlocks,
+		Committee:            msg.CommitteeId,
+		AmountForSale:        msg.AmountForSale,
+		RequestedAmount:      msg.RequestedAmount,
+		SellerReceiveAddress: msg.SellerReceiveAddress,
+		SellersSellAddress:   msg.SellersSellAddress,
 	}, msg.CommitteeId)
 	return
 }
@@ -507,14 +479,8 @@ func (s *StateMachine) HandleMessageEditOrder(msg *types.MessageEditOrder) (err 
 		if err = s.PoolAdd(msg.CommitteeId+uint64(types.EscrowPoolAddend), amountDifference); err != nil {
 			return
 		}
-		if err = s.AddToEscrowedSupply(order.Committee, amountDifference); err != nil {
-			return
-		}
 	} else if difference < 0 {
 		amountDifference := uint64(difference * -1)
-		if err = s.SubFromEscrowedSupply(order.Committee, amountDifference); err != nil {
-			return
-		}
 		// subtract from the committee escrow pool
 		if err = s.PoolSub(msg.CommitteeId+uint64(types.EscrowPoolAddend), amountDifference); err != nil {
 			return
@@ -524,13 +490,12 @@ func (s *StateMachine) HandleMessageEditOrder(msg *types.MessageEditOrder) (err 
 		}
 	}
 	err = s.EditOrder(&types.SellOrder{
-		Id:                    order.Id,
-		Committee:             msg.CommitteeId,
-		AmountForSale:         msg.AmountForSale,
-		RequestedAmount:       msg.RequestedAmount,
-		SellerReceiveAddress:  msg.SellerReceiveAddress,
-		OrderExpirationHeight: s.Height() + valParams.ValidatorOrderExpirationBlocks,
-		SellersSellAddress:    order.SellersSellAddress,
+		Id:                   order.Id,
+		Committee:            msg.CommitteeId,
+		AmountForSale:        msg.AmountForSale,
+		RequestedAmount:      msg.RequestedAmount,
+		SellerReceiveAddress: msg.SellerReceiveAddress,
+		SellersSellAddress:   order.SellersSellAddress,
 	}, msg.CommitteeId)
 	return
 }
@@ -543,9 +508,6 @@ func (s *StateMachine) HandleMessageDeleteOrder(msg *types.MessageDeleteOrder) (
 	}
 	if order.BuyerReceiveAddress != nil {
 		return types.ErrOrderAlreadyAccepted()
-	}
-	if err = s.SubFromEscrowedSupply(order.Committee, order.AmountForSale); err != nil {
-		return
 	}
 	// subtract from the committee escrow pool
 	if err = s.PoolSub(msg.CommitteeId+uint64(types.EscrowPoolAddend), order.AmountForSale); err != nil {

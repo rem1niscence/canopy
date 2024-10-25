@@ -65,7 +65,7 @@ type Pageable interface {
 func NewPage(p PageParams, pageType string) *Page { return &Page{PageParams: p, Type: pageType} }
 
 // Load() fills a page from an IteratorI
-func (p *Page) Load(storePrefix []byte, newestToOldest bool, results Pageable, db RStoreI, callback func(b []byte) ErrorI) (err ErrorI) {
+func (p *Page) Load(storePrefix []byte, newestToOldest bool, results Pageable, db RStoreI, callback func(k, v []byte) ErrorI) (err ErrorI) {
 	// retrieve the iterator
 	var it IteratorI
 	// set the page results so that even if it's a zero page, it will have a castable type
@@ -94,7 +94,7 @@ func (p *Page) Load(storePrefix []byte, newestToOldest bool, results Pageable, d
 			countOnly = true // switch to only counts
 			continue
 		}
-		if e := callback(it.Value()); e != nil {
+		if e := callback(it.Key(), it.Value()); e != nil {
 			return e
 		}
 
@@ -292,35 +292,32 @@ func BigLess(a *big.Int, b *big.Int) bool { return a.Cmp(b) == -1 }
 
 // Uint64PercentageDiv() calculates the percentage from dividend/divisor
 func Uint64PercentageDiv(dividend, divisor uint64) (res uint64) {
-	a := Uint64ToBigFloat(dividend)
-	b := Uint64ToBigFloat(divisor)
-	b.Quo(a, b)
-	b.Mul(b, big.NewFloat(100))
-	b.Add(b, big.NewFloat(.5)) // round ties away
-	res, _ = b.Uint64()
-	return
+	if dividend == 0 || divisor == 0 {
+		return 0
+	}
+	return (dividend * 100) / divisor
 }
 
 // Uint64Percentage() calculates the result of a percentage of an amount
 func Uint64Percentage(amount uint64, percentage uint64) (res uint64) {
-	a := Uint64ToBigFloat(amount)
-	b := big.NewFloat(float64(percentage))
-	b.Quo(b, big.NewFloat(100))
-	a.Mul(a, b)
-	a.Add(a, big.NewFloat(.5)) // round ties away
-	res, _ = a.Uint64()
-	return
+	if percentage == 0 || amount == 0 {
+		return 0
+	}
+	if percentage >= 100 {
+		return amount
+	}
+	return (amount * percentage) / 100
 }
 
 // Uint64ReducePercentage() reduces an amount by a specified percentage
 func Uint64ReducePercentage(amount uint64, percentage float64) (res uint64) {
-	a := Uint64ToBigFloat(amount)
-	b := big.NewFloat(100 - percentage)
-	b.Quo(b, big.NewFloat(100))
-	a.Mul(a, b)
-	a.Add(a, big.NewFloat(.5)) // round ties away
-	res, _ = a.Uint64()
-	return
+	if percentage >= 100 || amount == 0 {
+		return 0
+	}
+	if percentage == 0 {
+		return amount
+	}
+	return (amount * (100 - uint64(percentage))) / 100
 }
 
 // Uint64ToBigFloat() converts a uint64 to a big.Float
@@ -401,4 +398,25 @@ func CatchPanic(l LoggerI) {
 	if r := recover(); r != nil {
 		l.Errorf(string(debug.Stack()))
 	}
+}
+
+var Delimiter = []byte("/") // the delimiter that allows safe key prefixing (ex. /tx/100/abc vs /tx/10/0abc)
+
+// Delimit() appends the items together separated by a delimiter
+func Delimit(toAppend ...[]byte) (res []byte) {
+	for _, a := range toAppend {
+		if a == nil {
+			continue
+		}
+		withTerminatingDelim := append(a, Delimiter...)
+		res = append(res, withTerminatingDelim...)
+	}
+	return
+}
+
+// Copy() copies the byte slice and returns the copy
+func Copy(b []byte) []byte {
+	c := make([]byte, len(b))
+	copy(c, b)
+	return c
 }

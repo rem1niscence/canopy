@@ -39,7 +39,7 @@ func TestSetGetAccount(t *testing.T) {
 				Address: newTestAddress(t).Bytes(),
 				Amount:  100,
 			}, {
-				Address: newTestAddress(t, true).Bytes(),
+				Address: newTestAddress(t, 1).Bytes(),
 				Amount:  100,
 			}},
 		},
@@ -92,7 +92,7 @@ func TestGetSetAccounts(t *testing.T) {
 				Address: newTestAddress(t).Bytes(),
 				Amount:  100,
 			}, {
-				Address: newTestAddress(t, true).Bytes(),
+				Address: newTestAddress(t, 1).Bytes(),
 				Amount:  100,
 			}},
 		},
@@ -147,7 +147,7 @@ func TestGetAccountsPaginated(t *testing.T) {
 				Address: newTestAddress(t).Bytes(),
 				Amount:  100,
 			}, {
-				Address: newTestAddress(t, true).Bytes(),
+				Address: newTestAddress(t, 1).Bytes(),
 				Amount:  100,
 			}},
 			pageParams: lib.PageParams{
@@ -972,52 +972,6 @@ func TestAddToDelegationStakedSupply(t *testing.T) {
 	}
 }
 
-func TestAddToEscrowStakedSupply(t *testing.T) {
-	tests := []struct {
-		name      string
-		detail    string
-		amount    uint64
-		preAmount uint64
-		id        uint64
-	}{
-		{
-			name:   "without preexisting supply",
-			detail: "starting with 0 supply",
-			amount: 100,
-		},
-		{
-			name:      "with preexisting supply",
-			detail:    "starting with some supply",
-			amount:    100,
-			preAmount: 100,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// create a test state machine
-			sm := newTestStateMachine(t)
-			// add pre-amount if exists
-			if test.preAmount != 0 {
-				// retrieve supply before addition
-				supply, err := sm.GetSupply()
-				require.NoError(t, err)
-				supply.Escrowed = append(supply.Escrowed, &types.Pool{
-					Id:     test.id,
-					Amount: test.preAmount,
-				})
-				require.NoError(t, sm.SetSupply(supply))
-			}
-			// ensure no error on function call
-			require.NoError(t, sm.AddToEscrowedSupply(test.id, test.amount))
-			// retrieve the supply
-			supply, err := sm.GetSupply()
-			require.NoError(t, err)
-			// validate the expected supply
-			require.Equal(t, supply.Escrowed[0].Amount, test.preAmount+test.amount)
-		})
-	}
-}
-
 func TestSubFromTotalSupply(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -1119,7 +1073,7 @@ func TestSubFromCommitteeStakedSupply(t *testing.T) {
 			}
 			// check error on function call
 			err := sm.SubFromCommitteeStakedSupply(test.id, test.amount)
-			require.Equal(t, test.error, err != nil)
+			require.Equal(t, test.error, err != nil, err)
 			if err != nil {
 				return
 			}
@@ -1198,71 +1152,6 @@ func TestSubFromDelegationStakedSupply(t *testing.T) {
 			}
 			// validate the expected supply
 			require.Equal(t, supply.DelegationsOnly[0].Amount, test.preAmount-test.amount)
-		})
-	}
-}
-
-func TestSubFromEscrowStakedSupply(t *testing.T) {
-	tests := []struct {
-		name      string
-		detail    string
-		amount    uint64
-		preAmount uint64
-		id        uint64
-		zeroAfter bool
-		error     bool
-	}{
-		{
-			name:   "without preexisting supply",
-			detail: "starting with 0 supply",
-			amount: 100,
-			error:  true,
-		},
-		{
-			name:      "0 after subtraction",
-			detail:    "starting with exactly the right starting supply",
-			amount:    100,
-			preAmount: 100,
-			zeroAfter: true,
-		},
-		{
-			name:      "leftover after subtraction",
-			detail:    "starting with exactly the right starting supply",
-			amount:    99,
-			preAmount: 100,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// create a test state machine
-			sm := newTestStateMachine(t)
-			// add pre-amount if exists
-			if test.preAmount != 0 {
-				// retrieve supply before addition
-				supply, err := sm.GetSupply()
-				require.NoError(t, err)
-				supply.Escrowed = append(supply.Escrowed, &types.Pool{
-					Id:     test.id,
-					Amount: test.preAmount,
-				})
-				require.NoError(t, sm.SetSupply(supply))
-			}
-			// check error on function call
-			err := sm.SubFromEscrowedSupply(test.id, test.amount)
-			require.Equal(t, test.error, err != nil)
-			if err != nil {
-				return
-			}
-			// retrieve the supply
-			supply, err := sm.GetSupply()
-			require.NoError(t, err)
-			// if zero result expected, the filtering function should have removed it from the list
-			if test.zeroAfter {
-				require.Zero(t, len(supply.Escrowed))
-				return
-			}
-			// validate the expected supply
-			require.Equal(t, supply.Escrowed[0].Amount, test.preAmount-test.amount)
 		})
 	}
 }

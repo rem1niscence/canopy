@@ -1,0 +1,893 @@
+package fsm
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/ginchuco/ginchu/fsm/types"
+	"github.com/ginchuco/ginchu/lib"
+	"github.com/stretchr/testify/require"
+	"os"
+	"sort"
+	"testing"
+	"time"
+)
+
+func TestNewFromGenesisFile(t *testing.T) {
+	const dataDirPath = "./"
+	tests := []struct {
+		name     string
+		detail   string
+		input    types.GenesisState
+		expected types.GenesisState
+	}{
+		{
+			name:   "complete",
+			detail: "the complete genesis file testing",
+			input: types.GenesisState{
+				Pools: []*types.Pool{{
+					Id:     lib.CanopyCommitteeId,
+					Amount: 100,
+				}},
+				Accounts: []*types.Account{{
+					Address: newTestAddressBytes(t),
+					Amount:  100,
+				}},
+				Validators: []*types.Validator{{
+					Address:      newTestAddressBytes(t),
+					PublicKey:    newTestPublicKeyBytes(t),
+					StakedAmount: 100,
+					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Output:       newTestAddressBytes(t),
+				}},
+				OrderBooks: &types.OrderBooks{
+					OrderBooks: []*types.OrderBook{{
+						CommitteeId: lib.CanopyCommitteeId,
+						Orders: []*types.SellOrder{{
+							Id:                    1,
+							Committee:             lib.CanopyCommitteeId,
+							AmountForSale:         100,
+							RequestedAmount:       100,
+							SellerReceiveAddress:  newTestAddressBytes(t),
+							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
+							BuyerChainDeadline:    100,
+							OrderExpirationHeight: 100,
+							SellersSellAddress:    newTestAddressBytes(t, 2),
+						}, {
+							Id:                 2,
+							Committee:          1,
+							AmountForSale:      100,
+							RequestedAmount:    100,
+							SellersSellAddress: newTestAddressBytes(t, 2),
+						}},
+					}},
+				},
+				Params: types.DefaultParams(),
+			},
+			expected: types.GenesisState{
+				Pools: []*types.Pool{{
+					Id:     lib.CanopyCommitteeId,
+					Amount: 100,
+				}, {
+					Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
+					Amount: 200,
+				}},
+				Accounts: []*types.Account{{
+					Address: newTestAddressBytes(t),
+					Amount:  100,
+				}},
+				Validators: []*types.Validator{{
+					Address:      newTestAddressBytes(t),
+					PublicKey:    newTestPublicKeyBytes(t),
+					StakedAmount: 100,
+					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Output:       newTestAddressBytes(t),
+				}},
+				OrderBooks: &types.OrderBooks{
+					OrderBooks: []*types.OrderBook{{
+						CommitteeId: lib.CanopyCommitteeId,
+						Orders: []*types.SellOrder{{
+							Id:                    1,
+							Committee:             lib.CanopyCommitteeId,
+							AmountForSale:         100,
+							RequestedAmount:       100,
+							SellerReceiveAddress:  newTestAddressBytes(t),
+							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
+							BuyerChainDeadline:    100,
+							OrderExpirationHeight: 100,
+							SellersSellAddress:    newTestAddressBytes(t, 2),
+						}, {
+							Id:                 2,
+							Committee:          1,
+							AmountForSale:      100,
+							RequestedAmount:    100,
+							SellersSellAddress: newTestAddressBytes(t, 2),
+						}},
+					}},
+				},
+				Params: types.DefaultParams(),
+				Supply: &types.Supply{
+					Total:  500,
+					Staked: 100,
+					CommitteesWithDelegations: []*types.Pool{{
+						Id:     lib.CanopyCommitteeId,
+						Amount: 100,
+					}, {
+						Id:     1,
+						Amount: 100,
+					}},
+					DelegationsOnly: nil,
+				},
+			},
+		},
+		{
+			name:   "accounts",
+			detail: "the genesis file tests accounts only",
+			input: types.GenesisState{
+				Accounts: []*types.Account{{
+					Address: newTestAddressBytes(t),
+					Amount:  100,
+				}, {
+					Address: newTestAddressBytes(t, 1),
+					Amount:  100,
+				}},
+				Params: types.DefaultParams(),
+			},
+			expected: types.GenesisState{
+				Accounts: []*types.Account{{
+					Address: newTestAddressBytes(t),
+					Amount:  100,
+				}, {
+					Address: newTestAddressBytes(t, 1),
+					Amount:  100,
+				}},
+				OrderBooks: new(types.OrderBooks),
+				Params:     types.DefaultParams(),
+				Supply:     &types.Supply{Total: 200},
+			},
+		},
+		{
+			name:   "validators",
+			detail: "the genesis file tests validators only",
+			input: types.GenesisState{
+				Validators: []*types.Validator{{
+					Address:      newTestAddressBytes(t),
+					PublicKey:    newTestPublicKeyBytes(t),
+					StakedAmount: 100,
+					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Output:       newTestAddressBytes(t),
+				}},
+				Params: types.DefaultParams(),
+			},
+			expected: types.GenesisState{
+				Validators: []*types.Validator{{
+					Address:      newTestAddressBytes(t),
+					PublicKey:    newTestPublicKeyBytes(t),
+					StakedAmount: 100,
+					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Output:       newTestAddressBytes(t),
+				}},
+				OrderBooks: new(types.OrderBooks),
+				Params:     types.DefaultParams(),
+				Supply: &types.Supply{
+					Total:  100,
+					Staked: 100,
+					CommitteesWithDelegations: []*types.Pool{{
+						Id:     lib.CanopyCommitteeId,
+						Amount: 100,
+					}, {
+						Id:     1,
+						Amount: 100,
+					}},
+				},
+			},
+		},
+		{
+			name:   "pools",
+			detail: "the genesis file tests pools only",
+			input: types.GenesisState{
+				Pools: []*types.Pool{{
+					Id:     lib.CanopyCommitteeId,
+					Amount: 100,
+				}},
+				Params: types.DefaultParams(),
+			},
+			expected: types.GenesisState{
+				Pools: []*types.Pool{{
+					Id:     lib.CanopyCommitteeId,
+					Amount: 100,
+				}},
+				OrderBooks: new(types.OrderBooks),
+				Params:     types.DefaultParams(),
+				Supply: &types.Supply{
+					Total: 100,
+				},
+			},
+		},
+		{
+			name:   "order books",
+			detail: "the genesis file tests order books only",
+			input: types.GenesisState{
+				OrderBooks: &types.OrderBooks{
+					OrderBooks: []*types.OrderBook{{
+						CommitteeId: lib.CanopyCommitteeId,
+						Orders: []*types.SellOrder{{
+							Id:                    1,
+							Committee:             lib.CanopyCommitteeId,
+							AmountForSale:         100,
+							RequestedAmount:       100,
+							SellerReceiveAddress:  newTestAddressBytes(t),
+							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
+							BuyerChainDeadline:    100,
+							OrderExpirationHeight: 100,
+							SellersSellAddress:    newTestAddressBytes(t, 2),
+						}, {
+							Id:                 2,
+							Committee:          1,
+							AmountForSale:      100,
+							RequestedAmount:    100,
+							SellersSellAddress: newTestAddressBytes(t, 2),
+						}},
+					}},
+				},
+				Params: types.DefaultParams(),
+			},
+			expected: types.GenesisState{
+				Pools: []*types.Pool{{
+					Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
+					Amount: 200,
+				}},
+				OrderBooks: &types.OrderBooks{
+					OrderBooks: []*types.OrderBook{{
+						CommitteeId: lib.CanopyCommitteeId,
+						Orders: []*types.SellOrder{{
+							Id:                    1,
+							Committee:             lib.CanopyCommitteeId,
+							AmountForSale:         100,
+							RequestedAmount:       100,
+							SellerReceiveAddress:  newTestAddressBytes(t),
+							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
+							BuyerChainDeadline:    100,
+							OrderExpirationHeight: 100,
+							SellersSellAddress:    newTestAddressBytes(t, 2),
+						}, {
+							Id:                 2,
+							Committee:          1,
+							AmountForSale:      100,
+							RequestedAmount:    100,
+							SellersSellAddress: newTestAddressBytes(t, 2),
+						}},
+					}},
+				},
+				Params: types.DefaultParams(),
+				Supply: &types.Supply{
+					Total:           200,
+					DelegationsOnly: nil,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			sm.height = 0
+			// set the data dir path
+			sm.Config.DataDirPath = dataDirPath
+			// marshal genesis file to bytes
+			genesisJsonBytes, err := json.MarshalIndent(&test.input, "", "  ")
+			require.NoError(t, err)
+			// write test genesis to file
+			require.NoError(t, os.WriteFile("genesis.json", genesisJsonBytes, 0777))
+			// remove the test file
+			defer os.RemoveAll("genesis.json")
+			// execute function call
+			require.NoError(t, sm.NewFromGenesisFile())
+			// convert written state to
+			got, err := sm.ExportState()
+			require.NoError(t, err)
+			// sort the supply pools
+			sortById := func(p []*types.Pool) {
+				sort.Slice(p, func(i, j int) bool {
+					return (p)[i].Id >= (p)[j].Id
+				})
+			}
+			// sort the supply pools of got
+			sortById(got.Supply.CommitteesWithDelegations)
+			sortById(got.Supply.DelegationsOnly)
+			// sort the supply pools of expected
+			sortById(test.expected.Supply.CommitteesWithDelegations)
+			sortById(test.expected.Supply.DelegationsOnly)
+			// json for convenient compare
+			gotJson, _ := json.MarshalIndent(got, "", "  ")
+			expectedJson, _ := json.MarshalIndent(test.expected, "", "  ")
+			// compare got vs expected
+			require.EqualExportedValues(t, test.expected, *got, fmt.Sprintf("EXPECTED:\n%s\nGOT:\n%s", expectedJson, gotJson))
+		})
+	}
+}
+
+func newTestGenesisState(t *testing.T) types.GenesisState {
+	return types.GenesisState{
+		Time: uint64(time.Now().UnixMicro()),
+		Pools: []*types.Pool{{
+			Id:     lib.CanopyCommitteeId,
+			Amount: 100,
+		}},
+		Accounts: []*types.Account{{
+			Address: newTestAddressBytes(t),
+			Amount:  100,
+		}},
+		Validators: []*types.Validator{{
+			Address:      newTestAddressBytes(t),
+			PublicKey:    newTestPublicKeyBytes(t),
+			StakedAmount: 100,
+			Committees:   []uint64{lib.CanopyCommitteeId, 1},
+		}},
+		OrderBooks: &types.OrderBooks{
+			OrderBooks: []*types.OrderBook{{
+				CommitteeId: lib.CanopyCommitteeId,
+				Orders: []*types.SellOrder{{
+					Id:                    1,
+					Committee:             lib.CanopyCommitteeId,
+					AmountForSale:         100,
+					RequestedAmount:       100,
+					SellerReceiveAddress:  newTestAddressBytes(t),
+					BuyerReceiveAddress:   newTestAddressBytes(t, 1),
+					BuyerChainDeadline:    100,
+					OrderExpirationHeight: 100,
+					SellersSellAddress:    newTestAddressBytes(t, 2),
+				}, {
+					Id:                 2,
+					Committee:          lib.CanopyCommitteeId,
+					AmountForSale:      100,
+					RequestedAmount:    100,
+					SellersSellAddress: newTestAddressBytes(t, 2),
+				}},
+			}},
+		},
+		Params: types.DefaultParams(),
+	}
+}
+
+func TestReadGenesisFromFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		detail   string
+		expected *types.GenesisState
+		error    string
+	}{
+		{
+			name:   "no genesis file",
+			detail: "no genesis file was written so expect a read error",
+			error:  "read genesis file failed with err",
+		},
+		{
+			name:   "errored genesis file",
+			detail: "the genesis file has an error in it (address size) which makes it invalid",
+			expected: &types.GenesisState{
+				Accounts: []*types.Account{
+					{
+						Address: nil,
+						Amount:  100,
+					},
+				},
+				Params: types.DefaultParams(),
+			},
+			error: "address size is invalid",
+		},
+		{
+			name:   "valid genesis file",
+			detail: "the genesis file is valid so will compare read (got) vs expected",
+			expected: &types.GenesisState{
+				Accounts: []*types.Account{
+					{
+						Address: newTestAddressBytes(t),
+						Amount:  100,
+					},
+				},
+				Params: types.DefaultParams(),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			if test.expected != nil {
+				// marshal genesis file to bytes
+				genesisJsonBytes, err := json.MarshalIndent(&test.expected, "", "  ")
+				require.NoError(t, err)
+				// write test genesis to file
+				require.NoError(t, os.WriteFile("genesis.json", genesisJsonBytes, 0777))
+				// remove the test file
+				defer os.RemoveAll("genesis.json")
+			}
+			// execute the function call
+			got, err := sm.ReadGenesisFromFile()
+			// ensure error is expected
+			require.Equal(t, test.error != "", err != nil)
+			// if err isn't nil ensure that it contains the expected error
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+				return
+			}
+			// compare got with expected
+			require.EqualExportedValues(t, test.expected, got)
+		})
+	}
+}
+
+func TestNewStateFromGenesisFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		detail   string
+		input    *types.GenesisState
+		expected *types.GenesisState
+	}{
+		{
+			name:   "complete",
+			detail: "the complete genesis file testing",
+			input: &types.GenesisState{
+				Pools: []*types.Pool{{
+					Id:     lib.CanopyCommitteeId,
+					Amount: 100,
+				}},
+				Accounts: []*types.Account{{
+					Address: newTestAddressBytes(t),
+					Amount:  100,
+				}},
+				Validators: []*types.Validator{{
+					Address:      newTestAddressBytes(t),
+					PublicKey:    newTestPublicKeyBytes(t),
+					StakedAmount: 100,
+					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Output:       newTestAddressBytes(t),
+				}},
+				OrderBooks: &types.OrderBooks{
+					OrderBooks: []*types.OrderBook{{
+						CommitteeId: lib.CanopyCommitteeId,
+						Orders: []*types.SellOrder{{
+							Id:                    1,
+							Committee:             lib.CanopyCommitteeId,
+							AmountForSale:         100,
+							RequestedAmount:       100,
+							SellerReceiveAddress:  newTestAddressBytes(t),
+							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
+							BuyerChainDeadline:    100,
+							OrderExpirationHeight: 100,
+							SellersSellAddress:    newTestAddressBytes(t, 2),
+						}, {
+							Id:                 2,
+							Committee:          1,
+							AmountForSale:      100,
+							RequestedAmount:    100,
+							SellersSellAddress: newTestAddressBytes(t, 2),
+						}},
+					}},
+				},
+				Params: types.DefaultParams(),
+			},
+			expected: &types.GenesisState{
+				Pools: []*types.Pool{{
+					Id:     lib.CanopyCommitteeId,
+					Amount: 100,
+				}, {
+					Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
+					Amount: 200,
+				}},
+				Accounts: []*types.Account{{
+					Address: newTestAddressBytes(t),
+					Amount:  100,
+				}},
+				Validators: []*types.Validator{{
+					Address:      newTestAddressBytes(t),
+					PublicKey:    newTestPublicKeyBytes(t),
+					StakedAmount: 100,
+					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Output:       newTestAddressBytes(t),
+				}},
+				OrderBooks: &types.OrderBooks{
+					OrderBooks: []*types.OrderBook{{
+						CommitteeId: lib.CanopyCommitteeId,
+						Orders: []*types.SellOrder{{
+							Id:                    1,
+							Committee:             lib.CanopyCommitteeId,
+							AmountForSale:         100,
+							RequestedAmount:       100,
+							SellerReceiveAddress:  newTestAddressBytes(t),
+							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
+							BuyerChainDeadline:    100,
+							OrderExpirationHeight: 100,
+							SellersSellAddress:    newTestAddressBytes(t, 2),
+						}, {
+							Id:                 2,
+							Committee:          1,
+							AmountForSale:      100,
+							RequestedAmount:    100,
+							SellersSellAddress: newTestAddressBytes(t, 2),
+						}},
+					}},
+				},
+				Params: types.DefaultParams(),
+				Supply: &types.Supply{
+					Total:  500,
+					Staked: 100,
+					CommitteesWithDelegations: []*types.Pool{{
+						Id:     lib.CanopyCommitteeId,
+						Amount: 100,
+					}, {
+						Id:     1,
+						Amount: 100,
+					}},
+					DelegationsOnly: nil,
+				},
+			},
+		},
+		{
+			name:   "accounts",
+			detail: "the genesis file tests accounts only",
+			input: &types.GenesisState{
+				Accounts: []*types.Account{{
+					Address: newTestAddressBytes(t),
+					Amount:  100,
+				}, {
+					Address: newTestAddressBytes(t, 1),
+					Amount:  100,
+				}},
+				Params: types.DefaultParams(),
+			},
+			expected: &types.GenesisState{
+				Accounts: []*types.Account{{
+					Address: newTestAddressBytes(t),
+					Amount:  100,
+				}, {
+					Address: newTestAddressBytes(t, 1),
+					Amount:  100,
+				}},
+				OrderBooks: new(types.OrderBooks),
+				Params:     types.DefaultParams(),
+				Supply:     &types.Supply{Total: 200},
+			},
+		},
+		{
+			name:   "validators",
+			detail: "the genesis file tests validators only",
+			input: &types.GenesisState{
+				Validators: []*types.Validator{{
+					Address:      newTestAddressBytes(t),
+					PublicKey:    newTestPublicKeyBytes(t),
+					StakedAmount: 100,
+					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Output:       newTestAddressBytes(t),
+				}},
+				Params: types.DefaultParams(),
+			},
+			expected: &types.GenesisState{
+				Validators: []*types.Validator{{
+					Address:      newTestAddressBytes(t),
+					PublicKey:    newTestPublicKeyBytes(t),
+					StakedAmount: 100,
+					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Output:       newTestAddressBytes(t),
+				}},
+				OrderBooks: new(types.OrderBooks),
+				Params:     types.DefaultParams(),
+				Supply: &types.Supply{
+					Total:  100,
+					Staked: 100,
+					CommitteesWithDelegations: []*types.Pool{{
+						Id:     lib.CanopyCommitteeId,
+						Amount: 100,
+					}, {
+						Id:     1,
+						Amount: 100,
+					}},
+				},
+			},
+		},
+		{
+			name:   "pools",
+			detail: "the genesis file tests pools only",
+			input: &types.GenesisState{
+				Pools: []*types.Pool{{
+					Id:     lib.CanopyCommitteeId,
+					Amount: 100,
+				}},
+				Params: types.DefaultParams(),
+			},
+			expected: &types.GenesisState{
+				Pools: []*types.Pool{{
+					Id:     lib.CanopyCommitteeId,
+					Amount: 100,
+				}},
+				OrderBooks: new(types.OrderBooks),
+				Params:     types.DefaultParams(),
+				Supply: &types.Supply{
+					Total: 100,
+				},
+			},
+		},
+		{
+			name:   "order books",
+			detail: "the genesis file tests order books only",
+			input: &types.GenesisState{
+				OrderBooks: &types.OrderBooks{
+					OrderBooks: []*types.OrderBook{{
+						CommitteeId: lib.CanopyCommitteeId,
+						Orders: []*types.SellOrder{{
+							Id:                    1,
+							Committee:             lib.CanopyCommitteeId,
+							AmountForSale:         100,
+							RequestedAmount:       100,
+							SellerReceiveAddress:  newTestAddressBytes(t),
+							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
+							BuyerChainDeadline:    100,
+							OrderExpirationHeight: 100,
+							SellersSellAddress:    newTestAddressBytes(t, 2),
+						}, {
+							Id:                 2,
+							Committee:          1,
+							AmountForSale:      100,
+							RequestedAmount:    100,
+							SellersSellAddress: newTestAddressBytes(t, 2),
+						}},
+					}},
+				},
+				Params: types.DefaultParams(),
+			},
+			expected: &types.GenesisState{
+				Pools: []*types.Pool{{
+					Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
+					Amount: 200,
+				}},
+				OrderBooks: &types.OrderBooks{
+					OrderBooks: []*types.OrderBook{{
+						CommitteeId: lib.CanopyCommitteeId,
+						Orders: []*types.SellOrder{{
+							Id:                    1,
+							Committee:             lib.CanopyCommitteeId,
+							AmountForSale:         100,
+							RequestedAmount:       100,
+							SellerReceiveAddress:  newTestAddressBytes(t),
+							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
+							BuyerChainDeadline:    100,
+							OrderExpirationHeight: 100,
+							SellersSellAddress:    newTestAddressBytes(t, 2),
+						}, {
+							Id:                 2,
+							Committee:          1,
+							AmountForSale:      100,
+							RequestedAmount:    100,
+							SellersSellAddress: newTestAddressBytes(t, 2),
+						}},
+					}},
+				},
+				Params: types.DefaultParams(),
+				Supply: &types.Supply{
+					Total:           200,
+					DelegationsOnly: nil,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			sm.height = 0
+			// run the function call
+			require.NoError(t, sm.NewStateFromGenesis(test.input))
+			// convert written state to
+			got, err := sm.ExportState()
+			require.NoError(t, err)
+			// sort the supply pools
+			sortById := func(p []*types.Pool) {
+				sort.Slice(p, func(i, j int) bool {
+					return (p)[i].Id >= (p)[j].Id
+				})
+			}
+			// sort the supply pools of got
+			sortById(got.Supply.CommitteesWithDelegations)
+			sortById(got.Supply.DelegationsOnly)
+			// sort the supply pools of expected
+			sortById(test.expected.Supply.CommitteesWithDelegations)
+			sortById(test.expected.Supply.DelegationsOnly)
+			// json for convenient compare
+			gotJson, _ := json.MarshalIndent(got, "", "  ")
+			expectedJson, _ := json.MarshalIndent(test.expected, "", "  ")
+			// compare got vs expected
+			require.EqualExportedValues(t, *test.expected, *got, fmt.Sprintf("EXPECTED:\n%s\nGOT:\n%s", expectedJson, gotJson))
+		})
+	}
+}
+
+func TestValidateGenesisState(t *testing.T) {
+	tests := []struct {
+		name   string
+		detail string
+		input  *types.GenesisState
+		error  string
+	}{
+		{
+			name:   "bad validator address",
+			detail: "the validator address length is invalid",
+			input: &types.GenesisState{
+				Validators: []*types.Validator{
+					{
+						Address:      nil,
+						PublicKey:    newTestPublicKeyBytes(t),
+						StakedAmount: 100,
+					},
+				},
+				Params: types.DefaultParams(),
+			},
+			error: "address size is invalid",
+		},
+		{
+			name:   "bad validator public key",
+			detail: "the validator public key length is invalid",
+			input: &types.GenesisState{
+				Validators: []*types.Validator{
+					{
+						Address:      newTestAddressBytes(t),
+						PublicKey:    newTestAddressBytes(t),
+						StakedAmount: 100,
+					},
+				},
+				Params: types.DefaultParams(),
+			},
+			error: "public key size is invalid",
+		},
+		{
+			name:   "bad validator output address",
+			detail: "the validator output address length is invalid",
+			input: &types.GenesisState{
+				Validators: []*types.Validator{
+					{
+						Address:      newTestAddressBytes(t),
+						PublicKey:    newTestPublicKeyBytes(t),
+						StakedAmount: 100,
+						Output:       newTestPublicKeyBytes(t),
+					},
+				},
+				Params: types.DefaultParams(),
+			},
+			error: "address size is invalid",
+		},
+		{
+			name:   "bad validator minimum stake",
+			detail: "the validator minimum stake is invalid",
+			input: &types.GenesisState{
+				Validators: []*types.Validator{
+					{
+						Address:      newTestAddressBytes(t),
+						PublicKey:    newTestPublicKeyBytes(t),
+						StakedAmount: 0,
+						Output:       newTestAddressBytes(t),
+					},
+				},
+				Params: types.DefaultParams(),
+			},
+			error: "less than minimum stake",
+		},
+		{
+			name:   "account address",
+			detail: "the account address length is invalid",
+			input: &types.GenesisState{
+				Accounts: []*types.Account{
+					{
+						Address: newTestPublicKeyBytes(t),
+						Amount:  100,
+					},
+				},
+				Params: types.DefaultParams(),
+			},
+			error: "address size is invalid",
+		},
+		{
+			name:   "account amount",
+			detail: "the account amount is invalid",
+			input: &types.GenesisState{
+				Accounts: []*types.Account{
+					{
+						Address: newTestAddressBytes(t),
+						Amount:  0,
+					},
+				},
+				Params: types.DefaultParams(),
+			},
+			error: "amount is invalid",
+		},
+		{
+			name:   "pool amount",
+			detail: "the pool amount is invalid",
+			input: &types.GenesisState{
+				Pools: []*types.Pool{
+					{
+						Id:     lib.CanopyCommitteeId,
+						Amount: 0,
+					},
+				},
+				Params: types.DefaultParams(),
+			},
+			error: "amount is invalid",
+		},
+		{
+			name:   "duplicate committee order book",
+			detail: "the order book contains a duplicate committee entry",
+			input: &types.GenesisState{
+				OrderBooks: &types.OrderBooks{
+					OrderBooks: []*types.OrderBook{
+						{
+							CommitteeId: 0,
+							Orders: []*types.SellOrder{
+								{
+									Id:                 1,
+									Committee:          0,
+									AmountForSale:      100,
+									SellersSellAddress: newTestAddressBytes(t),
+								},
+							},
+						},
+						{
+							CommitteeId: 0,
+							Orders: []*types.SellOrder{
+								{
+									Id:                 2,
+									Committee:          0,
+									AmountForSale:      101,
+									SellersSellAddress: newTestAddressBytes(t, 1),
+								},
+							},
+						},
+					},
+				},
+				Params: types.DefaultParams(),
+			},
+			error: "sell order invalid",
+		},
+		{
+			name:   "duplicate sell order id",
+			detail: "the order book contains a sell order with a duplicate id within a single committee",
+			input: &types.GenesisState{
+				OrderBooks: &types.OrderBooks{
+					OrderBooks: []*types.OrderBook{
+						{
+							CommitteeId: 0,
+							Orders: []*types.SellOrder{
+								{
+									Id:                 1,
+									Committee:          0,
+									AmountForSale:      100,
+									SellersSellAddress: newTestAddressBytes(t),
+								},
+								{
+									Id:                 1,
+									Committee:          0,
+									AmountForSale:      101,
+									SellersSellAddress: newTestAddressBytes(t, 2),
+								},
+							},
+						},
+					},
+				},
+				Params: types.DefaultParams(),
+			},
+			error: "sell order invalid",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// run function call
+			err := sm.ValidateGenesisState(test.input)
+			// ensure expected error
+			require.Equal(t, test.error != "", err != nil)
+			if err != nil {
+				// ensure error contains
+				require.ErrorContains(t, err, test.error)
+			}
+		})
+	}
+}

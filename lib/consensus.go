@@ -172,8 +172,8 @@ func (x *QuorumCertificate) Equals(qc *QuorumCertificate) bool {
 	return x.Signature.Equals(qc.Signature)
 }
 
-// GetNonSigners() returns the public keys and count of those who did not sign the QC
-func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) (pubs [][]byte, count int, err ErrorI) {
+// GetNonSigners() returns the public keys and the percentage (of voting power out of total) of those who did not sign the QC
+func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) (nonSigners [][]byte, nonSignerPercent int, err ErrorI) {
 	if x == nil || x.Signature == nil {
 		return nil, 0, ErrEmptyQuorumCertificate()
 	}

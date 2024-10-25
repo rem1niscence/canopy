@@ -105,10 +105,12 @@ type Iterator struct {
 	err    error
 }
 
-func (i *Iterator) Valid() bool       { return i.parent.Valid() }
-func (i *Iterator) Next()             { i.parent.Next() }
-func (i *Iterator) Close()            { i.parent.Close() }
-func (i *Iterator) Key() (key []byte) { return removePrefix(i.parent.Item().Key(), []byte(i.prefix)) }
+func (i *Iterator) Valid() bool { return i.parent.Valid() }
+func (i *Iterator) Next()       { i.parent.Next() }
+func (i *Iterator) Close()      { i.parent.Close() }
+func (i *Iterator) Key() (key []byte) {
+	return removePrefix(lib.Copy(i.parent.Item().Key()), []byte(i.prefix))
+}
 
 // removePrefix() removes the prefix from the key
 func removePrefix(b, prefix []byte) []byte { return b[len(prefix):] }

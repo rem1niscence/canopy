@@ -20,8 +20,6 @@ var (
 	qcHeightPrefix     = []byte{7} // store key prefix for quorum certificate by height
 	doubleSignerPrefix = []byte{8} // store key prefix for double signers by height
 	checkPointPrefix   = []byte{9} // store key prefix for checkpoints for committee chains
-
-	delim = []byte("/") // the delimiter that allows safe key prefixing (ex. /tx/100/abc vs /tx/10/0abc)
 )
 
 // Indexer: the part of the DB that stores transactions, blocks, and quorum certificates
@@ -97,7 +95,7 @@ func (t *Indexer) GetBlockByHeight(height uint64) (*lib.BlockResult, lib.ErrorI)
 // GetBlocks() returns a page of blocks based on the page parameters
 func (t *Indexer) GetBlocks(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 	results, count, page := make(lib.BlockResults, 0), 0, lib.NewPage(p, lib.BlockResultsPageName)
-	err = page.Load(blockHeightPrefix, true, &results, t.db, func(b []byte) lib.ErrorI {
+	err = page.Load(blockHeightPrefix, true, &results, t.db, func(_, b []byte) lib.ErrorI {
 		// get the block from the iterator value
 		block, e := t.getBlock(b)
 		if e != nil {
@@ -258,10 +256,10 @@ func (t *Indexer) GetDoubleSigners() (ds []*lib.DoubleSigner, err lib.ErrorI) {
 	defer it.Close()
 	results := make(map[string][]uint64)
 	for ; it.Valid(); it.Next() {
-		// split the key by delimiter
-		split := bytes.Split(it.Key(), delim)
+		// split the key by Delimiter
+		split := bytes.Split(it.Key(), lib.Delimiter)
 		// sanity check the key
-		if len(split) != 3 {
+		if len(split) < 3 {
 			return nil, ErrInvalidKey()
 		}
 		// key split should be dsPrefix / height / address
@@ -269,7 +267,7 @@ func (t *Indexer) GetDoubleSigners() (ds []*lib.DoubleSigner, err lib.ErrorI) {
 		// add to results
 		heights := results[lib.BytesToString(address)]
 		heights = append(heights, height)
-		results[lib.BytesToString(address)] = heights
+		results[string(address)] = heights
 	}
 	for address, heights := range results {
 		ds = append(ds, &lib.DoubleSigner{
@@ -339,10 +337,10 @@ func (t *Indexer) GetAllCheckpoints(committeeId uint64) (checkpoints []*lib.Chec
 }
 
 func (t *Indexer) checkpointFromKeyValue(key, value []byte) (*lib.Checkpoint, lib.ErrorI) {
-	if bytes.Count(key, delim) < 2 {
+	if bytes.Count(key, lib.Delimiter) < 2 {
 		return nil, ErrInvalidKey()
 	}
-	bigEndianHeight := bytes.Split(key, delim)[2]
+	bigEndianHeight := bytes.Split(key, lib.Delimiter)[2]
 	height := binary.BigEndian.Uint64(bigEndianHeight)
 	return &lib.Checkpoint{
 		Height:    height,
@@ -426,7 +424,7 @@ func (t *Indexer) getTxsNonPaginated(prefix []byte, newestToOldest bool) (result
 // getTxs() returns a page of transactions in sorted order by block.index
 func (t *Indexer) getTxs(prefix []byte, newestToOldest bool, p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 	txResults, page := make(lib.TxResults, 0), lib.NewPage(p, lib.TxResultsPageName)
-	err = page.Load(prefix, newestToOldest, &txResults, t.db, func(b []byte) (e lib.ErrorI) {
+	err = page.Load(prefix, newestToOldest, &txResults, t.db, func(_, b []byte) (e lib.ErrorI) {
 		tx, e := t.getTx(b)
 		if e == nil {
 			txResults = append(txResults, tx)
@@ -497,7 +495,7 @@ func (t *Indexer) txHashKey(hash []byte) []byte {
 }
 
 func (t *Indexer) heightAndIndexKey(height, index uint64) []byte {
-	return multiAppendWithDelimiter(t.txHeightKey(height), t.encodeBigEndian(index))
+	return lib.Delimit(t.txHeightKey(height), t.encodeBigEndian(index))
 }
 
 func (t *Indexer) txHeightKey(height uint64) []byte {
@@ -537,19 +535,7 @@ func (t *Indexer) doubleSignerHeightKey(address []byte, height uint64) []byte {
 }
 
 func (t *Indexer) key(prefix []byte, param1, param2 []byte) []byte {
-	return multiAppendWithDelimiter(prefix, param1, param2)
-}
-
-// multiAppendWithDelimiter() appends the items together separated by a delimiter
-func multiAppendWithDelimiter(toAppend ...[]byte) (res []byte) {
-	for _, a := range toAppend {
-		if a == nil {
-			continue
-		}
-		withTerminatingDelim := append(a, delim...)
-		res = append(res, withTerminatingDelim...)
-	}
-	return
+	return lib.Delimit(prefix, param1, param2)
 }
 
 // encodeBigEndian() encodes a number such that default DB order

@@ -299,14 +299,14 @@ func pollValidators(frequency time.Duration) {
 			time.Sleep(frequency)
 			continue
 		}
-		vals, err := state.GetCanopyCommittee()
+		vals, err := state.GetCanopyCommitteeMembers()
 		if err != nil {
 			logger.Error(err.Error())
 			time.Sleep(frequency)
 			continue
 		}
 		pollMux.Lock()
-		poll = types.PollValidators(conf.NetworkID, vals, router[ProposalsRouteName].Path, logger)
+		poll = types.PollValidators(vals, router[ProposalsRouteName].Path, logger)
 		pollMux.Unlock()
 		time.Sleep(frequency)
 	}

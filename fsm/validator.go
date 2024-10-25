@@ -6,6 +6,8 @@ import (
 	"github.com/ginchuco/ginchu/lib/crypto"
 )
 
+// TODO ensure a 0 committee validator does not panic
+
 // GetValidator() gets the validator from the store via the address
 func (s *StateMachine) GetValidator(address crypto.AddressI) (*types.Validator, lib.ErrorI) {
 	bz, err := s.Get(types.KeyForValidator(address))
@@ -88,7 +90,7 @@ func (s *StateMachine) getValidatorsPaginated(p lib.PageParams, f lib.ValidatorF
 			return
 		})
 	} else { // if no filters
-		err = page.Load(prefix, false, &res, s.store, func(b []byte) (err lib.ErrorI) {
+		err = page.Load(prefix, false, &res, s.store, func(_, b []byte) (err lib.ErrorI) {
 			val, err := s.unmarshalValidator(b)
 			if err == nil {
 				res = append(res, val)
@@ -108,8 +110,27 @@ func (s *StateMachine) SetValidators(validators []*types.Validator, supply *type
 			return err
 		}
 		if val.MaxPausedHeight == 0 && val.UnstakingHeight == 0 {
-			if err := s.SetCommittees(crypto.NewAddressFromBytes(val.Address), val.StakedAmount, val.Committees); err != nil {
-				return err
+			switch val.Delegate {
+			case false:
+				if err := s.SetCommittees(crypto.NewAddressFromBytes(val.Address), val.StakedAmount, val.Committees); err != nil {
+					return err
+				}
+				supplyFromState, err := s.GetSupply()
+				if err != nil {
+					return err
+				}
+				supply.CommitteesWithDelegations = supplyFromState.CommitteesWithDelegations
+			case true:
+				supply.Delegated += val.StakedAmount
+				if err := s.SetDelegations(crypto.NewAddressFromBytes(val.Address), val.StakedAmount, val.Committees); err != nil {
+					return err
+				}
+				supplyFromState, err := s.GetSupply()
+				if err != nil {
+					return err
+				}
+				supply.CommitteesWithDelegations = supplyFromState.CommitteesWithDelegations
+				supply.DelegationsOnly = supplyFromState.DelegationsOnly
 			}
 		}
 	}
@@ -128,31 +149,67 @@ func (s *StateMachine) SetValidator(validator *types.Validator) lib.ErrorI {
 	return nil
 }
 
-// DeleteValidator() removes a validator from the state under a key
-func (s *StateMachine) DeleteValidator(address crypto.AddressI) lib.ErrorI {
-	if err := s.Delete(types.KeyForValidator(address)); err != nil {
+// UpdateValidatorStake() updates the stake of the validator object in state - updating the corresponding committees and supply
+func (s *StateMachine) UpdateValidatorStake(val *types.Validator, newCommittees []uint64, amountToAdd uint64) (err lib.ErrorI) {
+	// create address object
+	address := crypto.NewAddress(val.Address)
+	// update staked supply
+	if err = s.AddToStakedSupply(amountToAdd); err != nil {
 		return err
 	}
-	return nil
+	// calculate the new stake amount
+	newStakedAmount := val.StakedAmount + amountToAdd
+	// if the validator is a delegate or not
+	if val.Delegate {
+		// track total delegated tokens
+		if err = s.AddToDelegateSupply(amountToAdd); err != nil {
+			return err
+		}
+		// update the delegations with the new committeeIds and stake amount
+		if err = s.UpdateDelegations(address, val, newStakedAmount, newCommittees); err != nil {
+			return err
+		}
+	} else {
+		// update the committees with the new committeeIds and stake amount
+		if err = s.UpdateCommittees(address, val, newStakedAmount, newCommittees); err != nil {
+			return err
+		}
+	}
+	// update the validator committees in the structure
+	val.Committees = newCommittees
+	// update the stake amount in the structure
+	val.StakedAmount = newStakedAmount
+	// set validator
+	return s.SetValidator(val)
+}
+
+// DeleteValidator() completely removes a validator from the state
+func (s *StateMachine) DeleteValidator(validator *types.Validator) lib.ErrorI {
+	addr := crypto.NewAddress(validator.Address)
+	// delete the validator committee information
+	if validator.Delegate {
+		if err := s.DeleteDelegations(addr, validator.StakedAmount, validator.Committees); err != nil {
+			return err
+		}
+	} else {
+		if err := s.DeleteCommittees(addr, validator.StakedAmount, validator.Committees); err != nil {
+			return err
+		}
+	}
+	// delete the validator from state
+	return s.Delete(types.KeyForValidator(addr))
 }
 
 // UNSTAKING VALIDATORS BELOW
 
 // SetValidatorUnstaking() updates a Validator as 'unstaking' and removes it from its respective committees
-func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, height uint64) lib.ErrorI {
-	if err := s.Set(types.KeyForUnstaking(height, address), nil); err != nil {
+// NOTE: finish unstaking height is (likely) not current height, but one in the future when the validator will 'complete' unstaking and their
+// funds be returned
+func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, finishUnstakingHeight uint64) lib.ErrorI {
+	if err := s.Set(types.KeyForUnstaking(finishUnstakingHeight, address), nil); err != nil {
 		return err
 	}
-	if validator.Delegate {
-		if err := s.DeleteDelegations(address, validator.StakedAmount, validator.Committees); err != nil {
-			return err
-		}
-	} else {
-		if err := s.DeleteCommittees(address, validator.StakedAmount, validator.Committees); err != nil {
-			return err
-		}
-	}
-	validator.UnstakingHeight = height // height at which the validator finishes unstaking
+	validator.UnstakingHeight = finishUnstakingHeight // height at which the validator finishes unstaking
 	return s.SetValidator(validator)
 }
 
@@ -181,8 +238,14 @@ func (s *StateMachine) DeleteFinishedUnstaking() lib.ErrorI {
 		if err = s.SubFromStakedSupply(validator.StakedAmount); err != nil {
 			return err
 		}
+		if validator.Delegate {
+			// subtract those tokens from the delegate supply count
+			if err = s.SubFromDelegatedSupply(validator.StakedAmount); err != nil {
+				return err
+			}
+		}
 		// delete the validator structure
-		return s.DeleteValidator(addr)
+		return s.DeleteValidator(validator)
 	}
 	// for each unstaking key at this height
 	if err := s.IterateAndExecute(types.UnstakingPrefix(s.Height()), callback); err != nil {
@@ -210,9 +273,6 @@ func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *ty
 	if err := s.Set(types.KeyForPaused(maxPausedHeight, address), nil); err != nil {
 		return err
 	}
-	if err := s.DeleteCommittees(address, validator.StakedAmount, validator.Committees); err != nil {
-		return err
-	}
 	validator.MaxPausedHeight = maxPausedHeight
 	return s.SetValidator(validator)
 }
@@ -222,16 +282,17 @@ func (s *StateMachine) SetValidatorUnpaused(address crypto.AddressI, validator *
 	if err := s.Delete(types.KeyForPaused(validator.MaxPausedHeight, address)); err != nil {
 		return err
 	}
-	if err := s.SetCommittees(address, validator.StakedAmount, validator.Committees); err != nil {
-		return err
-	}
 	validator.MaxPausedHeight = 0
 	return s.SetValidator(validator)
 }
 
 // ForceUnstakeMaxPaused() force unstakes validators who have reached MaxPauseHeight and deletes their 'paused' key
+// EXPLAINER: addresses under the (max) paused prefix for the latest height indicate the Validator
+// reached their 'max paused height' as this key was set some heights ago when the validators were initially paused.
+// Note that these Validators still remain paused or else the key would have been deleted upon 'un-pausing'
 func (s *StateMachine) ForceUnstakeMaxPaused() lib.ErrorI {
 	var keys [][]byte
+	// this callback force unstakes all addresses under the prefix
 	forceUnstakeCallback := func(key, _ []byte) lib.ErrorI {
 		keys = append(keys, key)
 		addr, err := types.AddressFromKey(key)
@@ -240,10 +301,35 @@ func (s *StateMachine) ForceUnstakeMaxPaused() lib.ErrorI {
 		}
 		return s.ForceUnstakeValidator(addr)
 	}
+	// force unstake all addresses under the (max) paused prefix for the latest height
 	if err := s.IterateAndExecute(types.PausedPrefix(s.Height()), forceUnstakeCallback); err != nil {
 		return err
 	}
 	return s.DeleteAll(keys)
+}
+
+// GetAuthorizedSignersForValidator() returns the addresses that are able to sign messages on behalf of the validator
+func (s *StateMachine) GetAuthorizedSignersForValidator(address []byte) (signers [][]byte, err lib.ErrorI) {
+	// retrieve the validator from state
+	validator, err := s.GetValidator(crypto.NewAddressFromBytes(address))
+	if err != nil {
+		return nil, err
+	}
+	// ensure not nil
+	if validator == nil {
+		return nil, types.ErrValidatorNotExists()
+	}
+	// return the operator and output
+	return [][]byte{validator.Address, validator.Output}, nil
+}
+
+// validatorPubToAddr() is a convenience function that converts a BLS validator key to an address
+func (s *StateMachine) validatorPubToAddr(public []byte) ([]byte, lib.ErrorI) {
+	pk, er := crypto.NewPublicKeyFromBytes(public)
+	if er != nil {
+		return nil, types.ErrInvalidPublicKey(er)
+	}
+	return pk.Address().Bytes(), nil
 }
 
 // marshalValidator() converts the Validator object to bytes

@@ -31,8 +31,11 @@ func NewValidatorSet(validators *ConsensusValidators) (vs ValidatorSet, err Erro
 		totalPower += v.VotingPower
 		count++
 	}
+	if totalPower == 0 {
+		return ValidatorSet{}, ErrNoValidators()
+	}
 	// calculate the minimum power for a two-thirds majority (2f+1)
-	minPowerFor23Maj := Uint64ReducePercentage(totalPower, 100*float64(1)/float64(3)) + 1
+	minPowerFor23Maj := (2*totalPower)/3 + 1
 	if err != nil {
 		return
 	}

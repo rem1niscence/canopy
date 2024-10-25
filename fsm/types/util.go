@@ -51,25 +51,33 @@ type NonSigners []*NonSigner
 
 // genesisState is the json.Marshaller and json.Unmarshaler implementation for the GenesisState object
 type genesisState struct {
-	Time       string       `json:"time,omitempty"`
-	Pools      []*Pool      `json:"pools,omitempty"`
-	Accounts   []*Account   `protobuf:"bytes,3,rep,name=accounts,proto3" json:"accounts,omitempty"`
-	NonSigners NonSigners   `json:"nonSigners"`
-	Validators []*Validator `protobuf:"bytes,4,rep,name=validators,proto3" json:"validators,omitempty"`
-	Params     *Params      `protobuf:"bytes,5,opt,name=params,proto3" json:"params,omitempty"`
-	Supply     *Supply      `json:"supply"`
+	Time          string              `json:"time,omitempty"`
+	Pools         []*Pool             `json:"pools,omitempty"`
+	Accounts      []*Account          `protobuf:"bytes,3,rep,name=accounts,proto3" json:"accounts,omitempty"`
+	NonSigners    NonSigners          `json:"nonSigners"`
+	Validators    []*Validator        `protobuf:"bytes,4,rep,name=validators,proto3" json:"validators,omitempty"`
+	Params        *Params             `protobuf:"bytes,5,opt,name=params,proto3" json:"params,omitempty"`
+	Supply        *Supply             `json:"supply"`
+	OrderBooks    *OrderBooks         `protobuf:"bytes,7,opt,name=order_books,json=orderBooks,proto3" json:"order_books,omitempty"`
+	DoubleSigners []*lib.DoubleSigner `protobuf:"bytes,6,rep,name=double_signers,json=doubleSigners,proto3" json:"double_signers,omitempty"` // only used for export
 }
 
 // MarshalJSON() is the json.Marshaller implementation for the GenesisState object
 func (x *GenesisState) MarshalJSON() ([]byte, error) {
+	var t string
+	if x.Time != 0 {
+		t = time.UnixMicro(int64(x.Time)).Format(time.DateTime)
+	}
 	return json.Marshal(genesisState{
-		Time:       time.UnixMicro(int64(x.Time)).Format(time.DateTime),
-		Pools:      x.Pools,
-		Accounts:   x.Accounts,
-		NonSigners: x.NonSigners,
-		Validators: x.Validators,
-		Params:     x.Params,
-		Supply:     x.Supply,
+		Time:          t,
+		Pools:         x.Pools,
+		Accounts:      x.Accounts,
+		NonSigners:    x.NonSigners,
+		Validators:    x.Validators,
+		Params:        x.Params,
+		Supply:        x.Supply,
+		OrderBooks:    x.OrderBooks,
+		DoubleSigners: x.DoubleSigners,
 	})
 }
 
@@ -79,13 +87,16 @@ func (x *GenesisState) UnmarshalJSON(bz []byte) (err error) {
 	if err = json.Unmarshal(bz, ptr); err != nil {
 		return
 	}
-	t, e := time.Parse(time.DateTime, ptr.Time)
-	if e != nil {
-		return e
+	if ptr.Time != "" {
+		t, e := time.Parse(time.DateTime, ptr.Time)
+		if e != nil {
+			return e
+		}
+		x.Time = uint64(t.UnixMicro())
 	}
-	x.Time = uint64(t.UnixMicro())
 	x.Params, x.Pools, x.Supply = ptr.Params, ptr.Pools, ptr.Supply
 	x.Accounts, x.Validators, x.NonSigners = ptr.Accounts, ptr.Validators, ptr.NonSigners
+	x.OrderBooks, x.DoubleSigners = ptr.OrderBooks, ptr.DoubleSigners
 	return
 }
 
@@ -135,6 +146,7 @@ func (x *Pool) UnmarshalJSON(bz []byte) (err error) {
 type validator struct {
 	Address         *crypto.Address           `json:"address,omitempty"`
 	PublicKey       *crypto.BLS12381PublicKey `json:"public_key,omitempty"`
+	Committees      []uint64                  `json:"committees,omitempty"`
 	NetAddress      string                    `json:"net_address,omitempty"`
 	StakedAmount    uint64                    `json:"staked_amount,omitempty"`
 	MaxPausedHeight uint64                    `json:"max_paused_height,omitempty"`
@@ -153,6 +165,7 @@ func (x *Validator) MarshalJSON() ([]byte, error) {
 		PublicKey:       publicKey.(*crypto.BLS12381PublicKey),
 		NetAddress:      x.NetAddress,
 		StakedAmount:    x.StakedAmount,
+		Committees:      x.Committees,
 		MaxPausedHeight: x.MaxPausedHeight,
 		UnstakingHeight: x.UnstakingHeight,
 		Output:          crypto.NewAddressFromBytes(x.Output).(*crypto.Address),
@@ -165,7 +178,7 @@ func (x *Validator) UnmarshalJSON(bz []byte) error {
 	if err := json.Unmarshal(bz, val); err != nil {
 		return err
 	}
-	x.Address, x.PublicKey = val.Address.Bytes(), val.PublicKey.Bytes()
+	x.Address, x.PublicKey, x.Committees = val.Address.Bytes(), val.PublicKey.Bytes(), val.Committees
 	x.StakedAmount, x.NetAddress, x.Output = val.StakedAmount, val.NetAddress, val.Output.Bytes()
 	x.MaxPausedHeight, x.UnstakingHeight = val.MaxPausedHeight, val.UnstakingHeight
 	return nil
@@ -206,6 +219,71 @@ func (x *Validator) PassesFilter(f lib.ValidatorFilters) (ok bool) {
 	return true
 }
 
+// jsonSellOrder is the json.Marshaller and json.Unmarshaler implementation for the SellOrder object
+type jsonSellOrder struct {
+	Id                    uint64       `json:"Id,omitempty"`                    // the unique identifier of the order
+	Committee             uint64       `json:"Committee,omitempty"`             // the id of the committee that is in-charge of escrow for the swap
+	AmountForSale         uint64       `json:"AmountForSale,omitempty"`         // amount of CNPY for sale
+	RequestedAmount       uint64       `json:"RequestedAmount,omitempty"`       // amount of 'token' to receive
+	SellerReceiveAddress  lib.HexBytes `json:"SellerReceiveAddress,omitempty"`  // the external chain address to receive the 'token'
+	BuyerReceiveAddress   lib.HexBytes `json:"BuyerReceiveAddress,omitempty"`   // the buyer Canopy address to receive the CNPY
+	BuyerChainDeadline    uint64       `json:"BuyerChainDeadline,omitempty"`    // the external chain height deadline to send the 'tokens' to SellerReceiveAddress
+	OrderExpirationHeight uint64       `json:"OrderExpirationHeight,omitempty"` // the height when the order expires
+	SellersSellAddress    lib.HexBytes `json:"SellersSellAddress,omitempty"`    // the address of seller who is selling the CNPY
+}
+
+// MarshalJSON() is the json.Marshaller implementation for the SellOrder object
+func (x *SellOrder) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonSellOrder{
+		Id:                    x.Id,
+		Committee:             x.Committee,
+		AmountForSale:         x.AmountForSale,
+		RequestedAmount:       x.RequestedAmount,
+		SellerReceiveAddress:  x.SellerReceiveAddress,
+		BuyerReceiveAddress:   x.BuyerReceiveAddress,
+		BuyerChainDeadline:    x.BuyerChainDeadline,
+		OrderExpirationHeight: x.OrderExpirationHeight,
+		SellersSellAddress:    x.SellersSellAddress,
+	})
+}
+
+// UnmarshalJSON() is the json.Unmarshaler implementation for the SellOrder object
+func (x *SellOrder) UnmarshalJSON(bz []byte) error {
+	j := new(jsonSellOrder)
+	if err := json.Unmarshal(bz, j); err != nil {
+		return err
+	}
+	*x = SellOrder{
+		Id:                    j.Id,
+		Committee:             j.Committee,
+		AmountForSale:         j.AmountForSale,
+		RequestedAmount:       j.RequestedAmount,
+		SellerReceiveAddress:  j.SellerReceiveAddress,
+		BuyerReceiveAddress:   j.BuyerReceiveAddress,
+		BuyerChainDeadline:    j.BuyerChainDeadline,
+		OrderExpirationHeight: j.OrderExpirationHeight,
+		SellersSellAddress:    j.SellersSellAddress,
+	}
+	return nil
+}
+
+// MarshalJSON() is the json.Marshaller implementation for the OrderBooks object
+func (x *OrderBooks) MarshalJSON() ([]byte, error) {
+	return json.Marshal(x.OrderBooks)
+}
+
+// UnmarshalJSON() is the json.Unmarshaler implementation for the OrderBooks object
+func (x *OrderBooks) UnmarshalJSON(bz []byte) error {
+	jsonOrderBooks := new([]*OrderBook)
+	if err := json.Unmarshal(bz, jsonOrderBooks); err != nil {
+		return err
+	}
+	*x = OrderBooks{
+		OrderBooks: *jsonOrderBooks,
+	}
+	return nil
+}
+
 // Combine() merges the Reward Recipients' Payment Percents of the current Proposal with those of another Proposal
 // such that the Payment Percentages may be equally weighted when performing reward distribution calculations
 // NOTE: percents will exceed 100% over multiple samples, but are normalized using the NumberOfSamples field
@@ -213,6 +291,7 @@ func (x *CommitteeData) Combine(f *CommitteeData) lib.ErrorI {
 	if f == nil {
 		return nil
 	}
+	// for each payment percent,
 	for _, ep := range f.PaymentPercents {
 		x.addPercents(ep.Address, ep.Percent)
 	}
@@ -231,14 +310,16 @@ func (x *CommitteeData) Combine(f *CommitteeData) lib.ErrorI {
 
 // addPercents() is a helper function that adds reward distribution percents on behalf of an address
 func (x *CommitteeData) addPercents(address []byte, percent uint64) {
-	// check to see if the address already has samples
+	// check to see if the address already exists
 	for i, ep := range x.PaymentPercents {
+		// if already exists
 		if bytes.Equal(address, ep.Address) {
+			// simply add the percent to the previous
 			x.PaymentPercents[i].Percent += ep.Percent
 			return
 		}
 	}
-	// if not, append a sample to PaymentPercents
+	// if the address doesn't already exist, append a sample to PaymentPercents
 	x.PaymentPercents = append(x.PaymentPercents, &lib.PaymentPercents{
 		Address: address,
 		Percent: percent,
@@ -356,3 +437,10 @@ func (s *SlashTracker) toKey(address []byte) string {
 	}
 	return addr
 }
+
+type SupplyPoolType int
+
+const (
+	CommitteesWithDelegations SupplyPoolType = 0
+	DelegationsOnly           SupplyPoolType = 1
+)

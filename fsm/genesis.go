@@ -67,21 +67,18 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.Err
 		return err
 	}
 	for _, val := range genesis.Validators {
-		if len(val.Address) < crypto.AddressSize {
+		if len(val.Address) != crypto.AddressSize {
 			return types.ErrAddressSize()
 		}
-		if len(val.PublicKey) < crypto.Ed25519PubKeySize {
-			return types.ErrAddressSize()
+		if len(val.PublicKey) != crypto.BLS12381PubKeySize {
+			return types.ErrPublicKeySize()
 		}
-		if len(val.Output) < crypto.AddressSize {
+		if len(val.Output) != crypto.AddressSize {
 			return types.ErrAddressSize()
-		}
-		if val.StakedAmount < genesis.Params.Validator.ValidatorMinStake {
-			return types.ErrBelowMinimumStake()
 		}
 	}
 	for _, account := range genesis.Accounts {
-		if len(account.Address) < crypto.AddressSize {
+		if len(account.Address) != crypto.AddressSize {
 			return types.ErrAddressSize()
 		}
 		if account.Amount == 0 {
@@ -89,8 +86,27 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.Err
 		}
 	}
 	for _, pool := range genesis.Pools {
-		if pool.Id < 0 {
-			return types.ErrInvalidPoolName()
+		if pool.Amount == 0 {
+			return types.ErrInvalidAmount()
+		}
+	}
+	if genesis.OrderBooks != nil {
+		deDuplicateCommittees := make(map[uint64]struct{})
+		for _, orderBook := range genesis.OrderBooks.OrderBooks {
+			if _, found := deDuplicateCommittees[orderBook.CommitteeId]; found {
+				return types.InvalidSellOrder()
+			}
+			if len(orderBook.Orders) == 0 {
+				return types.InvalidSellOrder()
+			}
+			deDuplicateCommittees[orderBook.CommitteeId] = struct{}{}
+			deDuplicateIds := make(map[uint64]struct{})
+			for _, order := range orderBook.Orders {
+				if _, found := deDuplicateIds[order.Id]; found {
+					return types.InvalidSellOrder()
+				}
+				deDuplicateIds[order.Id] = struct{}{}
+			}
 		}
 	}
 	return nil

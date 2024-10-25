@@ -317,6 +317,7 @@ func (b *BFT) StartProposeVotePhase() {
 			return
 		}
 	}
+	// aggregate any evidence submitted from the replicas
 	byzantineEvidence := &ByzantineEvidence{
 		DSE: NewDSE(msg.LastDoubleSignEvidence),
 		BPE: NewBPE(msg.BadProposerEvidence),
@@ -337,6 +338,7 @@ func (b *BFT) StartProposeVotePhase() {
 			Header:      b.View.Copy(),
 			BlockHash:   crypto.Hash(b.Block),
 			ResultsHash: b.Results.Hash(),
+			ProposerKey: b.ProposerKey,
 		},
 	})
 }
@@ -365,6 +367,7 @@ func (b *BFT) StartPrecommitPhase() {
 			Header:      vote.Qc.Header,       // vote view
 			BlockHash:   crypto.Hash(b.Block), // vote block payload
 			ResultsHash: b.Results.Hash(),     // vote certificate results payload
+			ProposerKey: b.ProposerKey,
 			Signature:   as,
 		},
 	})
@@ -396,6 +399,7 @@ func (b *BFT) StartPrecommitVotePhase() {
 			Header:      b.View.Copy(),
 			BlockHash:   crypto.Hash(b.Block),
 			ResultsHash: b.Results.Hash(),
+			ProposerKey: b.ProposerKey,
 		},
 	})
 }
@@ -424,6 +428,7 @@ func (b *BFT) StartCommitPhase() {
 			Header:      vote.Qc.Header,       // vote view
 			BlockHash:   crypto.Hash(b.Block), // vote block payload
 			ResultsHash: b.Results.Hash(),     // vote certificate results payload
+			ProposerKey: b.ProposerKey,
 			Signature:   as,
 		},
 	})
@@ -449,9 +454,10 @@ func (b *BFT) StartCommitProcessPhase() {
 		return
 	}
 	msg.Qc.Block, msg.Qc.Results = b.Block, b.Results
+	// preset the Byzantine Evidence for the next height
 	b.ByzantineEvidence = &ByzantineEvidence{
-		DSE: b.GetDSE(),
-		BPE: b.GetBPE(), // TODO I believe that bad proposer evidence is useless here because it's from the previous height
+		DSE: b.GetLocalDSE(),
+		BPE: b.GetLocalBPE(),
 	}
 	// gossip committed block message to peers
 	b.SendCertMsg(b.CommitteeId, msg.Qc)

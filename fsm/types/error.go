@@ -271,6 +271,10 @@ func ErrInvalidBuyOrder() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidBuyOrder, lib.StateMachineModule, "buy order invalid")
 }
 
+func InvalidSellOrder() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidSellOrder, lib.StateMachineModule, "sell order invalid")
+}
+
 func ErrInvalidCloseOrder() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidCloseOrder, lib.StateMachineModule, "close order invalid")
 }

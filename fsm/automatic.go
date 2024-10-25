@@ -29,7 +29,7 @@ func (s *StateMachine) EndBlock(proposerAddress []byte) (err lib.ErrorI) {
 		return err
 	}
 	// distribute the committee rewards based on the various Proposal Transactions
-	if err = s.DistributeCommitteeReward(); err != nil {
+	if err = s.DistributeCommitteeRewards(); err != nil {
 		return err
 	}
 	// force unstakes validators who have been paused for MaxPauseBlocks
@@ -69,7 +69,7 @@ func (s *StateMachine) UpdateLastProposers(address []byte) lib.ErrorI {
 	}
 	if keys == nil || len(keys.Addresses) == 0 {
 		keys = new(lib.Proposers)
-		keys.Addresses = make([][]byte, 5)
+		keys.Addresses = [][]byte{{}, {}, {}, {}, {}}
 	}
 	index := s.Height() % 5
 	keys.Addresses[index] = address

@@ -107,7 +107,7 @@ func (f *Fuzzer) getRandomAmountUpTo(limit uint64) uint64 {
 }
 
 func (f *Fuzzer) getRandomStakeAmount(acc types.Account, fee uint64) (uint64, lib.ErrorI) {
-	minStake := f.getValParams().ValidatorMinStake
+	minStake := uint64(1)
 	if acc.Amount < minStake {
 		return 0, types.ErrInsufficientFunds()
 	}
@@ -115,10 +115,6 @@ func (f *Fuzzer) getRandomStakeAmount(acc types.Account, fee uint64) (uint64, li
 }
 
 func (f *Fuzzer) getBadStakeAmount() uint64 {
-	minStake := f.getValParams().ValidatorMinStake
-	if rand.Intn(2) == 0 {
-		return minStake - 1
-	}
 	return 0
 }
 

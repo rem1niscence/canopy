@@ -138,19 +138,21 @@ func (s *StateMachine) SetOrderBook(b *types.OrderBook) lib.ErrorI {
 
 // SetOrderBooks() sets a series of OrderBooks in the state db
 func (s *StateMachine) SetOrderBooks(b *types.OrderBooks, supply *types.Supply) lib.ErrorI {
-	// convert the order book into bytes
-	orderBookBz, err := lib.Marshal(b)
-	if err != nil {
-		return err
-	}
 	for _, book := range b.OrderBooks {
-		targetPool := s.findOrCreateSupplyPool(&supply.Escrowed, book.CommitteeId)
+		// convert the order book into bytes
+		orderBookBz, err := lib.Marshal(book)
+		if err != nil {
+			return err
+		}
+		// write the order book for the committee to state
+		key := types.KeyForOrderBook(book.CommitteeId)
+		if err = s.store.Set(key, orderBookBz); err != nil {
+			return err
+		}
+		// properly mint to the supply pool
 		for _, order := range book.Orders {
-			targetPool.Amount += order.AmountForSale
+			supply.Total += order.AmountForSale
 			if err = s.PoolAdd(book.CommitteeId+uint64(types.EscrowPoolAddend), order.AmountForSale); err != nil {
-				return err
-			}
-			if err = s.store.Set(types.KeyForOrderBook(book.CommitteeId), orderBookBz); err != nil {
 				return err
 			}
 		}

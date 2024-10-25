@@ -94,7 +94,7 @@ func (c *Controller) ResetBFTCallback(committeeID uint64) {
 		return
 	}
 	var err lib.ErrorI
-	consensus.ValidatorSet, err = c.FSM.GetCommittee(committeeID)
+	consensus.ValidatorSet, err = c.FSM.GetCommitteeMembers(committeeID)
 	if err != nil {
 		c.log.Errorf("failed retrieving committee when trigger occurred %s", err.Error())
 		return

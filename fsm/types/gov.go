@@ -49,7 +49,6 @@ func DefaultParams() *Params {
 			ProtocolVersion: NewProtocolVersion(0, 1),
 		},
 		Validator: &ValidatorParams{
-			ValidatorMinStake:                       1000000,
 			ValidatorUnstakingBlocks:                2,
 			ValidatorMaxPauseBlocks:                 4380,
 			ValidatorDoubleSignSlashPercentage:      10,
@@ -59,11 +58,10 @@ func DefaultParams() *Params {
 			ValidatorNonSignWindow:                  10,
 			ValidatorMaxCommittees:                  15,
 			ValidatorMaxCommitteeSize:               100,
-			ValidatorCommitteeReward:                1000000,
+			ValidatorBlockReward:                    1000000,
 			ValidatorEarlyWithdrawalPenalty:         20,
 			ValidatorDelegateUnstakingBlocks:        2,
 			ValidatorMinimumOrderSize:               100000000000,
-			ValidatorOrderExpirationBlocks:          4320,
 			ValidatorMinimumPercentForPaidCommittee: 33,
 			ValidatorMaxSlashPerCommittee:           15,
 		},
@@ -237,7 +235,6 @@ func IsStringParam(paramSpace, paramKey string) (bool, lib.ErrorI) {
 var _ ParamSpace = &ValidatorParams{}
 
 const (
-	ParamValidatorMinStake                       = "validator_min_stake"                          // minimum stake for a committee member / delegator
 	ParamValidatorUnstakingBlocks                = "validator_unstaking_blocks"                   // number of blocks a committee member must be 'unstaking' for
 	ParamValidatorMaxPauseBlocks                 = "validator_max_pause_blocks"                   // maximum blocks a validator may be paused for before force-unstaking
 	ParamValidatorBadProposeSlashPercentage      = "validator_bad_propose_slash_percentage"       // how much a bad proposer is slashed (% of stake)
@@ -247,19 +244,16 @@ const (
 	ParamValidatorDoubleSignSlashPercentage      = "validator_double_sign_slash_percentage"       // how much a double signer is slashed (% of stake)
 	ParamValidatorMaxCommittees                  = "validator_max_committees"                     // maximum number of committees a single validator may participate in
 	ParamValidatorMaxCommitteeSize               = "validator_max_committee_size"                 // maximum number of members a committee may have
+	ParamValidatorBlockReward                    = "validator_block_reward"                       // the amount of tokens minted each block
 	ParamValidatorEarlyWithdrawalPenalty         = "validator_early_withdrawal_penalty"           // reduction percentage of non-compounded rewards
 	ParamValidatorDelegateUnstakingBlocks        = "validator_delegate_unstaking_blocks"          // number of blocks a delegator must be 'unstaking' for
 	ParamValidatorMinimumOrderSize               = "validator_minimum_order_size"                 // minimum sell tokens in a sell order
-	ParamValidatorOrderExpirationBlocks          = "validator_order_expiration_blocks"            // how many blocks an order is kept in state before expiring
 	ParamValidatorMinimumPercentForPaidCommittee = "validator_minimum_percent_for_paid_committee" // the minimum percentage of total stake needed to be a 'paid committee'
 	ParamValidatorMaxSlashPerCommittee           = "validator_max_slash_per_committee"            // the maximum validator slash per committee per block
 )
 
 // Check() validates the Validator params
 func (x *ValidatorParams) Check() lib.ErrorI {
-	if x.ValidatorMinStake == 0 {
-		return ErrInvalidParam(ParamValidatorMinStake)
-	}
 	if x.ValidatorUnstakingBlocks == 0 {
 		return ErrInvalidParam(ParamValidatorUnstakingBlocks)
 	}
@@ -293,9 +287,6 @@ func (x *ValidatorParams) Check() lib.ErrorI {
 	if x.ValidatorEarlyWithdrawalPenalty > 100 {
 		return ErrInvalidParam(ParamValidatorEarlyWithdrawalPenalty)
 	}
-	if x.ValidatorOrderExpirationBlocks == 0 {
-		return ErrInvalidParam(ParamValidatorOrderExpirationBlocks)
-	}
 	if x.ValidatorMinimumPercentForPaidCommittee == 0 || x.ValidatorMinimumPercentForPaidCommittee > 100 {
 		return ErrInvalidParam(ParamValidatorMinimumPercentForPaidCommittee)
 	}
@@ -322,20 +313,18 @@ func (x *ValidatorParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.ValidatorNonSignSlashPercentage = value
 	case ParamValidatorDoubleSignSlashPercentage:
 		x.ValidatorDoubleSignSlashPercentage = value
-	case ParamValidatorMinStake:
-		x.ValidatorMinStake = value
 	case ParamValidatorMaxCommittees:
 		x.ValidatorMaxCommittees = value
 	case ParamValidatorMaxCommitteeSize:
 		x.ValidatorMaxCommitteeSize = value
+	case ParamValidatorBlockReward:
+		x.ValidatorBlockReward = value
 	case ParamValidatorEarlyWithdrawalPenalty:
 		x.ValidatorEarlyWithdrawalPenalty = value
 	case ParamValidatorDelegateUnstakingBlocks:
 		x.ValidatorDelegateUnstakingBlocks = value
 	case ParamValidatorMinimumOrderSize:
 		x.ValidatorMinimumOrderSize = value
-	case ParamValidatorOrderExpirationBlocks:
-		x.ValidatorOrderExpirationBlocks = value
 	case ParamValidatorMinimumPercentForPaidCommittee:
 		x.ValidatorMinimumPercentForPaidCommittee = value
 	case ParamValidatorMaxSlashPerCommittee:
@@ -517,7 +506,7 @@ type PollResult struct {
 }
 
 // PollValidators() iterates through all validators in a committee and checks how they voted
-func PollValidators(networkID uint64, vals *lib.ConsensusValidators, path string, logger lib.LoggerI) (poll Poll) {
+func PollValidators(vals *lib.ConsensusValidators, path string, logger lib.LoggerI) (poll Poll) {
 	poll = make(Poll)
 	validatorSet, e := lib.NewValidatorSet(vals)
 	if e != nil {

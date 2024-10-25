@@ -699,7 +699,7 @@ func checkAddress(address []byte) lib.ErrorI {
 // checkExternalAddress() validates an address from an external blockchain
 func checkExternalAddress(address []byte) lib.ErrorI {
 	addressLen := len(address)
-	if addressLen < crypto.AddressSize || addressLen > crypto.BLS12381PubKeySize {
+	if addressLen == 0 || addressLen > 100 {
 		return ErrAddressSize()
 	}
 	return nil

@@ -180,6 +180,9 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 	if height <= 1 {
 		height = 1 // 1 is first non-genesis height
 	}
+	if s.height == height {
+		return s, nil
+	}
 	store, ok := s.store.(lib.StoreI)
 	if !ok {
 		return nil, types.ErrWrongStoreType()
@@ -198,7 +201,7 @@ func (s *StateMachine) LoadCommittee(committeeID uint64, height uint64) (lib.Val
 	if err != nil {
 		return lib.ValidatorSet{}, err
 	}
-	vs, err := fsm.GetCommittee(committeeID)
+	vs, err := fsm.GetCommitteeMembers(committeeID)
 	if err != nil {
 		return lib.ValidatorSet{}, err
 	}
@@ -212,7 +215,7 @@ func (s *StateMachine) LoadCanopyCommittee(height uint64) (lib.ValidatorSet, lib
 	if err != nil {
 		return lib.ValidatorSet{}, err
 	}
-	vs, err := fsm.GetCanopyCommittee()
+	vs, err := fsm.GetCanopyCommitteeMembers()
 	if err != nil {
 		return lib.ValidatorSet{}, err
 	}
@@ -391,9 +394,12 @@ func (s *StateMachine) TxnWrap() (lib.StoreTxnI, lib.ErrorI) {
 	return txn, nil
 }
 
-func (s *StateMachine) Store() lib.RWStoreI                                 { return s.store }
-func (s *StateMachine) SetStore(store lib.RWStoreI)                         { s.store = store }
-func (s *StateMachine) Height() uint64                                      { return s.height }
-func (s *StateMachine) TotalVDFIterations() uint64                          { return s.vdfIterations }
-func (s *StateMachine) Reset()                                              { s.store.(lib.StoreI).Reset() }
+func (s *StateMachine) Store() lib.RWStoreI         { return s.store }
+func (s *StateMachine) SetStore(store lib.RWStoreI) { s.store = store }
+func (s *StateMachine) Height() uint64              { return s.height }
+func (s *StateMachine) TotalVDFIterations() uint64  { return s.vdfIterations }
+func (s *StateMachine) Reset() {
+	s.slashTracker = types.NewSlashTracker()
+	s.store.(lib.StoreI).Reset()
+}
 func (s *StateMachine) SetProposalVoteConfig(c types.GovProposalVoteConfig) { s.proposeVoteConfig = c }

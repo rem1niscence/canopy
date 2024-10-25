@@ -44,7 +44,7 @@ func (s *StateMachine) GetAccounts() ([]*types.Account, lib.ErrorI) {
 // GetAccountsPaginated() returns a page of Account structures in the state
 func (s *StateMachine) GetAccountsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 	page, res := lib.NewPage(p, types.AccountsPageName), make(types.AccountPage, 0)
-	err = page.Load(types.AccountPrefix(), false, &res, s.store, func(b []byte) (err lib.ErrorI) {
+	err = page.Load(types.AccountPrefix(), false, &res, s.store, func(_, b []byte) (err lib.ErrorI) {
 		acc, err := s.unmarshalAccount(b)
 		if err == nil {
 			res = append(res, acc)
@@ -184,7 +184,7 @@ func (s *StateMachine) GetPools() ([]*types.Pool, lib.ErrorI) {
 // GetPoolsPaginated() returns a particular page of Pool structures in the state
 func (s *StateMachine) GetPoolsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 	res, page := make(types.PoolPage, 0), lib.NewPage(p, types.PoolPageName)
-	err = page.Load(types.PoolPrefix(), false, &res, s.store, func(b []byte) (err lib.ErrorI) {
+	err = page.Load(types.PoolPrefix(), false, &res, s.store, func(_, b []byte) (err lib.ErrorI) {
 		acc, err := s.unmarshalPool(b)
 		if err == nil {
 			res = append(res, acc)
@@ -278,13 +278,23 @@ func (s *StateMachine) marshalPool(pool *types.Pool) ([]byte, lib.ErrorI) {
     showing both the total amount available and how it's distributed among various pools and purposes.
 */
 
-// AddToStakedSupply() adds to the staked supply count
+// AddToStakedSupply() adds to the staked supply count (staked + delegated)
 func (s *StateMachine) AddToStakedSupply(amount uint64) lib.ErrorI {
 	supply, err := s.GetSupply()
 	if err != nil {
 		return err
 	}
 	supply.Staked += amount
+	return s.SetSupply(supply)
+}
+
+// AddToStakedSupply() adds to the staked supply count
+func (s *StateMachine) AddToDelegateSupply(amount uint64) lib.ErrorI {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	supply.Delegated += amount
 	return s.SetSupply(supply)
 }
 
@@ -300,17 +310,12 @@ func (s *StateMachine) AddToTotalSupply(amount uint64) lib.ErrorI {
 
 // AddToCommitteeStakedSupply() adds to the committee staked supply count
 func (s *StateMachine) AddToCommitteeStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
-	return s.addToSupplyPool(committeeId, amount, 0)
+	return s.addToSupplyPool(committeeId, amount, types.CommitteesWithDelegations)
 }
 
 // AddToDelegateStakedSupply() adds to the delegate staked supply count
 func (s *StateMachine) AddToDelegateStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
-	return s.addToSupplyPool(committeeId, amount, 1)
-}
-
-// AddToEscrowedSupply() adds to the escrowed staked supply count
-func (s *StateMachine) AddToEscrowedSupply(committeeId uint64, amount uint64) lib.ErrorI {
-	return s.addToSupplyPool(committeeId, amount, 2)
+	return s.addToSupplyPool(committeeId, amount, types.DelegationsOnly)
 }
 
 // SubFromTotalSupply() removes from the total supply count
@@ -326,7 +331,7 @@ func (s *StateMachine) SubFromTotalSupply(amount uint64) lib.ErrorI {
 	return s.SetSupply(supply)
 }
 
-// SubFromStakedSupply() removes from the staked supply count
+// SubFromStakedSupply() removes from the staked supply count (staked + delegated)
 func (s *StateMachine) SubFromStakedSupply(amount uint64) lib.ErrorI {
 	supply, err := s.GetSupply()
 	if err != nil {
@@ -339,19 +344,37 @@ func (s *StateMachine) SubFromStakedSupply(amount uint64) lib.ErrorI {
 	return s.SetSupply(supply)
 }
 
+// SubFromDelegatedSupply() removes from the delegated supply count
+func (s *StateMachine) SubFromDelegatedSupply(amount uint64) lib.ErrorI {
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	if supply.Delegated < amount {
+		return types.ErrInsufficientSupply()
+	}
+	supply.Delegated -= amount
+	return s.SetSupply(supply)
+}
+
 // SubFromCommitteeStakedSupply() removes from the committee staked supply count
 func (s *StateMachine) SubFromCommitteeStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
-	return s.subFromSupplyPool(committeeId, amount, 0)
+	return s.subFromSupplyPool(committeeId, amount, types.CommitteesWithDelegations)
 }
 
 // SubFromDelegateStakedSupply() removes from the delegate committee staked supply count
 func (s *StateMachine) SubFromDelegateStakedSupply(committeeId uint64, amount uint64) lib.ErrorI {
-	return s.subFromSupplyPool(committeeId, amount, 1)
+	return s.subFromSupplyPool(committeeId, amount, types.DelegationsOnly)
 }
 
-// SubFromEscrowedSupply() removes from the delegate committee staked supply count
-func (s *StateMachine) SubFromEscrowedSupply(committeeId uint64, amount uint64) lib.ErrorI {
-	return s.subFromSupplyPool(committeeId, amount, 2)
+// GetCommitteeStakedSupply() retrieves the committee staked supply count
+func (s *StateMachine) GetCommitteeStakedSupply(committeeId uint64) (p *types.Pool, err lib.ErrorI) {
+	return s.getSupplyPool(committeeId, types.CommitteesWithDelegations)
+}
+
+// GetFromDelegateStakedSupply() retrieves the delegate committee staked supply count
+func (s *StateMachine) GetDelegateStakedSupply(committeeId uint64) (p *types.Pool, err lib.ErrorI) {
+	return s.getSupplyPool(committeeId, types.DelegationsOnly)
 }
 
 // GetSupply() returns the Supply structure held in the state
@@ -390,16 +413,16 @@ func (s *StateMachine) marshalSupply(supply *types.Supply) ([]byte, lib.ErrorI) 
 }
 
 // addToSupplyPool() adds to a supply pool using an addition callback with 'executeOnSupplyPool'
-func (s *StateMachine) addToSupplyPool(committeeId, amount uint64, targetType int) lib.ErrorI {
-	return s.executeOnSupplyPool(committeeId, targetType, func(p *types.Pool) (err lib.ErrorI) {
+func (s *StateMachine) addToSupplyPool(committeeId, amount uint64, targetType types.SupplyPoolType) lib.ErrorI {
+	return s.executeOnSupplyPool(committeeId, targetType, func(s *types.Supply, p *types.Pool) (err lib.ErrorI) {
 		p.Amount += amount
 		return
 	})
 }
 
 // subFromSupplyPool() subtracts from a supply pool using a subtraction callback with 'executeOnSupplyPool'
-func (s *StateMachine) subFromSupplyPool(committeeId, amount uint64, targetType int) lib.ErrorI {
-	return s.executeOnSupplyPool(committeeId, targetType, func(p *types.Pool) (err lib.ErrorI) {
+func (s *StateMachine) subFromSupplyPool(committeeId, amount uint64, targetType types.SupplyPoolType) lib.ErrorI {
+	return s.executeOnSupplyPool(committeeId, targetType, func(s *types.Supply, p *types.Pool) (err lib.ErrorI) {
 		if p == nil || p.Amount < amount {
 			return types.ErrInsufficientSupply()
 		}
@@ -408,31 +431,46 @@ func (s *StateMachine) subFromSupplyPool(committeeId, amount uint64, targetType 
 	})
 }
 
-// executeOnSupplyPool() finds a target pool using the target type and committeeId and executes a callback on it
-func (s *StateMachine) executeOnSupplyPool(committeeId uint64, targetType int, callback func(p *types.Pool) lib.ErrorI) lib.ErrorI {
-	supply, err := s.GetSupply()
+// getSupplyPool() returns the supply pool based on the target type
+func (s *StateMachine) getSupplyPool(committeeId uint64, targetType types.SupplyPoolType) (p *types.Pool, err lib.ErrorI) {
+	arr, _, err := s.getSupplyPools(targetType)
 	if err != nil {
-		return err
+		return
+	}
+	p = s.findOrCreateSupplyPool(arr, committeeId)
+	return
+}
+
+// getSupplyPools retrieves a particular pool based on the target type
+func (s *StateMachine) getSupplyPools(targetType types.SupplyPoolType) (arr *[]*types.Pool, supply *types.Supply, err lib.ErrorI) {
+	supply, err = s.GetSupply()
+	if err != nil {
+		return
 	}
 	// determine the type of the target
-	var arr *[]*types.Pool
 	switch targetType {
-	case 0:
+	case types.CommitteesWithDelegations:
 		arr = &supply.CommitteesWithDelegations
-	case 1:
+	case types.DelegationsOnly:
 		arr = &supply.DelegationsOnly
-	case 2:
-		arr = &supply.Escrowed
+	}
+	return
+}
+
+// executeOnSupplyPool() finds a target pool using the target type and committeeId and executes a callback on it
+func (s *StateMachine) executeOnSupplyPool(committeeId uint64, targetType types.SupplyPoolType, callback func(s *types.Supply, p *types.Pool) lib.ErrorI) lib.ErrorI {
+	arr, supply, err := s.getSupplyPools(targetType)
+	if err != nil {
+		return err
 	}
 	// locate the target pool
 	targetPool := s.findOrCreateSupplyPool(arr, committeeId)
 	// execute the business logic callback
-	if err = callback(targetPool); err != nil {
+	if err = callback(supply, targetPool); err != nil {
 		return err
 	}
 	// filter zeroes and sort the pool
-	// this prevents dead committees from bloating
-	// the supply structure
+	// this prevents dead committees from bloating the supply structure
 	types.FilterAndSortPool(arr)
 	// finally set the supply
 	return s.SetSupply(supply)
@@ -447,7 +485,7 @@ func (s *StateMachine) findOrCreateSupplyPool(poolArr *[]*types.Pool, committeeI
 		}
 	}
 	// if pool not found, add it to the list
-	pool = &types.Pool{}
+	pool = &types.Pool{Id: committeeId}
 	*poolArr = append(*poolArr, pool)
 	return
 }

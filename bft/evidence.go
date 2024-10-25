@@ -50,12 +50,12 @@ func (b *BFT) ValidateByzantineEvidence(slashRecipients *lib.SlashRecipients, be
 		}
 	}
 	if slashRecipients.BadProposers != nil {
-		// locally generate a Bad Proposers list from the provided evidence
+		// generate a Bad Proposers list from the provided evidence
 		badProposers, err := b.ProcessBPE(be.BPE.Evidence...)
 		if err != nil {
 			return err
 		}
-		// this validation ensures that the Meta.BadProposers is justified, but there may be additional evidence included without any error
+		// this validation ensures that the bad proposers are justified, but there may be additional evidence included without any error
 		for _, bp := range slashRecipients.BadProposers {
 			// check if the Bad Proposer in the Proposal is within our locally generated Bad Proposers list
 			if !slices.ContainsFunc(badProposers, func(badProposer []byte) bool {
@@ -171,8 +171,8 @@ func (b *BFT) AddDSE(e *DoubleSignEvidences, ev *DoubleSignEvidence) (err lib.Er
 	return
 }
 
-// GetDSE() returns the double sign evidences collected by the local node
-func (b *BFT) GetDSE() DoubleSignEvidences {
+// GetLocalDSE() returns the double sign evidences collected by the local node
+func (b *BFT) GetLocalDSE() DoubleSignEvidences {
 	dse := NewDSE()
 	// by partial QC: a byzantine Leader sent a 'non +2/3 quorum certificate'
 	// and the node holds a correct Quorum Certificate for the same View
@@ -355,18 +355,6 @@ func (b *BFT) addDSEByCandidate(dse *DoubleSignEvidences) {
 
 // BAD PROPOSER EVIDENCE BELOW
 
-func (b *BFT) GetBPE() BadProposerEvidences {
-	e := NewBPE()
-	for r := uint64(0); r < b.Round; r++ {
-		if msg := b.getProposal(r, ProposeVote); msg != nil && msg.Qc != nil {
-			if err := b.AddBPE(&e, &BadProposerEvidence{ElectionVoteQc: msg.Qc}); err != nil {
-				b.log.Error(err.Error())
-			}
-		}
-	}
-	return e
-}
-
 // NewBPE() creates a list of BadProposerEvidences with a builtin de-duplicator
 func NewBPE(bpe ...[]*BadProposerEvidence) BadProposerEvidences {
 	bp := make([]*BadProposerEvidence, 0)
@@ -382,11 +370,20 @@ func NewBPE(bpe ...[]*BadProposerEvidence) BadProposerEvidences {
 // ProcessBPE() validates each piece of bad proposer evidence and returns a list of bad proposers
 func (b *BFT) ProcessBPE(x ...*BadProposerEvidence) (badProposers [][]byte, err lib.ErrorI) {
 	for _, ev := range x {
-		// sanity check the evidence
-		if !ev.Check(nil, b.View, b.ValidatorSet) {
+		cert, e := b.LoadCertificate(b.CommitteeId, b.Height-1)
+		if e != nil {
+			return nil, e
+		}
+		// validate the evidence
+		if !ev.Check(cert.ProposerKey, b.View, b.ValidatorSet) {
 			return nil, lib.ErrInvalidEvidence()
 		}
+		// validate the evidence height
+		if ev.ElectionVoteQc.Header.Height != b.Height-1 {
+			return nil, lib.ErrWrongHeight()
+		}
 	}
+	// de duplicate the list
 	dedupe := make(map[string]struct{})
 	for _, bp := range x {
 		proposerKey := lib.BytesToString(bp.ElectionVoteQc.ProposerKey)
@@ -398,11 +395,34 @@ func (b *BFT) ProcessBPE(x ...*BadProposerEvidence) (badProposers [][]byte, err 
 	return
 }
 
+// GetLocalBPE() generates local BPE from any 'proposers' who did not complete their task of leading the round
+func (b *BFT) GetLocalBPE() BadProposerEvidences {
+	e := NewBPE()
+	for r := uint64(0); r < b.Round; r++ {
+		if msg := b.getProposal(r, ProposeVote); msg != nil && msg.Qc != nil {
+			if err := b.AddBPE(&e, &BadProposerEvidence{ElectionVoteQc: msg.Qc}, true); err != nil {
+				b.log.Error(err.Error())
+			}
+		}
+	}
+	return e
+}
+
 // AddBPE() attempts to add a piece of bad proposer evidence to the list
-func (b *BFT) AddBPE(bpe *BadProposerEvidences, ev *BadProposerEvidence) lib.ErrorI {
+func (b *BFT) AddBPE(bpe *BadProposerEvidences, ev *BadProposerEvidence, local bool) lib.ErrorI {
 	// sanity check the evidence
 	if !ev.Check(b.ProposerKey, b.View, b.ValidatorSet) {
 		return lib.ErrInvalidEvidence()
+	}
+	// validate the evidence height
+	validationHeight := b.Height - 1
+	// if it's locally generated evidence, then it's at the COMMIT_PROCESS phase and should be the same height
+	if local {
+		validationHeight = b.Height
+	}
+	// validate the evidence height
+	if ev.ElectionVoteQc.Header.Height != validationHeight {
+		return lib.ErrWrongHeight()
 	}
 	// prepare de duplicator
 	if bpe.DeDuplicator == nil {
@@ -424,7 +444,7 @@ func (x *BadProposerEvidence) Check(trueLeader []byte, view *lib.View, vs lib.Va
 		return
 	}
 	// ensure this is a valid election vote quorum certificate
-	isPartialQC, err := x.ElectionVoteQc.Check(vs, 0, view, true)
+	isPartialQC, err := x.ElectionVoteQc.Check(vs, 0, view, false)
 	if isPartialQC || err != nil || x.ElectionVoteQc.Header.Phase != lib.Phase_ELECTION_VOTE {
 		return
 	}

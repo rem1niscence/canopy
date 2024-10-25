@@ -463,7 +463,7 @@ func (c *Controller) ListenForCertificateRequests() {
 func (c *Controller) UpdateP2PMustConnect() {
 	m, s := make(map[string]*lib.PeerAddress), make([]*lib.PeerAddress, 0)
 	for committeeID := range c.Consensus {
-		committee, err := c.FSM.GetCommittee(committeeID)
+		committee, err := c.FSM.GetCommitteeMembers(committeeID)
 		if err != nil {
 			c.log.Errorf("unable to get must connect peers for committee %d with error %s", committeeID, err.Error())
 			continue

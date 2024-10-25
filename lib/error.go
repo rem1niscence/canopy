@@ -88,6 +88,7 @@ const (
 	CodeReadFile                    ErrorCode = 26
 	CodeInvalidArgument             ErrorCode = 27
 	CodeNilRewardRecipients         ErrorCode = 28
+	CodeNoValidators                ErrorCode = 29
 
 	// Consensus Module
 	ConsensusModule ErrorModule = "consensus"
@@ -223,6 +224,7 @@ const (
 	CodeInvalidCloseOrder                 ErrorCode = 81
 	CodeInvalidResetOrder                 ErrorCode = 82
 	CodeInvalidCheckpoint                 ErrorCode = 83
+	CodeInvalidSellOrder                  ErrorCode = 84
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -393,6 +395,10 @@ func ErrPubKeyFromBytes(err error) ErrorI {
 
 func ErrNewMultiPubKey(err error) ErrorI {
 	return NewError(CodeNewMultiPubKey, MainModule, fmt.Sprintf("newMultiPubKey() failed with err: %s", err.Error()))
+}
+
+func ErrNoValidators() ErrorI {
+	return NewError(CodeNoValidators, MainModule, fmt.Sprintf("there are no validators in the set"))
 }
 
 func ErrWrongHeight() ErrorI {

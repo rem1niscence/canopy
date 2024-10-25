@@ -8,7 +8,6 @@ import (
 func (x *Supply) Sort() {
 	x.SortCommittees()
 	x.SortDelegations()
-	x.SortEscrowed()
 }
 
 // SortCommittees() sorts the committees list by amount (stake) high to low
@@ -21,14 +20,12 @@ func (x *Supply) SortDelegations() {
 	FilterAndSortPool(&x.DelegationsOnly)
 }
 
-// SortEscrowed() sorts the committees list by amount (escrowed) high to low
-func (x *Supply) SortEscrowed() {
-	FilterAndSortPool(&x.Escrowed)
-}
-
 // filterAndSort() removes zero and nil elements from the pool slice and then sorts the slice by amount
 // finally setting the result to the pointer from the parameter
 func FilterAndSortPool(x *[]*Pool) {
+	if x == nil {
+		return
+	}
 	// filter zero elements
 	result := make([]*Pool, 0, len(*x))
 	for _, v := range *x {

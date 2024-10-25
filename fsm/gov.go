@@ -8,9 +8,15 @@ import (
 )
 
 // UpdateParam() updates a governance parameter keyed by space and name
-func (s *StateMachine) UpdateParam(space, paramName string, value proto.Message) (err lib.ErrorI) {
+func (s *StateMachine) UpdateParam(paramSpace, paramName string, value proto.Message) (err lib.ErrorI) {
+	// save the previous parameters to check for updates
+	previousParams, err := s.GetParams()
+	if err != nil {
+		return
+	}
+	// retrieve the space from the string
 	var sp types.ParamSpace
-	switch space {
+	switch paramSpace {
 	case types.ParamSpaceCons:
 		sp, err = s.GetParamsCons()
 	case types.ParamSpaceVal:
@@ -25,14 +31,90 @@ func (s *StateMachine) UpdateParam(space, paramName string, value proto.Message)
 	if err != nil {
 		return err
 	}
+	// set the value based on the type
 	switch v := value.(type) {
 	case *lib.UInt64Wrapper:
-		return sp.SetUint64(paramName, v.Value)
+		err = sp.SetUint64(paramName, v.Value)
 	case *lib.StringWrapper:
-		return sp.SetString(paramName, v.Value)
+		err = sp.SetString(paramName, v.Value)
 	default:
 		return types.ErrUnknownParamType(value)
 	}
+	if err != nil {
+		return err
+	}
+	// set the param space back in state
+	switch paramSpace {
+	case types.ParamSpaceCons:
+		return s.SetParamsCons(sp.(*types.ConsensusParams))
+	case types.ParamSpaceVal:
+		return s.SetParamsVal(sp.(*types.ValidatorParams))
+	case types.ParamSpaceFee:
+		return s.SetParamsFee(sp.(*types.FeeParams))
+	case types.ParamSpaceGov:
+		return s.SetParamsGov(sp.(*types.GovernanceParams))
+	}
+	// adjust the state if necessary
+	return s.ConformStateToParamUpdate(previousParams)
+}
+
+// ConformStateToParamUpdate() ensures the state does not violate the new values of the governance parameters
+// NOTE: at the moment only MaxCommitteeSize requires an adjustment with the exception of MinSellOrderSize which
+// is purposefully allowed to violate new updates
+func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) lib.ErrorI {
+	// retrieve the params from state
+	params, err := s.GetParams()
+	if err != nil {
+		return err
+	}
+	// check for a change in MaxCommitteeSize
+	if previousParams.Validator.ValidatorMaxCommitteeSize <= params.Validator.ValidatorMaxCommittees {
+		return nil
+	}
+	// shrinking MaxCommitteeSize must be immediately enforced to ensure no 'grandfathered' in violators
+	maxCommitteeSize := int(params.Validator.ValidatorMaxCommittees)
+	// maintain a counter for pseudorandom removal of the 'chain ids'
+	var idx int
+	// for each validator, remove the excess ids in a pseudorandom fashion
+	return s.IterateAndExecute(types.ValidatorPrefix(), func(_, value []byte) lib.ErrorI {
+		// convert bytes into a validator object
+		v, e := s.unmarshalValidator(value)
+		if e != nil {
+			return e
+		}
+		// check the number of committees for this validator and see if it's above the maximum
+		numCommittees := len(v.Committees)
+		if numCommittees <= maxCommitteeSize {
+			return nil
+		}
+		// create a variable to hold a copy of the new committees
+		newCommittees := make([]uint64, len(v.Committees))
+		// copy the committees
+		copy(newCommittees, v.Committees)
+		// if it's above the maximum allowed amount
+		for ; numCommittees > maxCommitteeSize; numCommittees-- {
+			// calculate a pseudorandom index
+			pseudoRandomIndex := idx % numCommittees
+			// remove the pseudorandom index from committees
+			newCommittees = append(newCommittees[:pseudoRandomIndex], newCommittees[pseudoRandomIndex+1:]...)
+			// increment the index to further the 'pseuorandom' property
+			idx++
+		}
+		// update the committees or delegations
+		if !v.Delegate {
+			if err = s.UpdateCommittees(crypto.NewAddress(v.Address), v, v.StakedAmount, newCommittees); err != nil {
+				return err
+			}
+		} else {
+			if err = s.UpdateDelegations(crypto.NewAddress(v.Address), v, v.StakedAmount, newCommittees); err != nil {
+				return err
+			}
+		}
+		// update the validator and its committees
+		v.Committees = newCommittees
+		// set the validator back into state
+		return s.SetValidator(v)
+	})
 }
 
 // SetParams() writes an entire Params object into state
@@ -132,34 +214,35 @@ func (s *StateMachine) GetParamsFee() (ptr *types.FeeParams, err lib.ErrorI) {
 	return
 }
 
-// ApproveProposal() validates a 'GovProposal' message (ex. MsgChangeParameter)
+// ApproveProposal() validates a 'GovProposal' message (ex. MsgChangeParameter or MsgDAOTransfer)
 // - checks message sent between start height and end height
 // - if APPROVE_ALL set or proposal on the APPROVE_LIST then no error
 // - else return ErrRejectProposal
 func (s *StateMachine) ApproveProposal(msg types.GovProposal) lib.ErrorI {
-	if msg.GetStartHeight() <= s.Height() && s.Height() <= msg.GetEndHeight() {
+	if s.Height() < msg.GetStartHeight() || s.Height() > msg.GetEndHeight() {
 		return types.ErrRejectProposal()
 	}
+	// handle the proposal based on config
 	switch s.proposeVoteConfig {
-	case types.ProposalApproveList:
+	case types.ProposalApproveList: // approve based on list
+		// convert the msg into bytes
 		bz, err := lib.Marshal(msg)
 		if err != nil {
 			return err
 		}
-		if bz == nil {
-			return types.ErrRejectProposal()
-		}
+		// read the 'approve list' from the datadirectory
 		proposals := make(types.GovProposals)
 		if err = proposals.NewFromFile(s.Config.DataDirPath); err != nil {
 			return err
 		}
-		if _, ok := proposals[crypto.HashString(bz)]; !ok {
+		// check on this specific message for explicit rejection or complete omission
+		if value, ok := proposals[crypto.HashString(bz)]; !ok || !value.Approve {
 			return types.ErrRejectProposal()
 		}
 		return nil
-	case types.RejectAllProposals:
+	case types.RejectAllProposals: // reject all
 		return types.ErrRejectProposal()
-	default:
+	default: // approve all
 		return nil
 	}
 }

@@ -21,23 +21,21 @@ message ConsensusParams {
 }
 
 message ValidatorParams {
-  uint64 validator_min_stake = 1;
-  uint64 validator_unstaking_blocks = 2;
-  uint64 validator_max_pause_blocks = 3;
-  uint64 validator_double_sign_slash_percentage = 4;
-  uint64 validator_bad_proposal_slash_percentage = 5;
-  uint64 validator_non_sign_slash_percentage = 6;
-  uint64 validator_max_non_sign = 7;
-  uint64 validator_non_sign_window = 8;
-  uint64 validator_max_committees = 9;
-  uint64 validator_max_committee_size = 10;
-  uint64 validator_committee_reward = 11;
-  uint64 validator_early_withdrawal_penalty = 12;
-  uint64 validator_delegate_unstaking_blocks = 13;
-  uint64 validator_minimum_order_size = 14;
-  uint64 validator_order_expiration_blocks = 15;
-  uint64 validator_minimum_percent_for_paid_committee = 16;
-  uint64 validator_max_slash_per_committee = 17;
+  uint64 validator_unstaking_blocks = 1;
+  uint64 validator_max_pause_blocks = 2;
+  uint64 validator_double_sign_slash_percentage = 3;
+  uint64 validator_bad_proposal_slash_percentage = 4;
+  uint64 validator_non_sign_slash_percentage = 5;
+  uint64 validator_max_non_sign = 6;
+  uint64 validator_non_sign_window = 7;
+  uint64 validator_max_committees = 8;
+  uint64 validator_max_committee_size = 9;
+  uint64 validator_block_reward = 10;
+  uint64 validator_early_withdrawal_penalty = 11;
+  uint64 validator_delegate_unstaking_blocks = 12;
+  uint64 validator_minimum_order_size = 13;
+  uint64 validator_minimum_percent_for_paid_committee = 14;
+  uint64 validator_max_slash_per_committee = 15;
 }
 
 message FeeParams {
