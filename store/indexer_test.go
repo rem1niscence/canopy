@@ -2,8 +2,8 @@ package store
 
 import (
 	"bytes"
-	"github.com/ginchuco/canopy/lib"
-	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"

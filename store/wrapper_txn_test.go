@@ -3,8 +3,8 @@ package store
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
-	"github.com/ginchuco/canopy/lib"
 	"github.com/stretchr/testify/require"
 	math "math/rand"
 	"testing"

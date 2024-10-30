@@ -1,5 +1,5 @@
 package crypto
 
-import "github.com/ginchuco/canopy/lib/codec"
+import "github.com/canopy-network/canopy/lib/codec"
 
 var cdc = codec.Protobuf{}

@@ -2,10 +2,10 @@ package fsm
 
 import (
 	"encoding/json"
-	"github.com/ginchuco/canopy/fsm/types"
-	"github.com/ginchuco/canopy/lib"
-	"github.com/ginchuco/canopy/lib/crypto"
-	"github.com/ginchuco/canopy/store"
+	"github.com/canopy-network/canopy/fsm/types"
+	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/store"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/alecthomas/units"
+	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
-	"github.com/ginchuco/canopy/lib"
 	"math"
 	"path/filepath"
 )

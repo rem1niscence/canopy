@@ -2,8 +2,8 @@ package bft
 
 import (
 	"bytes"
-	"github.com/ginchuco/canopy/lib"
-	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 )
 
 // PROPOSALS RECEIVED FROM PROPOSER FOR CURRENT HEIGHT

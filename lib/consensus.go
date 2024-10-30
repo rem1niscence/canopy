@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/alecthomas/units"
-	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"slices"
 )
 

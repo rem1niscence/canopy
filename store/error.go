@@ -2,7 +2,7 @@ package store
 
 import (
 	"fmt"
-	"github.com/ginchuco/canopy/lib"
+	"github.com/canopy-network/canopy/lib"
 )
 
 func ErrDecompactProof(err error) lib.ErrorI {

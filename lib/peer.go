@@ -3,7 +3,7 @@ package lib
 import (
 	"container/list"
 	"encoding/json"
-	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"net"
 	"slices"

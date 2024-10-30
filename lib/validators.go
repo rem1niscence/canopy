@@ -3,8 +3,8 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/drand/kyber"
-	"github.com/ginchuco/canopy/lib/crypto"
 )
 
 // ValidatorSet represents a collection of validators responsible for consensus

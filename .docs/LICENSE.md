@@ -1,7 +1,7 @@
-Copyright 2024, GinChu Consulting LLC
+Copyright 2024, canopy Consulting LLC
 
 SOFTWARE LICENSE TERMS
-This Software License Agreement ("Terms") is made and entered into as of 2024-04-12 ("Effective Date") by and between GinChu Consulting LLC, any user ("Licensee").
+This Software License Agreement ("Terms") is made and entered into as of 2024-04-12 ("Effective Date") by and between canopy Consulting LLC, any user ("Licensee").
 
 WHEREAS, Licensor owns this software;
 
@@ -10,7 +10,7 @@ WHEREAS, Licensee desires to use such software under the terms and conditions se
 NOW, THEREFORE, in consideration of the mutual promises contained herein and for other good and valuable consideration, the receipt and sufficiency of which are hereby acknowledged, the parties agree as follows:
 
 1. Definition of Software:
-   The term "Software" refers to the GinChu, including any updates, modifications, or associated documentation provided by Licensor.
+   The term "Software" refers to the canopy, including any updates, modifications, or associated documentation provided by Licensor.
 
 2. Grant of License:
    Subject to the terms and conditions of this Agreement, Licensor hereby grants to Licensee a no license to use the Software.
@@ -38,4 +38,4 @@ NOW, THEREFORE, in consideration of the mutual promises contained herein and for
 
 IN WITNESS WHEREOF, the parties have executed this Software License Agreement as of the Effective Date.
 
-Licensor: GinChu Consulting LLC
+Licensor: canopy Consulting LLC

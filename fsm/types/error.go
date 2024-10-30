@@ -2,7 +2,7 @@ package types
 
 import (
 	"fmt"
-	"github.com/ginchuco/canopy/lib"
+	"github.com/canopy-network/canopy/lib"
 )
 
 // This file defines errors for the State Machine module

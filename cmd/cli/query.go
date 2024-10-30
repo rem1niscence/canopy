@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/ginchuco/canopy/lib"
+	"github.com/canopy-network/canopy/lib"
 	"github.com/spf13/cobra"
 	"strconv"
 	"strings"

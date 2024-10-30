@@ -1,8 +1,8 @@
 package lib
 
 import (
+	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/dgraph-io/badger/v4"
-	"github.com/ginchuco/canopy/lib/crypto"
 )
 
 /*

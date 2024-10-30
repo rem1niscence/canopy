@@ -16,7 +16,7 @@ services:
     env_file:
       - .env
     networks:
-      - ginchu
+      - canopy
 
   node-2:
     container_name: node-2
@@ -33,7 +33,7 @@ services:
     env_file:
       - .env
     networks:
-      - ginchu
+      - canopy
 networks:
-  ginchu:
+  canopy:
     driver: bridge

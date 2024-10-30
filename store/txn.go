@@ -2,7 +2,7 @@ package store
 
 import (
 	"bytes"
-	"github.com/ginchuco/canopy/lib"
+	"github.com/canopy-network/canopy/lib"
 	"sort"
 	"strings"
 )

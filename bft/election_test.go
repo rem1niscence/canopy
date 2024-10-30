@@ -3,7 +3,7 @@ package bft
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"math"
 	"math/rand"

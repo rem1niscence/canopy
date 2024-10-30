@@ -1,9 +1,9 @@
 package fsm
 
 import (
-	"github.com/ginchuco/canopy/fsm/types"
-	"github.com/ginchuco/canopy/lib"
-	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/fsm/types"
+	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 )
 
 // TODO ensure a 0 committee validator does not panic

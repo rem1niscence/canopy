@@ -1,4 +1,4 @@
-module github.com/ginchuco/ginchu
+module github.com/canopy-network/canopy
 
 go 1.21.3
 

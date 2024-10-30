@@ -3,8 +3,8 @@ package store
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/ginchuco/canopy/lib"
-	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"time"
 )
 

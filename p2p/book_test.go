@@ -2,7 +2,7 @@ package p2p
 
 import (
 	"bytes"
-	"github.com/ginchuco/canopy/lib"
+	"github.com/canopy-network/canopy/lib"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"

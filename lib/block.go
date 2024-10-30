@@ -3,7 +3,7 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"time"
 )
 

@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ginchuco/canopy/cmd/rpc"
-	"github.com/ginchuco/canopy/lib"
-	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/cmd/rpc"
+	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"os"

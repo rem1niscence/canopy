@@ -2,7 +2,7 @@ package bft
 
 import (
 	"fmt"
-	"github.com/ginchuco/canopy/lib"
+	"github.com/canopy-network/canopy/lib"
 	"google.golang.org/protobuf/proto"
 )
 
