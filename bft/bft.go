@@ -3,8 +3,8 @@ package bft
 import (
 	"bytes"
 	"fmt"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"sort"
 	"sync/atomic"
 	"time"

@@ -1,9 +1,9 @@
 package fsm
 
 import (
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -88,18 +88,16 @@ func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) l
 			return nil
 		}
 		// create a variable to hold a copy of the new committees
-		newCommittees := make([]uint64, len(v.Committees))
-		// copy the committees
-		copy(newCommittees, v.Committees)
-		// if it's above the maximum allowed amount
-		for ; numCommittees > maxCommitteeSize; numCommittees-- {
+		newCommittees := make([]uint64, maxCommitteeSize)
+		// iterate 'maxCommitteeSize' number of times
+		for i := 0; i < maxCommitteeSize; i++ {
 			// calculate a pseudorandom index
-			pseudoRandomIndex := idx % numCommittees
-			// remove the pseudorandom index from committees
-			newCommittees = append(newCommittees[:pseudoRandomIndex], newCommittees[pseudoRandomIndex+1:]...)
-			// increment the index to further the 'pseuorandom' property
-			idx++
+			startIndex := idx % numCommittees
+			// add each element in a circular queue fashion starting at random position determined by idx
+			newCommittees[i] = v.Committees[(startIndex+i)%numCommittees]
 		}
+		// increment the index to further the 'pseuorandom' property
+		idx++
 		// update the committees or delegations
 		if !v.Delegate {
 			if err = s.UpdateCommittees(crypto.NewAddress(v.Address), v, v.StakedAmount, newCommittees); err != nil {

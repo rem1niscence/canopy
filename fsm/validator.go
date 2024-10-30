@@ -1,9 +1,9 @@
 package fsm
 
 import (
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 )
 
 // TODO ensure a 0 committee validator does not panic
@@ -206,8 +206,15 @@ func (s *StateMachine) DeleteValidator(validator *types.Validator) lib.ErrorI {
 // NOTE: finish unstaking height is (likely) not current height, but one in the future when the validator will 'complete' unstaking and their
 // funds be returned
 func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, finishUnstakingHeight uint64) lib.ErrorI {
-	if err := s.Set(types.KeyForUnstaking(finishUnstakingHeight, address), nil); err != nil {
+	// set an entry in the database to mark this validator as unstaking, a single byte is used to allow 'get' calls to differentiate between non-existing keys
+	if err := s.Set(types.KeyForUnstaking(finishUnstakingHeight, address), []byte{0x0}); err != nil {
 		return err
+	}
+	// if validator is 'paused' - unpause them
+	if validator.MaxPausedHeight != 0 {
+		if err := s.SetValidatorUnpaused(address, validator); err != nil {
+			return err
+		}
 	}
 	validator.UnstakingHeight = finishUnstakingHeight // height at which the validator finishes unstaking
 	return s.SetValidator(validator)
@@ -270,7 +277,8 @@ func (s *StateMachine) SetValidatorsPaused(addresses [][]byte) lib.ErrorI {
 
 // SetValidatorPaused() updates a Validator as 'paused' with a MaxPausedHeight (height at which the Validator is force-unstaked for being paused too long)
 func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *types.Validator, maxPausedHeight uint64) lib.ErrorI {
-	if err := s.Set(types.KeyForPaused(maxPausedHeight, address), nil); err != nil {
+	// set an entry in the database to mark this validator as paused, a single byte is used to allow 'get' calls to differentiate between non-existing keys
+	if err := s.Set(types.KeyForPaused(maxPausedHeight, address), []byte{0x0}); err != nil {
 		return err
 	}
 	validator.MaxPausedHeight = maxPausedHeight

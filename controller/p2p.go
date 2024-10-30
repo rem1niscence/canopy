@@ -3,9 +3,9 @@ package controller
 import (
 	"bytes"
 	"fmt"
-	"github.com/ginchuco/ginchu/bft"
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/bft"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
 	"math/rand"
 	"time"
 )
@@ -140,14 +140,19 @@ func (c *Controller) SendCertificateResultsTx(committeeID uint64, qc *lib.Quorum
 // SendCertMsg() gossips a QuorumCertificate (with block) through the P2P network for a specific committeeID
 func (c *Controller) SendCertMsg(committeeID uint64, qc *lib.QuorumCertificate) {
 	qc.Results = nil // omit the results
+	plug, _, err := c.GetPluginAndConsensus(committeeID)
+	if err != nil {
+		c.log.Errorf("unable to gossip block with err: %s", err.Error())
+		return
+	}
 	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(qc.ResultsHash))
 	blockMessage := &lib.BlockResponseMessage{
 		CommitteeId:         committeeID,
-		MaxHeight:           c.FSM.Height(),
-		TotalVdfIterations:  c.FSM.TotalVDFIterations(),
+		MaxHeight:           plug.Height(),
+		TotalVdfIterations:  plug.TotalVDFIterations(),
 		BlockAndCertificate: qc,
 	}
-	if err := c.P2P.SendToChainPeers(committeeID, Certificate, blockMessage); err != nil {
+	if err = c.P2P.SendToChainPeers(committeeID, Certificate, blockMessage); err != nil {
 		c.log.Errorf("unable to gossip block with err: %s", err.Error())
 	}
 	c.log.Debugf("gossiping done")
@@ -155,11 +160,15 @@ func (c *Controller) SendCertMsg(committeeID uint64, qc *lib.QuorumCertificate) 
 
 // SendCertReqMsg() sends a QuorumCertificate request to peer(s) - `heightOnly` is a request for just the peer's max height
 func (c *Controller) SendCertReqMsg(committeeID uint64, heightOnly bool, sendTo ...[]byte) {
-	var err error
+	plug, _, err := c.GetPluginAndConsensus(committeeID)
+	if err != nil {
+		c.log.Errorf("unable to gossip block with err: %s", err.Error())
+		return
+	}
 	if len(sendTo) == 0 {
 		if err = c.P2P.SendToChainPeers(committeeID, CertificateRequest, &lib.BlockRequestMessage{
 			CommitteeId: committeeID,
-			Height:      c.FSM.Height(),
+			Height:      plug.Height(),
 			HeightOnly:  heightOnly,
 		}, true); err != nil {
 			c.log.Error(err.Error())
@@ -168,7 +177,7 @@ func (c *Controller) SendCertReqMsg(committeeID uint64, heightOnly bool, sendTo 
 		for _, pk := range sendTo {
 			if err = c.P2P.SendTo(pk, CertificateRequest, &lib.BlockRequestMessage{
 				CommitteeId: committeeID,
-				Height:      c.FSM.Height(),
+				Height:      plug.Height(),
 				HeightOnly:  heightOnly,
 			}); err != nil {
 				c.log.Error(err.Error())

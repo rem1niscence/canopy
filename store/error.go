@@ -2,7 +2,7 @@ package store
 
 import (
 	"fmt"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/lib"
 )
 
 func ErrDecompactProof(err error) lib.ErrorI {

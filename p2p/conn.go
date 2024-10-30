@@ -3,7 +3,7 @@ package p2p
 import (
 	"bufio"
 	"github.com/alecthomas/units"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/lib"
 	limiter "github.com/mxk/go-flowrate/flowrate"
 	"google.golang.org/protobuf/proto"
 	"net"

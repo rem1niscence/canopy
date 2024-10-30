@@ -35,7 +35,12 @@ func FilterAndSortPool(x *[]*Pool) {
 	}
 	// sort the slice by amount
 	sort.Slice(result, func(i, j int) bool {
-		return result[i].Amount >= result[j].Amount
+		// second order sort is ascending by Ids
+		if result[i].Amount == result[j].Amount {
+			return result[i].Id < result[j].Id
+		}
+		// descending by amount
+		return result[i].Amount > result[j].Amount
 	})
 	// set to the pointer
 	*x = result

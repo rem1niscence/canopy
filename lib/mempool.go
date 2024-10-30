@@ -2,7 +2,7 @@ package lib
 
 import (
 	"bytes"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"sort"
 	"sync"
 )

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"time"

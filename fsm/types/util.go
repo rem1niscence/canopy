@@ -3,8 +3,8 @@ package types
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"time"
 )
 
@@ -235,15 +235,14 @@ type jsonSellOrder struct {
 // MarshalJSON() is the json.Marshaller implementation for the SellOrder object
 func (x *SellOrder) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonSellOrder{
-		Id:                    x.Id,
-		Committee:             x.Committee,
-		AmountForSale:         x.AmountForSale,
-		RequestedAmount:       x.RequestedAmount,
-		SellerReceiveAddress:  x.SellerReceiveAddress,
-		BuyerReceiveAddress:   x.BuyerReceiveAddress,
-		BuyerChainDeadline:    x.BuyerChainDeadline,
-		OrderExpirationHeight: x.OrderExpirationHeight,
-		SellersSellAddress:    x.SellersSellAddress,
+		Id:                   x.Id,
+		Committee:            x.Committee,
+		AmountForSale:        x.AmountForSale,
+		RequestedAmount:      x.RequestedAmount,
+		SellerReceiveAddress: x.SellerReceiveAddress,
+		BuyerReceiveAddress:  x.BuyerReceiveAddress,
+		BuyerChainDeadline:   x.BuyerChainDeadline,
+		SellersSellAddress:   x.SellersSellAddress,
 	})
 }
 
@@ -254,15 +253,14 @@ func (x *SellOrder) UnmarshalJSON(bz []byte) error {
 		return err
 	}
 	*x = SellOrder{
-		Id:                    j.Id,
-		Committee:             j.Committee,
-		AmountForSale:         j.AmountForSale,
-		RequestedAmount:       j.RequestedAmount,
-		SellerReceiveAddress:  j.SellerReceiveAddress,
-		BuyerReceiveAddress:   j.BuyerReceiveAddress,
-		BuyerChainDeadline:    j.BuyerChainDeadline,
-		OrderExpirationHeight: j.OrderExpirationHeight,
-		SellersSellAddress:    j.SellersSellAddress,
+		Id:                   j.Id,
+		Committee:            j.Committee,
+		AmountForSale:        j.AmountForSale,
+		RequestedAmount:      j.RequestedAmount,
+		SellerReceiveAddress: j.SellerReceiveAddress,
+		BuyerReceiveAddress:  j.BuyerReceiveAddress,
+		BuyerChainDeadline:   j.BuyerChainDeadline,
+		SellersSellAddress:   j.SellersSellAddress,
 	}
 	return nil
 }

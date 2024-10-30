@@ -1,9 +1,9 @@
 package fsm
 
 import (
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"math"
 )
 
@@ -36,8 +36,14 @@ func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
 	if err = s.MintToPool(lib.DAOPoolID, daoCut); err != nil {
 		return err
 	}
+	// define a convenience variable for the number of subsidized committees
+	subsidizedCount := uint64(len(subsidizedCommitteeIds))
+	// if there are none, return
+	if subsidizedCount == 0 {
+		return nil
+	}
 	// calculate the amount given to each qualifying committee
-	mintAmountPerCommittee := mintAmountAfterDAOCut / uint64(len(subsidizedCommitteeIds))
+	mintAmountPerCommittee := mintAmountAfterDAOCut / subsidizedCount
 	// issue that amount to each subsidized committee
 	for _, committeeId := range subsidizedCommitteeIds {
 		if err = s.MintToPool(committeeId, mintAmountPerCommittee); err != nil {
@@ -342,6 +348,8 @@ func (s *StateMachine) DeleteDelegate(address crypto.AddressI, committeeID, stak
 }
 
 // COMMITTEE DATA CODE BELOW
+// 'Committee Data' is information saved in state that is aggregated from CertificateResult messages
+// This information secures and dictates the distribution of a Committee's reward pool
 
 // UpsertCommitteeData() updates or inserts a committee data to the committees data list
 func (s *StateMachine) UpsertCommitteeData(new *types.CommitteeData) lib.ErrorI {

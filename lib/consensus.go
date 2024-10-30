@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/alecthomas/units"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"slices"
 )
 
@@ -52,7 +52,7 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 		if len(x.ResultsHash) != crypto.HashSize {
 			return ErrInvalidBlockHash()
 		}
-		// results may be omitted in certain cases like for integrated blockchains
+		// results may be omitted in certain cases like for integrated blockchain block storage
 		if x.Results != nil {
 			if err := x.Results.CheckBasic(); err != nil {
 				return err

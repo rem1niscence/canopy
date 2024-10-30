@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"github.com/alecthomas/units"
 	"github.com/dgraph-io/badger/v4"
-	app2 "github.com/ginchuco/ginchu/controller"
-	"github.com/ginchuco/ginchu/fsm"
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
-	"github.com/ginchuco/ginchu/store"
+	app2 "github.com/ginchuco/canopy/controller"
+	"github.com/ginchuco/canopy/fsm"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/ginchuco/canopy/store"
 	"github.com/julienschmidt/httprouter"
 	"github.com/nsf/jsondiff"
 	"github.com/rs/cors"
@@ -592,7 +592,7 @@ func TransactionEditStake(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if err != nil {
 			return nil, err
 		}
-		return types.NewEditStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal)
+		return types.NewEditStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.EarlyWithdrawal)
 	})
 }
 

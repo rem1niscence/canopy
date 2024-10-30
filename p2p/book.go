@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/lib"
 	"math"
 	"math/rand"
 	"os"

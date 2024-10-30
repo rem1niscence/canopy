@@ -1,8 +1,8 @@
 package p2p
 
 import (
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"net"
 	"sync"

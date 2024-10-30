@@ -2,11 +2,11 @@ package canopy
 
 import (
 	"bytes"
-	"github.com/ginchuco/ginchu/fsm"
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
-	"github.com/ginchuco/ginchu/plugin"
+	"github.com/ginchuco/canopy/fsm"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/ginchuco/canopy/plugin"
 	"math"
 	"time"
 )
@@ -124,7 +124,7 @@ func (p *Plugin) ProduceProposal(vdf *lib.VDF) (blockBytes []byte, rewardRecipie
 		Transactions: transactions,
 	}
 	// apply the block against the state machine to fill in the merkle `roots` for the block header
-	block.BlockHeader, _, _, err = p.FSM.ApplyBlock(block)
+	block.BlockHeader, _, err = p.FSM.ApplyBlock(block)
 	if err != nil {
 		return
 	}
@@ -221,7 +221,7 @@ func (p *Plugin) ApplyAndValidateBlock(b *lib.Block) (*lib.BlockResult, lib.Erro
 	blockHash, blockHeight := lib.BytesToString(b.BlockHeader.Hash), b.BlockHeader.Height
 	// apply the block against the state machine
 	p.log.Debugf("Applying block %s for height %d", blockHash, blockHeight)
-	header, txResults, _, err := p.FSM.ApplyBlock(b)
+	header, txResults, err := p.FSM.ApplyBlock(b)
 	if err != nil {
 		return nil, err
 	}

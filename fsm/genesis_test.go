@@ -3,13 +3,12 @@ package fsm
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
 	"github.com/stretchr/testify/require"
 	"os"
 	"sort"
 	"testing"
-	"time"
 )
 
 func TestNewFromGenesisFile(t *testing.T) {
@@ -21,103 +20,10 @@ func TestNewFromGenesisFile(t *testing.T) {
 		expected types.GenesisState
 	}{
 		{
-			name:   "complete",
-			detail: "the complete genesis file testing",
-			input: types.GenesisState{
-				Pools: []*types.Pool{{
-					Id:     lib.CanopyCommitteeId,
-					Amount: 100,
-				}},
-				Accounts: []*types.Account{{
-					Address: newTestAddressBytes(t),
-					Amount:  100,
-				}},
-				Validators: []*types.Validator{{
-					Address:      newTestAddressBytes(t),
-					PublicKey:    newTestPublicKeyBytes(t),
-					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
-					Output:       newTestAddressBytes(t),
-				}},
-				OrderBooks: &types.OrderBooks{
-					OrderBooks: []*types.OrderBook{{
-						CommitteeId: lib.CanopyCommitteeId,
-						Orders: []*types.SellOrder{{
-							Id:                    1,
-							Committee:             lib.CanopyCommitteeId,
-							AmountForSale:         100,
-							RequestedAmount:       100,
-							SellerReceiveAddress:  newTestAddressBytes(t),
-							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
-							BuyerChainDeadline:    100,
-							OrderExpirationHeight: 100,
-							SellersSellAddress:    newTestAddressBytes(t, 2),
-						}, {
-							Id:                 2,
-							Committee:          1,
-							AmountForSale:      100,
-							RequestedAmount:    100,
-							SellersSellAddress: newTestAddressBytes(t, 2),
-						}},
-					}},
-				},
-				Params: types.DefaultParams(),
-			},
-			expected: types.GenesisState{
-				Pools: []*types.Pool{{
-					Id:     lib.CanopyCommitteeId,
-					Amount: 100,
-				}, {
-					Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
-					Amount: 200,
-				}},
-				Accounts: []*types.Account{{
-					Address: newTestAddressBytes(t),
-					Amount:  100,
-				}},
-				Validators: []*types.Validator{{
-					Address:      newTestAddressBytes(t),
-					PublicKey:    newTestPublicKeyBytes(t),
-					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
-					Output:       newTestAddressBytes(t),
-				}},
-				OrderBooks: &types.OrderBooks{
-					OrderBooks: []*types.OrderBook{{
-						CommitteeId: lib.CanopyCommitteeId,
-						Orders: []*types.SellOrder{{
-							Id:                    1,
-							Committee:             lib.CanopyCommitteeId,
-							AmountForSale:         100,
-							RequestedAmount:       100,
-							SellerReceiveAddress:  newTestAddressBytes(t),
-							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
-							BuyerChainDeadline:    100,
-							OrderExpirationHeight: 100,
-							SellersSellAddress:    newTestAddressBytes(t, 2),
-						}, {
-							Id:                 2,
-							Committee:          1,
-							AmountForSale:      100,
-							RequestedAmount:    100,
-							SellersSellAddress: newTestAddressBytes(t, 2),
-						}},
-					}},
-				},
-				Params: types.DefaultParams(),
-				Supply: &types.Supply{
-					Total:  500,
-					Staked: 100,
-					CommitteesWithDelegations: []*types.Pool{{
-						Id:     lib.CanopyCommitteeId,
-						Amount: 100,
-					}, {
-						Id:     1,
-						Amount: 100,
-					}},
-					DelegationsOnly: nil,
-				},
-			},
+			name:     "complete",
+			detail:   "the complete genesis file testing",
+			input:    *newTestGenesisState(t),
+			expected: *newTestValidateGenesisState(t),
 		},
 		{
 			name:   "accounts",
@@ -211,15 +117,13 @@ func TestNewFromGenesisFile(t *testing.T) {
 					OrderBooks: []*types.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
 						Orders: []*types.SellOrder{{
-							Id:                    1,
-							Committee:             lib.CanopyCommitteeId,
-							AmountForSale:         100,
-							RequestedAmount:       100,
-							SellerReceiveAddress:  newTestAddressBytes(t),
-							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
-							BuyerChainDeadline:    100,
-							OrderExpirationHeight: 100,
-							SellersSellAddress:    newTestAddressBytes(t, 2),
+							Id:                   1,
+							Committee:            lib.CanopyCommitteeId,
+							AmountForSale:        100,
+							RequestedAmount:      100,
+							SellerReceiveAddress: newTestAddressBytes(t),
+							BuyerReceiveAddress:  newTestAddressBytes(t, 1),
+							BuyerChainDeadline:   100, SellersSellAddress: newTestAddressBytes(t, 2),
 						}, {
 							Id:                 2,
 							Committee:          1,
@@ -240,15 +144,13 @@ func TestNewFromGenesisFile(t *testing.T) {
 					OrderBooks: []*types.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
 						Orders: []*types.SellOrder{{
-							Id:                    1,
-							Committee:             lib.CanopyCommitteeId,
-							AmountForSale:         100,
-							RequestedAmount:       100,
-							SellerReceiveAddress:  newTestAddressBytes(t),
-							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
-							BuyerChainDeadline:    100,
-							OrderExpirationHeight: 100,
-							SellersSellAddress:    newTestAddressBytes(t, 2),
+							Id:                   1,
+							Committee:            lib.CanopyCommitteeId,
+							AmountForSale:        100,
+							RequestedAmount:      100,
+							SellerReceiveAddress: newTestAddressBytes(t),
+							BuyerReceiveAddress:  newTestAddressBytes(t, 1),
+							BuyerChainDeadline:   100, SellersSellAddress: newTestAddressBytes(t, 2),
 						}, {
 							Id:                 2,
 							Committee:          1,
@@ -282,70 +184,9 @@ func TestNewFromGenesisFile(t *testing.T) {
 			defer os.RemoveAll("genesis.json")
 			// execute function call
 			require.NoError(t, sm.NewFromGenesisFile())
-			// convert written state to
-			got, err := sm.ExportState()
-			require.NoError(t, err)
-			// sort the supply pools
-			sortById := func(p []*types.Pool) {
-				sort.Slice(p, func(i, j int) bool {
-					return (p)[i].Id >= (p)[j].Id
-				})
-			}
-			// sort the supply pools of got
-			sortById(got.Supply.CommitteesWithDelegations)
-			sortById(got.Supply.DelegationsOnly)
-			// sort the supply pools of expected
-			sortById(test.expected.Supply.CommitteesWithDelegations)
-			sortById(test.expected.Supply.DelegationsOnly)
-			// json for convenient compare
-			gotJson, _ := json.MarshalIndent(got, "", "  ")
-			expectedJson, _ := json.MarshalIndent(test.expected, "", "  ")
-			// compare got vs expected
-			require.EqualExportedValues(t, test.expected, *got, fmt.Sprintf("EXPECTED:\n%s\nGOT:\n%s", expectedJson, gotJson))
+			// validate the exported state
+			validateWithExportedState(t, sm, &test.expected)
 		})
-	}
-}
-
-func newTestGenesisState(t *testing.T) types.GenesisState {
-	return types.GenesisState{
-		Time: uint64(time.Now().UnixMicro()),
-		Pools: []*types.Pool{{
-			Id:     lib.CanopyCommitteeId,
-			Amount: 100,
-		}},
-		Accounts: []*types.Account{{
-			Address: newTestAddressBytes(t),
-			Amount:  100,
-		}},
-		Validators: []*types.Validator{{
-			Address:      newTestAddressBytes(t),
-			PublicKey:    newTestPublicKeyBytes(t),
-			StakedAmount: 100,
-			Committees:   []uint64{lib.CanopyCommitteeId, 1},
-		}},
-		OrderBooks: &types.OrderBooks{
-			OrderBooks: []*types.OrderBook{{
-				CommitteeId: lib.CanopyCommitteeId,
-				Orders: []*types.SellOrder{{
-					Id:                    1,
-					Committee:             lib.CanopyCommitteeId,
-					AmountForSale:         100,
-					RequestedAmount:       100,
-					SellerReceiveAddress:  newTestAddressBytes(t),
-					BuyerReceiveAddress:   newTestAddressBytes(t, 1),
-					BuyerChainDeadline:    100,
-					OrderExpirationHeight: 100,
-					SellersSellAddress:    newTestAddressBytes(t, 2),
-				}, {
-					Id:                 2,
-					Committee:          lib.CanopyCommitteeId,
-					AmountForSale:      100,
-					RequestedAmount:    100,
-					SellersSellAddress: newTestAddressBytes(t, 2),
-				}},
-			}},
-		},
-		Params: types.DefaultParams(),
 	}
 }
 
@@ -447,15 +288,14 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					OrderBooks: []*types.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
 						Orders: []*types.SellOrder{{
-							Id:                    1,
-							Committee:             lib.CanopyCommitteeId,
-							AmountForSale:         100,
-							RequestedAmount:       100,
-							SellerReceiveAddress:  newTestAddressBytes(t),
-							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
-							BuyerChainDeadline:    100,
-							OrderExpirationHeight: 100,
-							SellersSellAddress:    newTestAddressBytes(t, 2),
+							Id:                   1,
+							Committee:            lib.CanopyCommitteeId,
+							AmountForSale:        100,
+							RequestedAmount:      100,
+							SellerReceiveAddress: newTestAddressBytes(t),
+							BuyerReceiveAddress:  newTestAddressBytes(t, 1),
+							BuyerChainDeadline:   100,
+							SellersSellAddress:   newTestAddressBytes(t, 2),
 						}, {
 							Id:                 2,
 							Committee:          1,
@@ -490,15 +330,13 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					OrderBooks: []*types.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
 						Orders: []*types.SellOrder{{
-							Id:                    1,
-							Committee:             lib.CanopyCommitteeId,
-							AmountForSale:         100,
-							RequestedAmount:       100,
-							SellerReceiveAddress:  newTestAddressBytes(t),
-							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
-							BuyerChainDeadline:    100,
-							OrderExpirationHeight: 100,
-							SellersSellAddress:    newTestAddressBytes(t, 2),
+							Id:                   1,
+							Committee:            lib.CanopyCommitteeId,
+							AmountForSale:        100,
+							RequestedAmount:      100,
+							SellerReceiveAddress: newTestAddressBytes(t),
+							BuyerReceiveAddress:  newTestAddressBytes(t, 1),
+							BuyerChainDeadline:   100, SellersSellAddress: newTestAddressBytes(t, 2),
 						}, {
 							Id:                 2,
 							Committee:          1,
@@ -615,15 +453,13 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					OrderBooks: []*types.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
 						Orders: []*types.SellOrder{{
-							Id:                    1,
-							Committee:             lib.CanopyCommitteeId,
-							AmountForSale:         100,
-							RequestedAmount:       100,
-							SellerReceiveAddress:  newTestAddressBytes(t),
-							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
-							BuyerChainDeadline:    100,
-							OrderExpirationHeight: 100,
-							SellersSellAddress:    newTestAddressBytes(t, 2),
+							Id:                   1,
+							Committee:            lib.CanopyCommitteeId,
+							AmountForSale:        100,
+							RequestedAmount:      100,
+							SellerReceiveAddress: newTestAddressBytes(t),
+							BuyerReceiveAddress:  newTestAddressBytes(t, 1),
+							BuyerChainDeadline:   100, SellersSellAddress: newTestAddressBytes(t, 2),
 						}, {
 							Id:                 2,
 							Committee:          1,
@@ -644,15 +480,13 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					OrderBooks: []*types.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
 						Orders: []*types.SellOrder{{
-							Id:                    1,
-							Committee:             lib.CanopyCommitteeId,
-							AmountForSale:         100,
-							RequestedAmount:       100,
-							SellerReceiveAddress:  newTestAddressBytes(t),
-							BuyerReceiveAddress:   newTestAddressBytes(t, 1),
-							BuyerChainDeadline:    100,
-							OrderExpirationHeight: 100,
-							SellersSellAddress:    newTestAddressBytes(t, 2),
+							Id:                   1,
+							Committee:            lib.CanopyCommitteeId,
+							AmountForSale:        100,
+							RequestedAmount:      100,
+							SellerReceiveAddress: newTestAddressBytes(t),
+							BuyerReceiveAddress:  newTestAddressBytes(t, 1),
+							BuyerChainDeadline:   100, SellersSellAddress: newTestAddressBytes(t, 2),
 						}, {
 							Id:                 2,
 							Committee:          1,
@@ -890,4 +724,126 @@ func TestValidateGenesisState(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newTestGenesisState(t *testing.T) *types.GenesisState {
+	return &types.GenesisState{
+		Pools: []*types.Pool{{
+			Id:     lib.CanopyCommitteeId,
+			Amount: 100,
+		}},
+		Accounts: []*types.Account{{
+			Address: newTestAddressBytes(t),
+			Amount:  100,
+		}},
+		Validators: []*types.Validator{{
+			Address:      newTestAddressBytes(t),
+			PublicKey:    newTestPublicKeyBytes(t),
+			StakedAmount: 100,
+			Committees:   []uint64{lib.CanopyCommitteeId, 1},
+			Output:       newTestAddressBytes(t),
+		}},
+		OrderBooks: &types.OrderBooks{
+			OrderBooks: []*types.OrderBook{{
+				CommitteeId: lib.CanopyCommitteeId,
+				Orders: []*types.SellOrder{{
+					Id:                   1,
+					Committee:            lib.CanopyCommitteeId,
+					AmountForSale:        100,
+					RequestedAmount:      100,
+					SellerReceiveAddress: newTestAddressBytes(t),
+					BuyerReceiveAddress:  newTestAddressBytes(t, 1),
+					BuyerChainDeadline:   100,
+					SellersSellAddress:   newTestAddressBytes(t, 2),
+				}, {
+					Id:                 2,
+					Committee:          1,
+					AmountForSale:      100,
+					RequestedAmount:    100,
+					SellersSellAddress: newTestAddressBytes(t, 2),
+				}},
+			}},
+		},
+		Params: types.DefaultParams(),
+	}
+}
+
+func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
+	return &types.GenesisState{
+		Pools: []*types.Pool{{
+			Id:     lib.CanopyCommitteeId,
+			Amount: 100,
+		}, {
+			Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
+			Amount: 200,
+		}},
+		Accounts: []*types.Account{{
+			Address: newTestAddressBytes(t),
+			Amount:  100,
+		}},
+		Validators: []*types.Validator{{
+			Address:      newTestAddressBytes(t),
+			PublicKey:    newTestPublicKeyBytes(t),
+			StakedAmount: 100,
+			Committees:   []uint64{lib.CanopyCommitteeId, 1},
+			Output:       newTestAddressBytes(t),
+		}},
+		OrderBooks: &types.OrderBooks{
+			OrderBooks: []*types.OrderBook{{
+				CommitteeId: lib.CanopyCommitteeId,
+				Orders: []*types.SellOrder{{
+					Id:                   1,
+					Committee:            lib.CanopyCommitteeId,
+					AmountForSale:        100,
+					RequestedAmount:      100,
+					SellerReceiveAddress: newTestAddressBytes(t),
+					BuyerReceiveAddress:  newTestAddressBytes(t, 1),
+					BuyerChainDeadline:   100,
+					SellersSellAddress:   newTestAddressBytes(t, 2),
+				}, {
+					Id:                 2,
+					Committee:          1,
+					AmountForSale:      100,
+					RequestedAmount:    100,
+					SellersSellAddress: newTestAddressBytes(t, 2),
+				}},
+			}},
+		},
+		Params: types.DefaultParams(),
+		Supply: &types.Supply{
+			Total:  500,
+			Staked: 100,
+			CommitteesWithDelegations: []*types.Pool{{
+				Id:     lib.CanopyCommitteeId,
+				Amount: 100,
+			}, {
+				Id:     1,
+				Amount: 100,
+			}},
+			DelegationsOnly: nil,
+		},
+	}
+}
+
+func validateWithExportedState(t *testing.T, sm StateMachine, expected *types.GenesisState) {
+	// convert written state to
+	got, err := sm.ExportState()
+	require.NoError(t, err)
+	// sort the supply pools
+	sortById := func(p []*types.Pool) {
+		sort.Slice(p, func(i, j int) bool {
+			return (p)[i].Id >= (p)[j].Id
+		})
+	}
+	// sort the supply pools of got
+	sortById(got.Supply.CommitteesWithDelegations)
+	sortById(got.Supply.DelegationsOnly)
+	// sort the supply pools of expected
+	sortById(expected.Supply.CommitteesWithDelegations)
+	sortById(expected.Supply.DelegationsOnly)
+	// json for convenient compare
+	gotJson, _ := json.MarshalIndent(got, "", "  ")
+	expectedJson, _ := json.MarshalIndent(expected, "", "  ")
+	// compare got vs expected
+	require.EqualExportedValues(t, expected, got, fmt.Sprintf("EXPECTED:\n%s\nGOT:\n%s", expectedJson, gotJson))
 }

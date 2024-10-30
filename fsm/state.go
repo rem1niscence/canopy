@@ -1,9 +1,9 @@
 package fsm
 
 import (
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"runtime/debug"
 	"strings"
 )
@@ -47,7 +47,7 @@ func (s *StateMachine) Initialize(db lib.StoreI) (err lib.ErrorI) {
 		// if at height zero then init from genesis file
 		return s.NewFromGenesisFile()
 	} else {
-		blk, e := s.LoadBlock(s.Height())
+		blk, e := s.LoadBlock(s.Height() - 1)
 		if e != nil {
 			return e
 		}
@@ -56,68 +56,61 @@ func (s *StateMachine) Initialize(db lib.StoreI) (err lib.ErrorI) {
 	return nil
 }
 
-// catchPanic() acts as a failsafe, recovering from a panic and logging the error with the stack trace
-func (s *StateMachine) catchPanic() {
-	if r := recover(); r != nil {
-		s.log.Error(string(debug.Stack()))
-	}
-}
-
 // ApplyBlock processes a given block, updating the state machine's state accordingly
 // The function:
 // - executes `BeginBlock`
 // - applies all transactions within the block, generating transaction results nad a root hash
 // - executes `EndBlock`
-// - constructs and returns the block header, transaction results, and the next set of consensus validators
-func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResult, *lib.ConsensusValidators, lib.ErrorI) {
+// - constructs and returns the block header, and the transaction results
+func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResult, lib.ErrorI) {
 	defer s.catchPanic()
 	store, ok := s.Store().(lib.StoreI)
 	if !ok {
-		return nil, nil, nil, types.ErrWrongStoreType()
+		return nil, nil, types.ErrWrongStoreType()
 	}
 	// automated execution at the 'beginning of a block'
 	if err := s.BeginBlock(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	// apply all Transactions in the block
 	txResults, txRoot, numTxs, err := s.ApplyTransactions(b)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	if len(txRoot) == 0 {
 		txRoot = []byte(strings.Repeat("F", crypto.HashSize*2))
 	}
 	// automated execution at the 'ending of a block'
 	if err = s.EndBlock(b.BlockHeader.ProposerAddress); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	// load the previous validator set
 	lastValidatorSet, err := s.LoadCanopyCommittee(s.Height() - 1)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	// load the next validator set
 	nextValidatorSet, err := s.LoadCanopyCommittee(s.Height())
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	// generate roots for block header
 	lastValidatorRoot, err := lastValidatorSet.ValidatorSet.Root()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	nextValidatorRoot, err := nextValidatorSet.ValidatorSet.Root()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	stateRoot, err := store.Root()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	// get the previous block for the header
 	lastBlock, err := s.LoadBlock(s.height - 1)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	// generate the block header
 	header := lib.BlockHeader{
@@ -137,9 +130,9 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 	}
 	// create and set the block hash in the header
 	if _, err = header.SetHash(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
-	return &header, txResults, nextValidatorSet.ValidatorSet, nil
+	return &header, txResults, nil
 }
 
 // ApplyTransactions processes all transactions in the provided block and updates the state accordingly
@@ -196,7 +189,6 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 
 // LoadCommittee() loads the Consensus Validators for a particular committee at a particular height
 func (s *StateMachine) LoadCommittee(committeeID uint64, height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	height -= 1 // end block state is begin block of next height
 	fsm, err := s.TimeMachine(height)
 	if err != nil {
 		return lib.ValidatorSet{}, err
@@ -210,7 +202,6 @@ func (s *StateMachine) LoadCommittee(committeeID uint64, height uint64) (lib.Val
 
 // LoadCanopyCommittee() loads the Committee for ID 0
 func (s *StateMachine) LoadCanopyCommittee(height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	height -= 1 // end block state is begin block of next height
 	fsm, err := s.TimeMachine(height)
 	if err != nil {
 		return lib.ValidatorSet{}, err
@@ -403,3 +394,10 @@ func (s *StateMachine) Reset() {
 	s.store.(lib.StoreI).Reset()
 }
 func (s *StateMachine) SetProposalVoteConfig(c types.GovProposalVoteConfig) { s.proposeVoteConfig = c }
+
+// catchPanic() acts as a failsafe, recovering from a panic and logging the error with the stack trace
+func (s *StateMachine) catchPanic() {
+	if r := recover(); r != nil {
+		s.log.Error(string(debug.Stack()))
+	}
+}

@@ -1,9 +1,9 @@
 package fsm
 
 import (
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -946,6 +946,28 @@ func TestHandleMessageEditStake(t *testing.T) {
 			error: "unstaking",
 		},
 		{
+			name:   "unauthorized output change",
+			detail: "the sender is unable to change the output address",
+			presetValidator: &types.Validator{
+				Address:      newTestAddressBytes(t),
+				PublicKey:    newTestPublicKeyBytes(t),
+				NetAddress:   "http://example.com",
+				StakedAmount: 1,
+				Committees:   []uint64{0, 1},
+				Output:       newTestAddressBytes(t),
+				Compound:     true,
+			},
+			msg: &types.MessageEditStake{
+				Address:       newTestAddressBytes(t),
+				Amount:        2,
+				Committees:    []uint64{0, 1},
+				NetAddress:    "http://example.com",
+				OutputAddress: newTestAddressBytes(t, 1),
+				Compound:      true,
+			},
+			error: "unauthorized tx",
+		},
+		{
 			name:   "invalid amount",
 			detail: "the sender attempts to lower the stake by edit-stake",
 			presetValidator: &types.Validator{
@@ -998,8 +1020,8 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Committees:    []uint64{0, 1},
 				NetAddress:    "http://example2.com",
 				OutputAddress: newTestAddressBytes(t, 1),
-				Delegate:      true, // can't be edited
 				Compound:      false,
+				Signer:        newTestAddressBytes(t),
 			},
 			expectedValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
@@ -1015,11 +1037,11 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Staked: 1,
 				CommitteesWithDelegations: []*types.Pool{
 					{
-						Id:     1,
+						Id:     0,
 						Amount: 1,
 					},
 					{
-						Id:     0,
+						Id:     1,
 						Amount: 1,
 					},
 				},
@@ -1036,14 +1058,16 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Delegate:     true,
 			},
 			msg: &types.MessageEditStake{
-				Address:    newTestAddressBytes(t),
-				Amount:     1,
-				Committees: []uint64{0, 1},
+				Address:       newTestAddressBytes(t),
+				Amount:        1,
+				Committees:    []uint64{0, 1},
+				OutputAddress: newTestAddressBytes(t),
 			},
 			expectedValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
+				Output:       newTestAddressBytes(t),
 				Delegate:     true,
 			},
 			expectedSupply: &types.Supply{
@@ -1052,21 +1076,21 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Delegated: 1,
 				CommitteesWithDelegations: []*types.Pool{
 					{
-						Id:     1,
+						Id:     0,
 						Amount: 1,
 					},
 					{
-						Id:     0,
+						Id:     1,
 						Amount: 1,
 					},
 				},
 				DelegationsOnly: []*types.Pool{
 					{
-						Id:     1,
+						Id:     0,
 						Amount: 1,
 					},
 					{
-						Id:     0,
+						Id:     1,
 						Amount: 1,
 					},
 				},
@@ -1106,15 +1130,15 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Staked: 1,
 				CommitteesWithDelegations: []*types.Pool{
 					{
-						Id:     3,
-						Amount: 1,
-					},
-					{
 						Id:     1,
 						Amount: 1,
 					},
 					{
 						Id:     2,
+						Amount: 1,
+					},
+					{
+						Id:     3,
 						Amount: 1,
 					},
 				},
@@ -1133,7 +1157,6 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Address:    newTestAddressBytes(t),
 				Amount:     1,
 				Committees: []uint64{1, 2, 3},
-				Delegate:   true,
 			},
 			expectedValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
@@ -1147,29 +1170,29 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Delegated: 1,
 				CommitteesWithDelegations: []*types.Pool{
 					{
-						Id:     3,
-						Amount: 1,
-					},
-					{
 						Id:     1,
 						Amount: 1,
 					},
 					{
 						Id:     2,
+						Amount: 1,
+					},
+					{
+						Id:     3,
 						Amount: 1,
 					},
 				},
 				DelegationsOnly: []*types.Pool{
 					{
-						Id:     3,
-						Amount: 1,
-					},
-					{
 						Id:     1,
 						Amount: 1,
 					},
 					{
 						Id:     2,
+						Amount: 1,
+					},
+					{
+						Id:     3,
 						Amount: 1,
 					},
 				},
@@ -1199,15 +1222,15 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Staked: 2,
 				CommitteesWithDelegations: []*types.Pool{
 					{
-						Id:     3,
-						Amount: 2,
-					},
-					{
 						Id:     1,
 						Amount: 2,
 					},
 					{
 						Id:     2,
+						Amount: 2,
+					},
+					{
+						Id:     3,
 						Amount: 2,
 					},
 				},
@@ -1227,7 +1250,6 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Address:    newTestAddressBytes(t),
 				Amount:     2,
 				Committees: []uint64{1, 2, 3},
-				Delegate:   true,
 			},
 			expectedValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
@@ -1241,29 +1263,29 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Delegated: 2,
 				CommitteesWithDelegations: []*types.Pool{
 					{
-						Id:     3,
-						Amount: 2,
-					},
-					{
 						Id:     1,
 						Amount: 2,
 					},
 					{
 						Id:     2,
+						Amount: 2,
+					},
+					{
+						Id:     3,
 						Amount: 2,
 					},
 				},
 				DelegationsOnly: []*types.Pool{
 					{
-						Id:     3,
-						Amount: 2,
-					},
-					{
 						Id:     1,
 						Amount: 2,
 					},
 					{
 						Id:     2,
+						Amount: 2,
+					},
+					{
+						Id:     3,
 						Amount: 2,
 					},
 				},
@@ -1353,6 +1375,1239 @@ func TestHandleMessageEditStake(t *testing.T) {
 					require.Len(t, *list, 0)
 				}
 			}
+		})
+	}
+}
+
+func TestMessageUnstake(t *testing.T) {
+	tests := []struct {
+		name   string
+		detail string
+		preset *types.Validator
+		msg    *types.MessageUnstake
+		error  string
+	}{
+		{
+			name:   "validator doesn't exist",
+			detail: "validator does not exist to unstake it",
+			msg:    &types.MessageUnstake{Address: newTestAddressBytes(t)},
+			error:  "validator does not exist",
+		}, {
+			name:   "validator already unstaking",
+			detail: "validator is already unstaking so this operation is invalid",
+			preset: &types.Validator{
+				Address:         newTestAddressBytes(t),
+				UnstakingHeight: 1,
+			},
+			msg:   &types.MessageUnstake{Address: newTestAddressBytes(t)},
+			error: "validator is unstaking",
+		},
+		{
+			name:   "validator not delegate",
+			detail: "validator is not a delegate",
+			preset: &types.Validator{
+				Address: newTestAddressBytes(t),
+			},
+			msg: &types.MessageUnstake{Address: newTestAddressBytes(t)},
+		},
+		{
+			name:   "validator a delegate",
+			detail: "validator is a delegate",
+			preset: &types.Validator{
+				Address:  newTestAddressBytes(t),
+				Delegate: true,
+			},
+			msg: &types.MessageUnstake{Address: newTestAddressBytes(t)},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// create the sender address object
+			sender := crypto.NewAddress(test.msg.Address)
+			// preset the validator
+			if test.preset != nil {
+				supply := &types.Supply{}
+				require.NoError(t, sm.SetValidators([]*types.Validator{test.preset}, supply))
+				require.NoError(t, sm.SetSupply(supply))
+			}
+			// execute the function call
+			err := sm.HandleMessageUnstake(test.msg)
+			// validate the expected error
+			require.Equal(t, test.error != "", err != nil, err)
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+				return
+			}
+			// validate the unstaking of the validator object
+			val, err := sm.GetValidator(sender)
+			require.NoError(t, err)
+			// get validator params
+			valParams, err := sm.GetParamsVal()
+			require.NoError(t, err)
+			// calculate the finish unstaking height
+			var unstakingBlocks uint64
+			if val.Delegate {
+				unstakingBlocks = valParams.ValidatorDelegateUnstakingBlocks
+			} else {
+				unstakingBlocks = valParams.ValidatorUnstakingBlocks
+			}
+			finishUnstakingHeight := unstakingBlocks + sm.Height()
+			// compare got vs expected
+			require.Equal(t, finishUnstakingHeight, val.UnstakingHeight)
+			// check for the unstaking key
+			bz, err := sm.Get(types.KeyForUnstaking(finishUnstakingHeight, sender))
+			require.NoError(t, err)
+			require.Len(t, bz, 1)
+		})
+	}
+}
+
+func TestMessagePause(t *testing.T) {
+	tests := []struct {
+		name   string
+		detail string
+		preset *types.Validator
+		msg    *types.MessagePause
+		error  string
+	}{
+		{
+			name:   "validator doesn't exist",
+			detail: "validator does not exist to pause it",
+			msg:    &types.MessagePause{Address: newTestAddressBytes(t)},
+			error:  "validator does not exist",
+		}, {
+			name:   "validator already paused",
+			detail: "validator is already paused so this operation is invalid",
+			preset: &types.Validator{
+				Address:         newTestAddressBytes(t),
+				MaxPausedHeight: 1,
+			},
+			msg:   &types.MessagePause{Address: newTestAddressBytes(t)},
+			error: "validator paused",
+		},
+		{
+			name:   "validator unstaking",
+			detail: "validator is unstaking so this operation is invalid",
+			preset: &types.Validator{
+				Address:         newTestAddressBytes(t),
+				UnstakingHeight: 1,
+			},
+			msg:   &types.MessagePause{Address: newTestAddressBytes(t)},
+			error: "validator is unstaking",
+		},
+		{
+			name:   "validator is a delegate",
+			detail: "validator is a delegate",
+			preset: &types.Validator{
+				Address:  newTestAddressBytes(t),
+				Delegate: true,
+			},
+			msg:   &types.MessagePause{Address: newTestAddressBytes(t)},
+			error: "validator is a delegate",
+		},
+		{
+			name:   "validator is not a delegate",
+			detail: "validator is not a delegate",
+			preset: &types.Validator{
+				Address: newTestAddressBytes(t),
+			},
+			msg: &types.MessagePause{Address: newTestAddressBytes(t)},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// create the sender address object
+			sender := crypto.NewAddress(test.msg.Address)
+			// preset the validator
+			if test.preset != nil {
+				supply := &types.Supply{}
+				require.NoError(t, sm.SetValidators([]*types.Validator{test.preset}, supply))
+				require.NoError(t, sm.SetSupply(supply))
+			}
+			// execute the function call
+			err := sm.HandleMessagePause(test.msg)
+			// validate the expected error
+			require.Equal(t, test.error != "", err != nil, err)
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+				return
+			}
+			// validate the unstaking of the validator object
+			val, err := sm.GetValidator(sender)
+			require.NoError(t, err)
+			// get validator params
+			valParams, err := sm.GetParamsVal()
+			require.NoError(t, err)
+			// calculate the finish unstaking height
+			maxPauseBlocks := valParams.ValidatorMaxPauseBlocks + sm.Height()
+			// compare got vs expected
+			require.Equal(t, maxPauseBlocks, val.MaxPausedHeight)
+			// check for the paused key
+			bz, err := sm.Get(types.KeyForPaused(maxPauseBlocks, sender))
+			require.NoError(t, err)
+			require.Len(t, bz, 1)
+		})
+	}
+}
+
+func TestMessageUnpause(t *testing.T) {
+	tests := []struct {
+		name   string
+		detail string
+		preset *types.Validator
+		msg    *types.MessageUnpause
+		error  string
+	}{
+		{
+			name:   "validator doesn't exist",
+			detail: "validator does not exist to unpause it",
+			msg:    &types.MessageUnpause{Address: newTestAddressBytes(t)},
+			error:  "validator does not exist",
+		}, {
+			name:   "validator not paused",
+			detail: "validator is not paused so this operation is invalid",
+			preset: &types.Validator{
+				Address: newTestAddressBytes(t),
+			},
+			msg:   &types.MessageUnpause{Address: newTestAddressBytes(t)},
+			error: "validator not paused",
+		},
+		{
+			name:   "validator unstaking",
+			detail: "validator is unstaking so this operation is invalid",
+			preset: &types.Validator{
+				Address:         newTestAddressBytes(t),
+				MaxPausedHeight: 1,
+				UnstakingHeight: 1,
+			},
+			msg:   &types.MessageUnpause{Address: newTestAddressBytes(t)},
+			error: "validator is unstaking",
+		},
+		{
+			name:   "validator is paused",
+			detail: "validator is paused",
+			preset: &types.Validator{
+				Address:         newTestAddressBytes(t),
+				MaxPausedHeight: 1,
+			},
+			msg: &types.MessageUnpause{Address: newTestAddressBytes(t)},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// create the sender address object
+			sender := crypto.NewAddress(test.msg.Address)
+			// preset the validator
+			if test.preset != nil {
+				supply := &types.Supply{}
+				require.NoError(t, sm.SetValidators([]*types.Validator{test.preset}, supply))
+				require.NoError(t, sm.SetSupply(supply))
+				// preset the validator as paused
+				require.NoError(t, sm.Set(types.KeyForPaused(test.preset.MaxPausedHeight, sender), []byte{0x0}))
+			}
+			// execute the function call
+			err := sm.HandleMessageUnpause(test.msg)
+			// validate the expected error
+			require.Equal(t, test.error != "", err != nil, err)
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+				return
+			}
+			// validate the unstaking of the validator object
+			val, err := sm.GetValidator(sender)
+			require.NoError(t, err)
+			// compare got vs expected
+			require.EqualValues(t, 0, val.MaxPausedHeight)
+			// get validator params
+			valParams, err := sm.GetParamsVal()
+			require.NoError(t, err)
+			// check for the paused key
+			bz, err := sm.Get(types.KeyForPaused(valParams.ValidatorMaxPauseBlocks+sm.Height(), sender))
+			require.NoError(t, err)
+			require.Nil(t, bz)
+		})
+	}
+}
+
+func TestHandleMessageChangeParameter(t *testing.T) {
+	uint64Any, _ := lib.NewAny(&lib.UInt64Wrapper{Value: 100})
+	stringAny, _ := lib.NewAny(&lib.StringWrapper{Value: "1/2"})
+	tests := []struct {
+		name           string
+		detail         string
+		proposalConfig types.GovProposalVoteConfig
+		height         uint64
+		msg            *types.MessageChangeParameter
+		error          string
+	}{
+		{
+			name:           "before start height",
+			detail:         "the start height is greater than state machine height",
+			height:         1,
+			proposalConfig: types.AcceptAllProposals,
+			msg: &types.MessageChangeParameter{
+				ParameterSpace: "val",
+				ParameterKey:   types.ParamValidatorUnstakingBlocks,
+				ParameterValue: uint64Any,
+				StartHeight:    2,
+				EndHeight:      3,
+				Signer:         newTestAddressBytes(t),
+			},
+			error: "proposal rejected",
+		},
+		{
+			name:           "after end height",
+			detail:         "the end height is less than state machine height",
+			height:         4,
+			proposalConfig: types.AcceptAllProposals,
+			msg: &types.MessageChangeParameter{
+				ParameterSpace: "val",
+				ParameterKey:   types.ParamValidatorUnstakingBlocks,
+				ParameterValue: uint64Any,
+				StartHeight:    2,
+				EndHeight:      3,
+				Signer:         newTestAddressBytes(t),
+			},
+			error: "proposal rejected",
+		},
+		{
+			name:           "reject all config",
+			detail:         "configuration is set to reject all",
+			proposalConfig: types.RejectAllProposals,
+			height:         2,
+			msg: &types.MessageChangeParameter{
+				ParameterSpace: "val",
+				ParameterKey:   types.ParamValidatorUnstakingBlocks,
+				ParameterValue: uint64Any,
+				StartHeight:    2,
+				EndHeight:      3,
+				Signer:         newTestAddressBytes(t),
+			},
+			error: "proposal rejected",
+		},
+		{
+			name:           "change unstaking blocks",
+			detail:         "successfully change unstaking blocks with the message",
+			proposalConfig: types.AcceptAllProposals,
+			height:         2,
+			msg: &types.MessageChangeParameter{
+				ParameterSpace: "val",
+				ParameterKey:   types.ParamValidatorUnstakingBlocks,
+				ParameterValue: uint64Any,
+				StartHeight:    2,
+				EndHeight:      3,
+				Signer:         newTestAddressBytes(t),
+			},
+		},
+		{
+			name:           "change protocol version",
+			detail:         "successfully the protocol version with the message",
+			proposalConfig: types.AcceptAllProposals,
+			height:         2,
+			msg: &types.MessageChangeParameter{
+				ParameterSpace: "cons",
+				ParameterKey:   types.ParamProtocolVersion,
+				ParameterValue: stringAny,
+				StartHeight:    2,
+				EndHeight:      3,
+				Signer:         newTestAddressBytes(t),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// set state machine height
+			sm.height = test.height
+			// set state machine proposal configuration
+			sm.proposeVoteConfig = test.proposalConfig
+			// extract the value from the object
+			var (
+				uint64Value *lib.UInt64Wrapper
+				stringValue *lib.StringWrapper
+			)
+			// extract the value from any
+			value, err := lib.FromAny(test.msg.ParameterValue)
+			require.NoError(t, err)
+			if i, isUint64 := value.(*lib.UInt64Wrapper); isUint64 {
+				uint64Value = i
+			} else if s, isString := value.(*lib.StringWrapper); isString {
+				stringValue = s
+			}
+			// execute the function call
+			err = sm.HandleMessageChangeParameter(test.msg)
+			// validate the expected error
+			require.Equal(t, test.error != "", err != nil, err)
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+				return
+			}
+			// get params object from state
+			got, err := sm.GetParams()
+			require.NoError(t, err)
+			// validate the update
+			switch test.msg.ParameterKey {
+			case types.ParamValidatorUnstakingBlocks: // validator
+				require.Equal(t, uint64Value.Value, got.Validator.ValidatorUnstakingBlocks)
+			case types.ParamProtocolVersion: // consensus
+				require.Equal(t, stringValue.Value, got.Consensus.ProtocolVersion)
+			}
+		})
+	}
+}
+
+func TestHandleMessageDAOTransfer(t *testing.T) {
+	tests := []struct {
+		name           string
+		detail         string
+		daoPreset      uint64
+		proposalConfig types.GovProposalVoteConfig
+		height         uint64
+		msg            *types.MessageDAOTransfer
+		error          string
+	}{
+		{
+			name:           "before start height",
+			detail:         "the start height is greater than state machine height",
+			height:         1,
+			daoPreset:      1,
+			proposalConfig: types.AcceptAllProposals,
+			msg: &types.MessageDAOTransfer{
+				Address:     newTestAddressBytes(t),
+				Amount:      1,
+				StartHeight: 2,
+				EndHeight:   3,
+			},
+			error: "proposal rejected",
+		},
+		{
+			name:           "after end height",
+			detail:         "the end height is less than state machine height",
+			height:         4,
+			proposalConfig: types.AcceptAllProposals,
+			daoPreset:      1,
+			msg: &types.MessageDAOTransfer{
+				Address:     newTestAddressBytes(t),
+				Amount:      1,
+				StartHeight: 2,
+				EndHeight:   3,
+			},
+			error: "proposal rejected",
+		},
+		{
+			name:           "reject all config",
+			detail:         "configuration is set to reject all",
+			proposalConfig: types.RejectAllProposals,
+			height:         2,
+			daoPreset:      1,
+			msg: &types.MessageDAOTransfer{
+				Address:     newTestAddressBytes(t),
+				Amount:      1,
+				StartHeight: 2,
+				EndHeight:   3,
+			},
+			error: "proposal rejected",
+		},
+		{
+			name:           "insufficient funds",
+			detail:         "dao doesn't have the funds",
+			proposalConfig: types.AcceptAllProposals,
+			height:         2,
+			msg: &types.MessageDAOTransfer{
+				Address:     newTestAddressBytes(t),
+				Amount:      1,
+				StartHeight: 2,
+				EndHeight:   3,
+			},
+			error: "insufficient funds",
+		},
+		{
+			name:           "successful transfer",
+			detail:         "a successful dao transfer was completed with the message",
+			proposalConfig: types.AcceptAllProposals,
+			daoPreset:      1,
+			height:         2,
+			msg: &types.MessageDAOTransfer{
+				Address:     newTestAddressBytes(t),
+				Amount:      1,
+				StartHeight: 2,
+				EndHeight:   3,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// set state machine height
+			sm.height = test.height
+			// set state machine proposal configuration
+			sm.proposeVoteConfig = test.proposalConfig
+			// preset the dao amount
+			require.NoError(t, sm.PoolAdd(lib.DAOPoolID, test.daoPreset))
+			// execute the function call
+			err := sm.HandleMessageDAOTransfer(test.msg)
+			// validate the expected error
+			require.Equal(t, test.error != "", err != nil, err)
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+				return
+			}
+			// get the dao pool
+			got, err := sm.GetPoolBalance(lib.DAOPoolID)
+			require.NoError(t, err)
+			// validate the transfer
+			require.Equal(t, test.daoPreset-test.msg.Amount, got)
+			// get the recipient account
+			got, err = sm.GetAccountBalance(crypto.NewAddress(test.msg.Address))
+			require.Equal(t, test.msg.Amount, got)
+		})
+	}
+}
+
+func TestHandleMessageCertificateResults(t *testing.T) {
+	// pre-define a quorum certificate to insert into the message change certificate results
+	certificateResults := &lib.CertificateResult{
+		RewardRecipients: &lib.RewardRecipients{
+			PaymentPercents: []*lib.PaymentPercents{{Address: newTestAddressBytes(t), Percent: 100}},
+		},
+		SlashRecipients: &lib.SlashRecipients{
+			DoubleSigners: []*lib.DoubleSigner{
+				{PubKey: newTestPublicKeyBytes(t), Heights: []uint64{1}},
+			},
+			BadProposers: [][]byte{newTestPublicKeyBytes(t)},
+		},
+		Orders: &lib.Orders{
+			BuyOrders: []*lib.BuyOrder{{
+				OrderId:             0,
+				BuyerReceiveAddress: newTestAddressBytes(t),
+				BuyerChainDeadline:  100,
+			}},
+			ResetOrders: []uint64{1},
+			CloseOrders: []uint64{2},
+		},
+		Checkpoint: &lib.Checkpoint{Height: 1, BlockHash: crypto.Hash([]byte("block_hash"))},
+	}
+	tests := []struct {
+		name                   string
+		detail                 string
+		nonSubsidizedCommittee bool
+		noCommitteeMembers     bool
+		msg                    *types.MessageCertificateResults
+		error                  string
+	}{
+		{
+			name:                   "non subsidized committee",
+			detail:                 "the committee is not subsidized",
+			nonSubsidizedCommittee: true,
+			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+				Header: &lib.View{
+					Height:          1,
+					CommitteeHeight: 3,
+					CommitteeId:     lib.CanopyCommitteeId,
+				},
+			}},
+			error: "non subsidized committee",
+		},
+		{
+			name:   "older committee height",
+			detail: "a committee height that is LTE state machine height - 2",
+			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+				Header: &lib.View{
+					Height:          1,
+					CommitteeHeight: 0,
+					CommitteeId:     lib.CanopyCommitteeId,
+				},
+			}},
+			error: "invalid certificate committee height",
+		},
+		{
+			name:               "no committee members exist for that id",
+			detail:             "there are no committee members for that ID",
+			noCommitteeMembers: true,
+			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+				Header: &lib.View{
+					Height:          1,
+					CommitteeHeight: 3,
+					CommitteeId:     lib.CanopyCommitteeId,
+				},
+			}},
+			error: "there are no validators in the set",
+		},
+		{
+			name:               "no committee members exist for that id",
+			detail:             "there are no committee members for that ID",
+			noCommitteeMembers: true,
+			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+				Header: &lib.View{
+					Height:          1,
+					CommitteeHeight: 3,
+					CommitteeId:     lib.CanopyCommitteeId,
+				},
+			}},
+			error: "there are no validators in the set",
+		},
+		{
+			name:   "empty quorum certificate",
+			detail: "the QC is empty",
+			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+				Header: &lib.View{
+					Height:          1,
+					CommitteeHeight: 3,
+					CommitteeId:     lib.CanopyCommitteeId,
+				},
+			}},
+			error: "empty quorum certificate",
+		},
+		{
+			name:   "valid qc",
+			detail: "the qc sent is valid",
+			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+				Header: &lib.View{
+					Height:          1,
+					CommitteeHeight: 3,
+					CommitteeId:     lib.CanopyCommitteeId,
+				},
+				Results:     certificateResults,
+				ResultsHash: certificateResults.Hash(),
+				BlockHash:   crypto.Hash([]byte("some_block")),
+			}},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// increment height as height 2 ignores byzantine evidence
+			sm.height++
+			// check if the pool is subsidized
+			if !test.nonSubsidizedCommittee {
+				// subsidize the committee
+				require.NoError(t, sm.PoolAdd(test.msg.Qc.Header.CommitteeId, 1))
+			}
+			// check if there exists a committee
+			if !test.noCommitteeMembers {
+				// track the supply
+				supply := &types.Supply{}
+				// for 4 validators
+				for i := 0; i < 4; i++ {
+					// set the validator
+					require.NoError(t, sm.SetValidators([]*types.Validator{{
+						Address:      newTestAddressBytes(t, i),
+						PublicKey:    newTestPublicKeyBytes(t, i),
+						StakedAmount: 100,
+						Committees:   []uint64{lib.CanopyCommitteeId},
+					}}, supply))
+					// set the committee member
+					require.NoError(t, sm.SetCommitteeMember(newTestAddress(t, i), lib.CanopyCommitteeId, 100))
+				}
+				// set the supply in state
+				require.NoError(t, sm.SetSupply(supply))
+				// create an aggregate signature
+				// get the committee members
+				committee, err := sm.GetCommitteeMembers(lib.CanopyCommitteeId, true)
+				require.NoError(t, err)
+				// create a copy of the multikey
+				mk := committee.MultiKey.Copy()
+				// only sign with 3/4 to test the non-signer reduction
+				for i := 0; i < 3; i++ {
+					privateKey := newTestKeyGroup(t, i).PrivateKey
+					// search for the proper index for the signer
+					for j, pubKey := range mk.PublicKeys() {
+						// if found, add the signer
+						if privateKey.PublicKey().Equals(pubKey) {
+							// sign the qc
+							require.NoError(t, mk.AddSigner(privateKey.Sign(test.msg.Qc.SignBytes()), j))
+						}
+					}
+				}
+				// aggregate the signature
+				aggSig, e := mk.AggregateSignatures()
+				require.NoError(t, e)
+				// attach the signature to the message
+				test.msg.Qc.Signature = &lib.AggregateSignature{
+					Signature: aggSig,
+					Bitmap:    mk.Bitmap(),
+				}
+			}
+			// preset some sell orders to test with
+			for i := 0; i < 3; i++ {
+				var buyerAddress []byte
+				// set order #1, #2 with a buyer for 'reset' and 'close' functionality
+				if i != 0 {
+					buyerAddress = newTestAddressBytes(t)
+				}
+				// upsert each order in state
+				_, err := sm.CreateOrder(&types.SellOrder{
+					Committee:           lib.CanopyCommitteeId,
+					BuyerReceiveAddress: buyerAddress,
+					BuyerChainDeadline:  0,
+					SellersSellAddress:  newTestAddressBytes(t),
+				}, lib.CanopyCommitteeId)
+				// ensure no error
+				require.NoError(t, err)
+			}
+			// execute function call
+			err := sm.HandleMessageCertificateResults(test.msg)
+			// validate the expected error
+			require.Equal(t, test.error != "", err != nil, err)
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+				return
+			}
+			// 1) validate the 'buy order'
+			func() {
+				order, e := sm.GetOrder(0, lib.CanopyCommitteeId)
+				require.NoError(t, e)
+				// convenience variable for buy order
+				buyOrder := test.msg.Qc.Results.Orders.BuyOrders[0]
+				// validate the receipt address was set
+				require.Equal(t, buyOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
+				// validate the deadline was set
+				require.Equal(t, buyOrder.BuyerChainDeadline, order.BuyerChainDeadline)
+			}()
+			// 2) validate the 'reset order'
+			func() {
+				order, e := sm.GetOrder(1, lib.CanopyCommitteeId)
+				require.NoError(t, e)
+				// validate the receipt address was reset
+				require.Len(t, order.BuyerReceiveAddress, 0)
+				// validate the deadline was reset
+				require.Zero(t, order.BuyerChainDeadline)
+			}()
+
+			// 3) validate the 'close order'
+			func() {
+				_, err = sm.GetOrder(2, lib.CanopyCommitteeId)
+				require.ErrorContains(t, err, "order with id 2 not found")
+			}()
+
+			// 4) validate the 'checkpoint' service
+			func() {
+				// define convenience variable for checkpoint
+				expected := test.msg.Qc.Results.Checkpoint
+				// get the checkpoint
+				got, e := sm.store.(lib.StoreI).GetCheckpoint(lib.CanopyCommitteeId, expected.Height)
+				require.NoError(t, e)
+				// check got vs expected
+				require.Equal(t, expected.BlockHash, got)
+			}()
+
+			// 5) validate the 'committee data'
+			func() {
+				committeeData, e := sm.GetCommitteeData(lib.CanopyCommitteeId)
+				require.NoError(t, e)
+				// validate the committee height was properly set
+				require.Equal(t, test.msg.Qc.Header.CommitteeHeight, committeeData.CommitteeHeight)
+				// validate the chain height was properly set
+				require.Equal(t, test.msg.Qc.Header.Height, committeeData.ChainHeight)
+				// validate the number of samples was properly set
+				require.EqualValues(t, 1, committeeData.NumberOfSamples)
+				// validate the payment percent was set
+				require.Len(t, committeeData.PaymentPercents, 1)
+				// convenience variable for payment percent validation
+				expected := test.msg.Qc.Results.RewardRecipients.PaymentPercents[0]
+				// validate the payment percent WITH the non-signer reduction applied
+				require.Equal(t, expected.Percent, committeeData.PaymentPercents[0].Percent)
+			}()
+		})
+	}
+}
+
+func TestMessageSubsidy(t *testing.T) {
+	tests := []struct {
+		name          string
+		detail        string
+		presetAccount uint64
+		presetPool    uint64
+		msg           *types.MessageSubsidy
+		error         string
+	}{
+		{
+			name:          "insufficient funds",
+			detail:        "the account does not have enough funds to complete the transfer",
+			presetAccount: 1,
+			msg: &types.MessageSubsidy{
+				Address:     newTestAddressBytes(t),
+				CommitteeId: lib.CanopyCommitteeId,
+				Amount:      2,
+			},
+			error: "insufficient funds",
+		},
+		{
+			name:          "successful transfer",
+			detail:        "the transfer is successful",
+			presetAccount: 1,
+			msg: &types.MessageSubsidy{
+				Address:     newTestAddressBytes(t),
+				CommitteeId: lib.CanopyCommitteeId,
+				Amount:      1,
+			},
+		},
+		{
+			name:          "successful transfer pre-balance",
+			detail:        "the transfer is successful with pool having a non-zero balance to start",
+			presetAccount: 1,
+			presetPool:    2,
+			msg: &types.MessageSubsidy{
+				Address:     newTestAddressBytes(t),
+				CommitteeId: lib.CanopyCommitteeId,
+				Amount:      1,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// define an address variable for convenience
+			address := crypto.NewAddress(test.msg.Address)
+			// preset the account with tokens
+			require.NoError(t, sm.AccountAdd(address, test.presetAccount))
+			// preset the pool with tokens
+			require.NoError(t, sm.PoolAdd(test.msg.CommitteeId, test.presetPool))
+			// execute the function
+			err := sm.HandleMessageSubsidy(test.msg)
+			// validate the expected error
+			require.Equal(t, test.error != "", err != nil, err)
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+				return
+			}
+			// get the account balance
+			got, err := sm.GetAccountBalance(address)
+			require.NoError(t, err)
+			// validate the subtraction from the account
+			require.Equal(t, test.presetAccount-test.msg.Amount, got)
+			// get the pool balance
+			got, err = sm.GetPoolBalance(test.msg.CommitteeId)
+			require.NoError(t, err)
+			// validate the addition to the pool
+			require.Equal(t, test.presetPool+test.msg.Amount, got)
+		})
+	}
+}
+
+func TestMessageCreateOrder(t *testing.T) {
+	tests := []struct {
+		name             string
+		detail           string
+		presetAccount    uint64
+		minimumOrderSize uint64
+		msg              *types.MessageCreateOrder
+		error            string
+	}{
+		{
+			name:             "below minimum",
+			detail:           "the order does not satisfy the minimum order size",
+			presetAccount:    1,
+			minimumOrderSize: 2,
+			msg: &types.MessageCreateOrder{
+				CommitteeId:          lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      1,
+				SellerReceiveAddress: newTestAddressBytes(t),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+			error: "minimum order size",
+		},
+		{
+			name:             "insufficient funds",
+			detail:           "the account does not have sufficient funds to cover the sell order",
+			minimumOrderSize: 1,
+			msg: &types.MessageCreateOrder{
+				CommitteeId:          lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      1,
+				SellerReceiveAddress: newTestAddressBytes(t),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+			error: "insufficient funds",
+		},
+		{
+			name:             "valid sell order",
+			detail:           "the message creates a sell order in state",
+			presetAccount:    1,
+			minimumOrderSize: 1,
+			msg: &types.MessageCreateOrder{
+				CommitteeId:          lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      1,
+				SellerReceiveAddress: newTestAddressBytes(t),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// define an address variable for convenience
+			address := crypto.NewAddress(test.msg.SellersSellAddress)
+			// preset the minimum order size
+			valParams, err := sm.GetParamsVal()
+			require.NoError(t, err)
+			// set minimum order size
+			valParams.ValidatorMinimumOrderSize = test.minimumOrderSize
+			// set back in state
+			require.NoError(t, sm.SetParamsVal(valParams))
+			// preset the account with tokens
+			require.NoError(t, sm.AccountAdd(address, test.presetAccount))
+			// execute the function
+			err = sm.HandleMessageCreateOrder(test.msg)
+			// validate the expected error
+			require.Equal(t, test.error != "", err != nil, err)
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+				return
+			}
+			// get the account balance
+			got, err := sm.GetAccountBalance(address)
+			require.NoError(t, err)
+			// validate the subtraction from the account
+			require.Equal(t, test.presetAccount-test.msg.AmountForSale, got)
+			// get the pool balance
+			got, err = sm.GetPoolBalance(test.msg.CommitteeId + types.EscrowPoolAddend)
+			require.NoError(t, err)
+			// validate the addition to the pool
+			require.Equal(t, test.msg.AmountForSale, got)
+			// get the order in state
+			order, err := sm.GetOrder(0, test.msg.CommitteeId)
+			require.NoError(t, err)
+			// validate the creation of the order
+			require.EqualExportedValues(t, &types.SellOrder{
+				Committee:            test.msg.CommitteeId,
+				AmountForSale:        test.msg.AmountForSale,
+				RequestedAmount:      test.msg.RequestedAmount,
+				SellerReceiveAddress: test.msg.SellerReceiveAddress,
+				SellersSellAddress:   test.msg.SellersSellAddress,
+			}, order)
+		})
+	}
+}
+
+func TestHandleMessageEditOrder(t *testing.T) {
+	tests := []struct {
+		name             string
+		detail           string
+		presetAccount    uint64
+		minimumOrderSize uint64
+		preset           *types.SellOrder
+		msg              *types.MessageEditOrder
+		expected         *types.SellOrder
+		error            string
+	}{
+		{
+			name:   "no order found",
+			detail: "there exists no order",
+			msg: &types.MessageEditOrder{
+				OrderId:              0,
+				CommitteeId:          lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t, 2),
+			},
+			error: "not found",
+		},
+		{
+			name:   "order already accepted",
+			detail: "a buyer has already accepted the order, thus it cannot be edited",
+			preset: &types.SellOrder{
+				Id:                   0,
+				Committee:            lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t),
+				BuyerReceiveAddress:  newTestAddressBytes(t, 1), // signals a buyer
+				BuyerChainDeadline:   100,                       // signals a buyer
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+			msg: &types.MessageEditOrder{
+				OrderId:              0,
+				CommitteeId:          lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t, 2),
+			},
+			error: "order already accepted",
+		},
+		{
+			name:             "minimum order size",
+			detail:           "the edited order does not satisfy the minimum order size",
+			minimumOrderSize: 2,
+			preset: &types.SellOrder{
+				Id:                   0,
+				Committee:            lib.CanopyCommitteeId,
+				AmountForSale:        2,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+			msg: &types.MessageEditOrder{
+				OrderId:              0,
+				CommitteeId:          lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t, 2),
+			},
+			error: "minimum order size",
+		}, {
+			name:   "insufficient funds",
+			detail: "the account does not have the balance to cover the edit",
+			preset: &types.SellOrder{
+				Id:                   0,
+				Committee:            lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+			msg: &types.MessageEditOrder{
+				OrderId:              0,
+				CommitteeId:          lib.CanopyCommitteeId,
+				AmountForSale:        2,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t, 2),
+			},
+			error: "insufficient funds",
+		},
+		{
+			name:   "edit receive address",
+			detail: "the order simply updates the receive address but the amount stays the same",
+			preset: &types.SellOrder{
+				Id:                   0,
+				Committee:            lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+			msg: &types.MessageEditOrder{
+				OrderId:              0,
+				CommitteeId:          lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t, 2),
+			},
+			expected: &types.SellOrder{
+				Id:                   0,
+				Committee:            lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				SellerReceiveAddress: newTestAddressBytes(t, 2),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+		},
+		{
+			name:             "increase sell amount",
+			detail:           "the order has a increased the sell amount",
+			presetAccount:    1,
+			minimumOrderSize: 0,
+			preset: &types.SellOrder{
+				Id:                   0,
+				Committee:            lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+			msg: &types.MessageEditOrder{
+				OrderId:              0,
+				CommitteeId:          lib.CanopyCommitteeId,
+				AmountForSale:        2,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t, 2),
+			},
+			expected: &types.SellOrder{
+				Id:                   0,
+				Committee:            lib.CanopyCommitteeId,
+				AmountForSale:        2,
+				SellerReceiveAddress: newTestAddressBytes(t, 2),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+		},
+		{
+			name:   "decrease sell amount",
+			detail: "the order has a decreased the sell amount",
+			preset: &types.SellOrder{
+				Id:                   0,
+				Committee:            lib.CanopyCommitteeId,
+				AmountForSale:        2,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+			msg: &types.MessageEditOrder{
+				OrderId:              0,
+				CommitteeId:          lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t, 2),
+			},
+			expected: &types.SellOrder{
+				Id:                   0,
+				Committee:            lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				SellerReceiveAddress: newTestAddressBytes(t, 2),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var address crypto.AddressI
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// define an address variable for convenience
+			if test.preset != nil {
+				address = crypto.NewAddress(test.preset.SellersSellAddress)
+				// preset the minimum order size
+				valParams, err := sm.GetParamsVal()
+				require.NoError(t, err)
+				// set minimum order size
+				valParams.ValidatorMinimumOrderSize = test.minimumOrderSize
+				// set back in state
+				require.NoError(t, sm.SetParamsVal(valParams))
+				// preset the account with tokens
+				require.NoError(t, sm.AccountAdd(address, test.presetAccount))
+				// get the proper order book
+				orderBook, err := sm.GetOrderBook(lib.CanopyCommitteeId)
+				require.NoError(t, err)
+				// preset the sell order
+				_ = orderBook.AddOrder(test.preset)
+				// set it back in state
+				require.NoError(t, sm.SetOrderBook(orderBook))
+				// preset the pool with the amount to sell
+				require.NoError(t, sm.PoolAdd(test.preset.Committee+types.EscrowPoolAddend, test.preset.AmountForSale))
+			}
+			// execute the function
+			err := sm.HandleMessageEditOrder(test.msg)
+			// validate the expected error
+			require.Equal(t, test.error != "", err != nil, err)
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+				return
+			}
+			// get the account balance
+			got, err := sm.GetAccountBalance(address)
+			require.NoError(t, err)
+			// validate the subtraction/addition to/from the account
+			require.Equal(t, test.presetAccount-(test.msg.AmountForSale-test.preset.AmountForSale), got)
+			// get the pool balance
+			got, err = sm.GetPoolBalance(test.msg.CommitteeId + types.EscrowPoolAddend)
+			require.NoError(t, err)
+			// validate the subtraction/addition to/from the pool
+			require.Equal(t, test.preset.AmountForSale-(test.preset.AmountForSale-test.msg.AmountForSale), got)
+			// get the order in state
+			order, err := sm.GetOrder(0, test.msg.CommitteeId)
+			require.NoError(t, err)
+			// validate the creation of the order
+			require.EqualExportedValues(t, test.expected, order)
+		})
+	}
+}
+
+func TestHandleMessageDelete(t *testing.T) {
+	tests := []struct {
+		name          string
+		detail        string
+		presetAccount uint64
+		preset        *types.SellOrder
+		msg           *types.MessageDeleteOrder
+		error         string
+	}{
+		{
+			name:   "no order found",
+			detail: "there exists no order",
+			msg: &types.MessageDeleteOrder{
+				OrderId:     0,
+				CommitteeId: lib.CanopyCommitteeId,
+			},
+			error: "not found",
+		},
+		{
+			name:   "order already accepted",
+			detail: "a buyer has already accepted the order, thus it cannot be edited",
+			preset: &types.SellOrder{
+				Id:                   0,
+				Committee:            lib.CanopyCommitteeId,
+				AmountForSale:        1,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t),
+				BuyerReceiveAddress:  newTestAddressBytes(t, 1), // signals a buyer
+				BuyerChainDeadline:   100,                       // signals a buyer
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+			msg: &types.MessageDeleteOrder{
+				OrderId:     0,
+				CommitteeId: lib.CanopyCommitteeId,
+			},
+			error: "order already accepted",
+		},
+		{
+			name:   "successful delete",
+			detail: "the order delete was successful",
+			preset: &types.SellOrder{
+				Id:                   0,
+				Committee:            lib.CanopyCommitteeId,
+				AmountForSale:        2,
+				RequestedAmount:      0,
+				SellerReceiveAddress: newTestAddressBytes(t),
+				SellersSellAddress:   newTestAddressBytes(t),
+			},
+			msg: &types.MessageDeleteOrder{
+				OrderId:     0,
+				CommitteeId: lib.CanopyCommitteeId,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var address crypto.AddressI
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// define an address variable for convenience
+			if test.preset != nil {
+				address = crypto.NewAddress(test.preset.SellersSellAddress)
+				// preset the account with tokens
+				require.NoError(t, sm.AccountAdd(address, test.presetAccount))
+				// get the proper order book
+				orderBook, err := sm.GetOrderBook(lib.CanopyCommitteeId)
+				require.NoError(t, err)
+				// preset the sell order
+				_ = orderBook.AddOrder(test.preset)
+				// set it back in state
+				require.NoError(t, sm.SetOrderBook(orderBook))
+				// preset the pool with the amount to sell
+				require.NoError(t, sm.PoolAdd(test.preset.Committee+types.EscrowPoolAddend, test.preset.AmountForSale))
+			}
+			// execute the function
+			err := sm.HandleMessageDeleteOrder(test.msg)
+			// validate the expected error
+			require.Equal(t, test.error != "", err != nil, err)
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+				return
+			}
+			// get the account balance
+			got, err := sm.GetAccountBalance(address)
+			require.NoError(t, err)
+			// validate the addition to the account
+			require.Equal(t, test.presetAccount+test.preset.AmountForSale, got)
+			// get the pool balance
+			got, err = sm.GetPoolBalance(test.msg.CommitteeId + types.EscrowPoolAddend)
+			require.NoError(t, err)
+			// validate the subtraction from the pool
+			require.Zero(t, got)
+			// validate the delete
+			_, err = sm.GetOrder(0, test.msg.CommitteeId)
+			require.ErrorContains(t, err, "not found")
 		})
 	}
 }

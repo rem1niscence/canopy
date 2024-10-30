@@ -2,7 +2,7 @@ package rpc
 
 import (
 	"fmt"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/lib"
 )
 
 func ErrServerTimeout() lib.ErrorI {

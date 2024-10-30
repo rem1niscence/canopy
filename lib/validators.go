@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/drand/kyber"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib/crypto"
 )
 
 // ValidatorSet represents a collection of validators responsible for consensus

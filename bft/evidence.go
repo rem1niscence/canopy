@@ -2,7 +2,7 @@ package bft
 
 import (
 	"bytes"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/lib"
 	"slices"
 )
 

@@ -28,8 +28,8 @@ message MessageEditStake {
   repeated uint64 committees = 3;
   string net_address = 4;
   bytes output_address = 5;
-  bool delegate = 6;
-  bool compound = 7;
+  bool compound = 6;
+  bytes signer = 7;
 }
 
 message MessageUnstake {

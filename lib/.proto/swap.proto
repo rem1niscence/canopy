@@ -12,8 +12,7 @@ message SellOrder {
   bytes SellerReceiveAddress = 5; // the external chain address to receive the 'token'
   bytes BuyerReceiveAddress = 6; // the buyer Canopy address to receive the CNPY
   uint64 BuyerChainDeadline = 7; // the external chain height deadline to send the 'tokens' to SellerReceiveAddress
-  uint64 OrderExpirationHeight = 8; // the height when the order expires
-  bytes SellersSellAddress = 9; // the address of seller who is selling the CNPY
+  bytes SellersSellAddress = 8; // the address of seller who is selling the CNPY
 }
 
 message OrderBooks {

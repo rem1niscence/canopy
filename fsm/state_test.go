@@ -1,13 +1,231 @@
 package fsm
 
 import (
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
-	"github.com/ginchuco/ginchu/store"
+	"encoding/json"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
+	"github.com/ginchuco/canopy/store"
 	"github.com/stretchr/testify/require"
+	"os"
 	"testing"
+	"time"
 )
+
+func TestInitialize(t *testing.T) {
+	const dataDirPath = "./"
+	tests := []struct {
+		name          string
+		detail        string
+		presetBlock   *lib.Block
+		presetGenesis *types.GenesisState
+		height        uint64
+		expected      *types.GenesisState
+	}{
+		{
+			name:        "after genesis",
+			detail:      "the block height is after 0, thus it's the non-genesis initialization",
+			height:      2,
+			presetBlock: &lib.Block{BlockHeader: &lib.BlockHeader{Height: 1, Hash: crypto.Hash([]byte("test")), TotalVdfIterations: 2}},
+		},
+		{
+			name:          "genesis path",
+			detail:        "the height is 0 so the genesis path is taken",
+			presetGenesis: newTestGenesisState(t),
+			expected:      newTestValidateGenesisState(t),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create the default logger
+			log := lib.NewDefaultLogger()
+			// create an in-memory store
+			db, err := store.NewStoreInMemory(log)
+			require.NoError(t, err)
+			if test.presetGenesis != nil {
+				// marshal genesis file to bytes
+				genesisJsonBytes, e := json.MarshalIndent(&test.presetGenesis, "", "  ")
+				require.NoError(t, e)
+				// write test genesis to file
+				require.NoError(t, os.WriteFile("genesis.json", genesisJsonBytes, 0777))
+				// remove the test file
+				defer os.RemoveAll("genesis.json")
+			}
+			if test.presetBlock != nil {
+				// set the block in state
+				require.NoError(t, db.IndexBlock(&lib.BlockResult{
+					BlockHeader: test.presetBlock.BlockHeader,
+				}))
+			}
+			if test.height != 0 {
+				// increment the db version
+				_, _ = db.Commit()
+			}
+			// create a state machine object
+			sm := StateMachine{
+				store:  db,
+				height: test.height,
+				Config: lib.Config{},
+				log:    log,
+			}
+			// set the data dir path
+			sm.Config.DataDirPath = dataDirPath
+			// execute the function call
+			require.NoError(t, sm.Initialize(db))
+			// validate the initialization path
+			if sm.height == 0 {
+				// if genesis, validate the state
+				validateWithExportedState(t, sm, test.expected)
+			} else {
+				// if not genesis, validate the VDF iterations
+				require.Equal(t, test.presetBlock.BlockHeader.TotalVdfIterations, sm.vdfIterations)
+			}
+		})
+	}
+}
+
+func TestApplyBlock(t *testing.T) {
+	// define a key group to use in testing
+	kg := newTestKeyGroup(t)
+	// predefine a send-transaction to insert into the block
+	sendTx, err := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), 1, 1)
+	// ensure no error
+	require.NoError(t, err)
+	// convert the object to bytes
+	sendTxBytes, err := lib.Marshal(sendTx)
+	// ensure no error
+	require.NoError(t, err)
+	// define test cases
+	tests := []struct {
+		name            string
+		detail          string
+		accountPreset   uint64
+		storeError      bool
+		beginBlockError bool
+		block           *lib.Block
+		expectedHeader  *lib.BlockHeader
+		expectedResults *lib.TxResults
+		error           string
+	}{
+		{
+			name:       "store error",
+			detail:     "an error occurred in casting the store to lib.Store",
+			storeError: true,
+			error:      "wrong store type",
+		},
+		{
+			name:            "begin_block error",
+			detail:          "an error occurred in begin block",
+			block:           &lib.Block{BlockHeader: &lib.BlockHeader{}, Transactions: [][]byte{sendTxBytes}},
+			beginBlockError: true,
+			error:           "invalid protocol version",
+		},
+		{
+			name:   "transaction error",
+			detail: "an error occurred in the transaction",
+			block:  &lib.Block{BlockHeader: &lib.BlockHeader{}, Transactions: [][]byte{sendTxBytes}},
+			error:  "insufficient funds",
+		},
+		{
+			name:          "",
+			detail:        "",
+			accountPreset: 2,
+			block: &lib.Block{
+				BlockHeader: &lib.BlockHeader{
+					Height:                1,
+					NumTxs:                1,
+					TotalTxs:              1,
+					LastBlockHash:         crypto.Hash([]byte("block_hash")),
+					StateRoot:             nil,
+					TransactionRoot:       nil,
+					ValidatorRoot:         nil,
+					NextValidatorRoot:     nil,
+					ProposerAddress:       newTestAddressBytes(t),
+					Vdf:                   nil,
+					LastQuorumCertificate: nil,
+				},
+				Transactions: [][]byte{sendTxBytes},
+			},
+			expectedHeader: &lib.BlockHeader{
+				Height:                0,
+				Hash:                  nil,
+				NetworkId:             0,
+				Time:                  0,
+				NumTxs:                0,
+				TotalTxs:              0,
+				TotalVdfIterations:    0,
+				LastBlockHash:         nil,
+				StateRoot:             nil,
+				TransactionRoot:       nil,
+				ValidatorRoot:         nil,
+				NextValidatorRoot:     nil,
+				ProposerAddress:       nil,
+				Vdf:                   nil,
+				LastQuorumCertificate: nil,
+			},
+			expectedResults: &lib.TxResults{
+				{
+					Sender:      newTestAddressBytes(t),
+					Recipient:   newTestAddressBytes(t),
+					MessageType: "send",
+					Height:      1,
+					Index:       0,
+					Transaction: sendTx.(*lib.Transaction),
+					TxHash:      crypto.HashString(sendTxBytes),
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			sm.height = 1
+			if test.storeError {
+				// set the store to the wrong type
+				sm.store = lib.RWStoreI(nil)
+			} else {
+				// preset the 'last block' in state
+				require.NoError(t, sm.store.(lib.StoreI).IndexBlock(&lib.BlockResult{
+					BlockHeader: &lib.BlockHeader{
+						Height: 1,
+						Hash:   test.block.BlockHeader.LastBlockHash,
+						Time:   uint64(time.Now().UnixMicro()),
+					},
+				}))
+			}
+			if !test.beginBlockError {
+				// set the protocol version to trigger an error
+				sm.ProtocolVersion = 1
+			}
+			// set the minimum fee to 1 for send transactions
+			require.NoError(t, sm.UpdateParam("fee", types.ParamMessageSendFee, &lib.UInt64Wrapper{Value: 1}))
+			// preset the account with funds
+			require.NoError(t, sm.AccountAdd(newTestAddress(t), test.accountPreset))
+			// preset a committee member for canopy
+			require.NoError(t, sm.SetValidators([]*types.Validator{
+				{
+					Address:      newTestAddressBytes(t),
+					PublicKey:    newTestPublicKeyBytes(t),
+					StakedAmount: 1,
+					Committees:   []uint64{lib.CanopyCommitteeId},
+				},
+			}, &types.Supply{}))
+			// execute the function call
+			header, txResults, e := sm.ApplyBlock(test.block)
+			// validate the expected error
+			require.Equal(t, test.error != "", e != nil, e)
+			if e != nil {
+				require.ErrorContains(t, e, test.error)
+				return
+			}
+			// validate got vs expected block header
+			require.EqualExportedValues(t, test.expectedHeader, header)
+			// validate got vs expected tx results
+			require.EqualExportedValues(t, test.expectedResults, txResults)
+		})
+	}
+}
 
 func newSingleAccountStateMachine(t *testing.T) StateMachine {
 	sm := newTestStateMachine(t)
@@ -33,7 +251,6 @@ func newSingleAccountStateMachine(t *testing.T) StateMachine {
 func newTestStateMachine(t *testing.T) StateMachine {
 	log := lib.NewDefaultLogger()
 	db, err := store.NewStoreInMemory(log)
-	db.Commit()
 	require.NoError(t, err)
 	sm := StateMachine{
 		store:             db,
@@ -46,6 +263,8 @@ func newTestStateMachine(t *testing.T) StateMachine {
 		Config:            lib.Config{},
 		log:               log,
 	}
+	require.NoError(t, sm.SetParams(types.DefaultParams()))
+	db.Commit()
 	require.NoError(t, sm.SetParams(types.DefaultParams()))
 	return sm
 }

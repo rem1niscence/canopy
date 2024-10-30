@@ -1,8 +1,8 @@
 package bft
 
 import (
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 )
 
 // LEADER TRACKING AND AGGREGATING MESSAGES FROM REPLICAS

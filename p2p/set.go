@@ -1,7 +1,7 @@
 package p2p
 
 import (
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/lib"
 	"google.golang.org/protobuf/proto"
 	"sync"
 )

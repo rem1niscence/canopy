@@ -1,8 +1,8 @@
 package fsm
 
 import (
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"os"
@@ -254,17 +254,17 @@ func TestConformStateToParamUpdate(t *testing.T) {
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
-					Committees:   []uint64{1},
+					Committees:   []uint64{0},
 				},
 				{
 					Address:      newTestAddressBytes(t, 2),
 					StakedAmount: amount,
-					Committees:   []uint64{0},
+					Committees:   []uint64{1},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					StakedAmount: amount,
-					Committees:   []uint64{1},
+					Committees:   []uint64{0},
 				},
 			},
 		},
@@ -299,12 +299,12 @@ func TestConformStateToParamUpdate(t *testing.T) {
 				{
 					Address:      newTestAddressBytes(t, 2),
 					StakedAmount: amount,
-					Committees:   []uint64{3},
+					Committees:   []uint64{0},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					StakedAmount: amount,
-					Committees:   []uint64{0},
+					Committees:   []uint64{1},
 				},
 			},
 		},

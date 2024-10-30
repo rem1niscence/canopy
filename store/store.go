@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/alecthomas/units"
 	"github.com/dgraph-io/badger/v4"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/lib"
 	"math"
 	"path/filepath"
 )

@@ -2,7 +2,7 @@ package types
 
 import (
 	"fmt"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/lib"
 )
 
 // This file defines errors for the State Machine module
@@ -207,8 +207,8 @@ func ErrInvalidCommitteeStakeDistribution() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidCommitteeStakeDistribution, lib.StateMachineModule, "committees stake distribution is invalid")
 }
 
-func ErrInvalidDelegationStatus() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidDelegationStatus, lib.StateMachineModule, "invalid delegation status")
+func ErrValidatorIsADelegate() lib.ErrorI {
+	return lib.NewError(lib.CodeValidatorIsADelegate, lib.StateMachineModule, "validator is a delegate")
 }
 
 func ErrInvalidCommittee() lib.ErrorI {

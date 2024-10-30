@@ -2,7 +2,7 @@ package p2p
 
 import (
 	"fmt"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/lib"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"strings"

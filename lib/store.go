@@ -2,7 +2,7 @@ package lib
 
 import (
 	"github.com/dgraph-io/badger/v4"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib/crypto"
 )
 
 /*

@@ -206,7 +206,7 @@ const (
 	CodeInvalidDoubleSigner               ErrorCode = 63
 	CodeInvalidNumCommittees              ErrorCode = 64
 	CodeInvalidCommitteeStakeDistribution ErrorCode = 65
-	CodeInvalidDelegationStatus           ErrorCode = 66
+	CodeValidatorIsADelegate              ErrorCode = 66
 	CodeInvalidCommittee                  ErrorCode = 67
 	CodeInvalidCommitteeID                ErrorCode = 68
 	CodeWrongNetworkID                    ErrorCode = 69

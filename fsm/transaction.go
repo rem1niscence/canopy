@@ -1,9 +1,9 @@
 package fsm
 
 import (
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"time"
 )
@@ -90,11 +90,12 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (cr
 	if err != nil {
 		return nil, types.ErrTxSignBytes(err)
 	}
-	//
+	// convert signature bytes to public key object
 	publicKey, e := crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey)
 	if e != nil {
 		return nil, types.ErrInvalidPublicKey(e)
 	}
+	// validate the signature
 	if !publicKey.VerifyBytes(signBytes, tx.Signature.Signature) {
 		return nil, types.ErrInvalidSignature()
 	}
@@ -105,21 +106,33 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (cr
 	}
 	for _, signer := range signers {
 		if address.Equals(crypto.NewAddressFromBytes(signer)) {
+			// edit stake is a special case where the signer must be known by the handler
+			if editStake, ok := msg.(*types.MessageEditStake); ok {
+				editStake.Signer = signer
+			}
 			return address, nil
 		}
 	}
 	return nil, types.ErrUnauthorizedTx()
 }
 
-// CheckTimestamp() validates the timestamp of the transaction which acts as a prune-friendly, replay attack / hash collision prevention mechanism
+// CheckTimestamp() validates the timestamp of the transaction
+// Instead of using an increasing 'sequence number' Canopy uses timestamps to act as a prune-friendly, replay attack / hash collision prevention mechanism
+//   - Canopy searches the transaction indexer for the transaction using its hash to prevent 'replay attacks'
+//   - The timestamp protects against hash collisions as it injects 'micro-second level entropy'
+//     into the hash of the transaction, ensuring no transactions will 'accidentally collide'
+//   - The timestamp acceptance policy for transactions maintains an acceptable bound of time to support database pruning
 func (s *StateMachine) CheckTimestamp(tx *lib.Transaction) lib.ErrorI {
-	block, err := s.LoadBlock(s.Height())
+	height := s.Height()
+	if height < 2 {
+		return nil
+	}
+	block, err := s.LoadBlock(height - 1)
 	if err != nil {
 		return err
 	}
 	// this gives us a safe mempool to block acceptance while providing a safe tx indexer prune time
-	// example: block time must be +/- 2 hours and txs must be +/- 6 hours, thus theoretical safe prune should be 4 + 12 = 16 hours
-	// but due to factors like clock drift - 24 hours is a safe overestimate
+	// NOTE: due to factors like 'clock drift' the maximum prune should be no less than 24 hours
 	clockVarianceAcceptancePolicy := 6 * time.Hour
 	txTime, lastBlockTime := time.UnixMicro(int64(tx.Time)), time.UnixMicro(int64(block.BlockHeader.Time))
 	minimumTime, maximumTime := lastBlockTime.Add(-1*clockVarianceAcceptancePolicy), lastBlockTime.Add(clockVarianceAcceptancePolicy)

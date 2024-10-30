@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/alecthomas/units"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
@@ -386,9 +386,6 @@ func (x *FeeParams) Check() lib.ErrorI {
 	if x.MessageDaoTransferFee == 0 {
 		return ErrInvalidParam(ParamMessageDAOTransferFee)
 	}
-	//if x.MessageCertificateResultsFee == 0 { // Message proposal fee can be zero fee
-	//	return ErrInvalidParam(ParamMessageDAOTransferFee)
-	//}
 	if x.MessageSubsidyFee == 0 {
 		return ErrInvalidParam(ParamMessageSubsidyFee)
 	}

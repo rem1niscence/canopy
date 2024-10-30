@@ -3,8 +3,8 @@ package types
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"math"
 )
 

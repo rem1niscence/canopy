@@ -1,9 +1,10 @@
 package fsm
 
 import (
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"bytes"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 )
 
 // HandleMessage() routes the MessageI to the correct `handler` based on its `type`
@@ -210,6 +211,10 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 	if val.UnstakingHeight != 0 {
 		return types.ErrValidatorUnstaking()
 	}
+	// check if output address is being modified and ensure the signer is authorized to do this action
+	if !bytes.Equal(val.Output, msg.OutputAddress) && !bytes.Equal(val.Output, msg.Signer) {
+		return types.ErrUnauthorizedTx()
+	}
 	var amountToAdd uint64
 	switch {
 	case msg.Amount < val.StakedAmount: // amount less than stake
@@ -282,7 +287,7 @@ func (s *StateMachine) HandleMessagePause(msg *types.MessagePause) lib.ErrorI {
 		return types.ErrValidatorUnstaking()
 	}
 	if validator.Delegate {
-		return types.ErrInvalidDelegationStatus()
+		return types.ErrValidatorIsADelegate()
 	}
 	// get max pause parameter
 	params, err := s.GetParamsVal()
@@ -306,6 +311,7 @@ func (s *StateMachine) HandleMessageUnpause(msg *types.MessageUnpause) lib.Error
 	if validator.MaxPausedHeight == 0 {
 		return types.ErrValidatorNotPaused()
 	}
+	// theoretically should not happen as an unstaking validator should never be paused
 	if validator.UnstakingHeight != 0 {
 		return types.ErrValidatorUnstaking()
 	}
@@ -319,11 +325,12 @@ func (s *StateMachine) HandleMessageChangeParameter(msg *types.MessageChangePara
 	if err := s.ApproveProposal(msg); err != nil {
 		return types.ErrRejectProposal()
 	}
-	// update the parameter
+	// extract the value from the proto packed 'any'
 	protoMsg, err := lib.FromAny(msg.ParameterValue)
 	if err != nil {
 		return err
 	}
+	// update the parameter
 	return s.UpdateParam(msg.ParameterSpace, msg.ParameterKey, protoMsg)
 }
 
@@ -343,14 +350,20 @@ func (s *StateMachine) HandleMessageDAOTransfer(msg *types.MessageDAOTransfer) l
 
 // HandleMessageCertificateResults() is the proper handler for a `CertificateResults` message
 func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertificateResults) lib.ErrorI {
+	// define convenience variables
 	results, committeeId, store := msg.Qc.Results, msg.Qc.Header.CommitteeId, s.store.(lib.StoreI)
+	// get the validator params from state
+	validatorParams, err := s.GetParamsVal()
+	if err != nil {
+		return err
+	}
 	// get the proper reward Pool
-	pool, err := s.GetPool(committeeId)
+	poolBalance, err := s.GetPoolBalance(committeeId)
 	if err != nil {
 		return err
 	}
 	// ensure subsidized
-	if pool.Amount == 0 {
+	if poolBalance == 0 {
 		return types.ErrNonSubsidizedCommittee()
 	}
 	// validate the height of the CertificateResults Transaction
@@ -364,25 +377,27 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 		return err
 	}
 	// ensure it's a valid QC
-	// NOTE: max block size is 0 here because there should not be a block attached to this QC
+	// max block size is 0 here because there should not be a block attached to this QC
 	isPartialQC, err := msg.Qc.Check(committee, 0, &lib.View{NetworkId: uint64(s.NetworkID), CommitteeId: committeeId}, false)
 	if err != nil {
 		return err
 	}
+	// if it's not signed by a +2/3rds committee majority
 	if isPartialQC {
 		return lib.ErrNoMaj23()
 	}
-	// handle the token swaps from the
+	// handle the token swaps
 	if err = s.HandleCommitteeBuyOrders(results.Orders, committeeId); err != nil {
 		return err
 	}
 	// handle checkpoint-as-a-service functionality
 	if results.Checkpoint != nil {
-		// ensure checkpoint isn't older than the most recent
+		// retrieve the last saved checkpoint for this chain
 		mostRecentCheckpoint, e := store.GetMostRecentCheckpoint(committeeId)
 		if e != nil {
 			return e
 		}
+		// ensure checkpoint isn't older than the most recent
 		if results.Checkpoint.Height <= mostRecentCheckpoint.Height {
 			return types.ErrInvalidCheckpoint()
 		}
@@ -391,19 +406,16 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 			return err
 		}
 	}
-	// reduce payment percentages by non-signer-percent
-	validatorParams, err := s.GetParamsVal()
-	if err != nil {
-		return err
-	}
+	// calculate the missing (non-signers) percentage of voting power on this QC
 	nonSignerPercent, err := s.HandleByzantine(msg.Qc, committee.ValidatorSet, validatorParams)
 	if err != nil {
 		return err
 	}
+	// reduce all payment percents proportional to the non-signer percent
 	for i, p := range results.RewardRecipients.PaymentPercents {
 		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, float64(nonSignerPercent))
 	}
-	// upsert a fund
+	// update the committee data
 	return s.UpsertCommitteeData(&types.CommitteeData{
 		CommitteeId:     committeeId,
 		CommitteeHeight: msg.Qc.Header.CommitteeHeight,

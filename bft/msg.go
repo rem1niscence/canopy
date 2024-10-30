@@ -2,8 +2,8 @@ package bft
 
 import (
 	"bytes"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
 )
 

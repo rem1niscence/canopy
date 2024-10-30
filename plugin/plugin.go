@@ -1,8 +1,8 @@
 package plugin
 
 import (
-	"github.com/ginchuco/ginchu/fsm"
-	"github.com/ginchuco/ginchu/lib"
+	"github.com/ginchuco/canopy/fsm"
+	"github.com/ginchuco/canopy/lib"
 	"time"
 )
 

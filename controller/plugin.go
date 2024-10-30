@@ -1,11 +1,11 @@
 package controller
 
 import (
-	"github.com/ginchuco/ginchu/bft"
-	"github.com/ginchuco/ginchu/fsm"
-	"github.com/ginchuco/ginchu/fsm/types"
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/plugin"
+	"github.com/ginchuco/canopy/bft"
+	"github.com/ginchuco/canopy/fsm"
+	"github.com/ginchuco/canopy/fsm/types"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/plugin"
 )
 
 // HandleTransaction() accepts or rejects inbound txs based on the mempool state

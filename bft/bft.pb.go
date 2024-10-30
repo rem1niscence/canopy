@@ -7,7 +7,7 @@
 package bft
 
 import (
-	lib "github.com/ginchuco/ginchu/lib"
+	lib "github.com/ginchuco/canopy/lib"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"

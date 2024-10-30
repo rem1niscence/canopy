@@ -1,8 +1,8 @@
 package types
 
 import (
-	"github.com/ginchuco/ginchu/lib"
-	"github.com/ginchuco/ginchu/lib/crypto"
+	"github.com/ginchuco/canopy/lib"
+	"github.com/ginchuco/canopy/lib/crypto"
 	"time"
 )
 
@@ -29,14 +29,13 @@ func NewStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netAddre
 }
 
 // NewEditStakeTx() creates a EditStakeTransaction object in the interface form of TransactionI
-func NewEditStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netAddress string, committees []uint64, amount, fee uint64, delegate, earlyWithdrawal bool) (lib.TransactionI, lib.ErrorI) {
+func NewEditStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netAddress string, committees []uint64, amount, fee uint64, earlyWithdrawal bool) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageEditStake{
 		Address:       from.PublicKey().Address().Bytes(),
 		Amount:        amount,
 		Committees:    committees,
 		NetAddress:    netAddress,
 		OutputAddress: outputAddress.Bytes(),
-		Delegate:      delegate,
 		Compound:      !earlyWithdrawal,
 	}, fee)
 }
