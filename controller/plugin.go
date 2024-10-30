@@ -104,7 +104,7 @@ func (c *Controller) ResetBFTCallback(committeeID uint64) {
 
 // CANOPY (BASE CHAIN) SPECIFIC FUNCTIONALITY BELOW
 
-// ValidatorProposalConfig() is how the Validator is configured for `base chain` specific
+// ValidatorProposalConfig() is how the Validator is configured for `base chain` specific parameter upgrades
 func (c *Controller) ValidatorProposalConfig(fsm ...*fsm.StateMachine) (reset func()) {
 	for _, f := range fsm {
 		if c.Consensus[lib.CanopyCommitteeId].GetRound() < 3 {
