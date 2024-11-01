@@ -387,7 +387,7 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 		return lib.ErrNoMaj23()
 	}
 	// handle the token swaps
-	if err = s.HandleCommitteeBuyOrders(results.Orders, committeeId); err != nil {
+	if err = s.HandleCommitteeSwaps(results.Orders, committeeId); err != nil {
 		return err
 	}
 	// handle checkpoint-as-a-service functionality

@@ -6,12 +6,16 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 )
 
-func (s *StateMachine) HandleCommitteeBuyOrders(orders *lib.Orders, committeeId uint64) lib.ErrorI {
+// HandleCommitteeSwaps() when the committee submits a 'certificate results transaction', it informs the chain of various actions over sell orders
+// - 'buy' is an actor 'claiming / reserving' the sell order
+// - 'reset' is a 'claimed' order whose 'buyer' did not send the tokens to the seller before the deadline, thus the order is re-opened for sale
+// - 'close' is a 'claimed' order whose 'buyer' sent the tokens to the seller before the deadline, thus the order is 'closed' and the tokens are moved from escrow to the buyer
+func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, committeeId uint64) lib.ErrorI {
 	if orders != nil {
 		// buy orders are a result of the committee witnessing a 'claim transaction' for the order on the 'buyer chain'
 		// think of 'buy orders' like reserving the 'sell order'
 		for _, buyOrder := range orders.BuyOrders {
-			if err := s.BuyOrder(buyOrder.OrderId, buyOrder.BuyerReceiveAddress, buyOrder.BuyerChainDeadline, committeeId); err != nil {
+			if err := s.BuyOrder(buyOrder, committeeId); err != nil {
 				return err
 			}
 		}
@@ -26,26 +30,7 @@ func (s *StateMachine) HandleCommitteeBuyOrders(orders *lib.Orders, committeeId 
 		// close orders are a result of the committee witnessing the buyer sending the
 		// buy assets before the 'deadline height' of the 'buyer chain'
 		for _, closeOrderId := range orders.CloseOrders {
-			order, err := s.GetOrder(closeOrderId, committeeId)
-			if err != nil {
-				// due to the redundancy 'Look Back' design of the swaps submitting a close order that has no available order is allowed
-				// this is considered safe due to the +2/3rd committee signature requirement
-				s.log.Warn(err.Error())
-				continue
-			}
-			if order.BuyerReceiveAddress == nil {
-				return types.ErrInvalidBuyOrder()
-			}
-			// remove the funds from the escrow pool
-			if err = s.PoolSub(committeeId+types.EscrowPoolAddend, order.AmountForSale); err != nil {
-				return err
-			}
-			// send the funds to the recipient address
-			if err = s.AccountAdd(crypto.NewAddress(order.BuyerReceiveAddress), order.AmountForSale); err != nil {
-				return err
-			}
-			// delete the order
-			if err = s.DeleteOrder(closeOrderId, committeeId); err != nil {
+			if err := s.CloseOrder(closeOrderId, committeeId); err != nil {
 				return err
 			}
 		}
@@ -78,12 +63,12 @@ func (s *StateMachine) EditOrder(order *types.SellOrder, committeeId uint64) (er
 }
 
 // BuyOrder() adds a recipient and a deadline height to an existing order and saves it to the state
-func (s *StateMachine) BuyOrder(orderId uint64, buyerAddress []byte, buyerChainDeadlineHeight, committeeId uint64) (err lib.ErrorI) {
+func (s *StateMachine) BuyOrder(buyOrder *lib.BuyOrder, committeeId uint64) (err lib.ErrorI) {
 	orderBook, err := s.GetOrderBook(committeeId)
 	if err != nil {
 		return
 	}
-	if err = orderBook.BuyOrder(int(orderId), buyerAddress, buyerChainDeadlineHeight); err != nil {
+	if err = orderBook.BuyOrder(int(buyOrder.OrderId), buyOrder.BuyerReceiveAddress, buyOrder.BuyerChainDeadline); err != nil {
 		return
 	}
 	err = s.SetOrderBook(orderBook)
@@ -101,6 +86,32 @@ func (s *StateMachine) ResetOrder(orderId, committeeId uint64) (err lib.ErrorI) 
 	}
 	err = s.SetOrderBook(orderBook)
 	return
+}
+
+// CloseOrder() sends the tokens from escrow to the 'buyer address' and deletes the order
+func (s *StateMachine) CloseOrder(orderId, committeeId uint64) (err lib.ErrorI) {
+	// the order is 'closed' and the tokens are moved from escrow to the buyer
+	order, err := s.GetOrder(orderId, committeeId)
+	if err != nil {
+		// due to the redundancy 'Look Back' design of the swaps submitting a close order that has no available order is allowed
+		// this is considered safe due to the +2/3rd committee signature requirement
+		s.log.Warn(err.Error())
+		return nil
+	}
+	// ensure the order already was 'claimed / reserved'
+	if order.BuyerReceiveAddress == nil {
+		return types.ErrInvalidBuyOrder()
+	}
+	// remove the funds from the escrow pool
+	if err = s.PoolSub(committeeId+types.EscrowPoolAddend, order.AmountForSale); err != nil {
+		return err
+	}
+	// send the funds to the recipient address
+	if err = s.AccountAdd(crypto.NewAddress(order.BuyerReceiveAddress), order.AmountForSale); err != nil {
+		return err
+	}
+	// delete the order
+	return s.DeleteOrder(orderId, committeeId)
 }
 
 // DeleteOrder() deletes an existing order in the order book for a committee in the state db
