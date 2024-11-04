@@ -304,7 +304,7 @@ func (b *BFT) StartProposeVotePhase() {
 	b.log.Info(b.View.ToString())
 	msg := b.GetProposal()
 	if msg == nil {
-		b.log.Warn("No valid message received from Proposer")
+		b.log.Warn("FilterOption_Exclude valid message received from Proposer")
 		b.RoundInterrupt()
 		return
 	}
@@ -382,7 +382,7 @@ func (b *BFT) StartPrecommitVotePhase() {
 	b.log.Info(b.View.ToString())
 	msg := b.GetProposal()
 	if msg == nil {
-		b.log.Warn("No valid message received from Proposer")
+		b.log.Warn("FilterOption_Exclude valid message received from Proposer")
 		b.RoundInterrupt()
 		return
 	}
@@ -444,7 +444,7 @@ func (b *BFT) StartCommitProcessPhase() {
 	b.log.Info(b.View.ToString())
 	msg := b.GetProposal()
 	if msg == nil {
-		b.log.Warn("No valid message received from Proposer")
+		b.log.Warn("FilterOption_Exclude valid message received from Proposer")
 		b.RoundInterrupt()
 		return
 	}

@@ -1,12 +1,13 @@
 package fsm
 
 import (
+	"bytes"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 )
 
-// TODO ensure a 0 committee validator does not panic
+// TODO investigate 0 validator committee situations
 
 // GetValidator() gets the validator from the store via the address
 func (s *StateMachine) GetValidator(address crypto.AddressI) (*types.Validator, lib.ErrorI) {
@@ -150,6 +151,7 @@ func (s *StateMachine) SetValidator(validator *types.Validator) lib.ErrorI {
 }
 
 // UpdateValidatorStake() updates the stake of the validator object in state - updating the corresponding committees and supply
+// NOTE: new stake amount must be GTE the previous stake amount
 func (s *StateMachine) UpdateValidatorStake(val *types.Validator, newCommittees []uint64, amountToAdd uint64) (err lib.ErrorI) {
 	// create address object
 	address := crypto.NewAddress(val.Address)
@@ -196,6 +198,17 @@ func (s *StateMachine) DeleteValidator(validator *types.Validator) lib.ErrorI {
 			return err
 		}
 	}
+	// subtract from staked supply
+	if err := s.SubFromStakedSupply(validator.StakedAmount); err != nil {
+		return err
+	}
+	// subtract from delegate supply
+	if validator.Delegate {
+		// subtract those tokens from the delegate supply count
+		if err := s.SubFromDelegatedSupply(validator.StakedAmount); err != nil {
+			return err
+		}
+	}
 	// delete the validator from state
 	return s.Delete(types.KeyForValidator(addr))
 }
@@ -203,7 +216,7 @@ func (s *StateMachine) DeleteValidator(validator *types.Validator) lib.ErrorI {
 // UNSTAKING VALIDATORS BELOW
 
 // SetValidatorUnstaking() updates a Validator as 'unstaking' and removes it from its respective committees
-// NOTE: finish unstaking height is (likely) not current height, but one in the future when the validator will 'complete' unstaking and their
+// NOTE: finish unstaking height is the height in the future when the validator will be deleted and their
 // funds be returned
 func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, finishUnstakingHeight uint64) lib.ErrorI {
 	// set an entry in the database to mark this validator as unstaking, a single byte is used to allow 'get' calls to differentiate between non-existing keys
@@ -241,16 +254,6 @@ func (s *StateMachine) DeleteFinishedUnstaking() lib.ErrorI {
 		if err = s.AccountAdd(crypto.NewAddressFromBytes(validator.Output), validator.StakedAmount); err != nil {
 			return err
 		}
-		// subtract those tokens from the staked supply count
-		if err = s.SubFromStakedSupply(validator.StakedAmount); err != nil {
-			return err
-		}
-		if validator.Delegate {
-			// subtract those tokens from the delegate supply count
-			if err = s.SubFromDelegatedSupply(validator.StakedAmount); err != nil {
-				return err
-			}
-		}
 		// delete the validator structure
 		return s.DeleteValidator(validator)
 	}
@@ -265,14 +268,13 @@ func (s *StateMachine) DeleteFinishedUnstaking() lib.ErrorI {
 // PAUSED VALIDATORS BELOW
 
 // SetValidatorsPaused() automatically updates all validators as if they'd submitted a MessagePause
-func (s *StateMachine) SetValidatorsPaused(addresses [][]byte) lib.ErrorI {
+func (s *StateMachine) SetValidatorsPaused(addresses [][]byte) {
 	for _, addr := range addresses {
 		if err := s.HandleMessagePause(&types.MessagePause{Address: addr}); err != nil {
 			s.log.Debugf("can't pause validator %s with err %s", lib.BytesToString(addr), err.Error())
 			continue
 		}
 	}
-	return nil
 }
 
 // SetValidatorPaused() updates a Validator as 'paused' with a MaxPausedHeight (height at which the Validator is force-unstaked for being paused too long)
@@ -326,6 +328,10 @@ func (s *StateMachine) GetAuthorizedSignersForValidator(address []byte) (signers
 	// ensure not nil
 	if validator == nil {
 		return nil, types.ErrValidatorNotExists()
+	}
+	// return the operator only if custodial
+	if bytes.Equal(validator.Address, validator.Output) {
+		return [][]byte{validator.Address}, nil
 	}
 	// return the operator and output
 	return [][]byte{validator.Address, validator.Output}, nil

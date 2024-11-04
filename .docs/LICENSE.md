@@ -16,7 +16,7 @@ NOW, THEREFORE, in consideration of the mutual promises contained herein and for
    Subject to the terms and conditions of this Agreement, Licensor hereby grants to Licensee a no license to use the Software.
 
 3. Derivative Works:
-   No modifications or derivative works are allowed.
+   FilterOption_Exclude modifications or derivative works are allowed.
 
 4. Commercial Use:
    Commercial use is not allowed.

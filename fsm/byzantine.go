@@ -4,6 +4,7 @@ import (
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"slices"
 )
 
 // HandleByzantine() handles the byzantine (faulty/malicious) participants from a QuorumCertificate
@@ -69,9 +70,7 @@ func (s *StateMachine) SlashAndResetNonSigners(committeeId uint64, params *types
 		return err
 	}
 	// pause all on the bad list
-	if err := s.SetValidatorsPaused(badList); err != nil {
-		return err
-	}
+	s.SetValidatorsPaused(badList)
 	// slash all on the bad list
 	if err := s.SlashNonSigners(committeeId, params, badList); err != nil {
 		return err
@@ -257,9 +256,9 @@ func (s *StateMachine) SlashValidators(addresses [][]byte, committeeId, percent 
 // SlashValidator() burns a specified percentage of a validator's staked tokens
 func (s *StateMachine) SlashValidator(validator *types.Validator, committeeId, percent uint64, p *types.ValidatorParams) (err lib.ErrorI) {
 	// ensure no unauthorized slashes may occur
-	//if !slices.Contains(validator.Committees, committeeId) { TODO
-	//	return types.ErrInvalidCommitteeID()
-	//}
+	if !slices.Contains(validator.Committees, committeeId) {
+		return types.ErrInvalidCommitteeID()
+	}
 	// if a 'slash tracker' is used to limit the max slash per committee per block
 	if s.slashTracker != nil {
 		// get the slashed percent so far in this block by this committee

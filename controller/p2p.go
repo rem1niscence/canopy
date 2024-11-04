@@ -607,7 +607,7 @@ func (c *Controller) pollMaxHeight(committeeID uint64, backoff int) (maxHeight, 
 			syncingPeers = append(syncingPeers, lib.BytesToString(c.PublicKey))
 		case <-time.After(PollMaxHeightTimeoutS * time.Second * time.Duration(backoff)):
 			if maxHeight == 0 { // genesis file is 0 and first height is 1
-				c.log.Warn("No heights received from peers. Trying again")
+				c.log.Warn("FilterOption_Exclude heights received from peers. Trying again")
 				return c.pollMaxHeight(committeeID, backoff+1)
 			}
 			c.log.Debugf("Waiting peer max height is %d", maxHeight)

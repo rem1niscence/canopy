@@ -21,7 +21,7 @@ import (
 
 		3) Multi Candidate resolution: Replicas choose the lowest VRF out from all valid Candidates as the Leader
 
-		4) No candidate resolution: Stake-Weighted-Pseudorandom selection using a simple modulo over total stake
+		4) FilterOption_Exclude candidate resolution: Stake-Weighted-Pseudorandom selection using a simple modulo over total stake
 		landing on a 'token index' over the list of Validators organized by their staked tokens
 
 	Pros of Election Sortition:

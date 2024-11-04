@@ -187,31 +187,31 @@ func (x *Validator) UnmarshalJSON(bz []byte) error {
 // PassesFilter() returns if the Validator object passes the filter (true) or is filtered out (false)
 func (x *Validator) PassesFilter(f lib.ValidatorFilters) (ok bool) {
 	switch {
-	case f.Unstaking == lib.Yes:
+	case f.Unstaking == lib.FilterOption_MustBe:
 		if x.UnstakingHeight == 0 {
 			return
 		}
-	case f.Unstaking == lib.No:
+	case f.Unstaking == lib.FilterOption_Exclude:
 		if x.UnstakingHeight != 0 {
 			return
 		}
 	}
 	switch {
-	case f.Paused == lib.Yes:
+	case f.Paused == lib.FilterOption_MustBe:
 		if x.MaxPausedHeight == 0 {
 			return
 		}
-	case f.Paused == lib.No:
+	case f.Paused == lib.FilterOption_Exclude:
 		if x.MaxPausedHeight != 0 {
 			return
 		}
 	}
 	switch {
-	case f.Delegate == lib.Yes:
+	case f.Delegate == lib.FilterOption_MustBe:
 		if !x.Delegate {
 			return
 		}
-	case f.Delegate == lib.No:
+	case f.Delegate == lib.FilterOption_Exclude:
 		if x.Delegate {
 			return
 		}

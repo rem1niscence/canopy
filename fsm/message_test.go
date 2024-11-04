@@ -1536,7 +1536,7 @@ func TestMessagePause(t *testing.T) {
 				require.ErrorContains(t, err, test.error)
 				return
 			}
-			// validate the unstaking of the validator object
+			// validate the pausing of the validator object
 			val, err := sm.GetValidator(sender)
 			require.NoError(t, err)
 			// get validator params

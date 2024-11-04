@@ -286,7 +286,7 @@ type ValidatorFilters struct {
 
 // On() returns whether there exists any filters
 func (v ValidatorFilters) On() bool {
-	return v.Unstaking != Off || v.Paused != Off || v.Delegate != Off
+	return v.Unstaking != FilterOption_Off || v.Paused != FilterOption_Off || v.Delegate != FilterOption_Off
 }
 
 // FilterOption symbolizes 'condition must be true (yes)' 'condition must be false (no)' or 'filter off (both)' for filters
@@ -294,7 +294,7 @@ type FilterOption int
 
 // nolint:all
 const (
-	Off FilterOption = 0 // true or false condition
-	Yes              = 1 // condition must be true
-	No               = 2 // condition must be false
+	FilterOption_Off     FilterOption = 0 // true or false condition
+	FilterOption_MustBe               = 1 // condition must be true
+	FilterOption_Exclude              = 2 // condition must be false
 )

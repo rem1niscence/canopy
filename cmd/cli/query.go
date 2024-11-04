@@ -278,21 +278,21 @@ func getFilterArgs() (h uint64, params lib.PageParams, filters lib.ValidatorFilt
 	h, params = getPaginatedArgs()
 	switch {
 	case strings.Contains(strings.ToLower(unstaking), "y"):
-		filters.Unstaking = lib.Yes
+		filters.Unstaking = lib.FilterOption_MustBe
 	case strings.Contains(strings.ToLower(unstaking), "n"):
-		filters.Unstaking = lib.No
+		filters.Unstaking = lib.FilterOption_Exclude
 	}
 	switch {
 	case strings.Contains(strings.ToLower(paused), "y"):
-		filters.Paused = lib.Yes
+		filters.Paused = lib.FilterOption_MustBe
 	case strings.Contains(strings.ToLower(paused), "n"):
-		filters.Paused = lib.No
+		filters.Paused = lib.FilterOption_Exclude
 	}
 	switch {
 	case strings.Contains(strings.ToLower(delegated), "y"):
-		filters.Delegate = lib.Yes
+		filters.Delegate = lib.FilterOption_MustBe
 	case strings.Contains(strings.ToLower(delegated), "n"):
-		filters.Delegate = lib.No
+		filters.Delegate = lib.FilterOption_Exclude
 	}
 	return
 }
