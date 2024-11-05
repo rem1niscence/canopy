@@ -18,51 +18,64 @@ var _ bft.Controller = new(Controller)
 
 // Controller acts as the 'manager' of the modules of the application
 type Controller struct {
-	Plugins    map[uint64]plugin.Plugin
-	Consensus  map[uint64]*bft.BFT
+	Chains     map[uint64]*Chain // list of 'chains' this node is running
 	P2P        *p2p.P2P
 	FSM        *fsm.StateMachine
 	PublicKey  []byte
 	PrivateKey crypto.PrivateKeyI
-	isSyncing  map[uint64]*atomic.Bool
 	Config     lib.Config
 	log        lib.LoggerI
 	sync.Mutex
+}
+
+// Chain represents a 3rd party L1 'blockchain' that is a client of Canopy
+type Chain struct {
+	Plugin    plugin.Plugin // the bridge to the 3rd party chain
+	Consensus *bft.BFT      // the async consensus process between the committee members for the chain
+	isSyncing *atomic.Bool  // is the chain currently being downloaded from peers
 }
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
 func New(c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (*Controller, lib.ErrorI) {
 	// Canopy acts as the base blockchain and a plugin
 	sm := plugin.RegisteredPlugins[lib.CanopyCommitteeId].(plugin.CanopyPlugin).GetFSM()
+	// make a convenience variable for the 'height' of the state machine
 	height := sm.Height()
 	// load maxMembersPerCommittee param to set limits on P2P
 	maxMembersPerCommittee, err := sm.GetMaxValidators()
 	if err != nil {
 		return nil, err
 	}
+	// create a controller structure
 	controller := &Controller{
-		Plugins:    plugin.RegisteredPlugins,
-		Consensus:  make(map[uint64]*bft.BFT),
+		Chains:     make(map[uint64]*Chain),
 		P2P:        p2p.New(valKey, maxMembersPerCommittee, c, l),
 		FSM:        sm,
 		PublicKey:  valKey.PublicKey().Bytes(),
 		PrivateKey: valKey,
-		isSyncing:  make(map[uint64]*atomic.Bool),
 		Config:     c,
 		log:        l,
 		Mutex:      sync.Mutex{},
 	}
 	// using the Canopy state machine as the base blockchain, the controller is able to load the public keys for the 'Committees'
-	for id, plug := range controller.Plugins {
+	for id, plug := range plugin.RegisteredPlugins {
+		// add the callbacks from the controller to the plugin
+		// these callbacks allow the plugin to 'trigger' things in the controller
 		plug.WithCallbacks(controller.ResetBFTCallback, controller.SendTxMsg)
+		// load the committee from the Canopy state
 		valSet, e := sm.LoadCommittee(id, height)
 		if e != nil {
-			return nil, e
+			return nil, e // TODO is there a chicken and egg problem here with starting a new committee?
 		}
-		// initialize BFT instances for each plugin
-		controller.Consensus[id], err = bft.New(c, valKey, id, height, plug.Height(), valSet, controller, id == lib.CanopyCommitteeId, l)
-		controller.isSyncing[id] = &atomic.Bool{}
-		controller.Plugins[id] = plug
+		// initialize the chain, setting the plugin
+		chain := &Chain{Plugin: plug, isSyncing: &atomic.Bool{}}
+		// create a new BFT instance and assign it to the chain
+		chain.Consensus, err = bft.New(c, valKey, id, height, plug.Height(), valSet, controller, id == lib.CanopyCommitteeId, l)
+		if err != nil {
+			return nil, err
+		}
+		// save this chain in the map under the 'id'
+		controller.Chains[id] = chain
 	}
 	return controller, err
 }
@@ -74,9 +87,9 @@ func (c *Controller) Start() {
 	// start internal Controller listeners for P2P
 	c.StartListeners()
 	// sync and start each bft module
-	for id, cons := range c.Consensus {
+	for id, chain := range c.Chains {
 		go c.Sync(id)
-		go cons.Start()
+		go chain.Consensus.Start()
 	}
 }
 
@@ -94,11 +107,11 @@ func (c *Controller) Stop() {
 func (c *Controller) GetHeight(committeeID uint64) (uint64, lib.ErrorI) {
 	c.Lock()
 	defer c.Unlock()
-	plug, _, err := c.GetPluginAndConsensus(committeeID)
+	chain, err := c.GetChain(committeeID)
 	if err != nil {
 		return 0, err
 	}
-	return plug.Height(), nil
+	return chain.Plugin.Height(), nil
 }
 
 // LoadCommittee() gets the ValidatorSet that is authorized to come to Consensus agreement on the Proposal for a specific height/committeeId
@@ -108,11 +121,11 @@ func (c *Controller) LoadCommittee(committeeID uint64, height uint64) (lib.Valid
 
 // LoadCertificate() gets the Quorum Certificate from the committeeID-> plugin at a certain height
 func (c *Controller) LoadCertificate(committeeID uint64, height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
-	plug, _, err := c.GetPluginAndConsensus(committeeID)
+	chain, err := c.GetChain(committeeID)
 	if err != nil {
 		return nil, err
 	}
-	return plug.LoadCertificate(height)
+	return chain.Plugin.LoadCertificate(height)
 }
 
 // LoadMinimumEvidenceHeight() gets the minimum evidence height from Canopy
@@ -127,12 +140,12 @@ func (c *Controller) IsValidDoubleSigner(height uint64, address []byte) bool {
 
 // LoadLastCommitTime() gets a timestamp from the most recent Quorum Certificate
 func (c *Controller) LoadLastCommitTime(committeeID, height uint64) time.Time {
-	plug, _, err := c.GetPluginAndConsensus(committeeID)
+	chain, err := c.GetChain(committeeID)
 	if err != nil {
 		c.log.Error(err.Error())
 		return time.Time{}
 	}
-	return plug.LoadLastCommitTime(height - 1)
+	return chain.Plugin.LoadLastCommitTime(height - 1)
 }
 
 // LoadProposerKeys() gets the last Canopy proposer keys
@@ -161,59 +174,59 @@ func (c *Controller) LoadCommitteeHeightInState(committeeID uint64) uint64 {
 }
 
 // Syncing() returns if any of the supported chains are currently syncing
-func (c *Controller) Syncing(committeeID uint64) *atomic.Bool { return c.isSyncing[committeeID] }
+func (c *Controller) Syncing(committeeID uint64) *atomic.Bool { return c.Chains[committeeID].isSyncing }
 
 // ConsensusSummary() returns the summary json object of the bft for a specific chainID
 func (c *Controller) ConsensusSummary(committeeID uint64) ([]byte, lib.ErrorI) {
 	c.Lock()
 	defer c.Unlock()
 	hash := lib.HexBytes{}
-	_, cons, e := c.GetPluginAndConsensus(committeeID)
+	chain, e := c.GetChain(committeeID)
 	if e != nil {
 		return nil, e
 	}
-	if cons.Results != nil {
-		hash = cons.Results.Hash()
+	if chain.Consensus.Results != nil {
+		hash = chain.Consensus.Results.Hash()
 	}
 	selfKey, err := crypto.NewPublicKeyFromBytes(c.PublicKey)
 	if err != nil {
 		return nil, bft.ErrInvalidPublicKey()
 	}
 	var propAddress lib.HexBytes
-	if cons.ProposerKey != nil {
-		propKey, _ := crypto.NewPublicKeyFromBytes(cons.ProposerKey)
+	if chain.Consensus.ProposerKey != nil {
+		propKey, _ := crypto.NewPublicKeyFromBytes(chain.Consensus.ProposerKey)
 		propAddress = propKey.Address().Bytes()
 	}
 	status := ""
-	switch cons.View.Phase {
+	switch chain.Consensus.View.Phase {
 	case bft.Election, bft.Propose, bft.Precommit, bft.Commit:
-		proposal := cons.GetProposal()
+		proposal := chain.Consensus.GetProposal()
 		if proposal == nil {
 			status = "waiting for proposal"
 		} else {
 			status = "received proposal"
 		}
 	default:
-		if bytes.Equal(cons.ProposerKey, c.PublicKey) {
-			_, _, votedPercentage := cons.GetLeadingVote()
+		if bytes.Equal(chain.Consensus.ProposerKey, c.PublicKey) {
+			_, _, votedPercentage := chain.Consensus.GetLeadingVote()
 			status = fmt.Sprintf("received %d%% of votes", votedPercentage)
 		} else {
 			status = "voting on proposal"
 		}
 	}
 	return lib.MarshalJSONIndent(ConsensusSummary{
-		Syncing:              c.isSyncing[committeeID].Load(),
-		View:                 cons.View,
+		Syncing:              chain.isSyncing.Load(),
+		View:                 chain.Consensus.View,
 		ProposalHash:         hash,
 		Address:              selfKey.Address().Bytes(),
 		PublicKey:            c.PublicKey,
 		ProposerAddress:      propAddress,
-		Proposer:             cons.ProposerKey,
-		Proposals:            cons.Proposals,
-		Votes:                cons.Votes,
-		PartialQCs:           cons.PartialQCs,
-		MinimumPowerFor23Maj: cons.ValidatorSet.MinimumMaj23,
-		PacemakerVotes:       cons.PacemakerMessages,
+		Proposer:             chain.Consensus.ProposerKey,
+		Proposals:            chain.Consensus.Proposals,
+		Votes:                chain.Consensus.Votes,
+		PartialQCs:           chain.Consensus.PartialQCs,
+		MinimumPowerFor23Maj: chain.Consensus.ValidatorSet.MinimumMaj23,
+		PacemakerVotes:       chain.Consensus.PacemakerMessages,
 		Status:               status,
 	})
 }

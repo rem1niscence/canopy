@@ -13,11 +13,11 @@ import (
 func (c *Controller) HandleTransaction(committeeID uint64, tx []byte) lib.ErrorI {
 	c.Lock()
 	defer c.Unlock()
-	plug, _, err := c.GetPluginAndConsensus(committeeID)
+	chain, err := c.GetChain(committeeID)
 	if err != nil {
 		return err
 	}
-	return plug.HandleTx(tx)
+	return chain.Plugin.HandleTx(tx)
 }
 
 // ValidateCertificate() fully validates the proposal and resets back to begin block state
@@ -27,29 +27,25 @@ func (c *Controller) ValidateCertificate(committeeID uint64, qc *lib.QuorumCerti
 		reset := c.ValidatorProposalConfig(c.FSM)
 		defer func() { reset() }()
 	}
-	plug, cons, err := c.GetPluginAndConsensus(committeeID)
+	chain, err := c.GetChain(committeeID)
 	if err != nil {
 		return
 	}
 	// validate the byzantine evidence portion of the proposal (bft is canopy controlled)
-	if err = cons.ValidateByzantineEvidence(qc.Results.SlashRecipients, evidence); err != nil {
+	if err = chain.Consensus.ValidateByzantineEvidence(qc.Results.SlashRecipients, evidence); err != nil {
 		return err
 	}
 	// validate the rest of the proposal (block / reward recipients may only be determined and/or interpreted by the plugin)
-	return plug.ValidateCertificate(c.FSM.Height(), qc)
+	return chain.Plugin.ValidateCertificate(c.FSM.Height(), qc)
 }
 
-// GetPluginAndConsensus() returns the plugin and bft object for a specific committeeID, if not supported - then error
-func (c *Controller) GetPluginAndConsensus(committeeID uint64) (plugin.Plugin, *bft.BFT, lib.ErrorI) {
-	p, ok := c.Plugins[committeeID]
+// GetChain() returns the chain object for a specific committeeID, if not supported - then error
+func (c *Controller) GetChain(committeeID uint64) (*Chain, lib.ErrorI) {
+	chain, ok := c.Chains[committeeID]
 	if !ok {
-		return nil, nil, lib.ErrWrongCommitteeID()
+		return nil, lib.ErrWrongCommitteeID()
 	}
-	cons, ok := c.Consensus[committeeID]
-	if !ok {
-		return nil, nil, lib.ErrWrongCommitteeID()
-	}
-	return p, cons, nil
+	return chain, nil
 }
 
 // ProduceProposal() uses the associated `plugin` to create a Proposal with the candidate block and the `bft` to populate the byzantine evidence
@@ -58,12 +54,12 @@ func (c *Controller) ProduceProposal(committeeID uint64, be *bft.ByzantineEviden
 		reset := c.ValidatorProposalConfig(c.FSM)
 		defer func() { reset() }()
 	}
-	plug, cons, err := c.GetPluginAndConsensus(committeeID)
+	chain, err := c.GetChain(committeeID)
 	if err != nil {
 		return
 	}
 	// use the plugin to make the 'proposal'
-	block, rewardRecipients, err := plug.ProduceProposal(vdf)
+	block, rewardRecipients, err := chain.Plugin.ProduceProposal(vdf)
 	if err != nil {
 		return
 	}
@@ -72,11 +68,11 @@ func (c *Controller) ProduceProposal(committeeID uint64, be *bft.ByzantineEviden
 		SlashRecipients:  new(lib.SlashRecipients),
 	}
 	// use the bft object to fill in the Byzantine Evidence
-	results.SlashRecipients.DoubleSigners, err = cons.ProcessDSE(be.DSE.Evidence...)
+	results.SlashRecipients.DoubleSigners, err = chain.Consensus.ProcessDSE(be.DSE.Evidence...)
 	if err != nil {
 		c.log.Warn(err.Error()) // still produce proposal
 	}
-	results.SlashRecipients.BadProposers, err = cons.ProcessBPE(be.BPE.Evidence...)
+	results.SlashRecipients.BadProposers, err = chain.Consensus.ProcessBPE(be.BPE.Evidence...)
 	if err != nil {
 		c.log.Warn(err.Error()) // still produce proposal
 	}
@@ -88,18 +84,18 @@ func (c *Controller) ProduceProposal(committeeID uint64, be *bft.ByzantineEviden
 func (c *Controller) ResetBFTCallback(committeeID uint64) {
 	c.Lock()
 	defer c.Unlock()
-	consensus, ok := c.Consensus[committeeID]
+	chain, ok := c.Chains[committeeID]
 	if !ok {
 		c.log.Errorf("failed retrieving bft object when trigger occurred %s", lib.ErrWrongCommitteeID())
 		return
 	}
 	var err lib.ErrorI
-	consensus.ValidatorSet, err = c.FSM.GetCommitteeMembers(committeeID)
+	chain.Consensus.ValidatorSet, err = c.FSM.GetCommitteeMembers(committeeID)
 	if err != nil {
 		c.log.Errorf("failed retrieving committee when trigger occurred %s", err.Error())
 		return
 	}
-	consensus.ResetBFTChan() <- bft.ResetBFT{}
+	chain.Consensus.ResetBFTChan() <- bft.ResetBFT{}
 }
 
 // CANOPY (BASE CHAIN) SPECIFIC FUNCTIONALITY BELOW
@@ -107,7 +103,7 @@ func (c *Controller) ResetBFTCallback(committeeID uint64) {
 // ValidatorProposalConfig() is how the Validator is configured for `base chain` specific parameter upgrades
 func (c *Controller) ValidatorProposalConfig(fsm ...*fsm.StateMachine) (reset func()) {
 	for _, f := range fsm {
-		if c.Consensus[lib.CanopyCommitteeId].GetRound() < 3 {
+		if c.Chains[lib.CanopyCommitteeId].Consensus.GetRound() < 3 {
 			f.SetProposalVoteConfig(types.GovProposalVoteConfig_APPROVE_LIST)
 		} else {
 			f.SetProposalVoteConfig(types.GovProposalVoteConfig_REJECT_ALL)
@@ -125,9 +121,9 @@ func (c *Controller) ValidatorProposalConfig(fsm ...*fsm.StateMachine) (reset fu
 func (c *Controller) GetPendingPage(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 	c.Lock()
 	defer c.Unlock()
-	plug, _, err := c.GetPluginAndConsensus(lib.CanopyCommitteeId)
+	chain, err := c.GetChain(lib.CanopyCommitteeId)
 	if err != nil {
 		return nil, err
 	}
-	return plug.(plugin.CanopyPlugin).PendingPageForRPC(p)
+	return chain.Plugin.(plugin.CanopyPlugin).PendingPageForRPC(p)
 }
