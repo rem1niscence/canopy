@@ -141,6 +141,7 @@ func (c *Controller) GossipBlock(committeeID uint64, qc *lib.QuorumCertificate) 
 		TotalVdfIterations:  chain.Plugin.TotalVDFIterations(),
 		BlockAndCertificate: qc,
 	}
+	// gossip the block message to peers for a particular committee id
 	if err = c.P2P.SendToChainPeers(committeeID, Block, blockMessage); err != nil {
 		c.log.Errorf("unable to gossip block with err: %s", err.Error())
 	}

@@ -148,6 +148,7 @@ func (c *Controller) LoadLastProposers() *lib.Proposers {
 		c.log.Error(err.Error())
 		return nil
 	}
+	// return the
 	return &lib.Proposers{Addresses: keys.Addresses}
 }
 
