@@ -24,13 +24,6 @@ const (
 	PeerBookRequestTimeoutS      = 5               // timeout in seconds of the peer book
 	CrawlAndCleanBookFrequency   = time.Hour       // how often the book is cleaned and crawled
 	SaveBookFrequency            = time.Minute * 5 // how often the book is saved to a file
-
-	GoodPeerBookRespRep   = 3  // reputation points for a good peer book response
-	PeerBookReqTimeoutRep = -1 // slash for a non-response for a peer book request
-	UnexpectedMsgRep      = -1 // slash for an unexpected message
-	InvalidMsgRep         = -3 // slash for an invalid message
-	ExceedMaxPBReqRep     = -3 // slash for exceeding the max peer book requests
-	ExceedMaxPBLenRep     = -3 // slash for exceeding the size of the peer book message
 )
 
 // PeerBook is a persisted structure that maintains information on potential peers

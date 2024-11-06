@@ -23,11 +23,32 @@ const (
 	maxChanSize         = 100                    // maximum number of items in a channel before blocking
 	maxQueueSize        = 100                    // maximum number of items in a queue before blocking
 
-	maxMessageExceededSlash = -10 // slash for sending a 'Message (sum of Packets)' above the allowed maximum size
-	unknownMessageSlash     = -3  // unknown message type is received
-	badStreamSlash          = -3  // unknown stream id is received
-	badPacketSlash          = -1  // bad packet is received
-	noPongSlash             = -1  // no pong received
+	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
+	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
+	PollMaxHeightTimeoutS   = 5   // wait time for polling the maximum height of the peers
+	SyncTimeoutS            = 5   // wait time to receive an individual block (certificate) from a peer during syncing
+	MaxBlockReqPerWindow    = 5   // maximum block (certificate) requests per window per requester
+	BlockReqWindowS         = 10  // the 'window of time' before resetting limits for block (certificate) requests
+	GoodPeerBookRespRep     = 3   // reputation points for a good peer book response
+	GoodBlockRep            = 3   // rep boost for sending us a valid block (certificate)
+	GoodTxRep               = 3   // rep boost for sending us a valid transaction (certificate)
+	BadPacketSlash          = -1  // bad packet is received
+	NoPongSlash             = -1  // no pong received
+	TimeoutRep              = -1  // rep slash for not responding in time
+	UnexpectedBlockRep      = -1  // rep slash for sending us a block we weren't expecting
+	PeerBookReqTimeoutRep   = -1  // slash for a non-response for a peer book request
+	UnexpectedMsgRep        = -1  // slash for an unexpected message
+	InvalidMsgRep           = -3  // slash for an invalid message
+	ExceedMaxPBReqRep       = -3  // slash for exceeding the max peer book requests
+	ExceedMaxPBLenRep       = -3  // slash for exceeding the size of the peer book message
+	UnknownMessageSlash     = -3  // unknown message type is received
+	BadStreamSlash          = -3  // unknown stream id is received
+	InvalidTxRep            = -3  // rep slash for sending us an invalid transaction
+	NotValRep               = -3  // rep slash for sending us a validator only message but not being a validator
+	InvalidBlockRep         = -3  // rep slash for sending an invalid block (certificate) message
+	InvalidJustifyRep       = -3  // rep slash for sending an invalid certificate justification
+	BlockReqExceededRep     = -3  // rep slash for over-requesting blocks (certificates)
+	MaxMessageExceededSlash = -10 // slash for sending a 'Message (sum of Packets)' above the allowed maximum size
 )
 
 // MultiConn: A rate-limited, multiplexed connection that utilizes a series streams with varying priority for sending and receiving
@@ -126,7 +147,7 @@ func (c *MultiConn) startSendService() {
 			// set the pong timer to execute an Error function if the timer expires before receiving a pong
 			pongTimer = time.AfterFunc(pongTimeoutDuration, func() {
 				if e := ErrPongTimeout(); e != nil {
-					c.Error(e, noPongSlash)
+					c.Error(e, NoPongSlash)
 				}
 			})
 		case <-c.sendPong: // fires when receive service got a 'ping' message
@@ -166,7 +187,7 @@ func (c *MultiConn) startReceiveService() {
 				// load the proper stream
 				stream, found := c.streams[x.StreamId]
 				if !found {
-					c.Error(ErrBadStream(), badStreamSlash)
+					c.Error(ErrBadStream(), BadStreamSlash)
 					return
 				}
 				// get the peer info from the peer set
@@ -185,7 +206,7 @@ func (c *MultiConn) startReceiveService() {
 			case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
 				c.receivedPong <- struct{}{}
 			default: // unknown type results in slash and exiting the service
-				c.Error(ErrUnknownP2PMsg(x), unknownMessageSlash)
+				c.Error(ErrUnknownP2PMsg(x), UnknownMessageSlash)
 				return
 			}
 		case <-c.quitReceiving: // fires when quit is signaled
@@ -331,7 +352,7 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 	// if the addition of this new packet pushes the total message size above max
 	if int(maxMessageSize) < len(s.msgAssembler)+len(packet.Bytes) {
 		s.msgAssembler = make([]byte, 0, maxMessageSize)
-		return maxMessageExceededSlash, ErrMaxMessageSize()
+		return MaxMessageExceededSlash, ErrMaxMessageSize()
 	}
 	// combine this packet with the previously received ones
 	s.msgAssembler = append(s.msgAssembler, packet.Bytes...)
@@ -340,12 +361,12 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		// unmarshall all the bytes into the universal wrapper
 		var msg Envelope
 		if err := lib.Unmarshal(s.msgAssembler, &msg); err != nil {
-			return badPacketSlash, err
+			return BadPacketSlash, err
 		}
 		// read the payload into a proto.Message
 		payload, err := lib.FromAny(msg.Payload)
 		if err != nil {
-			return badPacketSlash, err
+			return BadPacketSlash, err
 		}
 		// wrap with metadata
 		m := (&lib.MessageAndMetadata{

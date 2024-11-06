@@ -18,14 +18,13 @@ var _ bft.Controller = new(Controller)
 
 // Controller acts as the 'manager' of the modules of the application
 type Controller struct {
-	Chains     map[uint64]*Chain // list of 'chains' this node is running
-	P2P        *p2p.P2P
-	FSM        *fsm.StateMachine
-	PublicKey  []byte
-	PrivateKey crypto.PrivateKeyI
-	Config     lib.Config
-	log        lib.LoggerI
-	sync.Mutex
+	Chains     map[uint64]*Chain  // list of 'chains' this node is running
+	P2P        *p2p.P2P           // the P2P module the node uses to connect to the network
+	PublicKey  []byte             // self public key
+	PrivateKey crypto.PrivateKeyI // self private key
+	Config     lib.Config         // node configuration
+	log        lib.LoggerI        // object for logging
+	sync.Mutex                    // mutex for thread safety
 }
 
 // Chain represents a 3rd party L1 'blockchain' that is a client of Canopy
@@ -50,7 +49,6 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (*Controller, l
 	controller := &Controller{
 		Chains:     make(map[uint64]*Chain),
 		P2P:        p2p.New(valKey, maxMembersPerCommittee, c, l),
-		FSM:        sm,
 		PublicKey:  valKey.PublicKey().Bytes(),
 		PrivateKey: valKey,
 		Config:     c,
@@ -97,7 +95,7 @@ func (c *Controller) Start() {
 func (c *Controller) Stop() {
 	c.Lock()
 	defer c.Unlock()
-	if err := c.FSM.Store().(lib.StoreI).Close(); err != nil {
+	if err := c.CanopyFSM().Store().(lib.StoreI).Close(); err != nil {
 		c.log.Error(err.Error())
 	}
 	c.P2P.Stop()
@@ -116,10 +114,10 @@ func (c *Controller) GetHeight(committeeID uint64) (uint64, lib.ErrorI) {
 
 // LoadCommittee() gets the ValidatorSet that is authorized to come to Consensus agreement on the Proposal for a specific height/committeeId
 func (c *Controller) LoadCommittee(committeeID uint64, height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	return c.FSM.LoadCommittee(committeeID, height)
+	return c.CanopyFSM().LoadCommittee(committeeID, height)
 }
 
-// LoadCertificate() gets the Quorum Certificate from the committeeID-> plugin at a certain height
+// LoadCertificate() gets the Quorum Block from the committeeID-> plugin at a certain height
 func (c *Controller) LoadCertificate(committeeID uint64, height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
 	chain, err := c.GetChain(committeeID)
 	if err != nil {
@@ -130,15 +128,15 @@ func (c *Controller) LoadCertificate(committeeID uint64, height uint64) (*lib.Qu
 
 // LoadMinimumEvidenceHeight() gets the minimum evidence height from Canopy
 func (c *Controller) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) {
-	return c.FSM.LoadMinimumEvidenceHeight()
+	return c.CanopyFSM().LoadMinimumEvidenceHeight()
 }
 
 // IsValidDoubleSigner() Canopy checks if the double signer is valid at a certain height
 func (c *Controller) IsValidDoubleSigner(height uint64, address []byte) bool {
-	return c.FSM.IsValidDoubleSigner(height, address) // may only be charged once per height
+	return c.CanopyFSM().IsValidDoubleSigner(height, address) // may only be charged once per height
 }
 
-// LoadLastCommitTime() gets a timestamp from the most recent Quorum Certificate
+// LoadLastCommitTime() gets a timestamp from the most recent Quorum Block
 func (c *Controller) LoadLastCommitTime(committeeID, height uint64) time.Time {
 	chain, err := c.GetChain(committeeID)
 	if err != nil {
@@ -150,7 +148,7 @@ func (c *Controller) LoadLastCommitTime(committeeID, height uint64) time.Time {
 
 // LoadProposerKeys() gets the last Canopy proposer keys
 func (c *Controller) LoadLastProposers() *lib.Proposers {
-	keys, err := c.FSM.GetLastProposers()
+	keys, err := c.CanopyFSM().GetLastProposers()
 	if err != nil {
 		c.log.Error(err.Error())
 		return nil
@@ -158,77 +156,80 @@ func (c *Controller) LoadLastProposers() *lib.Proposers {
 	return &lib.Proposers{Addresses: keys.Addresses}
 }
 
-// LoadCanopyHeight() loads the latest version of the Canopy blockchain
-func (c *Controller) LoadCanopyHeight() uint64 { return c.FSM.Height() }
-
 // LoadCommitteeHeightInState() returns the last height the committee submitted a proposal for rewards
 func (c *Controller) LoadCommitteeHeightInState(committeeID uint64) uint64 {
-	fund, err := c.FSM.GetCommitteeData(committeeID)
-	if err != nil {
+	// load the committee data from the canopy fsm
+	data, err := c.CanopyFSM().GetCommitteeData(committeeID)
+	// if the data doesn't exist return 0
+	if data == nil || err != nil {
 		return 0
 	}
-	if fund == nil {
-		return 0
-	}
-	return fund.CommitteeHeight
+	// return the committee height
+	return data.CommitteeHeight
+}
+
+// CanopyFSM() returns the state machine of the Canopy blockchain
+func (c *Controller) CanopyFSM() *fsm.StateMachine {
+	return c.Chains[lib.CanopyCommitteeId].Plugin.(plugin.CanopyPlugin).GetFSM()
 }
 
 // Syncing() returns if any of the supported chains are currently syncing
 func (c *Controller) Syncing(committeeID uint64) *atomic.Bool { return c.Chains[committeeID].isSyncing }
 
-// ConsensusSummary() returns the summary json object of the bft for a specific chainID
+// ConsensusSummary() for the RPC - returns the summary json object of the bft for a specific chainID
 func (c *Controller) ConsensusSummary(committeeID uint64) ([]byte, lib.ErrorI) {
+	// lock for thread safety
 	c.Lock()
 	defer c.Unlock()
-	hash := lib.HexBytes{}
+	// get the chain to summarize
 	chain, e := c.GetChain(committeeID)
 	if e != nil {
 		return nil, e
 	}
-	if chain.Consensus.Results != nil {
-		hash = chain.Consensus.Results.Hash()
-	}
-	selfKey, err := crypto.NewPublicKeyFromBytes(c.PublicKey)
-	if err != nil {
-		return nil, bft.ErrInvalidPublicKey()
-	}
-	var propAddress lib.HexBytes
-	if chain.Consensus.ProposerKey != nil {
-		propKey, _ := crypto.NewPublicKeyFromBytes(chain.Consensus.ProposerKey)
-		propAddress = propKey.Address().Bytes()
-	}
-	status := ""
-	switch chain.Consensus.View.Phase {
-	case bft.Election, bft.Propose, bft.Precommit, bft.Commit:
-		proposal := chain.Consensus.GetProposal()
-		if proposal == nil {
-			status = "waiting for proposal"
-		} else {
-			status = "received proposal"
-		}
-	default:
-		if bytes.Equal(chain.Consensus.ProposerKey, c.PublicKey) {
-			_, _, votedPercentage := chain.Consensus.GetLeadingVote()
-			status = fmt.Sprintf("received %d%% of votes", votedPercentage)
-		} else {
-			status = "voting on proposal"
-		}
-	}
-	return lib.MarshalJSONIndent(ConsensusSummary{
+	// convert self public key from bytes into an object
+	selfKey, _ := crypto.NewPublicKeyFromBytes(c.PublicKey)
+	// create the consensus summary object
+	consensusSummary := &ConsensusSummary{
 		Syncing:              chain.isSyncing.Load(),
 		View:                 chain.Consensus.View,
-		ProposalHash:         hash,
+		Locked:               chain.Consensus.HighQC != nil,
 		Address:              selfKey.Address().Bytes(),
 		PublicKey:            c.PublicKey,
-		ProposerAddress:      propAddress,
 		Proposer:             chain.Consensus.ProposerKey,
 		Proposals:            chain.Consensus.Proposals,
 		Votes:                chain.Consensus.Votes,
 		PartialQCs:           chain.Consensus.PartialQCs,
 		MinimumPowerFor23Maj: chain.Consensus.ValidatorSet.MinimumMaj23,
 		PacemakerVotes:       chain.Consensus.PacemakerMessages,
-		Status:               status,
-	})
+	}
+	// if exists, populate the proposal hash
+	if chain.Consensus.Results != nil {
+		consensusSummary.ProposalHash = chain.Consensus.Results.Hash()
+	}
+	// if exists, populate the proposer address
+	if chain.Consensus.ProposerKey != nil {
+		propKey, _ := crypto.NewPublicKeyFromBytes(chain.Consensus.ProposerKey)
+		consensusSummary.ProposerAddress = propKey.Address().Bytes()
+	}
+	// create a status string
+	switch chain.Consensus.View.Phase {
+	case bft.Election, bft.Propose, bft.Precommit, bft.Commit:
+		proposal := chain.Consensus.GetProposal()
+		if proposal == nil {
+			consensusSummary.Status = "waiting for proposal"
+		} else {
+			consensusSummary.Status = "received proposal"
+		}
+	case bft.ElectionVote, bft.ProposeVote, bft.CommitProcess:
+		if bytes.Equal(chain.Consensus.ProposerKey, c.PublicKey) {
+			_, _, votedPercentage := chain.Consensus.GetLeadingVote()
+			consensusSummary.Status = fmt.Sprintf("received %d%% of votes", votedPercentage)
+		} else {
+			consensusSummary.Status = "voting on proposal"
+		}
+	}
+	// convert the object into json
+	return lib.MarshalJSONIndent(&consensusSummary)
 }
 
 // ConsensusSummary is simply a json informational structure about the local status of the BFT

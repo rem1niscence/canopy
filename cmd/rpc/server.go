@@ -191,7 +191,7 @@ func StartRPC(a *app2.Controller, c lib.Config, l lib.LoggerI) {
 		AllowedOrigins: []string{"http://localhost:" + c.WalletPort, "http://localhost:" + c.ExplorerPort},
 		AllowedMethods: []string{"GET", "OPTIONS", "POST"},
 	})
-	s, timeout := a.FSM.Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
+	s, timeout := a.CanopyFSM().Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
 	app, conf, db, logger = a, c, s.DB(), l
 	l.Infof("Starting RPC server at 0.0.0.0:%s", c.RPCPort)
 	go func() {

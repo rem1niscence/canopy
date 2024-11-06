@@ -321,7 +321,7 @@ func TestID(t *testing.T) {
 }
 
 func TestMaxPacketSize(t *testing.T) {
-	maxPacket, _ := lib.Marshal(&Packet{StreamId: lib.Topic_CERTIFICATE, Eof: true, Bytes: make([]byte, maxDataChunkSize)})
+	maxPacket, _ := lib.Marshal(&Packet{StreamId: lib.Topic_BLOCK, Eof: true, Bytes: make([]byte, maxDataChunkSize)})
 	require.Equal(t, len(maxPacket), maxPacketSize)
 }
 

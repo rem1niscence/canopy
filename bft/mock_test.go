@@ -550,11 +550,11 @@ func (t *testController) SendCertificateResultsTx(committeeID uint64, certificat
 	t.gossipCertChan[committeeID] <- certificate
 }
 
-func (t *testController) SendConsMsgToReplicas(committeeID uint64, _ lib.ValidatorSet, msg lib.Signable) {
+func (t *testController) SendToReplicas(committeeID uint64, _ lib.ValidatorSet, msg lib.Signable) {
 	t.sendToReplicasChan[committeeID] <- msg
 }
 
-func (t *testController) SendConsMsgToProposer(committeeID uint64, msg lib.Signable) {
+func (t *testController) SendToProposer(committeeID uint64, msg lib.Signable) {
 	t.sendToProposerChan[committeeID] <- msg
 }
 
@@ -563,7 +563,7 @@ func (t *testController) IsValidDoubleSigner(_ uint64, _ []byte) bool     { retu
 func (t *testController) Syncing(_ uint64) *atomic.Bool                   { return &atomic.Bool{} }
 func (t *testController) LoadCommitteeHeightInState(_ uint64) uint64      { return 0 }
 func (t *testController) LoadLastProposers() *lib.Proposers               { return t.proposers }
-func (t *testController) SendCertMsg(committeeID uint64, cert *lib.QuorumCertificate) {
+func (t *testController) GossipBlock(committeeID uint64, cert *lib.QuorumCertificate) {
 	t.gossipCertChan[committeeID] <- cert
 }
 

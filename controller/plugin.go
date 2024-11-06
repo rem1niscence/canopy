@@ -24,7 +24,7 @@ func (c *Controller) HandleTransaction(committeeID uint64, tx []byte) lib.ErrorI
 func (c *Controller) ValidateCertificate(committeeID uint64, qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (err lib.ErrorI) {
 	// the base chain has specific logic to approve or reject proposals
 	if committeeID == lib.CanopyCommitteeId {
-		reset := c.ValidatorProposalConfig(c.FSM)
+		reset := c.ValidatorProposalConfig(c.CanopyFSM())
 		defer func() { reset() }()
 	}
 	chain, err := c.GetChain(committeeID)
@@ -36,22 +36,24 @@ func (c *Controller) ValidateCertificate(committeeID uint64, qc *lib.QuorumCerti
 		return err
 	}
 	// validate the rest of the proposal (block / reward recipients may only be determined and/or interpreted by the plugin)
-	return chain.Plugin.ValidateCertificate(c.FSM.Height(), qc)
+	return chain.Plugin.ValidateCertificate(c.CanopyFSM().Height(), qc)
 }
 
 // GetChain() returns the chain object for a specific committeeID, if not supported - then error
 func (c *Controller) GetChain(committeeID uint64) (*Chain, lib.ErrorI) {
+	// get the chain from the map
 	chain, ok := c.Chains[committeeID]
 	if !ok {
 		return nil, lib.ErrWrongCommitteeID()
 	}
+	// return the chain
 	return chain, nil
 }
 
 // ProduceProposal() uses the associated `plugin` to create a Proposal with the candidate block and the `bft` to populate the byzantine evidence
 func (c *Controller) ProduceProposal(committeeID uint64, be *bft.ByzantineEvidence, vdf *lib.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI) {
 	if committeeID == lib.CanopyCommitteeId {
-		reset := c.ValidatorProposalConfig(c.FSM)
+		reset := c.ValidatorProposalConfig(c.CanopyFSM())
 		defer func() { reset() }()
 	}
 	chain, err := c.GetChain(committeeID)
@@ -90,7 +92,7 @@ func (c *Controller) ResetBFTCallback(committeeID uint64) {
 		return
 	}
 	var err lib.ErrorI
-	chain.Consensus.ValidatorSet, err = c.FSM.GetCommitteeMembers(committeeID)
+	chain.Consensus.ValidatorSet, err = c.CanopyFSM().GetCommitteeMembers(committeeID)
 	if err != nil {
 		c.log.Errorf("failed retrieving committee when trigger occurred %s", err.Error())
 		return

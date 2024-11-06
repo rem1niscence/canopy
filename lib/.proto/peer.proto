@@ -8,8 +8,8 @@ import "consensus.proto";
 // ordered by stream priority
 enum Topic {
   CONSENSUS = 0;
-  CERTIFICATE = 1;
-  CERTIFICATE_REQUEST = 2;
+  BLOCK = 1;
+  BLOCK_REQUEST = 2;
   TX = 3;
   PEERS_RESPONSE = 4;
   PEERS_REQUEST = 5;
@@ -47,7 +47,7 @@ message BlockRequestMessage {
   bool height_only = 3;
 }
 
-message BlockResponseMessage {
+message BlockMessage {
   uint64 committee_id = 1;
   uint64 max_height = 2;
   uint64 total_vdf_iterations = 3;

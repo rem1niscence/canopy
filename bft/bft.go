@@ -215,7 +215,7 @@ func (b *BFT) StartElectionPhase() {
 	})
 	// if is a possible proposer candidate, then send the VRF to other Replicas for the ElectionVote
 	if isCandidate {
-		b.SendConsMsgToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
+		b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
 			Header: b.View.Copy(),
 			Vrf:    vrf,
 		})
@@ -240,7 +240,7 @@ func (b *BFT) StartElectionVotePhase() {
 		Iterations: uint64(iterations),
 	}
 	// sign and send vote to Proposer
-	b.SendConsMsgToProposer(b.CommitteeId, &Message{
+	b.SendToProposer(b.CommitteeId, &Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
 			Header:      b.View.Copy(),
 			ProposerKey: b.ProposerKey, // using voting power, authorizes Candidate to act as the 'Leader'
@@ -277,7 +277,7 @@ func (b *BFT) StartProposePhase() {
 		}
 	}
 	// send PROPOSE message to the replicas
-	b.SendConsMsgToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
+	b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
 		Header: b.View.Copy(),
 		Qc: &QC{
 			Header:      vote.Qc.Header, // the current view
@@ -333,7 +333,7 @@ func (b *BFT) StartProposeVotePhase() {
 	b.Block, b.Results = msg.Qc.Block, msg.Qc.Results
 	b.ByzantineEvidence = byzantineEvidence // BE stored in case of round interrupt and replicas locked on a proposal with BE
 	// send vote to the proposer
-	b.SendConsMsgToProposer(b.CommitteeId, &Message{
+	b.SendToProposer(b.CommitteeId, &Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
 			Header:      b.View.Copy(),
 			BlockHash:   crypto.Hash(b.Block),
@@ -361,7 +361,7 @@ func (b *BFT) StartPrecommitPhase() {
 		return
 	}
 	// send PRECOMMIT msg to Replicas
-	b.SendConsMsgToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
+	b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
 		Header: b.Copy(),
 		Qc: &QC{
 			Header:      vote.Qc.Header,       // vote view
@@ -394,7 +394,7 @@ func (b *BFT) StartPrecommitVotePhase() {
 	// `lock` on the proposal (only by satisfying the SAFE-NODE-PREDICATE or COMMIT can this node unlock)
 	b.HighQC = msg.Qc
 	// send vote to the proposer
-	b.SendConsMsgToProposer(b.CommitteeId, &Message{
+	b.SendToProposer(b.CommitteeId, &Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
 			Header:      b.View.Copy(),
 			BlockHash:   crypto.Hash(b.Block),
@@ -422,7 +422,7 @@ func (b *BFT) StartCommitPhase() {
 		return
 	}
 	// SEND MSG TO REPLICAS
-	b.SendConsMsgToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
+	b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
 		Header: b.Copy(), // header
 		Qc: &QC{
 			Header:      vote.Qc.Header,       // vote view
@@ -460,7 +460,7 @@ func (b *BFT) StartCommitProcessPhase() {
 		BPE: b.GetLocalBPE(),
 	}
 	// gossip committed block message to peers
-	b.SendCertMsg(b.CommitteeId, msg.Qc)
+	b.GossipBlock(b.CommitteeId, msg.Qc)
 	// if leader: send the proposal (reward) transaction
 	if b.SelfIsProposer() {
 		b.SendCertificateResultsTx(b.CommitteeId, msg.Qc)
@@ -474,7 +474,7 @@ func (b *BFT) RoundInterrupt() {
 	b.log.Warn(b.View.ToString())
 	b.Phase = RoundInterrupt
 	// send pacemaker message
-	b.SendConsMsgToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
+	b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
 		Qc: &lib.QuorumCertificate{
 			Header: b.View.Copy(),
 		},
@@ -777,13 +777,13 @@ type (
 		// IsValidDoubleSigner() checks to see if the double signer is valid for this specific height
 		IsValidDoubleSigner(height uint64, address []byte) bool
 		// SendCertMsg() is a P2P call to gossip a completed Quorum Certificate with a Proposal
-		SendCertMsg(committeeID uint64, certificate *lib.QuorumCertificate)
+		GossipBlock(committeeID uint64, certificate *lib.QuorumCertificate)
 		// SendCertificateResultsTx() is a P2P call that allows a Leader to submit their CertificateResults (reward) transaction
 		SendCertificateResultsTx(committeeID uint64, certificate *lib.QuorumCertificate)
 		// SendConsMsgToReplicas() is a P2P call to directly send a Consensus message to all Replicas
-		SendConsMsgToReplicas(committeeID uint64, replicas lib.ValidatorSet, msg lib.Signable)
+		SendToReplicas(committeeID uint64, replicas lib.ValidatorSet, msg lib.Signable)
 		// SendConsMsgToProposer() is a P2P call to directly send a Consensus message to the Leader
-		SendConsMsgToProposer(committeeID uint64, msg lib.Signable)
+		SendToProposer(committeeID uint64, msg lib.Signable)
 		// Syncing() returns true if the plugin is currently syncing
 		Syncing(committeeID uint64) *atomic.Bool
 	}
