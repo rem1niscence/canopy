@@ -93,23 +93,15 @@ func (c *Controller) Start() {
 
 // Stop() terminates the Controller service
 func (c *Controller) Stop() {
+	// lock the controller
 	c.Lock()
 	defer c.Unlock()
+	// stop the store module
 	if err := c.CanopyFSM().Store().(lib.StoreI).Close(); err != nil {
 		c.log.Error(err.Error())
 	}
+	// stop the p2p module
 	c.P2P.Stop()
-}
-
-// GetHeight() returns the latest held version of the state for a specific committeeID
-func (c *Controller) GetHeight(committeeID uint64) (uint64, lib.ErrorI) {
-	c.Lock()
-	defer c.Unlock()
-	chain, err := c.GetChain(committeeID)
-	if err != nil {
-		return 0, err
-	}
-	return chain.Plugin.Height(), nil
 }
 
 // LoadCommittee() gets the ValidatorSet that is authorized to come to Consensus agreement on the Proposal for a specific height/committeeId
@@ -138,16 +130,19 @@ func (c *Controller) IsValidDoubleSigner(height uint64, address []byte) bool {
 
 // LoadLastCommitTime() gets a timestamp from the most recent Quorum Block
 func (c *Controller) LoadLastCommitTime(committeeID, height uint64) time.Time {
+	// get the chain from the controller map
 	chain, err := c.GetChain(committeeID)
 	if err != nil {
 		c.log.Error(err.Error())
 		return time.Time{}
 	}
+	// return the last commit time for the previous height from the plugin
 	return chain.Plugin.LoadLastCommitTime(height - 1)
 }
 
 // LoadProposerKeys() gets the last Canopy proposer keys
 func (c *Controller) LoadLastProposers() *lib.Proposers {
+	// load the last proposers from Canopy
 	keys, err := c.CanopyFSM().GetLastProposers()
 	if err != nil {
 		c.log.Error(err.Error())

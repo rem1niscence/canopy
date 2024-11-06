@@ -266,7 +266,7 @@ func (c *Controller) ListenForBlock() {
 	c.log.Debug("Listening for inbound blocks")
 	// initialize a cache that prevents duplicate messages
 	cache := lib.NewMessageCache()
-	// for each inbound message received
+	// wait and execute for each inbound message received
 	for msg := range c.P2P.Inbox(Block) {
 		// create a variable to signal a 'stop loop'
 		var quit bool
@@ -281,7 +281,7 @@ func (c *Controller) ListenForBlock() {
 			}
 			c.log.Infof("Received new block from %s 📥", lib.BzToTruncStr(msg.Sender.Address.PublicKey))
 			// try to cast the message to a block message
-			blkResponseMsg, ok := msg.Message.(*lib.BlockMessage)
+			blockMessage, ok := msg.Message.(*lib.BlockMessage)
 			// if not a block message, slash the peer
 			if !ok {
 				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
@@ -290,12 +290,12 @@ func (c *Controller) ListenForBlock() {
 			// track processing time for consensus module
 			startTime := time.Now()
 			// handle the peer block
-			qc, outOfSync, err := c.handlePeerBlock(msg.Sender.Address.PublicKey, blkResponseMsg)
+			qc, outOfSync, err := c.handlePeerBlock(msg.Sender.Address.PublicKey, blockMessage)
 			// if the node has fallen 'out of sync' with the chain
 			if outOfSync {
-				c.log.Warnf("Node fell out of sync for committeeID: %d", blkResponseMsg.CommitteeId)
+				c.log.Warnf("Node fell out of sync for committeeID: %d", blockMessage.CommitteeId)
 				// revert to syncing mode
-				go c.Sync(blkResponseMsg.CommitteeId)
+				go c.Sync(blockMessage.CommitteeId)
 				// signal exit the out loop
 				quit = true
 				return
@@ -305,105 +305,135 @@ func (c *Controller) ListenForBlock() {
 				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
 				return
 			}
-			c.GossipBlock(blkResponseMsg.CommitteeId, qc)
-			// NEW TARGET BLOCK MEANS NEW_HEIGHT FOR TARGET BFT
-			if blkResponseMsg.CommitteeId != lib.CanopyCommitteeId {
-				c.Chains[blkResponseMsg.CommitteeId].Consensus.ResetBFTChan() <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
-				return
-			}
-			// NEW CANOPY BLOCK = RESET ALL BFTs WITH UPDATED COMMITTEES TO PREVENT CONFLICTING VALIDATOR SETS AMONG PEERS
-			newCanopyHeight := c.CanopyFSM().Height()
-			for _, chain := range c.Chains {
-				if chain.Consensus.CommitteeId == lib.CanopyCommitteeId {
-					continue
+			// gossip the block to the node's peers
+			c.GossipBlock(blockMessage.CommitteeId, qc)
+			// check if the block is for the Canopy (special case)
+			if blockMessage.CommitteeId == lib.CanopyCommitteeId {
+				// a new canopy block means all BFTs are reset with updated committees which prevents conflicting validator sets among peers
+				newCanopyHeight := c.CanopyFSM().Height()
+				// for each chain (that isn't canopy)
+				for _, chain := range c.Chains {
+					if chain.Consensus.CommitteeId == lib.CanopyCommitteeId {
+						continue
+					}
+					// load the new committee
+					newCommittee, e := c.LoadCommittee(chain.Consensus.CommitteeId, newCanopyHeight)
+					if e != nil {
+						c.log.Error(e.Error())
+						continue
+					}
+					// reset & update the consensus module
+					chain.Consensus.ResetBFTChan() <- bft.ResetBFT{UpdatedCommitteeSet: newCommittee, UpdatedCommitteeHeight: newCanopyHeight}
 				}
-				valSet, e := c.LoadCommittee(chain.Consensus.CommitteeId, newCanopyHeight)
-				if e != nil {
-					c.log.Error(e.Error())
-					continue
-				}
-				chain.Consensus.ResetBFTChan() <- bft.ResetBFT{UpdatedCommitteeSet: valSet, UpdatedCommitteeHeight: newCanopyHeight}
+				// update the peer 'must connect'
+				c.UpdateP2PMustConnect()
+			} else {
+				// block for a different committee than Canopy (standard case)
+				c.Chains[blockMessage.CommitteeId].Consensus.ResetBFTChan() <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
 			}
-			c.UpdateP2PMustConnect()
 		}()
+		// if quit signaled, exit the loop
 		if quit {
 			return
 		}
 	}
 }
 
-// ListenForConsensus() subscribes to -> validates -> and internally routes - inbound Consensus messages
+// ListenForConsensus() listens and internally routes inbound consensus messages
 func (c *Controller) ListenForConsensus() {
+	// wait and execute for each consensus message received
 	for msg := range c.P2P.Inbox(Cons) {
-		if c.isAnySyncing() {
-			continue
+		// define an error handling function for convenience
+		handleErr := func(e error, delta int32) {
+			c.log.Error(e.Error())
+			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, delta)
 		}
 		func() {
+			// lock the controller for thread safety
 			c.Lock()
 			defer c.Unlock()
+			// try to cast the p2p message to a 'consensus message'
 			consMsg, ok := msg.Message.(*lib.ConsensusMessage)
+			// if cast unsuccessful
 			if !ok {
 				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidMsgRep)
 				return
 			}
-			handleErr := func(e error, delta int32) {
-				c.log.Error(e.Error())
-				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, delta)
-			}
+			// get the chain in question
 			chain, ok := c.Chains[consMsg.CommitteeId]
 			if !ok {
 				return
 			}
-			vs, e := c.LoadCommittee(consMsg.CommitteeId, c.CanopyFSM().Height())
-			if e != nil {
-				handleErr(e, 0)
+			// if the chain is syncing, return
+			if chain.isSyncing.Load() {
 				return
 			}
-			if _, err := vs.GetValidator(msg.Sender.Address.PublicKey); err != nil {
-				handleErr(e, p2p.NotValRep)
+			// load the committee associated with the committee id at the latest canopy height
+			vs, err := c.LoadCommittee(consMsg.CommitteeId, c.CanopyFSM().Height())
+			if err != nil {
+				handleErr(err, 0)
 				return
 			}
-			if err := chain.Consensus.HandleMessage(msg.Message); err != nil {
-				handleErr(e, p2p.InvalidMsgRep)
+			// ensure the sender is a validator
+			if _, err = vs.GetValidator(msg.Sender.Address.PublicKey); err != nil {
+				handleErr(err, p2p.NotValRep)
+				return
+			}
+			// route the message to the consensus module
+			if err = chain.Consensus.HandleMessage(msg.Message); err != nil {
+				handleErr(err, p2p.InvalidMsgRep)
 				return
 			}
 		}()
 	}
 }
 
-// ListenForTx() subscribes to -> validates -> internally routes -> and gossips - inbound Transaction messages
+// ListenForTx() listen for inbound tx messages, internally route them, and gossip them to peers
 func (c *Controller) ListenForTx() {
+	// create a new message cache to filter out duplicate transaction messages
 	cache := lib.NewMessageCache()
+	// wait and execute for each inbound transaction message
 	for msg := range c.P2P.Inbox(Tx) {
 		func() {
+			// lock the controller for thread safety
 			c.Lock()
 			defer c.Unlock()
-			if c.isAnySyncing() {
-				return
-			}
+			// check and add the message to the cache to prevent duplicates
 			if ok := cache.Add(msg); !ok {
 				return
 			}
+			// create a convenience variable for the identity of the sender
 			senderID := msg.Sender.Address.PublicKey
+			// try to cast the p2p message as a tx message
 			txMsg, ok := msg.Message.(*lib.TxMessage)
+			// if the cast failed
 			if !ok {
 				c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
 				return
 			}
+			// if the message is empty
 			if txMsg == nil {
 				c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
 				return
 			}
+			// get the chain from the
 			chain, err := c.GetChain(txMsg.CommitteeId)
 			if err != nil {
 				c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
 				return
 			}
+			// if the chain is syncing, just return without handling
+			if chain.isSyncing.Load() {
+				return
+			}
+			// handle the transaction under the plugin
 			if err = chain.Plugin.HandleTx(txMsg.Tx); err != nil {
 				c.P2P.ChangeReputation(senderID, p2p.InvalidTxRep)
 				return
 			}
+			// bump peer reputation positively
 			c.P2P.ChangeReputation(senderID, p2p.GoodTxRep)
+			// gossip the transaction to peers
 			if err = c.P2P.SendToChainPeers(txMsg.CommitteeId, Tx, msg.Message); err != nil {
 				c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
 			}
@@ -412,45 +442,59 @@ func (c *Controller) ListenForTx() {
 	}
 }
 
-// ListenForBlockRequests() subscribes to -> validates -> internally routes -> and responds to - inbound BlockRequest messages
+// ListenForBlockRequests() listen for inbound block request messages from syncing peers, handles and answer them
 func (c *Controller) ListenForBlockRequests() {
+	// initialize a rate limiter for the inbound syncing messages
 	l := lib.NewLimiter(p2p.MaxBlockReqPerWindow, c.P2P.MaxPossiblePeers()*p2p.MaxBlockReqPerWindow, p2p.BlockReqWindowS)
 	for {
 		select {
+		// wait and execute for each inbound block request
 		case msg := <-c.P2P.Inbox(BlockRequest):
 			func() {
+				// lock the controller for thread safety
 				c.Lock()
 				defer c.Unlock()
-				if c.isAnySyncing() {
-					return
-				}
+				// create a convenience variable for the sender of the block request
 				senderID := msg.Sender.Address.PublicKey
+				// check with the rate limiter to see if *this peer* or *all peers* are blocked
 				blocked, allBlocked := l.NewRequest(lib.BytesToString(senderID))
+				// if *this peer* or *all peers* are blocked
 				if blocked || allBlocked {
+					// if only this specific peer is blocked, slash the reputation
 					if blocked {
 						c.P2P.ChangeReputation(senderID, p2p.BlockReqExceededRep)
 					}
 					return
 				}
+				// try to cast the p2p msg to a block request message
 				request, ok := msg.Message.(*lib.BlockRequestMessage)
 				if !ok {
 					c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
 					return
 				}
+				// get the chain from the controller map
 				chain, err := c.GetChain(request.CommitteeId)
 				if err != nil {
 					c.log.Error(err.Error())
 					return
 				}
-				var cert *lib.QuorumCertificate
+				// if the chain is syncing, return without handling
+				if chain.isSyncing.Load() {
+					return
+				}
+				// create an empty QC that will be populated if the request is more than 'height only'
+				var certificate *lib.QuorumCertificate
+				// if the requesting more than just the height
 				if !request.HeightOnly {
-					cert, err = chain.Plugin.LoadCertificate(request.Height)
+					// load the actual certificate and populate the variable
+					certificate, err = chain.Plugin.LoadCertificate(request.Height)
 					if err != nil {
 						c.log.Error(err.Error())
 						return
 					}
 				}
-				c.SendBlock(request.CommitteeId, chain.Plugin.Height(), chain.Plugin.TotalVDFIterations(), cert, senderID)
+				// send the block back to the requester
+				c.SendBlock(request.CommitteeId, chain.Plugin.Height(), chain.Plugin.TotalVDFIterations(), certificate, senderID)
 			}()
 		case <-l.C():
 			l.Reset()
@@ -460,45 +504,59 @@ func (c *Controller) ListenForBlockRequests() {
 
 // INTERNAL HELPERS BELOW
 
-// UpdateP2PMustConnect() tells the P2P module which nodes must be connected to (usually fellow committee members or none if not in committee)
+// UpdateP2PMustConnect() tells the P2P module which nodes are *required* to be connected to (usually fellow committee members or none if not in committee)
 func (c *Controller) UpdateP2PMustConnect() {
-	m, s := make(map[string]*lib.PeerAddress), make([]*lib.PeerAddress, 0)
+	// define a list
+	noDuplicates := make(map[string]*lib.PeerAddress)
+	// for each chain
 	for committeeID := range c.Chains {
+		// get the list of committee members
 		committee, err := c.CanopyFSM().GetCommitteeMembers(committeeID)
 		if err != nil {
 			c.log.Errorf("unable to get must connect peers for committee %d with error %s", committeeID, err.Error())
 			continue
 		}
+		// for each member of the committee
 		for _, member := range committee.ValidatorSet.ValidatorSet {
+			// convert the public key to a string
 			pkString := lib.BytesToString(member.PublicKey)
-			p, found := m[pkString]
+			// check the de-duplication map to see if the peer object already exists
+			p, found := noDuplicates[pkString]
+			// if the peer object doesn't exist on the list
 			if !found {
+				// create the peer object
 				p = &lib.PeerAddress{
 					PublicKey:  member.PublicKey,
 					NetAddress: member.NetAddress,
-					PeerMeta: &lib.PeerMeta{
-						Chains: []uint64{committeeID},
-					},
+					PeerMeta:   &lib.PeerMeta{Chains: []uint64{committeeID}},
 				}
 			} else {
+				// if the peer object already exists in the list, simply add this id to its list of chains
 				p.PeerMeta.Chains = append(p.PeerMeta.Chains, committeeID)
 			}
-			m[pkString] = p
+			// add to the de-duplication map to ensure we don't doubly create peer objects
+			noDuplicates[pkString] = p
 		}
 	}
-	for _, peerAddr := range m {
-		s = append(s, peerAddr)
+	// create a slice to send to the p2p module
+	var arr []*lib.PeerAddress
+	// iterate through the map and add it to the slice
+	for _, peerAddr := range noDuplicates {
+		arr = append(arr, peerAddr)
 	}
-	c.P2P.MustConnectReceiver() <- s
+	// send the slice to the p2p module
+	c.P2P.MustConnectReceiver() <- arr
 }
 
 // handlePeerBlock() validates and handles inbound Quorum Certificates from remote peers
 func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc *lib.QuorumCertificate, stillCatchingUp bool, err lib.ErrorI) {
-	// define an error handling function
-	handleErr, qc := func(err error) {
+	// define an error handling function for convenience
+	handleErr := func(err error) {
 		c.P2P.ChangeReputation(senderID, p2p.InvalidBlockRep)
 		c.log.Error(err.Error())
-	}, msg.BlockAndCertificate
+	}
+	// define a convenience variable for certificate
+	qc = msg.BlockAndCertificate
 	// get the plugin and consensus module for the specific committee
 	chain, e := c.GetChain(msg.CommitteeId)
 	if e != nil {
@@ -534,19 +592,23 @@ func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc
 
 // checkPeerQC() performs validity checks on a QuorumCertificate received from a peer
 func (c *Controller) checkPeerQC(maxBlockSize int, view *lib.View, v lib.ValidatorSet, qc *lib.QuorumCertificate, senderID []byte) lib.ErrorI {
+	// validate the quorum certificate
 	isPartialQC, err := qc.Check(v, maxBlockSize, view, false)
 	if err != nil {
 		c.P2P.ChangeReputation(senderID, p2p.InvalidJustifyRep)
 		return err
 	}
+	// if the quorum certificate doesn't have a +2/3rds majority
 	if isPartialQC {
 		c.P2P.ChangeReputation(senderID, p2p.InvalidJustifyRep)
 		return lib.ErrNoMaj23()
 	}
+	// if the results structure was not pruned from the certificate
 	if qc.Results != nil {
 		c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
 		return lib.ErrNonNilCertResults()
 	}
+	// if this certificate isn't finalized
 	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
 		c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
 		return lib.ErrWrongPhase()
@@ -610,27 +672,20 @@ func (c *Controller) pollMaxHeight(committeeID uint64, backoff int) (maxHeight, 
 
 // singleNodeNetwork() returns true if there are no other participants in the committee besides self
 func (c *Controller) singleNodeNetwork(committeeID uint64) bool {
+	// load the committee for Canopy
 	valSet, err := c.LoadCommittee(committeeID, c.CanopyFSM().Height())
 	if err != nil {
 		c.log.Error(err.Error())
 		return false
 	}
+	// if self is the only validator, return true
 	return len(valSet.ValidatorSet.ValidatorSet) == 1 &&
 		bytes.Equal(valSet.ValidatorSet.ValidatorSet[0].PublicKey, c.PublicKey)
 }
 
-// isAnySyncing() returns if any committee is currently syncing
-func (c *Controller) isAnySyncing() bool {
-	for _, chain := range c.Chains {
-		if chain.isSyncing.Load() == true {
-			return true
-		}
-	}
-	return false
-}
-
 // emptyInbox() discards all unread messages for a specific topic
 func (c *Controller) emptyInbox(topic lib.Topic) {
+	// clear the inbox
 	for len(c.P2P.Inbox(topic)) > 0 {
 		<-c.P2P.Inbox(topic)
 	}
@@ -638,10 +693,12 @@ func (c *Controller) emptyInbox(topic lib.Topic) {
 
 // syncingDone() checks if the syncing loop may complete for a specific committeeID
 func (c *Controller) syncingDone(committeeID, maxHeight, minVDFIterations uint64) bool {
+	// get the chain from the controller map
 	chain, err := c.GetChain(committeeID)
 	if err != nil {
 		c.log.Error(err.Error())
 	}
+	// if the plugin height is GTE the max height
 	if chain.Plugin.Height() >= maxHeight {
 		// ensure node did not lie about VDF iterations in their chain
 		if chain.Plugin.TotalVDFIterations() < minVDFIterations {
@@ -654,16 +711,20 @@ func (c *Controller) syncingDone(committeeID, maxHeight, minVDFIterations uint64
 
 // finishSyncing() is called when the syncing loop is completed for a specific committeeID
 func (c *Controller) finishSyncing(committeeID uint64) {
-	pluginHeight, err := c.GetHeight(committeeID)
-	if err != nil {
-		c.log.Error(err.Error())
-	}
+	// lock the controller
+	c.Lock()
+	defer c.Unlock()
+	// get the chain from the controller map
 	chain := c.Chains[committeeID]
+	// signal a reset of bft for the chain
 	chain.Consensus.ResetBFTChan() <- bft.ResetBFT{
-		ProcessTime: time.Since(c.LoadLastCommitTime(committeeID, pluginHeight)),
+		ProcessTime: time.Since(c.LoadLastCommitTime(committeeID, chain.Plugin.Height())),
 	}
+	// set syncing to false
 	chain.isSyncing.Store(false)
+	// set the chain in the list
 	c.Chains[committeeID] = chain
+	// enable listening for a block
 	go c.ListenForBlock()
 }
 
@@ -685,6 +746,7 @@ func (c *Controller) signableToConsensusMessage(committeeId uint64, msg lib.Sign
 	}, nil
 }
 
+// convenience aliases that reference the library package
 const (
 	BlockRequest = lib.Topic_BLOCK_REQUEST
 	Block        = lib.Topic_BLOCK
