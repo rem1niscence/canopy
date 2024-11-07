@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [Unreleased] - 11/07/2024
+
+- Reviving changelog
+- Added unit 400+ tests for FSM module
+- Fully documented the FSM module
+- Added comments to the .proto files
+- Renamed the project from codename to `Canopy`
+- Removed fuzzer (for now)
+
 ## [Unreleased] - 08/16/2024
 
 - Fully documented the P2P module
