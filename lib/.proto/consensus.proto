@@ -4,32 +4,96 @@ package types;
 option go_package = "github.com/canopy-network/canopy/lib";
 
 import "proposal.proto";
-
-message Proposers {
-  repeated bytes addresses = 1;
-}
-
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+//_
+//_
+//_
+// Phase is the smallest unit in the consensus process. Each round consists of multiple phases, and these phases are
+// executed sequentially to achieve consensus on the next block.
 enum Phase {
+  // unknown: is an unidentified phase that is likely an error
   UNKNOWN = 0;
+  // election:
+  // Each replica runs a Verifiable Random Function (VRF); if selected as a candidate,
+  // the replica sends its VRF output to the other replicas.
   ELECTION = 1;
+  // election_vote:
+  // Each replicas send ELECTION votes (signature) for the leader based on the lowest VRF value
+  // if no candidates exist, the process falls back to a stake-weighted-pseudorandom selection.
   ELECTION_VOTE = 2;
+  // propose:
+  // The leader collects ELECTION_VOTEs from +2/3 of the replicas, each including the lock, evidence, and signature
+  // from the sender. If a valid lock exists for the current height and meets the SAFE NODE PREDICATE, the leader uses
+  // that block as the proposal block. If no valid lock is found, the leader creates a new block to extend the
+  // blockchain. The leader then sends the new proposal (block, results, evidence) attaching the +2/3 signatures from
+  // ELECTION_VOTE to justify themselves as the Leader.
   PROPOSE = 3;
+  // propose_vote:
+  // Each replica validates the PROPOSE msg by verifying the aggregate signature, applying the proposal block against
+  // their state machine, and checking the header and results against what they produced. If valid, the replica sends
+  // a vote (signature) to the leader. Each vote vouches that the leader's proposal as valid
   PROPOSE_VOTE = 4;
+  // precommit:
+  // The leader collects PROPOSE_VOTEs from +2/3 of the replicas, each including a signature from the sender.
+  // The leader sends a PRECOMMIT message attaching +2/3 signatures from the PROPOSE_VOTE messages, justifying
+  // that +2/3 of the quorum believes the proposal is valid.
   PRECOMMIT = 5;
+  // precommit_vote:
+  // Each replica validates the PRECOMMIT msg by verifying the aggregate signature. If valid, the replica sends a vote
+  // to the leader. Each vote vouches that the replica has seen evidence that +2/3 of the quorum believe the proposal
+  // is valid.
   PRECOMMIT_VOTE = 6;
+  // commit:
+  // The leader collects PRECOMMIT_VOTEs from +2/3 from the replicas, each including a signature from the sender.
+  // The leader sends a COMMIT message attaching +2/3 signatures from the PRECOMMIT_VOTE messages, justifying that
+  // +2/3 of the quorum agree that a super-majority think the proposal is valid.
   COMMIT = 7;
+  // commit_process:
+  // Each replica validates the COMMIT msg by verifying the aggregate signature. If valid, the replica commits the
+  // block to finality, and resets the bft for the next height.
   COMMIT_PROCESS = 8;
+  // round_interrupt:
+  // A failure in the bft cycle caused a premature exit in the round. This results in a new round and an extended sleep
+  // time between phases to help alleviate any 'non-voter' issues. During this phase, each replica sends its View to
+  // all other replicas to alleviate round synchronous issues.
   ROUND_INTERRUPT = 9;
+  // pacemaker:
+  // This phase follows ROUND_INTERRUPT, each replica calculates the highest round a super-majority has seen and jumps
+  // to it to assist in 'round out of sync' issues.
   PACEMAKER = 10;
 }
 
+// A QuorumCertificate is a collection of signatures from a super-majority of validators that confirms consensus on a
+// particular block and results. It serves as proof that enough validators have agreed on the block & result’s validity,
+// ensuring its acceptance and security in the blockchain.
 message QuorumCertificate {
-  View header = 1; // replica vote view
-  CertificateResult results = 2; // used for PROPOSE
-  bytes results_hash = 3; // used after PROPOSE
-  bytes block = 4; // used for PROPOSE
-  bytes block_hash = 5; // used after PROPOSE
-  bytes proposer_key = 6; // only EV and PROPOSE
+  // header: is the view of the quorum certificate
+  View header = 1;
+  // results: is the certificate result that Canopy uses to process payments, evidence, swaps, and checkpoints
+  CertificateResult results = 2;
+  // results_hash: is the cryptographic integrity bytes for results, results hash may be used to confirm the validator
+  // quorum signed off on the results
+  bytes results_hash = 3;
+  // block: the proposed block to be added to the blockchain
+  bytes block = 4;
+  // block_hash: is the cryptographic integrity bytes for block, block hash may be used to confirm the validator quorum
+  // signed off on the block
+  bytes block_hash = 5;
+  // proposer_key: is the public key of the block proposer
+  bytes proposer_key = 6;
+  // (aggregate) signature: the compact signature created by combining multiple individual signatures from replica
+  // validators. This signature serves as a justification that a super-majority quorum signed off on the certificate
   AggregateSignature signature = 7; // aggregate signature from the current proposer message
 }
 
@@ -67,13 +131,30 @@ message View {
   Phase phase = 6;
 }
 
-// Verifiable Delay Function
+// A Verifiable Delay Function is a cryptographic function that takes a set amount of time to compute, even on powerful
+// hardware, and produces a result that any node may quickly verify. In Canopy it's used as a proxy for time to deter
+// historical forking attacks like a 'long-range-attack'.
 message VDF {
-  bytes proof = 1; // proof of function completion given a specific seed
-  uint64 iterations = 2; // number of iterations (proxy for time)
+  // proof: a proof of function completion given a specific seed
+  bytes proof = 1;
+  // iterations: number of serial executions (proxy for time)
+  uint64 iterations = 2;
 }
 
+// An Aggregate Signature is a single, compact signature created by combining multiple individual signatures from
+// different participants. It allows verification that each participant signed the same message, which saves space
+// and improves efficiency in blockchain and consensus protocols by reducing the need to store or verify multiple
+// separate signatures.
 message AggregateSignature {
+  // signature: is the compacted signature bytes of the aggregate quorum
   bytes signature = 1;
+  // bitmap: used to efficiently track which signatures from the list of participants are included in the
+  // aggregate signature (as only +2/3rds are needed to make it valid. Bit 1 is included Bit 0 is not
   bytes bitmap = 2;
+}
+
+// Proposers is a list of addresses that represent the previous proposers
+message Proposers {
+  // addresses: is the list of addresses (short version of public keys)
+  repeated bytes addresses = 1;
 }

@@ -20,20 +20,76 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+// _
+// _
+// _
+// Phase is the smallest unit in the consensus process. Each round consists of multiple phases, and these phases are
+// executed sequentially to achieve consensus on the next block.
 type Phase int32
 
 const (
-	Phase_UNKNOWN         Phase = 0
-	Phase_ELECTION        Phase = 1
-	Phase_ELECTION_VOTE   Phase = 2
-	Phase_PROPOSE         Phase = 3
-	Phase_PROPOSE_VOTE    Phase = 4
-	Phase_PRECOMMIT       Phase = 5
-	Phase_PRECOMMIT_VOTE  Phase = 6
-	Phase_COMMIT          Phase = 7
-	Phase_COMMIT_PROCESS  Phase = 8
+	// unknown: is an unidentified phase that is likely an error
+	Phase_UNKNOWN Phase = 0
+	// election:
+	// Each replica runs a Verifiable Random Function (VRF); if selected as a candidate,
+	// the replica sends its VRF output to the other replicas.
+	Phase_ELECTION Phase = 1
+	// election_vote:
+	// Each replicas send ELECTION votes (signature) for the leader based on the lowest VRF value
+	// if no candidates exist, the process falls back to a stake-weighted-pseudorandom selection.
+	Phase_ELECTION_VOTE Phase = 2
+	// propose:
+	// The leader collects ELECTION_VOTEs from +2/3 of the replicas, each including the lock, evidence, and signature
+	// from the sender. If a valid lock exists for the current height and meets the SAFE NODE PREDICATE, the leader uses
+	// that block as the proposal block. If no valid lock is found, the leader creates a new block to extend the
+	// blockchain. The leader then sends the new proposal (block, results, evidence) attaching the +2/3 signatures from
+	// ELECTION_VOTE to justify themselves as the Leader.
+	Phase_PROPOSE Phase = 3
+	// propose_vote:
+	// Each replica validates the PROPOSE msg by verifying the aggregate signature, applying the proposal block against
+	// their state machine, and checking the header and results against what they produced. If valid, the replica sends
+	// a vote (signature) to the leader. Each vote vouches that the leader's proposal as valid
+	Phase_PROPOSE_VOTE Phase = 4
+	// precommit:
+	// The leader collects PROPOSE_VOTEs from +2/3 of the replicas, each including a signature from the sender.
+	// The leader sends a PRECOMMIT message attaching +2/3 signatures from the PROPOSE_VOTE messages, justifying
+	// that +2/3 of the quorum believes the proposal is valid.
+	Phase_PRECOMMIT Phase = 5
+	// precommit_vote:
+	// Each replica validates the PRECOMMIT msg by verifying the aggregate signature. If valid, the replica sends a vote
+	// to the leader. Each vote vouches that the replica has seen evidence that +2/3 of the quorum believe the proposal
+	// is valid.
+	Phase_PRECOMMIT_VOTE Phase = 6
+	// commit:
+	// The leader collects PRECOMMIT_VOTEs from +2/3 from the replicas, each including a signature from the sender.
+	// The leader sends a COMMIT message attaching +2/3 signatures from the PRECOMMIT_VOTE messages, justifying that
+	// +2/3 of the quorum agree that a super-majority think the proposal is valid.
+	Phase_COMMIT Phase = 7
+	// commit_process:
+	// Each replica validates the COMMIT msg by verifying the aggregate signature. If valid, the replica commits the
+	// block to finality, and resets the bft for the next height.
+	Phase_COMMIT_PROCESS Phase = 8
+	// round_interrupt:
+	// A failure in the bft cycle caused a premature exit in the round. This results in a new round and an extended sleep
+	// time between phases to help alleviate any 'non-voter' issues. During this phase, each replica sends its View to
+	// all other replicas to alleviate round synchronous issues.
 	Phase_ROUND_INTERRUPT Phase = 9
-	Phase_PACEMAKER       Phase = 10
+	// pacemaker:
+	// This phase follows ROUND_INTERRUPT, each replica calculates the highest round a super-majority has seen and jumps
+	// to it to assist in 'round out of sync' issues.
+	Phase_PACEMAKER Phase = 10
 )
 
 // Enum value maps for Phase.
@@ -93,71 +149,37 @@ func (Phase) EnumDescriptor() ([]byte, []int) {
 	return file_consensus_proto_rawDescGZIP(), []int{0}
 }
 
-type Proposers struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Addresses [][]byte `protobuf:"bytes,1,rep,name=addresses,proto3" json:"addresses,omitempty"`
-}
-
-func (x *Proposers) Reset() {
-	*x = Proposers{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_consensus_proto_msgTypes[0]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *Proposers) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Proposers) ProtoMessage() {}
-
-func (x *Proposers) ProtoReflect() protoreflect.Message {
-	mi := &file_consensus_proto_msgTypes[0]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Proposers.ProtoReflect.Descriptor instead.
-func (*Proposers) Descriptor() ([]byte, []int) {
-	return file_consensus_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *Proposers) GetAddresses() [][]byte {
-	if x != nil {
-		return x.Addresses
-	}
-	return nil
-}
-
+// A QuorumCertificate is a collection of signatures from a super-majority of validators that confirms consensus on a
+// particular block and results. It serves as proof that enough validators have agreed on the block & result’s validity,
+// ensuring its acceptance and security in the blockchain.
 type QuorumCertificate struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Header      *View               `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`                              // replica vote view
-	Results     *CertificateResult  `protobuf:"bytes,2,opt,name=results,proto3" json:"results,omitempty"`                            // used for PROPOSE
-	ResultsHash []byte              `protobuf:"bytes,3,opt,name=results_hash,json=resultsHash,proto3" json:"results_hash,omitempty"` // used after PROPOSE
-	Block       []byte              `protobuf:"bytes,4,opt,name=block,proto3" json:"block,omitempty"`                                // used for PROPOSE
-	BlockHash   []byte              `protobuf:"bytes,5,opt,name=block_hash,json=blockHash,proto3" json:"block_hash,omitempty"`       // used after PROPOSE
-	ProposerKey []byte              `protobuf:"bytes,6,opt,name=proposer_key,json=proposerKey,proto3" json:"proposer_key,omitempty"` // only EV and PROPOSE
-	Signature   *AggregateSignature `protobuf:"bytes,7,opt,name=signature,proto3" json:"signature,omitempty"`                        // aggregate signature from the current proposer message
+	// header: is the view of the quorum certificate
+	Header *View `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	// results: is the certificate result that Canopy uses to process payments, evidence, swaps, and checkpoints
+	Results *CertificateResult `protobuf:"bytes,2,opt,name=results,proto3" json:"results,omitempty"`
+	// results_hash: is the cryptographic integrity bytes for results, results hash may be used to confirm the validator
+	// quorum signed off on the results
+	ResultsHash []byte `protobuf:"bytes,3,opt,name=results_hash,json=resultsHash,proto3" json:"results_hash,omitempty"`
+	// block: the proposed block to be added to the blockchain
+	Block []byte `protobuf:"bytes,4,opt,name=block,proto3" json:"block,omitempty"`
+	// block_hash: is the cryptographic integrity bytes for block, block hash may be used to confirm the validator quorum
+	// signed off on the block
+	BlockHash []byte `protobuf:"bytes,5,opt,name=block_hash,json=blockHash,proto3" json:"block_hash,omitempty"`
+	// proposer_key: is the public key of the block proposer
+	ProposerKey []byte `protobuf:"bytes,6,opt,name=proposer_key,json=proposerKey,proto3" json:"proposer_key,omitempty"`
+	// (aggregate) signature: the compact signature created by combining multiple individual signatures from replica
+	// validators. This signature serves as a justification that a super-majority quorum signed off on the certificate
+	Signature *AggregateSignature `protobuf:"bytes,7,opt,name=signature,proto3" json:"signature,omitempty"` // aggregate signature from the current proposer message
 }
 
 func (x *QuorumCertificate) Reset() {
 	*x = QuorumCertificate{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_consensus_proto_msgTypes[1]
+		mi := &file_consensus_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -170,7 +192,7 @@ func (x *QuorumCertificate) String() string {
 func (*QuorumCertificate) ProtoMessage() {}
 
 func (x *QuorumCertificate) ProtoReflect() protoreflect.Message {
-	mi := &file_consensus_proto_msgTypes[1]
+	mi := &file_consensus_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -183,7 +205,7 @@ func (x *QuorumCertificate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuorumCertificate.ProtoReflect.Descriptor instead.
 func (*QuorumCertificate) Descriptor() ([]byte, []int) {
-	return file_consensus_proto_rawDescGZIP(), []int{1}
+	return file_consensus_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *QuorumCertificate) GetHeader() *View {
@@ -276,7 +298,7 @@ type View struct {
 func (x *View) Reset() {
 	*x = View{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_consensus_proto_msgTypes[2]
+		mi := &file_consensus_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -289,7 +311,7 @@ func (x *View) String() string {
 func (*View) ProtoMessage() {}
 
 func (x *View) ProtoReflect() protoreflect.Message {
-	mi := &file_consensus_proto_msgTypes[2]
+	mi := &file_consensus_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -302,7 +324,7 @@ func (x *View) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use View.ProtoReflect.Descriptor instead.
 func (*View) Descriptor() ([]byte, []int) {
-	return file_consensus_proto_rawDescGZIP(), []int{2}
+	return file_consensus_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *View) GetNetworkId() uint64 {
@@ -347,20 +369,24 @@ func (x *View) GetPhase() Phase {
 	return Phase_UNKNOWN
 }
 
-// Verifiable Delay Function
+// A Verifiable Delay Function is a cryptographic function that takes a set amount of time to compute, even on powerful
+// hardware, and produces a result that any node may quickly verify. In Canopy it's used as a proxy for time to deter
+// historical forking attacks like a 'long-range-attack'.
 type VDF struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Proof      []byte `protobuf:"bytes,1,opt,name=proof,proto3" json:"proof,omitempty"`            // proof of function completion given a specific seed
-	Iterations uint64 `protobuf:"varint,2,opt,name=iterations,proto3" json:"iterations,omitempty"` // number of iterations (proxy for time)
+	// proof: a proof of function completion given a specific seed
+	Proof []byte `protobuf:"bytes,1,opt,name=proof,proto3" json:"proof,omitempty"`
+	// iterations: number of serial executions (proxy for time)
+	Iterations uint64 `protobuf:"varint,2,opt,name=iterations,proto3" json:"iterations,omitempty"`
 }
 
 func (x *VDF) Reset() {
 	*x = VDF{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_consensus_proto_msgTypes[3]
+		mi := &file_consensus_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -373,7 +399,7 @@ func (x *VDF) String() string {
 func (*VDF) ProtoMessage() {}
 
 func (x *VDF) ProtoReflect() protoreflect.Message {
-	mi := &file_consensus_proto_msgTypes[3]
+	mi := &file_consensus_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -386,7 +412,7 @@ func (x *VDF) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VDF.ProtoReflect.Descriptor instead.
 func (*VDF) Descriptor() ([]byte, []int) {
-	return file_consensus_proto_rawDescGZIP(), []int{3}
+	return file_consensus_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *VDF) GetProof() []byte {
@@ -403,19 +429,26 @@ func (x *VDF) GetIterations() uint64 {
 	return 0
 }
 
+// An Aggregate Signature is a single, compact signature created by combining multiple individual signatures from
+// different participants. It allows verification that each participant signed the same message, which saves space
+// and improves efficiency in blockchain and consensus protocols by reducing the need to store or verify multiple
+// separate signatures.
 type AggregateSignature struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// signature: is the compacted signature bytes of the aggregate quorum
 	Signature []byte `protobuf:"bytes,1,opt,name=signature,proto3" json:"signature,omitempty"`
-	Bitmap    []byte `protobuf:"bytes,2,opt,name=bitmap,proto3" json:"bitmap,omitempty"`
+	// bitmap: used to efficiently track which signatures from the list of participants are included in the
+	// aggregate signature (as only +2/3rds are needed to make it valid. Bit 1 is included Bit 0 is not
+	Bitmap []byte `protobuf:"bytes,2,opt,name=bitmap,proto3" json:"bitmap,omitempty"`
 }
 
 func (x *AggregateSignature) Reset() {
 	*x = AggregateSignature{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_consensus_proto_msgTypes[4]
+		mi := &file_consensus_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -428,7 +461,7 @@ func (x *AggregateSignature) String() string {
 func (*AggregateSignature) ProtoMessage() {}
 
 func (x *AggregateSignature) ProtoReflect() protoreflect.Message {
-	mi := &file_consensus_proto_msgTypes[4]
+	mi := &file_consensus_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -441,7 +474,7 @@ func (x *AggregateSignature) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AggregateSignature.ProtoReflect.Descriptor instead.
 func (*AggregateSignature) Descriptor() ([]byte, []int) {
-	return file_consensus_proto_rawDescGZIP(), []int{4}
+	return file_consensus_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AggregateSignature) GetSignature() []byte {
@@ -458,54 +491,103 @@ func (x *AggregateSignature) GetBitmap() []byte {
 	return nil
 }
 
+// Proposers is a list of addresses that represent the previous proposers
+type Proposers struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// addresses: is the list of addresses (short version of public keys)
+	Addresses [][]byte `protobuf:"bytes,1,rep,name=addresses,proto3" json:"addresses,omitempty"`
+}
+
+func (x *Proposers) Reset() {
+	*x = Proposers{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_consensus_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Proposers) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Proposers) ProtoMessage() {}
+
+func (x *Proposers) ProtoReflect() protoreflect.Message {
+	mi := &file_consensus_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Proposers.ProtoReflect.Descriptor instead.
+func (*Proposers) Descriptor() ([]byte, []int) {
+	return file_consensus_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Proposers) GetAddresses() [][]byte {
+	if x != nil {
+		return x.Addresses
+	}
+	return nil
+}
+
 var File_consensus_proto protoreflect.FileDescriptor
 
 var file_consensus_proto_rawDesc = []byte{
 	0x0a, 0x0f, 0x63, 0x6f, 0x6e, 0x73, 0x65, 0x6e, 0x73, 0x75, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74,
 	0x6f, 0x12, 0x05, 0x74, 0x79, 0x70, 0x65, 0x73, 0x1a, 0x0e, 0x70, 0x72, 0x6f, 0x70, 0x6f, 0x73,
-	0x61, 0x6c, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x29, 0x0a, 0x09, 0x50, 0x72, 0x6f, 0x70,
-	0x6f, 0x73, 0x65, 0x72, 0x73, 0x12, 0x1c, 0x0a, 0x09, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73,
-	0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x09, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73,
-	0x73, 0x65, 0x73, 0x22, 0xa0, 0x02, 0x0a, 0x11, 0x51, 0x75, 0x6f, 0x72, 0x75, 0x6d, 0x43, 0x65,
-	0x72, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x12, 0x23, 0x0a, 0x06, 0x68, 0x65, 0x61,
-	0x64, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0b, 0x2e, 0x74, 0x79, 0x70, 0x65,
-	0x73, 0x2e, 0x56, 0x69, 0x65, 0x77, 0x52, 0x06, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x12, 0x32,
-	0x0a, 0x07, 0x72, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32,
-	0x18, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x43, 0x65, 0x72, 0x74, 0x69, 0x66, 0x69, 0x63,
-	0x61, 0x74, 0x65, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x52, 0x07, 0x72, 0x65, 0x73, 0x75, 0x6c,
-	0x74, 0x73, 0x12, 0x21, 0x0a, 0x0c, 0x72, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x73, 0x5f, 0x68, 0x61,
-	0x73, 0x68, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0b, 0x72, 0x65, 0x73, 0x75, 0x6c, 0x74,
-	0x73, 0x48, 0x61, 0x73, 0x68, 0x12, 0x14, 0x0a, 0x05, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x18, 0x04,
-	0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x12, 0x1d, 0x0a, 0x0a, 0x62,
-	0x6c, 0x6f, 0x63, 0x6b, 0x5f, 0x68, 0x61, 0x73, 0x68, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0c, 0x52,
-	0x09, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x48, 0x61, 0x73, 0x68, 0x12, 0x21, 0x0a, 0x0c, 0x70, 0x72,
-	0x6f, 0x70, 0x6f, 0x73, 0x65, 0x72, 0x5f, 0x6b, 0x65, 0x79, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0c,
-	0x52, 0x0b, 0x70, 0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65, 0x72, 0x4b, 0x65, 0x79, 0x12, 0x37, 0x0a,
-	0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x18, 0x07, 0x20, 0x01, 0x28, 0x0b,
-	0x32, 0x19, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x41, 0x67, 0x67, 0x72, 0x65, 0x67, 0x61,
-	0x74, 0x65, 0x53, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x52, 0x09, 0x73, 0x69, 0x67,
-	0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x22, 0xbf, 0x01, 0x0a, 0x04, 0x56, 0x69, 0x65, 0x77, 0x12,
-	0x1d, 0x0a, 0x0a, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x04, 0x52, 0x09, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x49, 0x64, 0x12, 0x21,
-	0x0a, 0x0c, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x02,
-	0x20, 0x01, 0x28, 0x04, 0x52, 0x0b, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x49,
-	0x64, 0x12, 0x16, 0x0a, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28,
-	0x04, 0x52, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x12, 0x23, 0x0a, 0x0d, 0x63, 0x61, 0x6e,
-	0x6f, 0x70, 0x79, 0x5f, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x18, 0x04, 0x20, 0x01, 0x28, 0x04,
-	0x52, 0x0c, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x12, 0x14,
-	0x0a, 0x05, 0x72, 0x6f, 0x75, 0x6e, 0x64, 0x18, 0x05, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x72,
-	0x6f, 0x75, 0x6e, 0x64, 0x12, 0x22, 0x0a, 0x05, 0x70, 0x68, 0x61, 0x73, 0x65, 0x18, 0x06, 0x20,
-	0x01, 0x28, 0x0e, 0x32, 0x0c, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x50, 0x68, 0x61, 0x73,
-	0x65, 0x52, 0x05, 0x70, 0x68, 0x61, 0x73, 0x65, 0x22, 0x3b, 0x0a, 0x03, 0x56, 0x44, 0x46, 0x12,
-	0x14, 0x0a, 0x05, 0x70, 0x72, 0x6f, 0x6f, 0x66, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05,
-	0x70, 0x72, 0x6f, 0x6f, 0x66, 0x12, 0x1e, 0x0a, 0x0a, 0x69, 0x74, 0x65, 0x72, 0x61, 0x74, 0x69,
-	0x6f, 0x6e, 0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x69, 0x74, 0x65, 0x72, 0x61,
-	0x74, 0x69, 0x6f, 0x6e, 0x73, 0x22, 0x4a, 0x0a, 0x12, 0x41, 0x67, 0x67, 0x72, 0x65, 0x67, 0x61,
-	0x74, 0x65, 0x53, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x12, 0x1c, 0x0a, 0x09, 0x73,
-	0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x09,
-	0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x62, 0x69, 0x74,
-	0x6d, 0x61, 0x70, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x62, 0x69, 0x74, 0x6d, 0x61,
-	0x70, 0x2a, 0xbb, 0x01, 0x0a, 0x05, 0x50, 0x68, 0x61, 0x73, 0x65, 0x12, 0x0b, 0x0a, 0x07, 0x55,
+	0x61, 0x6c, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0xa0, 0x02, 0x0a, 0x11, 0x51, 0x75, 0x6f,
+	0x72, 0x75, 0x6d, 0x43, 0x65, 0x72, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x12, 0x23,
+	0x0a, 0x06, 0x68, 0x65, 0x61, 0x64, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0b,
+	0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x56, 0x69, 0x65, 0x77, 0x52, 0x06, 0x68, 0x65, 0x61,
+	0x64, 0x65, 0x72, 0x12, 0x32, 0x0a, 0x07, 0x72, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x73, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x43, 0x65, 0x72,
+	0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x52, 0x07,
+	0x72, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x73, 0x12, 0x21, 0x0a, 0x0c, 0x72, 0x65, 0x73, 0x75, 0x6c,
+	0x74, 0x73, 0x5f, 0x68, 0x61, 0x73, 0x68, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0b, 0x72,
+	0x65, 0x73, 0x75, 0x6c, 0x74, 0x73, 0x48, 0x61, 0x73, 0x68, 0x12, 0x14, 0x0a, 0x05, 0x62, 0x6c,
+	0x6f, 0x63, 0x6b, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x62, 0x6c, 0x6f, 0x63, 0x6b,
+	0x12, 0x1d, 0x0a, 0x0a, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x5f, 0x68, 0x61, 0x73, 0x68, 0x18, 0x05,
+	0x20, 0x01, 0x28, 0x0c, 0x52, 0x09, 0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x48, 0x61, 0x73, 0x68, 0x12,
+	0x21, 0x0a, 0x0c, 0x70, 0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65, 0x72, 0x5f, 0x6b, 0x65, 0x79, 0x18,
+	0x06, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0b, 0x70, 0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65, 0x72, 0x4b,
+	0x65, 0x79, 0x12, 0x37, 0x0a, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x18,
+	0x07, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x19, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x41, 0x67,
+	0x67, 0x72, 0x65, 0x67, 0x61, 0x74, 0x65, 0x53, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65,
+	0x52, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x22, 0xbf, 0x01, 0x0a, 0x04,
+	0x56, 0x69, 0x65, 0x77, 0x12, 0x1d, 0x0a, 0x0a, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x5f,
+	0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x09, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72,
+	0x6b, 0x49, 0x64, 0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65,
+	0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0b, 0x63, 0x6f, 0x6d, 0x6d, 0x69,
+	0x74, 0x74, 0x65, 0x65, 0x49, 0x64, 0x12, 0x16, 0x0a, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74,
+	0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x12, 0x23,
+	0x0a, 0x0d, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x5f, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x18,
+	0x04, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0c, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x48, 0x65, 0x69,
+	0x67, 0x68, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x72, 0x6f, 0x75, 0x6e, 0x64, 0x18, 0x05, 0x20, 0x01,
+	0x28, 0x04, 0x52, 0x05, 0x72, 0x6f, 0x75, 0x6e, 0x64, 0x12, 0x22, 0x0a, 0x05, 0x70, 0x68, 0x61,
+	0x73, 0x65, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x0c, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73,
+	0x2e, 0x50, 0x68, 0x61, 0x73, 0x65, 0x52, 0x05, 0x70, 0x68, 0x61, 0x73, 0x65, 0x22, 0x3b, 0x0a,
+	0x03, 0x56, 0x44, 0x46, 0x12, 0x14, 0x0a, 0x05, 0x70, 0x72, 0x6f, 0x6f, 0x66, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0c, 0x52, 0x05, 0x70, 0x72, 0x6f, 0x6f, 0x66, 0x12, 0x1e, 0x0a, 0x0a, 0x69, 0x74,
+	0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a,
+	0x69, 0x74, 0x65, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x22, 0x4a, 0x0a, 0x12, 0x41, 0x67,
+	0x67, 0x72, 0x65, 0x67, 0x61, 0x74, 0x65, 0x53, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65,
+	0x12, 0x1c, 0x0a, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0c, 0x52, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x12, 0x16,
+	0x0a, 0x06, 0x62, 0x69, 0x74, 0x6d, 0x61, 0x70, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06,
+	0x62, 0x69, 0x74, 0x6d, 0x61, 0x70, 0x22, 0x29, 0x0a, 0x09, 0x50, 0x72, 0x6f, 0x70, 0x6f, 0x73,
+	0x65, 0x72, 0x73, 0x12, 0x1c, 0x0a, 0x09, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x65, 0x73,
+	0x18, 0x01, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x09, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x65,
+	0x73, 0x2a, 0xbb, 0x01, 0x0a, 0x05, 0x50, 0x68, 0x61, 0x73, 0x65, 0x12, 0x0b, 0x0a, 0x07, 0x55,
 	0x4e, 0x4b, 0x4e, 0x4f, 0x57, 0x4e, 0x10, 0x00, 0x12, 0x0c, 0x0a, 0x08, 0x45, 0x4c, 0x45, 0x43,
 	0x54, 0x49, 0x4f, 0x4e, 0x10, 0x01, 0x12, 0x11, 0x0a, 0x0d, 0x45, 0x4c, 0x45, 0x43, 0x54, 0x49,
 	0x4f, 0x4e, 0x5f, 0x56, 0x4f, 0x54, 0x45, 0x10, 0x02, 0x12, 0x0b, 0x0a, 0x07, 0x50, 0x52, 0x4f,
@@ -538,17 +620,17 @@ var file_consensus_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_consensus_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_consensus_proto_goTypes = []interface{}{
 	(Phase)(0),                 // 0: types.Phase
-	(*Proposers)(nil),          // 1: types.Proposers
-	(*QuorumCertificate)(nil),  // 2: types.QuorumCertificate
-	(*View)(nil),               // 3: types.View
-	(*VDF)(nil),                // 4: types.VDF
-	(*AggregateSignature)(nil), // 5: types.AggregateSignature
+	(*QuorumCertificate)(nil),  // 1: types.QuorumCertificate
+	(*View)(nil),               // 2: types.View
+	(*VDF)(nil),                // 3: types.VDF
+	(*AggregateSignature)(nil), // 4: types.AggregateSignature
+	(*Proposers)(nil),          // 5: types.Proposers
 	(*CertificateResult)(nil),  // 6: types.CertificateResult
 }
 var file_consensus_proto_depIdxs = []int32{
-	3, // 0: types.QuorumCertificate.header:type_name -> types.View
+	2, // 0: types.QuorumCertificate.header:type_name -> types.View
 	6, // 1: types.QuorumCertificate.results:type_name -> types.CertificateResult
-	5, // 2: types.QuorumCertificate.signature:type_name -> types.AggregateSignature
+	4, // 2: types.QuorumCertificate.signature:type_name -> types.AggregateSignature
 	0, // 3: types.View.phase:type_name -> types.Phase
 	4, // [4:4] is the sub-list for method output_type
 	4, // [4:4] is the sub-list for method input_type
@@ -565,18 +647,6 @@ func file_consensus_proto_init() {
 	file_proposal_proto_init()
 	if !protoimpl.UnsafeEnabled {
 		file_consensus_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Proposers); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_consensus_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*QuorumCertificate); i {
 			case 0:
 				return &v.state
@@ -588,7 +658,7 @@ func file_consensus_proto_init() {
 				return nil
 			}
 		}
-		file_consensus_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_consensus_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*View); i {
 			case 0:
 				return &v.state
@@ -600,7 +670,7 @@ func file_consensus_proto_init() {
 				return nil
 			}
 		}
-		file_consensus_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+		file_consensus_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*VDF); i {
 			case 0:
 				return &v.state
@@ -612,8 +682,20 @@ func file_consensus_proto_init() {
 				return nil
 			}
 		}
-		file_consensus_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_consensus_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*AggregateSignature); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_consensus_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Proposers); i {
 			case 0:
 				return &v.state
 			case 1:
