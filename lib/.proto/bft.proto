@@ -6,32 +6,77 @@ option go_package = "github.com/canopy-network/canopy/bft";
 import "consensus.proto";
 import "tx.proto";
 
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+//_
+//_
+//_
+// (Consensus) Message
+//
+// This structure defines the wire message used in the BFT consensus process. Validators use these messages to propose,
+// vote on, and confirm blocks, allowing the network agree on a single version of the blockchain, even in there
+// exists faulty or malicious actors.
 message Message {
+  // header: the current view of the consensus process according to the sender
   View header = 1;
-  Signature vrf = 2; // only ELECTION phase from proposer
-  QuorumCertificate qc = 3; // Proposers use this to aggregate replica messages, Replicas sign parts of this to vote
-  QuorumCertificate high_qc = 4; // only if a previous lock was seen: ELECTION-VOTE phase by replica and PROPOSE phase by proposer
-  repeated DoubleSignEvidence last_double_sign_evidence = 5; // evidence from height - 1 (required cause last round ds would not be caught otherwise)
-  repeated BadProposerEvidence bad_proposer_evidence = 6; // evidence from current height (last round is always good, so we can do same height)
+  // vrf: the output of the vrf allowing participants to trust the leader was chosen fairly and securely.
+  Signature vrf = 2;
+  // qc: proof that a minimum number of validators have agreed on a proposal, typically represented by their collective
+  // signatures (aggregated by the leader), which confirms consensus and allows the network to move forward
+  QuorumCertificate qc = 3;
+  // high_qc: the latest 'round' quorum certificate where a +2/3rds of validators reached quorum for the PRECOMMIT phase
+  // This serves as a secure proof to protect those who may have committed in a type II asynchronous network
+  QuorumCertificate high_qc = 4;
+  // double_sign_evidence: proof that a validator has signed two conflicting proposals at the same View
+  repeated DoubleSignEvidence last_double_sign_evidence = 5;
+  // bad_proposer_evidence: proof that a leader failed to complete the consensus round
+  repeated BadProposerEvidence bad_proposer_evidence = 6;
+  // vdf: a Verifiable Delay Function is a cryptographic function that takes a fixed time to compute
+  // but is fast to verify, deterring historical fork attacks like the long-range-attack
   VDF vdf = 7;
+  // signature: the digital signature of the sender of the consensus message
   Signature signature = 8;
 }
 
-message DoubleSignEvidences {
-  repeated DoubleSignEvidence Evidence = 1;
-  map<string, bool> DeDuplicator = 2;
-}
-
+// double_sign_evidence is proof that a validator has signed two conflicting proposals at the same block height and round
+// showing dishonest or faulty behavior and triggering slashes to protect the network’s integrity
 message DoubleSignEvidence {
+  // vote_a: one of two quorum certificates that are of the same View that have conflicting payloads both that are
+  // signed by one or more validators
   QuorumCertificate vote_a = 1;
+  // vote_b: one of two quorum certificates that are of the same View that have conflicting payloads both that are
+  // signed by one or more validators
   QuorumCertificate vote_b = 2;
 }
 
-message BadProposerEvidences {
-  repeated BadProposerEvidence Evidence = 1;
+// double_sign_evidences is a de-duplicated list of double sign evidence
+message DoubleSignEvidences {
+  // evidence: a list of double sign evidence
+  repeated DoubleSignEvidence Evidence = 1;
+  // de-duplicator: a map structure that prevents accidental collision of evidence in the list
   map<string, bool> DeDuplicator = 2;
 }
 
+// bad_proposer_evidence is proof that a Leader failed to complete the consensus round
 message BadProposerEvidence {
+  // election_vote_qc: is proof that the validator was a Leader that height which is checked against the true leader
   QuorumCertificate election_vote_qc = 1;
+}
+
+// bad_proposer_evidences is a de-duplicated list of bad proposer evidence
+message BadProposerEvidences {
+  // evidence: a list of bad proposer evidence
+  repeated BadProposerEvidence Evidence = 1;
+  // de-duplicator: a map structure that prevents accidental collision of evidence in the list
+  map<string, bool> DeDuplicator = 2;
 }

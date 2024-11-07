@@ -491,10 +491,10 @@ func (tc *testConsensus) view(phase Phase, round ...uint64) *lib.View {
 		r = round[0]
 	}
 	return &lib.View{
-		Height:          1,
-		Round:           r,
-		CommitteeHeight: 1,
-		Phase:           phase,
+		Height:       1,
+		Round:        r,
+		CanopyHeight: 1,
+		Phase:        phase,
 	}
 }
 

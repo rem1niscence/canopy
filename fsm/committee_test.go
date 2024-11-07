@@ -27,7 +27,7 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 			daoCutPercent: 10,
 			supply: &types.Supply{
 				Staked: 100,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     lib.CanopyCommitteeId,
 						Amount: 10,
@@ -52,7 +52,7 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 			daoCutPercent: 10,
 			supply: &types.Supply{
 				Staked: 100,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     lib.CanopyCommitteeId,
 						Amount: 10,
@@ -85,7 +85,7 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 			daoCutPercent: 10,
 			supply: &types.Supply{
 				Staked: 100,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     lib.CanopyCommitteeId,
 						Amount: 10,
@@ -148,7 +148,7 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 			require.NoError(t, err)
 			// set the test supply
 			supply.Staked = test.supply.Staked
-			supply.CommitteesWithDelegations = test.supply.CommitteesWithDelegations
+			supply.CommitteeStaked = test.supply.CommitteeStaked
 			// set the supply back in state
 			require.NoError(t, sm.SetSupply(supply))
 			// execute the function call
@@ -190,7 +190,7 @@ func TestGetPaidCommittees(t *testing.T) {
 			minPercentForPaidCommittee: 10,
 			supply: &types.Supply{
 				Staked: 100,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: 1,
@@ -204,7 +204,7 @@ func TestGetPaidCommittees(t *testing.T) {
 			minPercentForPaidCommittee: 10,
 			supply: &types.Supply{
 				Staked: 100,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: 100,
@@ -219,7 +219,7 @@ func TestGetPaidCommittees(t *testing.T) {
 			minPercentForPaidCommittee: 10,
 			supply: &types.Supply{
 				Staked: 100,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: 10,
@@ -238,7 +238,7 @@ func TestGetPaidCommittees(t *testing.T) {
 			minPercentForPaidCommittee: 10,
 			supply: &types.Supply{
 				Staked: 100,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: 100,
@@ -257,7 +257,7 @@ func TestGetPaidCommittees(t *testing.T) {
 			minPercentForPaidCommittee: 10,
 			supply: &types.Supply{
 				Staked: 100,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: 10,
@@ -287,7 +287,7 @@ func TestGetPaidCommittees(t *testing.T) {
 			require.NoError(t, err)
 			// set the test supply
 			supply.Staked = test.supply.Staked
-			supply.CommitteesWithDelegations = test.supply.CommitteesWithDelegations
+			supply.CommitteeStaked = test.supply.CommitteeStaked
 			// set the supply back in state
 			require.NoError(t, sm.SetSupply(supply))
 			// execute the function call

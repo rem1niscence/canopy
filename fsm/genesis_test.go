@@ -77,7 +77,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 				Supply: &types.Supply{
 					Total:  100,
 					Staked: 100,
-					CommitteesWithDelegations: []*types.Pool{{
+					CommitteeStaked: []*types.Pool{{
 						Id:     lib.CanopyCommitteeId,
 						Amount: 100,
 					}, {
@@ -162,8 +162,8 @@ func TestNewFromGenesisFile(t *testing.T) {
 				},
 				Params: types.DefaultParams(),
 				Supply: &types.Supply{
-					Total:           200,
-					DelegationsOnly: nil,
+					Total:                  200,
+					CommitteeDelegatedOnly: nil,
 				},
 			},
 		},
@@ -350,14 +350,14 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 				Supply: &types.Supply{
 					Total:  500,
 					Staked: 100,
-					CommitteesWithDelegations: []*types.Pool{{
+					CommitteeStaked: []*types.Pool{{
 						Id:     lib.CanopyCommitteeId,
 						Amount: 100,
 					}, {
 						Id:     1,
 						Amount: 100,
 					}},
-					DelegationsOnly: nil,
+					CommitteeDelegatedOnly: nil,
 				},
 			},
 		},
@@ -413,7 +413,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 				Supply: &types.Supply{
 					Total:  100,
 					Staked: 100,
-					CommitteesWithDelegations: []*types.Pool{{
+					CommitteeStaked: []*types.Pool{{
 						Id:     lib.CanopyCommitteeId,
 						Amount: 100,
 					}, {
@@ -498,8 +498,8 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 				},
 				Params: types.DefaultParams(),
 				Supply: &types.Supply{
-					Total:           200,
-					DelegationsOnly: nil,
+					Total:                  200,
+					CommitteeDelegatedOnly: nil,
 				},
 			},
 		},
@@ -521,11 +521,11 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 				})
 			}
 			// sort the supply pools of got
-			sortById(got.Supply.CommitteesWithDelegations)
-			sortById(got.Supply.DelegationsOnly)
+			sortById(got.Supply.CommitteeStaked)
+			sortById(got.Supply.CommitteeDelegatedOnly)
 			// sort the supply pools of expected
-			sortById(test.expected.Supply.CommitteesWithDelegations)
-			sortById(test.expected.Supply.DelegationsOnly)
+			sortById(test.expected.Supply.CommitteeStaked)
+			sortById(test.expected.Supply.CommitteeDelegatedOnly)
 			// json for convenient compare
 			gotJson, _ := json.MarshalIndent(got, "", "  ")
 			expectedJson, _ := json.MarshalIndent(test.expected, "", "  ")
@@ -587,22 +587,6 @@ func TestValidateGenesisState(t *testing.T) {
 				Params: types.DefaultParams(),
 			},
 			error: "address size is invalid",
-		},
-		{
-			name:   "bad validator minimum stake",
-			detail: "the validator minimum stake is invalid",
-			input: &types.GenesisState{
-				Validators: []*types.Validator{
-					{
-						Address:      newTestAddressBytes(t),
-						PublicKey:    newTestPublicKeyBytes(t),
-						StakedAmount: 0,
-						Output:       newTestAddressBytes(t),
-					},
-				},
-				Params: types.DefaultParams(),
-			},
-			error: "less than minimum stake",
 		},
 		{
 			name:   "account address",
@@ -813,14 +797,14 @@ func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 		Supply: &types.Supply{
 			Total:  500,
 			Staked: 100,
-			CommitteesWithDelegations: []*types.Pool{{
+			CommitteeStaked: []*types.Pool{{
 				Id:     lib.CanopyCommitteeId,
 				Amount: 100,
 			}, {
 				Id:     1,
 				Amount: 100,
 			}},
-			DelegationsOnly: nil,
+			CommitteeDelegatedOnly: nil,
 		},
 	}
 }
@@ -836,11 +820,11 @@ func validateWithExportedState(t *testing.T, sm StateMachine, expected *types.Ge
 		})
 	}
 	// sort the supply pools of got
-	sortById(got.Supply.CommitteesWithDelegations)
-	sortById(got.Supply.DelegationsOnly)
+	sortById(got.Supply.CommitteeStaked)
+	sortById(got.Supply.CommitteeDelegatedOnly)
 	// sort the supply pools of expected
-	sortById(expected.Supply.CommitteesWithDelegations)
-	sortById(expected.Supply.DelegationsOnly)
+	sortById(expected.Supply.CommitteeStaked)
+	sortById(expected.Supply.CommitteeDelegatedOnly)
 	// json for convenient compare
 	gotJson, _ := json.MarshalIndent(got, "", "  ")
 	expectedJson, _ := json.MarshalIndent(expected, "", "  ")

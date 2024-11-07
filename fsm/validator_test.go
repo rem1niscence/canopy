@@ -156,7 +156,7 @@ func TestSetGetValidators(t *testing.T) {
 			expectedSupply: &types.Supply{
 				Total:  amount*3 + 3,
 				Staked: amount*3 + 3,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     lib.CanopyCommitteeId,
 						Amount: amount*3 + 3,
@@ -195,10 +195,10 @@ func TestSetGetValidators(t *testing.T) {
 				},
 			},
 			expectedSupply: &types.Supply{
-				Total:     amount*3 + 3,
-				Staked:    amount*3 + 3,
-				Delegated: amount*3 + 3,
-				CommitteesWithDelegations: []*types.Pool{
+				Total:         amount*3 + 3,
+				Staked:        amount*3 + 3,
+				DelegatedOnly: amount*3 + 3,
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     lib.CanopyCommitteeId,
 						Amount: amount*3 + 3,
@@ -208,7 +208,7 @@ func TestSetGetValidators(t *testing.T) {
 						Amount: amount*3 + 3,
 					},
 				},
-				DelegationsOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*types.Pool{
 					{
 						Id:     lib.CanopyCommitteeId,
 						Amount: amount*3 + 3,
@@ -400,7 +400,7 @@ func TestUpdateValidatorStake(t *testing.T) {
 			expectedSupply: &types.Supply{
 				Total:  amount,
 				Staked: amount,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: amount,
@@ -428,7 +428,7 @@ func TestUpdateValidatorStake(t *testing.T) {
 			expectedSupply: &types.Supply{
 				Total:  amount, // not updated by this function
 				Staked: amount + 1,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,
@@ -456,10 +456,10 @@ func TestUpdateValidatorStake(t *testing.T) {
 				Delegate:     true,
 			},
 			expectedSupply: &types.Supply{
-				Total:     amount, // not updated by this function
-				Staked:    amount + 1,
-				Delegated: amount + 1,
-				CommitteesWithDelegations: []*types.Pool{
+				Total:         amount, // not updated by this function
+				Staked:        amount + 1,
+				DelegatedOnly: amount + 1,
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,
@@ -469,7 +469,7 @@ func TestUpdateValidatorStake(t *testing.T) {
 						Amount: amount + 1,
 					},
 				},
-				DelegationsOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*types.Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,
@@ -497,7 +497,7 @@ func TestUpdateValidatorStake(t *testing.T) {
 			expectedSupply: &types.Supply{
 				Total:  amount, // not updated by this function
 				Staked: amount + 1,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,
@@ -525,10 +525,10 @@ func TestUpdateValidatorStake(t *testing.T) {
 				Delegate:     true,
 			},
 			expectedSupply: &types.Supply{
-				Total:     amount, // not updated by this function
-				Staked:    amount + 1,
-				Delegated: amount + 1,
-				CommitteesWithDelegations: []*types.Pool{
+				Total:         amount, // not updated by this function
+				Staked:        amount + 1,
+				DelegatedOnly: amount + 1,
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,
@@ -538,7 +538,7 @@ func TestUpdateValidatorStake(t *testing.T) {
 						Amount: amount + 1,
 					},
 				},
-				DelegationsOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*types.Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,

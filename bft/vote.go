@@ -133,7 +133,7 @@ func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 			// as anything older is invalid and at risk of a 'long range attack'
 			stateCommitteeHeight := b.Controller.LoadCommitteeHeightInState(b.CommitteeId)
 			// ensure the highQC has a valid Quorum Certificate
-			vs, err := b.Controller.LoadCommittee(b.CommitteeId, vote.HighQc.Header.CommitteeHeight)
+			vs, err := b.Controller.LoadCommittee(b.CommitteeId, vote.HighQc.Header.CanopyHeight)
 			if err != nil {
 				return err
 			}

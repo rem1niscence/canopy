@@ -254,10 +254,13 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 				require.NoError(t, sm.AddToTotalSupply(stakeAmount))
 				// add the validator stake to supply
 				require.NoError(t, sm.AddToStakedSupply(stakeAmount))
+				// add the validator stake to supply
+				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyCommitteeId, stakeAmount))
 				// set the non signer as a validator in state
 				require.NoError(t, sm.SetValidator(&types.Validator{
 					Address:      nonSigner.Address,
 					StakedAmount: stakeAmount,
+					Committees:   []uint64{lib.CanopyCommitteeId},
 				}))
 				// convert the non signer to bytes
 				bz, e := lib.Marshal(&types.NonSignerInfo{
@@ -514,11 +517,14 @@ func TestHandleDoubleSigners(t *testing.T) {
 				require.NoError(t, err)
 				// save the public key for later use in the test
 				pubs = append(pubs, pub)
+				// add to the committee supply
+				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyCommitteeId, stakeAmount))
 				// set the double signer as a validator in state
 				require.NoError(t, sm.SetValidator(&types.Validator{
 					Address:      pub.Address().Bytes(),
 					PublicKey:    pub.Bytes(),
 					StakedAmount: stakeAmount,
+					Committees:   []uint64{lib.CanopyCommitteeId},
 				}))
 			}
 			// get the validator params
@@ -605,7 +611,10 @@ func TestHandleBadProposers(t *testing.T) {
 					Address:      pub.Address().Bytes(),
 					PublicKey:    pub.Bytes(),
 					StakedAmount: stakeAmount,
+					Committees:   []uint64{lib.CanopyCommitteeId},
 				}))
+				// add to the committee supply
+				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyCommitteeId, stakeAmount))
 			}
 			// get the validator params
 			valParams, err := sm.GetParamsVal()
@@ -764,6 +773,7 @@ func TestSlash(t *testing.T) {
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
+					Committees:   []uint64{lib.CanopyCommitteeId},
 				},
 			},
 			slashes: []slash{
@@ -781,6 +791,7 @@ func TestSlash(t *testing.T) {
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
+					Committees:   []uint64{lib.CanopyCommitteeId},
 				},
 			},
 			slashes: []slash{
@@ -798,6 +809,7 @@ func TestSlash(t *testing.T) {
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
+					Committees:   []uint64{lib.CanopyCommitteeId},
 				},
 			},
 			slashes: []slash{
@@ -815,6 +827,7 @@ func TestSlash(t *testing.T) {
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
+					Committees:   []uint64{lib.CanopyCommitteeId},
 				},
 			},
 			slashes: []slash{
@@ -842,10 +855,12 @@ func TestSlash(t *testing.T) {
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
+					Committees:   []uint64{lib.CanopyCommitteeId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					StakedAmount: stakeAmount,
+					Committees:   []uint64{lib.CanopyCommitteeId},
 				},
 			},
 			slashes: []slash{
@@ -898,6 +913,8 @@ func TestSlash(t *testing.T) {
 				require.NoError(t, sm.AddToStakedSupply(stakeAmount))
 				// set the bad proposer as a validator in state
 				require.NoError(t, sm.SetValidator(v))
+				// add to the committee supply
+				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyCommitteeId, stakeAmount))
 			}
 			// execute the slashes
 			for _, s := range test.slashes {

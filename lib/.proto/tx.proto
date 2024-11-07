@@ -24,7 +24,11 @@ message TxResult {
   string tx_hash = 7;
 }
 
+// A Signature is a digital signature is a cryptographic "fingerprint" created with a private key,
+// allowing others to verify the authenticity and integrity of a message using the corresponding public key
 message Signature {
+  // public_key: is a cryptographic code shared openly, used to verify digital signatures
   bytes public_key = 1;
+  // signature: the bytes of the signature output from a private key which may be verified with the message and public
   bytes signature = 2;
 }

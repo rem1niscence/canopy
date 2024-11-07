@@ -21,19 +21,50 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+// _
+// _
+// _
+// (Consensus) Message
+//
+// This structure defines the wire message used in the BFT consensus process. Validators use these messages to propose,
+// vote on, and confirm blocks, allowing the network agree on a single version of the blockchain, even in there
+// exists faulty or malicious actors.
 type Message struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Header                 *lib.View              `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
-	Vrf                    *lib.Signature         `protobuf:"bytes,2,opt,name=vrf,proto3" json:"vrf,omitempty"`                                                                         // only ELECTION phase from proposer
-	Qc                     *lib.QuorumCertificate `protobuf:"bytes,3,opt,name=qc,proto3" json:"qc,omitempty"`                                                                           // Proposers use this to aggregate replica messages, Replicas sign parts of this to vote
-	HighQc                 *lib.QuorumCertificate `protobuf:"bytes,4,opt,name=high_qc,json=highQc,proto3" json:"high_qc,omitempty"`                                                     // only if a previous lock was seen: ELECTION-VOTE phase by replica and PROPOSE phase by proposer
-	LastDoubleSignEvidence []*DoubleSignEvidence  `protobuf:"bytes,5,rep,name=last_double_sign_evidence,json=lastDoubleSignEvidence,proto3" json:"last_double_sign_evidence,omitempty"` // evidence from height - 1 (required cause last round ds would not be caught otherwise)
-	BadProposerEvidence    []*BadProposerEvidence `protobuf:"bytes,6,rep,name=bad_proposer_evidence,json=badProposerEvidence,proto3" json:"bad_proposer_evidence,omitempty"`            // evidence from current height (last round is always good, so we can do same height)
-	Vdf                    *lib.VDF               `protobuf:"bytes,7,opt,name=vdf,proto3" json:"vdf,omitempty"`
-	Signature              *lib.Signature         `protobuf:"bytes,8,opt,name=signature,proto3" json:"signature,omitempty"`
+	// header: the current view of the consensus process according to the sender
+	Header *lib.View `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	// vrf: the output of the vrf allowing participants to trust the leader was chosen fairly and securely.
+	Vrf *lib.Signature `protobuf:"bytes,2,opt,name=vrf,proto3" json:"vrf,omitempty"`
+	// qc: proof that a minimum number of validators have agreed on a proposal, typically represented by their collective
+	// signatures (aggregated by the leader), which confirms consensus and allows the network to move forward
+	Qc *lib.QuorumCertificate `protobuf:"bytes,3,opt,name=qc,proto3" json:"qc,omitempty"`
+	// high_qc: the latest 'round' quorum certificate where a +2/3rds of validators reached quorum for the PRECOMMIT phase
+	// This serves as a secure proof to protect those who may have committed in a type II asynchronous network
+	HighQc *lib.QuorumCertificate `protobuf:"bytes,4,opt,name=high_qc,json=highQc,proto3" json:"high_qc,omitempty"`
+	// double_sign_evidence: proof that a validator has signed two conflicting proposals at the same View
+	LastDoubleSignEvidence []*DoubleSignEvidence `protobuf:"bytes,5,rep,name=last_double_sign_evidence,json=lastDoubleSignEvidence,proto3" json:"last_double_sign_evidence,omitempty"`
+	// bad_proposer_evidence: proof that a leader failed to complete the consensus round
+	BadProposerEvidence []*BadProposerEvidence `protobuf:"bytes,6,rep,name=bad_proposer_evidence,json=badProposerEvidence,proto3" json:"bad_proposer_evidence,omitempty"`
+	// vdf: a Verifiable Delay Function is a cryptographic function that takes a fixed time to compute
+	// but is fast to verify, deterring historical fork attacks like the long-range-attack
+	Vdf *lib.VDF `protobuf:"bytes,7,opt,name=vdf,proto3" json:"vdf,omitempty"`
+	// signature: the digital signature of the sender of the consensus message
+	Signature *lib.Signature `protobuf:"bytes,8,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 
 func (x *Message) Reset() {
@@ -124,74 +155,25 @@ func (x *Message) GetSignature() *lib.Signature {
 	return nil
 }
 
-type DoubleSignEvidences struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Evidence     []*DoubleSignEvidence `protobuf:"bytes,1,rep,name=Evidence,proto3" json:"Evidence,omitempty"`
-	DeDuplicator map[string]bool       `protobuf:"bytes,2,rep,name=DeDuplicator,proto3" json:"DeDuplicator,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
-}
-
-func (x *DoubleSignEvidences) Reset() {
-	*x = DoubleSignEvidences{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_bft_proto_msgTypes[1]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *DoubleSignEvidences) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DoubleSignEvidences) ProtoMessage() {}
-
-func (x *DoubleSignEvidences) ProtoReflect() protoreflect.Message {
-	mi := &file_bft_proto_msgTypes[1]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DoubleSignEvidences.ProtoReflect.Descriptor instead.
-func (*DoubleSignEvidences) Descriptor() ([]byte, []int) {
-	return file_bft_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *DoubleSignEvidences) GetEvidence() []*DoubleSignEvidence {
-	if x != nil {
-		return x.Evidence
-	}
-	return nil
-}
-
-func (x *DoubleSignEvidences) GetDeDuplicator() map[string]bool {
-	if x != nil {
-		return x.DeDuplicator
-	}
-	return nil
-}
-
+// double_sign_evidence is proof that a validator has signed two conflicting proposals at the same block height and round
+// showing dishonest or faulty behavior and triggering slashes to protect the network’s integrity
 type DoubleSignEvidence struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// vote_a: one of two quorum certificates that are of the same View that have conflicting payloads both that are
+	// signed by one or more validators
 	VoteA *lib.QuorumCertificate `protobuf:"bytes,1,opt,name=vote_a,json=voteA,proto3" json:"vote_a,omitempty"`
+	// vote_b: one of two quorum certificates that are of the same View that have conflicting payloads both that are
+	// signed by one or more validators
 	VoteB *lib.QuorumCertificate `protobuf:"bytes,2,opt,name=vote_b,json=voteB,proto3" json:"vote_b,omitempty"`
 }
 
 func (x *DoubleSignEvidence) Reset() {
 	*x = DoubleSignEvidence{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_bft_proto_msgTypes[2]
+		mi := &file_bft_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -204,7 +186,7 @@ func (x *DoubleSignEvidence) String() string {
 func (*DoubleSignEvidence) ProtoMessage() {}
 
 func (x *DoubleSignEvidence) ProtoReflect() protoreflect.Message {
-	mi := &file_bft_proto_msgTypes[2]
+	mi := &file_bft_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -217,7 +199,7 @@ func (x *DoubleSignEvidence) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DoubleSignEvidence.ProtoReflect.Descriptor instead.
 func (*DoubleSignEvidence) Descriptor() ([]byte, []int) {
-	return file_bft_proto_rawDescGZIP(), []int{2}
+	return file_bft_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *DoubleSignEvidence) GetVoteA() *lib.QuorumCertificate {
@@ -234,32 +216,35 @@ func (x *DoubleSignEvidence) GetVoteB() *lib.QuorumCertificate {
 	return nil
 }
 
-type BadProposerEvidences struct {
+// double_sign_evidences is a de-duplicated list of double sign evidence
+type DoubleSignEvidences struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Evidence     []*BadProposerEvidence `protobuf:"bytes,1,rep,name=Evidence,proto3" json:"Evidence,omitempty"`
-	DeDuplicator map[string]bool        `protobuf:"bytes,2,rep,name=DeDuplicator,proto3" json:"DeDuplicator,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	// evidence: a list of double sign evidence
+	Evidence []*DoubleSignEvidence `protobuf:"bytes,1,rep,name=Evidence,proto3" json:"Evidence,omitempty"`
+	// de-duplicator: a map structure that prevents accidental collision of evidence in the list
+	DeDuplicator map[string]bool `protobuf:"bytes,2,rep,name=DeDuplicator,proto3" json:"DeDuplicator,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
 }
 
-func (x *BadProposerEvidences) Reset() {
-	*x = BadProposerEvidences{}
+func (x *DoubleSignEvidences) Reset() {
+	*x = DoubleSignEvidences{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_bft_proto_msgTypes[3]
+		mi := &file_bft_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
 }
 
-func (x *BadProposerEvidences) String() string {
+func (x *DoubleSignEvidences) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BadProposerEvidences) ProtoMessage() {}
+func (*DoubleSignEvidences) ProtoMessage() {}
 
-func (x *BadProposerEvidences) ProtoReflect() protoreflect.Message {
-	mi := &file_bft_proto_msgTypes[3]
+func (x *DoubleSignEvidences) ProtoReflect() protoreflect.Message {
+	mi := &file_bft_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -270,37 +255,39 @@ func (x *BadProposerEvidences) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BadProposerEvidences.ProtoReflect.Descriptor instead.
-func (*BadProposerEvidences) Descriptor() ([]byte, []int) {
-	return file_bft_proto_rawDescGZIP(), []int{3}
+// Deprecated: Use DoubleSignEvidences.ProtoReflect.Descriptor instead.
+func (*DoubleSignEvidences) Descriptor() ([]byte, []int) {
+	return file_bft_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *BadProposerEvidences) GetEvidence() []*BadProposerEvidence {
+func (x *DoubleSignEvidences) GetEvidence() []*DoubleSignEvidence {
 	if x != nil {
 		return x.Evidence
 	}
 	return nil
 }
 
-func (x *BadProposerEvidences) GetDeDuplicator() map[string]bool {
+func (x *DoubleSignEvidences) GetDeDuplicator() map[string]bool {
 	if x != nil {
 		return x.DeDuplicator
 	}
 	return nil
 }
 
+// bad_proposer_evidence is proof that a Leader failed to complete the consensus round
 type BadProposerEvidence struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// election_vote_qc: is proof that the validator was a Leader that height which is checked against the true leader
 	ElectionVoteQc *lib.QuorumCertificate `protobuf:"bytes,1,opt,name=election_vote_qc,json=electionVoteQc,proto3" json:"election_vote_qc,omitempty"`
 }
 
 func (x *BadProposerEvidence) Reset() {
 	*x = BadProposerEvidence{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_bft_proto_msgTypes[4]
+		mi := &file_bft_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -313,7 +300,7 @@ func (x *BadProposerEvidence) String() string {
 func (*BadProposerEvidence) ProtoMessage() {}
 
 func (x *BadProposerEvidence) ProtoReflect() protoreflect.Message {
-	mi := &file_bft_proto_msgTypes[4]
+	mi := &file_bft_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -326,12 +313,70 @@ func (x *BadProposerEvidence) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BadProposerEvidence.ProtoReflect.Descriptor instead.
 func (*BadProposerEvidence) Descriptor() ([]byte, []int) {
-	return file_bft_proto_rawDescGZIP(), []int{4}
+	return file_bft_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *BadProposerEvidence) GetElectionVoteQc() *lib.QuorumCertificate {
 	if x != nil {
 		return x.ElectionVoteQc
+	}
+	return nil
+}
+
+// bad_proposer_evidences is a de-duplicated list of bad proposer evidence
+type BadProposerEvidences struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// evidence: a list of bad proposer evidence
+	Evidence []*BadProposerEvidence `protobuf:"bytes,1,rep,name=Evidence,proto3" json:"Evidence,omitempty"`
+	// de-duplicator: a map structure that prevents accidental collision of evidence in the list
+	DeDuplicator map[string]bool `protobuf:"bytes,2,rep,name=DeDuplicator,proto3" json:"DeDuplicator,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+}
+
+func (x *BadProposerEvidences) Reset() {
+	*x = BadProposerEvidences{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_bft_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *BadProposerEvidences) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BadProposerEvidences) ProtoMessage() {}
+
+func (x *BadProposerEvidences) ProtoReflect() protoreflect.Message {
+	mi := &file_bft_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BadProposerEvidences.ProtoReflect.Descriptor instead.
+func (*BadProposerEvidences) Descriptor() ([]byte, []int) {
+	return file_bft_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *BadProposerEvidences) GetEvidence() []*BadProposerEvidence {
+	if x != nil {
+		return x.Evidence
+	}
+	return nil
+}
+
+func (x *BadProposerEvidences) GetDeDuplicator() map[string]bool {
+	if x != nil {
+		return x.DeDuplicator
 	}
 	return nil
 }
@@ -368,48 +413,48 @@ var file_bft_proto_rawDesc = []byte{
 	0x76, 0x64, 0x66, 0x12, 0x2e, 0x0a, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65,
 	0x18, 0x08, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x10, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x53,
 	0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x52, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74,
-	0x75, 0x72, 0x65, 0x22, 0xdf, 0x01, 0x0a, 0x13, 0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x53, 0x69,
-	0x67, 0x6e, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x73, 0x12, 0x35, 0x0a, 0x08, 0x45,
-	0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x19, 0x2e,
-	0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x53, 0x69, 0x67, 0x6e,
-	0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x52, 0x08, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e,
-	0x63, 0x65, 0x12, 0x50, 0x0a, 0x0c, 0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74,
-	0x6f, 0x72, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2c, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73,
-	0x2e, 0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x53, 0x69, 0x67, 0x6e, 0x45, 0x76, 0x69, 0x64, 0x65,
-	0x6e, 0x63, 0x65, 0x73, 0x2e, 0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f,
-	0x72, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x0c, 0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63,
-	0x61, 0x74, 0x6f, 0x72, 0x1a, 0x3f, 0x0a, 0x11, 0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63,
-	0x61, 0x74, 0x6f, 0x72, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76,
-	0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x08, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75,
-	0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x76, 0x0a, 0x12, 0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x53,
-	0x69, 0x67, 0x6e, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x12, 0x2f, 0x0a, 0x06, 0x76,
-	0x6f, 0x74, 0x65, 0x5f, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x74, 0x79,
-	0x70, 0x65, 0x73, 0x2e, 0x51, 0x75, 0x6f, 0x72, 0x75, 0x6d, 0x43, 0x65, 0x72, 0x74, 0x69, 0x66,
-	0x69, 0x63, 0x61, 0x74, 0x65, 0x52, 0x05, 0x76, 0x6f, 0x74, 0x65, 0x41, 0x12, 0x2f, 0x0a, 0x06,
-	0x76, 0x6f, 0x74, 0x65, 0x5f, 0x62, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x74,
-	0x79, 0x70, 0x65, 0x73, 0x2e, 0x51, 0x75, 0x6f, 0x72, 0x75, 0x6d, 0x43, 0x65, 0x72, 0x74, 0x69,
-	0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x52, 0x05, 0x76, 0x6f, 0x74, 0x65, 0x42, 0x22, 0xe2, 0x01,
-	0x0a, 0x14, 0x42, 0x61, 0x64, 0x50, 0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65, 0x72, 0x45, 0x76, 0x69,
-	0x64, 0x65, 0x6e, 0x63, 0x65, 0x73, 0x12, 0x36, 0x0a, 0x08, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e,
-	0x63, 0x65, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73,
-	0x2e, 0x42, 0x61, 0x64, 0x50, 0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65, 0x72, 0x45, 0x76, 0x69, 0x64,
-	0x65, 0x6e, 0x63, 0x65, 0x52, 0x08, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x12, 0x51,
-	0x0a, 0x0c, 0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f, 0x72, 0x18, 0x02,
-	0x20, 0x03, 0x28, 0x0b, 0x32, 0x2d, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x42, 0x61, 0x64,
+	0x75, 0x72, 0x65, 0x22, 0x76, 0x0a, 0x12, 0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x53, 0x69, 0x67,
+	0x6e, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x12, 0x2f, 0x0a, 0x06, 0x76, 0x6f, 0x74,
+	0x65, 0x5f, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x74, 0x79, 0x70, 0x65,
+	0x73, 0x2e, 0x51, 0x75, 0x6f, 0x72, 0x75, 0x6d, 0x43, 0x65, 0x72, 0x74, 0x69, 0x66, 0x69, 0x63,
+	0x61, 0x74, 0x65, 0x52, 0x05, 0x76, 0x6f, 0x74, 0x65, 0x41, 0x12, 0x2f, 0x0a, 0x06, 0x76, 0x6f,
+	0x74, 0x65, 0x5f, 0x62, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x74, 0x79, 0x70,
+	0x65, 0x73, 0x2e, 0x51, 0x75, 0x6f, 0x72, 0x75, 0x6d, 0x43, 0x65, 0x72, 0x74, 0x69, 0x66, 0x69,
+	0x63, 0x61, 0x74, 0x65, 0x52, 0x05, 0x76, 0x6f, 0x74, 0x65, 0x42, 0x22, 0xdf, 0x01, 0x0a, 0x13,
+	0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x53, 0x69, 0x67, 0x6e, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e,
+	0x63, 0x65, 0x73, 0x12, 0x35, 0x0a, 0x08, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x18,
+	0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x19, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x44, 0x6f,
+	0x75, 0x62, 0x6c, 0x65, 0x53, 0x69, 0x67, 0x6e, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65,
+	0x52, 0x08, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x12, 0x50, 0x0a, 0x0c, 0x44, 0x65,
+	0x44, 0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f, 0x72, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0b,
+	0x32, 0x2c, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x44, 0x6f, 0x75, 0x62, 0x6c, 0x65, 0x53,
+	0x69, 0x67, 0x6e, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x73, 0x2e, 0x44, 0x65, 0x44,
+	0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f, 0x72, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x0c,
+	0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f, 0x72, 0x1a, 0x3f, 0x0a, 0x11,
+	0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f, 0x72, 0x45, 0x6e, 0x74, 0x72,
+	0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03,
+	0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x08, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0x59, 0x0a,
+	0x13, 0x42, 0x61, 0x64, 0x50, 0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65, 0x72, 0x45, 0x76, 0x69, 0x64,
+	0x65, 0x6e, 0x63, 0x65, 0x12, 0x42, 0x0a, 0x10, 0x65, 0x6c, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e,
+	0x5f, 0x76, 0x6f, 0x74, 0x65, 0x5f, 0x71, 0x63, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x18,
+	0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x51, 0x75, 0x6f, 0x72, 0x75, 0x6d, 0x43, 0x65, 0x72,
+	0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x52, 0x0e, 0x65, 0x6c, 0x65, 0x63, 0x74, 0x69,
+	0x6f, 0x6e, 0x56, 0x6f, 0x74, 0x65, 0x51, 0x63, 0x22, 0xe2, 0x01, 0x0a, 0x14, 0x42, 0x61, 0x64,
 	0x50, 0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65, 0x72, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65,
-	0x73, 0x2e, 0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f, 0x72, 0x45, 0x6e,
-	0x74, 0x72, 0x79, 0x52, 0x0c, 0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f,
-	0x72, 0x1a, 0x3f, 0x0a, 0x11, 0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f,
-	0x72, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75,
-	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x08, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02,
-	0x38, 0x01, 0x22, 0x59, 0x0a, 0x13, 0x42, 0x61, 0x64, 0x50, 0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65,
-	0x72, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x12, 0x42, 0x0a, 0x10, 0x65, 0x6c, 0x65,
-	0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x76, 0x6f, 0x74, 0x65, 0x5f, 0x71, 0x63, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x51, 0x75, 0x6f, 0x72,
-	0x75, 0x6d, 0x43, 0x65, 0x72, 0x74, 0x69, 0x66, 0x69, 0x63, 0x61, 0x74, 0x65, 0x52, 0x0e, 0x65,
-	0x6c, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x56, 0x6f, 0x74, 0x65, 0x51, 0x63, 0x42, 0x26, 0x5a,
+	0x73, 0x12, 0x36, 0x0a, 0x08, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x18, 0x01, 0x20,
+	0x03, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x42, 0x61, 0x64, 0x50,
+	0x72, 0x6f, 0x70, 0x6f, 0x73, 0x65, 0x72, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x52,
+	0x08, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x12, 0x51, 0x0a, 0x0c, 0x44, 0x65, 0x44,
+	0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f, 0x72, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0b, 0x32,
+	0x2d, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x42, 0x61, 0x64, 0x50, 0x72, 0x6f, 0x70, 0x6f,
+	0x73, 0x65, 0x72, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x73, 0x2e, 0x44, 0x65, 0x44,
+	0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f, 0x72, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x0c,
+	0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f, 0x72, 0x1a, 0x3f, 0x0a, 0x11,
+	0x44, 0x65, 0x44, 0x75, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x6f, 0x72, 0x45, 0x6e, 0x74, 0x72,
+	0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03,
+	0x6b, 0x65, 0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x08, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x42, 0x26, 0x5a,
 	0x24, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x61, 0x6e, 0x6f,
 	0x70, 0x79, 0x2d, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70,
 	0x79, 0x2f, 0x62, 0x66, 0x74, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
@@ -430,10 +475,10 @@ func file_bft_proto_rawDescGZIP() []byte {
 var file_bft_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_bft_proto_goTypes = []interface{}{
 	(*Message)(nil),               // 0: types.Message
-	(*DoubleSignEvidences)(nil),   // 1: types.DoubleSignEvidences
-	(*DoubleSignEvidence)(nil),    // 2: types.DoubleSignEvidence
-	(*BadProposerEvidences)(nil),  // 3: types.BadProposerEvidences
-	(*BadProposerEvidence)(nil),   // 4: types.BadProposerEvidence
+	(*DoubleSignEvidence)(nil),    // 1: types.DoubleSignEvidence
+	(*DoubleSignEvidences)(nil),   // 2: types.DoubleSignEvidences
+	(*BadProposerEvidence)(nil),   // 3: types.BadProposerEvidence
+	(*BadProposerEvidences)(nil),  // 4: types.BadProposerEvidences
 	nil,                           // 5: types.DoubleSignEvidences.DeDuplicatorEntry
 	nil,                           // 6: types.BadProposerEvidences.DeDuplicatorEntry
 	(*lib.View)(nil),              // 7: types.View
@@ -446,17 +491,17 @@ var file_bft_proto_depIdxs = []int32{
 	8,  // 1: types.Message.vrf:type_name -> types.Signature
 	9,  // 2: types.Message.qc:type_name -> types.QuorumCertificate
 	9,  // 3: types.Message.high_qc:type_name -> types.QuorumCertificate
-	2,  // 4: types.Message.last_double_sign_evidence:type_name -> types.DoubleSignEvidence
-	4,  // 5: types.Message.bad_proposer_evidence:type_name -> types.BadProposerEvidence
+	1,  // 4: types.Message.last_double_sign_evidence:type_name -> types.DoubleSignEvidence
+	3,  // 5: types.Message.bad_proposer_evidence:type_name -> types.BadProposerEvidence
 	10, // 6: types.Message.vdf:type_name -> types.VDF
 	8,  // 7: types.Message.signature:type_name -> types.Signature
-	2,  // 8: types.DoubleSignEvidences.Evidence:type_name -> types.DoubleSignEvidence
-	5,  // 9: types.DoubleSignEvidences.DeDuplicator:type_name -> types.DoubleSignEvidences.DeDuplicatorEntry
-	9,  // 10: types.DoubleSignEvidence.vote_a:type_name -> types.QuorumCertificate
-	9,  // 11: types.DoubleSignEvidence.vote_b:type_name -> types.QuorumCertificate
-	4,  // 12: types.BadProposerEvidences.Evidence:type_name -> types.BadProposerEvidence
-	6,  // 13: types.BadProposerEvidences.DeDuplicator:type_name -> types.BadProposerEvidences.DeDuplicatorEntry
-	9,  // 14: types.BadProposerEvidence.election_vote_qc:type_name -> types.QuorumCertificate
+	9,  // 8: types.DoubleSignEvidence.vote_a:type_name -> types.QuorumCertificate
+	9,  // 9: types.DoubleSignEvidence.vote_b:type_name -> types.QuorumCertificate
+	1,  // 10: types.DoubleSignEvidences.Evidence:type_name -> types.DoubleSignEvidence
+	5,  // 11: types.DoubleSignEvidences.DeDuplicator:type_name -> types.DoubleSignEvidences.DeDuplicatorEntry
+	9,  // 12: types.BadProposerEvidence.election_vote_qc:type_name -> types.QuorumCertificate
+	3,  // 13: types.BadProposerEvidences.Evidence:type_name -> types.BadProposerEvidence
+	6,  // 14: types.BadProposerEvidences.DeDuplicator:type_name -> types.BadProposerEvidences.DeDuplicatorEntry
 	15, // [15:15] is the sub-list for method output_type
 	15, // [15:15] is the sub-list for method input_type
 	15, // [15:15] is the sub-list for extension type_name
@@ -483,18 +528,6 @@ func file_bft_proto_init() {
 			}
 		}
 		file_bft_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*DoubleSignEvidences); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_bft_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*DoubleSignEvidence); i {
 			case 0:
 				return &v.state
@@ -506,8 +539,20 @@ func file_bft_proto_init() {
 				return nil
 			}
 		}
+		file_bft_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DoubleSignEvidences); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 		file_bft_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BadProposerEvidences); i {
+			switch v := v.(*BadProposerEvidence); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -519,7 +564,7 @@ func file_bft_proto_init() {
 			}
 		}
 		file_bft_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BadProposerEvidence); i {
+			switch v := v.(*BadProposerEvidences); i {
 			case 0:
 				return &v.state
 			case 1:

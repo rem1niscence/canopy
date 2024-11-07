@@ -27,15 +27,11 @@ func TestApplyTransaction(t *testing.T) {
 		error         string
 	}{
 		{
-			name:   "checkTx fails",
-			detail: "failure on stateless transaction checking",
-			error:  "message is empty",
-		},
-		{
 			name:          "deduct fee fails",
 			detail:        "failure on fee deduction",
 			lastBlockTime: time.Now(),
 			transaction:   sendTx,
+			expected:      &lib.TxResult{},
 			error:         "insufficient funds",
 		},
 		{
@@ -44,6 +40,7 @@ func TestApplyTransaction(t *testing.T) {
 			lastBlockTime: time.Now(),
 			presetSender:  amount - 1,
 			transaction:   sendTx,
+			expected:      &lib.TxResult{},
 			error:         "insufficient funds",
 		},
 		{

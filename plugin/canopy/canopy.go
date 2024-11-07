@@ -258,10 +258,10 @@ func (p *Plugin) CompareBlockHeaders(candidate *lib.BlockHeader, compare *lib.Bl
 		}
 		// check the last QC
 		isPartialQC, err := candidate.LastQuorumCertificate.Check(vs, 0, &lib.View{
-			Height:          lastQCHeight,
-			CommitteeHeight: lastQCHeight,
-			NetworkId:       p.Config.NetworkID,
-			CommitteeId:     p.CommitteeId,
+			Height:       lastQCHeight,
+			CanopyHeight: lastQCHeight,
+			NetworkId:    p.Config.NetworkID,
+			CommitteeId:  p.CommitteeId,
 		}, true)
 		if err != nil {
 			return err

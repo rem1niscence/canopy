@@ -568,7 +568,8 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 			detail: "retrieves the authorized signers for message delete order",
 			msg: &types.MessageCertificateResults{
 				Qc: &lib.QuorumCertificate{
-					Header: &lib.View{CommitteeId: lib.CanopyCommitteeId, Height: 1},
+					Header:      &lib.View{CommitteeId: lib.CanopyCommitteeId, Height: 1},
+					ProposerKey: newTestPublicKeyBytes(t),
 				},
 			},
 			expected: [][]byte{newTestAddressBytes(t)},
@@ -870,7 +871,7 @@ func TestHandleMessageStake(t *testing.T) {
 			}
 			if val.Delegate {
 				// validate the addition to the delegated pool
-				require.Equal(t, test.msg.Amount, supply.Delegated)
+				require.Equal(t, test.msg.Amount, supply.DelegatedOnly)
 				// validate the addition to the delegations only
 				for _, id := range val.Committees {
 					// get the supply for each committee
@@ -1035,7 +1036,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 			expectedSupply: &types.Supply{
 				Total:  1,
 				Staked: 1,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: 1,
@@ -1071,10 +1072,10 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Delegate:     true,
 			},
 			expectedSupply: &types.Supply{
-				Total:     1,
-				Staked:    1,
-				Delegated: 1,
-				CommitteesWithDelegations: []*types.Pool{
+				Total:         1,
+				Staked:        1,
+				DelegatedOnly: 1,
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     0,
 						Amount: 1,
@@ -1084,7 +1085,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 						Amount: 1,
 					},
 				},
-				DelegationsOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*types.Pool{
 					{
 						Id:     0,
 						Amount: 1,
@@ -1128,7 +1129,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 			expectedSupply: &types.Supply{
 				Total:  1,
 				Staked: 1,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     1,
 						Amount: 1,
@@ -1165,10 +1166,10 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Delegate:     true,
 			},
 			expectedSupply: &types.Supply{
-				Total:     1,
-				Staked:    1,
-				Delegated: 1,
-				CommitteesWithDelegations: []*types.Pool{
+				Total:         1,
+				Staked:        1,
+				DelegatedOnly: 1,
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     1,
 						Amount: 1,
@@ -1182,7 +1183,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 						Amount: 1,
 					},
 				},
-				DelegationsOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*types.Pool{
 					{
 						Id:     1,
 						Amount: 1,
@@ -1220,7 +1221,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 			expectedSupply: &types.Supply{
 				Total:  3,
 				Staked: 2,
-				CommitteesWithDelegations: []*types.Pool{
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     1,
 						Amount: 2,
@@ -1258,10 +1259,10 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Delegate:     true,
 			},
 			expectedSupply: &types.Supply{
-				Total:     3,
-				Staked:    2,
-				Delegated: 2,
-				CommitteesWithDelegations: []*types.Pool{
+				Total:         3,
+				Staked:        2,
+				DelegatedOnly: 2,
+				CommitteeStaked: []*types.Pool{
 					{
 						Id:     1,
 						Amount: 2,
@@ -1275,7 +1276,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 						Amount: 2,
 					},
 				},
-				DelegationsOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*types.Pool{
 					{
 						Id:     1,
 						Amount: 2,
@@ -1909,9 +1910,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			nonSubsidizedCommittee: true,
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:          1,
-					CommitteeHeight: 3,
-					CommitteeId:     lib.CanopyCommitteeId,
+					Height:       1,
+					CanopyHeight: 3,
+					CommitteeId:  lib.CanopyCommitteeId,
 				},
 			}},
 			error: "non subsidized committee",
@@ -1921,9 +1922,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			detail: "a committee height that is LTE state machine height - 2",
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:          1,
-					CommitteeHeight: 0,
-					CommitteeId:     lib.CanopyCommitteeId,
+					Height:       1,
+					CanopyHeight: 0,
+					CommitteeId:  lib.CanopyCommitteeId,
 				},
 			}},
 			error: "invalid certificate committee height",
@@ -1934,9 +1935,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			noCommitteeMembers: true,
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:          1,
-					CommitteeHeight: 3,
-					CommitteeId:     lib.CanopyCommitteeId,
+					Height:       1,
+					CanopyHeight: 3,
+					CommitteeId:  lib.CanopyCommitteeId,
 				},
 			}},
 			error: "there are no validators in the set",
@@ -1947,9 +1948,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			noCommitteeMembers: true,
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:          1,
-					CommitteeHeight: 3,
-					CommitteeId:     lib.CanopyCommitteeId,
+					Height:       1,
+					CanopyHeight: 3,
+					CommitteeId:  lib.CanopyCommitteeId,
 				},
 			}},
 			error: "there are no validators in the set",
@@ -1959,9 +1960,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			detail: "the QC is empty",
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:          1,
-					CommitteeHeight: 3,
-					CommitteeId:     lib.CanopyCommitteeId,
+					Height:       1,
+					CanopyHeight: 3,
+					CommitteeId:  lib.CanopyCommitteeId,
 				},
 			}},
 			error: "empty quorum certificate",
@@ -1971,9 +1972,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			detail: "the qc sent is valid",
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:          1,
-					CommitteeHeight: 3,
-					CommitteeId:     lib.CanopyCommitteeId,
+					Height:       1,
+					CanopyHeight: 3,
+					CommitteeId:  lib.CanopyCommitteeId,
 				},
 				Results:     certificateResults,
 				ResultsHash: certificateResults.Hash(),
@@ -2105,7 +2106,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				committeeData, e := sm.GetCommitteeData(lib.CanopyCommitteeId)
 				require.NoError(t, e)
 				// validate the committee height was properly set
-				require.Equal(t, test.msg.Qc.Header.CommitteeHeight, committeeData.CommitteeHeight)
+				require.Equal(t, test.msg.Qc.Header.CanopyHeight, committeeData.CommitteeHeight)
 				// validate the chain height was properly set
 				require.Equal(t, test.msg.Qc.Header.Height, committeeData.ChainHeight)
 				// validate the number of samples was properly set

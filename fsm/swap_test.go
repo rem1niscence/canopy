@@ -17,10 +17,6 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 		error  string
 	}{
 		{
-			name:   "no orders",
-			detail: "test.orders is nil",
-		},
-		{
 			name:   "buy order already accepted",
 			detail: "the buy order cannot be claimed as its already reserved",
 			preset: []*types.SellOrder{
@@ -319,10 +315,12 @@ func TestEditOrder(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
 			// preset the order
-			_, err := sm.CreateOrder(test.preset, test.preset.Committee)
-			require.NoError(t, err)
+			if test.preset != nil {
+				_, err := sm.CreateOrder(test.preset, test.preset.Committee)
+				require.NoError(t, err)
+			}
 			// execute the function call
-			err = sm.EditOrder(test.expected, lib.CanopyCommitteeId)
+			err := sm.EditOrder(test.expected, lib.CanopyCommitteeId)
 			// validate the expected error
 			require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {

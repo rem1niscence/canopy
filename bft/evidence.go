@@ -91,7 +91,7 @@ func (b *BFT) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.DoubleSigne
 			return nil, err
 		}
 		// load the Validator set for this Committee at that height
-		committeeHeight := x.VoteA.Header.CommitteeHeight
+		committeeHeight := x.VoteA.Header.CanopyHeight
 		vs, err := b.LoadCommittee(b.CommitteeId, committeeHeight)
 		if err != nil {
 			return nil, err
@@ -206,7 +206,7 @@ func (x *DoubleSignEvidence) CheckBasic() lib.ErrorI {
 // Check() validates the double sign evidence
 func (x *DoubleSignEvidence) Check(vs lib.ValidatorSet, view *lib.View, minimumEvidenceHeight uint64) lib.ErrorI {
 	// can't be too old
-	if x.VoteA.Header.CommitteeHeight < minimumEvidenceHeight {
+	if x.VoteA.Header.CanopyHeight < minimumEvidenceHeight {
 		return lib.ErrEvidenceTooOld()
 	}
 	// ensure large payloads are empty as they are unnecessary for this message

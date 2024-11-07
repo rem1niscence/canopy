@@ -64,7 +64,7 @@ func (s *StateMachine) GetPaidCommittees(valParams *types.ValidatorParams) (paid
 	// since re-staking is enabled in the Canopy protocol, the protocol is able to simply pick which chains are paid via a 'committed stake'
 	// percentage. Since the effective cost of 're-staking' is essentially zero (minus the risk associated with slashing on the chain)
 	// this may be thought of like a popularity contest or a vote.
-	for _, committee := range supply.CommitteesWithDelegations {
+	for _, committee := range supply.CommitteeStaked {
 		// calculate the percent of stake the committee controls
 		committedStakePercent := lib.Uint64PercentageDiv(committee.Amount, supply.Staked)
 		// if the committee percentage is over the threshold

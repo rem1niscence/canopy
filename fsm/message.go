@@ -119,19 +119,11 @@ func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]by
 		}
 		return [][]byte{order.SellersSellAddress}, nil
 	case *types.MessageCertificateResults:
-		// any member may submit it - as the reward recipients are locked in the QC.ProposalHash
-		committee, e := s.LoadCommittee(x.Qc.Header.CommitteeId, x.Qc.Header.Height)
+		pub, e := lib.PublicKeyFromBytes(x.Qc.ProposerKey)
 		if e != nil {
 			return nil, e
 		}
-		for _, member := range committee.ValidatorSet.ValidatorSet {
-			address, er := s.validatorPubToAddr(member.PublicKey)
-			if er != nil {
-				return nil, er
-			}
-			signers = append(signers, address)
-		}
-		return
+		return [][]byte{pub.Address().Bytes()}, nil
 	default:
 		return nil, types.ErrUnknownMessage(x)
 	}
@@ -367,7 +359,7 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 		return types.ErrNonSubsidizedCommittee()
 	}
 	// validate the height of the CertificateResults Transaction
-	height := msg.Qc.Header.CommitteeHeight
+	height := msg.Qc.Header.CanopyHeight
 	if height != s.Height() && height != s.Height()-1 {
 		return lib.ErrInvalidQCCommitteeHeight()
 	}
@@ -418,7 +410,7 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 	// update the committee data
 	return s.UpsertCommitteeData(&types.CommitteeData{
 		CommitteeId:     committeeId,
-		CommitteeHeight: msg.Qc.Header.CommitteeHeight,
+		CommitteeHeight: msg.Qc.Header.CanopyHeight,
 		ChainHeight:     msg.Qc.Header.Height,
 		PaymentPercents: results.RewardRecipients.PaymentPercents,
 	})

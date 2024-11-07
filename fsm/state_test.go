@@ -85,10 +85,16 @@ func TestInitialize(t *testing.T) {
 }
 
 func TestApplyBlock(t *testing.T) {
+	var timestamp = uint64(time.Date(2024, 02, 01, 0, 0, 0, 0, time.UTC).UnixMicro())
 	// define a key group to use in testing
 	kg := newTestKeyGroup(t)
 	// predefine a send-transaction to insert into the block
 	sendTx, err := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), 1, 1)
+	txn := sendTx.(*lib.Transaction)
+	// set the timestamp to a fixed time for validity checking
+	txn.Time = timestamp
+	// re-sign the tx
+	require.NoError(t, txn.Sign(kg.PrivateKey))
 	// ensure no error
 	require.NoError(t, err)
 	// convert the object to bytes
@@ -104,7 +110,7 @@ func TestApplyBlock(t *testing.T) {
 		beginBlockError bool
 		block           *lib.Block
 		expectedHeader  *lib.BlockHeader
-		expectedResults *lib.TxResults
+		expectedResults *lib.TxResult
 		error           string
 	}{
 		{
@@ -127,52 +133,73 @@ func TestApplyBlock(t *testing.T) {
 			error:  "insufficient funds",
 		},
 		{
-			name:          "",
-			detail:        "",
+			name:          "successful apply block",
+			detail:        "the happy path with apply block without a 'last quorum certificate'",
 			accountPreset: 2,
 			block: &lib.Block{
 				BlockHeader: &lib.BlockHeader{
-					Height:                1,
-					NumTxs:                1,
-					TotalTxs:              1,
-					LastBlockHash:         crypto.Hash([]byte("block_hash")),
-					StateRoot:             nil,
-					TransactionRoot:       nil,
-					ValidatorRoot:         nil,
-					NextValidatorRoot:     nil,
-					ProposerAddress:       newTestAddressBytes(t),
-					Vdf:                   nil,
-					LastQuorumCertificate: nil,
+					Height:          2,
+					NumTxs:          1,
+					Time:            timestamp,
+					TotalTxs:        1,
+					LastBlockHash:   crypto.Hash([]byte("block_hash")),
+					ProposerAddress: newTestAddressBytes(t),
 				},
 				Transactions: [][]byte{sendTxBytes},
 			},
 			expectedHeader: &lib.BlockHeader{
-				Height:                0,
-				Hash:                  nil,
-				NetworkId:             0,
-				Time:                  0,
-				NumTxs:                0,
-				TotalTxs:              0,
-				TotalVdfIterations:    0,
-				LastBlockHash:         nil,
-				StateRoot:             nil,
-				TransactionRoot:       nil,
-				ValidatorRoot:         nil,
-				NextValidatorRoot:     nil,
-				ProposerAddress:       nil,
-				Vdf:                   nil,
-				LastQuorumCertificate: nil,
-			},
-			expectedResults: &lib.TxResults{
-				{
-					Sender:      newTestAddressBytes(t),
-					Recipient:   newTestAddressBytes(t),
-					MessageType: "send",
-					Height:      1,
-					Index:       0,
-					Transaction: sendTx.(*lib.Transaction),
-					TxHash:      crypto.HashString(sendTxBytes),
+				Height: 3,
+				Hash: []byte{
+					0xb2, 0x81, 0x46, 0x46, 0xa8, 0x6f, 0xdd,
+					0xa4, 0x52, 0x31, 0xc9, 0x50, 0x14, 0x8f,
+					0xda, 0x68, 0x9f, 0x6f, 0xbd, 0x11, 0x92,
+					0xb8, 0x9b, 0x27, 0xf2, 0xa6, 0x74, 0xe8,
+					0xd4, 0x51, 0xfc, 0x20,
 				},
+				Time:               timestamp,
+				NumTxs:             1,
+				TotalTxs:           1,
+				TotalVdfIterations: 0,
+				LastBlockHash: []byte{0x26, 0x46, 0x0e, 0xd3,
+					0x76, 0x17, 0x95, 0x7c, 0x96, 0xd9, 0xab, 0xf5,
+					0x94, 0xa1, 0xac, 0x86, 0x5a, 0x43, 0x11, 0x02,
+					0xfc, 0x38, 0x77, 0x71, 0xa8, 0xc7, 0x6d, 0xa0,
+					0x2e, 0x6f, 0x01, 0xe8,
+				},
+				StateRoot: []byte{
+					0xc5, 0xa6, 0xcd, 0x27, 0xe7, 0x42, 0x2d, 0x29,
+					0x4d, 0x9f, 0xf3, 0xcd, 0xa1, 0xe7, 0x29, 0xa9,
+					0x80, 0x06, 0x55, 0x77, 0xfb, 0x26, 0xe3, 0x82,
+					0x56, 0x1c, 0x1d, 0xa4, 0x94, 0x2a, 0xd9, 0x7f,
+				},
+				TransactionRoot: []byte{
+					0xa5, 0xa9, 0x96, 0xf2, 0x52, 0x65, 0x1e, 0x3f,
+					0x98, 0x8b, 0x69, 0xf8, 0xd4, 0x22, 0xec, 0xf1,
+					0x28, 0x25, 0x10, 0x02, 0x7b, 0x61, 0x69, 0x76,
+					0xca, 0x98, 0xa4, 0xc0, 0x83, 0x22, 0xd0, 0xca,
+				},
+				ValidatorRoot: []byte{
+					0xc4, 0x4b, 0x97, 0xc6, 0x09, 0x21, 0x6e, 0x45,
+					0xd3, 0x88, 0x84, 0x10, 0x31, 0xe6, 0xa3, 0x64,
+					0x53, 0x9e, 0x0d, 0x33, 0xc2, 0xe3, 0x8a, 0x47,
+					0x13, 0xa7, 0x53, 0xdd, 0x17, 0x8b, 0x64, 0x9c,
+				},
+				NextValidatorRoot: []byte{
+					0xc4, 0x4b, 0x97, 0xc6, 0x09, 0x21, 0x6e, 0x45,
+					0xd3, 0x88, 0x84, 0x10, 0x31, 0xe6, 0xa3, 0x64,
+					0x53, 0x9e, 0x0d, 0x33, 0xc2, 0xe3, 0x8a, 0x47,
+					0x13, 0xa7, 0x53, 0xdd, 0x17, 0x8b, 0x64, 0x9c,
+				},
+				ProposerAddress: newTestAddressBytes(t),
+			},
+			expectedResults: &lib.TxResult{
+				Sender:      newTestAddressBytes(t),
+				Recipient:   newTestAddressBytes(t),
+				MessageType: "send",
+				Height:      3,
+				Index:       0,
+				Transaction: sendTx.(*lib.Transaction),
+				TxHash:      crypto.HashString(sendTxBytes),
 			},
 		},
 	}
@@ -180,7 +207,6 @@ func TestApplyBlock(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
-			sm.height = 1
 			if test.storeError {
 				// set the store to the wrong type
 				sm.store = lib.RWStoreI(nil)
@@ -188,29 +214,34 @@ func TestApplyBlock(t *testing.T) {
 				// preset the 'last block' in state
 				require.NoError(t, sm.store.(lib.StoreI).IndexBlock(&lib.BlockResult{
 					BlockHeader: &lib.BlockHeader{
-						Height: 1,
+						Height: 2,
 						Hash:   test.block.BlockHeader.LastBlockHash,
-						Time:   uint64(time.Now().UnixMicro()),
+						Time:   timestamp,
 					},
 				}))
+				// set the minimum fee to 1 for send transactions
+				require.NoError(t, sm.UpdateParam("fee", types.ParamMessageSendFee, &lib.UInt64Wrapper{Value: 1}))
+				// preset the account with funds
+				require.NoError(t, sm.AccountAdd(newTestAddress(t), test.accountPreset))
+				// preset a committee member for canopy
+				require.NoError(t, sm.SetValidators([]*types.Validator{
+					{
+						Address:      newTestAddressBytes(t),
+						PublicKey:    newTestPublicKeyBytes(t),
+						StakedAmount: 1,
+						Committees:   []uint64{lib.CanopyCommitteeId},
+					},
+				}, &types.Supply{}))
+				// setup for a 'last validator set' for apply block
+				sm.height = 3
+				// ommit here to have a 'last validator set' for apply block
+				_, err = sm.store.(lib.StoreI).Commit()
+				require.NoError(t, err)
 			}
 			if !test.beginBlockError {
-				// set the protocol version to trigger an error
+				// set the protocol version to not trigger an error
 				sm.ProtocolVersion = 1
 			}
-			// set the minimum fee to 1 for send transactions
-			require.NoError(t, sm.UpdateParam("fee", types.ParamMessageSendFee, &lib.UInt64Wrapper{Value: 1}))
-			// preset the account with funds
-			require.NoError(t, sm.AccountAdd(newTestAddress(t), test.accountPreset))
-			// preset a committee member for canopy
-			require.NoError(t, sm.SetValidators([]*types.Validator{
-				{
-					Address:      newTestAddressBytes(t),
-					PublicKey:    newTestPublicKeyBytes(t),
-					StakedAmount: 1,
-					Committees:   []uint64{lib.CanopyCommitteeId},
-				},
-			}, &types.Supply{}))
 			// execute the function call
 			header, txResults, e := sm.ApplyBlock(test.block)
 			// validate the expected error
@@ -222,7 +253,7 @@ func TestApplyBlock(t *testing.T) {
 			// validate got vs expected block header
 			require.EqualExportedValues(t, test.expectedHeader, header)
 			// validate got vs expected tx results
-			require.EqualExportedValues(t, test.expectedResults, txResults)
+			require.EqualExportedValues(t, test.expectedResults, txResults[0])
 		})
 	}
 }
@@ -343,9 +374,9 @@ func newTestQC(t *testing.T, params testQCParams) (qc *lib.QuorumCertificate) {
 	// create the QC object
 	qc = &lib.QuorumCertificate{
 		Header: &lib.View{
-			Height:          params.height,
-			CommitteeHeight: params.height,
-			CommitteeId:     lib.CanopyCommitteeId,
+			Height:       params.height,
+			CanopyHeight: params.height,
+			CommitteeId:  lib.CanopyCommitteeId,
 		},
 		Results:     params.results,
 		ResultsHash: params.results.Hash(),

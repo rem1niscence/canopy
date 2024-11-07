@@ -3,20 +3,54 @@ package types;
 
 option go_package = "github.com/canopy-network/canopy/fsm/types";
 
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+//_
+//_
+//_
+// An account is a structure that holds funds and can send or receive transactions using a crypto key pair
+// Each account has a unique address and a balance, think a bank account - but managed by the blockchain
+// instead of a bank
 message Account {
+  // address: the short version of a public key
   bytes address = 1;
+  // amount: the balance of funds the account has
   uint64 amount = 2;
 }
 
+// A pool is like an account without an owner, holding funds that are managed directly by the blockchain protocol
+// It's very similar to an account but instead of an address it has a unique ID and operates based on predefined
+// blockchain rules rather than individual control
 message Pool {
+  // id: the unique identifier of the pool
   uint64 id = 1;
+  // amount: the balance of funds the pool has
   uint64 amount = 2;
 }
 
+// A supply structure keeps track of the total amount of tokens or funds available across the entire blockchain
+// It provides a single source of truth for the overall token supply managed by the network
+// It conveniently buckets the tokens into useful categories allowing transparency and consistency
+// NOTE: 'staked' includes delegations, to calculate stake without delegations, simply staked - delegated_only
 message Supply {
+  // total: the total tokens existing in the system - minted tokens are added, burned tokens are removed
   uint64 total = 1;
-  uint64 staked = 2; // staked + delegated
-  uint64 delegated = 3;
-  repeated Pool committees_with_delegations = 4; // supplies of committees
-  repeated Pool delegations_only = 5; // supplies of delegations towards committees
+  // staked: the total locked tokens in the protocol - this includes delegated
+  uint64 staked = 2;
+  // delegated_only: the total locked tokens that are delegated only
+  uint64 delegated_only = 3;
+  // committee_staked: a list of committees and their 'committed (staked + delegated)' tokens, sorted by stake
+  repeated Pool committee_staked = 4;
+  // committee_delegated_only: a list of committees and their 'delegated only' tokens, sorted by stake
+  repeated Pool committee_delegated_only = 5;
 }

@@ -5,7 +5,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 )
 
-// This file defines errors for the State Machine module
+// This file defines error objects for the State Machine module
 
 func ErrReadGenesisFile(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeReadGenesisFile, lib.StateMachineModule, fmt.Sprintf("read genesis file failed with err: %s", err.Error()))

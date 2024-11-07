@@ -203,12 +203,16 @@ func (x *TxResult) GetTxHash() string {
 	return ""
 }
 
+// A Signature is a digital signature is a cryptographic "fingerprint" created with a private key,
+// allowing others to verify the authenticity and integrity of a message using the corresponding public key
 type Signature struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// public_key: is a cryptographic code shared openly, used to verify digital signatures
 	PublicKey []byte `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	// signature: the bytes of the signature output from a private key which may be verified with the message and public
 	Signature []byte `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 

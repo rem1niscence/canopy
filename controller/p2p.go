@@ -567,10 +567,10 @@ func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc
 	v := chain.Consensus.ValidatorSet
 	// validate the quorum certificate
 	if err = c.checkPeerQC(chain.Plugin.LoadMaxBlockSize(), &lib.View{
-		Height:          chain.Plugin.Height() + 1,
-		CommitteeHeight: c.LoadCommitteeHeightInState(msg.CommitteeId),
-		NetworkId:       c.Config.NetworkID,
-		CommitteeId:     msg.CommitteeId,
+		Height:       chain.Plugin.Height() + 1,
+		CanopyHeight: c.LoadCommitteeHeightInState(msg.CommitteeId),
+		NetworkId:    c.Config.NetworkID,
+		CommitteeId:  msg.CommitteeId,
 	}, v, qc, senderID); err != nil {
 		handleErr(err)
 		return
@@ -622,7 +622,7 @@ func (c *Controller) checkPeerQC(maxBlockSize int, view *lib.View, v lib.Validat
 	// enforce the last saved committee height as valid
 	// NOTE: historical committees are accepted up to the last saved height in the state
 	// else there's a potential for a long-range attack
-	if qc.Header.CommitteeHeight < view.CommitteeHeight {
+	if qc.Header.CanopyHeight < view.CanopyHeight {
 		c.P2P.ChangeReputation(senderID, p2p.InvalidJustifyRep)
 		return lib.ErrInvalidQCCommitteeHeight()
 	}

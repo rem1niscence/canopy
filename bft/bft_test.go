@@ -67,12 +67,12 @@ func TestStartElectionPhase(t *testing.T) {
 			} else {
 				// if supposed to be a 'candidate', validate the ELECTION message
 				expectedView := lib.View{
-					Height:          1,
-					Round:           0,
-					Phase:           Election,
-					CommitteeHeight: 1,
-					NetworkId:       0,
-					CommitteeId:     0,
+					Height:       1,
+					Round:        0,
+					Phase:        Election,
+					CanopyHeight: 1,
+					NetworkId:    0,
+					CommitteeId:  0,
 				}
 				select {
 				case <-time.After(testTimeout):
@@ -142,10 +142,10 @@ func TestStartElectionVotePhase(t *testing.T) {
 				}
 			}
 			pub, _, expectedView := c.valKeys[0].PublicKey(), c.valKeys[0], lib.View{
-				Height:          1,
-				Round:           0,
-				CommitteeHeight: 1,
-				Phase:           ElectionVote,
+				Height:       1,
+				Round:        0,
+				CanopyHeight: 1,
+				Phase:        ElectionVote,
 			}
 			go c.bft.StartElectionVotePhase()
 			select {
@@ -218,15 +218,15 @@ func TestStartProposePhase(t *testing.T) {
 				multiKey = c.simElectionVotePhase(t, 0, test.hasBE, test.hasLivenessHQC, test.hasSafetyHQC, 0)
 			}
 			expectedView, expectedQCView := lib.View{
-				Height:          1,
-				Round:           0,
-				Phase:           Propose,
-				CommitteeHeight: 1,
+				Height:       1,
+				Round:        0,
+				Phase:        Propose,
+				CanopyHeight: 1,
 			}, lib.View{
-				Height:          1,
-				Round:           0,
-				Phase:           ElectionVote,
-				CommitteeHeight: 1,
+				Height:       1,
+				Round:        0,
+				Phase:        ElectionVote,
+				CanopyHeight: 1,
 			}
 			go c.bft.StartProposePhase()
 			select {
@@ -320,12 +320,12 @@ func TestStartProposeVotePhase(t *testing.T) {
 			}
 			block, results := c.simProposePhase(t, 0, test.validProposal, be, highQC, 0)
 			expectedView := lib.View{
-				Height:          1,
-				Round:           0,
-				Phase:           ProposeVote,
-				CommitteeHeight: 1,
-				NetworkId:       0,
-				CommitteeId:     0,
+				Height:       1,
+				Round:        0,
+				Phase:        ProposeVote,
+				CanopyHeight: 1,
+				NetworkId:    0,
+				CommitteeId:  0,
 			}
 			// valid proposal
 			go c.bft.StartProposeVotePhase()
@@ -383,19 +383,19 @@ func TestStartPrecommitPhase(t *testing.T) {
 			// setup
 			c, multiKey, blockHash, resultsHash := newTestConsensus(t, Precommit, 3), crypto.MultiPublicKeyI(nil), []byte(nil), []byte(nil)
 			expectedView, expectedQCView := lib.View{
-				Height:          1,
-				Round:           0,
-				Phase:           Precommit,
-				CommitteeHeight: 1,
-				NetworkId:       0,
-				CommitteeId:     0,
+				Height:       1,
+				Round:        0,
+				Phase:        Precommit,
+				CanopyHeight: 1,
+				NetworkId:    0,
+				CommitteeId:  0,
 			}, lib.View{
-				Height:          1,
-				Round:           0,
-				Phase:           ProposeVote,
-				CommitteeHeight: 1,
-				NetworkId:       0,
-				CommitteeId:     0,
+				Height:       1,
+				Round:        0,
+				Phase:        ProposeVote,
+				CanopyHeight: 1,
+				NetworkId:    0,
+				CommitteeId:  0,
 			}
 			if test.has23MajPropVote {
 				multiKey, blockHash, resultsHash = c.simProposeVotePhase(t, test.isProposer, true, 0)
@@ -474,10 +474,10 @@ func TestStartPrecommitVotePhase(t *testing.T) {
 				c.bft.ProposerKey = []byte("some other proposer")
 			}
 			expectedView := lib.View{
-				Height:          1,
-				Round:           0,
-				CommitteeHeight: 1,
-				Phase:           PrecommitVote,
+				Height:       1,
+				Round:        0,
+				CanopyHeight: 1,
+				Phase:        PrecommitVote,
 			}
 			go c.bft.StartPrecommitVotePhase()
 			select {
@@ -532,15 +532,15 @@ func TestStartCommitPhase(t *testing.T) {
 			c := newTestConsensus(t, Commit, 3)
 			multiKey, blockHash, resultsHash := crypto.MultiPublicKeyI(nil), []byte(nil), []byte(nil)
 			expectedView, expectedQCView := lib.View{
-				Height:          1,
-				Round:           0,
-				CommitteeHeight: 1,
-				Phase:           Commit,
+				Height:       1,
+				Round:        0,
+				CanopyHeight: 1,
+				Phase:        Commit,
 			}, lib.View{
-				Height:          1,
-				Round:           0,
-				CommitteeHeight: 1,
-				Phase:           PrecommitVote,
+				Height:       1,
+				Round:        0,
+				CanopyHeight: 1,
+				Phase:        PrecommitVote,
 			}
 			if !test.isProposer {
 				c.bft.ProposerKey = []byte("some other proposer")
@@ -658,10 +658,10 @@ func TestStartCommitProcessPhase(t *testing.T) {
 				multiKey, block, results = c.simCommitPhase(t, 1, 1)
 			}
 			expectedQCView := lib.View{
-				Height:          1,
-				Round:           1,
-				CommitteeHeight: 1,
-				Phase:           PrecommitVote,
+				Height:       1,
+				Round:        1,
+				CanopyHeight: 1,
+				Phase:        PrecommitVote,
 			}
 			if test.hasEVDSE {
 				c.bft.ProposerKey = c.valKeys[1].PublicKey().Bytes()
@@ -703,10 +703,10 @@ func TestRoundInterrupt(t *testing.T) {
 		msg, ok := m.(*Message)
 		require.True(t, ok)
 		require.EqualExportedValues(t, msg.Qc.Header, &lib.View{
-			Height:          1,
-			Round:           0,
-			CommitteeHeight: 1,
-			Phase:           RoundInterrupt,
+			Height:       1,
+			Round:        0,
+			CanopyHeight: 1,
+			Phase:        RoundInterrupt,
 		})
 		require.Equal(t, c.bft.Phase, RoundInterrupt)
 	}

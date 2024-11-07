@@ -33,25 +33,38 @@ message QuorumCertificate {
   AggregateSignature signature = 7; // aggregate signature from the current proposer message
 }
 
+// A View is a specific point in the consensus process; think of it like a snapshot of the consensus process at a
+// certain point in time.
+// A View comprises of:
+//
+// 1) Network ID and Committee ID: These identifiers uniquely define the BFT instance,
+// distinguishing different networks and the committees within them
+//
+// 2) Height and Canopy Height: For each BFT instance, the height increases with every new block produced,
+// and the canopy height when a canopy block is produced.
+//
+// 3) Round: Each height comprises of 1 or more rounds. A round increments when no block is produced but resets
+// to zero at a new height.
+//
+// 3) Phase: Each round consists of a fixed number of phases. Phases progress within the round and either end
+// with the successful production of a block or quit prematurely due to an error.
 message View {
-  // the height of the integrated chain
-  // number of committed blocks in the integrated blockchain
-  uint64 height = 1;
-  // step within the consensus protocol where validators attempt to agree on the next block
-  // each round a new Proposer is selected to lead the validators to agree on the next block
-  // if they fail, the round is incremented, more time is granted for consensus timeouts, and the
-  // cycle starts over
-  uint64 round = 2;
+  // the unique identifier of the blockchain network
+  uint64 network_id = 1;
+  // the unique identifier of the committee within the blockchain network
+  uint64 committee_id = 2;
+  // the height or number of committed blocks in the blockchain
+  uint64 height = 3;
+  // the Canopy blockchain height also the height that the committee validator set may be verified
+  uint64 canopy_height = 4;
+  // each height consists of one or more `rounds` which is a step within the consensus protocol where
+  // a new Proposer is selected to lead the validators to agree on the next block if they fail, the
+  // round is incremented, more time is granted for consensus timeouts, and the cycle starts over
+  uint64 round = 5;
   // represents the smallest unit in the consensus process. Each round consists of multiple phases, and these phases are
   // executed sequentially to achieve consensus on the next block.
   // ELECTION->ELECTION-VOTE->PROPOSE->PROPOSE-VOTE->PRECOMMIT->PRECOMMIT-VOTE->COMMIT->COMMIT-PROCESS
-  Phase phase = 3;
-  // the Canopy chain height also the height that the committee validator set may be verified
-  uint64 committee_height = 4;
-  // the identifier of the network preventing cross-play between different networks (testnet / mainnet / forks)
-  uint64 network_id = 5;
-  // maps to a specific committee on Canopy
-  uint64 committee_id = 6;
+  Phase phase = 6;
 }
 
 // Verifiable Delay Function

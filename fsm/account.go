@@ -294,7 +294,7 @@ func (s *StateMachine) AddToDelegateSupply(amount uint64) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	supply.Delegated += amount
+	supply.DelegatedOnly += amount
 	return s.SetSupply(supply)
 }
 
@@ -350,10 +350,10 @@ func (s *StateMachine) SubFromDelegatedSupply(amount uint64) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	if supply.Delegated < amount {
+	if supply.DelegatedOnly < amount {
 		return types.ErrInsufficientSupply()
 	}
-	supply.Delegated -= amount
+	supply.DelegatedOnly -= amount
 	return s.SetSupply(supply)
 }
 
@@ -450,9 +450,9 @@ func (s *StateMachine) getSupplyPools(targetType types.SupplyPoolType) (arr *[]*
 	// determine the type of the target
 	switch targetType {
 	case types.CommitteesWithDelegations:
-		arr = &supply.CommitteesWithDelegations
+		arr = &supply.CommitteeStaked
 	case types.DelegationsOnly:
-		arr = &supply.DelegationsOnly
+		arr = &supply.CommitteeDelegatedOnly
 	}
 	return
 }

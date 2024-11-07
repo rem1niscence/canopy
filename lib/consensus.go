@@ -125,7 +125,7 @@ func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommi
 	}
 	// invalid 'historical committee', must be before the last committee height saved in the state
 	// if not, there is a potential for a long range attack
-	if stateCommitteeHeight > x.Header.CommitteeHeight {
+	if stateCommitteeHeight > x.Header.CanopyHeight {
 		return ErrInvalidQCCommitteeHeight()
 	}
 	// enforce same target height
@@ -254,7 +254,7 @@ func (x *View) Check(view *View, enforceHeights bool) ErrorI {
 	if enforceHeights && x.Height != view.Height {
 		return ErrWrongHeight()
 	}
-	if enforceHeights && x.CommitteeHeight != view.CommitteeHeight {
+	if enforceHeights && x.CanopyHeight != view.CanopyHeight {
 		return ErrWrongCommitteeHeight()
 	}
 	return nil
@@ -263,12 +263,12 @@ func (x *View) Check(view *View, enforceHeights bool) ErrorI {
 // Copy() returns a reference to a clone of the View
 func (x *View) Copy() *View {
 	return &View{
-		Height:          x.Height,
-		Round:           x.Round,
-		Phase:           x.Phase,
-		CommitteeHeight: x.CommitteeHeight,
-		NetworkId:       x.NetworkId,
-		CommitteeId:     x.CommitteeId,
+		Height:       x.Height,
+		Round:        x.Round,
+		Phase:        x.Phase,
+		CanopyHeight: x.CanopyHeight,
+		NetworkId:    x.NetworkId,
+		CommitteeId:  x.CommitteeId,
 	}
 }
 
@@ -281,7 +281,7 @@ func (x *View) Equals(v *View) bool {
 	if x.Height != v.Height {
 		return false
 	}
-	if x.CommitteeHeight != v.CommitteeHeight {
+	if x.CanopyHeight != v.CanopyHeight {
 		return false
 	}
 	if x.CommitteeId != v.CommitteeId {
@@ -315,10 +315,10 @@ func (x *View) Less(v *View) bool {
 		return false
 	}
 	// if Canopy height is less
-	if x.CommitteeHeight < v.CommitteeHeight {
+	if x.CanopyHeight < v.CanopyHeight {
 		return true
 	}
-	if x.CommitteeHeight > v.CommitteeHeight {
+	if x.CanopyHeight > v.CanopyHeight {
 		return false
 	}
 	// if round is less
@@ -337,7 +337,7 @@ func (x *View) Less(v *View) bool {
 
 // ToString() returns the log string format of View
 func (x *View) ToString() string {
-	return fmt.Sprintf("(H:%d, CH:%d, R:%d, P:%s)", x.Height, x.CommitteeHeight, x.Round, x.Phase)
+	return fmt.Sprintf("(H:%d, CH:%d, R:%d, P:%s)", x.Height, x.CanopyHeight, x.Round, x.Phase)
 }
 
 // jsonView represents the json.Marshaller and json.Unmarshaler implementation of View
@@ -354,7 +354,7 @@ type jsonView struct {
 func (x View) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonView{
 		Height:          x.Height,
-		CommitteeHeight: x.CommitteeHeight,
+		CommitteeHeight: x.CanopyHeight,
 		Round:           x.Round,
 		Phase:           Phase_name[int32(x.Phase)],
 		NetworkID:       x.NetworkId,

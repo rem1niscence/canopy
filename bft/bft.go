@@ -53,10 +53,10 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, committeeHeight, 
 	}
 	return &BFT{
 		View: &lib.View{
-			Height:          height,
-			CommitteeHeight: committeeHeight,
-			NetworkId:       c.NetworkID,
-			CommitteeId:     committeeID,
+			Height:       height,
+			CanopyHeight: committeeHeight,
+			NetworkId:    c.NetworkID,
+			CommitteeId:  committeeID,
 		},
 		Votes:        make(VotesForHeight),
 		Proposals:    make(ProposalsForHeight),
@@ -128,7 +128,7 @@ func (b *BFT) Start() {
 					}
 					b.log.Info("Resetting BFT timers after receiving a new Canopy block")
 					// update the new committee
-					b.CommitteeHeight, b.ValidatorSet = resetBFT.UpdatedCommitteeHeight, resetBFT.UpdatedCommitteeSet
+					b.CanopyHeight, b.ValidatorSet = resetBFT.UpdatedCommitteeHeight, resetBFT.UpdatedCommitteeSet
 					// reset back to round 0 but maintain locks to prevent 'fork attacks'
 					b.NewHeight(true)
 					// immediately reset and start the height over again with the new Validator set
@@ -613,7 +613,7 @@ func (b *BFT) SafeNode(msg *Message) lib.ErrorI {
 		return nil // SAFETY (SAME PROPOSAL AS LOCKED)
 	}
 	// if the view of the Locked proposal is older than the Leader's message
-	if msg.HighQc.Header.CommitteeHeight > b.HighQC.Header.CommitteeHeight || msg.HighQc.Header.Round > b.HighQC.Header.Round {
+	if msg.HighQc.Header.CanopyHeight > b.HighQC.Header.CanopyHeight || msg.HighQc.Header.Round > b.HighQC.Header.Round {
 		return nil // LIVENESS (HIGHER ROUND v COMMITTEE THAN LOCKED)
 	}
 	return ErrFailedSafeNodePredicate()

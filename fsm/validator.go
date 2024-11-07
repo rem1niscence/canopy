@@ -120,9 +120,9 @@ func (s *StateMachine) SetValidators(validators []*types.Validator, supply *type
 				if err != nil {
 					return err
 				}
-				supply.CommitteesWithDelegations = supplyFromState.CommitteesWithDelegations
+				supply.CommitteeStaked = supplyFromState.CommitteeStaked
 			case true:
-				supply.Delegated += val.StakedAmount
+				supply.DelegatedOnly += val.StakedAmount
 				if err := s.SetDelegations(crypto.NewAddressFromBytes(val.Address), val.StakedAmount, val.Committees); err != nil {
 					return err
 				}
@@ -130,8 +130,8 @@ func (s *StateMachine) SetValidators(validators []*types.Validator, supply *type
 				if err != nil {
 					return err
 				}
-				supply.CommitteesWithDelegations = supplyFromState.CommitteesWithDelegations
-				supply.DelegationsOnly = supplyFromState.DelegationsOnly
+				supply.CommitteeStaked = supplyFromState.CommitteeStaked
+				supply.CommitteeDelegatedOnly = supplyFromState.CommitteeDelegatedOnly
 			}
 		}
 	}

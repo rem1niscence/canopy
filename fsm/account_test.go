@@ -909,7 +909,7 @@ func TestAddToCommitteeStakedSupply(t *testing.T) {
 				// retrieve supply before addition
 				supply, err := sm.GetSupply()
 				require.NoError(t, err)
-				supply.CommitteesWithDelegations = append(supply.CommitteesWithDelegations, &types.Pool{
+				supply.CommitteeStaked = append(supply.CommitteeStaked, &types.Pool{
 					Id:     test.id,
 					Amount: test.preAmount,
 				})
@@ -921,7 +921,7 @@ func TestAddToCommitteeStakedSupply(t *testing.T) {
 			supply, err := sm.GetSupply()
 			require.NoError(t, err)
 			// validate the expected supply
-			require.Equal(t, supply.CommitteesWithDelegations[0].Amount, test.preAmount+test.amount)
+			require.Equal(t, supply.CommitteeStaked[0].Amount, test.preAmount+test.amount)
 		})
 	}
 }
@@ -955,7 +955,7 @@ func TestAddToDelegationStakedSupply(t *testing.T) {
 				// retrieve supply before addition
 				supply, err := sm.GetSupply()
 				require.NoError(t, err)
-				supply.DelegationsOnly = append(supply.DelegationsOnly, &types.Pool{
+				supply.CommitteeDelegatedOnly = append(supply.CommitteeDelegatedOnly, &types.Pool{
 					Id:     test.id,
 					Amount: test.preAmount,
 				})
@@ -967,7 +967,7 @@ func TestAddToDelegationStakedSupply(t *testing.T) {
 			supply, err := sm.GetSupply()
 			require.NoError(t, err)
 			// validate the expected supply
-			require.Equal(t, supply.DelegationsOnly[0].Amount, test.preAmount+test.amount)
+			require.Equal(t, supply.CommitteeDelegatedOnly[0].Amount, test.preAmount+test.amount)
 		})
 	}
 }
@@ -1065,7 +1065,7 @@ func TestSubFromCommitteeStakedSupply(t *testing.T) {
 				// retrieve supply before addition
 				supply, err := sm.GetSupply()
 				require.NoError(t, err)
-				supply.CommitteesWithDelegations = append(supply.CommitteesWithDelegations, &types.Pool{
+				supply.CommitteeStaked = append(supply.CommitteeStaked, &types.Pool{
 					Id:     test.id,
 					Amount: test.preAmount,
 				})
@@ -1082,11 +1082,11 @@ func TestSubFromCommitteeStakedSupply(t *testing.T) {
 			require.NoError(t, err)
 			// if zero result expected, the filtering function should have removed it from the list
 			if test.zeroAfter {
-				require.Zero(t, len(supply.CommitteesWithDelegations))
+				require.Zero(t, len(supply.CommitteeStaked))
 				return
 			}
 			// validate the expected supply
-			require.Equal(t, supply.CommitteesWithDelegations[0].Amount, test.preAmount-test.amount)
+			require.Equal(t, supply.CommitteeStaked[0].Amount, test.preAmount-test.amount)
 		})
 	}
 }
@@ -1130,7 +1130,7 @@ func TestSubFromDelegationStakedSupply(t *testing.T) {
 				// retrieve supply before addition
 				supply, err := sm.GetSupply()
 				require.NoError(t, err)
-				supply.DelegationsOnly = append(supply.DelegationsOnly, &types.Pool{
+				supply.CommitteeDelegatedOnly = append(supply.CommitteeDelegatedOnly, &types.Pool{
 					Id:     test.id,
 					Amount: test.preAmount,
 				})
@@ -1147,11 +1147,11 @@ func TestSubFromDelegationStakedSupply(t *testing.T) {
 			require.NoError(t, err)
 			// if zero result expected, the filtering function should have removed it from the list
 			if test.zeroAfter {
-				require.Zero(t, len(supply.DelegationsOnly))
+				require.Zero(t, len(supply.CommitteeDelegatedOnly))
 				return
 			}
 			// validate the expected supply
-			require.Equal(t, supply.DelegationsOnly[0].Amount, test.preAmount-test.amount)
+			require.Equal(t, supply.CommitteeDelegatedOnly[0].Amount, test.preAmount-test.amount)
 		})
 	}
 }
