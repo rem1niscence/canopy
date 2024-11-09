@@ -20,19 +20,64 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+// _
+// _
+// _
+// SWAP PROTOCOL: Facilitates a token swap between Bob (with Token A) and Alice (with Token B).
+// The committee oversees the process while controlling Blockchain A and observing Blockchain B.
+//
+//  1. Bob creates a 'SellOrder' with the amount of "Token A" he wants to sell, the 'exchange rate', and his
+//     'Token B address'. Token A is escrowed in a committee-controlled address. Bob can reverse this order by submitting
+//     a transaction on Blockchain A.
+//
+//  2. Alice accepts Bob's offer by sending a transaction on Blockchain B, referencing Bob’s offer hash and providing her
+//     'Token A address' in the memo field.
+//
+//  3. The committee updates the recipient of Bob’s sell order to Alice’s "Token A" address, verifying that Alice has
+//     enough "aged Token B" in her Blockchain B address.
+//
+// 4. Alice sends "Token B" to Bob, with a memo linking to the 'Request to Sell'.
+//
+// 5. The committee witnesses Alice’s transaction and releases Bob’s "Token A" to Alice.
+//
+//  6. If Alice does not send "Token B" within N Blockchain B blocks, the committee resets Bob’s 'Request to Sell'
+//     recipient.
+//
+// SellOrder is a structure that holds relevant data to complete a token swap. It's created by a 'request to sell'
+// then populated by an 'intent to buy', and finally closed when the committee witnesses the transfer of funds.
 type SellOrder struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id                   uint64 `protobuf:"varint,1,opt,name=Id,proto3" json:"Id,omitempty"`                                    // the unique identifier of the order
-	Committee            uint64 `protobuf:"varint,2,opt,name=Committee,proto3" json:"Committee,omitempty"`                      // the id of the committee that is in-charge of escrow for the swap
-	AmountForSale        uint64 `protobuf:"varint,3,opt,name=AmountForSale,proto3" json:"AmountForSale,omitempty"`              // amount of CNPY for sale
-	RequestedAmount      uint64 `protobuf:"varint,4,opt,name=RequestedAmount,proto3" json:"RequestedAmount,omitempty"`          // amount of 'token' to receive
-	SellerReceiveAddress []byte `protobuf:"bytes,5,opt,name=SellerReceiveAddress,proto3" json:"SellerReceiveAddress,omitempty"` // the external chain address to receive the 'token'
-	BuyerReceiveAddress  []byte `protobuf:"bytes,6,opt,name=BuyerReceiveAddress,proto3" json:"BuyerReceiveAddress,omitempty"`   // the buyer Canopy address to receive the CNPY
-	BuyerChainDeadline   uint64 `protobuf:"varint,7,opt,name=BuyerChainDeadline,proto3" json:"BuyerChainDeadline,omitempty"`    // the external chain height deadline to send the 'tokens' to SellerReceiveAddress
-	SellersSellAddress   []byte `protobuf:"bytes,8,opt,name=SellersSellAddress,proto3" json:"SellersSellAddress,omitempty"`     // the address of seller who is selling the CNPY
+	// id: the unique identifier of the order
+	Id uint64 `protobuf:"varint,1,opt,name=Id,proto3" json:"Id,omitempty"`
+	// committee: the id of the committee that is in-charge of escrow for the swap
+	Committee uint64 `protobuf:"varint,2,opt,name=Committee,proto3" json:"Committee,omitempty"`
+	// amount_for_sale: amount of CNPY for sale
+	AmountForSale uint64 `protobuf:"varint,3,opt,name=AmountForSale,proto3" json:"AmountForSale,omitempty"`
+	// requested_amount: amount of 'counter-asset' to receive
+	RequestedAmount uint64 `protobuf:"varint,4,opt,name=RequestedAmount,proto3" json:"RequestedAmount,omitempty"`
+	// sellers_receive_address: the external chain address to receive the 'counter-asset'
+	SellerReceiveAddress []byte `protobuf:"bytes,5,opt,name=SellerReceiveAddress,proto3" json:"SellerReceiveAddress,omitempty"`
+	// buyers_receive_address: the buyer Canopy address to receive the CNPY
+	BuyerReceiveAddress []byte `protobuf:"bytes,6,opt,name=BuyerReceiveAddress,proto3" json:"BuyerReceiveAddress,omitempty"`
+	// buyers_chain_deadline: the external chain height deadline to send the 'tokens' to SellerReceiveAddress
+	BuyerChainDeadline uint64 `protobuf:"varint,7,opt,name=BuyerChainDeadline,proto3" json:"BuyerChainDeadline,omitempty"`
+	// sellers_sell_address: the signing address of seller who is selling the CNPY
+	SellersSellAddress []byte `protobuf:"bytes,8,opt,name=SellersSellAddress,proto3" json:"SellersSellAddress,omitempty"`
 }
 
 func (x *SellOrder) Reset() {
@@ -123,11 +168,13 @@ func (x *SellOrder) GetSellersSellAddress() []byte {
 	return nil
 }
 
+// OrderBooks: is a list of order book objects held in the blockchain state
 type OrderBooks struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// OrderBooks: the actual list of order book objects
 	OrderBooks []*OrderBook `protobuf:"bytes,1,rep,name=OrderBooks,proto3" json:"OrderBooks,omitempty"`
 }
 
@@ -170,13 +217,16 @@ func (x *OrderBooks) GetOrderBooks() []*OrderBook {
 	return nil
 }
 
+// OrderBook: a list of sell orders associated with a particular committee held in the blockchain state
 type OrderBook struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	CommitteeId uint64       `protobuf:"varint,1,opt,name=committeeId,proto3" json:"committeeId,omitempty"`
-	Orders      []*SellOrder `protobuf:"bytes,2,rep,name=orders,proto3" json:"orders,omitempty"`
+	// committee_id: the unique identifier of the 'counter asset' committee
+	CommitteeId uint64 `protobuf:"varint,1,opt,name=committeeId,proto3" json:"committeeId,omitempty"`
+	// orders: the actual list of sell orders
+	Orders []*SellOrder `protobuf:"bytes,2,rep,name=orders,proto3" json:"orders,omitempty"`
 }
 
 func (x *OrderBook) Reset() {

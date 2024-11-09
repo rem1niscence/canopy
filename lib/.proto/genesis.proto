@@ -5,18 +5,48 @@ option go_package = "github.com/canopy-network/canopy/fsm/types";
 
 import "account.proto";
 import "validator.proto";
-import "proposal.proto";
+import "certificate.proto";
 import "gov.proto";
 import "swap.proto";
 
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+//_
+//_
+//_
+// GenesisState is an importable and exportable structure that is representative of the blockchain state at a
+// certain height. The main use-cases for the Genesis state are acting as block 0 and analyzing the state db in
+// json form. Please note that Block 0 is ofter referred to as the 'genesis' block
 message GenesisState {
+  // time: the start time of the blockchain network
   uint64 time = 1;
+  // pools: a list of all the auto controlled accounts
   repeated Pool pools = 2;
+  // accounts: a list of all the user controlled accounts
   repeated Account accounts = 3;
+  // validators: a list of all the staked validators
   repeated Validator validators = 4;
-  repeated NonSigner non_signers = 5; // only used for export
-  repeated DoubleSigner double_signers = 6; // only used for export
+  // non_signers: a count of validators who haven't signed in some 'non-sign-window' of blocks
+  // this field is not importable
+  repeated NonSigner non_signers = 5;
+  // double_signers: a list of those who 'double-signed' and the heights they double signed on
+  // this field is not importable
+  repeated DoubleSigner double_signers = 6;
+  // order_books: is a list of active sell orders
   OrderBooks order_books = 7;
+  // params: is a list of governance parameters and their respective values
   Params params = 8;
-  Supply supply = 9; // only used for export
+  // supply: keeps track of the total amount of tokens or funds available across the entire blockchain
+  // this field is not importable (auto generated using pools, accounts, validators etc.)
+  Supply supply = 9;
 }

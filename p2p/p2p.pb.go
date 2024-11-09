@@ -22,14 +22,30 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// A generic wrapper over a proto.message for the P2P module to handle
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+// _
+// _
+// _
+// Enveloper is a generic wrapper over a proto.message for the P2P module to handle
 // Envelopes are first used to wrap bytes into a Packet, Ping, or Pong
-// Then again are used to wrap a Packet.bytes into proto.Message
+// Then later is used to wrap a Packet.bytes into proto.Message
 type Envelope struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// payload: is a generic proto.message
 	Payload *anypb.Any `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
 }
 
@@ -72,15 +88,18 @@ func (x *Envelope) GetPayload() *anypb.Any {
 	return nil
 }
 
-// A partial or full 'Message' with a Stream Topic designation and an EOF signal
+// A Packet is a part of a message (or the entire message) that is associated with a specific stream topic and includes an EOF signal
 type Packet struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// stream_id: the identifier of the stream/topic that this packet belongs to, used for multiplexing
 	StreamId lib.Topic `protobuf:"varint,1,opt,name=stream_id,json=streamId,proto3,enum=types.Topic" json:"stream_id,omitempty"`
-	Eof      bool      `protobuf:"varint,2,opt,name=eof,proto3" json:"eof,omitempty"`
-	Bytes    []byte    `protobuf:"bytes,3,opt,name=bytes,proto3" json:"bytes,omitempty"`
+	// eof: indicates whether this is the last packet of the message (EOF = true) or if more packets will follow (EOF = false)
+	Eof bool `protobuf:"varint,2,opt,name=eof,proto3" json:"eof,omitempty"`
+	// bytes: the actual message data transferred in this packet. It could represent the entire message or just a part of it
+	Bytes []byte `protobuf:"bytes,3,opt,name=bytes,proto3" json:"bytes,omitempty"`
 }
 
 func (x *Packet) Reset() {
@@ -136,6 +155,7 @@ func (x *Packet) GetBytes() []byte {
 	return nil
 }
 
+// Ping is a message sent by a node to check the availability or responsiveness of another peer
 type Ping struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -174,6 +194,7 @@ func (*Ping) Descriptor() ([]byte, []int) {
 	return file_p2p_proto_rawDescGZIP(), []int{2}
 }
 
+// Pong is a response message sent back to acknowledge receipt of a Ping message, confirming the peer is active
 type Pong struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -212,6 +233,7 @@ func (*Pong) Descriptor() ([]byte, []int) {
 	return file_p2p_proto_rawDescGZIP(), []int{3}
 }
 
+// PeerBookRequest is a peer exchange request message that enables new peer discovery via swapping
 type PeerBookRequestMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -250,11 +272,14 @@ func (*PeerBookRequestMessage) Descriptor() ([]byte, []int) {
 	return file_p2p_proto_rawDescGZIP(), []int{4}
 }
 
+// PeerBookResponseMessage is a peer exchange response message sent back after receiving a PeerBookRequestMessage
+// The peer will select some random peers from their PeerBook to reply with
 type PeerBookResponseMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// book: randomly selected peers to exchange with the requester peer
 	Book []*BookPeer `protobuf:"bytes,1,rep,name=book,proto3" json:"book,omitempty"`
 }
 
@@ -297,13 +322,19 @@ func (x *PeerBookResponseMessage) GetBook() []*BookPeer {
 	return nil
 }
 
+// BookPeer is the peer object held and saved in the peer book for persisted peer connectivity and exchange
+// Peer or Address book: A collection of peers or network addresses that a node uses to discover and connect with other nodes in the network.
+// This book helps nodes keep track of available peers for communication and maintaining network connectivity.
 type BookPeer struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Address               *lib.PeerAddress `protobuf:"bytes,1,opt,name=Address,proto3" json:"Address,omitempty"`
-	ConsecutiveFailedDial int32            `protobuf:"varint,2,opt,name=consecutive_failed_dial,json=consecutiveFailedDial,proto3" json:"consecutive_failed_dial,omitempty"`
+	// address: is the peer address object that holds identification and metadata about the peer
+	Address *lib.PeerAddress `protobuf:"bytes,1,opt,name=Address,proto3" json:"Address,omitempty"`
+	// consecutive_failed_dial: is a churn management counter that tracks the number of consecutive failures
+	// enough consecutive fails, the BookPeer is evicted from the book
+	ConsecutiveFailedDial int32 `protobuf:"varint,2,opt,name=consecutive_failed_dial,json=consecutiveFailedDial,proto3" json:"consecutive_failed_dial,omitempty"`
 }
 
 func (x *BookPeer) Reset() {

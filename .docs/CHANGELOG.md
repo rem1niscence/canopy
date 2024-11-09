@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [Unreleased] - 11/08/2024
+
+- Commented to proto files bft.proto - tx.proto
+- Removed param Block_Reward
+- Added halvening logic
+
 ## [Unreleased] - 11/07/2024
 
 - Reviving changelog

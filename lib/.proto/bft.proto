@@ -4,6 +4,7 @@ package types;
 option go_package = "github.com/canopy-network/canopy/bft";
 
 import "consensus.proto";
+import "certificate.proto";
 import "tx.proto";
 
 // *****************************************************************************************************

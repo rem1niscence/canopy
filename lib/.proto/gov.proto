@@ -3,63 +3,151 @@ package types;
 
 option go_package = "github.com/canopy-network/canopy/fsm/types";
 
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+//_
+//_
+//_
+// GovProposalVoteConfig is the configuration for nodes to handle 'governance proposal transactions' like DAO Transfer
+// or Change Parameter
+enum GovProposalVoteConfig {
+  // accept_all is the default mode for 'non-consensus' where all inbound governance proposals are accepted
+  ACCEPT_ALL = 0;
+  // approve_list is the default mode for Validators who are active in BFT. This refers to their local approve list in
+  // their data directory
+  APPROVE_LIST = 1;
+  // reject_all is a mode that turns on if problems are detected during the consensus process, ensuring the proposal
+  // process doesn't contribute to a chain halt
+  REJECT_ALL = 2;
+}
+
+// Params are are configurable settings in a blockchain or decentralized network that control various aspects of the
+// system's operation and rules, such as transaction fees, block sizes, and validator behaviors. These parameters can be
+// adjusted through validator consensus to adapt the network as needs change.
+// Parameters are organized into 4 'parameter spaces' that are purely for organization and i/o optimization.
 message Params {
+  // consensus: are parameters in the 'consensus' space
+  // settings that define how nodes in the blockchain agree on the state of the ledger
   ConsensusParams Consensus = 1;
+  // validator: are parameters in the 'validator' space
+  // settings that define the rules and criteria for validators in the blockchain network
   ValidatorParams Validator = 2;
+  // fee: are parameters in the 'fee' space
+  // settings that define the various amounts of transaction fees
   FeeParams Fee = 3;
+  // governance: are parameters in the 'gov' space
+  // settings that define the rules that enable decentralized and autonomous governing of the network
   GovernanceParams Governance = 4;
 }
 
+// The ProtocolVersion is a string that marks the particular version of rules governing how nodes communicate and
+// validate data in a network. It enables nodes to stay synchronized, ensuring they follow the same standards
 message ProtocolVersion {
+  // height: the block number the protocol version becomes live
   uint64 height = 1;
+  // version: is an identifier for a specific set of rules and features in a blockchain or network protocol
   uint64 version = 2;
 }
 
+// ConsensusParams is the parameter space that defines how nodes in the blockchain agree on the state of the ledger
 message ConsensusParams {
+  // block_size: is the maximum allowed size of a block (not including the header)
   uint64 block_size = 1;
+  // protocol_version: is the minimum protocol standard that nodes must run to participate in the network
   string protocol_version = 2;
 }
 
+// ValidatorParams is the parameter space that defines the rules and criteria for validators in the blockchain
 message ValidatorParams {
+  // unstaking_blocks: is the number of blocks a validator's staked tokens must remain locked and slashable after
+  // sending 'unstake_validator'. Without unstaking blocks, validators could withdraw their stake right after attempting
+  // malicious behavior, like double-signing or failing to validate correctly
   uint64 validator_unstaking_blocks = 1;
+  // max_pause_blocks: is the maximum number of blocks a validator may be paused before being 'force unstaked'.
+  // This is necessary to prevent dead validators from forever existing in the state
   uint64 validator_max_pause_blocks = 2;
+  // double_sign_slash_percentage: is the percentage of staked tokens that are slashed when a Validator is caught
+  // performing a double-sign (signing two different blocks for the same block height and round,
+  // supporting conflicting versions of the blockchain)
   uint64 validator_double_sign_slash_percentage = 3;
+  // bad_proposal_slash_percentage: is the percentage of staked tokens that are slashed when a Validator is caught
+  // failing to complete a consensus round when they are elected leader.
   uint64 validator_bad_proposal_slash_percentage = 4;
+  // non_sign_slash_percentage: is the percentage of staked tokens that are slashed when a Validator doesn't sign a
+  // number of blocks over the max_non_sign threshold within the non_sign_window blocks.
   uint64 validator_non_sign_slash_percentage = 5;
+  // max_non_sign: is the maximum number of blocks a Validator may not sign before being slashed, a threshold system
+  // provides lee-way for accidental non-sign faults
   uint64 validator_max_non_sign = 6;
+  // non_sign_window: is the period of blocks in which a validator’s count of missed signatures (non-signs) is tracked
+  // before it is reset. During this window, if a validator fails to sign blocks, the missed count is incremented
+  // Once the window expires, the non-sign count is reset, providing the validator a chance to recover without immediate
+  // penalties
   uint64 validator_non_sign_window = 7;
+  // max_committees: is the maximum number of committees a validator is allowed to stake for
   uint64 validator_max_committees = 8;
+  // max_committee_size: is the maximum number of active validators a committee may have participating in BFT at any
+  // one view
   uint64 validator_max_committee_size = 9;
-  uint64 validator_block_reward = 10;
-  uint64 validator_early_withdrawal_penalty = 11;
-  uint64 validator_delegate_unstaking_blocks = 12;
-  uint64 validator_minimum_order_size = 13;
-  uint64 validator_minimum_percent_for_paid_committee = 14;
-  uint64 validator_max_slash_per_committee = 15;
+  // early_withdrawal_penalty: is the percent reward deduction if NOT compounding validator rewards
+  uint64 validator_early_withdrawal_penalty = 10;
+  // delegate_unstaking_blocks: is the number of blocks a delegate validator's staked tokens must remain locked.
+  // Since there's no slashing of delegates, this variable affects economic stability more than security
+  uint64 validator_delegate_unstaking_blocks = 11;
+  // minimum_order_size: is the minimum amount a 'sell order' must sell in order to be valid
+  uint64 validator_minimum_order_size = 12;
+  // stake_percent_for_subsidized_committee: is the minimum percentage of total stake that a committee must have
+  // committed to it in order to be considered "subsidized" by the protocol
+  uint64 validator_stake_percent_for_subsidized_committee = 13;
+  // max_slash_per_committee: is the maximum slash per committee per block that a validator may receive.
+  // If the slash exceeds maximum, the validator will be auto-removed from the committee to protect all parties from
+  // cascading failures.
+  uint64 validator_max_slash_per_committee = 14;
 }
 
+// FeeParams is the parameter space that defines various amounts for transaction fees
 message FeeParams {
+  // message_send_fee: is the fee amount (in uCNPY) for Message Send
   uint64 message_send_fee = 1;
+  // message_stake_fee: is the fee amount (in uCNPY) for Message Stake
   uint64 message_stake_fee = 2;
+  // message_edit_stake_fee: is the fee amount (in uCNPY) for Message Edit-Stake
   uint64 message_edit_stake_fee = 3;
+  // message_unstake_stake_fee: is the fee amount (in uCNPY) for Message Unstake
   uint64 message_unstake_fee = 4;
+  // message_pause_fee: is the fee amount (in uCNPY) for Message Pause
   uint64 message_pause_fee = 5;
+  // message_unpause_fee: is the fee amount (in uCNPY) for Message Unpause
   uint64 message_unpause_fee = 6;
+  // message_change_parameter_fee: is the fee amount (in uCNPY) for Message Change Parameter
   uint64 message_change_parameter_fee = 7;
+  // message_dao_transfer: is the fee amount (in uCNPY) for Message DAO transfer
   uint64 message_dao_transfer_fee = 8;
+  // message_certificate_results_fee: is the fee amount (in uCNPY) for Message Certificate Results
   uint64 message_certificate_results_fee = 9;
+  // message_subsidy_fee: is the fee amount (in uCNPY) for Message Subsidy
   uint64 message_subsidy_fee = 10;
+  // message_create_order_fee: is the fee amount (in uCNPY) for Message Create Order
   uint64 message_create_order_fee = 11;
+  // message_edit_order_fee: is the fee amount (in uCNPY) for Message Edit Order
   uint64 message_edit_order_fee = 12;
+  // message_delete_order_fee: is the fee amount (in uCNPY) for Message Delete Order
   uint64 message_delete_order_fee = 13;
 }
 
+// GovernanceParams is the parameter space that define the rules that enable decentralized and autonomous
+// governing of the network
 message GovernanceParams {
+  // dao_reward_percent: is the percent of the block reward that is sent to the DAO
   uint64 dao_reward_percentage = 1;
-}
-
-enum GovProposalVoteConfig {
-  ACCEPT_ALL = 0;
-  APPROVE_LIST = 1;
-  REJECT_ALL = 2;
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
+	"math"
 	"testing"
 )
 
@@ -136,9 +137,9 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 			params, err := sm.GetParams()
 			require.NoError(t, err)
 			// override the minimum percent for paid committee
-			params.Validator.ValidatorMinimumPercentForPaidCommittee = minPercentForPaidCommittee
+			params.Validator.ValidatorStakePercentForSubsidizedCommittee = minPercentForPaidCommittee
 			// override the mint amount
-			params.Validator.ValidatorBlockReward = test.mintAmount
+			types.InitialTokensPerBlock = int(test.mintAmount)
 			// override the DAO cut percent
 			params.Governance.DaoRewardPercentage = test.daoCutPercent
 			// set the params back in state
@@ -279,7 +280,7 @@ func TestGetPaidCommittees(t *testing.T) {
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
 			// override the minimum percent for paid committee
-			valParams.ValidatorMinimumPercentForPaidCommittee = test.minPercentForPaidCommittee
+			valParams.ValidatorStakePercentForSubsidizedCommittee = test.minPercentForPaidCommittee
 			// set the params back in state
 			require.NoError(t, sm.SetParamsVal(valParams))
 			// get the supply in state
@@ -1641,6 +1642,55 @@ func TestGetSetCommitteesData(t *testing.T) {
 			require.NoError(t, err)
 			// compare got vs expected
 			require.EqualExportedValues(t, test.set, got)
+		})
+	}
+}
+
+func TestHalvening(t *testing.T) {
+	tests := []struct {
+		name                  string
+		height                uint64
+		initialTokensPerBlock uint64
+		blocksPerHalvening    uint64
+		expected              uint64
+	}{
+		{
+			name:                  "no halvenings",
+			height:                0,
+			blocksPerHalvening:    210000,
+			initialTokensPerBlock: 50000000,
+			expected:              50000000,
+		},
+		{
+			name:                  "1 halvening",
+			height:                1 * 210000,
+			blocksPerHalvening:    210000,
+			initialTokensPerBlock: 50000000,
+			expected:              25000000,
+		},
+		{
+			name:                  "2 halvening",
+			height:                2 * 210000,
+			blocksPerHalvening:    210000,
+			initialTokensPerBlock: 50000000,
+			expected:              12500000,
+		},
+		{
+			name:                  "max halvenings",
+			height:                32 * 210000,
+			blocksPerHalvening:    210000,
+			initialTokensPerBlock: 50000000,
+			expected:              0,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// calculate the number of halvenings
+			halvenings := test.height / test.blocksPerHalvening
+			// each halving, the reward is divided by 2
+			got := uint64(float64(test.initialTokensPerBlock) / (math.Pow(2, float64(halvenings))))
+			// compare got vs expected
+			require.Equal(t, test.expected, got)
 		})
 	}
 }

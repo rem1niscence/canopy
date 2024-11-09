@@ -20,13 +20,31 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+// _
+// _
+// _
+// CommitID is a structure that holds the merkle root for a certain height
 type CommitID struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// height: the identifier of the commit_id referencing the block height
 	Height uint64 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
-	Root   []byte `protobuf:"bytes,2,opt,name=root,proto3" json:"root,omitempty"`
+	// root: the merkle root of the SMT state commit store
+	Root []byte `protobuf:"bytes,2,opt,name=root,proto3" json:"root,omitempty"`
 }
 
 func (x *CommitID) Reset() {
@@ -75,13 +93,18 @@ func (x *CommitID) GetRoot() []byte {
 	return nil
 }
 
+// StoreMerkleProof Celestia's implementation of a Sparse Merkle Tree Proof
+// used for membership and non-membership proofs for lite node functionality
 type StoreMerkleProof struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Key   []byte                    `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Value []byte                    `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	// key: the key of the key-value pair to be proved
+	Key []byte `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// value: the value of the key-value pair to be proved
+	Value []byte `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	// proof: the compacted merkle proof from the SMT tree
 	Proof *SparseCompactMerkleProof `protobuf:"bytes,3,opt,name=proof,proto3" json:"proof,omitempty"`
 }
 
@@ -138,25 +161,26 @@ func (x *StoreMerkleProof) GetProof() *SparseCompactMerkleProof {
 	return nil
 }
 
+// SparseCompactMerkleProof Celestia's implementation of a Sparse Compact Merkle Tree Proof
 type SparseCompactMerkleProof struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// SideNodes is an array of the sibling nodes leading up to the leaf of the proof.
+	// SideNodes: is an array of the sibling nodes leading up to the leaf of the proof.
 	SideNodes [][]byte `protobuf:"bytes,1,rep,name=SideNodes,proto3" json:"SideNodes,omitempty"`
-	// NonMembershipLeafData is the data of the unrelated leaf at the position
+	// NonMembershipLeafData: is the data of the unrelated leaf at the position
 	// of the key being proven, in the case of a non-membership proof. For
 	// membership proofs, is nil.
 	NonMembershipLeafData []byte `protobuf:"bytes,2,opt,name=NonMembershipLeafData,proto3" json:"NonMembershipLeafData,omitempty"`
-	// BitMask, in the case of a compact proof, is a bit mask of the sidenodes
+	// BitMask: in the case of a compact proof, is a bit mask of the sidenodes
 	// of the proof where an on-bit indicates that the sidenode at the bit's
 	// index is a placeholder. This is only set if the proof is compact.
 	BitMask []byte `protobuf:"bytes,3,opt,name=BitMask,proto3" json:"BitMask,omitempty"`
-	// NumSideNodes, in the case of a compact proof, indicates the number of
+	// NumSideNodes: in the case of a compact proof, indicates the number of
 	// sidenodes in the proof when decompacted. This is only set if the proof is compact.
 	NumSideNodes uint32 `protobuf:"varint,4,opt,name=NumSideNodes,proto3" json:"NumSideNodes,omitempty"`
-	// SiblingData is the data of the sibling node to the leaf being proven,
+	// SiblingData: is the data of the sibling node to the leaf being proven,
 	// required for updatable proofs. For unupdatable proofs, is nil.
 	SiblingData []byte `protobuf:"bytes,5,opt,name=SiblingData,proto3" json:"SiblingData,omitempty"`
 }

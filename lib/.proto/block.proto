@@ -4,6 +4,7 @@ package types;
 option go_package = "github.com/canopy-network/canopy/lib";
 
 import "tx.proto";
+import "certificate.proto";
 import "consensus.proto";
 
 // *****************************************************************************************************

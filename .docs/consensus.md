@@ -66,7 +66,7 @@ FAQ:
 	- 3rd phase solves the 'hidden lock' problem by running a precursor phase to ensure there'c enough evidence among the replicas that if
 	  a node locked on a block, 2/3 replicas have also seen that value.
 	- However, it'c very unlikely that a hidden lock would accidentally happen, this additional phase is only helpful in
-	  a Type 2 asynchronous network where the hidden lock is forced by a malicious leader and the next leader is not malicious as the use of highQC
+	  a MessageType 2 asynchronous network where the hidden lock is forced by a malicious leader and the next leader is not malicious as the use of highQC
 	  is never enforced among the replicas. It'c only enforced if they have locked on it. So they solve the accidental/single malicious hidden lock.
 	- Also optimistic responsiveness is counter to blockchains that want relatively consistent block times
 	- Not to mention, VRF leader selection requires some delta time bound to ensure no 'hidden leaders' and if we embed the VRF process within 3 phase

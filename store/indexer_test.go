@@ -51,10 +51,10 @@ func newTestTxResult(t *testing.T) (r *lib.TxResult, tx *lib.Transaction, hash [
 	a, err := lib.NewAny(msg)
 	require.NoError(t, err)
 	tx = &lib.Transaction{
-		Type: "commit_id",
-		Msg:  a,
-		Time: uint64(time.Now().UnixMicro()),
-		Fee:  1,
+		MessageType: "commit_id",
+		Msg:         a,
+		Time:        uint64(time.Now().UnixMicro()),
+		Fee:         1,
 	}
 	require.NoError(t, tx.Sign(pk))
 	hash, err = tx.GetHash()

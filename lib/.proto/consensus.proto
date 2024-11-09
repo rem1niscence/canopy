@@ -2,8 +2,6 @@ syntax = "proto3";
 package types;
 
 option go_package = "github.com/canopy-network/canopy/lib";
-
-import "proposal.proto";
 // *****************************************************************************************************
 // This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
 //
@@ -72,29 +70,6 @@ enum Phase {
   // This phase follows ROUND_INTERRUPT, each replica calculates the highest round a super-majority has seen and jumps
   // to it to assist in 'round out of sync' issues.
   PACEMAKER = 10;
-}
-
-// A QuorumCertificate is a collection of signatures from a super-majority of validators that confirms consensus on a
-// particular block and results. It serves as proof that enough validators have agreed on the block & result’s validity,
-// ensuring its acceptance and security in the blockchain.
-message QuorumCertificate {
-  // header: is the view of the quorum certificate
-  View header = 1;
-  // results: is the certificate result that Canopy uses to process payments, evidence, swaps, and checkpoints
-  CertificateResult results = 2;
-  // results_hash: is the cryptographic integrity bytes for results, results hash may be used to confirm the validator
-  // quorum signed off on the results
-  bytes results_hash = 3;
-  // block: the proposed block to be added to the blockchain
-  bytes block = 4;
-  // block_hash: is the cryptographic integrity bytes for block, block hash may be used to confirm the validator quorum
-  // signed off on the block
-  bytes block_hash = 5;
-  // proposer_key: is the public key of the block proposer
-  bytes proposer_key = 6;
-  // (aggregate) signature: the compact signature created by combining multiple individual signatures from replica
-  // validators. This signature serves as a justification that a super-majority quorum signed off on the certificate
-  AggregateSignature signature = 7; // aggregate signature from the current proposer message
 }
 
 // A View is a specific point in the consensus process; think of it like a snapshot of the consensus process at a

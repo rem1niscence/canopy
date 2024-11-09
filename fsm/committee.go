@@ -26,8 +26,16 @@ func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	// the total mint amount is defined by a governance parameter
-	totalMintAmount := params.ValidatorBlockReward
+	// calculate the number of halvenings
+	halvenings := s.height / uint64(types.BlocksPerHalvening)
+	// each halving, the reward is divided by 2
+	totalMintAmount := uint64(float64(types.InitialTokensPerBlock) / (math.Pow(2, float64(halvenings))))
+	// define a convenience variable for the number of subsidized committees
+	subsidizedCount := uint64(len(subsidizedCommitteeIds))
+	// if there are no subsidized committees or no mint amount
+	if subsidizedCount == 0 || totalMintAmount == 0 {
+		return nil
+	}
 	// calculate the amount left for the committees after the parameterized DAO cut
 	mintAmountAfterDAOCut := lib.Uint64ReducePercentage(totalMintAmount, float64(govParams.DaoRewardPercentage))
 	// calculate the DAO cut
@@ -35,12 +43,6 @@ func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
 	// mint to the DAO account
 	if err = s.MintToPool(lib.DAOPoolID, daoCut); err != nil {
 		return err
-	}
-	// define a convenience variable for the number of subsidized committees
-	subsidizedCount := uint64(len(subsidizedCommitteeIds))
-	// if there are none, return
-	if subsidizedCount == 0 {
-		return nil
 	}
 	// calculate the amount given to each qualifying committee
 	mintAmountPerCommittee := mintAmountAfterDAOCut / subsidizedCount
@@ -68,7 +70,7 @@ func (s *StateMachine) GetPaidCommittees(valParams *types.ValidatorParams) (paid
 		// calculate the percent of stake the committee controls
 		committedStakePercent := lib.Uint64PercentageDiv(committee.Amount, supply.Staked)
 		// if the committee percentage is over the threshold
-		if committedStakePercent >= valParams.ValidatorMinimumPercentForPaidCommittee {
+		if committedStakePercent >= valParams.ValidatorStakePercentForSubsidizedCommittee {
 			// add it to the paid list
 			paidIDs = append(paidIDs, committee.Id)
 		}

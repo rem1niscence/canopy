@@ -20,11 +20,28 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+// _
+// _
+// _
+// ProtoAddress is a wrapper around address bytes enabling protobuf encoding and decoding
 type ProtoAddress struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// address: the shorter version of a public key
 	Address []byte `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
 }
 
@@ -67,11 +84,13 @@ func (x *ProtoAddress) GetAddress() []byte {
 	return nil
 }
 
+// ProtoPubKey is a wrapper around public key bytes enabling protobuf encoding and decoding
 type ProtoPubKey struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// pub_key: the public cryptographic code that allows signature verification from a private key
 	Pubkey []byte `protobuf:"bytes,1,opt,name=pubkey,proto3" json:"pubkey,omitempty"`
 }
 
@@ -114,11 +133,14 @@ func (x *ProtoPubKey) GetPubkey() []byte {
 	return nil
 }
 
+// ProtoPrivKey is a wrapper around private key bytes enabling protobuf encoding and decoding
 type ProtoPrivKey struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// priv_key: is a secret cryptographic key used in asymmetric encryption to sign data and prove ownership
+	// of a public key
 	Privkey []byte `protobuf:"bytes,1,opt,name=privkey,proto3" json:"privkey,omitempty"`
 }
 

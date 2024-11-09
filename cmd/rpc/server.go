@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	ContentType     = "Content-Type"
+	ContentType     = "Content-MessageType"
 	ApplicationJSON = "application/json; charset=utf-8"
 	localhost       = "127.0.0.1"
 	colon           = ":"

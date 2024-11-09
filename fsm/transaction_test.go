@@ -231,17 +231,17 @@ func TestCheckSignature(t *testing.T) {
 	require.NoError(t, e)
 	// define a transaction object to sign it
 	tx := &lib.Transaction{
-		Type: msg.Name(),
-		Msg:  a,
-		Time: uint64(time.Now().UnixMicro()),
-		Fee:  1,
+		MessageType: msg.Name(),
+		Msg:         a,
+		Time:        uint64(time.Now().UnixMicro()),
+		Fee:         1,
 	}
 	// define a second transaction object to sign
 	tx2 := &lib.Transaction{
-		Type: msg2.Name(),
-		Msg:  a2,
-		Time: uint64(time.Now().UnixMicro()),
-		Fee:  1,
+		MessageType: msg2.Name(),
+		Msg:         a2,
+		Time:        uint64(time.Now().UnixMicro()),
+		Fee:         1,
 	}
 	// sign the transaction to use in testing
 	require.NoError(t, tx.Sign(kg.PrivateKey))
@@ -260,10 +260,10 @@ func TestCheckSignature(t *testing.T) {
 			name:   "empty signature",
 			detail: "the function call errors due to an empty signature",
 			transaction: &lib.Transaction{
-				Type: msg.Name(),
-				Msg:  a,
-				Time: uint64(time.Now().UnixMicro()),
-				Fee:  1,
+				MessageType: msg.Name(),
+				Msg:         a,
+				Time:        uint64(time.Now().UnixMicro()),
+				Fee:         1,
 			},
 			msg:   msg,
 			error: "empty signature",
@@ -272,8 +272,8 @@ func TestCheckSignature(t *testing.T) {
 			name:   "bad public key",
 			detail: "the function call errors due to a bad signature public key",
 			transaction: &lib.Transaction{
-				Type: msg.Name(),
-				Msg:  a,
+				MessageType: msg.Name(),
+				Msg:         a,
 				Signature: &lib.Signature{
 					PublicKey: newTestAddressBytes(t),
 					Signature: crypto.Hash([]byte("some_signature")),
@@ -288,8 +288,8 @@ func TestCheckSignature(t *testing.T) {
 			name:   "bad signature verification",
 			detail: "the function call errors due to a bad signature verification",
 			transaction: &lib.Transaction{
-				Type: msg.Name(),
-				Msg:  a,
+				MessageType: msg.Name(),
+				Msg:         a,
 				Signature: &lib.Signature{
 					PublicKey: newTestPublicKeyBytes(t),
 					Signature: crypto.Hash([]byte("some_signature")),

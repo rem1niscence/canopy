@@ -1,7 +1,7 @@
 syntax = "proto3";
 package types;
 
-import "proposal.proto";
+import "certificate.proto";
 
 option go_package = "github.com/canopy-network/canopy/fsm/types";
 

@@ -80,8 +80,8 @@ func (x *Transaction) Check() ErrorI {
 	if x.Msg == nil {
 		return ErrEmptyMessage()
 	}
-	if x.Type == "" {
-		return ErrUnknownMessageName(x.Type)
+	if x.MessageType == "" {
+		return ErrUnknownMessageName(x.MessageType)
 	}
 	if x.Signature == nil {
 		return ErrEmptySignature()
@@ -152,7 +152,7 @@ func (x Transaction) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(jsonTx{
-		Type:      x.Type,
+		Type:      x.MessageType,
 		Msg:       bz,
 		Signature: x.Signature,
 		Time:      time.UnixMicro(int64(x.Time)).Format(time.DateTime),
@@ -183,11 +183,11 @@ func (x *Transaction) UnmarshalJSON(b []byte) error {
 		return e
 	}
 	*x = Transaction{
-		Type:      j.Type,
-		Msg:       a,
-		Signature: j.Signature,
-		Time:      uint64(t.UnixMicro()),
-		Fee:       j.Fee,
+		MessageType: j.Type,
+		Msg:         a,
+		Signature:   j.Signature,
+		Time:        uint64(t.UnixMicro()),
+		Fee:         j.Fee,
 	}
 	return nil
 }

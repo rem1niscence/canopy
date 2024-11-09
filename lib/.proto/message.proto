@@ -4,90 +4,201 @@ package types;
 option go_package = "github.com/canopy-network/canopy/fsm/types";
 
 import "google/protobuf/any.proto";
-import "consensus.proto";
+import "certificate.proto";
 
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+//_
+//_
+//_
+// MessageSend is a standard transfer transaction, taking tokens from the sender and transferring
+// them to the recipient
 message MessageSend {
+  // from_address: is the sender of the funds
   bytes from_address = 1;
+  // to_address: is the recipient of the funds
   bytes to_address = 2;
+  // amount: is the amount of tokens in micro-denomination (uCNPY)
   uint64 amount = 3;
 }
 
+// MessageStake is the Validator registration message, locking up a certain amount of tokens.
+// Staking as a non-delegate is registering for active participation in the committee(s) consensus process(es),
+// whereas delegate is passive participation that acts as a contribution to which committees are subsidized by the
+// protocol. Either the operator or the sender may originate the stake transaction
 message MessageStake {
+  // public_key: the public cryptographic identity of the Validator operator that is unique to a users
+  // secret private key
   bytes public_key = 1;
+  // amount: is the amount of tokens to be removed from the sender account and locked as a surety bond against bad
+  // behavior
   uint64 amount = 2;
+  // committees: is the list of committees the validator is restaking their tokens towards
   repeated uint64 committees = 3;
+  // net_address: is the tcp peer-to-peer address of the peer
   string net_address = 4;
+  // output_address: is the short version of the public key where reward and unstaking funds will be distributed to
   bytes output_address = 5;
+  // delegate: signals whether the Validator is a delegate or not
   bool delegate = 6;
+  // compound: signals whether the Validator is auto-compounding or not
   bool compound = 7;
 }
 
+// MessageStake is the Validator modification message, it allows an increase locking up a certain amount of tokens,
+// a change to the committees, the p2p address, the output address, and auto-compounding status
+// To leave fields un-edited, simply use the previous value
 message MessageEditStake {
+  // address: the short version of the public key, acting as a unique identify linked to the Validator structure
   bytes address = 1;
+  // amount: the updated amount of tokens being staked. This must be greater than or equal to the previous staked amount
+  // The user's account balance is reduced by the difference between the old and new staked amounts
+  // (old.Staked_Tokens - message.amount)
   uint64 amount = 2;
+  // committees: the update to the committees the validator is restaking their tokens for
   repeated uint64 committees = 3;
+  // net_address: the update to the tcp peer-to-peer address of the peer
   string net_address = 4;
+  // output_address: the update to the reward address, only the output address may edit this
   bytes output_address = 5;
+  // compound: the update to the auto-compounding status
   bool compound = 6;
+  // signer: this field is needed so that the protocol may save the signer once they're identified by their public key
+  // this is necessary because only the output address may edit the output field.
   bytes signer = 7;
 }
 
+// MessageUnstake is the Validator leave message, it begins the process of a Validator exiting the network
+// The block when the funds will be returned may be found in the Validator structure after submitting this transaction
 message MessageUnstake {
+  // address: the short version of the public key, acting as a unique identify linked to the Validator structure
   bytes address = 1;
 }
 
+// MessagePause is the Validator break message, it temporarily removes the Validator from active duty
+// This allows operators a path to gracefully maintain their Validators without fully exiting
 message MessagePause {
+  // address: the short version of the public key, acting as a unique identify linked to the Validator structure
   bytes address = 1;
 }
 
+// MessageUnpause is the Validator return message, it re-enlists the Validator to active duty
 message MessageUnpause {
+  // address: the short version of the public key, acting as a unique identify linked to the Validator structure
   bytes address = 1;
 }
 
+// MessageChangeParameter is a governance proposal message used to modify a governance parameter
+// This type of message must be manually pre-approved by +2/3rds of the Validators via their APPROVE_LIST
+// In short, a 'proposer' generates the message JSON, communicates the JSON to Validators, Validators vote
+// by populating their APPROVE_LIST which configures how they'll vote during the consensus process when a
+// block includes this transaction in it.
 message MessageChangeParameter {
+  // parameter_space: is the organization path where the parameter is found (val, cons, fee, gov)
   string parameter_space = 1;
+  // parameter_key: is the name of the parameter
   string parameter_key = 2;
+  // parameter_value: is the uint64 or string value of the parameter
   google.protobuf.Any parameter_value = 3;
+  // start_height: is the beginning height where the parameter must be sent
+  // this field locks in a block-range when it's converted to JSON and allows Validators a deadline to vote
   uint64 start_height = 4;
+  // end_height: is the ending height where the parameter must be sent
+  // this field locks in a block-range when it's converted to JSON and allows Validators a deadline to vote
   uint64 end_height = 5;
+  // signer: is the address of the sender / creator of the proposal
+  // this field locks in an author of the transaction when it's converted to JSON
   bytes signer = 6;
 }
 
+// MessageDAOTransfer is a governance proposal message used to send funds from the DAO pool to an account
+// This type of message must be manually pre-approved by +2/3rds of the Validators via their APPROVE_LIST
+// In short, a 'proposer' generates the message JSON, communicates the JSON to Validators, Validators vote
+// by populating their APPROVE_LIST which configures how they'll vote during the consensus process when a
+// block includes this transaction in it.
 message MessageDAOTransfer {
+  // address: is the recipient address and sender of this message
   bytes address = 1;
+  // amount: is the amount of
   uint64 amount = 2;
+  // start_height: is the beginning height where the parameter must be sent
+  // this field locks in a block-range when it's converted to JSON and allows Validators a deadline to vote
   uint64 start_height = 4;
+  // end_height: is the ending height where the parameter must be sent
+  // this field locks in a block-range when it's converted to JSON and allows Validators a deadline to vote
   uint64 end_height = 5;
 }
 
+// MessageCertificateResults is a summary from the Leader of a recently completed BFT process in the form of a Quorum
+// Certificate signed by a super-majority of the committee members at a given height.
+// This message defines committee treasury pool recipients, slash recipients, sell orders actions, and checkpoints
 message MessageCertificateResults {
+  // qc: a super-majority signed quorum certificate from a recently completed BFT process (COMMIT_PROCESS phase)
   QuorumCertificate qc = 1;
 }
 
+// MessageSubsidy is an account to committee treasury pool transfer transaction
+// At economic maturity without inflation, this is how the network continues to offer its Validation services
 message MessageSubsidy {
+  // address: is the sender of the funds
   bytes address = 1;
+  // committee_id: is the id of the committee the funds are being sent to
   uint64 committee_id = 2;
+  // amount: is the amount of funds that are taken from the sender and transferred to the recipient pool
   uint64 amount = 3;
+  // opcode: a generic code field to allow fund designation instructions
   string opcode = 4;
 }
 
+// MessageCreateOrder creates a new token swap 'sell order', removing tokens from the sender
+// account and transferring them to an escrow pool while awaiting a buyer
 message MessageCreateOrder {
+  // committee_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
   uint64 CommitteeId = 1;
+  // amount_for_sale: the amount of uCNPY listed for sale, transferred to escrow
   uint64 AmountForSale = 2;
+  // requested_amount: the amount of the 'counter asset' the buyer must send in order to complete a swap
   uint64 RequestedAmount = 3;
+  // sellers_receive_address: the address of the seller where the 'counter asset' will be received
   bytes SellerReceiveAddress = 4;
+  // sellers_sell_address: the Canopy address the seller is selling and signing from
   bytes SellersSellAddress = 5;
 }
 
+// MessageEditOrder modifies an un-claimed token swap 'sell order', token amount may be increased or decreased as well
+// as the recipient address
+// If an order is already 'claimed' or 'bought', the order may not be modified
 message MessageEditOrder {
+  // order_id: is the number id that is unique to this committee to identify the order
+  // not modifiable, used for order identification only
   uint64 OrderId = 1;
+  // committee_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
+  // not modifiable, used for order identification only
   uint64 CommitteeId = 2;
+  // amount_for_sale: the updated amount of uCNPY listed for sale, a reduction will return escrowed tokens to the seller's
+  // receive address
   uint64 AmountForSale = 3;
+  // requested_amount: the updated amount of the 'counter asset' the buyer must send in order to complete a swap
   uint64 RequestedAmount = 4;
+  // sellers_receive_address: the address of the seller where the 'counter asset' will be received
   bytes SellerReceiveAddress = 5;
 }
 
+// MessageDeleteOrder: deletes an un-claimed token swap 'sell order'
+// If an order is already 'claimed' or 'bought', the order may not be deleted
 message MessageDeleteOrder {
+  // order_id: is the number id that is unique to this committee to identify the order
   uint64 OrderId = 1;
+  // committee_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
   uint64 CommitteeId = 2;
 }

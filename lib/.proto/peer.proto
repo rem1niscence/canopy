@@ -3,58 +3,116 @@ package types;
 
 option go_package = "github.com/canopy-network/canopy/lib";
 
-import "consensus.proto";
+import "certificate.proto";
 
-// ordered by stream priority
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+//_
+//_
+//_
+// Topic: an identifier used to organize and manage different streams of data within a single communication channel
+// It allows multiple, independent message streams to be handled simultaneously over the same connection
+// It's ordered by stream priority
 enum Topic {
+  // CONSENSUS: topic for the BFT process
   CONSENSUS = 0;
+  // BLOCK: topic for an inbound block and certificate
   BLOCK = 1;
+  // BLOCK_REQUEST: topic for a peer requesting a certain block and certificate
   BLOCK_REQUEST = 2;
+  // TX: topic for an inbound transaction
   TX = 3;
+  // PEERS_RESPONSE: topic for a response to a peer exchange request
   PEERS_RESPONSE = 4;
+  // PEERS_REQUEST: topic a peer requesting an exchange of book peers
   PEERS_REQUEST = 5;
+  // INVALID: topic to mark the exclusive end of valid topics
   INVALID = 6;
 }
 
+// PeerInfo contains peering information about a peer node, like its address, connection type, trust level,
+// and reputation
 message PeerInfo {
+  // Address: the address information of the peer, including its public key and network address
   PeerAddress Address = 1;
+  // is_outbound: indicates whether the connection to the peer was initiated by this node (true if outbound)
   bool is_outbound = 2;
+  // is_must_connect: indicates whether this peer is a required connection that the node must connect to
   bool is_must_connect = 3;
+  // is_trusted: marks whether this peer is configured as trusted
   bool is_trusted = 4;
+  // reputation: a numerical score representing the peer's reputation to this local node
   int32 reputation = 5;
 }
 
+// PeerAddress holds the details of the peer's network address and public key
 message PeerAddress {
+  // public_key: the peer's public key used for cryptographic identity
   bytes public_key = 1;
+  // net_address: the tcp network address of the peer.
   string net_address = 2;
+  // peer_meta: additional metadata about the peer, such as the network ID and chains it supports
   PeerMeta peer_meta = 3;
 }
 
+// PeerMeta contains additional metadata about a peer, including supported networks and chains
 message PeerMeta {
+  // network_id: the identifier for the network the peer is part of
+  // this ensures no conflicts among different peering networks (mainnet, testnet, etc.)
   uint64 network_id = 1;
+  // chains: a list of chain identifiers that the peer supports and/or participates in
   repeated uint64 chains = 2;
+  // signature: a cryptographic signature to verify the authenticity of the peer's metadata
   bytes signature = 3;
 }
 
+// ConsensusMessage is a p2p message payload that is handled by the BFT module
 message ConsensusMessage {
+  // committee_id: is the unique identifier of the committee associated with this message
   uint64 committee_id = 1;
+  // message: the bytes of the consensus message that may be unmarshalled into a consensus.Message object
   bytes message = 2;
 }
 
+// BlockRequestMessage is a p2p message payload that is requesting a block and/or max_height of the peer
 message BlockRequestMessage {
+  // committee_id: is the unique identifier of the committee associated with this message
   uint64 committee_id = 1;
+  // height: the height of the block being requested
   uint64 height = 2;
+  // height_only: signals if this is a max-height only request, no block is expected in the response to this type
+  // of message
   bool height_only = 3;
 }
 
+// BlockMessage is a p2p message payload that is responding to a block request message
 message BlockMessage {
+  // committee_id: is the unique identifier of the committee associated with this message
   uint64 committee_id = 1;
+  // max_height: the maximum height of this blockchain the peer is aware of
   uint64 max_height = 2;
+  // total_vdf_iterations: the total number of vdf iterations associated with this blockchain
+  // this helps a peer to chose given a choice between two forks as well as verify the integrity of the peer
   uint64 total_vdf_iterations = 3;
+  // block_and_certificate: is the actual block and the super-majority signed quorum certificate that justifies it
   QuorumCertificate BlockAndCertificate = 4;
 }
 
+// TxMessage is a p2p message payload that is an inbound transaction to be processed by the blockchain's FSM and saved
+// in that chains mempool
 message TxMessage {
+  // committee_id: is the unique identifier of the committee associated with this message
   uint64 committee_id = 1;
+  // tx: is the bytes of the transaction that may be unmarshalled into a Transaction object
   bytes tx = 2;
 }

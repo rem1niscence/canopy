@@ -68,7 +68,7 @@ Mechanisms Needed:
 - Trusted Blocks (Cementing/Checkpointing), every UNSTAKING_BLOCKS, checkpoint the software 
 
 - FAQ:
-    - Q: Since Evidence must be from the view-1, isn't it possible evidence may go unreported in Type 2 async networks?
+    - Q: Since Evidence must be from the view-1, isn't it possible evidence may go unreported in MessageType 2 async networks?
     - A: The consensus mechanism waits a max-network-delay delta time bound to prevent the hidden lock issue. This is
       the entire basis
       of the `lock + highQC` design and is considered a peer-reviewed safeguard of the liveness of the protocol. Since

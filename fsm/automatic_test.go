@@ -5,6 +5,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
+	"math"
 	"testing"
 )
 
@@ -420,13 +421,12 @@ func TestLastProposers(t *testing.T) {
 }
 
 func (s *StateMachine) calculateRewardPerCommittee(t *testing.T, numberOfSubsidizedCommittees int) (mintAmountPerCommittee uint64, daoCut uint64) {
-	// get the necessary parameters
-	params, err := s.GetParamsVal()
-	require.NoError(t, err)
 	govParams, err := s.GetParamsGov()
 	require.NoError(t, err)
-	// the total mint amount is defined by a governance parameter
-	totalMintAmount := params.ValidatorBlockReward
+	// calculate the number of halvenings
+	halvings := float64(s.height / uint64(types.BlocksPerHalvening))
+	// each halving, the reward is divided by 2
+	totalMintAmount := uint64(float64(types.InitialTokensPerBlock) / (math.Pow(2, halvings)))
 	// calculate the amount left for the committees after the parameterized DAO cut
 	mintAmountAfterDAOCut := lib.Uint64ReducePercentage(totalMintAmount, float64(govParams.DaoRewardPercentage))
 	// calculate the DAO cut

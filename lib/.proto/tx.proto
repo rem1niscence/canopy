@@ -4,26 +4,56 @@ package types;
 option go_package = "github.com/canopy-network/canopy/lib";
 
 import "google/protobuf/any.proto";
-
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+//_
+//_
+//_
+// Transaction represents a request or action submitted to the network like transfer assets or perform other operations
+// within the blockchain system
 message Transaction {
-  string type = 1;
+  // message_type: The type of the transaction like 'send' or 'stake'
+  string message_type = 1;
+  // msg: The actual transaction message payload, which is encapsulated in a generic message format
   google.protobuf.Any msg = 2;
+  // signature: The cryptographic signature used to verify the authenticity of the transaction
   Signature signature = 3;
+  // time: The timestamp when the transaction was created
   uint64 time = 4;
+  // fee: The fee associated with processing the transaction
   uint64 fee = 5;
+  // memo: An optional message or note attached to the transaction
   string memo = 6;
 }
 
+// TxResult represents the result of a processed transaction, including information about the sender, recipient,
+// transaction hash, and the associated block height and index.
 message TxResult {
+  // sender: The address of the user sending the transaction
   bytes sender = 1;
+  // recipient: The address of the user receiving the transaction
   bytes recipient = 2;
+  // message_type: The type of the transaction like 'send' or 'stake'
   string message_type = 3;
+  // height: The block height at which the transaction was included
   uint64 height = 4;
+  // index: The position of the transaction within the block
   uint64 index = 5;
+  // transaction: The original transaction object
   Transaction transaction = 6;
+  // tx_hash: The unique hash that identifies the transaction
   string tx_hash = 7;
 }
-
 // A Signature is a digital signature is a cryptographic "fingerprint" created with a private key,
 // allowing others to verify the authenticity and integrity of a message using the corresponding public key
 message Signature {

@@ -34,6 +34,13 @@ const (
 	RejectAllProposals  = GovProposalVoteConfig_REJECT_ALL
 )
 
+var (
+	// the number of tokens in micro denomination that are initially (before halvenings) minted per block
+	InitialTokensPerBlock = 50 * 1000000 // 50 CNPY
+	// the number of blocks between each halvening (block reward is cut in half) event
+	BlocksPerHalvening = 210000
+)
+
 // ParamSpace is a distinct, isolated category within the overarching Params structure
 type ParamSpace interface {
 	Check() lib.ErrorI
@@ -49,21 +56,20 @@ func DefaultParams() *Params {
 			ProtocolVersion: NewProtocolVersion(0, 1),
 		},
 		Validator: &ValidatorParams{
-			ValidatorUnstakingBlocks:                2,
-			ValidatorMaxPauseBlocks:                 4380,
-			ValidatorDoubleSignSlashPercentage:      10,
-			ValidatorBadProposalSlashPercentage:     1,
-			ValidatorNonSignSlashPercentage:         1,
-			ValidatorMaxNonSign:                     4,
-			ValidatorNonSignWindow:                  10,
-			ValidatorMaxCommittees:                  15,
-			ValidatorMaxCommitteeSize:               100,
-			ValidatorBlockReward:                    1000000,
-			ValidatorEarlyWithdrawalPenalty:         20,
-			ValidatorDelegateUnstakingBlocks:        2,
-			ValidatorMinimumOrderSize:               100000000000,
-			ValidatorMinimumPercentForPaidCommittee: 33,
-			ValidatorMaxSlashPerCommittee:           15,
+			ValidatorUnstakingBlocks:                    2,
+			ValidatorMaxPauseBlocks:                     4380,
+			ValidatorDoubleSignSlashPercentage:          10,
+			ValidatorBadProposalSlashPercentage:         1,
+			ValidatorNonSignSlashPercentage:             1,
+			ValidatorMaxNonSign:                         4,
+			ValidatorNonSignWindow:                      10,
+			ValidatorMaxCommittees:                      15,
+			ValidatorMaxCommitteeSize:                   100,
+			ValidatorEarlyWithdrawalPenalty:             20,
+			ValidatorDelegateUnstakingBlocks:            2,
+			ValidatorMinimumOrderSize:                   100000000000,
+			ValidatorStakePercentForSubsidizedCommittee: 33,
+			ValidatorMaxSlashPerCommittee:               15,
 		},
 		Fee: &FeeParams{
 			MessageSendFee:               10000,
@@ -235,21 +241,20 @@ func IsStringParam(paramSpace, paramKey string) (bool, lib.ErrorI) {
 var _ ParamSpace = &ValidatorParams{}
 
 const (
-	ParamValidatorUnstakingBlocks                = "validator_unstaking_blocks"                   // number of blocks a committee member must be 'unstaking' for
-	ParamValidatorMaxPauseBlocks                 = "validator_max_pause_blocks"                   // maximum blocks a validator may be paused for before force-unstaking
-	ParamValidatorBadProposeSlashPercentage      = "validator_bad_propose_slash_percentage"       // how much a bad proposer is slashed (% of stake)
-	ParamValidatorNonSignSlashPercentage         = "validator_non_sign_slash_percentage"          // how much a non-signer is slashed if exceeds threshold in window (% of stake)
-	ParamValidatorMaxNonSign                     = "validator_max_non_sign"                       // how much a committee member can not sign before being slashed
-	ParamValidatorNonSignWindow                  = "validator_non_sign_window"                    // how frequently the non-sign-count is reset
-	ParamValidatorDoubleSignSlashPercentage      = "validator_double_sign_slash_percentage"       // how much a double signer is slashed (% of stake)
-	ParamValidatorMaxCommittees                  = "validator_max_committees"                     // maximum number of committees a single validator may participate in
-	ParamValidatorMaxCommitteeSize               = "validator_max_committee_size"                 // maximum number of members a committee may have
-	ParamValidatorBlockReward                    = "validator_block_reward"                       // the amount of tokens minted each block
-	ParamValidatorEarlyWithdrawalPenalty         = "validator_early_withdrawal_penalty"           // reduction percentage of non-compounded rewards
-	ParamValidatorDelegateUnstakingBlocks        = "validator_delegate_unstaking_blocks"          // number of blocks a delegator must be 'unstaking' for
-	ParamValidatorMinimumOrderSize               = "validator_minimum_order_size"                 // minimum sell tokens in a sell order
-	ParamValidatorMinimumPercentForPaidCommittee = "validator_minimum_percent_for_paid_committee" // the minimum percentage of total stake needed to be a 'paid committee'
-	ParamValidatorMaxSlashPerCommittee           = "validator_max_slash_per_committee"            // the maximum validator slash per committee per block
+	ParamValidatorUnstakingBlocks                    = "validator_unstaking_blocks"                       // number of blocks a committee member must be 'unstaking' for
+	ParamValidatorMaxPauseBlocks                     = "validator_max_pause_blocks"                       // maximum blocks a validator may be paused for before force-unstaking
+	ParamValidatorBadProposeSlashPercentage          = "validator_bad_propose_slash_percentage"           // how much a bad proposer is slashed (% of stake)
+	ParamValidatorNonSignSlashPercentage             = "validator_non_sign_slash_percentage"              // how much a non-signer is slashed if exceeds threshold in window (% of stake)
+	ParamValidatorMaxNonSign                         = "validator_max_non_sign"                           // how much a committee member can not sign before being slashed
+	ParamValidatorNonSignWindow                      = "validator_non_sign_window"                        // how frequently the non-sign-count is reset
+	ParamValidatorDoubleSignSlashPercentage          = "validator_double_sign_slash_percentage"           // how much a double signer is slashed (% of stake)
+	ParamValidatorMaxCommittees                      = "validator_max_committees"                         // maximum number of committees a single validator may participate in
+	ParamValidatorMaxCommitteeSize                   = "validator_max_committee_size"                     // maximum number of members a committee may have
+	ParamValidatorEarlyWithdrawalPenalty             = "validator_early_withdrawal_penalty"               // reduction percentage of non-compounded rewards
+	ParamValidatorDelegateUnstakingBlocks            = "validator_delegate_unstaking_blocks"              // number of blocks a delegator must be 'unstaking' for
+	ParamValidatorMinimumOrderSize                   = "validator_minimum_order_size"                     // minimum sell tokens in a sell order
+	ParamValidatorStakePercentForSubsidizedCommittee = "validator_stake_percent_for_subsidized_committee" // the minimum percentage of total stake needed to be a 'paid committee'
+	ParamValidatorMaxSlashPerCommittee               = "validator_max_slash_per_committee"                // the maximum validator slash per committee per block
 )
 
 // Check() validates the Validator params
@@ -287,8 +292,8 @@ func (x *ValidatorParams) Check() lib.ErrorI {
 	if x.ValidatorEarlyWithdrawalPenalty > 100 {
 		return ErrInvalidParam(ParamValidatorEarlyWithdrawalPenalty)
 	}
-	if x.ValidatorMinimumPercentForPaidCommittee == 0 || x.ValidatorMinimumPercentForPaidCommittee > 100 {
-		return ErrInvalidParam(ParamValidatorMinimumPercentForPaidCommittee)
+	if x.ValidatorStakePercentForSubsidizedCommittee == 0 || x.ValidatorStakePercentForSubsidizedCommittee > 100 {
+		return ErrInvalidParam(ParamValidatorStakePercentForSubsidizedCommittee)
 	}
 	if x.ValidatorMaxSlashPerCommittee == 0 || x.ValidatorMaxSlashPerCommittee > 100 {
 		return ErrInvalidParam(ParamValidatorMaxSlashPerCommittee)
@@ -317,16 +322,14 @@ func (x *ValidatorParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.ValidatorMaxCommittees = value
 	case ParamValidatorMaxCommitteeSize:
 		x.ValidatorMaxCommitteeSize = value
-	case ParamValidatorBlockReward:
-		x.ValidatorBlockReward = value
 	case ParamValidatorEarlyWithdrawalPenalty:
 		x.ValidatorEarlyWithdrawalPenalty = value
 	case ParamValidatorDelegateUnstakingBlocks:
 		x.ValidatorDelegateUnstakingBlocks = value
 	case ParamValidatorMinimumOrderSize:
 		x.ValidatorMinimumOrderSize = value
-	case ParamValidatorMinimumPercentForPaidCommittee:
-		x.ValidatorMinimumPercentForPaidCommittee = value
+	case ParamValidatorStakePercentForSubsidizedCommittee:
+		x.ValidatorStakePercentForSubsidizedCommittee = value
 	case ParamValidatorMaxSlashPerCommittee:
 		x.ValidatorMaxSlashPerCommittee = value
 	default:

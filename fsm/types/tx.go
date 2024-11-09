@@ -122,11 +122,11 @@ func NewTransaction(pk crypto.PrivateKeyI, msg lib.MessageI, fee uint64) (lib.Tr
 		return nil, err
 	}
 	tx := &lib.Transaction{
-		Type:      msg.Name(),
-		Msg:       a,
-		Signature: nil,
-		Time:      uint64(time.Now().UnixMicro()), // stateless, prune friendly - replay / hash-collision protection
-		Fee:       fee,
+		MessageType: msg.Name(),
+		Msg:         a,
+		Signature:   nil,
+		Time:        uint64(time.Now().UnixMicro()), // stateless, prune friendly - replay / hash-collision protection
+		Fee:         fee,
 	}
 	return tx, tx.Sign(pk)
 }
