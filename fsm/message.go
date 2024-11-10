@@ -409,10 +409,10 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 	}
 	// update the committee data
 	return s.UpsertCommitteeData(&types.CommitteeData{
-		CommitteeId:     committeeId,
-		CommitteeHeight: msg.Qc.Header.CanopyHeight,
-		ChainHeight:     msg.Qc.Header.Height,
-		PaymentPercents: results.RewardRecipients.PaymentPercents,
+		CommitteeId:             committeeId,
+		LastCanopyHeightUpdated: msg.Qc.Header.CanopyHeight,
+		LastChainHeightUpdated:  msg.Qc.Header.Height,
+		PaymentPercents:         results.RewardRecipients.PaymentPercents,
 	})
 }
 

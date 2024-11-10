@@ -21,21 +21,59 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+// _
+// _
+// _
+//
+// A Validator is an actor in the blockchain network responsible for verifying transactions, creating new blocks,
+// and maintaining the blockchain's integrity and security. In Canopy, Validators provide this service for multiple
+// chains by restaking their tokens across multiple 'committees' and run a blockchain client for each
+// Both the Operator and the Output private key may sign transactions on behalf of the Validator, but only the
+// Output private key may change the Output address.
 type Validator struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Address         []byte   `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
-	PublicKey       []byte   `protobuf:"bytes,2,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
-	NetAddress      string   `protobuf:"bytes,3,opt,name=net_address,json=netAddress,proto3" json:"net_address,omitempty"`
-	StakedAmount    uint64   `protobuf:"varint,4,opt,name=staked_amount,json=stakedAmount,proto3" json:"staked_amount,omitempty"`
-	Committees      []uint64 `protobuf:"varint,5,rep,packed,name=committees,proto3" json:"committees,omitempty"`
-	MaxPausedHeight uint64   `protobuf:"varint,6,opt,name=max_paused_height,json=maxPausedHeight,proto3" json:"max_paused_height,omitempty"`
-	UnstakingHeight uint64   `protobuf:"varint,7,opt,name=unstaking_height,json=unstakingHeight,proto3" json:"unstaking_height,omitempty"`
-	Output          []byte   `protobuf:"bytes,8,opt,name=output,proto3" json:"output,omitempty"`
-	Delegate        bool     `protobuf:"varint,9,opt,name=delegate,proto3" json:"delegate,omitempty"`
-	Compound        bool     `protobuf:"varint,10,opt,name=compound,proto3" json:"compound,omitempty"`
+	// address: the short version of the public key of the operator of the service, corresponding to the 2
+	Address []byte `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	// public_key: the public cryptographic identity of the operator of the service. This key must be an aggregable BLS
+	// key for efficiency in the BFT process.
+	PublicKey []byte `protobuf:"bytes,2,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	// net_address: the tcp peer-to-peer address of the node to enable easy discovery of the peer for multi-consensus
+	NetAddress string `protobuf:"bytes,3,opt,name=net_address,json=netAddress,proto3" json:"net_address,omitempty"`
+	// staked_amount: the amount of tokens locked as a surety bond against malicious behavior. These tokens may be
+	// increased by auto-compounding rewards or by an edit-stake command. This bond is returned to the output address
+	// after executing an unstake command and waiting the unstaking period.
+	StakedAmount uint64 `protobuf:"varint,4,opt,name=staked_amount,json=stakedAmount,proto3" json:"staked_amount,omitempty"`
+	// committees: a list of ids of the committees the validator is offering Validation or Delegation services for
+	Committees []uint64 `protobuf:"varint,5,rep,packed,name=committees,proto3" json:"committees,omitempty"`
+	// max_paused_height: if the Validator is paused, this value tracks the maximum height it may be paused before it
+	// automatically begins unstaking
+	MaxPausedHeight uint64 `protobuf:"varint,6,opt,name=max_paused_height,json=maxPausedHeight,proto3" json:"max_paused_height,omitempty"`
+	// unstaking_height: if the Validator is unstaking, this value tracks the future block height a Validator's surety
+	// bond will be returned
+	UnstakingHeight uint64 `protobuf:"varint,7,opt,name=unstaking_height,json=unstakingHeight,proto3" json:"unstaking_height,omitempty"`
+	// output: the address where early-withdrawal rewards and the unstaking surety bond are transferred to
+	Output []byte `protobuf:"bytes,8,opt,name=output,proto3" json:"output,omitempty"`
+	// delegate: signals whether the Validator is a Delegate or not. If true, the Validator only passively participates
+	// in Validation-as-a-Service by dedicating their funds to help the chain qualify for protocol subsidisation
+	Delegate bool `protobuf:"varint,9,opt,name=delegate,proto3" json:"delegate,omitempty"`
+	// compound: signals whether the Validator is auto-compounding (increasing their stake with new rewards) or
+	// withdrawing rewards early to their output address as they come in
+	Compound bool `protobuf:"varint,10,opt,name=compound,proto3" json:"compound,omitempty"`
 }
 
 func (x *Validator) Reset() {
@@ -140,66 +178,22 @@ func (x *Validator) GetCompound() bool {
 	return false
 }
 
-type NonSignerInfo struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Counter uint64 `protobuf:"varint,1,opt,name=counter,proto3" json:"counter,omitempty"`
-}
-
-func (x *NonSignerInfo) Reset() {
-	*x = NonSignerInfo{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_validator_proto_msgTypes[1]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *NonSignerInfo) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*NonSignerInfo) ProtoMessage() {}
-
-func (x *NonSignerInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_validator_proto_msgTypes[1]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use NonSignerInfo.ProtoReflect.Descriptor instead.
-func (*NonSignerInfo) Descriptor() ([]byte, []int) {
-	return file_validator_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *NonSignerInfo) GetCounter() uint64 {
-	if x != nil {
-		return x.Counter
-	}
-	return 0
-}
-
+// NonSignerInfo is information that tracks the number of blocks not signed by the Validator within the Non-Sign-Window
 type NonSigner struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// address: shorter version of the operator public key of the non signer
 	Address []byte `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	// counter: increments when a Validator doesn't sign a block and resets every non-sign-window
 	Counter uint64 `protobuf:"varint,2,opt,name=counter,proto3" json:"counter,omitempty"`
 }
 
 func (x *NonSigner) Reset() {
 	*x = NonSigner{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_validator_proto_msgTypes[2]
+		mi := &file_validator_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -212,7 +206,7 @@ func (x *NonSigner) String() string {
 func (*NonSigner) ProtoMessage() {}
 
 func (x *NonSigner) ProtoReflect() protoreflect.Message {
-	mi := &file_validator_proto_msgTypes[2]
+	mi := &file_validator_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -225,7 +219,7 @@ func (x *NonSigner) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NonSigner.ProtoReflect.Descriptor instead.
 func (*NonSigner) Descriptor() ([]byte, []int) {
-	return file_validator_proto_rawDescGZIP(), []int{2}
+	return file_validator_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *NonSigner) GetAddress() []byte {
@@ -242,6 +236,7 @@ func (x *NonSigner) GetCounter() uint64 {
 	return 0
 }
 
+// CommitteesData is a list of essential information about the committee
 type CommitteesData struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -253,7 +248,7 @@ type CommitteesData struct {
 func (x *CommitteesData) Reset() {
 	*x = CommitteesData{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_validator_proto_msgTypes[3]
+		mi := &file_validator_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -266,7 +261,7 @@ func (x *CommitteesData) String() string {
 func (*CommitteesData) ProtoMessage() {}
 
 func (x *CommitteesData) ProtoReflect() protoreflect.Message {
-	mi := &file_validator_proto_msgTypes[3]
+	mi := &file_validator_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -279,7 +274,7 @@ func (x *CommitteesData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitteesData.ProtoReflect.Descriptor instead.
 func (*CommitteesData) Descriptor() ([]byte, []int) {
-	return file_validator_proto_rawDescGZIP(), []int{3}
+	return file_validator_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CommitteesData) GetList() []*CommitteeData {
@@ -289,22 +284,32 @@ func (x *CommitteesData) GetList() []*CommitteeData {
 	return nil
 }
 
+// CommitteeData is current status information about the current status of the Committee
 type CommitteeData struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	CommitteeId     uint64                 `protobuf:"varint,1,opt,name=committee_id,json=committeeId,proto3" json:"committee_id,omitempty"`
-	CommitteeHeight uint64                 `protobuf:"varint,2,opt,name=committee_height,json=committeeHeight,proto3" json:"committee_height,omitempty"`
-	ChainHeight     uint64                 `protobuf:"varint,3,opt,name=chain_height,json=chainHeight,proto3" json:"chain_height,omitempty"`
+	// committee_id: is the unique identifier of the chain and the committee of Validators responsible for it
+	CommitteeId uint64 `protobuf:"varint,1,opt,name=committee_id,json=committeeId,proto3" json:"committee_id,omitempty"`
+	// last_updated_height: is the Canopy height included in the most recently processed Certificate Results transaction
+	// This protects against historical committee attacks and ensures sequentiality among committees
+	LastCanopyHeightUpdated uint64 `protobuf:"varint,2,opt,name=last_canopy_height_updated,json=lastCanopyHeightUpdated,proto3" json:"last_canopy_height_updated,omitempty"`
+	// last_chain_height_updated: is the 3rd party chain height included in the most recent processed Certificate Results
+	// transaction. This protects against reformatting the replay attacks
+	LastChainHeightUpdated uint64 `protobuf:"varint,3,opt,name=last_chain_height_updated,json=lastChainHeightUpdated,proto3" json:"last_chain_height_updated,omitempty"`
+	// payment_percents: a list of recipients and the percentage of rewards they will receive, distributed at the end of
+	// the block
 	PaymentPercents []*lib.PaymentPercents `protobuf:"bytes,4,rep,name=payment_percents,json=paymentPercents,proto3" json:"payment_percents,omitempty"`
-	NumberOfSamples uint64                 `protobuf:"varint,5,opt,name=number_of_samples,json=numberOfSamples,proto3" json:"number_of_samples,omitempty"`
+	// number_of_samples: the total count of processed Certificate Result Transactions, used to dilute reward percentages
+	// accurately
+	NumberOfSamples uint64 `protobuf:"varint,5,opt,name=number_of_samples,json=numberOfSamples,proto3" json:"number_of_samples,omitempty"`
 }
 
 func (x *CommitteeData) Reset() {
 	*x = CommitteeData{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_validator_proto_msgTypes[4]
+		mi := &file_validator_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -317,7 +322,7 @@ func (x *CommitteeData) String() string {
 func (*CommitteeData) ProtoMessage() {}
 
 func (x *CommitteeData) ProtoReflect() protoreflect.Message {
-	mi := &file_validator_proto_msgTypes[4]
+	mi := &file_validator_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -330,7 +335,7 @@ func (x *CommitteeData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitteeData.ProtoReflect.Descriptor instead.
 func (*CommitteeData) Descriptor() ([]byte, []int) {
-	return file_validator_proto_rawDescGZIP(), []int{4}
+	return file_validator_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CommitteeData) GetCommitteeId() uint64 {
@@ -340,16 +345,16 @@ func (x *CommitteeData) GetCommitteeId() uint64 {
 	return 0
 }
 
-func (x *CommitteeData) GetCommitteeHeight() uint64 {
+func (x *CommitteeData) GetLastCanopyHeightUpdated() uint64 {
 	if x != nil {
-		return x.CommitteeHeight
+		return x.LastCanopyHeightUpdated
 	}
 	return 0
 }
 
-func (x *CommitteeData) GetChainHeight() uint64 {
+func (x *CommitteeData) GetLastChainHeightUpdated() uint64 {
 	if x != nil {
-		return x.ChainHeight
+		return x.LastChainHeightUpdated
 	}
 	return 0
 }
@@ -395,35 +400,35 @@ var file_validator_proto_rawDesc = []byte{
 	0x61, 0x74, 0x65, 0x18, 0x09, 0x20, 0x01, 0x28, 0x08, 0x52, 0x08, 0x64, 0x65, 0x6c, 0x65, 0x67,
 	0x61, 0x74, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x63, 0x6f, 0x6d, 0x70, 0x6f, 0x75, 0x6e, 0x64, 0x18,
 	0x0a, 0x20, 0x01, 0x28, 0x08, 0x52, 0x08, 0x63, 0x6f, 0x6d, 0x70, 0x6f, 0x75, 0x6e, 0x64, 0x22,
-	0x29, 0x0a, 0x0d, 0x4e, 0x6f, 0x6e, 0x53, 0x69, 0x67, 0x6e, 0x65, 0x72, 0x49, 0x6e, 0x66, 0x6f,
-	0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28,
-	0x04, 0x52, 0x07, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x65, 0x72, 0x22, 0x3f, 0x0a, 0x09, 0x4e, 0x6f,
-	0x6e, 0x53, 0x69, 0x67, 0x6e, 0x65, 0x72, 0x12, 0x18, 0x0a, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65,
-	0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73,
-	0x73, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x65, 0x72, 0x18, 0x02, 0x20, 0x01,
-	0x28, 0x04, 0x52, 0x07, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x65, 0x72, 0x22, 0x3a, 0x0a, 0x0e, 0x43,
-	0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x73, 0x44, 0x61, 0x74, 0x61, 0x12, 0x28, 0x0a,
-	0x04, 0x6c, 0x69, 0x73, 0x74, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x74, 0x79,
-	0x70, 0x65, 0x73, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x44, 0x61, 0x74,
-	0x61, 0x52, 0x04, 0x6c, 0x69, 0x73, 0x74, 0x22, 0xef, 0x01, 0x0a, 0x0d, 0x43, 0x6f, 0x6d, 0x6d,
-	0x69, 0x74, 0x74, 0x65, 0x65, 0x44, 0x61, 0x74, 0x61, 0x12, 0x21, 0x0a, 0x0c, 0x63, 0x6f, 0x6d,
-	0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52,
-	0x0b, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x49, 0x64, 0x12, 0x29, 0x0a, 0x10,
-	0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x5f, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0f, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65,
-	0x65, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x12, 0x21, 0x0a, 0x0c, 0x63, 0x68, 0x61, 0x69, 0x6e,
-	0x5f, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0b, 0x63,
-	0x68, 0x61, 0x69, 0x6e, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x12, 0x41, 0x0a, 0x10, 0x70, 0x61,
-	0x79, 0x6d, 0x65, 0x6e, 0x74, 0x5f, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x73, 0x18, 0x04,
-	0x20, 0x03, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x50, 0x61, 0x79,
-	0x6d, 0x65, 0x6e, 0x74, 0x50, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x0f, 0x70, 0x61,
-	0x79, 0x6d, 0x65, 0x6e, 0x74, 0x50, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x73, 0x12, 0x2a, 0x0a,
-	0x11, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x5f, 0x6f, 0x66, 0x5f, 0x73, 0x61, 0x6d, 0x70, 0x6c,
-	0x65, 0x73, 0x18, 0x05, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0f, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72,
-	0x4f, 0x66, 0x53, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x73, 0x42, 0x2c, 0x5a, 0x2a, 0x67, 0x69, 0x74,
-	0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2d, 0x6e,
-	0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2f, 0x66, 0x73,
-	0x6d, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x3f, 0x0a, 0x09, 0x4e, 0x6f, 0x6e, 0x53, 0x69, 0x67, 0x6e, 0x65, 0x72, 0x12, 0x18, 0x0a, 0x07,
+	0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x61,
+	0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x65,
+	0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x07, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x65, 0x72,
+	0x22, 0x3a, 0x0a, 0x0e, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x73, 0x44, 0x61,
+	0x74, 0x61, 0x12, 0x28, 0x0a, 0x04, 0x6c, 0x69, 0x73, 0x74, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b,
+	0x32, 0x14, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74,
+	0x65, 0x65, 0x44, 0x61, 0x74, 0x61, 0x52, 0x04, 0x6c, 0x69, 0x73, 0x74, 0x22, 0x99, 0x02, 0x0a,
+	0x0d, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x44, 0x61, 0x74, 0x61, 0x12, 0x21,
+	0x0a, 0x0c, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x04, 0x52, 0x0b, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x49,
+	0x64, 0x12, 0x3b, 0x0a, 0x1a, 0x6c, 0x61, 0x73, 0x74, 0x5f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79,
+	0x5f, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x5f, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x17, 0x6c, 0x61, 0x73, 0x74, 0x43, 0x61, 0x6e, 0x6f, 0x70,
+	0x79, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x12, 0x39,
+	0x0a, 0x19, 0x6c, 0x61, 0x73, 0x74, 0x5f, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x5f, 0x68, 0x65, 0x69,
+	0x67, 0x68, 0x74, 0x5f, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x04, 0x52, 0x16, 0x6c, 0x61, 0x73, 0x74, 0x43, 0x68, 0x61, 0x69, 0x6e, 0x48, 0x65, 0x69, 0x67,
+	0x68, 0x74, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x12, 0x41, 0x0a, 0x10, 0x70, 0x61, 0x79,
+	0x6d, 0x65, 0x6e, 0x74, 0x5f, 0x70, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x73, 0x18, 0x04, 0x20,
+	0x03, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x50, 0x61, 0x79, 0x6d,
+	0x65, 0x6e, 0x74, 0x50, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x73, 0x52, 0x0f, 0x70, 0x61, 0x79,
+	0x6d, 0x65, 0x6e, 0x74, 0x50, 0x65, 0x72, 0x63, 0x65, 0x6e, 0x74, 0x73, 0x12, 0x2a, 0x0a, 0x11,
+	0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x5f, 0x6f, 0x66, 0x5f, 0x73, 0x61, 0x6d, 0x70, 0x6c, 0x65,
+	0x73, 0x18, 0x05, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0f, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x4f,
+	0x66, 0x53, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x73, 0x42, 0x2c, 0x5a, 0x2a, 0x67, 0x69, 0x74, 0x68,
+	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2d, 0x6e, 0x65,
+	0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2f, 0x66, 0x73, 0x6d,
+	0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -438,18 +443,17 @@ func file_validator_proto_rawDescGZIP() []byte {
 	return file_validator_proto_rawDescData
 }
 
-var file_validator_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_validator_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_validator_proto_goTypes = []interface{}{
 	(*Validator)(nil),           // 0: types.Validator
-	(*NonSignerInfo)(nil),       // 1: types.NonSignerInfo
-	(*NonSigner)(nil),           // 2: types.NonSigner
-	(*CommitteesData)(nil),      // 3: types.CommitteesData
-	(*CommitteeData)(nil),       // 4: types.CommitteeData
-	(*lib.PaymentPercents)(nil), // 5: types.PaymentPercents
+	(*NonSigner)(nil),           // 1: types.NonSigner
+	(*CommitteesData)(nil),      // 2: types.CommitteesData
+	(*CommitteeData)(nil),       // 3: types.CommitteeData
+	(*lib.PaymentPercents)(nil), // 4: types.PaymentPercents
 }
 var file_validator_proto_depIdxs = []int32{
-	4, // 0: types.CommitteesData.list:type_name -> types.CommitteeData
-	5, // 1: types.CommitteeData.payment_percents:type_name -> types.PaymentPercents
+	3, // 0: types.CommitteesData.list:type_name -> types.CommitteeData
+	4, // 1: types.CommitteeData.payment_percents:type_name -> types.PaymentPercents
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
@@ -476,18 +480,6 @@ func file_validator_proto_init() {
 			}
 		}
 		file_validator_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*NonSignerInfo); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_validator_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*NonSigner); i {
 			case 0:
 				return &v.state
@@ -499,7 +491,7 @@ func file_validator_proto_init() {
 				return nil
 			}
 		}
-		file_validator_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+		file_validator_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CommitteesData); i {
 			case 0:
 				return &v.state
@@ -511,7 +503,7 @@ func file_validator_proto_init() {
 				return nil
 			}
 		}
-		file_validator_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_validator_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CommitteeData); i {
 			case 0:
 				return &v.state
@@ -530,7 +522,7 @@ func file_validator_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_validator_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

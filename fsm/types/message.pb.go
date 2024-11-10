@@ -108,7 +108,8 @@ func (x *MessageSend) GetAmount() uint64 {
 // MessageStake is the Validator registration message, locking up a certain amount of tokens.
 // Staking as a non-delegate is registering for active participation in the committee(s) consensus process(es),
 // whereas delegate is passive participation that acts as a contribution to which committees are subsidized by the
-// protocol. Either the operator or the sender may originate the stake transaction
+// protocol. Either the operator or the sender may originate the stake transaction, but the funds are removed from
+// the sender's account
 type MessageStake struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

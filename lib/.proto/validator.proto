@@ -4,37 +4,84 @@ package types;
 import "certificate.proto";
 
 option go_package = "github.com/canopy-network/canopy/fsm/types";
-
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+//_
+//_
+//_
+//
+// A Validator is an actor in the blockchain network responsible for verifying transactions, creating new blocks,
+// and maintaining the blockchain's integrity and security. In Canopy, Validators provide this service for multiple
+// chains by restaking their tokens across multiple 'committees' and run a blockchain client for each
+// Both the Operator and the Output private key may sign transactions on behalf of the Validator, but only the
+// Output private key may change the Output address.
 message Validator {
+  // address: the short version of the public key of the operator of the service, corresponding to the 2
   bytes address = 1;
+  // public_key: the public cryptographic identity of the operator of the service. This key must be an aggregable BLS
+  // key for efficiency in the BFT process.
   bytes public_key = 2;
+  // net_address: the tcp peer-to-peer address of the node to enable easy discovery of the peer for multi-consensus
   string net_address = 3;
+  // staked_amount: the amount of tokens locked as a surety bond against malicious behavior. These tokens may be
+  // increased by auto-compounding rewards or by an edit-stake command. This bond is returned to the output address
+  // after executing an unstake command and waiting the unstaking period.
   uint64 staked_amount = 4;
+  // committees: a list of ids of the committees the validator is offering Validation or Delegation services for
   repeated uint64 committees = 5;
+  // max_paused_height: if the Validator is paused, this value tracks the maximum height it may be paused before it
+  // automatically begins unstaking
   uint64 max_paused_height = 6;
+  // unstaking_height: if the Validator is unstaking, this value tracks the future block height a Validator's surety
+  // bond will be returned
   uint64 unstaking_height = 7;
+  // output: the address where early-withdrawal rewards and the unstaking surety bond are transferred to
   bytes output = 8;
+  // delegate: signals whether the Validator is a Delegate or not. If true, the Validator only passively participates
+  // in Validation-as-a-Service by dedicating their funds to help the chain qualify for protocol subsidisation
   bool delegate = 9;
+  // compound: signals whether the Validator is auto-compounding (increasing their stake with new rewards) or
+  // withdrawing rewards early to their output address as they come in
   bool compound = 10;
 }
 
-message NonSignerInfo {
-  uint64 counter = 1;
-}
-
+// NonSignerInfo is information that tracks the number of blocks not signed by the Validator within the Non-Sign-Window
 message NonSigner {
+  // address: shorter version of the operator public key of the non signer
   bytes address = 1;
+  // counter: increments when a Validator doesn't sign a block and resets every non-sign-window
   uint64 counter = 2;
 }
 
+// CommitteesData is a list of essential information about the committee
 message CommitteesData {
   repeated CommitteeData list = 1;
 }
 
+// CommitteeData is current status information about the current status of the Committee
 message CommitteeData {
+  // committee_id: is the unique identifier of the chain and the committee of Validators responsible for it
   uint64 committee_id = 1;
-  uint64 committee_height = 2;
-  uint64 chain_height = 3;
+  // last_updated_height: is the Canopy height included in the most recently processed Certificate Results transaction
+  // This protects against historical committee attacks and ensures sequentiality among committees
+  uint64 last_canopy_height_updated = 2;
+  // last_chain_height_updated: is the 3rd party chain height included in the most recent processed Certificate Results
+  // transaction. This protects against reformatting the replay attacks
+  uint64 last_chain_height_updated = 3;
+  // payment_percents: a list of recipients and the percentage of rewards they will receive, distributed at the end of
+  // the block
   repeated PaymentPercents  payment_percents = 4;
+  // number_of_samples: the total count of processed Certificate Result Transactions, used to dilute reward percentages
+  // accurately
   uint64 number_of_samples = 5;
 }

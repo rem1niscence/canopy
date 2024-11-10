@@ -1,37 +1,45 @@
 package crypto
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/ed25519"
-	"crypto/rand"
 	"crypto/sha512"
 	"crypto/subtle"
-	"encoding/base64"
 	"filippo.io/edwards25519"
 	"fmt"
 	"golang.org/x/crypto/curve25519"
-	"io"
 )
 
 // https://cr.yp.to/ecdh.html
 
-func SharedSecret(public, private []byte) ([]byte, error) {
-	pkPriv := ed25519.PrivateKey(private)
-	xPub, err := Ed25519PublicKeyToCurve25519(public)
+// Big picture: DH is used to establish a shared secret, and then HKDF is used to derive multiple keys from that secret for encryption
+
+// SharedSecret function takes ed25519 public and private keys, converts them to Curve25519-compatible keys,
+// and performs a Diffie-Hellman-style key exchange with X25519 - meaning both peers compute exact pseudorandom
+// bytes from their peersPublicKey and their local private key without transmitting the secret over the wire
+func SharedSecret(peerPublicKey, private []byte) ([]byte, error) {
+	// convert the peer public key to Curve 25519
+	xPub, err := Ed25519PublicKeyToCurve25519(peerPublicKey)
 	if err != nil {
 		return nil, err
 	}
-	secret, err := curve25519.X25519(Ed25519PrivateKeyToCurve25519(pkPriv), xPub)
+	// convert local private key to Curve 25519
+	xPriv := Ed25519PrivateKeyToCurve25519(private)
+	// generate a secret from the
+	secret, err := curve25519.X25519(xPriv, xPub)
 	if err != nil {
 		return nil, err
 	}
+	// ensure the secret isn't an 'all-zero' byte array as this would be a weak or invalid key agreement
 	if subtle.ConstantTimeCompare(secret[:], new([32]byte)[:]) == 1 {
 		return nil, fmt.Errorf("all zero shared secret")
 	}
+	// return the diffie hellman secret
 	return secret, nil
 }
 
+// Ed25519PrivateKeyToCurve25519 hashes the Ed25519 private key seed and extracts the first 32 bytes to form a
+// Curve25519 scalar, which is compatible with Curve25519 operations
+// This conversion allows the use of a single cryptographic key pair Ed25519 for both signing and key exchange
 func Ed25519PrivateKeyToCurve25519(pk ed25519.PrivateKey) []byte {
 	h := sha512.New()
 	h.Write(pk.Seed())
@@ -39,6 +47,9 @@ func Ed25519PrivateKeyToCurve25519(pk ed25519.PrivateKey) []byte {
 	return out[:curve25519.ScalarSize]
 }
 
+// Ed25519PublicKeyToCurve25519 interprets the Ed25519 public key as a point on the Edwards25519 curve and converts
+// it to a Curve25519 public key in Montgomery form, suitable for X25519 encryption
+// This conversion allows the use of a single cryptographic key pair Ed25519 for both signing and key exchange
 func Ed25519PublicKeyToCurve25519(pk ed25519.PublicKey) ([]byte, error) {
 	p, err := new(edwards25519.Point).SetBytes(pk)
 	if err != nil {
@@ -47,50 +58,9 @@ func Ed25519PublicKeyToCurve25519(pk ed25519.PublicKey) ([]byte, error) {
 	return p.BytesMontgomery(), nil
 }
 
-func EncryptMessage(key []byte, message string) (string, error) {
-	byteMsg := []byte(message)
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", fmt.Errorf("could not create new cipher: %v", err)
-	}
-
-	cipherText := make([]byte, aes.BlockSize+len(byteMsg))
-	iv := cipherText[:aes.BlockSize]
-	if _, err = io.ReadFull(rand.Reader, iv); err != nil {
-		return "", fmt.Errorf("could not encrypt: %v", err)
-	}
-
-	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(cipherText[aes.BlockSize:], byteMsg)
-
-	return base64.StdEncoding.EncodeToString(cipherText), nil
-}
-
-func DecryptMessage(key []byte, message string) (string, error) {
-	cipherText, err := base64.StdEncoding.DecodeString(message)
-	if err != nil {
-		return "", fmt.Errorf("could not base64 decode: %v", err)
-	}
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", fmt.Errorf("could not create new cipher: %v", err)
-	}
-
-	if len(cipherText) < aes.BlockSize {
-		return "", fmt.Errorf("invalid ciphertext block size")
-	}
-
-	iv := cipherText[:aes.BlockSize]
-	cipherText = cipherText[aes.BlockSize:]
-
-	stream := cipher.NewCFBDecrypter(block, iv)
-	stream.XORKeyStream(cipherText, cipherText)
-
-	return string(cipherText), nil
-}
-
-var blacklist = [][32]byte{
+// x25519WeakPointBlacklist taken from lib-sodium
+// https://github.com/jedisct1/libsodium/blob/985ad65bfb1563ca69e0bc0248e15da4f5cf575f/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c
+var x25519WeakPointBlacklist = [][32]byte{
 	// 0 (order 4)
 	{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -123,8 +93,11 @@ var blacklist = [][32]byte{
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f},
 }
 
+// PubIsBlacklisted() prevents public keys that exploit vulnerabilities in 25519 -> x25519 conversion
+// Reject small-order points early to prevent vulnerabilities from weak points that could be exploited in cryptographic operations,
+// as recommended in the research (https://eprint.iacr.org/2017/806.pdf)
 func PubIsBlacklisted(pubKey []byte) bool {
-	for _, bl := range blacklist {
+	for _, bl := range x25519WeakPointBlacklist {
 		if subtle.ConstantTimeCompare(pubKey[:], bl[:]) == 1 {
 			return true
 		}

@@ -60,7 +60,7 @@ func (c *Controller) Sync(committeeID uint64) {
 				pollMaxHeight()
 				return
 			}
-			// process the quorum certificate received by the peer
+			// process the quorum certificate received from the peer
 			if _, _, err := c.handlePeerBlock(msg.Sender.Address.PublicKey, blkResponseMsg); err != nil {
 				// poll max height of all peers
 				pollMaxHeight()

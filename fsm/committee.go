@@ -115,9 +115,9 @@ func (s *StateMachine) DistributeCommitteeRewards() lib.ErrorI {
 		}
 		// clear the committee data, but leave the ID, (external) chain height, and committee height
 		committeesData.List[i] = &types.CommitteeData{
-			CommitteeId:     data.CommitteeId,
-			CommitteeHeight: data.CommitteeHeight,
-			ChainHeight:     data.ChainHeight,
+			CommitteeId:             data.CommitteeId,
+			LastCanopyHeightUpdated: data.LastCanopyHeightUpdated,
+			LastChainHeightUpdated:  data.LastChainHeightUpdated,
 		}
 	}
 	// set the committees data
@@ -358,7 +358,7 @@ func (s *StateMachine) UpsertCommitteeData(new *types.CommitteeData) lib.ErrorI 
 	// retrieve the committees' data list, the target and index in the list based on the committeeId
 	committeesData, targetData, idx, err := s.getCommitteeDataAndList(new.CommitteeId)
 	// check the new committee data is not 'out-dated'
-	if new.CommitteeHeight < targetData.CommitteeHeight || new.ChainHeight <= targetData.ChainHeight {
+	if new.LastCanopyHeightUpdated < targetData.LastCanopyHeightUpdated || new.LastChainHeightUpdated <= targetData.LastChainHeightUpdated {
 		return types.ErrInvalidCertificateResults()
 	}
 	// combine the new data with the target
@@ -401,11 +401,11 @@ func (s *StateMachine) getCommitteeDataAndList(targetCommitteeID uint64) (list *
 	idx = len(list.List)
 	// set the committee data in the returned variable
 	d = &types.CommitteeData{
-		CommitteeId:     targetCommitteeID,
-		CommitteeHeight: 0,
-		ChainHeight:     0,
-		PaymentPercents: make([]*lib.PaymentPercents, 0),
-		NumberOfSamples: 0,
+		CommitteeId:             targetCommitteeID,
+		LastCanopyHeightUpdated: 0,
+		LastChainHeightUpdated:  0,
+		PaymentPercents:         make([]*lib.PaymentPercents, 0),
+		NumberOfSamples:         0,
 	}
 	// insert a new committee fund at the end of the list
 	list.List = append(list.List, d)

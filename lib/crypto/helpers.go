@@ -6,11 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/canopy-network/canopy/lib/codec"
 	"github.com/drand/kyber"
 	"github.com/drand/kyber/sign"
 	"github.com/drand/kyber/util/random"
 	"os"
 )
+
+var cdc = codec.Protobuf{}
 
 type KeyGroup struct {
 	Address    AddressI

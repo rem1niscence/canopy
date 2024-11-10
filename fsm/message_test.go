@@ -2106,9 +2106,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				committeeData, e := sm.GetCommitteeData(lib.CanopyCommitteeId)
 				require.NoError(t, e)
 				// validate the committee height was properly set
-				require.Equal(t, test.msg.Qc.Header.CanopyHeight, committeeData.CommitteeHeight)
+				require.Equal(t, test.msg.Qc.Header.CanopyHeight, committeeData.LastCanopyHeightUpdated)
 				// validate the chain height was properly set
-				require.Equal(t, test.msg.Qc.Header.Height, committeeData.ChainHeight)
+				require.Equal(t, test.msg.Qc.Header.Height, committeeData.LastChainHeightUpdated)
 				// validate the number of samples was properly set
 				require.EqualValues(t, 1, committeeData.NumberOfSamples)
 				// validate the payment percent was set

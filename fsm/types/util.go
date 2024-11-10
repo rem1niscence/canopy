@@ -297,11 +297,11 @@ func (x *CommitteeData) Combine(f *CommitteeData) lib.ErrorI {
 	// this is to ensure both Proposals have the latest Block and Meta information
 	// in the case where the caller uses a pattern where there may be a stale Block/Meta
 	*x = CommitteeData{
-		PaymentPercents: x.PaymentPercents,
-		NumberOfSamples: x.NumberOfSamples + 1,
-		CommitteeId:     f.CommitteeId,
-		CommitteeHeight: f.CommitteeHeight,
-		ChainHeight:     f.ChainHeight,
+		PaymentPercents:         x.PaymentPercents,
+		NumberOfSamples:         x.NumberOfSamples + 1,
+		CommitteeId:             f.CommitteeId,
+		LastCanopyHeightUpdated: f.LastCanopyHeightUpdated,
+		LastChainHeightUpdated:  f.LastChainHeightUpdated,
 	}
 	return nil
 }

@@ -161,7 +161,7 @@ func (c *Controller) LoadCommitteeHeightInState(committeeID uint64) uint64 {
 		return 0
 	}
 	// return the committee height
-	return data.CommitteeHeight
+	return data.LastCanopyHeightUpdated
 }
 
 // CanopyFSM() returns the state machine of the Canopy blockchain

@@ -79,25 +79,25 @@ func TestEndBlock(t *testing.T) {
 	// generate committee data for testing
 	committeeData := []*types.CommitteeData{
 		{
-			CommitteeId:     lib.CanopyCommitteeId,
-			ChainHeight:     1,
-			CommitteeHeight: 2,
+			CommitteeId:             lib.CanopyCommitteeId,
+			LastChainHeightUpdated:  1,
+			LastCanopyHeightUpdated: 2,
 			PaymentPercents: []*lib.PaymentPercents{
 				{Address: newTestAddressBytes(t, 1), Percent: 100},
 			},
 		},
 		{
-			CommitteeId:     lib.CanopyCommitteeId,
-			ChainHeight:     2,
-			CommitteeHeight: 2,
+			CommitteeId:             lib.CanopyCommitteeId,
+			LastChainHeightUpdated:  2,
+			LastCanopyHeightUpdated: 2,
 			PaymentPercents: []*lib.PaymentPercents{
 				{Address: newTestAddressBytes(t, 2), Percent: 100},
 			},
 		},
 		{
-			CommitteeId:     lib.CanopyCommitteeId,
-			ChainHeight:     3,
-			CommitteeHeight: 2,
+			CommitteeId:             lib.CanopyCommitteeId,
+			LastChainHeightUpdated:  3,
+			LastCanopyHeightUpdated: 2,
 			PaymentPercents: []*lib.PaymentPercents{
 				{Address: newTestAddressBytes(t, 3), Percent: 100},
 			},

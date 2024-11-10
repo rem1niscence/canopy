@@ -263,7 +263,7 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 					Committees:   []uint64{lib.CanopyCommitteeId},
 				}))
 				// convert the non signer to bytes
-				bz, e := lib.Marshal(&types.NonSignerInfo{
+				bz, e := lib.Marshal(&types.NonSigner{
 					Counter: nonSigner.Counter,
 				})
 				require.NoError(t, e)
@@ -382,7 +382,7 @@ func TestIncrementNonSigners(t *testing.T) {
 			// pre-set the non signers
 			for _, nonSigner := range test.preset {
 				// create the non signer info
-				nonSignerInfo := &types.NonSignerInfo{Counter: nonSigner.Counter}
+				nonSignerInfo := &types.NonSigner{Counter: nonSigner.Counter}
 				// convert it to bytes
 				bz, err := lib.Marshal(nonSignerInfo)
 				require.NoError(t, err)

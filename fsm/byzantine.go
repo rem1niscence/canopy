@@ -56,7 +56,7 @@ func (s *StateMachine) SlashAndResetNonSigners(committeeId uint64, params *types
 		if err != nil {
 			return err
 		}
-		ptr := new(types.NonSignerInfo)
+		ptr := new(types.NonSigner)
 		if err = lib.Unmarshal(v, ptr); err != nil {
 			return err
 		}
@@ -92,7 +92,7 @@ func (s *StateMachine) GetNonSigners() (results types.NonSigners, e lib.ErrorI) 
 		if err != nil {
 			return nil, err
 		}
-		ptr := new(types.NonSignerInfo)
+		ptr := new(types.NonSigner)
 		if err = lib.Unmarshal(it.Value(), ptr); err != nil {
 			return nil, err
 		}
@@ -118,7 +118,7 @@ func (s *StateMachine) IncrementNonSigners(nonSigners [][]byte) lib.ErrorI {
 			return lib.ErrPubKeyFromBytes(e)
 		}
 		key := types.KeyForNonSigner(pubKey.Address().Bytes())
-		ptr := new(types.NonSignerInfo)
+		ptr := new(types.NonSigner)
 		bz, err := s.Get(key)
 		if err != nil {
 			return err

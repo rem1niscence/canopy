@@ -15,18 +15,17 @@ var (
 	MaxHash = bytes.Repeat([]byte{0xFF}, HashSize)
 )
 
-func Hasher() hash.Hash {
-	return sha256.New()
-}
+// Hasher() returns the global hashing algorithm used
+func Hasher() hash.Hash { return sha256.New() }
 
-func Hash(bz []byte) []byte {
-	h := sha256.Sum256(bz)
+// Hash() executes the global hashing algorithm on input bytes
+func Hash(msg []byte) []byte {
+	h := sha256.Sum256(msg)
 	return h[:]
 }
 
-func HashString(bz []byte) string {
-	return hex.EncodeToString(Hash(bz))
-}
+// HashString() returns the hex byte version of a hash
+func HashString(msg []byte) string { return hex.EncodeToString(Hash(msg)) }
 
 // MerkleTree creates a merkle tree from a slice of bytes. A
 // linear slice was chosen since it uses about half as much memory as a tree
@@ -52,24 +51,18 @@ func MerkleTree(items [][]byte) (root []byte, store [][]byte, err error) {
 
 		// no right child, parent = hash(concat(left, left))
 		case store[i+1] == nil:
-			store[offset] = hashMerkleNodes(store[i], store[i])
+			store[offset] = append(store[i], store[i]...)
 
 		// normal case, parent = hash(concat(left, right))
 		default:
-			store[offset] = hashMerkleNodes(store[i], store[i+1])
+			store[offset] = append(store[i], store[i+1]...)
 		}
 		offset++
 	}
 	return store[n-1], store, nil
 }
 
-func hashMerkleNodes(left []byte, right []byte) []byte {
-	var h [HashSize * 2]byte
-	copy(h[:HashSize], left[:])
-	copy(h[HashSize:], right[:])
-	return Hash(h[:])
-}
-
+// nextPowerOfTwo() calculates the smallest power of 2 that is greater than or equal to the input value
 func nextPowerOfTwo(v int) int {
 	v--
 	v |= v >> 1

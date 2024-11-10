@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [Unreleased] - 11/09/2024
+- Finished commenting the .proto files
+- Began commenting and enhancing tests in the crypto package
+
 ## [Unreleased] - 11/08/2024
 
 - Commented to proto files bft.proto - tx.proto

@@ -1383,9 +1383,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			detail: "1 insert for 2 different committees i.e. no 'updates'",
 			upsert: []*types.CommitteeData{
 				{
-					CommitteeId:     1,
-					CommitteeHeight: 1,
-					ChainHeight:     1,
+					CommitteeId:             1,
+					LastCanopyHeightUpdated: 1,
+					LastChainHeightUpdated:  1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1395,9 +1395,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 2, // can't overwrite number of samples
 				},
 				{
-					CommitteeId:     2,
-					CommitteeHeight: 2,
-					ChainHeight:     2,
+					CommitteeId:             2,
+					LastCanopyHeightUpdated: 2,
+					LastChainHeightUpdated:  2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
@@ -1409,9 +1409,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			},
 			expected: []*types.CommitteeData{
 				{
-					CommitteeId:     1,
-					CommitteeHeight: 1,
-					ChainHeight:     1,
+					CommitteeId:             1,
+					LastCanopyHeightUpdated: 1,
+					LastChainHeightUpdated:  1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1421,9 +1421,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 1,
 				},
 				{
-					CommitteeId:     2,
-					CommitteeHeight: 2,
-					ChainHeight:     2,
+					CommitteeId:             2,
+					LastCanopyHeightUpdated: 2,
+					LastChainHeightUpdated:  2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
@@ -1439,9 +1439,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			detail: "2 'sets' for the same committees i.e. one 'update'",
 			upsert: []*types.CommitteeData{
 				{
-					CommitteeId:     1,
-					CommitteeHeight: 1,
-					ChainHeight:     1,
+					CommitteeId:             1,
+					LastCanopyHeightUpdated: 1,
+					LastChainHeightUpdated:  1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1451,9 +1451,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 2, // can't overwrite number of samples
 				},
 				{
-					CommitteeId:     1,
-					CommitteeHeight: 2,
-					ChainHeight:     2,
+					CommitteeId:             1,
+					LastCanopyHeightUpdated: 2,
+					LastChainHeightUpdated:  2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
@@ -1465,9 +1465,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			},
 			expected: []*types.CommitteeData{
 				{
-					CommitteeId:     1,
-					CommitteeHeight: 2,
-					ChainHeight:     2,
+					CommitteeId:             1,
+					LastCanopyHeightUpdated: 2,
+					LastChainHeightUpdated:  2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1487,9 +1487,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			detail: "can't update with a LTE chain height",
 			upsert: []*types.CommitteeData{
 				{
-					CommitteeId:     1,
-					CommitteeHeight: 1,
-					ChainHeight:     1,
+					CommitteeId:             1,
+					LastCanopyHeightUpdated: 1,
+					LastChainHeightUpdated:  1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1499,9 +1499,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 2, // can't overwrite number of samples
 				},
 				{
-					CommitteeId:     1,
-					CommitteeHeight: 2,
-					ChainHeight:     1,
+					CommitteeId:             1,
+					LastCanopyHeightUpdated: 2,
+					LastChainHeightUpdated:  1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
@@ -1518,9 +1518,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			detail: "can't update with a smaller committee height",
 			upsert: []*types.CommitteeData{
 				{
-					CommitteeId:     1,
-					CommitteeHeight: 1,
-					ChainHeight:     1,
+					CommitteeId:             1,
+					LastCanopyHeightUpdated: 1,
+					LastChainHeightUpdated:  1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1530,9 +1530,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 2, // can't overwrite number of samples
 				},
 				{
-					CommitteeId:     1,
-					CommitteeHeight: 0,
-					ChainHeight:     2,
+					CommitteeId:             1,
+					LastCanopyHeightUpdated: 0,
+					LastChainHeightUpdated:  2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
@@ -1566,7 +1566,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 				// check number of samples
 				require.Equal(t, expected.NumberOfSamples, got.NumberOfSamples)
 				// check chain heights
-				require.Equal(t, expected.ChainHeight, got.ChainHeight)
+				require.Equal(t, expected.LastChainHeightUpdated, got.LastChainHeightUpdated)
 				// check payment percents
 				for i, expectedPP := range expected.PaymentPercents {
 					require.EqualExportedValues(t, expectedPP, got.PaymentPercents[i])
@@ -1587,9 +1587,9 @@ func TestGetSetCommitteesData(t *testing.T) {
 			detail: "only one committee data inserted",
 			set: &types.CommitteesData{List: []*types.CommitteeData{
 				{
-					CommitteeId:     1,
-					CommitteeHeight: 1,
-					ChainHeight:     1,
+					CommitteeId:             1,
+					LastCanopyHeightUpdated: 1,
+					LastChainHeightUpdated:  1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1605,9 +1605,9 @@ func TestGetSetCommitteesData(t *testing.T) {
 			detail: "two different committee data inserted",
 			set: &types.CommitteesData{List: []*types.CommitteeData{
 				{
-					CommitteeId:     1,
-					CommitteeHeight: 1,
-					ChainHeight:     1,
+					CommitteeId:             1,
+					LastCanopyHeightUpdated: 1,
+					LastChainHeightUpdated:  1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1617,9 +1617,9 @@ func TestGetSetCommitteesData(t *testing.T) {
 					NumberOfSamples: 1,
 				},
 				{
-					CommitteeId:     0,
-					CommitteeHeight: 2,
-					ChainHeight:     2,
+					CommitteeId:             0,
+					LastCanopyHeightUpdated: 2,
+					LastChainHeightUpdated:  2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),

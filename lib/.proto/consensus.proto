@@ -133,3 +133,21 @@ message Proposers {
   // addresses: is the list of addresses (short version of public keys)
   repeated bytes addresses = 1;
 }
+
+// ConsensusValidator is the bft abstraction of the Validator structure that only contains information relevant to
+// the bft process
+message ConsensusValidator {
+  // public_key: the operator's aggregable public key that is used to validate signatures from the operator
+  bytes public_key = 1;
+  // voting_power: the weight of this node's vote, typically 1 to 1 matched to staked tokens
+  uint64 voting_power = 2;
+  // net_address: the p2p tcp address of the validator node
+  string net_address = 3;
+}
+
+// ConsensusValidators is a list of Consensus Validator objects used in the bft process often representing a BFT
+// committee
+message ConsensusValidators {
+  // validator_set: is the actual list of Validators and their respective
+  repeated ConsensusValidator ValidatorSet = 1;
+}
