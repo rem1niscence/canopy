@@ -145,7 +145,8 @@ func TestStart(t *testing.T) {
 	c.DialPeers = []string{fmt.Sprintf("%s@%s", lib.BytesToString(n2.pub), n2.listener.Addr().String())}
 	n1 := newTestP2PNodeWithConfig(t, c)
 	// test churn process
-	random, _ := crypto.NewBLSPublicKey()
+	private, _ := crypto.NewBLS12381PrivateKey()
+	random := private.PublicKey()
 	pm := &lib.PeerMeta{
 		NetworkId: 1,
 		Chains:    []uint64{1},
@@ -413,7 +414,7 @@ func newTestP2PNode(t *testing.T) (n testP2PNode) {
 
 func newTestP2PNodeWithConfig(t *testing.T, c lib.Config, noLog ...bool) (n testP2PNode) {
 	var err error
-	n.priv, err = crypto.NewBLSPrivateKey()
+	n.priv, err = crypto.NewBLS12381PrivateKey()
 	require.NoError(t, err)
 	n.pub = n.priv.PublicKey().Bytes()
 	require.NoError(t, err)

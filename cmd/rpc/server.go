@@ -491,7 +491,7 @@ func Keystore(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 func KeystoreNewKey(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		pk, err := crypto.NewBLSPrivateKey()
+		pk, err := crypto.NewBLS12381PrivateKey()
 		if err != nil {
 			return nil, err
 		}

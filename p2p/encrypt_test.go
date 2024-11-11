@@ -11,9 +11,9 @@ import (
 
 func TestEncryptedConn(t *testing.T) {
 	msg1, msg2 := []byte("foo"), []byte("bar")
-	p1, err := crypto.NewBLSPrivateKey()
+	p1, err := crypto.NewBLS12381PrivateKey()
 	require.NoError(t, err)
-	p2, err := crypto.NewBLSPrivateKey()
+	p2, err := crypto.NewBLS12381PrivateKey()
 	require.NoError(t, err)
 	c1, c2 := net.Pipe()
 	defer func() { c1.Close(); c2.Close() }()

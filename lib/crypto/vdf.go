@@ -17,11 +17,13 @@ const (
 )
 
 type VDFService struct {
-	TargetTime time.Duration // target time should have a pre-baked in 'breathing room' to prevent misses due to accidental overages
-	Iterations int           // number of iterations the VDF will currently Run()
-	Output     []byte        // the output from the previous VDF run
-	stopChan   chan struct{}
-	running    *atomic.Bool
+	TargetTime     time.Duration // target time should have a pre-baked in 'breathing room' to prevent misses due to accidental overages
+	ProcessTime    time.Duration // how long the last run took
+	Iterations     int           // number of iterations the VDF will currently Run()
+	LastIterations int           // the number of iterations the VDF completed
+	Output         []byte        // the output from the previous VDF run
+	stopChan       chan struct{}
+	running        *atomic.Bool
 }
 
 // NewVDFService() creates a new instance of the VDF service
@@ -31,7 +33,7 @@ func NewVDFService(targetTime time.Duration) (vdf *VDFService) {
 	return
 }
 
-// Run() generates a VDF proof using the current params state of the VDF Service object
+// Run() *blocking call*:  generates a VDF proof using the current params state of the VDF Service object
 func (vdf *VDFService) Run(seed []byte) {
 	if vdf == nil {
 		return
@@ -58,6 +60,8 @@ func (vdf *VDFService) Run(seed []byte) {
 	}
 	// combine the y and proof as that's how it's verified
 	vdf.Output = append(y, proof...)
+	// save iterations of the last run before adjusting
+	vdf.LastIterations = vdf.Iterations
 	// adjust the iterations based on completion time
 	vdf.adjustIterations(time.Since(startTime))
 }
@@ -77,7 +81,7 @@ func (vdf *VDFService) Finish() (out []byte, iterations int) {
 	if vdf.Output == nil {
 		return
 	}
-	return vdf.Output, vdf.Iterations
+	return vdf.Output, vdf.LastIterations
 }
 
 // VerifyVDF() verifies the VDF using the seed, the proof, and the number of iterations

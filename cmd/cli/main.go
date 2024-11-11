@@ -97,7 +97,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 	}
 	privateValKeyPath := filepath.Join(dataDirPath, lib.ValKeyPath)
 	if _, err := os.Stat(privateValKeyPath); errors.Is(err, os.ErrNotExist) {
-		blsPrivateKey, _ := crypto.NewBLSPrivateKey()
+		blsPrivateKey, _ := crypto.NewBLS12381PrivateKey()
 		log.Infof("Creating %s file", lib.ValKeyPath)
 		if err = crypto.PrivateKeyToFile(blsPrivateKey, privateValKeyPath); err != nil {
 			panic(err)
@@ -122,7 +122,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			panic(err)
 		}
 	}
-	privateValKey, err := crypto.NewBLSPrivateKeyFromFile(privateValKeyPath)
+	privateValKey, err := crypto.NewBLS12381PrivateKeyFromFile(privateValKeyPath)
 	if err != nil {
 		panic(err)
 	}

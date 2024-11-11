@@ -2,24 +2,27 @@ package crypto
 
 import (
 	"crypto/rand"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
-func TestED25519Bytes(t *testing.T) {
+func TestSECP256K1Bytes(t *testing.T) {
 	// private key testing
-	privateKey, err := NewEd25519PrivateKey()
+	privateKey, err := NewSECP256K1PrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 	privKeyBz := privateKey.Bytes()
-	privateKey2 := BytesToED25519Private(privKeyBz)
+	privateKey2, err := BytesToSECP256K1Private(privKeyBz)
+	require.NoError(t, err)
 	if !privateKey.Equals(privateKey2) {
 		t.Fatalf("wanted %s, got %s", privateKey, privateKey2)
 	}
 	// public key testing
 	pubKey := privateKey.PublicKey()
 	pubKeyBz := pubKey.Bytes()
-	pubKey2 := BytesToED25519Public(pubKeyBz)
+	pubKey2, err := BytesToSECP256K1Public(pubKeyBz)
+	require.NoError(t, err)
 	if !pubKey.Equals(pubKey2) {
 		t.Fatalf("wanted %s got %s", pubKey, pubKey2)
 	}
@@ -32,9 +35,9 @@ func TestED25519Bytes(t *testing.T) {
 	}
 }
 
-func TestED25519SignAndVerify(t *testing.T) {
+func TestSECP256K1SignAndVerify(t *testing.T) {
 	// create the private key
-	pk, err := NewEd25519PrivateKey()
+	pk, err := NewSECP256K1PrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}

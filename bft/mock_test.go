@@ -68,7 +68,7 @@ func newTestValSet(t *testing.T, numValidators int) (valSet ValSet, valKeys []cr
 			votingPower += 2
 		}
 		// convert the string private key into a private key object
-		privateKey, e := crypto.NewBLSPrivateKeyFromString(keys[i])
+		privateKey, e := crypto.StringToBLS12381PrivateKey(keys[i])
 		require.NoError(t, e)
 		// add the private key to the list of keys
 		valKeys = append(valKeys, privateKey)

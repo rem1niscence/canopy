@@ -23,7 +23,7 @@ func NewValidatorSet(validators *ConsensusValidators) (vs ValidatorSet, err Erro
 	// iterate through the ValidatorSet to get the count, total power, and convert
 	// the public keys to 'points' on an elliptic curve for the BLS multikey
 	for _, v := range validators.ValidatorSet {
-		point, e := crypto.NewBLSPointFromBytes(v.PublicKey)
+		point, e := crypto.BytesToBLS12381Point(v.PublicKey)
 		if e != nil {
 			return ValidatorSet{}, ErrPubKeyFromBytes(e)
 		}

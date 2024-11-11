@@ -334,9 +334,9 @@ func newTestKeyGroup(t *testing.T, variation ...int) *crypto.KeyGroup {
 	)
 
 	if len(variation) == 1 {
-		key, err = crypto.NewBLSPrivateKeyFromString(keys[variation[0]])
+		key, err = crypto.StringToBLS12381PrivateKey(keys[variation[0]])
 	} else {
-		key, err = crypto.NewBLSPrivateKeyFromString(keys[0])
+		key, err = crypto.StringToBLS12381PrivateKey(keys[0])
 	}
 	require.NoError(t, err)
 	return crypto.NewKeyGroup(key)

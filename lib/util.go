@@ -268,7 +268,7 @@ func StringToBytes(s string) ([]byte, ErrorI) {
 
 // PublicKeyFromBytes() converts a byte slice into a BLS public key
 func PublicKeyFromBytes(pubKey []byte) (crypto.PublicKeyI, ErrorI) {
-	publicKey, err := crypto.NewBLSPublicKeyFromBytes(pubKey)
+	publicKey, err := crypto.BytesToBLS12381Public(pubKey)
 	if err != nil {
 		return nil, ErrPubKeyFromBytes(err)
 	}

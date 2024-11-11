@@ -9,6 +9,8 @@ import (
 	"github.com/drand/kyber/pairing"
 	"github.com/drand/kyber/sign"
 	"github.com/drand/kyber/sign/bdn"
+	"github.com/drand/kyber/util/random"
+	"os"
 )
 
 const (
@@ -28,9 +30,49 @@ type BLS12381PrivateKey struct {
 	scheme *bdn.Scheme
 }
 
-// NewBLS12381PrivateKey() creates a new BLS private key reference from a kyber.Scalar
-func NewBLS12381PrivateKey(privateKey kyber.Scalar) *BLS12381PrivateKey {
+// newBLS12381PrivateKey() creates a new BLS private key reference from a kyber.Scalar
+func newBLS12381PrivateKey(privateKey kyber.Scalar) *BLS12381PrivateKey {
 	return &BLS12381PrivateKey{Scalar: privateKey, scheme: newBLSScheme()}
+}
+
+// NewBLS12381PrivateKey() generates a new BLS private key
+func NewBLS12381PrivateKey() (PrivateKeyI, error) {
+	privateKey, _ := newBLSScheme().NewKeyPair(random.New())
+	return newBLS12381PrivateKey(privateKey), nil
+}
+
+// StringToBLS12381PrivateKey() creates a new PrivateKeyI interface  from a BLS Private Key hex string
+func StringToBLS12381PrivateKey(hexString string) (PrivateKeyI, error) {
+	bz, err := hex.DecodeString(hexString)
+	if err != nil {
+		return nil, err
+	}
+	return BytesToBLS12381PrivateKey(bz)
+}
+
+// BytesToBLS12381PrivateKey() creates a new PrivateKeyI interface from a BLS Private Key bytes
+func BytesToBLS12381PrivateKey(bz []byte) (PrivateKeyI, error) {
+	keyCopy := newBLSSuite().G2().Scalar()
+	if err := keyCopy.UnmarshalBinary(bz); err != nil {
+		return nil, err
+	}
+	return &BLS12381PrivateKey{
+		Scalar: keyCopy,
+		scheme: newBLSScheme(),
+	}, nil
+}
+
+// NewBLS12381PrivateKeyFromFile() creates a new PrivateKeyI interface from a BLS12381 json file
+func NewBLS12381PrivateKeyFromFile(filepath string) (PrivateKeyI, error) {
+	jsonBytes, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, err
+	}
+	ptr := new(BLS12381PrivateKey)
+	if err = json.Unmarshal(jsonBytes, ptr); err != nil {
+		return nil, err
+	}
+	return ptr, nil
 }
 
 // Bytes() gives the protobuf bytes representation of the private key
@@ -80,7 +122,7 @@ func (b *BLS12381PrivateKey) UnmarshalJSON(bz []byte) (err error) {
 	if err != nil {
 		return
 	}
-	pk, err := NewBLSPrivateKeyFromBytes(bz)
+	pk, err := BytesToBLS12381PrivateKey(bz)
 	if err != nil {
 		return err
 	}
@@ -103,6 +145,36 @@ type BLS12381PublicKey struct {
 // NewBLSPublicKey creates a new BLSPublicKey reference from a kyber point
 func NewBLS12381PublicKey(publicKey kyber.Point) *BLS12381PublicKey {
 	return &BLS12381PublicKey{Point: publicKey, scheme: newBLSScheme()}
+}
+
+// StringToBLSPublic() creates a new PublicKeyI interface from BLS hex string
+func StringToBLS12381Public(hexString string) (PublicKeyI, error) {
+	bz, err := hex.DecodeString(hexString)
+	if err != nil {
+		return nil, err
+	}
+	return BytesToBLS12381Public(bz)
+}
+
+// BytesToBLS12381Public() creates a new PublicKeyI interface from BLS public key bytes
+func BytesToBLS12381Public(bz []byte) (PublicKeyI, error) {
+	point, err := BytesToBLS12381Point(bz)
+	if err != nil {
+		return nil, err
+	}
+	return &BLS12381PublicKey{
+		Point:  point,
+		scheme: newBLSScheme(),
+	}, nil
+}
+
+// BytesToBLS12381Point() creates a new G1 point on BLS12-381 curve which is the public key of the pair
+func BytesToBLS12381Point(bz []byte) (kyber.Point, error) {
+	point := newBLSSuite().G1().Point()
+	if err := point.UnmarshalBinary(bz); err != nil {
+		return nil, err
+	}
+	return point, nil
 }
 
 // Address() returns the short version of the public key
@@ -134,7 +206,7 @@ func (b *BLS12381PublicKey) UnmarshalJSON(bz []byte) (err error) {
 	if err != nil {
 		return
 	}
-	pk, err := NewBLSPublicKeyFromBytes(bz)
+	pk, err := BytesToBLS12381Public(bz)
 	if err != nil {
 		return err
 	}
@@ -165,6 +237,8 @@ func (b *BLS12381PublicKey) String() string {
 	return hex.EncodeToString(b.Bytes())
 }
 
+var _ MultiPublicKeyI = &BLS12381MultiPublicKey{}
+
 // BLS12381MultiPublicKey is an aggregated public key created by combining multiple BLS public keys from different signers
 // This combined key is used to verify an aggregated signature, confirming that a quorum (or all) of the original signers
 // have participated without needing to verify each signer individually
@@ -175,8 +249,22 @@ type BLS12381MultiPublicKey struct {
 }
 
 // NewBLSMultiPublicKey() creates a new BLS12381MultiPublicKey reference from a kyber mask object
-func NewBLSMultiPublicKey(mask *sign.Mask) *BLS12381MultiPublicKey {
+func newBLSMultiPublicKey(mask *sign.Mask) *BLS12381MultiPublicKey {
 	return &BLS12381MultiPublicKey{mask: mask, scheme: newBLSScheme(), signatures: make([][]byte, len(mask.Publics()))}
+}
+
+// NewMultiBLSFromPoints() creates a multi public key from a list of G1 points on a BLS12381 curve
+func NewMultiBLSFromPoints(publicKeys []kyber.Point, bitmap []byte) (MultiPublicKeyI, error) {
+	mask, err := sign.NewMask(newBLSSuite(), publicKeys, nil)
+	if err != nil {
+		return nil, err
+	}
+	if bitmap != nil {
+		if err = mask.SetMask(bitmap); err != nil {
+			return nil, err
+		}
+	}
+	return newBLSMultiPublicKey(mask), nil
 }
 
 // VerifyBytes() verifies a digital signature given the original message payload and the signature out

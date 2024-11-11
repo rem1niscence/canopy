@@ -15,6 +15,12 @@ var (
 	MaxHash = bytes.Repeat([]byte{0xFF}, HashSize)
 )
 
+/*
+	Hash is a function that takes an input message and returns a fixed-size string of bytes that is unique to the input
+    to produce a short, fixed-length representation of the data, which can be used for various applications like data
+    integrity checks
+*/
+
 // Hasher() returns the global hashing algorithm used
 func Hasher() hash.Hash { return sha256.New() }
 

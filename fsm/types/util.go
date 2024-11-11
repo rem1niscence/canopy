@@ -156,7 +156,7 @@ type validator struct {
 
 // MarshalJSON() is the json.Marshaller implementation for the Validator object
 func (x *Validator) MarshalJSON() ([]byte, error) {
-	publicKey, err := crypto.NewBLSPublicKeyFromBytes(x.PublicKey)
+	publicKey, err := crypto.BytesToBLS12381Public(x.PublicKey)
 	if err != nil {
 		return nil, err
 	}

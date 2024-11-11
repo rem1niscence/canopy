@@ -2,6 +2,7 @@ package crypto
 
 import (
 	ed25519 "crypto/ed25519"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 )
@@ -18,9 +19,32 @@ const (
 // It is used to create 'unique' digital signatures of messages
 type ED25519PrivateKey struct{ ed25519.PrivateKey }
 
-// NewPrivateKeyED25519() creates a new ED25519PrivateKey wrapper that satisfies the PrivateKeyI interface
-func NewPrivateKeyED25519(privateKey ed25519.PrivateKey) *ED25519PrivateKey {
+// newPrivateKeyED25519() creates a new ED25519PrivateKey wrapper that satisfies the PrivateKeyI interface
+func newPrivateKeyED25519(privateKey ed25519.PrivateKey) *ED25519PrivateKey {
 	return &ED25519PrivateKey{PrivateKey: privateKey}
+}
+
+// NewEd25519PrivateKey() generates a new ED25519 private key
+func NewEd25519PrivateKey() (PrivateKeyI, error) {
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	return newPrivateKeyED25519(priv), nil
+}
+
+// BytesToED25519Private() creates a new PrivateKeyI interface from ED25519 bytes
+func BytesToED25519Private(bz []byte) PrivateKeyI {
+	return newPrivateKeyED25519(bz)
+}
+
+// StringToED25519Private() creates a new PrivateKeyI interface from an ED25519 hex string
+func StringToED25519Private(hexString string) (PrivateKeyI, error) {
+	bz, err := hex.DecodeString(hexString)
+	if err != nil {
+		return nil, err
+	}
+	return newPrivateKeyED25519(bz), nil
 }
 
 // ensure ED25519PrivateKey satisfies PrivateKeyI interface
@@ -58,7 +82,7 @@ func (p *ED25519PrivateKey) UnmarshalJSON(b []byte) (err error) {
 	if err != nil {
 		return
 	}
-	*p = *NewPrivateKeyED25519(bz)
+	*p = *newPrivateKeyED25519(bz)
 	return
 }
 
@@ -117,4 +141,18 @@ func (p *ED25519PublicKey) VerifyBytes(msg []byte, sig []byte) bool {
 // Equals() compares two public key objects and returns if the two are equal
 func (p *ED25519PublicKey) Equals(i PublicKeyI) bool {
 	return p.PublicKey.Equal(ed25519.PublicKey(i.Bytes()))
+}
+
+// StringToED25519Public() creates a new PublicKeyI interface from ED25519PublicKey bytes
+func StringToED25519Public(hexString string) (PublicKeyI, error) {
+	bz, err := hex.DecodeString(hexString)
+	if err != nil {
+		return nil, err
+	}
+	return NewPublicKeyED25519(bz), nil
+}
+
+// BytesToED25519Public() creates a new PublicKeyI interface from a ED25519PublicKey hex string
+func BytesToED25519Public(bz []byte) PublicKeyI {
+	return NewPublicKeyED25519(bz)
 }

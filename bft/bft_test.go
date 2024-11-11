@@ -50,7 +50,7 @@ func TestStartElectionPhase(t *testing.T) {
 			// use validator 0 as the test replica
 			pub, private := c.valKeys[0].PublicKey(), c.valKeys[0]
 			if !test.selfIsValidator {
-				pk, err := crypto.NewBLSPrivateKey()
+				pk, err := crypto.NewBLS12381PrivateKey()
 				require.NoError(t, err)
 				c.bft.PublicKey = pk.PublicKey().Bytes()
 			}

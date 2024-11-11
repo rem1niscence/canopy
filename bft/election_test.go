@@ -73,7 +73,7 @@ func TestWhenIsCandidate(t *testing.T) {
 }
 
 func TestSortitionValidity(t *testing.T) {
-	privateKey, _ := crypto.NewBLSPrivateKey()
+	privateKey, _ := crypto.NewBLS12381PrivateKey()
 	lastNProposers := [][]byte{[]byte("a"), []byte("b"), []byte("c")}
 	power, totalPower := 1000000, 3000000
 	expectedAvg := float64(power) / float64(totalPower)

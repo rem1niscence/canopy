@@ -85,7 +85,7 @@ func (p *Plugin) Start() {
 func (p *Plugin) ProduceProposal(vdf *lib.VDF) (blockBytes []byte, rewardRecipients *lib.RewardRecipients, err lib.ErrorI) {
 	// reset the state machine once this code completes
 	defer func() { p.FSM.Reset() }()
-	pubKey, _ := crypto.NewBLSPublicKeyFromBytes(p.PublicKey)
+	pubKey, _ := crypto.BytesToBLS12381Public(p.PublicKey)
 	height := p.FSM.Height()
 	// load the previous block from the store
 	lastBlock, err := p.FSM.LoadBlock(height - 1)

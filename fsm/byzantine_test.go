@@ -150,7 +150,7 @@ func TestHandleByzantine(t *testing.T) {
 				for _, nonSigner := range expectedNonSigners {
 					// ensure the non-signers array was updated with the expected key
 					require.True(t, slices.ContainsFunc(nonSigners, func(ns *types.NonSigner) bool {
-						pub, _ := crypto.NewBLSPublicKeyFromBytes(nonSigner)
+						pub, _ := crypto.BytesToBLS12381Public(nonSigner)
 						return bytes.Equal(ns.Address, pub.Address().Bytes())
 					}))
 				}
@@ -159,7 +159,7 @@ func TestHandleByzantine(t *testing.T) {
 					// validate the reset
 					require.Zero(t, len(nonSigners))
 					// retrieve the validator object
-					pub, _ := crypto.NewBLSPublicKeyFromBytes(committee.ValidatorSet.ValidatorSet[0].PublicKey)
+					pub, _ := crypto.BytesToBLS12381Public(committee.ValidatorSet.ValidatorSet[0].PublicKey)
 					validator, _ := sm.GetValidator(pub.Address())
 					// validate the pausing
 					require.NotZero(t, validator.MaxPausedHeight)
@@ -171,7 +171,7 @@ func TestHandleByzantine(t *testing.T) {
 			// STEP 3) validate 'bad proposer' logic
 			func() {
 				if test.qc.Results.SlashRecipients != nil && test.qc.Results.SlashRecipients.BadProposers != nil {
-					publicKey, e := crypto.NewBLSPublicKeyFromBytes(test.qc.Results.SlashRecipients.BadProposers[0])
+					publicKey, e := crypto.BytesToBLS12381Public(test.qc.Results.SlashRecipients.BadProposers[0])
 					require.NoError(t, e)
 					// get the validator associated with the bad proposer
 					validator, e := sm.GetValidator(publicKey.Address())
