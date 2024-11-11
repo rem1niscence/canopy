@@ -1,6 +1,11 @@
 # CHANGELOG
 
+## [Unreleased] - 11/11/2024
+
+- Finished commenting and enhancing tests in the crypto package
+
 ## [Unreleased] - 11/09/2024
+
 - Finished commenting the .proto files
 - Began commenting and enhancing tests in the crypto package
 
