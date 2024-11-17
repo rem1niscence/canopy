@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [Unreleased] - 11/12/2024
+- Improved vdf file comments
+
 ## [Unreleased] - 11/11/2024
 
 - Finished commenting and enhancing tests in the crypto package
