@@ -14,7 +14,7 @@ import (
 // CheckBasic() provides basic 'sanity' checks on the CertificateResult structure
 func (x *CertificateResult) CheckBasic() ErrorI {
 	if x == nil {
-		return ErrNilProposal()
+		return ErrNilCertificateResults()
 	}
 	if err := x.RewardRecipients.CheckBasic(); err != nil {
 		return err

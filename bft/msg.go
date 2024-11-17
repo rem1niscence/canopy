@@ -68,7 +68,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 		}
 		// validate committee height
 		if x.Header.CanopyHeight != b.CanopyHeight {
-			return false, lib.ErrWrongCommitteeHeight()
+			return false, lib.ErrWrongCanopyHeight()
 		}
 		// sanity check the VRF
 		if err = checkSignatureBasic(x.Vrf); err != nil {
@@ -106,7 +106,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 			return false, lib.ErrWrongHeight()
 		}
 		if x.Header.CanopyHeight != b.CanopyHeight {
-			return false, lib.ErrWrongCommitteeHeight()
+			return false, lib.ErrWrongCanopyHeight()
 		}
 		if x.Qc.Header.Height < b.LoadCommitteeHeightInState(b.CommitteeId) {
 			return false, lib.ErrInvalidQCCommitteeHeight()

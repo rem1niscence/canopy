@@ -456,8 +456,10 @@ func (tc *testConsensus) newTestDoubleSignEvidence(t *testing.T) []*DoubleSignEv
 // newTestBadProposerEvidence() fabricates bad proposer evidence for the testing suite
 func (tc *testConsensus) newTestBadProposerEvidence(t *testing.T) []*BadProposerEvidence {
 	// create a certificate for the Election Vote that justifies that Validator 1 *should have* proposed a block
+	view := tc.view(ElectionVote)
+	view.Height = 0 // TODO, bad proposer evidence timing is not 100% defined still
 	qcA := &lib.QuorumCertificate{
-		Header:      tc.view(ElectionVote),
+		Header:      view,
 		ProposerKey: tc.valKeys[1].PublicKey().Bytes(),
 	}
 	// create the justification

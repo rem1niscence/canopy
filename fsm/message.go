@@ -141,7 +141,7 @@ func (s *StateMachine) HandleMessageSend(msg *types.MessageSend) lib.ErrorI {
 
 // HandleMessageStake() is the proper handler for a `Stake` message (Validator does not yet exist in the state)
 func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
-	publicKey, e := crypto.NewPublicKeyFromBytes(msg.PublicKey)
+	publicKey, e := crypto.BytesToBLS12381Public(msg.PublicKey)
 	if e != nil {
 		return types.ErrInvalidPublicKey(e)
 	}

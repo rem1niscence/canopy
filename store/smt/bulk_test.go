@@ -38,7 +38,7 @@ func bulkOperations(t *testing.T, operations int, insert int, update int, delete
 
 	for i := 0; i < operations; i++ {
 		n := rand.Intn(max)
-		if n < insert { // Insert
+		if n < insert { // insert
 			keyLen := 16 + rand.Intn(32)
 			key := make([]byte, keyLen)
 			rand.Read(key)

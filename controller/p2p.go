@@ -497,7 +497,7 @@ func (c *Controller) ListenForBlockRequests() {
 				// send the block back to the requester
 				c.SendBlock(request.CommitteeId, chain.Plugin.Height(), chain.Plugin.TotalVDFIterations(), certificate, senderID)
 			}()
-		case <-l.C():
+		case <-l.TimeToReset():
 			l.Reset()
 		}
 	}

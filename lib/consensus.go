@@ -4,228 +4,303 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/drand/kyber"
 	"slices"
 )
 
-const (
-	GlobalMaxBlockSize = int(32 * units.MB)
-)
+// ValidatorSet represents a collection of validators responsible for consensus
+// It facilitates the creation and validation of +2/3 Majority agreements using multi-signatures
+type ValidatorSet struct {
+	ValidatorSet  *ConsensusValidators   // a list of validators participating in the consensus process
+	MultiKey      crypto.MultiPublicKeyI // a composite public key derived from the individual public keys of all validators, used for verifying multi-signatures
+	TotalPower    uint64                 // the aggregate voting power of all validators in the set, reflecting their influence on the consensus
+	MinimumMaj23  uint64                 // the minimum voting power threshold required to achieve a two-thirds majority (2f+1), essential for consensus decisions
+	NumValidators uint64                 // the total number of validators in the set, indicating the size of the validator pool
+}
 
-// QUORUM CERTIFICATE CODE BELOW
-
-// SignBytes() returns the canonical byte representation used to digitally sign the bytes of the structure
-func (x *QuorumCertificate) SignBytes() (signBytes []byte) {
-	if x.ProposerKey != nil {
-		bz, _ := Marshal(&QuorumCertificate{Header: x.Header, ProposerKey: x.ProposerKey})
-		return bz
+// NewValidatorSet() initializes a ValidatorSet from a given set of consensus validators
+func NewValidatorSet(validators *ConsensusValidators) (vs ValidatorSet, err ErrorI) {
+	totalPower, count, points := uint64(0), uint64(0), make([]kyber.Point, 0)
+	// iterate through the ValidatorSet to get the count, total power, and convert
+	// the public keys to 'points' on an elliptic curve for the BLS multikey
+	for _, v := range validators.ValidatorSet {
+		point, e := crypto.BytesToBLS12381Point(v.PublicKey)
+		if e != nil {
+			return ValidatorSet{}, ErrPubKeyFromBytes(e)
+		}
+		points = append(points, point)
+		totalPower += v.VotingPower
+		count++
 	}
-	// temp variables to save values
-	results, block, aggregateSignature := x.Results, x.Block, x.Signature
-	// remove the values from the struct
-	x.Results, x.Block, x.Signature = nil, nil, nil
-	// convert the structure into the sign bytes
-	signBytes, _ = Marshal(x)
-	// add back the removed values
-	x.Results, x.Block, x.Signature = results, block, aggregateSignature
+	if totalPower == 0 {
+		return ValidatorSet{}, ErrNoValidators()
+	}
+	// calculate the minimum power for a two-thirds majority (2f+1)
+	minPowerFor23Maj := (2*totalPower)/3 + 1
+	// create a composite multi-public key out of the public keys (in curve point format)
+	mpk, e := crypto.NewMultiBLSFromPoints(points, nil)
+	if e != nil {
+		return ValidatorSet{}, ErrNewMultiPubKey(e)
+	}
+	// return the validator set
+	return ValidatorSet{
+		ValidatorSet:  validators,
+		MultiKey:      mpk,
+		TotalPower:    totalPower,
+		MinimumMaj23:  minPowerFor23Maj,
+		NumValidators: count,
+	}, nil
+}
+
+// GetValidator() retrieves a validator from the ValidatorSet using the public key
+func (vs *ValidatorSet) GetValidator(publicKey []byte) (val *ConsensusValidator, err ErrorI) {
+	val, _, err = vs.GetValidatorAndIdx(publicKey)
 	return
 }
 
-// CheckBasic() performs 'sanity' checks on the Quorum Certificate structure
-// height may be optionally passed for View checking
-func (x *QuorumCertificate) CheckBasic() ErrorI {
-	// a valid QC must have either the proposal hash or the proposer key set
-	if x == nil || (x.ResultsHash == nil && x.ProposerKey == nil) {
-		return ErrEmptyQuorumCertificate()
+// GetValidatorAndIdx() retrieves a validator and its index in the ValidatorSet using the public key
+func (vs *ValidatorSet) GetValidatorAndIdx(publicKey []byte) (val *ConsensusValidator, idx int, err ErrorI) {
+	if vs == nil || vs.ValidatorSet == nil {
+		return nil, 0, ErrInvalidValidatorIndex()
 	}
-	// sanity check the view of the QC
-	if err := x.Header.CheckBasic(); err != nil {
-		return err
-	}
-	// is QC with result (AFTER ELECTION)
-	if x.ResultsHash != nil {
-		// sanity check the hashes
-		if len(x.BlockHash) != crypto.HashSize {
-			return ErrInvalidBlockHash()
-		}
-		if len(x.ResultsHash) != crypto.HashSize {
-			return ErrInvalidBlockHash()
-		}
-		// results may be omitted in certain cases like for integrated blockchain block storage
-		if x.Results != nil {
-			if err := x.Results.CheckBasic(); err != nil {
-				return err
-			}
-			// validate the ProposalHash = the hash of the proposal sign bytes
-			resultsBytes, err := Marshal(x.Results)
-			if err != nil {
-				return err
-			}
-			// check the results hash
-			if !bytes.Equal(x.ResultsHash, crypto.Hash(resultsBytes)) {
-				return ErrMismatchResultsHash()
-			}
-		}
-		// block may be omitted in certain cases like the 'reward transaction'
-		if x.Block != nil {
-			// check the block hash
-			if !bytes.Equal(x.BlockHash, crypto.Hash(x.Block)) {
-				return ErrInvalidBlockHash()
-			}
-			blockSize := len(x.Block)
-			// global max block size enforcement
-			if blockSize > GlobalMaxBlockSize {
-				return ErrExpectedMaxBlockSize()
-			}
-		}
-	} else { // is QC with proposer key (ELECTION)
-		if len(x.ProposerKey) != crypto.BLS12381PubKeySize {
-			return ErrInvalidProposerPubKey()
-		}
-		if len(x.ResultsHash) != 0 || x.Results != nil {
-			return ErrMismatchResultsHash()
-		}
-		if len(x.BlockHash) != 0 || len(x.Block) != 0 {
-			return ErrMismatchBlockHash()
+	for i, v := range vs.ValidatorSet.ValidatorSet {
+		if bytes.Equal(v.PublicKey, publicKey) {
+			return v, i, nil
 		}
 	}
-	// ensure a valid aggregate signature is possible
-	return x.Signature.CheckBasic()
+	return nil, 0, ErrValidatorNotInSet(publicKey)
 }
 
-// Check() validates the QC by cross-checking the aggregate signature against the ValidatorSet
-// isPartialQC means a valid aggregate signature, but not enough signers for +2/3 majority
-func (x *QuorumCertificate) Check(vs ValidatorSet, maxBlockSize int, view *View, enforceHeights bool) (isPartialQC bool, error ErrorI) {
-	if err := x.CheckBasic(); err != nil {
-		return false, err
+// CheckBasic() validates the basic structure and length of the AggregateSignature
+func (x *AggregateSignature) CheckBasic() ErrorI {
+	if x == nil {
+		return ErrEmptyAggregateSignature()
 	}
-	if err := x.Header.Check(view, enforceHeights); err != nil {
-		return false, err
+	if len(x.Signature) != crypto.BLS12381SignatureSize {
+		return ErrInvalidAggrSignatureLength()
 	}
-	if x.Block != nil {
-		blockSize := len(x.Block)
-		// global max block size enforcement
-		if blockSize > maxBlockSize {
-			return false, ErrExpectedMaxBlockSize()
-		}
-	}
-	return x.Signature.Check(x, vs)
-}
-
-// CheckHighQC() performs additional validation on the special `HighQC` (justify unlock QC)
-func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommitteeHeight uint64, vs ValidatorSet) ErrorI {
-	isPartialQC, err := x.Check(vs, maxBlockSize, view, false)
-	if err != nil {
-		return err
-	}
-	// `highQCs` can't justify an unlock without +2/3 majority
-	if isPartialQC {
-		return ErrNoMaj23()
-	}
-	// invalid 'historical committee', must be before the last committee height saved in the state
-	// if not, there is a potential for a long range attack
-	if stateCommitteeHeight > x.Header.CanopyHeight {
-		return ErrInvalidQCCommitteeHeight()
-	}
-	// enforce same target height
-	if x.Header.Height != view.Height {
-		return ErrWrongHeight()
-	}
-	// a valid HighQC must have the phase must be PRECOMMIT_VOTE
-	// as that's the phase where replicas 'Lock'
-	if x.Header.Phase != Phase_PRECOMMIT_VOTE {
-		return ErrWrongPhase()
-	}
-	// the block hash nor results hash cannot be nil for a HighQC
-	// as it's after the election phase
-	if x.BlockHash == nil || x.ResultsHash == nil {
-		return ErrNilBlock()
+	if len(x.Bitmap) == 0 {
+		return ErrEmptySignerBitmap()
 	}
 	return nil
 }
 
-// Equals() checks the equality of the current QC against the parameter QC
-// equals rejects nil QCs
-func (x *QuorumCertificate) Equals(qc *QuorumCertificate) bool {
-	if x == nil || qc == nil {
-		return false
+// Check() validates a +2/3 majority of the signature using the payload bytes and the ValidatorSet
+// NOTE: "partialQC" means the signature is valid but does not reach a +2/3 majority
+func (x *AggregateSignature) Check(sb SignByte, vs ValidatorSet) (isPartialQC bool, err ErrorI) {
+	if err = x.CheckBasic(); err != nil {
+		return false, err
 	}
-	if !x.Header.Equals(qc.Header) {
-		return false
+	key := vs.MultiKey.Copy()
+	// indicate which validator indexes have purportedly signed the payload
+	// and are included in the aggregated signature
+	if er := key.SetBitmap(x.Bitmap); er != nil {
+		return false, ErrInvalidSignerBitmap(er)
 	}
-	if !bytes.Equal(x.ProposerKey, qc.ProposerKey) {
-		return false
+	// use the composite public key to verify the aggregate signature
+	if !key.VerifyBytes(sb.SignBytes(), x.Signature) {
+		return false, ErrInvalidAggrSignature()
 	}
-	if !bytes.Equal(x.BlockHash, qc.BlockHash) {
-		return false
+	// get the total power and the min +2/3 majority from the bitmap and ValSet
+	_, totalSignedPower, err := x.GetSigners(vs)
+	if err != nil {
+		return false, err
 	}
-	if !bytes.Equal(x.Block, qc.Block) {
-		return false
+	// ensure the signers reach a +2/3 majority
+	if totalSignedPower < vs.MinimumMaj23 {
+		return true, nil
 	}
-	if !bytes.Equal(x.ResultsHash, qc.ResultsHash) {
-		return false
-	}
-	if !x.Results.Equals(qc.Results) {
-		return false
-	}
-	return x.Signature.Equals(qc.Signature)
+	return false, nil
 }
 
-// GetNonSigners() returns the public keys and the percentage (of voting power out of total) of those who did not sign the QC
-func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) (nonSigners [][]byte, nonSignerPercent int, err ErrorI) {
-	if x == nil || x.Signature == nil {
-		return nil, 0, ErrEmptyQuorumCertificate()
+// Equals() checks if two AggregateSignature instances are identical
+func (x *AggregateSignature) Equals(a *AggregateSignature) bool {
+	if x == nil || a == nil {
+		return false
 	}
-	return x.Signature.GetNonSigners(vs)
+	if !bytes.Equal(x.Signature, a.Signature) {
+		return false
+	}
+	if !bytes.Equal(x.Bitmap, a.Bitmap) {
+		return false
+	}
+	return true
 }
 
-// jsonQC represents the json.Marshaller and json.Unmarshaler implementation of QC
-type jsonQC struct {
-	Header       *View               `json:"header,omitempty"`
-	Block        HexBytes            `json:"block,omitempty"`
-	BlockHash    HexBytes            `json:"blockHash,omitempty"`
-	ResultsHash  HexBytes            `json:"resultsHash,omitempty"`
-	Results      *CertificateResult  `json:"results,omitempty"`
-	ProposalHash HexBytes            `json:"block_hash,omitempty"`
-	ProposerKey  HexBytes            `json:"proposer_key,omitempty"`
-	Signature    *AggregateSignature `json:"signature,omitempty"`
+// GetSigners() returns the public keys and corresponding combined voting power of those who signed
+func (x *AggregateSignature) GetSigners(vs ValidatorSet) (signers [][]byte, signedPower uint64, err ErrorI) {
+	signers, signedPower, err = x.getSigners(vs, false)
+	return
+}
+
+// GetNonSigners() returns the public keys and corresponding percentage of voting power who are not included in the AggregateSignature
+func (x *AggregateSignature) GetNonSigners(valSet *ConsensusValidators) (nonSigners [][]byte, nonSignerPercent int, err ErrorI) {
+	vs, err := NewValidatorSet(valSet)
+	if err != nil {
+		return nil, 0, err
+	}
+	nonSigners, nonSignerPower, err := x.getSigners(vs, true)
+	nonSignerPercent = int(Uint64PercentageDiv(nonSignerPower, vs.TotalPower))
+	return
+}
+
+// getSigners() returns the public keys and corresponding combined voting power of signers or nonsigners
+func (x *AggregateSignature) getSigners(vs ValidatorSet, nonSigners bool) (pubkeys [][]byte, power uint64, err ErrorI) {
+	key := vs.MultiKey.Copy()
+	// set the 'who signed' bitmap in a copy of the key
+	if e := key.SetBitmap(x.Bitmap); e != nil {
+		err = ErrInvalidSignerBitmap(e)
+		return
+	}
+	// iterate through the ValSet to and see if the validator signed
+	power = uint64(0)
+	for i, val := range vs.ValidatorSet.ValidatorSet {
+		// did they sign?
+		signed, er := key.SignerEnabledAt(i)
+		if er != nil {
+			err = ErrInvalidSignerBitmap(er)
+			return
+		}
+		// if so, add to the pubkeys and add to the power
+		if signed && !nonSigners || !signed && nonSigners {
+			pubkeys = append(pubkeys, val.PublicKey)
+			power += val.VotingPower
+		}
+	}
+	return
+}
+
+// GetDoubleSigners() compares the signers of two signatures and return who signed both
+func (x *AggregateSignature) GetDoubleSigners(y *AggregateSignature, vs ValidatorSet) (doubleSigners [][]byte, err ErrorI) {
+	key, key2 := vs.MultiKey.Copy(), vs.MultiKey.Copy()
+	// set the 'who signed' bitmap in a copy of both keys
+	if er := key.SetBitmap(x.Bitmap); er != nil {
+		return nil, ErrInvalidSignerBitmap(er)
+	}
+	if er := key2.SetBitmap(y.Bitmap); er != nil {
+		return nil, ErrInvalidSignerBitmap(er)
+	}
+	// iterate through the ValSet to and see if the validator signed
+	for i, val := range vs.ValidatorSet.ValidatorSet {
+		signed, e := key.SignerEnabledAt(i)
+		if e != nil {
+			return nil, ErrInvalidSignerBitmap(e)
+		}
+		// if signed 1, check if they signed 2 as well
+		if signed {
+			signed, e = key2.SignerEnabledAt(i)
+			if e != nil {
+				return nil, ErrInvalidSignerBitmap(e)
+			}
+			// if signed both, save as a double signer
+			if signed {
+				doubleSigners = append(doubleSigners, val.PublicKey)
+			}
+		}
+	}
+	return
+}
+
+// jsonAggregateSig represents the json.Marshaller and json.Unmarshaler implementation of AggregateSignature
+type jsonAggregateSig struct {
+	Signature HexBytes `json:"signature,omitempty"`
+	Bitmap    HexBytes `json:"bitmap,omitempty"`
 }
 
 // MarshalJSON() implements the json.Marshaller interface
-func (x QuorumCertificate) MarshalJSON() ([]byte, error) {
-	return json.Marshal(jsonQC{
-		Header:      x.Header,
-		Results:     x.Results,
-		ResultsHash: x.ResultsHash,
-		Block:       x.Block,
-		BlockHash:   x.BlockHash,
-		ProposerKey: x.ProposerKey,
-		Signature:   x.Signature,
+func (x AggregateSignature) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonAggregateSig{
+		Signature: x.Signature,
+		Bitmap:    x.Bitmap,
 	})
 }
 
 // UnmarshalJSON() implements the json.Unmarshaler interface
-func (x *QuorumCertificate) UnmarshalJSON(b []byte) (err error) {
-	var j jsonQC
-	if err = json.Unmarshal(b, &j); err != nil {
-		return
+func (x *AggregateSignature) UnmarshalJSON(b []byte) error {
+	var j jsonAggregateSig
+	if err := json.Unmarshal(b, &j); err != nil {
+		return err
 	}
-	*x = QuorumCertificate{
-		Header:      j.Header,
-		Results:     j.Results,
-		ResultsHash: j.ResultsHash,
-		Block:       j.Block,
-		BlockHash:   j.BlockHash,
-		ProposerKey: j.ProposerKey,
-		Signature:   j.Signature,
-	}
+	x.Signature, x.Bitmap = j.Signature, j.Bitmap
 	return nil
 }
 
+// CONSENSUS VALIDATOR LOGIC BELOW
+
+// Root() calculates the Merkle root of the ConsensusValidators
+func (x *ConsensusValidators) Root() ([]byte, ErrorI) {
+	if x == nil || len(x.ValidatorSet) == 0 {
+		return nil, nil
+	}
+	var b [][]byte
+	for _, val := range x.ValidatorSet {
+		bz, err := Marshal(val)
+		if err != nil {
+			return nil, err
+		}
+		b = append(b, bz)
+	}
+	root, _, err := MerkleTree(b)
+	return root, err
+}
+
+// marshalling utility structure for the ConsensusValidator
+// allows easy hex byte marshalling of the public key
+type jsonConsValidator struct {
+	PublicKey   HexBytes `json:"public_key,omitempty"`
+	VotingPower uint64   `json:"voting_power,omitempty"`
+	NetAddress  string   `json:"net_address,omitempty"`
+}
+
+// MarshalJSON() overrides and implements the json.Marshaller interface
+func (x *ConsensusValidator) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&jsonConsValidator{
+		PublicKey:   x.PublicKey,
+		VotingPower: x.VotingPower,
+		NetAddress:  x.NetAddress,
+	})
+}
+
+// UnmarshalJSON() overrides and implements the json.Unmarshaller interface
+func (x *ConsensusValidator) UnmarshalJSON(b []byte) (err error) {
+	j := new(jsonConsValidator)
+	if err = json.Unmarshal(b, j); err != nil {
+		return err
+	}
+	*x = ConsensusValidator{
+		PublicKey:   j.PublicKey,
+		VotingPower: j.VotingPower,
+		NetAddress:  j.NetAddress,
+	}
+	return
+}
+
+// ValidatorFilters are used to filter types of validators from a ValidatorPage
+type ValidatorFilters struct {
+	Unstaking FilterOption `json:"unstaking"`
+	Paused    FilterOption `json:"paused"`
+	Delegate  FilterOption `json:"delegate"`
+}
+
+// On() returns whether there exists any filters
+func (v ValidatorFilters) On() bool {
+	return v.Unstaking != FilterOption_Off || v.Paused != FilterOption_Off || v.Delegate != FilterOption_Off
+}
+
+// FilterOption symbolizes 'condition must be true (yes)' 'condition must be false (no)' or 'filter off (both)' for filters
+type FilterOption int
+
+// nolint:all
+const (
+	FilterOption_Off     FilterOption = 0 // true or false condition
+	FilterOption_MustBe               = 1 // condition must be true
+	FilterOption_Exclude              = 2 // condition must be false
+)
+
 // VIEW CODE BELOW
 
-const MaxRound = 1000 // max round is arbitrarily chosen and may be modified safely
+const MaxRound = 10000 // max round is arbitrarily chosen and may be modified safely
 
 func (x *View) CheckBasic() ErrorI {
 	if x == nil {
@@ -255,7 +330,7 @@ func (x *View) Check(view *View, enforceHeights bool) ErrorI {
 		return ErrWrongHeight()
 	}
 	if enforceHeights && x.CanopyHeight != view.CanopyHeight {
-		return ErrWrongCommitteeHeight()
+		return ErrWrongCanopyHeight()
 	}
 	return nil
 }
@@ -342,29 +417,46 @@ func (x *View) ToString() string {
 
 // jsonView represents the json.Marshaller and json.Unmarshaler implementation of View
 type jsonView struct {
-	Height          uint64 `json:"height"`
-	CommitteeHeight uint64 `json:"committeeHeight"`
-	Round           uint64 `json:"round"`
-	Phase           string `json:"phase"` // string version of phase
-	NetworkID       uint64 `json:"networkID"`
-	CommitteeID     uint64 `json:"committeeID"`
+	Height       uint64 `json:"height"`
+	CanopyHeight uint64 `json:"committeeHeight"`
+	Round        uint64 `json:"round"`
+	Phase        string `json:"phase"` // string version of phase
+	NetworkID    uint64 `json:"networkID"`
+	CommitteeID  uint64 `json:"committeeID"`
 }
 
 // MarshalJSON() implements the json.Marshaller interface
 func (x View) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonView{
-		Height:          x.Height,
-		CommitteeHeight: x.CanopyHeight,
-		Round:           x.Round,
-		Phase:           Phase_name[int32(x.Phase)],
-		NetworkID:       x.NetworkId,
-		CommitteeID:     x.CommitteeId,
+		Height:       x.Height,
+		CanopyHeight: x.CanopyHeight,
+		Round:        x.Round,
+		Phase:        Phase_name[int32(x.Phase)],
+		NetworkID:    x.NetworkId,
+		CommitteeID:  x.CommitteeId,
 	})
 }
 
 // MarshalJSON() implements the json.Marshaller interface
-func (x *Phase) MarshalJSON() ([]byte, error) {
-	return json.Marshal(Phase_name[int32(*x)])
+func (x *View) UnmarshalJSON(b []byte) (err error) {
+	j := new(jsonView)
+	if err = json.Unmarshal(b, j); err != nil {
+		return
+	}
+	*x = View{
+		NetworkId:    j.NetworkID,
+		CommitteeId:  j.CommitteeID,
+		Height:       j.Height,
+		CanopyHeight: j.CanopyHeight,
+		Round:        j.Round,
+		Phase:        Phase(Phase_value[j.Phase]),
+	}
+	return
+}
+
+// MarshalJSON() implements the json.Marshaller interface
+func (x Phase) MarshalJSON() ([]byte, error) {
+	return json.Marshal(Phase_name[int32(x)])
 }
 
 // UnmarshalJSON() implements the json.Unmarshaler interface
@@ -404,7 +496,7 @@ func (x *DoubleSigner) Equals(d *DoubleSigner) bool {
 }
 
 // MarshalJSON() implements the json.Marshaller interface
-func (x *VDF) MarshalJSON() ([]byte, error) {
+func (x VDF) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&jsonVDF{
 		Proof:      x.Proof,
 		Iterations: x.Iterations,

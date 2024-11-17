@@ -59,7 +59,7 @@ message PeerInfo {
 message PeerAddress {
   // public_key: the peer's public key used for cryptographic identity
   bytes public_key = 1;
-  // net_address: the tcp network address of the peer.
+  // net_address: the tcp network address of the peer Ex. tcp://8.8.8.8:8080 or 8.8.8.8:8080
   string net_address = 2;
   // peer_meta: additional metadata about the peer, such as the network ID and chains it supports
   PeerMeta peer_meta = 3;

@@ -40,6 +40,9 @@ type MempoolTx struct {
 
 // NewMempool() creates a new FeeMempool instance of a Mempool
 func NewMempool(config MempoolConfig) Mempool {
+	if config.DropPercentage == 0 {
+		config.DropPercentage = DefaultMempoolConfig().DropPercentage
+	}
 	return &FeeMempool{
 		l:        sync.RWMutex{},
 		hashMap:  make(map[string]struct{}),
@@ -68,7 +71,7 @@ func (f *FeeMempool) AddTransaction(tx []byte, fee uint64) (recheck bool, err Er
 		return false, ErrMaxTxSize()
 	}
 	// insert the transaction into the pool
-	recheck = f.pool.Insert(MempoolTx{
+	recheck = f.pool.insert(MempoolTx{
 		Tx:  tx,
 		Fee: fee,
 	})
@@ -80,9 +83,10 @@ func (f *FeeMempool) AddTransaction(tx []byte, fee uint64) (recheck bool, err Er
 	f.txsBytes += txBytes
 	// assess if limits are exceeded - if so, drop from the bottom
 	var dropped []MempoolTx
-	if uint32(f.count) >= f.config.MaxTransactionCount || uint64(f.txsBytes) >= f.config.MaxTotalBytes {
+	// loop until the conditions are satisfied
+	for uint32(f.count) > f.config.MaxTransactionCount || uint64(f.txsBytes) > f.config.MaxTotalBytes {
 		// drop percentage is configurable
-		dropped = f.pool.Drop(f.config.DropPercentage)
+		dropped = f.pool.drop(f.config.DropPercentage)
 		// for each dropped transaction
 		for _, d := range dropped {
 			// decrement count
@@ -98,7 +102,7 @@ func (f *FeeMempool) AddTransaction(tx []byte, fee uint64) (recheck bool, err Er
 }
 
 // GetTransactions() returns a list of the Transactions from the pool up to 'max collective Transaction bytes'
-func (f *FeeMempool) GetTransactions(maxBytes uint64) (txs [][]byte, totalTxs int) {
+func (f *FeeMempool) GetTransactions(maxBytes uint64) (txs [][]byte, count int) {
 	totalBytes := uint64(0)
 	for _, tx := range f.pool.s {
 		txBytes := len(tx.Tx)
@@ -110,7 +114,7 @@ func (f *FeeMempool) GetTransactions(maxBytes uint64) (txs [][]byte, totalTxs in
 		}
 		// add the tx to the list and increment totalTxs
 		txs = append(txs, tx.Tx)
-		totalTxs++
+		count++
 	}
 	return
 }
@@ -119,7 +123,7 @@ func (f *FeeMempool) GetTransactions(maxBytes uint64) (txs [][]byte, totalTxs in
 func (f *FeeMempool) Contains(hash string) bool {
 	f.l.RLock()
 	defer f.l.RUnlock()
-	if _, has := f.hashMap[hash]; has {
+	if _, contains := f.hashMap[hash]; contains {
 		return true
 	}
 	return false
@@ -129,7 +133,7 @@ func (f *FeeMempool) Contains(hash string) bool {
 func (f *FeeMempool) DeleteTransaction(tx []byte) {
 	f.l.Lock()
 	defer f.l.Unlock()
-	deleted := f.pool.Delete(tx)
+	deleted := f.pool.delete(tx)
 	if deleted.Tx == nil {
 		return
 	}
@@ -178,7 +182,7 @@ type mempoolIterator struct {
 
 // NewMempoolIterator() initializes a new iterator for the mempool transactions
 func NewMempoolIterator(p MempoolTxs) *mempoolIterator {
-	pool := p.Copy() // copy the pool for safe iteration during a parallel
+	pool := p.copy() // copy the pool for safe iteration during a parallel
 	return &mempoolIterator{pool: pool, valid: pool.count != 0}
 }
 
@@ -206,8 +210,8 @@ type MempoolTxs struct {
 	s     []MempoolTx
 }
 
-// Insert() inserts a new tx into the list sorted by the highest fee to the lowest fee
-func (t *MempoolTxs) Insert(tx MempoolTx) (recheck bool) {
+// insert() inserts a new tx into the list sorted by the highest fee to the lowest fee
+func (t *MempoolTxs) insert(tx MempoolTx) (recheck bool) {
 	// The comparison t.s[i].Fee < tr.Fee ensures that the search returns the first position
 	// where the fee is less than the transaction being inserted. This places transactions with
 	// higher fees at the beginning of the slice
@@ -232,8 +236,8 @@ func (t *MempoolTxs) Insert(tx MempoolTx) (recheck bool) {
 	return
 }
 
-// Delete() evicts a transaction from the list and re-order based on the fee
-func (t *MempoolTxs) Delete(tx []byte) (deleted MempoolTx) {
+// delete() evicts a transaction from the list and re-order based on the fee
+func (t *MempoolTxs) delete(tx []byte) (deleted MempoolTx) {
 	index := t.count
 	for i := 0; i < t.count; i++ {
 		// if candidate == target
@@ -255,10 +259,10 @@ func (t *MempoolTxs) Delete(tx []byte) (deleted MempoolTx) {
 	return
 }
 
-// Drop() removes the bottom (the lowest fee) X percent of Transactions
-func (t *MempoolTxs) Drop(percent int) (dropped []MempoolTx) {
+// drop() removes the bottom (the lowest fee) X percent of Transactions
+func (t *MempoolTxs) drop(percent int) (dropped []MempoolTx) {
 	// calculate the percent using integer division
-	numDrop := (t.count * percent) / 100
+	numDrop := (t.count*percent)/100 + 1
 	// decrement count by number evicted
 	t.count -= numDrop
 	// save the evicted list
@@ -268,8 +272,8 @@ func (t *MempoolTxs) Drop(percent int) (dropped []MempoolTx) {
 	return
 }
 
-// Copy() returns a shallow copy of the MempoolTxs
-func (t *MempoolTxs) Copy() *MempoolTxs {
+// copy() returns a shallow copy of the MempoolTxs
+func (t *MempoolTxs) copy() *MempoolTxs {
 	dst := make([]MempoolTx, t.count)
 	copy(dst, t.s)
 	return &MempoolTxs{

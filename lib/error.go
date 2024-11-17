@@ -72,14 +72,14 @@ const (
 	CodeNilBlockHeader              ErrorCode = 10
 	CodeInvalidBlockProposerAddress ErrorCode = 11
 	CodeInvalidBlockHash            ErrorCode = 12
-	CodeNilBlockHash                ErrorCode = 13
+	CodeWrongLengthBlockHash        ErrorCode = 13
 	CodeNilBlockTime                ErrorCode = 14
-	CodeNilLastBlockHash            ErrorCode = 15
+	CodeWrongLengthLastBlockHash    ErrorCode = 15
 	CodeNilNetworkID                ErrorCode = 16
-	CodeNilStateRoot                ErrorCode = 17
-	CodeNilTxRoot                   ErrorCode = 18
-	CodeNilValRoot                  ErrorCode = 19
-	CodeNilNextValRoot              ErrorCode = 20
+	CodeWrongLengthStateRoot        ErrorCode = 17
+	CodeWrongLengthTxRoot           ErrorCode = 18
+	CodeWrongLengthValRoot          ErrorCode = 19
+	CodeWrongLengthNextValRoot      ErrorCode = 20
 	CodeMerkleTree                  ErrorCode = 21
 	CodeUnequalBlockHash            ErrorCode = 22
 	CodeNewPubKeyFromBytes          ErrorCode = 23
@@ -89,6 +89,7 @@ const (
 	CodeInvalidArgument             ErrorCode = 27
 	CodeNilRewardRecipients         ErrorCode = 28
 	CodeNoValidators                ErrorCode = 29
+	CodeInvalidResultsHash          ErrorCode = 30
 
 	// Consensus Module
 	ConsensusModule ErrorModule = "consensus"
@@ -211,7 +212,7 @@ const (
 	CodeInvalidCommitteeID                ErrorCode = 68
 	CodeWrongNetworkID                    ErrorCode = 69
 	CodeInvalidSlashRecipients            ErrorCode = 70
-	CodeCommitteeHeight                   ErrorCode = 71
+	CodeCanopyHeight                      ErrorCode = 71
 	CodeInvalidQCCommitteeHeight          ErrorCode = 72
 	CodeInvalidBadProposer                ErrorCode = 73
 	CodeOrderNotFound                     ErrorCode = 74
@@ -329,8 +330,8 @@ func ErrNilBlock() ErrorI {
 	return NewError(CodeNilBlock, MainModule, "block is nil")
 }
 
-func ErrNilProposal() ErrorI {
-	return NewError(CodeNilBlock, MainModule, "proposal is nil")
+func ErrNilCertificateResults() ErrorI {
+	return NewError(CodeNilBlock, MainModule, "certificate results is nil")
 }
 
 func ErrNilRewardRecipients() ErrorI {
@@ -349,36 +350,40 @@ func ErrInvalidBlockHash() ErrorI {
 	return NewError(CodeInvalidBlockHash, MainModule, "invalid block hash")
 }
 
-func ErrNilBlockHash() ErrorI {
-	return NewError(CodeNilBlockHash, MainModule, "nil block hash")
+func ErrInvalidResultsHash() ErrorI {
+	return NewError(CodeInvalidResultsHash, MainModule, "invalid results hash")
+}
+
+func ErrWrongLengthBlockHash() ErrorI {
+	return NewError(CodeWrongLengthBlockHash, MainModule, "wrong length block hash")
 }
 
 func ErrNilBlockTime() ErrorI {
 	return NewError(CodeNilBlockTime, MainModule, "nil block time")
 }
 
-func ErrNilLastBlockHash() ErrorI {
-	return NewError(CodeNilLastBlockHash, MainModule, "nil last block hash")
+func ErrWrongLengthLastBlockHash() ErrorI {
+	return NewError(CodeWrongLengthLastBlockHash, MainModule, "wrong length last block hash")
 }
 
 func ErrNilNetworkID() ErrorI {
 	return NewError(CodeNilNetworkID, MainModule, "nil network id")
 }
 
-func ErrNilTransactionRoot() ErrorI {
-	return NewError(CodeNilTxRoot, MainModule, "nil transaction root")
+func ErrWrongLengthTransactionRoot() ErrorI {
+	return NewError(CodeWrongLengthTxRoot, MainModule, "wrong length transaction root")
 }
 
-func ErrNilStateRoot() ErrorI {
-	return NewError(CodeNilStateRoot, MainModule, "nil state root")
+func ErrWrongLengthStateRoot() ErrorI {
+	return NewError(CodeWrongLengthStateRoot, MainModule, "wrong length state root")
 }
 
-func ErrNilValidatorRoot() ErrorI {
-	return NewError(CodeNilValRoot, MainModule, "nil validator root")
+func ErrWrongLengthValidatorRoot() ErrorI {
+	return NewError(CodeWrongLengthValRoot, MainModule, "wrong length validator root")
 }
 
-func ErrNilNextValidatorRoot() ErrorI {
-	return NewError(CodeNilNextValRoot, MainModule, "nil next validator root")
+func ErrWrongLengthNextValidatorRoot() ErrorI {
+	return NewError(CodeWrongLengthNextValRoot, MainModule, "wrong length next validator root")
 }
 
 func ErrMerkleTree(err error) ErrorI {
@@ -405,8 +410,8 @@ func ErrWrongHeight() ErrorI {
 	return NewError(CodeWrongHeight, ConsensusModule, "wrong height")
 }
 
-func ErrWrongCommitteeHeight() ErrorI {
-	return NewError(CodeCommitteeHeight, ConsensusModule, "wrong committee height")
+func ErrWrongCanopyHeight() ErrorI {
+	return NewError(CodeCanopyHeight, ConsensusModule, "wrong canopy height")
 }
 
 func ErrInvalidQCCommitteeHeight() ErrorI {
@@ -554,7 +559,7 @@ func ErrInvalidBadProposer() ErrorI {
 }
 
 func ErrMismatchResultsHash() ErrorI {
-	return NewError(CodeMismatchResultsHash, ConsensusModule, "mismatch result hash")
+	return NewError(CodeMismatchResultsHash, ConsensusModule, "mismatch results hash")
 }
 
 func ErrMismatchBlockHash() ErrorI {

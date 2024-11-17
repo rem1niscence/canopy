@@ -10,54 +10,8 @@ import (
 /*
 	This file contains the Canopy implementation of a 'Block' which is used as 'Block bytes' in Committee for Canopy
 	NOTE: other Committees will use other 'Block' implementations dictated by the respective plugins
+	// TODO since block is only specific to Canopy, consider moving this file out of library
 */
-
-// BLOCK CODE BELOW
-
-// Check() 'sanity checks' the Block structure
-func (x *Block) Check(networkID, committeeID uint64) ErrorI {
-	if x == nil {
-		return ErrNilBlock()
-	}
-	return x.BlockHeader.Check(networkID, committeeID)
-}
-
-// Hash() computes, sets, and returns the BlockHash
-func (x *Block) Hash() ([]byte, ErrorI) {
-	return x.BlockHeader.SetHash()
-}
-
-// jsonBlock is the Block implementation of json.Marshaller and json.Unmarshaler
-type jsonBlock struct {
-	BlockHeader  *BlockHeader `json:"block_header,omitempty"`
-	Transactions []HexBytes   `json:"transactions,omitempty"`
-}
-
-// MarshalJSON() implements the json.Marshaller interface
-func (x Block) MarshalJSON() ([]byte, error) {
-	var txs []HexBytes
-	for _, tx := range x.Transactions {
-		txs = append(txs, tx)
-	}
-	return json.Marshal(jsonBlock{
-		BlockHeader:  x.BlockHeader,
-		Transactions: txs,
-	})
-}
-
-// UnmarshalJSON() implements the json.Unmarshaler interface
-func (x *Block) UnmarshalJSON(b []byte) error {
-	var j jsonBlock
-	if err := json.Unmarshal(b, &j); err != nil {
-		return err
-	}
-	var txs [][]byte
-	for _, tx := range j.Transactions {
-		txs = append(txs, tx)
-	}
-	x.BlockHeader, x.Transactions = j.BlockHeader, txs
-	return nil
-}
 
 // BLOCK HEADER CODE BELOW
 
@@ -73,36 +27,38 @@ func (x *BlockHeader) Check(networkID, committeeID uint64) ErrorI {
 	}
 	// check BlockHash size
 	if len(x.Hash) != crypto.HashSize {
-		return ErrNilBlockHash()
+		return ErrWrongLengthBlockHash()
 	}
 	// check StateRoot hash size
 	if len(x.StateRoot) != crypto.HashSize {
-		return ErrNilStateRoot()
+		return ErrWrongLengthStateRoot()
 	}
 	// check TransactionRoot hash size
 	if len(x.TransactionRoot) != crypto.HashSize {
-		return ErrNilTransactionRoot()
+		return ErrWrongLengthTransactionRoot()
 	}
 	// check ValidatorRoot hash size
 	if len(x.ValidatorRoot) != crypto.HashSize {
-		return ErrNilValidatorRoot()
+		return ErrWrongLengthValidatorRoot()
 	}
 	// check NextValidatorRoot hash size
 	if len(x.NextValidatorRoot) != crypto.HashSize {
-		return ErrNilNextValidatorRoot()
+		return ErrWrongLengthNextValidatorRoot()
 	}
 	// check LastBlockHash hash size
 	if len(x.LastBlockHash) != crypto.HashSize {
-		return ErrNilLastBlockHash()
+		return ErrWrongLengthLastBlockHash()
 	}
 	// check the LastQuorumCertificate
 	// no block should be included in this, so set maxBlockSize to 0
 	if err := x.LastQuorumCertificate.CheckBasic(); err != nil {
 		return err
 	}
-	if x.LastQuorumCertificate.Header.NetworkId != networkID {
+	// check network id
+	if uint64(x.NetworkId) != networkID || x.LastQuorumCertificate.Header.NetworkId != networkID {
 		return ErrWrongNetworkID()
 	}
+	// check committee id
 	if x.LastQuorumCertificate.Header.CommitteeId != committeeID {
 		return ErrWrongCommitteeID()
 	}
@@ -114,11 +70,18 @@ func (x *BlockHeader) Check(networkID, committeeID uint64) ErrorI {
 	if x.NetworkId == 0 {
 		return ErrNilNetworkID()
 	}
-	// check for BlockHash validity
+	// save hash in a temp variable
+	tmp := x.Hash
+	// set hash to nil
+	x.Hash = nil
+	// get the header bytes
 	bz, err := Marshal(x)
 	if err != nil {
 		return err
 	}
+	// reset the hash
+	x.Hash = tmp
+	// check got vs expected
 	if !bytes.Equal(x.Hash, crypto.Hash(bz)) {
 		return ErrMismatchBlockHash()
 	}
@@ -164,12 +127,14 @@ func (x BlockHeader) MarshalJSON() ([]byte, error) {
 		Time:                  time.UnixMicro(int64(x.Time)).Format(time.DateTime),
 		NumTxs:                x.NumTxs,
 		TotalTxs:              x.TotalTxs,
+		TotalVdfIterations:    x.TotalVdfIterations,
 		LastBlockHash:         x.LastBlockHash,
 		StateRoot:             x.StateRoot,
 		TransactionRoot:       x.TransactionRoot,
 		ValidatorRoot:         x.ValidatorRoot,
 		NextValidatorRoot:     x.NextValidatorRoot,
 		ProposerAddress:       x.ProposerAddress,
+		VDF:                   x.Vdf,
 		LastQuorumCertificate: x.LastQuorumCertificate,
 	})
 }
@@ -191,14 +156,61 @@ func (x *BlockHeader) UnmarshalJSON(b []byte) error {
 		Time:                  uint64(t.UnixMicro()),
 		NumTxs:                j.NumTxs,
 		TotalTxs:              j.TotalTxs,
+		TotalVdfIterations:    j.TotalVdfIterations,
 		LastBlockHash:         j.LastBlockHash,
 		StateRoot:             j.StateRoot,
 		TransactionRoot:       j.TransactionRoot,
 		ValidatorRoot:         j.ValidatorRoot,
 		NextValidatorRoot:     j.NextValidatorRoot,
 		ProposerAddress:       j.ProposerAddress,
+		Vdf:                   j.VDF,
 		LastQuorumCertificate: j.LastQuorumCertificate,
 	}
+	return nil
+}
+
+// BLOCK CODE BELOW
+
+// Check() 'sanity checks' the Block structure
+func (x *Block) Check(networkID, committeeID uint64) ErrorI {
+	if x == nil {
+		return ErrNilBlock()
+	}
+	return x.BlockHeader.Check(networkID, committeeID)
+}
+
+// Hash() computes, sets, and returns the BlockHash
+func (x *Block) Hash() ([]byte, ErrorI) { return x.BlockHeader.SetHash() }
+
+// jsonBlock is the Block implementation of json.Marshaller and json.Unmarshaler
+type jsonBlock struct {
+	BlockHeader  *BlockHeader `json:"block_header,omitempty"`
+	Transactions []HexBytes   `json:"transactions,omitempty"`
+}
+
+// MarshalJSON() implements the json.Marshaller interface
+func (x Block) MarshalJSON() ([]byte, error) {
+	var txs []HexBytes
+	for _, tx := range x.Transactions {
+		txs = append(txs, tx)
+	}
+	return json.Marshal(jsonBlock{
+		BlockHeader:  x.BlockHeader,
+		Transactions: txs,
+	})
+}
+
+// UnmarshalJSON() implements the json.Unmarshaler interface
+func (x *Block) UnmarshalJSON(b []byte) error {
+	var j jsonBlock
+	if err := json.Unmarshal(b, &j); err != nil {
+		return err
+	}
+	var txs [][]byte
+	for _, tx := range j.Transactions {
+		txs = append(txs, tx)
+	}
+	x.BlockHeader, x.Transactions = j.BlockHeader, txs
 	return nil
 }
 

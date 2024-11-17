@@ -16,14 +16,29 @@ const (
 	BitSize = 2048
 )
 
+// VDFService is a structure that wraps Verifiable Delay Functionality
+// Verifiable Delay Function (VDF) is a cryptographic algorithm that requires a specific,
+// non-parallelizable amount of time to compute, while its result can be quickly and easily verified
+// Here's how it works:
+//   - VDFService.Run() runs the VDF for a pre-defined number of iterations
+//   - There's two paths: Success and Interrupt, either path results in an adjustment in the number of
+//     iterations based on ProcessingTime (how long it took) vs TargetTime (the desired completion time)
+//   - - The success path is a non-interrupted VDF run. This run results in a populated VDFResults object
+//   - - The interrupt path is a premature exit VDF run that has an empty VDFResults object
+//
+// The VDF is designed to handle a single call to Run() always followed by a single call to Finish()
 type VDFService struct {
-	TargetTime     time.Duration // target time should have a pre-baked in 'breathing room' to prevent misses due to accidental overages
-	ProcessTime    time.Duration // how long the last run took
-	Iterations     int           // number of iterations the VDF will currently Run()
-	LastIterations int           // the number of iterations the VDF completed
-	Output         []byte        // the output from the previous VDF run
-	stopChan       chan struct{}
-	running        *atomic.Bool
+	TargetTime time.Duration // the desired completion time of a VDF run, overages are expected, so add 'breathing room'
+	Iterations int           // number of iterations the VDF will currently Run()
+	Results    VDFResults    // the results from the previous VDF run
+	stopChan   chan struct{} // channel to signal an exit for the vdf
+	running    *atomic.Bool  // if the vdf service is currently running
+}
+
+// VDFResults is a structure to contain the result output of a Verifiable Delay Function
+type VDFResults struct {
+	Output     []byte // the VDF proof of iterations completed
+	Iterations int    // the iterations input parameter
 }
 
 // NewVDFService() creates a new instance of the VDF service
@@ -34,6 +49,7 @@ func NewVDFService(targetTime time.Duration) (vdf *VDFService) {
 }
 
 // Run() *blocking call*:  generates a VDF proof using the current params state of the VDF Service object
+// The design is to save the results
 func (vdf *VDFService) Run(seed []byte) {
 	if vdf == nil {
 		return
@@ -43,7 +59,9 @@ func (vdf *VDFService) Run(seed []byte) {
 	if !vdf.running.CompareAndSwap(false, true) {
 		return
 	}
-	// reset the sync variable
+	// clear the results object
+	vdf.Results = VDFResults{}
+	// at the end of this function, reset the sync variable
 	defer vdf.running.Store(false)
 	// track the start time to measure the 'processing time'
 	startTime := time.Now()
@@ -59,9 +77,9 @@ func (vdf *VDFService) Run(seed []byte) {
 		return
 	}
 	// combine the y and proof as that's how it's verified
-	vdf.Output = append(y, proof...)
+	vdf.Results.Output = append(y, proof...)
 	// save iterations of the last run before adjusting
-	vdf.LastIterations = vdf.Iterations
+	vdf.Results.Iterations = vdf.Iterations
 	// adjust the iterations based on completion time
 	vdf.adjustIterations(time.Since(startTime))
 }
@@ -78,10 +96,12 @@ func (vdf *VDFService) Finish() (out []byte, iterations int) {
 		vdf.stopChan <- struct{}{} // NOTE: multiple sequential calls to stop is not supported
 		return
 	}
-	if vdf.Output == nil {
+	// if output is empty, it's a premature exit
+	if vdf.Results.Output == nil {
 		return
 	}
-	return vdf.Output, vdf.LastIterations
+	// return last (run) iterations
+	return vdf.Results.Output, vdf.Results.Iterations
 }
 
 // VerifyVDF() verifies the VDF using the seed, the proof, and the number of iterations

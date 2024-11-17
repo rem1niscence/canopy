@@ -168,7 +168,7 @@ func (p *P2P) ListenForPeerBookRequests() {
 			if err != nil {
 				p.log.Error(err.Error()) // log error
 			}
-		case <-l.C(): // fires when the limiter should reset
+		case <-l.TimeToReset(): // fires when the limiter should reset
 			l.Reset()
 		}
 	}

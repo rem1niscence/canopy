@@ -200,7 +200,7 @@ type PeerAddress struct {
 
 	// public_key: the peer's public key used for cryptographic identity
 	PublicKey []byte `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
-	// net_address: the tcp network address of the peer.
+	// net_address: the tcp network address of the peer Ex. tcp://8.8.8.8:8080 or 8.8.8.8:8080
 	NetAddress string `protobuf:"bytes,2,opt,name=net_address,json=netAddress,proto3" json:"net_address,omitempty"`
 	// peer_meta: additional metadata about the peer, such as the network ID and chains it supports
 	PeerMeta *PeerMeta `protobuf:"bytes,3,opt,name=peer_meta,json=peerMeta,proto3" json:"peer_meta,omitempty"`
