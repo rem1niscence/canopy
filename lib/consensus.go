@@ -114,20 +114,6 @@ func (x *AggregateSignature) Check(sb SignByte, vs ValidatorSet) (isPartialQC bo
 	return false, nil
 }
 
-// Equals() checks if two AggregateSignature instances are identical
-func (x *AggregateSignature) Equals(a *AggregateSignature) bool {
-	if x == nil || a == nil {
-		return false
-	}
-	if !bytes.Equal(x.Signature, a.Signature) {
-		return false
-	}
-	if !bytes.Equal(x.Bitmap, a.Bitmap) {
-		return false
-	}
-	return true
-}
-
 // GetSigners() returns the public keys and corresponding combined voting power of those who signed
 func (x *AggregateSignature) GetSigners(vs ValidatorSet) (signers [][]byte, signedPower uint64, err ErrorI) {
 	signers, signedPower, err = x.getSigners(vs, false)

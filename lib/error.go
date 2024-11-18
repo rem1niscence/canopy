@@ -136,7 +136,10 @@ const (
 	CodeExpectedBlockSizeLimit          ErrorCode = 39
 	CodeNonNilCertResults               ErrorCode = 40
 	CodeInvalidMemo                     ErrorCode = 41
-	CodeNilCertResults                  ErrorCode = 42
+	CodeNilCertResult                   ErrorCode = 42
+	CodeNilBuyOrder                     ErrorCode = 43
+	CodeInvalidBuyerReceiveAddress      ErrorCode = 44
+	CodeEmptyTransaction                ErrorCode = 45
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -188,7 +191,7 @@ const (
 	CodeNonSubsidizedCommittee            ErrorCode = 44
 	CodeInvalidNumberOfSamples            ErrorCode = 45
 	CodeInvalidCertificateResults         ErrorCode = 46
-	CodeInvalidNumRecipients              ErrorCode = 47
+	CodePaymentRecipientsCount            ErrorCode = 47
 	CodeInvalidPercentAllocation          ErrorCode = 48
 	CodeStringToInt                       ErrorCode = 49
 	CodeInvalidParam                      ErrorCode = 50
@@ -330,8 +333,8 @@ func ErrNilBlock() ErrorI {
 	return NewError(CodeNilBlock, MainModule, "block is nil")
 }
 
-func ErrNilCertificateResults() ErrorI {
-	return NewError(CodeNilBlock, MainModule, "certificate results is nil")
+func ErrNilCertificateResult() ErrorI {
+	return NewError(CodeNilCertResult, MainModule, "certificate result is nil")
 }
 
 func ErrNilRewardRecipients() ErrorI {
@@ -534,6 +537,10 @@ func ErrUnknownPageable(s string) ErrorI {
 	return NewError(CodeUnknownPageable, StateMachineModule, fmt.Sprintf("pageable %s is unknown", s))
 }
 
+func ErrEmptyTransaction() ErrorI {
+	return NewError(CodeEmptyTransaction, StateMachineModule, "transaction is empty")
+}
+
 func ErrEmptyMessage() ErrorI {
 	return NewError(CodeEmptyMessage, StateMachineModule, "message is empty")
 }
@@ -570,8 +577,8 @@ func ErrInvalidPercentAllocation() ErrorI {
 	return NewError(CodeInvalidPercentAllocation, StateMachineModule, "invalid percent allocation")
 }
 
-func ErrInvalidNumOfRecipients() ErrorI {
-	return NewError(CodeInvalidNumRecipients, StateMachineModule, "invalid num payment recipients")
+func ErrPaymentRecipientsCount() ErrorI {
+	return NewError(CodePaymentRecipientsCount, StateMachineModule, "invalid payment recipients count")
 }
 
 func ErrWrongNetworkID() ErrorI {
@@ -581,6 +588,7 @@ func ErrWrongNetworkID() ErrorI {
 func ErrWrongCommitteeID() ErrorI {
 	return NewError(CodeWrongCommitteeID, StateMachineModule, "wrong committee id")
 }
+
 func ErrDuplicateTx(hash []byte) ErrorI {
 	return NewError(CodeDuplicateTransaction, ConsensusModule, fmt.Sprintf("tx %s is a duplicate", hex.EncodeToString(hash)))
 }
@@ -588,6 +596,7 @@ func ErrDuplicateTx(hash []byte) ErrorI {
 func ErrMaxTxSize() ErrorI {
 	return NewError(CodeMaxTxSize, StateMachineModule, "max tx size")
 }
+
 func ErrInvalidArgument() ErrorI {
 	return NewError(CodeInvalidArgument, MainModule, "the argument is invalid")
 }
@@ -595,9 +604,19 @@ func ErrInvalidArgument() ErrorI {
 func ErrExpectedMaxBlockSize() ErrorI {
 	return NewError(CodeExpectedBlockSizeLimit, MainModule, "the block size exceeds the expected limit")
 }
+
 func ErrNonNilCertResults() ErrorI {
 	return NewError(CodeNonNilCertResults, MainModule, "the certificate results is not empty")
 }
+
+func ErrNilBuyOrder() ErrorI {
+	return NewError(CodeNilBuyOrder, MainModule, "buy order is nil")
+}
+
+func ErrInvalidBuyerReceiveAddress() ErrorI {
+	return NewError(CodeInvalidBuyerReceiveAddress, MainModule, "invalid buyer receive address")
+}
+
 func ErrNilCertResults() ErrorI {
-	return NewError(CodeNilCertResults, MainModule, "the certificate results is empty")
+	return NewError(CodeNilCertResult, MainModule, "the certificate results is empty")
 }

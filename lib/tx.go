@@ -14,7 +14,7 @@ var (
 	_ TransactionI = &Transaction{} // TransactionI interface enforcement of the Transaction struct
 	_ SignatureI   = &Signature{}   // SignatureI interface enforcement of the Signature struct
 	_ TxResultI    = &TxResult{}    // TxResultI interface enforcement of the TxResult struct
-	_ Pageable     = new(TxResults)
+	_ Pageable     = new(TxResults) // Pageable interface enforcement of the TxResult struct
 )
 
 const (
@@ -22,9 +22,11 @@ const (
 	PendingResultsPageName = "pending-results-page" //  the name of a page of mempool pending transactions
 )
 
+// Messages must be pre-registered for Transaction JSON unmarshalling
 var RegisteredMessages map[string]MessageI
 
 func init() {
+	RegisteredMessages = make(map[string]MessageI)
 	RegisteredPageables[TxResultsPageName] = new(TxResults)      // preregister the page type for unmarshalling
 	RegisteredPageables[PendingResultsPageName] = new(TxResults) // preregister the page type for unmarshalling
 }
@@ -34,12 +36,12 @@ func init() {
 // TxResultI is the model of a completed transaction object after execution
 type TxResultI interface {
 	proto.Message
-	GetSender() []byte
-	GetRecipient() []byte
-	GetMessageType() string
-	GetHeight() uint64
-	GetIndex() uint64
-	GetTxHash() string
+	GetSender() []byte      // the sender of the transaction
+	GetRecipient() []byte   // the receiver of the transaction (i.e. the recipient of a 'send' transaction; empty of not applicable)
+	GetMessageType() string // the type of message the transaction contains
+	GetHeight() uint64      // the block number the transaction is included in
+	GetIndex() uint64       // the index of the transaction in the block
+	GetTxHash() string      // the cryptographic hash of the transaction
 	GetTx() TransactionI
 }
 
@@ -75,15 +77,18 @@ type MessageI interface {
 
 // TRANSACTION CODE BELOW
 
-// Check() is a stateless validation function for a Transaction object
-func (x *Transaction) Check() ErrorI {
+// CheckBasic() is a stateless validation function for a Transaction object
+func (x *Transaction) CheckBasic() ErrorI {
+	if x == nil {
+		return ErrEmptyTransaction()
+	}
 	if x.Msg == nil {
 		return ErrEmptyMessage()
 	}
 	if x.MessageType == "" {
 		return ErrUnknownMessageName(x.MessageType)
 	}
-	if x.Signature == nil {
+	if x.Signature == nil || x.Signature.Signature == nil || x.Signature.PublicKey == nil {
 		return ErrEmptySignature()
 	}
 	if x.Time == 0 {
@@ -104,15 +109,18 @@ func (x *Transaction) GetHash() ([]byte, ErrorI) {
 	return crypto.Hash(bz), nil
 }
 
-// GetSig() accessor for signature field
+// GetSig() accessor for signature field (do not delete: needed to satisfy TransactionI)
 func (x *Transaction) GetSig() SignatureI { return x.Signature }
 
 // GetSignBytes() returns the canonical byte representation of the Transaction for signing and signature verification
 func (x *Transaction) GetSignBytes() ([]byte, ErrorI) {
 	return Marshal(&Transaction{
-		Msg:       x.Msg,
-		Signature: nil,
-		Time:      x.Time,
+		MessageType: x.MessageType,
+		Msg:         x.Msg,
+		Signature:   nil,
+		Time:        x.Time,
+		Fee:         x.Fee,
+		Memo:        x.Memo,
 	})
 }
 
@@ -135,6 +143,7 @@ type jsonTx struct {
 	Signature *Signature      `json:"signature,omitempty"`
 	Time      string          `json:"time,omitempty"`
 	Fee       uint64          `json:"fee,omitempty"`
+	Memo      string          `json:"memo,omitempty"`
 }
 
 // nolint:all
@@ -157,6 +166,7 @@ func (x Transaction) MarshalJSON() ([]byte, error) {
 		Signature: x.Signature,
 		Time:      time.UnixMicro(int64(x.Time)).Format(time.DateTime),
 		Fee:       x.Fee,
+		Memo:      x.Memo,
 	})
 }
 
@@ -188,6 +198,7 @@ func (x *Transaction) UnmarshalJSON(b []byte) error {
 		Signature:   j.Signature,
 		Time:        uint64(t.UnixMicro()),
 		Fee:         j.Fee,
+		Memo:        j.Memo,
 	}
 	return nil
 }

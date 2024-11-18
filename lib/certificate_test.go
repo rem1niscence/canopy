@@ -217,3 +217,173 @@ func TestCertificateSignBytes(t *testing.T) {
 	// check got vs expected
 	require.Equal(t, expected, got)
 }
+
+func TestCertificateResultsCheckBasic(t *testing.T) {
+	tests := []struct {
+		name   string
+		detail string
+		result *CertificateResult
+		error  string
+	}{
+		{
+			name:   "nil",
+			detail: "certificate result is nil or empty",
+			result: nil,
+			error:  "certificate result is nil",
+		},
+		{
+			name:   "nil reward recipient",
+			detail: "reward recipients is nil or empty",
+			result: &CertificateResult{
+				RewardRecipients: nil,
+			},
+			error: "reward recipients is nil",
+		},
+		{
+			name:   "payment recipients count",
+			detail: "there's an invalid number of payment recipients",
+			result: &CertificateResult{
+				RewardRecipients: &RewardRecipients{
+					PaymentPercents: nil,
+				},
+			},
+			error: "invalid payment recipients count",
+		},
+		{
+			name:   "invalid bad proposer",
+			detail: "a bad proposers can't be nil",
+			result: &CertificateResult{
+				RewardRecipients: &RewardRecipients{
+					PaymentPercents: []*PaymentPercents{{
+						Address: newTestAddressBytes(t),
+						Percent: 100,
+					}},
+				},
+				SlashRecipients: &SlashRecipients{
+					BadProposers: [][]byte{nil},
+				},
+			},
+			error: "bad proposer is invalid",
+		},
+		{
+			name:   "invalid double signer",
+			detail: "a double signer can't be nil",
+			result: &CertificateResult{
+				RewardRecipients: &RewardRecipients{
+					PaymentPercents: []*PaymentPercents{{
+						Address: newTestAddressBytes(t),
+						Percent: 100,
+					}},
+				},
+				SlashRecipients: &SlashRecipients{
+					DoubleSigners: []*DoubleSigner{nil},
+				},
+			},
+			error: "double signer is invalid",
+		},
+		{
+			name:   "nil buy order",
+			detail: "a buy order cannot be nil",
+			result: &CertificateResult{
+				RewardRecipients: &RewardRecipients{
+					PaymentPercents: []*PaymentPercents{{
+						Address: newTestAddressBytes(t),
+						Percent: 100,
+					}},
+				},
+				Orders: &Orders{
+					BuyOrders: []*BuyOrder{
+						nil,
+					},
+				},
+			},
+			error: "buy order is nil",
+		},
+		{
+			name:   "invalid buy order",
+			detail: "a buy order receive address is invalid",
+			result: &CertificateResult{
+				RewardRecipients: &RewardRecipients{
+					PaymentPercents: []*PaymentPercents{{
+						Address: newTestAddressBytes(t),
+						Percent: 100,
+					}},
+				},
+				Orders: &Orders{
+					BuyOrders: []*BuyOrder{
+						{
+							OrderId:             0,
+							BuyerReceiveAddress: nil,
+							BuyerChainDeadline:  0,
+						},
+					},
+				},
+			},
+			error: "invalid buyer receive address",
+		},
+		{
+			name:   "invalid checkpoint hash",
+			detail: "a checkpoint hash is invalid",
+			result: &CertificateResult{
+				RewardRecipients: &RewardRecipients{
+					PaymentPercents: []*PaymentPercents{{
+						Address: newTestAddressBytes(t),
+						Percent: 100,
+					}},
+				},
+				Checkpoint: &Checkpoint{
+					Height:    0,
+					BlockHash: bytes.Repeat([]byte("F"), 101),
+				},
+			},
+			error: "invalid block hash",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// execute function call
+			err := test.result.CheckBasic()
+			// validate if an error is expected
+			require.Equal(t, err != nil, test.error != "", err)
+			// validate actual error if any
+			if err != nil {
+				require.ErrorContains(t, err, test.error)
+			}
+		})
+	}
+}
+
+func TestCheckpointHash(t *testing.T) {
+	// pre-define a certificate result object
+	result := &CertificateResult{
+		RewardRecipients: &RewardRecipients{
+			PaymentPercents: []*PaymentPercents{{
+				Address: newTestAddressBytes(t),
+				Percent: 100,
+			}},
+		},
+		Orders: &Orders{
+			BuyOrders: []*BuyOrder{
+				{
+					OrderId:             0,
+					BuyerReceiveAddress: newTestAddressBytes(t),
+					BuyerChainDeadline:  0,
+				},
+			},
+			ResetOrders: []uint64{0},
+			CloseOrders: []uint64{1},
+		},
+		Checkpoint: &Checkpoint{
+			Height:    1,
+			BlockHash: []byte("hash"),
+		},
+	}
+	// calculate expected
+	bz, err := Marshal(result)
+	require.NoError(t, err)
+	expected := crypto.Hash(bz)
+	// execute function call
+	got := result.Hash()
+	// compare got vs expected
+	require.Equal(t, expected, got)
+}

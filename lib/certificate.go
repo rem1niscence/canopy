@@ -143,33 +143,6 @@ func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommi
 	return nil
 }
 
-// Equals() checks the equality of the current QC against the parameter QC
-// equals rejects nil QCs
-func (x *QuorumCertificate) Equals(qc *QuorumCertificate) bool {
-	if x == nil || qc == nil {
-		return false
-	}
-	if !x.Header.Equals(qc.Header) {
-		return false
-	}
-	if !bytes.Equal(x.ProposerKey, qc.ProposerKey) {
-		return false
-	}
-	if !bytes.Equal(x.BlockHash, qc.BlockHash) {
-		return false
-	}
-	if !bytes.Equal(x.Block, qc.Block) {
-		return false
-	}
-	if !bytes.Equal(x.ResultsHash, qc.ResultsHash) {
-		return false
-	}
-	if !x.Results.Equals(qc.Results) {
-		return false
-	}
-	return x.Signature.Equals(qc.Signature)
-}
-
 // GetNonSigners() returns the public keys and the percentage (of voting power out of total) of those who did not sign the QC
 func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) (nonSigners [][]byte, nonSignerPercent int, err ErrorI) {
 	if x == nil || x.Signature == nil {
@@ -217,6 +190,236 @@ func (x *QuorumCertificate) UnmarshalJSON(b []byte) (err error) {
 		BlockHash:   j.BlockHash,
 		ProposerKey: j.ProposerKey,
 		Signature:   j.Signature,
+	}
+	return nil
+}
+
+// 	A CertificateResult contains Canopy information for what happens to stakeholders as a result of the BFT
+
+// CERTIFICATE RESULT CODE BELOW
+
+// CheckBasic() provides basic 'sanity' checks on the CertificateResult structure
+func (x *CertificateResult) CheckBasic() ErrorI {
+	if x == nil {
+		return ErrNilCertificateResult()
+	}
+	if err := x.RewardRecipients.CheckBasic(); err != nil {
+		return err
+	}
+	if err := x.SlashRecipients.CheckBasic(); err != nil {
+		return err
+	}
+	if err := x.Orders.CheckBasic(); err != nil {
+		return err
+	}
+	return x.Checkpoint.CheckBasic()
+}
+
+// Hash() returns the cryptographic hash of the canonical Sign Bytes of the CertificateResult
+func (x *CertificateResult) Hash() []byte {
+	bz, _ := Marshal(x)
+	return crypto.Hash(bz)
+}
+
+// AwardPercents() adds reward distribution PaymentPercent samples to the CertificateResult structure
+// NOTE: percents should not exceed 100% in a single sample
+func (x *CertificateResult) AwardPercents(percents []*PaymentPercents) ErrorI {
+	x.RewardRecipients.NumberOfSamples++
+	for _, ep := range percents {
+		x.addPercents(ep.Address, ep.Percent)
+	}
+	return nil
+}
+
+// addPercents() is a helper function that adds reward distribution percents on behalf of an address
+func (x *CertificateResult) addPercents(address []byte, percent uint64) {
+	// check to see if the address already has samples
+	for i, ep := range x.RewardRecipients.PaymentPercents {
+		if bytes.Equal(address, ep.Address) {
+			x.RewardRecipients.PaymentPercents[i].Percent += ep.Percent
+			return
+		}
+	}
+	// if not, append a sample to PaymentPercents
+	x.RewardRecipients.PaymentPercents = append(x.RewardRecipients.PaymentPercents, &PaymentPercents{
+		Address: address,
+		Percent: percent,
+	})
+}
+
+// REWARD RECIPIENT CODE BELOW
+
+// CheckBasic() performs a basic 'sanity check' on the structure
+func (x *RewardRecipients) CheckBasic() (err ErrorI) {
+	if x == nil {
+		return ErrNilRewardRecipients()
+	}
+	// validate the number of recipients
+	paymentRecipientCount := len(x.PaymentPercents)
+	// ensure not zero or bigger than 25
+	if paymentRecipientCount == 0 || paymentRecipientCount > 25 {
+		return ErrPaymentRecipientsCount()
+	}
+	// validate the percents add up to 100 (or less)
+	totalPercent := uint64(0)
+	for _, pp := range x.PaymentPercents {
+		// ensure each percent isn't nil
+		if pp == nil {
+			return ErrInvalidPercentAllocation()
+		}
+		// ensure each percent address is the right size
+		if len(pp.Address) != crypto.AddressSize {
+			return ErrInvalidAddress()
+		}
+		// ensure each percent isn't 0
+		if pp.Percent == 0 {
+			return ErrInvalidPercentAllocation()
+		}
+		// add to total
+		totalPercent += pp.Percent
+		// ensure the percent doesn't exceed 100
+		if totalPercent > 100 {
+			return ErrInvalidPercentAllocation()
+		}
+	}
+	return
+}
+
+// jsonRewardRecipients is the RewardRecipients implementation of json.Marshaller and json.Unmarshaler
+type jsonRewardRecipients struct {
+	PaymentPercents []*PaymentPercents `json:"payment_percents,omitempty"` // recipients of the block reward by percentage
+	NumberOfSamples uint64             `json:"number_of_samples,omitempty"`
+}
+
+// UnmarshalJSON() satisfies the json.Unmarshaler interface
+func (x *RewardRecipients) UnmarshalJSON(i []byte) error {
+	j := new(jsonRewardRecipients)
+	if err := json.Unmarshal(i, j); err != nil {
+		return err
+	}
+	*x = RewardRecipients{
+		PaymentPercents: j.PaymentPercents,
+		NumberOfSamples: j.NumberOfSamples,
+	}
+	return nil
+}
+
+// MarshalJSON() satisfies the json.Marshaller interface
+func (x *RewardRecipients) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonRewardRecipients{
+		PaymentPercents: x.PaymentPercents,
+		NumberOfSamples: x.NumberOfSamples,
+	})
+}
+
+// PAYMENT PERCENTS CODE BELOW
+
+// paymentPercents is the PaymentPercents implementation of json.Marshaller and json.Unmarshaler
+type paymentPercents struct {
+	Address  HexBytes `json:"address"`
+	Percents uint64   `json:"percents"`
+}
+
+// MarshalJSON() satisfies the json.Marshaller interface
+func (x *PaymentPercents) MarshalJSON() ([]byte, error) {
+	return json.Marshal(paymentPercents{
+		Address:  x.Address,
+		Percents: x.Percent,
+	})
+}
+
+// UnmarshalJSON() satisfies the json.Unmarshaler interface
+func (x *PaymentPercents) UnmarshalJSON(b []byte) error {
+	var ep paymentPercents
+	if err := json.Unmarshal(b, &ep); err != nil {
+		return err
+	}
+	x.Address, x.Percent = ep.Address, ep.Percents
+	return nil
+}
+
+// SLASH RECIPIENTS CODE BELOW
+
+// CheckBasic() validates the ProposalMeta structure
+func (x *SlashRecipients) CheckBasic() ErrorI {
+	if x != nil {
+		for _, r := range x.BadProposers {
+			if r == nil {
+				return ErrInvalidBadProposer()
+			}
+		}
+		for _, r := range x.DoubleSigners {
+			if r == nil {
+				return ErrInvalidDoubleSigner()
+			}
+		}
+	}
+	return nil
+}
+
+// jsonSlashRecipients is the SlashRecipients implementation of json.Marshaller and json.Unmarshaler
+type jsonSlashRecipients struct {
+	DoubleSigners []*DoubleSigner `json:"double_signers,omitempty"` // who did the bft decide was a double signer
+	BadProposers  []HexBytes      `json:"bad_proposers,omitempty"`  // who did the bft decide was a bad proposer
+}
+
+// UnmarshalJSON() satisfies the json.Unmarshaler interface
+func (x *SlashRecipients) UnmarshalJSON(i []byte) error {
+	j := new(jsonSlashRecipients)
+	if err := json.Unmarshal(i, j); err != nil {
+		return err
+	}
+	var badProposers [][]byte
+	for _, bp := range j.BadProposers {
+		badProposers = append(badProposers, bp)
+	}
+	*x = SlashRecipients{
+		DoubleSigners: j.DoubleSigners,
+		BadProposers:  badProposers,
+	}
+	return nil
+}
+
+// MarshalJSON() satisfies the json.Marshaller interface
+func (x *SlashRecipients) MarshalJSON() ([]byte, error) {
+	var badProposers []HexBytes
+	for _, bp := range x.BadProposers {
+		badProposers = append(badProposers, bp)
+	}
+	return json.Marshal(jsonSlashRecipients{
+		DoubleSigners: x.DoubleSigners,
+		BadProposers:  badProposers,
+	})
+}
+
+// ORDERS CODE BELOW
+
+// CheckBasic() performs stateless validation on an Orders object
+func (x *Orders) CheckBasic() ErrorI {
+	if x == nil {
+		return nil
+	}
+	// check the buy orders
+	for _, buy := range x.BuyOrders {
+		if buy == nil {
+			return ErrNilBuyOrder()
+		}
+		if buy.BuyerReceiveAddress == nil {
+			return ErrInvalidBuyerReceiveAddress()
+		}
+	}
+	return nil
+}
+
+// CHECKPOINT CODE BELOW
+
+// CheckBasic() performs stateless validation on a Checkpoint object
+func (x *Checkpoint) CheckBasic() ErrorI {
+	if x == nil {
+		return nil
+	}
+	if len(x.BlockHash) > 100 {
+		return ErrInvalidBlockHash()
 	}
 	return nil
 }

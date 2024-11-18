@@ -22,7 +22,7 @@ func (b *BFT) HandleMessage(message proto.Message) lib.ErrorI {
 				b.log.Errorf("Received invalid vote from %s", lib.BytesToString(msg.Signature.PublicKey))
 				return err
 			}
-			b.log.Debugf("Received %s message from replica: %s", msg.Qc.Header.ToString(), lib.BzToTruncStr(msg.Signature.PublicKey))
+			b.log.Debugf("Received %s message from replica: %s", msg.Qc.Header.ToString(), lib.BytesToTruncatedString(msg.Signature.PublicKey))
 			// store pacemaker messages separate from 'votes'
 			if msg.IsPacemakerMessage() {
 				return b.AddPacemakerMessage(msg)
@@ -36,10 +36,10 @@ func (b *BFT) HandleMessage(message proto.Message) lib.ErrorI {
 				b.log.Errorf("Received invalid proposal from %s", lib.BytesToString(msg.Signature.PublicKey))
 				return err
 			}
-			b.log.Debugf("Received %s message from proposer: %s", msg.Header.ToString(), lib.BzToTruncStr(msg.Signature.PublicKey))
+			b.log.Debugf("Received %s message from proposer: %s", msg.Header.ToString(), lib.BytesToTruncatedString(msg.Signature.PublicKey))
 			// store partial QCs as they may be indicative of byzantine behavior
 			if partialQC {
-				b.log.Errorf("Received partial QC from proposer %s", lib.BzToTruncStr(msg.Signature.PublicKey))
+				b.log.Errorf("Received partial QC from proposer %s", lib.BytesToTruncatedString(msg.Signature.PublicKey))
 				return b.AddPartialQC(msg)
 			}
 			// store Proposal

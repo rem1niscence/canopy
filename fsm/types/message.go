@@ -28,7 +28,6 @@ const (
 
 func init() {
 	// Register all messages types for conversion of bytes to the correct MessageI implementation
-	lib.RegisteredMessages = make(map[string]lib.MessageI)
 	lib.RegisteredMessages[MessageSendName] = new(MessageSend)
 	lib.RegisteredMessages[MessageStakeName] = new(MessageStake)
 	lib.RegisteredMessages[MessageEditStakeName] = new(MessageEditStake)
@@ -440,7 +439,7 @@ func (x *MessageCertificateResults) Check() lib.ErrorI {
 	if err := checkCommitteeId(x.Qc.Header.CommitteeId); err != nil {
 		return err
 	}
-	if err := lib.CheckPaymentPercentsSample(results.RewardRecipients.PaymentPercents); err != nil {
+	if err := results.RewardRecipients.CheckBasic(); err != nil {
 		return err
 	}
 	if results.RewardRecipients.NumberOfSamples != 0 {

@@ -229,7 +229,7 @@ func TestEndBlock(t *testing.T) {
 						// full_reward = ROUND_DOWN( percentage / number_of_samples * available_reward )
 						fullReward := uint64(float64(paymentPercents.Percent) / float64(len(committeeData)*100) * float64(test.committeeRewardAmount))
 						// if not compounding, use the early withdrawal reward
-						earlyWithdrawalReward := lib.Uint64ReducePercentage(fullReward, float64(valParams.ValidatorEarlyWithdrawalPenalty))
+						earlyWithdrawalReward := lib.Uint64ReducePercentage(fullReward, valParams.ValidatorEarlyWithdrawalPenalty)
 						require.NoError(t, err)
 						// compare got and expected
 						require.Equal(t, earlyWithdrawalReward, account.Amount)
@@ -428,7 +428,7 @@ func (s *StateMachine) calculateRewardPerCommittee(t *testing.T, numberOfSubsidi
 	// each halving, the reward is divided by 2
 	totalMintAmount := uint64(float64(types.InitialTokensPerBlock) / (math.Pow(2, halvings)))
 	// calculate the amount left for the committees after the parameterized DAO cut
-	mintAmountAfterDAOCut := lib.Uint64ReducePercentage(totalMintAmount, float64(govParams.DaoRewardPercentage))
+	mintAmountAfterDAOCut := lib.Uint64ReducePercentage(totalMintAmount, govParams.DaoRewardPercentage)
 	// calculate the DAO cut
 	daoCut = totalMintAmount - mintAmountAfterDAOCut
 	// calculate the amount given to each qualifying committee

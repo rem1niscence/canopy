@@ -26,25 +26,21 @@ func init() {
 type PoolPage []*Pool
 
 // PoolPage satisfies the Page interface
-func (p *PoolPage) Len() int          { return len(*p) }
 func (p *PoolPage) New() lib.Pageable { return &PoolPage{} }
 
 type AccountPage []*Account
 
 // AccountPage satisfies the Page interface
-func (p *AccountPage) Len() int          { return len(*p) }
 func (p *AccountPage) New() lib.Pageable { return &AccountPage{} }
 
 type ValidatorPage []*Validator
 
 // ValidatorPage satisfies the Page interface
-func (p *ValidatorPage) Len() int          { return len(*p) }
 func (p *ValidatorPage) New() lib.Pageable { return &ValidatorPage{{}} }
 
 type ConsValidatorPage []*lib.ConsensusValidator
 
 // ConsValidatorPage satisfies the Page interface
-func (p *ConsValidatorPage) Len() int          { return len(*p) }
 func (p *ConsValidatorPage) New() lib.Pageable { return &ConsValidatorPage{{}} }
 
 type NonSigners []*NonSigner

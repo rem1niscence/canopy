@@ -1,6 +1,12 @@
 # CHANGELOG
 
+## [Unreleased] - 11/18/2024
+
+- Added unit tests to `lib` directory
+- Updated Changelog
+
 ## [Unreleased] - 11/12/2024
+
 - Improved vdf file comments
 
 ## [Unreleased] - 11/11/2024

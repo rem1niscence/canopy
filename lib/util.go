@@ -3,7 +3,6 @@ package lib
 import (
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -20,12 +19,12 @@ var RegisteredPageables = make(map[string]Pageable)
 
 // Page is a pagination wrapper over a slice of data
 type Page struct {
-	PageParams
-	Results    Pageable `json:"results"`
-	Type       string   `json:"type"`
-	Count      int      `json:"count"`
-	TotalPages int      `json:"totalPages"`
-	TotalCount int      `json:"totalCount"`
+	PageParams          // the input parameters for the page
+	Results    Pageable `json:"results"`    // the actual returned array of items
+	Type       string   `json:"type"`       // the type of the page
+	Count      int      `json:"count"`      // count of items included in the page
+	TotalPages int      `json:"totalPages"` // number of pages that exist based on these page parameters
+	TotalCount int      `json:"totalCount"` // count of items that exist
 }
 
 // PageParams are the input parameters to calculate the proper page
@@ -34,31 +33,8 @@ type PageParams struct {
 	PerPage    int `json:"perPage"`
 }
 
-// SkipToIndex() sanity checks params and then determines the first index of the page
-func (p *PageParams) SkipToIndex() int {
-	defaultPerPage, maxPerPage := 10, 5000
-	if p.PerPage == 0 {
-		p.PerPage = defaultPerPage
-	}
-	if p.PerPage > maxPerPage {
-		p.PerPage = maxPerPage
-	}
-	// start page count at 1 not 0
-	if p.PageNumber == 0 {
-		p.PageNumber = 1
-	}
-	if p.PageNumber == 1 {
-		return 0
-	}
-	lastPage := p.PageNumber - 1
-	return lastPage * p.PerPage
-}
-
 // Pageable() is a simple interface that represents Page structures
-type Pageable interface {
-	New() Pageable
-	Len() int
-}
+type Pageable interface{ New() Pageable }
 
 // NewPage() returns a new instance of the Page object from the params and pageType
 // Load() or LoadArray() is the likely next function call
@@ -66,7 +42,6 @@ func NewPage(p PageParams, pageType string) *Page { return &Page{PageParams: p, 
 
 // Load() fills a page from an IteratorI
 func (p *Page) Load(storePrefix []byte, newestToOldest bool, results Pageable, db RStoreI, callback func(k, v []byte) ErrorI) (err ErrorI) {
-	// retrieve the iterator
 	var it IteratorI
 	// set the page results so that even if it's a zero page, it will have a castable type
 	p.Results = results
@@ -83,21 +58,26 @@ func (p *Page) Load(storePrefix []byte, newestToOldest bool, results Pageable, d
 	}
 	defer it.Close()
 	// skip to index makes the starting point appropriate based on the page params
-	pageStartIndex := p.SkipToIndex()
-	for countOnly, i := false, 0; it.Valid(); func() { it.Next(); i++ }() {
+	// initialize variable to indicate if the loop is counting only or actually populating
+	pageStartIndex, countOnly := p.skipToIndex(), false
+	// execute the loop
+	for ; it.Valid(); it.Next() {
+		// pre-increment total count to ensure each iteration of the loop is counted including if !it.Valid() or `countOnly`
 		p.TotalCount++
-		if i < pageStartIndex || countOnly {
+		// while count is below the start page index (LTE because we pre-increment)
+		if p.TotalCount <= pageStartIndex || countOnly {
 			continue
 		}
-		// if reached end of the desired page
-		if i == pageStartIndex+p.PerPage {
+		// if reached end of the desired page (+1 because we pre-increment)
+		if p.TotalCount == pageStartIndex+p.PerPage+1 {
 			countOnly = true // switch to only counts
 			continue
 		}
+		// execute the callback; passing key and value
 		if e := callback(it.Key(), it.Value()); e != nil {
 			return e
 		}
-
+		// set the results and increment the count
 		p.Results = results
 		p.Count++
 	}
@@ -113,27 +93,52 @@ func (p *Page) LoadArray(slice any, results Pageable, callback func(i any) Error
 		return ErrInvalidArgument()
 	}
 	// skip to index makes the starting point appropriate based on the page params
-	pageStartIndex, size := p.SkipToIndex(), arr.Len()
-	for i, countOnly := 0, false; i < size; i++ {
+	pageStartIndex, size := p.skipToIndex(), arr.Len()
+	// initialize variable to indicate if the loop is counting only or actually populating
+	countOnly := false
+	for p.TotalCount < size {
+		// pre-increment total count to ensure each iteration of the loop is counted including if p.TotalCount > size or `countOnly`
 		p.TotalCount++
-		if i < pageStartIndex || countOnly {
+		// while count is below the start page index (LTE because we pre-increment)
+		if p.TotalCount <= pageStartIndex || countOnly {
 			continue
 		}
-		elem := arr.Index(i).Interface()
+		elem := arr.Index(p.TotalCount - 1).Interface()
 		if e := callback(elem); e != nil {
 			return e
 		}
-		// if reached end of the desired page
-		if i == pageStartIndex+p.PerPage {
+		// if reached end of the desired page (+1 because we pre-increment)
+		if p.TotalCount-1 == pageStartIndex+p.PerPage {
 			countOnly = true // switch to only counts
 			continue
 		}
+		// set the results and increment the count
 		p.Results = results
 		p.Count++
 	}
 	// calculate total pages
 	p.TotalPages = int(math.Ceil(float64(p.TotalCount) / float64(p.PerPage)))
 	return
+}
+
+// skipToIndex() sanity checks params and then determines the first index of the page
+func (p *PageParams) skipToIndex() int {
+	defaultPerPage, maxPerPage := 10, 5000
+	if p.PerPage == 0 {
+		p.PerPage = defaultPerPage
+	}
+	if p.PerPage > maxPerPage {
+		p.PerPage = maxPerPage
+	}
+	// start page count at 1 not 0
+	if p.PageNumber == 0 {
+		p.PageNumber = 1
+	}
+	if p.PageNumber == 1 {
+		return 0
+	}
+	lastPage := p.PageNumber - 1
+	return lastPage * p.PerPage
 }
 
 // UnmarshalJSON() overrides the unmarshalling logic of the
@@ -248,27 +253,26 @@ func BytesToString(b []byte) string {
 	return hex.EncodeToString(b)
 }
 
-// BzToTruncStr() converts a byte slice to a truncated hexadecimal string
-func BzToTruncStr(b []byte) string {
+// StringToBytes() converts a hexadecimal string back into a byte slice
+func StringToBytes(s string) ([]byte, ErrorI) {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		return nil, ErrStringToBytes(err)
+	}
+	return b, nil
+}
+
+// BytesToTruncatedString() converts a byte slice to a truncated hexadecimal string
+func BytesToTruncatedString(b []byte) string {
 	if len(b) > 10 {
 		return hex.EncodeToString(b[:10])
 	}
 	return hex.EncodeToString(b)
 }
 
-// StringToBytes() converts a hexadecimal string back into a byte slice
-func StringToBytes(s string) ([]byte, ErrorI) {
-	b, err := hex.DecodeString(s)
-	if err != nil {
-		fmt.Println(s)
-		return nil, ErrStringToBytes(err)
-	}
-	return b, nil
-}
-
 // PublicKeyFromBytes() converts a byte slice into a BLS public key
 func PublicKeyFromBytes(pubKey []byte) (crypto.PublicKeyI, ErrorI) {
-	publicKey, err := crypto.BytesToBLS12381Public(pubKey)
+	publicKey, err := crypto.NewPublicKeyFromBytes(pubKey)
 	if err != nil {
 		return nil, ErrPubKeyFromBytes(err)
 	}
@@ -284,18 +288,21 @@ func MerkleTree(items [][]byte) (root []byte, tree [][]byte, err ErrorI) {
 	return
 }
 
-// BigGreater() compares two big.Int values and returns true if the first is greater
-func BigGreater(a *big.Int, b *big.Int) bool { return a.Cmp(b) == 1 }
-
 // BigLess() compares two big.Int values and returns true if the first is less
 func BigLess(a *big.Int, b *big.Int) bool { return a.Cmp(b) == -1 }
 
 // Uint64PercentageDiv() calculates the percentage from dividend/divisor
-func Uint64PercentageDiv(dividend, divisor uint64) (res uint64) {
+func Uint64PercentageDiv(dividend, divisor uint64) (percent uint64) {
 	if dividend == 0 || divisor == 0 {
 		return 0
 	}
-	return (dividend * 100) / divisor
+	// calculate the percent
+	percent = (dividend * 100) / divisor
+	// ensure the percent can't exceed 100
+	if percent > 100 {
+		percent = 100
+	}
+	return percent
 }
 
 // Uint64Percentage() calculates the result of a percentage of an amount
@@ -310,7 +317,7 @@ func Uint64Percentage(amount uint64, percentage uint64) (res uint64) {
 }
 
 // Uint64ReducePercentage() reduces an amount by a specified percentage
-func Uint64ReducePercentage(amount uint64, percentage float64) (res uint64) {
+func Uint64ReducePercentage(amount uint64, percentage uint64) (res uint64) {
 	if percentage >= 100 || amount == 0 {
 		return 0
 	}
@@ -412,11 +419,4 @@ func Delimit(toAppend ...[]byte) (res []byte) {
 		res = append(res, withTerminatingDelim...)
 	}
 	return
-}
-
-// Copy() copies the byte slice and returns the copy
-func Copy(b []byte) []byte {
-	c := make([]byte, len(b))
-	copy(c, b)
-	return c
 }

@@ -405,7 +405,7 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 	}
 	// reduce all payment percents proportional to the non-signer percent
 	for i, p := range results.RewardRecipients.PaymentPercents {
-		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, float64(nonSignerPercent))
+		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, uint64(nonSignerPercent))
 	}
 	// update the committee data
 	return s.UpsertCommitteeData(&types.CommitteeData{

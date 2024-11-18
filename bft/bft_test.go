@@ -251,9 +251,9 @@ func TestStartProposePhase(t *testing.T) {
 				require.Equal(t, expectedAggSig, msg.Qc.Signature.Signature)
 				if test.hasBE {
 					expectedBPE, expectedDSE := c.newTestBadProposerEvidence(t), c.newTestDoubleSignEvidence(t)
-					require.True(t, expectedBPE[0].ElectionVoteQc.Equals(msg.BadProposerEvidence[0].ElectionVoteQc))
-					require.True(t, expectedDSE[0].VoteA.Equals(msg.LastDoubleSignEvidence[0].VoteA))
-					require.True(t, expectedDSE[0].VoteB.Equals(msg.LastDoubleSignEvidence[0].VoteB))
+					require.EqualExportedValues(t, expectedBPE[0].ElectionVoteQc, msg.BadProposerEvidence[0].ElectionVoteQc)
+					require.EqualExportedValues(t, expectedDSE[0].VoteA, msg.LastDoubleSignEvidence[0].VoteA)
+					require.EqualExportedValues(t, expectedDSE[0].VoteB, msg.LastDoubleSignEvidence[0].VoteB)
 				}
 				if test.hasLivenessHQC || test.hasSafetyHQC {
 					require.Equal(t, msg.Qc.BlockHash, c.setupTestableHighQC(t, test.hasLivenessHQC, true).BlockHash)

@@ -219,9 +219,6 @@ func (x *Block) UnmarshalJSON(b []byte) error {
 // BlockResults is a collection of Blocks containing their TransactionResults and Meta after commitment
 type BlockResults []*BlockResult
 
-// Len() Satisfies the pageable interface
-func (b *BlockResults) Len() int { return len(*b) }
-
 // New() Satisfies the pageable interface
 func (b *BlockResults) New() Pageable { return &BlockResults{} }
 

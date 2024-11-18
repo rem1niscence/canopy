@@ -37,7 +37,7 @@ func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
 		return nil
 	}
 	// calculate the amount left for the committees after the parameterized DAO cut
-	mintAmountAfterDAOCut := lib.Uint64ReducePercentage(totalMintAmount, float64(govParams.DaoRewardPercentage))
+	mintAmountAfterDAOCut := lib.Uint64ReducePercentage(totalMintAmount, govParams.DaoRewardPercentage)
 	// calculate the DAO cut
 	daoCut := totalMintAmount - mintAmountAfterDAOCut
 	// mint to the DAO account
@@ -130,7 +130,7 @@ func (s *StateMachine) DistributeCommitteeReward(stub *lib.PaymentPercents, rewa
 	// full_reward = truncate ( percentage / number_of_samples * available_reward )
 	fullReward := uint64(float64(stub.Percent) / float64(numberOfSamples*100) * float64(rewardPoolAmount))
 	// if not compounding, use the early withdrawal reward
-	earlyWithdrawalReward := lib.Uint64ReducePercentage(fullReward, float64(valParams.ValidatorEarlyWithdrawalPenalty))
+	earlyWithdrawalReward := lib.Uint64ReducePercentage(fullReward, valParams.ValidatorEarlyWithdrawalPenalty)
 	// check if is validator
 	validator, _ := s.GetValidator(address)
 	// if non validator, send EarlyWithdrawalReward to the address

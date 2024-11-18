@@ -548,7 +548,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 					// ensure no longer is a valid double signer
 					require.False(t, sm.IsValidDoubleSigner(height, validator.Address))
 					// re-calculate the expected
-					expected = lib.Uint64ReducePercentage(expected, float64(valParams.ValidatorDoubleSignSlashPercentage))
+					expected = lib.Uint64ReducePercentage(expected, valParams.ValidatorDoubleSignSlashPercentage)
 				}
 				// validate the slash
 				require.Equal(t, validator.StakedAmount, expected)
@@ -633,7 +633,7 @@ func TestHandleBadProposers(t *testing.T) {
 				validator, e := sm.GetValidator(pubs[i].Address())
 				require.NoError(t, e)
 				// calculate the expected stake after slash
-				expected := lib.Uint64ReducePercentage(stakeAmount, float64(valParams.ValidatorBadProposalSlashPercentage))
+				expected := lib.Uint64ReducePercentage(stakeAmount, valParams.ValidatorBadProposalSlashPercentage)
 				// validate the slash
 				require.Equal(t, validator.StakedAmount, expected)
 			}
@@ -930,13 +930,13 @@ func TestSlash(t *testing.T) {
 				switch s.Type {
 				case doubleSignerSlash:
 					err = sm.SlashDoubleSigners(s.CommitteeId, valParams, [][]byte{s.Address})
-					expected = lib.Uint64ReducePercentage(expected, float64(valParams.ValidatorDoubleSignSlashPercentage))
+					expected = lib.Uint64ReducePercentage(expected, valParams.ValidatorDoubleSignSlashPercentage)
 				case badProposerSlash:
 					err = sm.SlashBadProposers(s.CommitteeId, valParams, [][]byte{s.Address})
-					expected = lib.Uint64ReducePercentage(expected, float64(valParams.ValidatorBadProposalSlashPercentage))
+					expected = lib.Uint64ReducePercentage(expected, valParams.ValidatorBadProposalSlashPercentage)
 				case nonSignerSlash:
 					err = sm.SlashNonSigners(s.CommitteeId, valParams, [][]byte{s.Address})
-					expected = lib.Uint64ReducePercentage(expected, float64(valParams.ValidatorNonSignSlashPercentage))
+					expected = lib.Uint64ReducePercentage(expected, valParams.ValidatorNonSignSlashPercentage)
 				default:
 					t.Fatal("unknown slash type")
 				}

@@ -15,7 +15,7 @@ import (
 // 1) Get the height and begin block params from the state_machine
 // 2) Get peer max_height from P2P
 // 3) Ask peers for a block at a time
-// 4) Check each block by checking if cert was signed by +2/3 maj (COMMIT message)
+// 4) CheckBasic each block by checking if cert was signed by +2/3 maj (COMMIT message)
 // 5) Commit block against the state machine, if error fatal
 // 5) Do this until reach the max-peer-height
 // 6) Stay on top by listening to incoming cert messages
@@ -280,7 +280,7 @@ func (c *Controller) ListenForBlock() {
 			if ok := cache.Add(msg); !ok {
 				return
 			}
-			c.log.Infof("Received new block from %s 📥", lib.BzToTruncStr(msg.Sender.Address.PublicKey))
+			c.log.Infof("Received new block from %s 📥", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 			// try to cast the message to a block message
 			blockMessage, ok := msg.Message.(*lib.BlockMessage)
 			// if not a block message, slash the peer

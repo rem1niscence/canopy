@@ -43,7 +43,7 @@ func (s *StateMachine) CheckTx(transaction []byte) (result *CheckTxResult, err l
 		return
 	}
 	// perform basic validations against the tx object
-	if err = tx.Check(); err != nil {
+	if err = tx.CheckBasic(); err != nil {
 		return
 	}
 	// validate the timestamp (prune friendly - replay protection)

@@ -217,7 +217,7 @@ func (x *DoubleSignEvidence) Check(vs lib.ValidatorSet, view *lib.View, minimumE
 		return lib.ErrNonNilCertResults()
 	}
 	// should be a valid QC for the committee
-	// NOTE: Check() purposefully doesn't return errors on partial QCs
+	// NOTE: CheckBasic() purposefully doesn't return errors on partial QCs
 	if _, err := x.VoteA.Check(vs, 0, view, false); err != nil {
 		return err
 	}

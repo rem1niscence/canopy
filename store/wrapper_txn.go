@@ -109,7 +109,13 @@ func (i *Iterator) Valid() bool { return i.parent.Valid() }
 func (i *Iterator) Next()       { i.parent.Next() }
 func (i *Iterator) Close()      { i.parent.Close() }
 func (i *Iterator) Key() (key []byte) {
-	return removePrefix(lib.Copy(i.parent.Item().Key()), []byte(i.prefix))
+	// get the key from the parent
+	key = i.parent.Item().Key()
+	// make a copy of the key
+	c := make([]byte, len(key))
+	copy(c, key)
+	// remove the prefix and return
+	return removePrefix(c, []byte(i.prefix))
 }
 
 // removePrefix() removes the prefix from the key

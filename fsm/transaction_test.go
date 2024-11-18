@@ -111,14 +111,17 @@ func TestCheckTx(t *testing.T) {
 	// define a version with a bad fee (below state limit)
 	sendTxBadFee := sendTx.(*lib.Transaction)
 	sendTxBadFee.Fee = 0
+	require.NoError(t, sendTxBadFee.Sign(kg.PrivateKey))
 	// convert the object to bytes
 	txBadFee, e := lib.Marshal(sendTxBadFee)
+	require.NoError(t, e)
 	// define a version without a bad signature
 	sendTxBadSig := sendTx.(*lib.Transaction)
 	sendTxBadSig.Signature.Signature = []byte("bad sig")
 	// convert the object to bytes
 	txBadSig, e := lib.Marshal(sendTxBadSig)
 	require.NoError(t, e)
+	// define test cases
 	tests := []struct {
 		name          string
 		detail        string

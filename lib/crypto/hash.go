@@ -35,37 +35,40 @@ func HashString(msg []byte) string { return hex.EncodeToString(Hash(msg)) }
 
 // MerkleTree creates a merkle tree from a slice of bytes. A
 // linear slice was chosen since it uses about half as much memory as a tree
+// example: items = {a, b, c, d} -> store = {H(a), H(b), H(c), H(d), H(H(a),H(b)), H(H(c),H(d)), H(H(H(a),H(b)),H(H(c),H(d))) }
 func MerkleTree(items [][]byte) (root []byte, store [][]byte, err error) {
 	if len(items) == 0 {
 		return []byte{}, [][]byte{}, nil
 	}
-	// Calculate how many entries are required to hold the binary merkle
+	// calculate how many entries are required to hold the binary merkle
 	// tree as a linear array and create a slice of that size.
 	offset := nextPowerOfTwo(len(items))
-	n := offset*2 - 1
-	store = make([][]byte, n)
-	// Create the base hashes and populate the slice with them.
+	// calculate the length of the tree
+	size := offset*2 - 1
+	// initialize the store to populate the tree with
+	store = make([][]byte, size)
+	// create the base hashes and populate the slice with them.
 	for i, item := range items {
 		store[i] = Hash(item)
 	}
 	// offset index = after the last transaction and adjusted to the next power of two.
-	for i := 0; i < n-1; i += 2 {
+	for i := 0; i < size-1; i += 2 {
 		switch {
-		// no left child, parent = nil
+		// normal case, parent = hash(concat(left, right))
+		default:
+			store[offset] = Hash(append(store[i], store[i+1]...))
+
+		// no left or right child, so the parent is going to be nil
 		case store[i] == nil:
 			store[offset] = nil
 
 		// no right child, parent = hash(concat(left, left))
 		case store[i+1] == nil:
-			store[offset] = append(store[i], store[i]...)
-
-		// normal case, parent = hash(concat(left, right))
-		default:
-			store[offset] = append(store[i], store[i+1]...)
+			store[offset] = Hash(append(store[i], store[i]...))
 		}
 		offset++
 	}
-	return store[n-1], store, nil
+	return store[size-1], store, nil
 }
 
 // nextPowerOfTwo() calculates the smallest power of 2 that is greater than or equal to the input value

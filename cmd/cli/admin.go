@@ -309,7 +309,7 @@ func argToCommittees(arg string) string {
 func getPassword() string {
 	if pwd == "" {
 		fmt.Println("Enter password:")
-		password, err := term.ReadPassword(int(os.Stdin))
+		password, err := term.ReadPassword(int(os.Stdin.Fd()))
 		if err != nil {
 			l.Fatal(err.Error())
 		}
