@@ -15,9 +15,8 @@ import (
 // The Leader must gather these votes to organize consensus in the current Phase and lead the set through the stages of BFT.
 
 // ProposalsForHeight are an in-memory list of messages received from the Leader
-// [ROUND][PHASE] -> PROPOSAL(s)
-// NOTE: using an array of Messages as the ELECTION phase may require multiple proposals if there is multiple Candidates
-type ProposalsForHeight map[uint64]map[string][]*Message
+// NOTE: an array of Messages is required for the ELECTION phase as there can be multiple proposals if there is multiple Candidates
+type ProposalsForHeight map[uint64]map[string][]*Message // [ROUND][PHASE] -> PROPOSAL(s)
 
 // AddProposal() saves a validated proposal from the Leader in memory
 func (b *BFT) AddProposal(m *Message) lib.ErrorI {

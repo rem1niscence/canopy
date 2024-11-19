@@ -97,7 +97,7 @@ func (b *BFT) getVoteSet(vote *Message) (voteSet *VoteSet) {
 }
 
 // addSigToVoteSet() adds the digital signature from the Replica to the VoteSet
-func (b *BFT) addSigToVoteSet(vote *Message, voteSet *VoteSet) lib.ErrorI {
+func (b *BFT) addSigToVoteSet(vote *Message, voteSet *VoteSet) (err lib.ErrorI) {
 	val, idx, err := b.ValidatorSet.GetValidatorAndIdx(vote.Signature.PublicKey)
 	if err != nil {
 		return err
@@ -113,7 +113,7 @@ func (b *BFT) addSigToVoteSet(vote *Message, voteSet *VoteSet) lib.ErrorI {
 	if er = voteSet.multiKey.AddSigner(vote.Signature.Signature, idx); er != nil {
 		return ErrUnableToAddSigner(er)
 	}
-	return nil
+	return
 }
 
 // handleHighQCVDFAndEvidence() processes any 'highQC', 'vdf' or 'evidence' an ElectionVote from a Replica may have submitted
