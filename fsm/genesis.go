@@ -21,6 +21,7 @@ func (s *StateMachine) NewFromGenesisFile() lib.ErrorI {
 	if _, err = s.store.(lib.StoreI).Commit(); err != nil {
 		return err
 	}
+	s.height += 1
 	return nil
 }
 

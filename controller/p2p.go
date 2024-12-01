@@ -125,6 +125,8 @@ func (c *Controller) SendCertificateResultsTx(committeeID uint64, qc *lib.Quorum
 
 // GossipBlockMsg() gossips a QuorumCertificate (with block) through the P2P network for a specific committeeID
 func (c *Controller) GossipBlock(committeeID uint64, qc *lib.QuorumCertificate) {
+	// create a new pointer instance so when the results are omitted it doesn't affect other parts
+	cpy := &(*qc)
 	// get the chain associated with this quorum certificate
 	chain, err := c.GetChain(committeeID)
 	if err != nil {
@@ -132,18 +134,24 @@ func (c *Controller) GossipBlock(committeeID uint64, qc *lib.QuorumCertificate) 
 		return
 	}
 	// when sending a certificate message, it's good practice to omit the 'results' field as it is only important for the Canopy Blockchain
-	qc.Results = nil
-	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(qc.ResultsHash))
+	cpy.Results = nil
+	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(cpy.ResultsHash))
 	// create the block message
 	blockMessage := &lib.BlockMessage{
 		CommitteeId:         committeeID,
 		MaxHeight:           chain.Plugin.Height(),
 		TotalVdfIterations:  chain.Plugin.TotalVDFIterations(),
-		BlockAndCertificate: qc,
+		BlockAndCertificate: cpy,
 	}
 	// gossip the block message to peers for a particular committee id
 	if err = c.P2P.SendToChainPeers(committeeID, Block, blockMessage); err != nil {
 		c.log.Errorf("unable to gossip block with err: %s", err.Error())
+	}
+	// if a single node network - send to self
+	if c.singleNodeNetwork(committeeID) {
+		if err = c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
+			c.log.Errorf("unable to self send block with err: %s", err.Error())
+		}
 	}
 	c.log.Debugf("gossiping done")
 }
@@ -302,7 +310,7 @@ func (c *Controller) ListenForBlock() {
 				return
 			}
 			if err != nil {
-				c.log.Error(err.Error())
+				c.log.Debugf("peer block was invalid: %s", err.Error())
 				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
 				return
 			}
@@ -315,6 +323,8 @@ func (c *Controller) ListenForBlock() {
 				// for each chain (that isn't canopy)
 				for _, chain := range c.Chains {
 					if chain.Consensus.CommitteeId == lib.CanopyCommitteeId {
+						// reset the canopy BFT as if it was a target chain
+						c.Chains[blockMessage.CommitteeId].Consensus.ResetBFTChan() <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
 						continue
 					}
 					// load the new committee
@@ -324,7 +334,7 @@ func (c *Controller) ListenForBlock() {
 						continue
 					}
 					// reset & update the consensus module
-					chain.Consensus.ResetBFTChan() <- bft.ResetBFT{UpdatedCommitteeSet: newCommittee, UpdatedCommitteeHeight: newCanopyHeight}
+					chain.Consensus.ResetBFTChan() <- bft.ResetBFT{UpdatedCommitteeSet: newCommittee, UpdatedCanopyHeight: newCanopyHeight}
 				}
 				// update the peer 'must connect'
 				c.UpdateP2PMustConnect()
@@ -380,8 +390,14 @@ func (c *Controller) ListenForConsensus() {
 				handleErr(err, p2p.NotValRep)
 				return
 			}
+			// convert the bytes to a bft.Message object
+			bftMsg := new(bft.Message)
+			if err = lib.Unmarshal(consMsg.Message, bftMsg); err != nil {
+				handleErr(err, p2p.InvalidMsgRep)
+				return
+			}
 			// route the message to the consensus module
-			if err = chain.Consensus.HandleMessage(msg.Message); err != nil {
+			if err = chain.Consensus.HandleMessage(bftMsg); err != nil {
 				handleErr(err, p2p.InvalidMsgRep)
 				return
 			}
@@ -551,43 +567,36 @@ func (c *Controller) UpdateP2PMustConnect() {
 
 // handlePeerBlock() validates and handles inbound Quorum Certificates from remote peers
 func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc *lib.QuorumCertificate, stillCatchingUp bool, err lib.ErrorI) {
-	// define an error handling function for convenience
-	handleErr := func(err error) {
-		c.P2P.ChangeReputation(senderID, p2p.InvalidBlockRep)
-		c.log.Error(err.Error())
-	}
 	// define a convenience variable for certificate
 	qc = msg.BlockAndCertificate
 	// get the plugin and consensus module for the specific committee
 	chain, e := c.GetChain(msg.CommitteeId)
 	if e != nil {
-		handleErr(e)
+		c.P2P.ChangeReputation(senderID, p2p.InvalidBlockRep)
 		return
 	}
 	v := chain.Consensus.ValidatorSet
 	// validate the quorum certificate
 	if err = c.checkPeerQC(chain.Plugin.LoadMaxBlockSize(), &lib.View{
-		Height:       chain.Plugin.Height() + 1,
+		Height:       chain.Plugin.Height(),
 		CanopyHeight: c.LoadCommitteeHeightInState(msg.CommitteeId),
 		NetworkId:    c.Config.NetworkID,
 		CommitteeId:  msg.CommitteeId,
 	}, v, qc, senderID); err != nil {
-		handleErr(err)
+		c.P2P.ChangeReputation(senderID, p2p.InvalidBlockRep)
 		return
 	}
 	// validates the 'block' and 'block hash' of the proposal
 	stillCatchingUp, err = chain.Plugin.CheckPeerQC(msg.MaxHeight, qc)
 	if err != nil {
-		handleErr(err)
+		c.P2P.ChangeReputation(senderID, p2p.InvalidBlockRep)
 		return
 	}
 	// attempts to commit the QC to persistence of chain by playing it against the state machine
 	if err = chain.Plugin.CommitCertificate(qc); err != nil {
-		handleErr(err)
+		c.P2P.ChangeReputation(senderID, p2p.InvalidBlockRep)
 		return
 	}
-	// increment the height of the consensus
-	chain.Consensus.Height = chain.Plugin.Height() + 1
 	return
 }
 
@@ -662,7 +671,7 @@ func (c *Controller) pollMaxHeight(committeeID uint64, backoff int) (maxHeight, 
 			syncingPeers = append(syncingPeers, lib.BytesToString(c.PublicKey))
 		case <-time.After(p2p.PollMaxHeightTimeoutS * time.Second * time.Duration(backoff)):
 			if maxHeight == 0 { // genesis file is 0 and first height is 1
-				c.log.Warn("FilterOption_Exclude heights received from peers. Trying again")
+				c.log.Warn("no heights received from peers. Trying again")
 				return c.pollMaxHeight(committeeID, backoff+1)
 			}
 			c.log.Debugf("Waiting peer max height is %d", maxHeight)

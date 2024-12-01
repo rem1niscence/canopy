@@ -16,7 +16,7 @@ NOW, THEREFORE, in consideration of the mutual promises contained herein and for
    Subject to the terms and conditions of this Agreement, Licensor hereby grants to Licensee a no license to use the Software.
 
 3. Derivative Works:
-   FilterOption_Exclude modifications or derivative works are allowed.
+   No modifications or derivative works are allowed.
 
 4. Commercial Use:
    Commercial use is not allowed.
@@ -38,4 +38,4 @@ NOW, THEREFORE, in consideration of the mutual promises contained herein and for
 
 IN WITNESS WHEREOF, the parties have executed this Software License Agreement as of the Effective Date.
 
-Licensor: canopy Consulting LLC
+Licensor: Canopy Network Labs

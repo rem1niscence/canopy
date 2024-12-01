@@ -77,9 +77,6 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(txRoot) == 0 {
-		txRoot = []byte(strings.Repeat("F", crypto.HashSize*2))
-	}
 	// automated execution at the 'ending of a block'
 	if err = s.EndBlock(b.BlockHeader.ProposerAddress); err != nil {
 		return nil, nil, err
@@ -120,12 +117,14 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 		Time:                  b.BlockHeader.Time,
 		NumTxs:                uint64(numTxs),
 		TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(numTxs),
-		LastBlockHash:         lastBlock.BlockHeader.Hash,
+		TotalVdfIterations:    b.BlockHeader.TotalVdfIterations,
+		LastBlockHash:         nonEmptyHash(lastBlock.BlockHeader.Hash),
 		StateRoot:             stateRoot,
-		TransactionRoot:       txRoot,
+		TransactionRoot:       nonEmptyHash(txRoot),
 		ValidatorRoot:         lastValidatorRoot,
 		NextValidatorRoot:     nextValidatorRoot,
 		ProposerAddress:       b.BlockHeader.ProposerAddress,
+		Vdf:                   b.BlockHeader.Vdf,
 		LastQuorumCertificate: b.BlockHeader.LastQuorumCertificate,
 	}
 	// create and set the block hash in the header
@@ -233,9 +232,9 @@ func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
 
 // LoadCertificateWithProposal() loads a quorum certificate
 func (s *StateMachine) LoadCertificateWithProposal(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
-	if height <= 1 {
-		height = 1
-	}
+	//if height <= 1 {
+	//	height = 1
+	//}
 	store, ok := s.store.(lib.StoreI)
 	if !ok {
 		return nil, types.ErrWrongStoreType()
@@ -245,9 +244,9 @@ func (s *StateMachine) LoadCertificateWithProposal(height uint64) (*lib.QuorumCe
 
 // LoadCertificateHashesOnly() loads a quorum certificate but nullifies the block and results
 func (s *StateMachine) LoadCertificateHashesOnly(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
-	if height <= 1 {
-		height = 1
-	}
+	//if height <= 1 {
+	//	height = 1
+	//}
 	qc, err := s.LoadCertificateWithProposal(height)
 	if err != nil {
 		return nil, err
@@ -400,4 +399,13 @@ func (s *StateMachine) catchPanic() {
 	if r := recover(); r != nil {
 		s.log.Error(string(debug.Stack()))
 	}
+}
+
+// nonEmptyHash() ensures the hash isn't empty
+// substituting a dummy hash in its place
+func nonEmptyHash(h []byte) []byte {
+	if len(h) == 0 {
+		h = []byte(strings.Repeat("F", crypto.HashSize))
+	}
+	return h
 }

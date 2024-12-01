@@ -42,7 +42,7 @@ type BFT struct {
 }
 
 // New() creates a new instance of HotstuffBFT for a specific Committee
-func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, committeeHeight, height uint64, vs ValSet,
+func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, canopyHeight, height uint64, vs ValSet,
 	con Controller, vdfEnabled bool, l lib.LoggerI) (*BFT, lib.ErrorI) {
 	// determine if using a Verifiable Delay Function for long-range-attack protection
 	var vdf *crypto.VDFService
@@ -54,7 +54,7 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, committeeHeight, 
 	return &BFT{
 		View: &lib.View{
 			Height:       height,
-			CanopyHeight: committeeHeight,
+			CanopyHeight: canopyHeight,
 			NetworkId:    c.NetworkID,
 			CommitteeId:  committeeID,
 		},
@@ -117,23 +117,23 @@ func (b *BFT) Start() {
 			}()
 
 		// RESET BFT
-		// - This triggers when receiving a new Commit Block (QC) from either Canopy (a) or this chain (b)
+		// - This triggers when receiving a new Commit Block (QC) from either Canopy (a) or a sub-chain (b)
 		case resetBFT := <-b.resetBFT:
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
-				if resetBFT.UpdatedCommitteeHeight != 0 { // Canopy block reset
+				if resetBFT.UpdatedCanopyHeight != 0 { // (a) Canopy block reset
 					if b.CommitteeId == lib.CanopyCommitteeId {
 						return // ignore if Canopy Committee, as the Target reset notification is the correct reset path
 					}
 					b.log.Info("Resetting BFT timers after receiving a new Canopy block")
 					// update the new committee
-					b.CanopyHeight, b.ValidatorSet = resetBFT.UpdatedCommitteeHeight, resetBFT.UpdatedCommitteeSet
+					b.CanopyHeight, b.ValidatorSet = resetBFT.UpdatedCanopyHeight, resetBFT.UpdatedCommitteeSet
 					// reset back to round 0 but maintain locks to prevent 'fork attacks'
 					b.NewHeight(true)
 					// immediately reset and start the height over again with the new Validator set
 					b.SetWaitTimers(0, b.WaitTime(CommitProcess, 10), 0)
-				} else { // Target block reset
+				} else { // (b) Target block reset
 					b.log.Info("Resetting BFT timers after receiving a new Target block (NEW_HEIGHT)")
 					// reset BFT variables and start VDF
 					b.NewHeight()
@@ -227,7 +227,7 @@ func (b *BFT) StartElectionPhase() {
 // - Replicas review messages from Candidates and determine the 'Leader' by the highest VRF
 // - If no Candidate messages received, fallback to stake weighted random 'Leader' selection
 // - Replicas send a signed (aggregable) ELECTION vote to the Leader (Proposer)
-// - With this vote, the Replica attaches any Byzantine evidence or 'Locked' QC they have collected
+// - With this vote, the Replica attaches any Byzantine evidence or 'Locked' QC they have collected as well as their VDF output
 func (b *BFT) StartElectionVotePhase() {
 	b.log.Info(b.View.ToString())
 	// select Proposer (set is required for self-send)
@@ -304,7 +304,7 @@ func (b *BFT) StartProposeVotePhase() {
 	b.log.Info(b.View.ToString())
 	msg := b.GetProposal()
 	if msg == nil {
-		b.log.Warn("FilterOption_Exclude valid message received from Proposer")
+		b.log.Warn("no valid message received from Proposer")
 		b.RoundInterrupt()
 		return
 	}
@@ -382,7 +382,7 @@ func (b *BFT) StartPrecommitVotePhase() {
 	b.log.Info(b.View.ToString())
 	msg := b.GetProposal()
 	if msg == nil {
-		b.log.Warn("FilterOption_Exclude valid message received from Proposer")
+		b.log.Warn("no valid message received from Proposer")
 		b.RoundInterrupt()
 		return
 	}
@@ -444,7 +444,7 @@ func (b *BFT) StartCommitProcessPhase() {
 	b.log.Info(b.View.ToString())
 	msg := b.GetProposal()
 	if msg == nil {
-		b.log.Warn("FilterOption_Exclude valid message received from Proposer")
+		b.log.Warn("no valid message received from Proposer")
 		b.RoundInterrupt()
 		return
 	}
@@ -584,6 +584,8 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 		if err := b.RunVDF(); err != nil {
 			b.log.Errorf("RunVDF() failed with error, %s", err.Error())
 		}
+		b.Height++
+		b.CanopyHeight = b.Controller.GetCanopyHeight()
 	}
 	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
@@ -739,9 +741,9 @@ func (b *BFT) ResetBFTChan() chan ResetBFT { return b.resetBFT }
 
 // ResetBFT is a structure that allows the Controller to reset the BFT either due to a Target chain block or Canopy block
 type ResetBFT struct {
-	UpdatedCommitteeHeight uint64        // new Canopy height
-	UpdatedCommitteeSet    ValSet        // new Committee from the Canopy block
-	ProcessTime            time.Duration // process Target block time
+	UpdatedCanopyHeight uint64        // new Canopy height
+	UpdatedCommitteeSet ValSet        // new Committee from the Canopy block
+	ProcessTime         time.Duration // process Target block time
 }
 
 // phaseToString() converts the phase object to a human-readable string
@@ -760,6 +762,8 @@ type (
 	Controller interface {
 		Lock()
 		Unlock()
+		// GetCanopyHeight returns the height of the base-chain
+		GetCanopyHeight() uint64
 		// ProduceProposal() is a plugin call to produce a Proposal object as a Leader
 		ProduceProposal(committeeID uint64, be *ByzantineEvidence, vdf *lib.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
 		// ValidateCertificate() is a plugin call to validate a Certificate object as a Replica

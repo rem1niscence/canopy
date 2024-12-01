@@ -139,7 +139,7 @@ CommitteeMembers <Must be CanopyValidators)
 
 ClientValidator
 
-- FilterOption_Exclude minimum stake, but payment is degraded based on bucket
+- No minimum stake, but payment is degraded based on bucket
 
 Features:
 

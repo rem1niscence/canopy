@@ -115,7 +115,7 @@ func (vdf *VDFService) VerifyVDF(seed, proof []byte, iterations int) bool {
 func (vdf *VDFService) estimateIterationsPerSecond() {
 	var (
 		totalTime  time.Duration
-		iterations = 5 // more iterations  = longer startup time
+		iterations = 1 // more iterations  = longer startup time
 	)
 	for i := 0; i < iterations; i++ {
 		startTime := time.Now()

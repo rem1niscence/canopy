@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [Unreleased] - 12/1/2024
+- Fixed startup bugs
+- Removed redundant logging
+- Added logic for gossiping block in single node network
+- Added height update logic
+
 ## [Unreleased] - 11/18/2024
 
 - Added unit tests to `lib` directory

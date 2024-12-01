@@ -211,7 +211,7 @@ func StartRPC(a *app2.Controller, c lib.Config, l lib.LoggerI) {
 	runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
 	l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
 	runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
-	go pollValidators(time.Minute)
+	//go pollValidators(time.Minute)
 }
 
 func Version(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {

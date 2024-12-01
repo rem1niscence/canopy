@@ -61,27 +61,48 @@ var startCmd = &cobra.Command{
 	},
 }
 
+// Start() is the entrypoint of the application
 func Start() {
+	// create a new database object from the config
 	db, err := store.New(config, l)
 	if err != nil {
 		l.Fatal(err.Error())
 	}
-	if err = canopy.RegisterNew(config, lib.CanopyCommitteeId, validatorKey, db, l); err != nil {
-		l.Fatal(err.Error())
-	}
+	// register all plugins as active
+	RegisterAllPlugins(config, validatorKey, db, l)
+	// create a new instance of the application
 	app, err := controller.New(config, validatorKey, l)
 	if err != nil {
 		l.Fatal(err.Error())
 	}
+	// start the application
 	app.Start()
+	// start the rpc
 	rpc.StartRPC(app, config, l)
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGABRT)
-	s := <-stop
+	// block until a kill signal is received
+	waitForKill()
+	// gracefully stop the app
 	app.Stop()
-	l.Infof("Exit command %s received", s)
+	// exit
 	os.Exit(0)
 
+}
+
+// RegisterAllPlugins() registers plugins with the controller - creating consensus instances for each
+func RegisterAllPlugins(c lib.Config, valKey crypto.PrivateKeyI, db lib.StoreI, l lib.LoggerI) {
+	// register a new Canopy plugin
+	if err := canopy.RegisterNew(c, lib.CanopyCommitteeId, valKey, db, l); err != nil {
+		l.Fatal(err.Error())
+	}
+}
+
+// waitForKill() blocks until a kill signal is received
+func waitForKill() {
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGABRT)
+	// block until kill signal is received
+	s := <-stop
+	l.Infof("Exit command %s received", s)
 }
 
 func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config, privateValKey crypto.PrivateKeyI) {
@@ -144,11 +165,11 @@ func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFile
 	addr := consPubKey.Address()
 	j := &types.GenesisState{
 		Time:     uint64(time.Now().UnixMicro()),
-		Pools:    []*types.Pool{{Id: lib.DAOPoolID}},
 		Accounts: []*types.Account{{Address: addr.Bytes(), Amount: 1000000}},
 		Validators: []*types.Validator{{
 			Address:      addr.Bytes(),
 			PublicKey:    consPubKey.Bytes(),
+			Committees:   []uint64{lib.CanopyCommitteeId},
 			NetAddress:   "http://localhost:9000",
 			StakedAmount: 1000000000000000000,
 			Output:       addr.Bytes(),

@@ -49,18 +49,22 @@ func (x *BlockHeader) Check(networkID, committeeID uint64) ErrorI {
 	if len(x.LastBlockHash) != crypto.HashSize {
 		return ErrWrongLengthLastBlockHash()
 	}
-	// check the LastQuorumCertificate
-	// no block should be included in this, so set maxBlockSize to 0
-	if err := x.LastQuorumCertificate.CheckBasic(); err != nil {
-		return err
+	if x.Height > 1 {
+		// check the LastQuorumCertificate
+		if err := x.LastQuorumCertificate.CheckBasic(); err != nil {
+			return err
+		}
+		if x.LastQuorumCertificate.Header.NetworkId != networkID {
+			return ErrWrongNetworkID()
+		}
+		// check committee id
+		if x.LastQuorumCertificate.Header.CommitteeId != committeeID {
+			return ErrWrongCommitteeID()
+		}
 	}
 	// check network id
-	if uint64(x.NetworkId) != networkID || x.LastQuorumCertificate.Header.NetworkId != networkID {
+	if uint64(x.NetworkId) != networkID {
 		return ErrWrongNetworkID()
-	}
-	// check committee id
-	if x.LastQuorumCertificate.Header.CommitteeId != committeeID {
-		return ErrWrongCommitteeID()
 	}
 	// check for non-zero BlockTime
 	if x.Time == 0 {

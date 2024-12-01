@@ -187,10 +187,13 @@ func (p *Plugin) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (still
 	if err = lib.Unmarshal(qc.Block, blk); err != nil {
 		return
 	}
+	// ensure the unmarshalled block is not nil
+	if blk == nil || blk.BlockHeader == nil {
+		return false, lib.ErrNilBlock()
+	}
 	// ensure the Proposal.BlockHash corresponds to the actual hash of the block
-	hash, _ := blk.BlockHeader.SetHash()
-	if !bytes.Equal(qc.BlockHash, hash) {
-		err = lib.ErrMismatchResultsHash()
+	if !bytes.Equal(qc.BlockHash, crypto.Hash(qc.Block)) {
+		err = lib.ErrMismatchBlockHash()
 		return
 	}
 	// check the height of the block
@@ -251,15 +254,15 @@ func (p *Plugin) CompareBlockHeaders(candidate *lib.BlockHeader, compare *lib.Bl
 	// validate the last quorum certificate of the block header
 	// by using the historical canopy committee
 	if candidate.Height > 2 {
-		lastQCHeight := candidate.Height - 1
-		vs, err := p.FSM.LoadCanopyCommittee(lastQCHeight)
+		lastBlockHeight := candidate.Height - 1
+		vs, err := p.FSM.LoadCanopyCommittee(lastBlockHeight)
 		if err != nil {
 			return err
 		}
 		// check the last QC
 		isPartialQC, err := candidate.LastQuorumCertificate.Check(vs, 0, &lib.View{
-			Height:       lastQCHeight,
-			CanopyHeight: lastQCHeight,
+			Height:       lastBlockHeight,
+			CanopyHeight: lastBlockHeight,
 			NetworkId:    p.Config.NetworkID,
 			CommitteeId:  p.CommitteeId,
 		}, true)

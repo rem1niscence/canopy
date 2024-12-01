@@ -67,13 +67,13 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (*Controller, l
 		}
 		// initialize the chain, setting the plugin
 		chain := &Chain{Plugin: plug, isSyncing: &atomic.Bool{}}
+		// save this chain in the map under the 'id'
+		controller.Chains[id] = chain
 		// create a new BFT instance and assign it to the chain
-		chain.Consensus, err = bft.New(c, valKey, id, height, plug.Height(), valSet, controller, id == lib.CanopyCommitteeId, l)
+		chain.Consensus, err = bft.New(c, valKey, id, height, plug.Height()-1, valSet, controller, id == lib.CanopyCommitteeId, l)
 		if err != nil {
 			return nil, err
 		}
-		// save this chain in the map under the 'id'
-		controller.Chains[id] = chain
 	}
 	return controller, err
 }
@@ -171,6 +171,9 @@ func (c *Controller) CanopyFSM() *fsm.StateMachine {
 
 // Syncing() returns if any of the supported chains are currently syncing
 func (c *Controller) Syncing(committeeID uint64) *atomic.Bool { return c.Chains[committeeID].isSyncing }
+
+// GetCanopyHeight() returns the height of the canopy base-chain
+func (c *Controller) GetCanopyHeight() uint64 { return c.CanopyFSM().Height() }
 
 // ConsensusSummary() for the RPC - returns the summary json object of the bft for a specific chainID
 func (c *Controller) ConsensusSummary(committeeID uint64) ([]byte, lib.ErrorI) {
