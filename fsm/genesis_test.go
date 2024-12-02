@@ -59,7 +59,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				Params: types.DefaultParams(),
@@ -69,7 +69,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				OrderBooks: new(types.OrderBooks),
@@ -81,7 +81,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 						Id:     lib.CanopyCommitteeId,
 						Amount: 100,
 					}, {
-						Id:     1,
+						Id:     2,
 						Amount: 100,
 					}},
 				},
@@ -126,7 +126,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 							BuyerChainDeadline:   100, SellersSellAddress: newTestAddressBytes(t, 2),
 						}, {
 							Id:                 2,
-							Committee:          1,
+							Committee:          2,
 							AmountForSale:      100,
 							RequestedAmount:    100,
 							SellersSellAddress: newTestAddressBytes(t, 2),
@@ -153,7 +153,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 							BuyerChainDeadline:   100, SellersSellAddress: newTestAddressBytes(t, 2),
 						}, {
 							Id:                 2,
-							Committee:          1,
+							Committee:          2,
 							AmountForSale:      100,
 							RequestedAmount:    100,
 							SellersSellAddress: newTestAddressBytes(t, 2),
@@ -281,7 +281,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				OrderBooks: &types.OrderBooks{
@@ -298,7 +298,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 							SellersSellAddress:   newTestAddressBytes(t, 2),
 						}, {
 							Id:                 2,
-							Committee:          1,
+							Committee:          2,
 							AmountForSale:      100,
 							RequestedAmount:    100,
 							SellersSellAddress: newTestAddressBytes(t, 2),
@@ -323,7 +323,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				OrderBooks: &types.OrderBooks{
@@ -339,7 +339,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 							BuyerChainDeadline:   100, SellersSellAddress: newTestAddressBytes(t, 2),
 						}, {
 							Id:                 2,
-							Committee:          1,
+							Committee:          2,
 							AmountForSale:      100,
 							RequestedAmount:    100,
 							SellersSellAddress: newTestAddressBytes(t, 2),
@@ -354,7 +354,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 						Id:     lib.CanopyCommitteeId,
 						Amount: 100,
 					}, {
-						Id:     1,
+						Id:     2,
 						Amount: 100,
 					}},
 					CommitteeDelegatedOnly: nil,
@@ -395,7 +395,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				Params: types.DefaultParams(),
@@ -405,7 +405,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				OrderBooks: new(types.OrderBooks),
@@ -417,7 +417,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 						Id:     lib.CanopyCommitteeId,
 						Amount: 100,
 					}, {
-						Id:     1,
+						Id:     2,
 						Amount: 100,
 					}},
 				},
@@ -724,7 +724,7 @@ func newTestGenesisState(t *testing.T) *types.GenesisState {
 			Address:      newTestAddressBytes(t),
 			PublicKey:    newTestPublicKeyBytes(t),
 			StakedAmount: 100,
-			Committees:   []uint64{lib.CanopyCommitteeId, 1},
+			Committees:   []uint64{lib.CanopyCommitteeId, 2},
 			Output:       newTestAddressBytes(t),
 		}},
 		OrderBooks: &types.OrderBooks{
@@ -741,7 +741,7 @@ func newTestGenesisState(t *testing.T) *types.GenesisState {
 					SellersSellAddress:   newTestAddressBytes(t, 2),
 				}, {
 					Id:                 2,
-					Committee:          1,
+					Committee:          2,
 					AmountForSale:      100,
 					RequestedAmount:    100,
 					SellersSellAddress: newTestAddressBytes(t, 2),
@@ -769,7 +769,7 @@ func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 			Address:      newTestAddressBytes(t),
 			PublicKey:    newTestPublicKeyBytes(t),
 			StakedAmount: 100,
-			Committees:   []uint64{lib.CanopyCommitteeId, 1},
+			Committees:   []uint64{lib.CanopyCommitteeId, 2},
 			Output:       newTestAddressBytes(t),
 		}},
 		OrderBooks: &types.OrderBooks{
@@ -786,7 +786,7 @@ func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 					SellersSellAddress:   newTestAddressBytes(t, 2),
 				}, {
 					Id:                 2,
-					Committee:          1,
+					Committee:          2,
 					AmountForSale:      100,
 					RequestedAmount:    100,
 					SellersSellAddress: newTestAddressBytes(t, 2),
@@ -801,7 +801,7 @@ func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 				Id:     lib.CanopyCommitteeId,
 				Amount: 100,
 			}, {
-				Id:     1,
+				Id:     2,
 				Amount: 100,
 			}},
 			CommitteeDelegatedOnly: nil,

@@ -494,6 +494,7 @@ func (tc *testConsensus) view(phase Phase, round ...uint64) *lib.View {
 	}
 	return &lib.View{
 		NetworkId:    lib.CanopyMainnetNetworkId,
+		CommitteeId:  lib.CanopyCommitteeId,
 		Height:       1,
 		Round:        r,
 		CanopyHeight: 1,

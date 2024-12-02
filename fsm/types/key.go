@@ -9,6 +9,7 @@ import (
 )
 
 var ReservedIDs = []uint64{
+	lib.UnknownCommitteeId,
 	lib.CanopyCommitteeId,
 	lib.DAOPoolID,
 }

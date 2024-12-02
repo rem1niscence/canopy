@@ -368,19 +368,19 @@ func TestGetCommitteeMembers(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: stakedAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t, 1),
 					StakedAmount: stakedAmount + 2,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 				},
 				{
 					Address:      newTestAddressBytes(t, 2),
 					PublicKey:    newTestPublicKeyBytes(t, 2),
 					StakedAmount: stakedAmount + 1,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 				},
 			},
 			expected: map[uint64][][]byte{
@@ -389,7 +389,7 @@ func TestGetCommitteeMembers(t *testing.T) {
 					newTestPublicKeyBytes(t, 2),
 					newTestPublicKeyBytes(t, 0),
 				},
-				1: {
+				2: {
 					newTestPublicKeyBytes(t, 1),
 					newTestPublicKeyBytes(t, 2),
 					newTestPublicKeyBytes(t, 0),
@@ -406,7 +406,7 @@ func TestGetCommitteeMembers(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: stakedAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
@@ -418,7 +418,7 @@ func TestGetCommitteeMembers(t *testing.T) {
 					Address:      newTestAddressBytes(t, 2),
 					PublicKey:    newTestPublicKeyBytes(t, 2),
 					StakedAmount: stakedAmount + 1,
-					Committees:   []uint64{lib.CanopyCommitteeId, 1},
+					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 				},
 			},
 			expected: map[uint64][][]byte{
@@ -427,7 +427,7 @@ func TestGetCommitteeMembers(t *testing.T) {
 					newTestPublicKeyBytes(t, 2),
 					newTestPublicKeyBytes(t, 0),
 				},
-				1: {
+				2: {
 					newTestPublicKeyBytes(t, 2),
 					newTestPublicKeyBytes(t, 0),
 				},

@@ -256,7 +256,8 @@ const (
 	ValKeyPath             = "validator_key.json"
 	GenesisFilePath        = "genesis.json"
 	ProposalsFilePath      = "proposals.json"
-	CanopyCommitteeId      = uint64(0)
+	UnknownCommitteeId     = uint64(0)
+	CanopyCommitteeId      = uint64(1)
 	DAOPoolID              = math.MaxUint64
 	CanopyMainnetNetworkId = 1
 )

@@ -72,7 +72,7 @@ func TestStartElectionPhase(t *testing.T) {
 					Phase:        Election,
 					CanopyHeight: 1,
 					NetworkId:    1,
-					CommitteeId:  0,
+					CommitteeId:  lib.CanopyCommitteeId,
 				}
 				select {
 				case <-time.After(testTimeout):
@@ -143,9 +143,10 @@ func TestStartElectionVotePhase(t *testing.T) {
 			}
 			pub, _, expectedView := c.valKeys[0].PublicKey(), c.valKeys[0], lib.View{
 				NetworkId:    lib.CanopyMainnetNetworkId,
+				CommitteeId:  lib.CanopyCommitteeId,
 				Height:       1,
-				Round:        0,
 				CanopyHeight: 1,
+				Round:        0,
 				Phase:        ElectionVote,
 			}
 			go c.bft.StartElectionVotePhase()
@@ -220,13 +221,14 @@ func TestStartProposePhase(t *testing.T) {
 			}
 			expectedView, expectedQCView := lib.View{
 				NetworkId:    lib.CanopyMainnetNetworkId,
+				CommitteeId:  lib.CanopyCommitteeId,
 				Height:       1,
 				Round:        0,
 				Phase:        Propose,
 				CanopyHeight: 1,
 			}, lib.View{
 				NetworkId:    lib.CanopyMainnetNetworkId,
-				CommitteeId:  0,
+				CommitteeId:  lib.CanopyCommitteeId,
 				Height:       1,
 				CanopyHeight: 1,
 				Round:        0,
@@ -329,7 +331,7 @@ func TestStartProposeVotePhase(t *testing.T) {
 				Phase:        ProposeVote,
 				CanopyHeight: 1,
 				NetworkId:    1,
-				CommitteeId:  0,
+				CommitteeId:  lib.CanopyCommitteeId,
 			}
 			// valid proposal
 			go c.bft.StartProposeVotePhase()
@@ -391,15 +393,15 @@ func TestStartPrecommitPhase(t *testing.T) {
 				Round:        0,
 				Phase:        Precommit,
 				CanopyHeight: 1,
-				NetworkId:    1,
-				CommitteeId:  0,
+				NetworkId:    lib.CanopyMainnetNetworkId,
+				CommitteeId:  lib.CanopyCommitteeId,
 			}, lib.View{
 				Height:       1,
 				Round:        0,
 				Phase:        ProposeVote,
 				CanopyHeight: 1,
-				NetworkId:    1,
-				CommitteeId:  0,
+				NetworkId:    lib.CanopyMainnetNetworkId,
+				CommitteeId:  lib.CanopyCommitteeId,
 			}
 			if test.has23MajPropVote {
 				multiKey, blockHash, resultsHash = c.simProposeVotePhase(t, test.isProposer, true, 0)
@@ -479,6 +481,7 @@ func TestStartPrecommitVotePhase(t *testing.T) {
 			}
 			expectedView := lib.View{
 				NetworkId:    lib.CanopyMainnetNetworkId,
+				CommitteeId:  lib.CanopyCommitteeId,
 				Height:       1,
 				Round:        0,
 				CanopyHeight: 1,
@@ -538,12 +541,14 @@ func TestStartCommitPhase(t *testing.T) {
 			multiKey, blockHash, resultsHash := crypto.MultiPublicKeyI(nil), []byte(nil), []byte(nil)
 			expectedView, expectedQCView := lib.View{
 				NetworkId:    lib.CanopyMainnetNetworkId,
+				CommitteeId:  lib.CanopyCommitteeId,
 				Height:       1,
 				Round:        0,
 				CanopyHeight: 1,
 				Phase:        Commit,
 			}, lib.View{
 				NetworkId:    lib.CanopyMainnetNetworkId,
+				CommitteeId:  lib.CanopyCommitteeId,
 				Height:       1,
 				Round:        0,
 				CanopyHeight: 1,
@@ -668,6 +673,8 @@ func TestStartCommitProcessPhase(t *testing.T) {
 				Height:       1,
 				Round:        1,
 				CanopyHeight: 1,
+				NetworkId:    lib.CanopyMainnetNetworkId,
+				CommitteeId:  lib.CanopyCommitteeId,
 				Phase:        PrecommitVote,
 			}
 			if test.hasEVDSE {
@@ -714,6 +721,7 @@ func TestRoundInterrupt(t *testing.T) {
 			Height:       1,
 			Round:        0,
 			CanopyHeight: 1,
+			CommitteeId:  lib.CanopyCommitteeId,
 			Phase:        RoundInterrupt,
 		})
 		require.Equal(t, c.bft.Phase, RoundInterrupt)

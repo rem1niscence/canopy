@@ -551,17 +551,17 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 		}, {
 			name:     "msg create order",
 			detail:   "retrieves the authorized signers for message create order",
-			msg:      &types.MessageCreateOrder{SellersSellAddress: newTestAddressBytes(t)},
+			msg:      &types.MessageCreateOrder{CommitteeId: lib.CanopyCommitteeId, SellersSellAddress: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg edit order",
 			detail:   "retrieves the authorized signers for message edit order",
-			msg:      &types.MessageEditOrder{},
+			msg:      &types.MessageEditOrder{CommitteeId: lib.CanopyCommitteeId},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg delete order",
 			detail:   "retrieves the authorized signers for message delete order",
-			msg:      &types.MessageEditOrder{},
+			msg:      &types.MessageEditOrder{CommitteeId: lib.CanopyCommitteeId},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:   "msg certificate results",
