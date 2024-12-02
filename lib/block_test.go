@@ -143,6 +143,7 @@ func TestCheckBlockHeader(t *testing.T) {
 			name:   "empty last quorum certificate",
 			detail: "the last quorum certificate is nil or empty",
 			blockHeader: &BlockHeader{
+				Height:            2,
 				ProposerAddress:   newTestAddressBytes(t),
 				Hash:              crypto.Hash([]byte("hash")),
 				StateRoot:         crypto.Hash([]byte("hash")),
@@ -184,6 +185,7 @@ func TestCheckBlockHeader(t *testing.T) {
 			networkId:   1,
 			committeeId: 1,
 			blockHeader: &BlockHeader{
+				Height:            2,
 				ProposerAddress:   newTestAddressBytes(t),
 				Hash:              crypto.Hash([]byte("hash")),
 				StateRoot:         crypto.Hash([]byte("hash")),

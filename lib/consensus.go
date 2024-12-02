@@ -398,7 +398,7 @@ func (x *View) Less(v *View) bool {
 
 // ToString() returns the log string format of View
 func (x *View) ToString() string {
-	return fmt.Sprintf("(H:%d, CH:%d, R:%d, P:%s)", x.Height, x.CanopyHeight, x.Round, x.Phase)
+	return fmt.Sprintf("(ID: %d H:%d, CH:%d, R:%d, P:%s)", x.CommitteeId, x.Height, x.CanopyHeight, x.Round, x.Phase)
 }
 
 // jsonView represents the json.Marshaller and json.Unmarshaler implementation of View

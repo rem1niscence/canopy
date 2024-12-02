@@ -493,6 +493,7 @@ func (tc *testConsensus) view(phase Phase, round ...uint64) *lib.View {
 		r = round[0]
 	}
 	return &lib.View{
+		NetworkId:    lib.CanopyMainnetNetworkId,
 		Height:       1,
 		Round:        r,
 		CanopyHeight: 1,
@@ -564,6 +565,7 @@ func (t *testController) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) { retu
 func (t *testController) IsValidDoubleSigner(_ uint64, _ []byte) bool     { return true }
 func (t *testController) Syncing(_ uint64) *atomic.Bool                   { return &atomic.Bool{} }
 func (t *testController) LoadCommitteeHeightInState(_ uint64) uint64      { return 0 }
+func (t *testController) GetCanopyHeight() uint64                         { return 0 }
 func (t *testController) LoadLastProposers() *lib.Proposers               { return t.proposers }
 func (t *testController) GossipBlock(committeeID uint64, cert *lib.QuorumCertificate) {
 	t.gossipCertChan[committeeID] <- cert

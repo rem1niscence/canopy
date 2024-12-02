@@ -73,7 +73,7 @@ func TestInitialize(t *testing.T) {
 			// execute the function call
 			require.NoError(t, sm.Initialize(db))
 			// validate the initialization path
-			if sm.height == 0 {
+			if test.height == 0 {
 				// if genesis, validate the state
 				validateWithExportedState(t, sm, test.expected)
 			} else {
