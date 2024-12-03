@@ -50,7 +50,7 @@ func (c *Client) BlockByHash(hash string) (p *lib.BlockResult, err lib.ErrorI) {
 
 func (c *Client) Blocks(params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(BlocksRouteName, 0, params, p)
+	err = c.paginatedHeightRequest(BlocksRouteName, 0, 0, params, p)
 	return
 }
 
@@ -105,7 +105,7 @@ func (c *Client) TransactionByHash(hash string) (p *lib.TxResult, err lib.ErrorI
 
 func (c *Client) TransactionsByHeight(height uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(TxsByHeightRouteName, height, params, p)
+	err = c.paginatedHeightRequest(TxsByHeightRouteName, height, lib.UnknownCommitteeId, params, p)
 	return
 }
 
@@ -129,19 +129,19 @@ func (c *Client) Account(height uint64, address string) (p *types.Account, err l
 
 func (c *Client) Accounts(height uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(AccountsRouteName, height, params, p)
+	err = c.paginatedHeightRequest(AccountsRouteName, height, lib.UnknownCommitteeId, params, p)
 	return
 }
 
 func (c *Client) Pool(height uint64, id uint64) (p *types.Pool, err lib.ErrorI) {
 	p = new(types.Pool)
-	err = c.heightAndNameRequest(PoolRouteName, height, id, p)
+	err = c.heightAndIdRequest(PoolRouteName, height, id, p)
 	return
 }
 
 func (c *Client) Pools(height uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(PoolsRouteName, height, params, p)
+	err = c.paginatedHeightRequest(PoolsRouteName, height, lib.UnknownCommitteeId, params, p)
 	return
 }
 
@@ -153,13 +153,49 @@ func (c *Client) Validator(height uint64, address string) (p *types.Validator, e
 
 func (c *Client) Validators(height uint64, params lib.PageParams, filter lib.ValidatorFilters) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(ValidatorsRouteName, height, params, p, filter)
+	err = c.paginatedHeightRequest(ValidatorsRouteName, height, lib.UnknownCommitteeId, params, p, filter)
 	return
 }
 
 func (c *Client) ConsValidators(height uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(ConsValidatorsRouteName, height, params, p)
+	err = c.paginatedHeightRequest(ConsValidatorsRouteName, height, lib.UnknownCommitteeId, params, p)
+	return
+}
+
+func (c *Client) Committee(height uint64, id uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
+	p = new(lib.Page)
+	err = c.paginatedHeightRequest(CommitteeRouteName, height, id, params, p)
+	return
+}
+
+func (c *Client) CommitteeData(height uint64, id uint64) (p *lib.Page, err lib.ErrorI) {
+	p = new(lib.Page)
+	err = c.heightAndIdRequest(CommitteeDataRouteName, height, id, p)
+	return
+}
+
+func (c *Client) CommitteesData(height uint64) (p *lib.Page, err lib.ErrorI) {
+	p = new(lib.Page)
+	err = c.paginatedHeightRequest(CommitteesDataRouteName, height, lib.UnknownCommitteeId, lib.PageParams{}, p)
+	return
+}
+
+func (c *Client) SubsidizedCommittees(height uint64) (p *lib.Page, err lib.ErrorI) {
+	p = new(lib.Page)
+	err = c.heightRequest(SubsidizedCommitteesRouteName, height, p)
+	return
+}
+
+func (c *Client) Order(height, orderId, committeeId uint64) (p *lib.Page, err lib.ErrorI) {
+	p = new(lib.Page)
+	err = c.orderRequest(OrderRouteName, height, orderId, committeeId, p)
+	return
+}
+
+func (c *Client) Orders(height, committeeId uint64) (p *lib.Page, err lib.ErrorI) {
+	p = new(lib.Page)
+	err = c.heightAndIdRequest(OrdersRouteName, height, committeeId, p)
 	return
 }
 
@@ -400,6 +436,70 @@ func (c *Client) TxSubsidy(from string, amt, committeeID uint64, opCode string,
 	})
 }
 
+func (c *Client) TxCreateOrder(from string, sellAmount, receiveAmount, committeeID uint64, receiveAddress string,
+	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	receiveAddr, err := lib.NewHexBytesFromString(receiveAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxCreateOrderRouteName, txRequest{
+		Amount:               sellAmount,
+		Fee:                  optFee,
+		Submit:               submit,
+		ReceiveAmount:        receiveAmount,
+		ReceiveAddress:       receiveAddr,
+		addressRequest:       addressRequest{Address: fromHex},
+		passwordRequest:      passwordRequest{Password: pwd},
+		txChangeParamRequest: txChangeParamRequest{},
+		committeesRequest:    committeesRequest{fmt.Sprintf("%d", committeeID)},
+	})
+}
+
+func (c *Client) TxEditOrder(from string, sellAmount, receiveAmount, orderId, committeeID uint64, receiveAddress string,
+	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	receiveAddr, err := lib.NewHexBytesFromString(receiveAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxEditOrderRouteName, txRequest{
+		Amount:               sellAmount,
+		Fee:                  optFee,
+		Submit:               submit,
+		ReceiveAmount:        receiveAmount,
+		ReceiveAddress:       receiveAddr,
+		OrderId:              orderId,
+		addressRequest:       addressRequest{Address: fromHex},
+		passwordRequest:      passwordRequest{Password: pwd},
+		txChangeParamRequest: txChangeParamRequest{},
+		committeesRequest:    committeesRequest{fmt.Sprintf("%d", committeeID)},
+	})
+}
+
+func (c *Client) TxDeleteOrder(from string, orderId, committeeID uint64,
+	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxEditOrderRouteName, txRequest{
+		Fee:                  optFee,
+		Submit:               submit,
+		OrderId:              orderId,
+		addressRequest:       addressRequest{Address: fromHex},
+		passwordRequest:      passwordRequest{Password: pwd},
+		txChangeParamRequest: txChangeParamRequest{},
+		committeesRequest:    committeesRequest{fmt.Sprintf("%d", committeeID)},
+	})
+}
+
 func (c *Client) ResourceUsage() (returned *resourceUsageResponse, err lib.ErrorI) {
 	returned = new(resourceUsageResponse)
 	err = c.get(ResourceUsageRouteName, returned, true)
@@ -504,7 +604,7 @@ func (c *Client) keystoreRequest(routeName string, keystoreRequest keystoreReque
 	return
 }
 
-func (c *Client) paginatedHeightRequest(routeName string, height uint64, p lib.PageParams, ptr any, filters ...lib.ValidatorFilters) (err lib.ErrorI) {
+func (c *Client) paginatedHeightRequest(routeName string, height, committeeId uint64, p lib.PageParams, ptr any, filters ...lib.ValidatorFilters) (err lib.ErrorI) {
 	var vf lib.ValidatorFilters
 	if filters != nil {
 		vf = filters[0]
@@ -513,6 +613,7 @@ func (c *Client) paginatedHeightRequest(routeName string, height uint64, p lib.P
 		heightRequest:    heightRequest{height},
 		PageParams:       p,
 		ValidatorFilters: vf,
+		idRequest:        idRequest{committeeId},
 	})
 	if err != nil {
 		return
@@ -546,6 +647,21 @@ func (c *Client) heightRequest(routeName string, height uint64, ptr any) (err li
 	return
 }
 
+func (c *Client) orderRequest(routeName string, height, orderId, committeeId uint64, ptr any) (err lib.ErrorI) {
+	bz, err := lib.MarshalJSON(orderRequest{
+		CommitteeId: committeeId,
+		OrderId:     orderId,
+		heightRequest: heightRequest{
+			Height: height,
+		},
+	})
+	if err != nil {
+		return
+	}
+	err = c.post(routeName, bz, ptr)
+	return
+}
+
 func (c *Client) hashRequest(routeName string, hash string, ptr any, admin ...bool) (err lib.ErrorI) {
 	bz, err := lib.MarshalJSON(hashRequest{Hash: hash})
 	if err != nil {
@@ -571,8 +687,8 @@ func (c *Client) heightAndAddressRequest(routeName string, height uint64, addres
 	return
 }
 
-func (c *Client) heightAndNameRequest(routeName string, height, id uint64, ptr any) (err lib.ErrorI) {
-	bz, err := lib.MarshalJSON(heightAndNameRequest{
+func (c *Client) heightAndIdRequest(routeName string, height, id uint64, ptr any) (err lib.ErrorI) {
+	bz, err := lib.MarshalJSON(heightAndIdRequest{
 		heightRequest: heightRequest{height},
 		idRequest:     idRequest{id},
 	})

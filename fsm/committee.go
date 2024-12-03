@@ -16,13 +16,8 @@ func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	// get validator params that are needed to complete this operation
-	params, err := s.GetParamsVal()
-	if err != nil {
-		return err
-	}
 	// get the committees that `qualify` for subsidization
-	subsidizedCommitteeIds, err := s.GetPaidCommittees(params)
+	subsidizedCommitteeIds, err := s.GetSubsidizedCommittees()
 	if err != nil {
 		return err
 	}
@@ -55,9 +50,14 @@ func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
 	return nil
 }
 
-// GetPaidCommittees() returns a list of committeeIDs that receive a portion of the 'block reward'
+// GetSubsidizedCommittees() returns a list of committeeIDs that receive a portion of the 'block reward'
 // Think of these committees as 'automatically subsidized' by the protocol
-func (s *StateMachine) GetPaidCommittees(valParams *types.ValidatorParams) (paidIDs []uint64, err lib.ErrorI) {
+func (s *StateMachine) GetSubsidizedCommittees() (paidIDs []uint64, err lib.ErrorI) {
+	// get validator params that are needed to complete this operation
+	valParams, err := s.GetParamsVal()
+	if err != nil {
+		return nil, err
+	}
 	// retrieve the supply
 	supply, err := s.GetSupply()
 	if err != nil {

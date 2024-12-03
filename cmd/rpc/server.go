@@ -40,37 +40,43 @@ const (
 	localhost       = "127.0.0.1"
 	colon           = ":"
 
-	VersionRouteName        = "version"
-	TxRouteName             = "tx"
-	HeightRouteName         = "height"
-	AccountRouteName        = "account"
-	AccountsRouteName       = "accounts"
-	PoolRouteName           = "pool"
-	PoolsRouteName          = "pools"
-	ValidatorRouteName      = "validator"
-	ValidatorsRouteName     = "validators"
-	ConsValidatorsRouteName = "cons-validators"
-	NonSignersRouteName     = "non-signers"
-	SupplyRouteName         = "supply"
-	ParamRouteName          = "params"
-	FeeParamRouteName       = "fee-params"
-	GovParamRouteName       = "gov-params"
-	ConParamsRouteName      = "con-params"
-	ValParamRouteName       = "val-params"
-	StateRouteName          = "state"
-	StateDiffRouteName      = "state-diff"
-	StateDiffGetRouteName   = "state-diff-get"
-	CertByHeightRouteName   = "cert-by-height"
-	BlocksRouteName         = "blocks"
-	BlockByHeightRouteName  = "block-by-height"
-	BlockByHashRouteName    = "block-by-hash"
-	TxsByHeightRouteName    = "txs-by-height"
-	TxsBySenderRouteName    = "txs-by-sender"
-	TxsByRecRouteName       = "txs-by-rec"
-	TxByHashRouteName       = "tx-by-hash"
-	PendingRouteName        = "pending"
-	ProposalsRouteName      = "proposals"
-	PollRouteName           = "poll"
+	VersionRouteName              = "version"
+	TxRouteName                   = "tx"
+	HeightRouteName               = "height"
+	AccountRouteName              = "account"
+	AccountsRouteName             = "accounts"
+	PoolRouteName                 = "pool"
+	PoolsRouteName                = "pools"
+	ValidatorRouteName            = "validator"
+	ValidatorsRouteName           = "validators"
+	ConsValidatorsRouteName       = "cons-validators"
+	NonSignersRouteName           = "non-signers"
+	SupplyRouteName               = "supply"
+	ParamRouteName                = "params"
+	FeeParamRouteName             = "fee-params"
+	GovParamRouteName             = "gov-params"
+	ConParamsRouteName            = "con-params"
+	ValParamRouteName             = "val-params"
+	StateRouteName                = "state"
+	StateDiffRouteName            = "state-diff"
+	StateDiffGetRouteName         = "state-diff-get"
+	CertByHeightRouteName         = "cert-by-height"
+	BlocksRouteName               = "blocks"
+	BlockByHeightRouteName        = "block-by-height"
+	BlockByHashRouteName          = "block-by-hash"
+	TxsByHeightRouteName          = "txs-by-height"
+	TxsBySenderRouteName          = "txs-by-sender"
+	TxsByRecRouteName             = "txs-by-rec"
+	TxByHashRouteName             = "tx-by-hash"
+	PendingRouteName              = "pending"
+	ProposalsRouteName            = "proposals"
+	PollRouteName                 = "poll"
+	CommitteeRouteName            = "committee"
+	CommitteeDataRouteName        = "committee-data"
+	CommitteesDataRouteName       = "committees-data"
+	SubsidizedCommitteesRouteName = "subsidized-committees"
+	OrderRouteName                = "order"
+	OrdersRouteName               = "orders"
 	// debug
 	DebugBlockedRouteName = "blocked"
 	DebugHeapRouteName    = "heap"
@@ -92,6 +98,9 @@ const (
 	TxChangeParamRouteName     = "tx-change-param"
 	TxDAOTransferRouteName     = "tx-dao-transfer"
 	TxSubsidyRouteName         = "tx-subsidy"
+	TxCreateOrderRouteName     = "tx-create-order"
+	TxEditOrderRouteName       = "tx-edit-order"
+	TxDeleteOrderRouteName     = "tx-delete-order"
 	ResourceUsageRouteName     = "resource-usage"
 	PeerInfoRouteName          = "peer-info"
 	ConsensusInfoRouteName     = "consensus-info"
@@ -113,36 +122,42 @@ var (
 	logger lib.LoggerI
 
 	router = routes{
-		VersionRouteName:       {Method: http.MethodGet, Path: "/v1/", HandlerFunc: Version},
-		TxRouteName:            {Method: http.MethodPost, Path: "/v1/tx", HandlerFunc: Transaction},
-		HeightRouteName:        {Method: http.MethodPost, Path: "/v1/query/height", HandlerFunc: Height},
-		AccountRouteName:       {Method: http.MethodPost, Path: "/v1/query/account", HandlerFunc: Account},
-		AccountsRouteName:      {Method: http.MethodPost, Path: "/v1/query/accounts", HandlerFunc: Accounts},
-		PoolRouteName:          {Method: http.MethodPost, Path: "/v1/query/pool", HandlerFunc: Pool},
-		PoolsRouteName:         {Method: http.MethodPost, Path: "/v1/query/pools", HandlerFunc: Pools},
-		ValidatorRouteName:     {Method: http.MethodPost, Path: "/v1/query/validator", HandlerFunc: Validator},
-		ValidatorsRouteName:    {Method: http.MethodPost, Path: "/v1/query/validators", HandlerFunc: Validators},
-		NonSignersRouteName:    {Method: http.MethodPost, Path: "/v1/query/non-signers", HandlerFunc: NonSigners},
-		ParamRouteName:         {Method: http.MethodPost, Path: "/v1/query/params", HandlerFunc: Params},
-		SupplyRouteName:        {Method: http.MethodPost, Path: "/v1/query/supply", HandlerFunc: Supply},
-		FeeParamRouteName:      {Method: http.MethodPost, Path: "/v1/query/fee-params", HandlerFunc: FeeParams},
-		GovParamRouteName:      {Method: http.MethodPost, Path: "/v1/query/gov-params", HandlerFunc: GovParams},
-		ConParamsRouteName:     {Method: http.MethodPost, Path: "/v1/query/con-params", HandlerFunc: ConParams},
-		ValParamRouteName:      {Method: http.MethodPost, Path: "/v1/query/val-params", HandlerFunc: ValParams},
-		StateRouteName:         {Method: http.MethodPost, Path: "/v1/query/state", HandlerFunc: State},
-		StateDiffRouteName:     {Method: http.MethodPost, Path: "/v1/query/state-diff", HandlerFunc: StateDiff},
-		StateDiffGetRouteName:  {Method: http.MethodGet, Path: "/v1/query/state-diff", HandlerFunc: StateDiff},
-		CertByHeightRouteName:  {Method: http.MethodPost, Path: "/v1/query/cert-by-height", HandlerFunc: CertByHeight},
-		BlockByHeightRouteName: {Method: http.MethodPost, Path: "/v1/query/block-by-height", HandlerFunc: BlockByHeight},
-		BlocksRouteName:        {Method: http.MethodPost, Path: "/v1/query/blocks", HandlerFunc: Blocks},
-		BlockByHashRouteName:   {Method: http.MethodPost, Path: "/v1/query/block-by-hash", HandlerFunc: BlockByHash},
-		TxsByHeightRouteName:   {Method: http.MethodPost, Path: "/v1/query/txs-by-height", HandlerFunc: TransactionsByHeight},
-		TxsBySenderRouteName:   {Method: http.MethodPost, Path: "/v1/query/txs-by-sender", HandlerFunc: TransactionsBySender},
-		TxsByRecRouteName:      {Method: http.MethodPost, Path: "/v1/query/txs-by-rec", HandlerFunc: TransactionsByRecipient},
-		TxByHashRouteName:      {Method: http.MethodPost, Path: "/v1/query/tx-by-hash", HandlerFunc: TransactionByHash},
-		PendingRouteName:       {Method: http.MethodPost, Path: "/v1/query/pending", HandlerFunc: Pending},
-		ProposalsRouteName:     {Method: http.MethodGet, Path: "/v1/gov/proposals", HandlerFunc: Proposals},
-		PollRouteName:          {Method: http.MethodGet, Path: "/v1/gov/poll", HandlerFunc: Poll},
+		VersionRouteName:              {Method: http.MethodGet, Path: "/v1/", HandlerFunc: Version},
+		TxRouteName:                   {Method: http.MethodPost, Path: "/v1/tx", HandlerFunc: Transaction},
+		HeightRouteName:               {Method: http.MethodPost, Path: "/v1/query/height", HandlerFunc: Height},
+		AccountRouteName:              {Method: http.MethodPost, Path: "/v1/query/account", HandlerFunc: Account},
+		AccountsRouteName:             {Method: http.MethodPost, Path: "/v1/query/accounts", HandlerFunc: Accounts},
+		PoolRouteName:                 {Method: http.MethodPost, Path: "/v1/query/pool", HandlerFunc: Pool},
+		PoolsRouteName:                {Method: http.MethodPost, Path: "/v1/query/pools", HandlerFunc: Pools},
+		ValidatorRouteName:            {Method: http.MethodPost, Path: "/v1/query/validator", HandlerFunc: Validator},
+		ValidatorsRouteName:           {Method: http.MethodPost, Path: "/v1/query/validators", HandlerFunc: Validators},
+		CommitteeRouteName:            {Method: http.MethodPost, Path: "/v1/query/committee", HandlerFunc: Committee},
+		CommitteeDataRouteName:        {Method: http.MethodPost, Path: "/v1/query/committee-data", HandlerFunc: CommitteeData},
+		CommitteesDataRouteName:       {Method: http.MethodPost, Path: "/v1/query/committees-data", HandlerFunc: CommitteesData},
+		SubsidizedCommitteesRouteName: {Method: http.MethodPost, Path: "/v1/query/subsidized-committees", HandlerFunc: SubsidizedCommittees},
+		NonSignersRouteName:           {Method: http.MethodPost, Path: "/v1/query/non-signers", HandlerFunc: NonSigners},
+		ParamRouteName:                {Method: http.MethodPost, Path: "/v1/query/params", HandlerFunc: Params},
+		SupplyRouteName:               {Method: http.MethodPost, Path: "/v1/query/supply", HandlerFunc: Supply},
+		FeeParamRouteName:             {Method: http.MethodPost, Path: "/v1/query/fee-params", HandlerFunc: FeeParams},
+		GovParamRouteName:             {Method: http.MethodPost, Path: "/v1/query/gov-params", HandlerFunc: GovParams},
+		ConParamsRouteName:            {Method: http.MethodPost, Path: "/v1/query/con-params", HandlerFunc: ConParams},
+		ValParamRouteName:             {Method: http.MethodPost, Path: "/v1/query/val-params", HandlerFunc: ValParams},
+		StateRouteName:                {Method: http.MethodPost, Path: "/v1/query/state", HandlerFunc: State},
+		StateDiffRouteName:            {Method: http.MethodPost, Path: "/v1/query/state-diff", HandlerFunc: StateDiff},
+		StateDiffGetRouteName:         {Method: http.MethodGet, Path: "/v1/query/state-diff", HandlerFunc: StateDiff},
+		CertByHeightRouteName:         {Method: http.MethodPost, Path: "/v1/query/cert-by-height", HandlerFunc: CertByHeight},
+		BlockByHeightRouteName:        {Method: http.MethodPost, Path: "/v1/query/block-by-height", HandlerFunc: BlockByHeight},
+		BlocksRouteName:               {Method: http.MethodPost, Path: "/v1/query/blocks", HandlerFunc: Blocks},
+		BlockByHashRouteName:          {Method: http.MethodPost, Path: "/v1/query/block-by-hash", HandlerFunc: BlockByHash},
+		TxsByHeightRouteName:          {Method: http.MethodPost, Path: "/v1/query/txs-by-height", HandlerFunc: TransactionsByHeight},
+		TxsBySenderRouteName:          {Method: http.MethodPost, Path: "/v1/query/txs-by-sender", HandlerFunc: TransactionsBySender},
+		TxsByRecRouteName:             {Method: http.MethodPost, Path: "/v1/query/txs-by-rec", HandlerFunc: TransactionsByRecipient},
+		TxByHashRouteName:             {Method: http.MethodPost, Path: "/v1/query/tx-by-hash", HandlerFunc: TransactionByHash},
+		OrderRouteName:                {Method: http.MethodPost, Path: "/v1/query/order", HandlerFunc: Order},
+		OrdersRouteName:               {Method: http.MethodPost, Path: "/v1/query/orders", HandlerFunc: Orders},
+		PendingRouteName:              {Method: http.MethodPost, Path: "/v1/query/pending", HandlerFunc: Pending},
+		ProposalsRouteName:            {Method: http.MethodGet, Path: "/v1/gov/proposals", HandlerFunc: Proposals},
+		PollRouteName:                 {Method: http.MethodGet, Path: "/v1/gov/poll", HandlerFunc: Poll},
 		// debug
 		DebugBlockedRouteName: {Method: http.MethodPost, Path: "/debug/blocked", HandlerFunc: debugHandler(DebugBlockedRouteName)},
 		DebugHeapRouteName:    {Method: http.MethodPost, Path: "/debug/heap", HandlerFunc: debugHandler(DebugHeapRouteName)},
@@ -163,6 +178,9 @@ var (
 		TxUnpauseRouteName:         {Method: http.MethodPost, Path: "/v1/admin/tx-unpause", HandlerFunc: TransactionUnpause, AdminOnly: true},
 		TxChangeParamRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-change-param", HandlerFunc: TransactionChangeParam, AdminOnly: true},
 		TxDAOTransferRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-dao-transfer", HandlerFunc: TransactionDAOTransfer, AdminOnly: true},
+		TxCreateOrderRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-create-order", HandlerFunc: TransactionCreateOrder, AdminOnly: true},
+		TxEditOrderRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-edit-order", HandlerFunc: TransactionEditOrder, AdminOnly: true},
+		TxDeleteOrderRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-delete-order", HandlerFunc: TransactionDeleteOrder, AdminOnly: true},
 		TxSubsidyRouteName:         {Method: http.MethodPost, Path: "/v1/admin/subsidy", HandlerFunc: TransactionSubsidy, AdminOnly: true},
 		ResourceUsageRouteName:     {Method: http.MethodGet, Path: "/v1/admin/resource-usage", HandlerFunc: ResourceUsage, AdminOnly: true},
 		PeerInfoRouteName:          {Method: http.MethodGet, Path: "/v1/admin/peer-info", HandlerFunc: PeerInfo, AdminOnly: true},
@@ -386,7 +404,7 @@ func Accounts(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func Pool(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	heightAndNameParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
+	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
 		return s.GetPool(id)
 	})
 }
@@ -419,6 +437,38 @@ func Validators(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	heightPaginated(w, r, func(s *fsm.StateMachine, p *paginatedHeightRequest) (interface{}, lib.ErrorI) {
 		return s.GetValidatorsPaginated(p.PageParams, p.ValidatorFilters)
 	})
+}
+
+func Committee(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightPaginated(w, r, func(s *fsm.StateMachine, p *paginatedHeightRequest) (interface{}, lib.ErrorI) {
+		return s.GetCommitteePaginated(p.PageParams, p.ID)
+	})
+}
+
+func CommitteeData(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
+		return s.GetCommitteeData(id)
+	})
+}
+
+func CommitteesData(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightPaginated(w, r, func(s *fsm.StateMachine, p *paginatedHeightRequest) (interface{}, lib.ErrorI) {
+		return s.GetCommitteesData() // consider pagination
+	})
+}
+
+func SubsidizedCommittees(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightParams(w, r, func(s *fsm.StateMachine) (interface{}, lib.ErrorI) { return s.GetSubsidizedCommittees() })
+}
+
+func Order(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	orderParams(w, r, func(s *fsm.StateMachine, p *orderRequest) (any, lib.ErrorI) {
+		return s.GetOrder(p.OrderId, p.CommitteeId)
+	})
+}
+
+func Orders(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (any, lib.ErrorI) { return s.GetOrderBook(id) })
 }
 
 func Params(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -536,14 +586,17 @@ func KeystoreGetKeyGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 }
 
 type txRequest struct {
-	Amount          uint64 `json:"amount"`
-	NetAddress      string `json:"netAddress"`
-	Output          string `json:"output"`
-	OpCode          string `json:"opCode"`
-	Fee             uint64 `json:"fee"`
-	Delegate        bool   `json:"delegate"`
-	EarlyWithdrawal bool   `json:"earlyWithdrawal"`
-	Submit          bool   `json:"submit"`
+	Amount          uint64       `json:"amount"`
+	NetAddress      string       `json:"netAddress"`
+	Output          string       `json:"output"`
+	OpCode          string       `json:"opCode"`
+	Fee             uint64       `json:"fee"`
+	Delegate        bool         `json:"delegate"`
+	EarlyWithdrawal bool         `json:"earlyWithdrawal"`
+	Submit          bool         `json:"submit"`
+	ReceiveAmount   uint64       `json:"receiveAmount"`
+	ReceiveAddress  lib.HexBytes `json:"receiveAddress"`
+	OrderId         uint64       `json:"orderId"`
 	addressRequest
 	passwordRequest
 	txChangeParamRequest
@@ -646,6 +699,36 @@ func TransactionSubsidy(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 			committeeId = c[0]
 		}
 		return types.NewSubsidyTx(p, ptr.Amount, committeeId, ptr.OpCode, ptr.Fee)
+	})
+}
+
+func TransactionCreateOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		committeeId := uint64(0)
+		if c, err := StringToCommittees(ptr.committees); err == nil {
+			committeeId = c[0]
+		}
+		return types.NewCreateOrderTx(p, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee)
+	})
+}
+
+func TransactionEditOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		committeeId := uint64(0)
+		if c, err := StringToCommittees(ptr.committees); err == nil {
+			committeeId = c[0]
+		}
+		return types.NewEditOrderTx(p, ptr.OrderId, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee)
+	})
+}
+
+func TransactionDeleteOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		committeeId := uint64(0)
+		if c, err := StringToCommittees(ptr.committees); err == nil {
+			committeeId = c[0]
+		}
+		return types.NewDeleteOrderTx(p, ptr.OrderId, committeeId, ptr.Fee)
 	})
 }
 
@@ -893,13 +976,27 @@ func heightAndAddressParams(w http.ResponseWriter, r *http.Request, callback fun
 	write(w, p, http.StatusOK)
 }
 
-func heightAndNameParams(w http.ResponseWriter, r *http.Request, callback func(*fsm.StateMachine, uint64) (any, lib.ErrorI)) {
-	req := new(heightAndNameRequest)
+func heightAndIdParams(w http.ResponseWriter, r *http.Request, callback func(*fsm.StateMachine, uint64) (any, lib.ErrorI)) {
+	req := new(heightAndIdRequest)
 	state, ok := getStateMachineFromHeightParams(w, r, req)
 	if !ok {
 		return
 	}
 	p, err := callback(state, req.ID)
+	if err != nil {
+		write(w, err, http.StatusBadRequest)
+		return
+	}
+	write(w, p, http.StatusOK)
+}
+
+func orderParams(w http.ResponseWriter, r *http.Request, callback func(s *fsm.StateMachine, request *orderRequest) (any, lib.ErrorI)) {
+	req := new(orderRequest)
+	state, ok := getStateMachineFromHeightParams(w, r, req)
+	if !ok {
+		return
+	}
+	p, err := callback(state, req)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
@@ -1032,6 +1129,12 @@ type heightRequest struct {
 	Height uint64 `json:"height"`
 }
 
+type orderRequest struct {
+	CommitteeId uint64 `json:"committeeId"`
+	OrderId     uint64 `json:"orderId"`
+	heightRequest
+}
+
 type heightsRequest struct {
 	heightRequest
 	StartHeight uint64 `json:"startHeight"`
@@ -1057,6 +1160,7 @@ type paginatedHeightRequest struct {
 	heightRequest
 	lib.PageParams
 	lib.ValidatorFilters
+	idRequest
 }
 
 type heightAndAddressRequest struct {
@@ -1064,7 +1168,7 @@ type heightAndAddressRequest struct {
 	addressRequest
 }
 
-type heightAndNameRequest struct {
+type heightAndIdRequest struct {
 	heightRequest
 	idRequest
 }

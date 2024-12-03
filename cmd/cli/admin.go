@@ -47,6 +47,9 @@ func init() {
 	adminCmd.AddCommand(txChangeParamCmd)
 	adminCmd.AddCommand(txDAOTransferCmd)
 	adminCmd.AddCommand(txSubsidyCmd)
+	adminCmd.AddCommand(txCreateOrderCmd)
+	adminCmd.AddCommand(txEditOrderCmd)
+	adminCmd.AddCommand(txDeleteOrderCmd)
 	adminCmd.AddCommand(resourceUsageCmd)
 	adminCmd.AddCommand(peerInfoCmd)
 	adminCmd.AddCommand(peerBookCmd)
@@ -196,11 +199,38 @@ var (
 	}
 
 	txSubsidyCmd = &cobra.Command{
-		Use:   "tx-subsidy-cmd <address> <amount> <committee-id> <opcode> --fee=10000 --simulate=true",
+		Use:   "tx-subsidy <address> <amount> <committee-id> <opcode> --fee=10000 --simulate=true",
 		Short: "subsidize the reward pool of a committee - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(4),
 		Run: func(cmd *cobra.Command, args []string) {
 			writeTxResultToConsole(client.TxSubsidy(argGetAddr(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), args[3], getPassword(), !sim, fee))
+		},
+	}
+
+	txCreateOrderCmd = &cobra.Command{
+		Use:   "tx-create-order <address> <sell-amount> <receive-amount> <committee-id> <receive-address> --fee=10000 --simulate=true",
+		Short: "create a sell order - use the simulate flag to generate json only",
+		Args:  cobra.MinimumNArgs(5),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeTxResultToConsole(client.TxCreateOrder(argGetAddr(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), uint64(argToInt(args[3])), args[4], getPassword(), !sim, fee))
+		},
+	}
+
+	txEditOrderCmd = &cobra.Command{
+		Use:   "tx-edit-order <address> <sell-amount> <receive-amount> <order-id> <committee-id> <receive-address> --fee=10000 --simulate=true",
+		Short: "edit an existing sell order - use the simulate flag to generate json only",
+		Args:  cobra.MinimumNArgs(6),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeTxResultToConsole(client.TxEditOrder(argGetAddr(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), uint64(argToInt(args[3])), uint64(argToInt(args[4])), args[5], getPassword(), !sim, fee))
+		},
+	}
+
+	txDeleteOrderCmd = &cobra.Command{
+		Use:   "tx-delete-order <address> <order-id> <committee-id>--fee=10000 --simulate=true",
+		Short: "delete an existing sell order - use the simulate flag to generate json only",
+		Args:  cobra.MinimumNArgs(3),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeTxResultToConsole(client.TxDeleteOrder(argGetAddr(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), getPassword(), !sim, fee))
 		},
 	}
 

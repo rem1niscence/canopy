@@ -13,7 +13,7 @@ var queryCmd = &cobra.Command{
 }
 
 var (
-	height, startHeight, pageNumber, perPage, unstaking, delegated, paused = uint64(0), uint64(0), 0, 0, "", "", ""
+	height, startHeight, pageNumber, perPage, committee, order, unstaking, delegated, paused = uint64(0), uint64(0), 0, 0, uint64(0), uint64(0), "", "", ""
 )
 
 func init() {
@@ -21,6 +21,8 @@ func init() {
 	queryCmd.PersistentFlags().Uint64Var(&height, "start-height", 0, "starting height for queries with a range")
 	queryCmd.PersistentFlags().IntVar(&pageNumber, "page-number", 0, "page number on a paginated call")
 	queryCmd.PersistentFlags().IntVar(&perPage, "per-page", 0, "number of items per page on a paginated call")
+	queryCmd.PersistentFlags().Uint64Var(&committee, "committee", 0, "filter validators by committee id")
+	queryCmd.PersistentFlags().Uint64Var(&order, "order", 0, "the unique identifier of the sell order")
 	queryCmd.PersistentFlags().StringVar(&unstaking, "unstaking", "", "yes = only unstaking validators, no = only non-unstaking validators")
 	queryCmd.PersistentFlags().StringVar(&paused, "paused", "", "yes = only paused validators, no = only unpaused validators")
 	queryCmd.PersistentFlags().StringVar(&delegated, "delegated", "", "yes = only delegated validators, no = only non-delegated validators")
@@ -30,7 +32,12 @@ func init() {
 	queryCmd.AddCommand(poolCmd)
 	queryCmd.AddCommand(poolsCmd)
 	queryCmd.AddCommand(validatorCmd)
-	queryCmd.AddCommand(validatorsCmd)
+	queryCmd.AddCommand(committeeCmd)
+	queryCmd.AddCommand(committeeDataCmd)
+	queryCmd.AddCommand(committeesDataCmd)
+	queryCmd.AddCommand(subsidizedCommitteeCmd)
+	queryCmd.AddCommand(orderCmd)
+	queryCmd.AddCommand(ordersCmd)
 	queryCmd.AddCommand(consValidatorsCmd)
 	queryCmd.AddCommand(nonSignersCmd)
 	queryCmd.AddCommand(paramsCmd)
@@ -103,7 +110,7 @@ var (
 	}
 
 	validatorsCmd = &cobra.Command{
-		Use:   "validators --height=1 --per-page=10 --page-number=1 --unstaking=yes --paused=no",
+		Use:   "validators --height=1 --per-page=10 --page-number=1 --committee=1 --unstaking=yes --paused=no",
 		Short: "query all validators on the blockchain",
 		Run: func(cmd *cobra.Command, args []string) {
 			writeToConsole(client.Validators(getFilterArgs()))
@@ -115,6 +122,55 @@ var (
 		Short: "query all consensus participating validators on the blockchain",
 		Run: func(cmd *cobra.Command, args []string) {
 			writeToConsole(client.ConsValidators(getPaginatedArgs()))
+		},
+	}
+
+	committeeCmd = &cobra.Command{
+		Use:   "committee --height=1 --per-page=10 --page-number=1 --committee=1",
+		Short: "query committee members",
+		Run: func(cmd *cobra.Command, args []string) {
+			h, params := getPaginatedArgs()
+			writeToConsole(client.Committee(h, committee, params))
+		},
+	}
+
+	committeeDataCmd = &cobra.Command{
+		Use:   "committee-data --height=1 --committee=1",
+		Short: "query the chain metadata for a committee",
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.CommitteeData(height, committee))
+		},
+	}
+
+	committeesDataCmd = &cobra.Command{
+		Use:   "committees-data --height=1",
+		Short: "query the chain metadata for all committees",
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.CommitteesData(height))
+		},
+	}
+
+	subsidizedCommitteeCmd = &cobra.Command{
+		Use:   "subsidized-committees --height=1",
+		Short: "query a list of committees that are subsidized",
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.SubsidizedCommittees(height))
+		},
+	}
+
+	orderCmd = &cobra.Command{
+		Use:   "order --height=1 --order=1 --committee=1",
+		Short: "query a specific sell order",
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.Order(height, order, committee))
+		},
+	}
+
+	ordersCmd = &cobra.Command{
+		Use:   "orders --height=1 --committee=1",
+		Short: "query all sell orders for a committee",
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.Orders(height, committee))
 		},
 	}
 
@@ -294,6 +350,7 @@ func getFilterArgs() (h uint64, params lib.PageParams, filters lib.ValidatorFilt
 	case strings.Contains(strings.ToLower(delegated), "n"):
 		filters.Delegate = lib.FilterOption_Exclude
 	}
+	filters.Committee = committee
 	return
 }
 

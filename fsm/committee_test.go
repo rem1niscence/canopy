@@ -292,7 +292,7 @@ func TestGetPaidCommittees(t *testing.T) {
 			// set the supply back in state
 			require.NoError(t, sm.SetSupply(supply))
 			// execute the function call
-			paidCommitteeIds, err := sm.GetPaidCommittees(valParams)
+			paidCommitteeIds, err := sm.GetSubsidizedCommittees()
 			require.NoError(t, err)
 			// ensure expected = got
 			require.Equal(t, test.paidCommitteeIds, paidCommitteeIds)

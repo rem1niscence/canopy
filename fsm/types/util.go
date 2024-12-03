@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"slices"
 	"time"
 )
 
@@ -209,6 +210,11 @@ func (x *Validator) PassesFilter(f lib.ValidatorFilters) (ok bool) {
 		}
 	case f.Delegate == lib.FilterOption_Exclude:
 		if x.Delegate {
+			return
+		}
+	}
+	if f.Committee != 0 {
+		if !slices.Contains(x.Committees, f.Committee) {
 			return
 		}
 	}

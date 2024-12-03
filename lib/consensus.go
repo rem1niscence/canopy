@@ -267,11 +267,12 @@ type ValidatorFilters struct {
 	Unstaking FilterOption `json:"unstaking"`
 	Paused    FilterOption `json:"paused"`
 	Delegate  FilterOption `json:"delegate"`
+	Committee uint64       `json:"committee"`
 }
 
 // On() returns whether there exists any filters
 func (v ValidatorFilters) On() bool {
-	return v.Unstaking != FilterOption_Off || v.Paused != FilterOption_Off || v.Delegate != FilterOption_Off
+	return v.Unstaking != FilterOption_Off || v.Paused != FilterOption_Off || v.Delegate != FilterOption_Off || v.Committee != 0
 }
 
 // FilterOption symbolizes 'condition must be true (yes)' 'condition must be false (no)' or 'filter off (both)' for filters

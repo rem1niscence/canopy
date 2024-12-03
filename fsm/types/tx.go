@@ -117,6 +117,36 @@ func NewSubsidyTx(from crypto.PrivateKeyI, amount, committeeId uint64, opCode st
 	}, fee)
 }
 
+// NewCreateOrderTx() creates a CreateOrderTransaction object in the interface form of TransactionI
+func NewCreateOrderTx(from crypto.PrivateKeyI, sellAmount, requestAmount, committeeId uint64, receiveAddress []byte, fee uint64) (lib.TransactionI, lib.ErrorI) {
+	return NewTransaction(from, &MessageCreateOrder{
+		CommitteeId:          committeeId,
+		AmountForSale:        sellAmount,
+		RequestedAmount:      requestAmount,
+		SellerReceiveAddress: receiveAddress,
+		SellersSellAddress:   from.PublicKey().Address().Bytes(),
+	}, fee)
+}
+
+// NewEditOrderTx() creates an EditOrderTransaction object in the interface form of TransactionI
+func NewEditOrderTx(from crypto.PrivateKeyI, orderId, sellAmount, requestAmount, committeeId uint64, receiveAddress []byte, fee uint64) (lib.TransactionI, lib.ErrorI) {
+	return NewTransaction(from, &MessageEditOrder{
+		OrderId:              orderId,
+		CommitteeId:          committeeId,
+		AmountForSale:        sellAmount,
+		RequestedAmount:      requestAmount,
+		SellerReceiveAddress: receiveAddress,
+	}, fee)
+}
+
+// NewDeleteOrderTx() creates an DeleteOrderTransaction object in the interface form of TransactionI
+func NewDeleteOrderTx(from crypto.PrivateKeyI, orderId, committeeId uint64, fee uint64) (lib.TransactionI, lib.ErrorI) {
+	return NewTransaction(from, &MessageDeleteOrder{
+		OrderId:     orderId,
+		CommitteeId: committeeId,
+	}, fee)
+}
+
 // NewTransaction() creates a Transaction object from a message in the interface form of TransactionI
 func NewTransaction(pk crypto.PrivateKeyI, msg lib.MessageI, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	a, err := lib.NewAny(msg)

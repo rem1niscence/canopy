@@ -1,6 +1,20 @@
 # CHANGELOG
 
+## [Unreleased] - 12/2/2024
+
+- Added RPC and CLI functionality:
+    - `Get Committee Members`
+    - `Get Paid Committees`
+    - `Get All Committees Data`
+    - `Get Committee Data`
+    - `Create Sell Order Transaction`
+    - `Edit Sell Order Transaction`
+    - `Delete Sell Order Transaction`
+    - `Get Orders`
+    - `Get Order`
+
 ## [Unreleased] - 12/1/2024
+
 - Fixed startup bugs
 - Removed redundant logging
 - Added logic for gossiping block in single node network
