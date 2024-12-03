@@ -168,8 +168,8 @@ export async function getModalData(query, page) {
 export async function getCardData() {
     let cardData = {}
     cardData.blocks = await Blocks(1, 0)
-    cardData.consVals = await ConsValidators(1, 0)
-    cardData.valdiators = await ConsValidators(1, 0)
+    // cardData.consVals = await ConsValidators(1, 0)
+    // cardData.validators = await ConsValidators(1, 0)
     cardData.supply = await Supply(0, 0)
     cardData.pool = await DAO(0, 0)
     cardData.params = await Params(0, 0)

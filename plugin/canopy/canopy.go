@@ -298,17 +298,18 @@ func (p *Plugin) IntegratedChain() bool { return true }
 // HandleTx() routes an inbound transaction from the Controller
 func (p *Plugin) HandleTx(tx []byte) lib.ErrorI {
 	hash := crypto.Hash(tx)
+	hashString := lib.BytesToString(hash)
 	// indexer
 	txResult, err := p.FSM.Store().(lib.StoreI).GetTxByHash(hash)
 	if err != nil {
 		return err
 	}
 	if txResult.TxHash != "" {
-		return lib.ErrDuplicateTx(hash)
+		return lib.ErrDuplicateTx(hashString)
 	}
 	// mempool
-	if h := lib.BytesToString(hash); p.Mempool.Contains(h) {
-		return lib.ErrTxFoundInMempool(h)
+	if p.Mempool.Contains(hashString) {
+		return lib.ErrTxFoundInMempool(hashString)
 	}
 	return p.Mempool.HandleTransaction(tx)
 }

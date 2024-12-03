@@ -28,7 +28,7 @@ function formatValue(k, v, openModal) {
 function convertBlock(v) {
     let {
         last_quorum_certificate, next_validator_root, state_root, transaction_root,
-        validator_root, last_block_hash, network_id, ...value
+        validator_root, last_block_hash, network_id, vdf, ...value
     } = cpyObj(v.block_header)
     if ("num_txs" in v.block_header) {
         return value
@@ -84,6 +84,7 @@ function getTableHeader(v) {
             }
             return convertTransaction(v.results[0])
         case "block-results-page":
+            console.log(v.results)
             return convertBlock(v.results[0])
         case "accounts":
             return v.results[0]

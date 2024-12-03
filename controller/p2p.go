@@ -6,8 +6,10 @@ import (
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/p2p"
 	"math/rand"
+	"slices"
 	"time"
 )
 
@@ -99,49 +101,66 @@ func (c *Controller) SendTxMsg(committeeID uint64, tx []byte) lib.ErrorI {
 // SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
 func (c *Controller) SendCertificateResultsTx(committeeID uint64, qc *lib.QuorumCertificate) {
 	c.log.Debugf("Sending certificate results txn for: %s", lib.BytesToString(qc.ResultsHash))
+	// save the block to set it back to the object after this function completes
+	blk := qc.Block
+	defer func() { qc.Block = blk }()
+	// it's good practice to omit the block when sending the transaction as it's not relevant to canopy
+	qc.Block = nil
 	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, 0)
 	if err != nil {
 		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return
 	}
+	// check if committee is subsidized
+	subsidizedCommittees, err := c.CanopyFSM().GetSubsidizedCommittees()
+	if err != nil {
+		c.log.Errorf("Auto-certificate-results-txn stopped due error: %s", err.Error())
+		return
+	}
 	// get the pool (of funds for the committee) from the canopy blockchain
 	pool, err := c.CanopyFSM().GetPool(qc.Header.CommitteeId)
-	if err != nil || pool.Amount == 0 {
-		c.log.Errorf("Auto-proposal-txn stopped due to not subsidized")
+	if err != nil {
+		c.log.Errorf("Auto-certificate-results-txn stopped due error: %s", err.Error())
+		return
+	}
+	if !slices.Contains(subsidizedCommittees, committeeID) && pool.Amount == 0 {
+		c.log.Errorf("Auto-certificate-results-txn as committee is not subsidized")
 		return // not subsidized
 	}
 	// convert the transaction into bytes
 	bz, err := lib.Marshal(tx)
 	if err != nil {
-		c.log.Errorf("Marshalling auto-proposal-txn failed with err: %s", err.Error())
+		c.log.Errorf("Marshalling auto-certificate-results-txn failed with err: %s", err.Error())
 		return
 	}
 	// send the proposal transaction
 	if err = c.SendTxMsg(committeeID, bz); err != nil {
-		c.log.Errorf("Gossiping auto-proposal-txn failed with err: %s", err.Error())
+		c.log.Errorf("Gossiping auto-certificate-results-txn failed with err: %s", err.Error())
 		return
 	}
+	c.log.Infof("Gossipped the certificate-results-txn")
 }
 
 // GossipBlockMsg() gossips a QuorumCertificate (with block) through the P2P network for a specific committeeID
 func (c *Controller) GossipBlock(committeeID uint64, qc *lib.QuorumCertificate) {
-	// create a new pointer instance so when the results are omitted it doesn't affect other parts
-	cpy := &(*qc)
+	// save the results to add back after this function completes
+	results := qc.Results
+	defer func() { qc.Results = results }()
+	// when sending a certificate message, it's good practice to omit the 'results' field as it is only important for the Canopy Blockchain
+	qc.Results = nil
 	// get the chain associated with this quorum certificate
 	chain, err := c.GetChain(committeeID)
 	if err != nil {
 		c.log.Errorf("unable to gossip block with err: %s", err.Error())
 		return
 	}
-	// when sending a certificate message, it's good practice to omit the 'results' field as it is only important for the Canopy Blockchain
-	cpy.Results = nil
-	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(cpy.ResultsHash))
+	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(qc.ResultsHash))
 	// create the block message
 	blockMessage := &lib.BlockMessage{
 		CommitteeId:         committeeID,
 		MaxHeight:           chain.Plugin.Height(),
 		TotalVdfIterations:  chain.Plugin.TotalVDFIterations(),
-		BlockAndCertificate: cpy,
+		BlockAndCertificate: qc,
 	}
 	// gossip the block message to peers for a particular committee id
 	if err = c.P2P.SendToChainPeers(committeeID, Block, blockMessage); err != nil {
@@ -448,6 +467,7 @@ func (c *Controller) ListenForTx() {
 				c.P2P.ChangeReputation(senderID, p2p.InvalidTxRep)
 				return
 			}
+			c.log.Infof("Received valid transaction %s from %s for chain %d", crypto.HashString(txMsg.Tx), lib.BytesToString(senderID), txMsg.CommitteeId)
 			// bump peer reputation positively
 			c.P2P.ChangeReputation(senderID, p2p.GoodTxRep)
 			// gossip the transaction to peers

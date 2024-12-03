@@ -157,44 +157,38 @@ func (c *Client) Validators(height uint64, params lib.PageParams, filter lib.Val
 	return
 }
 
-func (c *Client) ConsValidators(height uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
-	p = new(lib.Page)
-	err = c.paginatedHeightRequest(ConsValidatorsRouteName, height, lib.UnknownCommitteeId, params, p)
-	return
-}
-
 func (c *Client) Committee(height uint64, id uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
 	err = c.paginatedHeightRequest(CommitteeRouteName, height, id, params, p)
 	return
 }
 
-func (c *Client) CommitteeData(height uint64, id uint64) (p *lib.Page, err lib.ErrorI) {
-	p = new(lib.Page)
+func (c *Client) CommitteeData(height uint64, id uint64) (p *types.CommitteeData, err lib.ErrorI) {
+	p = new(types.CommitteeData)
 	err = c.heightAndIdRequest(CommitteeDataRouteName, height, id, p)
 	return
 }
 
-func (c *Client) CommitteesData(height uint64) (p *lib.Page, err lib.ErrorI) {
-	p = new(lib.Page)
+func (c *Client) CommitteesData(height uint64) (p *types.CommitteesData, err lib.ErrorI) {
+	p = new(types.CommitteesData)
 	err = c.paginatedHeightRequest(CommitteesDataRouteName, height, lib.UnknownCommitteeId, lib.PageParams{}, p)
 	return
 }
 
-func (c *Client) SubsidizedCommittees(height uint64) (p *lib.Page, err lib.ErrorI) {
-	p = new(lib.Page)
+func (c *Client) SubsidizedCommittees(height uint64) (p *[]uint64, err lib.ErrorI) {
+	p = new([]uint64)
 	err = c.heightRequest(SubsidizedCommitteesRouteName, height, p)
 	return
 }
 
-func (c *Client) Order(height, orderId, committeeId uint64) (p *lib.Page, err lib.ErrorI) {
-	p = new(lib.Page)
+func (c *Client) Order(height, orderId, committeeId uint64) (p *types.SellOrder, err lib.ErrorI) {
+	p = new(types.SellOrder)
 	err = c.orderRequest(OrderRouteName, height, orderId, committeeId, p)
 	return
 }
 
-func (c *Client) Orders(height, committeeId uint64) (p *lib.Page, err lib.ErrorI) {
-	p = new(lib.Page)
+func (c *Client) Orders(height, committeeId uint64) (p *types.OrderBook, err lib.ErrorI) {
+	p = new(types.OrderBook)
 	err = c.heightAndIdRequest(OrdersRouteName, height, committeeId, p)
 	return
 }

@@ -11,7 +11,7 @@ import (
 // ApplyTransaction() processes the transaction within the state machine, returning the corresponding TxResult.
 func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash string) (*lib.TxResult, lib.ErrorI) {
 	// validate the transaction and get the check result
-	result, err := s.CheckTx(transaction)
+	result, err := s.CheckTx(transaction, txHash)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 }
 
 // CheckTx() validates the transaction object
-func (s *StateMachine) CheckTx(transaction []byte) (result *CheckTxResult, err lib.ErrorI) {
+func (s *StateMachine) CheckTx(transaction []byte, txHash string) (result *CheckTxResult, err lib.ErrorI) {
 	// convert the transaction bytes into an object
 	tx := new(lib.Transaction)
 	if err = lib.Unmarshal(transaction, tx); err != nil {
@@ -47,7 +47,7 @@ func (s *StateMachine) CheckTx(transaction []byte) (result *CheckTxResult, err l
 		return
 	}
 	// validate the timestamp (prune friendly - replay protection)
-	if err = s.CheckTimestamp(tx); err != nil {
+	if err = s.CheckReplay(tx, txHash); err != nil {
 		return
 	}
 	// perform basic validations against the message payload
@@ -116,18 +116,33 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (cr
 	return nil, types.ErrUnauthorizedTx()
 }
 
-// CheckTimestamp() validates the timestamp of the transaction
+// CheckReplay() validates the timestamp of the transaction
 // Instead of using an increasing 'sequence number' Canopy uses timestamps to act as a prune-friendly, replay attack / hash collision prevention mechanism
 //   - Canopy searches the transaction indexer for the transaction using its hash to prevent 'replay attacks'
 //   - The timestamp protects against hash collisions as it injects 'micro-second level entropy'
 //     into the hash of the transaction, ensuring no transactions will 'accidentally collide'
 //   - The timestamp acceptance policy for transactions maintains an acceptable bound of time to support database pruning
-func (s *StateMachine) CheckTimestamp(tx *lib.Transaction) lib.ErrorI {
+func (s *StateMachine) CheckReplay(tx *lib.Transaction, txHash string) lib.ErrorI {
 	height := s.Height()
 	if height < 2 {
 		return nil
 	}
-	block, err := s.LoadBlock(height - 1)
+	store, ok := s.store.(lib.StoreI)
+	if !ok {
+		return types.ErrWrongStoreType()
+	}
+	// convert the hash to bytes
+	hash, err := lib.StringToBytes(txHash)
+	if err != nil {
+		return err
+	}
+	// ensure the tx doesn't already exist
+	txResult, err := store.GetTxByHash(hash)
+	if txResult.TxHash != "" {
+		return lib.ErrDuplicateTx(txHash)
+	}
+	// get the latest block for the timestamp
+	block, err := store.GetBlockByHeight(height - 1)
 	if err != nil {
 		return err
 	}

@@ -19,9 +19,9 @@ function getCardInfo1(props, idx) {
             return "+" + formatNumber(blks.results[0].block_header.num_txs)
         case 3:
             let totalStake = 0
-            props.consVals.results.forEach(function (validator) {
-                totalStake += Number(validator.voting_power)
-            })
+            // props.consVals.results.forEach(function (validator) { TODO fix
+            //     totalStake += Number(validator.voting_power)
+            // })
             return <>{formatNumber(totalStake)}<span style={{fontSize: "14px"}}>{" stake"}</span></>
     }
 }
@@ -36,7 +36,8 @@ function getCardInfo2(props, idx) {
         case 2:
             return "blk size: " + formatBytes(v.results[0].meta.size)
         case 3:
-            return props.consVals.results.length + " unique vals"
+            // return props.consVals.results.length + " unique vals" TODO fix
+            return 1 + " unique vals"
     }
 }
 
@@ -65,7 +66,8 @@ function getCardInfo4(props, idx) {
         case 2:
             return "TOTAL " + formatNumber(v.results[0].block_header.total_txs)
         case 3:
-            return "MaxStake: " + formatNumber(props.consVals.results[0].voting_power, 1000)
+            // return "MaxStake: " + formatNumber(props.consVals.results[0].voting_power, 1000) TODO fix
+            return "MaxStake: " + formatNumber(1000000, 1000)
         default:
             return "?"
     }
@@ -94,9 +96,9 @@ function getCardInfo5(props, idx) {
             return "Average fee in last blk: " + formatNumber(totalFee / txs.length, 1000000)
         case 3:
             let totalStake = 0
-            props.consVals.results.forEach(function (validator) {
-                totalStake += Number(validator.voting_power)
-            })
+            // props.consVals.results.forEach(function (validator) { TODO fix
+            //     totalStake += Number(validator.voting_power)
+            // })
             return (totalStake / props.supply.staked * 100).toFixed(1) + "% in consensus"
     }
 }

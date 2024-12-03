@@ -171,7 +171,7 @@ func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFile
 			PublicKey:    consPubKey.Bytes(),
 			Committees:   []uint64{lib.CanopyCommitteeId},
 			NetAddress:   "http://localhost:9000",
-			StakedAmount: 1000000000000000000,
+			StakedAmount: 1000000000000,
 			Output:       addr.Bytes(),
 		}},
 		Params: types.DefaultParams(),

@@ -197,7 +197,7 @@ func TestCheckTx(t *testing.T) {
 				},
 			}))
 			// execute the function call
-			got, err := sm.CheckTx(test.tx)
+			got, err := sm.CheckTx(test.tx, crypto.HashString(test.tx))
 			// validate the expected error
 			require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {
@@ -336,7 +336,7 @@ func TestCheckSignature(t *testing.T) {
 	}
 }
 
-func TestCheckTimestamp(t *testing.T) {
+func TestCheckReplay(t *testing.T) {
 	start := time.Now()
 	tests := []struct {
 		name          string
@@ -406,7 +406,7 @@ func TestCheckTimestamp(t *testing.T) {
 				},
 			}))
 			// execute the function call
-			err := sm.CheckTimestamp(test.tx)
+			err := sm.CheckReplay(test.tx, crypto.HashString([]byte("hash")))
 			// validate the expected error
 			require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {

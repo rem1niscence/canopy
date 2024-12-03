@@ -49,7 +49,6 @@ const (
 	PoolsRouteName                = "pools"
 	ValidatorRouteName            = "validator"
 	ValidatorsRouteName           = "validators"
-	ConsValidatorsRouteName       = "cons-validators"
 	NonSignersRouteName           = "non-signers"
 	SupplyRouteName               = "supply"
 	ParamRouteName                = "params"
@@ -225,10 +224,10 @@ func StartRPC(a *app2.Controller, c lib.Config, l lib.LoggerI) {
 			Handler: cor.Handler(http.TimeoutHandler(router.NewAdmin(), timeout, ErrServerTimeout().Error())),
 		}).ListenAndServe().Error())
 	}()
-	l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
-	runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
-	l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
-	runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
+	//l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
+	//runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
+	//l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
+	//runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
 	//go pollValidators(time.Minute)
 }
 
@@ -436,6 +435,12 @@ func Validator(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 func Validators(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	heightPaginated(w, r, func(s *fsm.StateMachine, p *paginatedHeightRequest) (interface{}, lib.ErrorI) {
 		return s.GetValidatorsPaginated(p.PageParams, p.ValidatorFilters)
+	})
+}
+
+func ConsValidators(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightPaginated(w, r, func(s *fsm.StateMachine, p *paginatedHeightRequest) (interface{}, lib.ErrorI) {
+		return s.GetValidatorsPaginated(p.PageParams)
 	})
 }
 

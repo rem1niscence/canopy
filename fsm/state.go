@@ -138,10 +138,20 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 func (s *StateMachine) ApplyTransactions(block *lib.Block) (results []*lib.TxResult, root []byte, n int, er lib.ErrorI) {
 	var txBytes [][]byte
 	blockSize := uint64(0)
+	// use a map to check the block transactions for duplicates (replays)
+	duplicates := make(map[string]struct{})
 	// iterates over each transaction in the block
 	for index, tx := range block.Transactions {
+		// calculate the hex string of the hash of the transaction
+		hashString := crypto.HashString(tx)
+		// check if it's a duplicate
+		if _, isDuplicate := duplicates[hashString]; isDuplicate {
+			return results, root, n, lib.ErrDuplicateTx(hashString)
+		}
+		// add duplicate map
+		duplicates[hashString] = struct{}{}
 		// apply the tx to the state machine, generating a transaction result
-		result, err := s.ApplyTransaction(uint64(index), tx, crypto.HashString(tx))
+		result, err := s.ApplyTransaction(uint64(index), tx, hashString)
 		if err != nil {
 			return nil, nil, 0, err
 		}

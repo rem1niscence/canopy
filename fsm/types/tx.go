@@ -99,12 +99,7 @@ func NewDAOTransferTx(from crypto.PrivateKeyI, amount, start, end, fee uint64) (
 
 // NewCertificateResultsTx() creates a CertificateResultsTransaction object in the interface form of TransactionI
 func NewCertificateResultsTx(from crypto.PrivateKeyI, qc *lib.QuorumCertificate, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	// omit the block in a way that won't affect the original
-	a := *qc
-	a.Block = nil
-	return NewTransaction(from, &MessageCertificateResults{
-		Qc: &a,
-	}, fee)
+	return NewTransaction(from, &MessageCertificateResults{Qc: qc}, fee)
 }
 
 // NewSubsidyTx() creates a SubsidyTransaction object in the interface form of TransactionI

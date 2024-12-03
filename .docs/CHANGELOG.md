@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [Unreleased] - 12/3/2024
+
+- Fixed `RPC client` return types for the below endpoints
+- Addressed the `committee stake` bug
+- Retroactively filled in changelog for september and october gap
+- Added replay attack protection logic for transactions
+
 ## [Unreleased] - 12/2/2024
 
 - Added RPC and CLI functionality:
@@ -46,12 +53,52 @@
 
 ## [Unreleased] - 11/07/2024
 
-- Reviving changelog
-- Added unit 400+ tests for FSM module
-- Fully documented the FSM module
-- Added comments to the .proto files
+- Finished comments to the .proto files
 - Renamed the project from codename to `Canopy`
 - Removed fuzzer (for now)
+
+## [Unreleased] - 10/27/2024
+
+- Added comments to `/lib/proto` codec
+- Added comments to `/lib/proto` consensus
+- Added comments to `/lib/proto` crypto
+- Added comments to `/lib/proto` genesis
+- Added comments to `/lib/proto` gov
+- Added comments to `/lib/proto` message
+- Added comments to `/lib/proto` p2p
+- Added comments to `/lib/proto` peer
+- Added comments to `/lib/proto` store
+- Added comments to `/lib/proto` swap
+
+## [Unreleased] - 10/13/2024
+
+- Added comments to `/lib/proto` account
+- Added comments to `/lib/proto` bft
+- Added comments to `/lib/proto` certificate
+- Added FSM tests for validator
+- Commented that same file
+
+## [Unreleased] - 09/29/2024
+
+- Added FSM tests for swap
+- Added FSM tests for transaction
+- Added FSM tests for message
+- Added FSM tests for state
+- Commented the same files
+
+## [Unreleased] - 09/15/2024
+
+- Added FSM tests for byzantine
+- Added FSM tests for committee
+- Added FSM tests for genesis
+- Added FSM tests for gov
+- Commented the same files
+
+## [Unreleased] - 09/01/2024
+
+- Added FSM tests for account
+- Added FSM tests for automatic
+- Commented the same files
 
 ## [Unreleased] - 08/16/2024
 

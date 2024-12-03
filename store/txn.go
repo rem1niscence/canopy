@@ -28,7 +28,7 @@ var _ lib.StoreTxnI = &Txn{}
 */
 
 type Txn struct {
-	parent lib.RWStoreI // memory store to Write() to
+	lib.StoreI // memory store to Write() to
 	txn
 }
 
@@ -46,8 +46,8 @@ type op struct {
 }
 
 // NewTxn() creates a new instance of a Txn with the specified parent store
-func NewTxn(parent lib.RWStoreI) *Txn {
-	return &Txn{parent: parent, txn: txn{ops: make(map[string]op), sorted: make([]string, 0)}}
+func NewTxn(parent lib.StoreI) *Txn {
+	return &Txn{StoreI: parent, txn: txn{ops: make(map[string]op), sorted: make([]string, 0)}}
 }
 
 // Get() retrieves the value for a given key from either the in-memory operations or the parent store
@@ -55,7 +55,7 @@ func (c *Txn) Get(key []byte) ([]byte, lib.ErrorI) {
 	if v, found := c.ops[string(key)]; found {
 		return v.value, nil
 	}
-	return c.parent.Get(key)
+	return c.StoreI.Get(key)
 }
 
 // Set() adds or updates the value for a key in the in-memory operations
@@ -83,7 +83,7 @@ func (c *Txn) addToSorted(key string) {
 
 // Iterator() returns a new iterator for merged iteration of both the in-memory operations and parent store with the given prefix
 func (c *Txn) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
-	parent, err := c.parent.Iterator(prefix)
+	parent, err := c.StoreI.Iterator(prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (c *Txn) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 
 // RevIterator() returns a new reverse iterator for merged iteration of both the in-memory operations and parent store with the given prefix
 func (c *Txn) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
-	parent, err := c.parent.RevIterator(prefix)
+	parent, err := c.StoreI.RevIterator(prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -106,11 +106,11 @@ func (c *Txn) Discard() { c.ops, c.sorted, c.sortedLen = nil, nil, 0 }
 func (c *Txn) Write() (err lib.ErrorI) {
 	for k, v := range c.ops {
 		if v.delete {
-			if err = c.parent.Delete([]byte(k)); err != nil {
+			if err = c.StoreI.Delete([]byte(k)); err != nil {
 				return
 			}
 		} else {
-			if err = c.parent.Set([]byte(k), v.value); err != nil {
+			if err = c.StoreI.Set([]byte(k), v.value); err != nil {
 				return
 			}
 		}

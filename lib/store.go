@@ -78,6 +78,8 @@ type RIndexerI interface {
 type StoreTxnI interface {
 	WStoreI
 	RStoreI
+	RIndexerI
+	WIndexerI
 	Write() ErrorI
 	Discard()
 }

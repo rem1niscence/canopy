@@ -313,7 +313,7 @@ func (p *P2P) IsSelf(a *lib.PeerAddress) bool {
 func (p *P2P) SelfSend(fromPublicKey []byte, topic lib.Topic, payload proto.Message) lib.ErrorI {
 	p.log.Debugf("Self sending %s message", topic)
 	p.Inbox(topic) <- (&lib.MessageAndMetadata{
-		Message: payload,
+		Message: proto.Clone(payload),
 		Sender:  &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: fromPublicKey}},
 	}).WithHash()
 	return nil

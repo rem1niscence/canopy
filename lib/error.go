@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math"
 	"runtime"
@@ -589,8 +588,8 @@ func ErrWrongCommitteeID() ErrorI {
 	return NewError(CodeWrongCommitteeID, StateMachineModule, "wrong committee id")
 }
 
-func ErrDuplicateTx(hash []byte) ErrorI {
-	return NewError(CodeDuplicateTransaction, ConsensusModule, fmt.Sprintf("tx %s is a duplicate", hex.EncodeToString(hash)))
+func ErrDuplicateTx(hash string) ErrorI {
+	return NewError(CodeDuplicateTransaction, ConsensusModule, fmt.Sprintf("tx %s is a duplicate", hash))
 }
 
 func ErrMaxTxSize() ErrorI {
