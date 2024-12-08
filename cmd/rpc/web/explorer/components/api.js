@@ -9,7 +9,6 @@ const txsByRec = "/v1/query/txs-by-rec"
 const txsByHeightPath = "/v1/query/txs-by-height"
 const pendingPath = "/v1/query/pending"
 const validatorsPath = "/v1/query/validators"
-const consValidatorsPath = "/v1/query/cons-validators"
 const accountsPath = "/v1/query/accounts"
 const poolPath = "/v1/query/pool"
 const accountPath = "/v1/query/account"
@@ -34,12 +33,16 @@ function heightAndAddrRequest(height, address) {
     return JSON.stringify({height: height, address: address})
 }
 
-function heightAndNameRequest(height, name) {
-    return JSON.stringify({height: height, name: name})
+function heightAndIDRequest(height, id) {
+    return JSON.stringify({height: height, id: id})
 }
 
 function pageHeightReq(page, height) {
     return JSON.stringify({pageNumber: page, perPage: 10, height: height})
+}
+
+function validatorsReq(page, height, committee) {
+    return JSON.stringify({height: height, pageNumber: page, perPage: 10, committee: committee})
 }
 
 export async function POST(request, path) {
@@ -72,12 +75,12 @@ export function Validators(page, _) {
     return POST(pageHeightReq(page, 0), validatorsPath)
 }
 
-export function ConsValidators(page, _) {
-    return POST(pageHeightReq(page, 0), consValidatorsPath)
+export function Committee(page, committee_id) {
+    return POST(validatorsReq(page, 0, committee_id), validatorsPath)
 }
 
 export function DAO(height, _) {
-    return POST(heightAndNameRequest(height, "DAO"), poolPath)
+    return POST(heightAndIDRequest(height, 4294967296), poolPath)
 }
 
 export function Account(height, address) {
@@ -168,8 +171,7 @@ export async function getModalData(query, page) {
 export async function getCardData() {
     let cardData = {}
     cardData.blocks = await Blocks(1, 0)
-    // cardData.consVals = await ConsValidators(1, 0)
-    // cardData.validators = await ConsValidators(1, 0)
+    cardData.canopyCommittee = await Committee(1, 1)
     cardData.supply = await Supply(0, 0)
     cardData.pool = await DAO(0, 0)
     cardData.params = await Params(0, 0)
@@ -182,7 +184,7 @@ export async function getDataForTable(page, category) {
         case 0:
             return await Blocks(page, 0)
         case 1:
-            return await Transactions(page, 18179)
+            return await Transactions(page, 0)
         case 2:
             return await Pending(page, 0)
         case 3:

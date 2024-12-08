@@ -4,7 +4,7 @@ import {JsonViewer} from '@textea/json-viewer'
 import {Modal, Table, Tab, Tabs, CardGroup, Card, Toast, ToastContainer, Button} from 'react-bootstrap'
 import * as API from "@/components/api";
 import {
-    clipboard, convertNonIndexTransactions, cpyObj, formatBlock, formatIfTime, isEmpty,
+    clipboard, convertNonIndexTransactions, cpyObj, formatBlock, formatCertificateResults, formatIfTime, isEmpty,
     pagination, upperCaseAndRepUnderscore, withTooltip
 } from "@/components/util";
 
@@ -49,7 +49,11 @@ function formatTabData(state, v, tab) {
         }
     } else if ("transaction" in v) {
         if (tab === 0) {
-            return cpyObj(v.transaction.msg)
+            let cpy = cpyObj(v.transaction.msg)
+            if ("qc" in cpy) {
+                cpy = formatCertificateResults(cpy.qc)
+            }
+            return cpy
         } else if (tab === 1) {
             let {msg, signature, ...value} = v.transaction
             return value

@@ -26,9 +26,10 @@ function formatValue(k, v, openModal) {
 }
 
 function convertBlock(v) {
+    // list of values to omit
     let {
         last_quorum_certificate, next_validator_root, state_root, transaction_root,
-        validator_root, last_block_hash, network_id, vdf, ...value
+        validator_root, last_block_hash, network_id, total_vdf_iterations, vdf, ...value
     } = cpyObj(v.block_header)
     if ("num_txs" in v.block_header) {
         return value
@@ -84,7 +85,6 @@ function getTableHeader(v) {
             }
             return convertTransaction(v.results[0])
         case "block-results-page":
-            console.log(v.results)
             return convertBlock(v.results[0])
         case "accounts":
             return v.results[0]
@@ -100,6 +100,7 @@ function getTableBody(v) {
     switch (v.type) {
         case "tx-results-page":
         case "pending-results-page":
+            console.log(v)
             if (v.results == null) {
                 return [0]
             }

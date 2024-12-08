@@ -19,9 +19,9 @@ function getCardInfo1(props, idx) {
             return "+" + formatNumber(blks.results[0].block_header.num_txs)
         case 3:
             let totalStake = 0
-            // props.consVals.results.forEach(function (validator) { TODO fix
-            //     totalStake += Number(validator.voting_power)
-            // })
+            props.canopyCommittee.results.forEach(function (validator) {
+                totalStake += Number(validator.staked_amount)
+            })
             return <>{formatNumber(totalStake)}<span style={{fontSize: "14px"}}>{" stake"}</span></>
     }
 }
@@ -36,8 +36,7 @@ function getCardInfo2(props, idx) {
         case 2:
             return "blk size: " + formatBytes(v.results[0].meta.size)
         case 3:
-            // return props.consVals.results.length + " unique vals" TODO fix
-            return 1 + " unique vals"
+            return props.canopyCommittee.results.length + " unique vals"
     }
 }
 
@@ -51,7 +50,7 @@ function getCardInfo3(props, idx) {
         case 2:
             return "block #" + v.results[0].block_header.height
         case 3:
-            return "threshold " + formatNumber(props.params.Validator.validator_min_stake, 1000)
+            return "stake threshold " + formatNumber(props.params.Validator.validator_stake_percent_for_subsidized_committee, 1000) + "%"
     }
 }
 
@@ -62,12 +61,12 @@ function getCardInfo4(props, idx) {
             return <div style={{height: "25px", paddingTop: "10px"}}><Truncate text={v.results[0].block_header.hash}/>
             </div>
         case 1:
-            return "+" + Number(props.params.Validator.validator_block_reward) / 1000000 + "/blk"
+            return "+" + Number(50) + "/blk"
         case 2:
             return "TOTAL " + formatNumber(v.results[0].block_header.total_txs)
         case 3:
-            // return "MaxStake: " + formatNumber(props.consVals.results[0].voting_power, 1000) TODO fix
-            return "MaxStake: " + formatNumber(1000000, 1000)
+            return "MaxStake: " + formatNumber(props.canopyCommittee.results[0].staked_amount, 1000)
+
         default:
             return "?"
     }
@@ -96,10 +95,10 @@ function getCardInfo5(props, idx) {
             return "Average fee in last blk: " + formatNumber(totalFee / txs.length, 1000000)
         case 3:
             let totalStake = 0
-            // props.consVals.results.forEach(function (validator) { TODO fix
-            //     totalStake += Number(validator.voting_power)
-            // })
-            return (totalStake / props.supply.staked * 100).toFixed(1) + "% in consensus"
+            props.canopyCommittee.results.forEach(function (validator) {
+                totalStake += Number(validator.staked_amount)
+            })
+            return (totalStake / props.supply.staked * 100).toFixed(1) + "% in canopy committee"
     }
 }
 

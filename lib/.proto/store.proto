@@ -56,3 +56,7 @@ message SparseCompactMerkleProof {
   // required for updatable proofs. For unupdatable proofs, is nil.
   bytes SiblingData = 5;
 }
+
+message SMTNode {
+
+}

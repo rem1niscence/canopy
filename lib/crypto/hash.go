@@ -12,6 +12,7 @@ const (
 )
 
 var (
+	MinHash = bytes.Repeat([]byte{0x00}, HashSize)
 	MaxHash = bytes.Repeat([]byte{0xFF}, HashSize)
 )
 

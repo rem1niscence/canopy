@@ -258,6 +258,6 @@ const (
 	ProposalsFilePath      = "proposals.json"
 	UnknownCommitteeId     = uint64(0)
 	CanopyCommitteeId      = uint64(1)
-	DAOPoolID              = math.MaxUint64
+	DAOPoolID              = math.MaxUint32 + 1
 	CanopyMainnetNetworkId = 1
 )

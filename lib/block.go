@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"time"
 )
 
 /*
@@ -108,7 +107,7 @@ type jsonBlockHeader struct {
 	Height                uint64             `json:"height,omitempty"`
 	Hash                  HexBytes           `json:"hash,omitempty"`
 	NetworkId             uint32             `json:"network_id,omitempty"`
-	Time                  string             `json:"time,omitempty"`
+	Time                  uint64             `json:"time,omitempty"`
 	NumTxs                uint64             `json:"num_txs,omitempty"`
 	TotalTxs              uint64             `json:"total_txs,omitempty"`
 	TotalVdfIterations    uint64             `json:"total_vdf_iterations,omitempty"`
@@ -128,7 +127,7 @@ func (x BlockHeader) MarshalJSON() ([]byte, error) {
 		Height:                x.Height,
 		Hash:                  x.Hash,
 		NetworkId:             x.NetworkId,
-		Time:                  time.UnixMicro(int64(x.Time)).Format(time.DateTime),
+		Time:                  x.Time,
 		NumTxs:                x.NumTxs,
 		TotalTxs:              x.TotalTxs,
 		TotalVdfIterations:    x.TotalVdfIterations,
@@ -149,15 +148,15 @@ func (x *BlockHeader) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &j); err != nil {
 		return err
 	}
-	t, err := time.Parse(time.DateTime, j.Time)
-	if err != nil {
-		return err
-	}
+	//t, err := time.Parse(time.DateTime, j.Time)
+	//if err != nil {
+	//	return err
+	//}
 	*x = BlockHeader{
 		Height:                j.Height,
 		Hash:                  j.Hash,
 		NetworkId:             j.NetworkId,
-		Time:                  uint64(t.UnixMicro()),
+		Time:                  j.Time,
 		NumTxs:                j.NumTxs,
 		TotalTxs:              j.TotalTxs,
 		TotalVdfIterations:    j.TotalVdfIterations,

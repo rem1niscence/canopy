@@ -33,10 +33,11 @@ Date.prototype.addMS = function (s) {
     return this;
 }
 
-export function addDate(date, duration) {
+export function addDate(value, duration) {
+    const milliseconds = Math.floor(value / 1000)
+    const date = new Date(milliseconds)
     let ms = string_to_milliseconds(duration)
-    let d = new Date(Date.parse(date + " UTC"))
-    return d.addMS(ms).toLocaleTimeString()
+    return date.addMS(ms).toLocaleTimeString()
 }
 
 export function formatBytes(a, b = 2) {
@@ -46,8 +47,11 @@ export function formatBytes(a, b = 2) {
 }
 
 export function formatTime(value) {
-    let d = new Date(Date.parse(value + " UTC"))
-    return d.toLocaleTimeString()
+    const milliseconds = Math.floor(value / 1000)
+    const date = new Date(milliseconds)
+    // let d = new Date(Date.parse(value + " UTC"))
+    // console.log(d)
+    return date.toLocaleTimeString()
 }
 
 export function formatIfTime(key, value) {
@@ -148,9 +152,20 @@ export function convertNonIndexTransactions(txs) {
 }
 
 export function formatBlock(blk) {
+    // list of values to omit
     let {
         last_quorum_certificate, next_validator_root, state_root, transaction_root,
-        validator_root, last_block_hash, network_id, ...value
+        validator_root, last_block_hash, network_id, vdf, ...value
     } = blk.block.block_header
     return value
+}
+
+export function formatCertificateResults(qc) {
+    return {
+        "certificate_height":qc.header.height,
+        "network_id":qc.header.networkID,
+        "committee_id":qc.header.committeeID,
+        "block_hash":qc.blockHash,
+        "results_hash":qc.resultsHash,
+    }
 }

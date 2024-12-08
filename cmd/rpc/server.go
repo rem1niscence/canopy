@@ -438,15 +438,9 @@ func Validators(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	})
 }
 
-func ConsValidators(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	heightPaginated(w, r, func(s *fsm.StateMachine, p *paginatedHeightRequest) (interface{}, lib.ErrorI) {
-		return s.GetValidatorsPaginated(p.PageParams)
-	})
-}
-
 func Committee(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	heightPaginated(w, r, func(s *fsm.StateMachine, p *paginatedHeightRequest) (interface{}, lib.ErrorI) {
-		return s.GetCommitteePaginated(p.PageParams, p.ID)
+		return s.GetCommitteePaginated(p.PageParams, p.ValidatorFilters.Committee)
 	})
 }
 
@@ -1165,7 +1159,6 @@ type paginatedHeightRequest struct {
 	heightRequest
 	lib.PageParams
 	lib.ValidatorFilters
-	idRequest
 }
 
 type heightAndAddressRequest struct {

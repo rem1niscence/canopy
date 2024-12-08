@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [Unreleased] - 12/5/2024
+- Started the SMT logic in store package
+
+## [Unreleased] - 12/4/2024
+- Fixed bugs in the `block_explorer`
+- Fixed `block-by-height` CLI bug
+- Renamed `block-by-height` to block in cli
+- Reverted `block timestamp` to unix micro
+
 ## [Unreleased] - 12/3/2024
 
 - Fixed `RPC client` return types for the below endpoints

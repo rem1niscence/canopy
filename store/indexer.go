@@ -107,7 +107,7 @@ func (t *Indexer) GetBlocks(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 			return e
 		}
 		// do not capture the 1 additional block that is needed for the metadata
-		if count < p.PerPage {
+		if count < page.PerPage {
 			results = append(results, block)
 		}
 		// block meta is never stored, just calculated at read time

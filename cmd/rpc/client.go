@@ -50,7 +50,7 @@ func (c *Client) BlockByHash(hash string) (p *lib.BlockResult, err lib.ErrorI) {
 
 func (c *Client) Blocks(params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(BlocksRouteName, 0, 0, params, p)
+	err = c.paginatedHeightRequest(BlocksRouteName, 0, params, p)
 	return
 }
 
@@ -105,7 +105,7 @@ func (c *Client) TransactionByHash(hash string) (p *lib.TxResult, err lib.ErrorI
 
 func (c *Client) TransactionsByHeight(height uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(TxsByHeightRouteName, height, lib.UnknownCommitteeId, params, p)
+	err = c.paginatedHeightRequest(TxsByHeightRouteName, height, params, p)
 	return
 }
 
@@ -129,7 +129,7 @@ func (c *Client) Account(height uint64, address string) (p *types.Account, err l
 
 func (c *Client) Accounts(height uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(AccountsRouteName, height, lib.UnknownCommitteeId, params, p)
+	err = c.paginatedHeightRequest(AccountsRouteName, height, params, p)
 	return
 }
 
@@ -141,7 +141,7 @@ func (c *Client) Pool(height uint64, id uint64) (p *types.Pool, err lib.ErrorI) 
 
 func (c *Client) Pools(height uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(PoolsRouteName, height, lib.UnknownCommitteeId, params, p)
+	err = c.paginatedHeightRequest(PoolsRouteName, height, params, p)
 	return
 }
 
@@ -153,13 +153,13 @@ func (c *Client) Validator(height uint64, address string) (p *types.Validator, e
 
 func (c *Client) Validators(height uint64, params lib.PageParams, filter lib.ValidatorFilters) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(ValidatorsRouteName, height, lib.UnknownCommitteeId, params, p, filter)
+	err = c.paginatedHeightRequest(ValidatorsRouteName, height, params, p, filter)
 	return
 }
 
 func (c *Client) Committee(height uint64, id uint64, params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	p = new(lib.Page)
-	err = c.paginatedHeightRequest(CommitteeRouteName, height, id, params, p)
+	err = c.paginatedHeightRequest(CommitteeRouteName, height, params, p, lib.ValidatorFilters{Committee: id})
 	return
 }
 
@@ -171,7 +171,7 @@ func (c *Client) CommitteeData(height uint64, id uint64) (p *types.CommitteeData
 
 func (c *Client) CommitteesData(height uint64) (p *types.CommitteesData, err lib.ErrorI) {
 	p = new(types.CommitteesData)
-	err = c.paginatedHeightRequest(CommitteesDataRouteName, height, lib.UnknownCommitteeId, lib.PageParams{}, p)
+	err = c.paginatedHeightRequest(CommitteesDataRouteName, height, lib.PageParams{}, p)
 	return
 }
 
@@ -598,7 +598,7 @@ func (c *Client) keystoreRequest(routeName string, keystoreRequest keystoreReque
 	return
 }
 
-func (c *Client) paginatedHeightRequest(routeName string, height, committeeId uint64, p lib.PageParams, ptr any, filters ...lib.ValidatorFilters) (err lib.ErrorI) {
+func (c *Client) paginatedHeightRequest(routeName string, height uint64, p lib.PageParams, ptr any, filters ...lib.ValidatorFilters) (err lib.ErrorI) {
 	var vf lib.ValidatorFilters
 	if filters != nil {
 		vf = filters[0]
@@ -607,7 +607,6 @@ func (c *Client) paginatedHeightRequest(routeName string, height, committeeId ui
 		heightRequest:    heightRequest{height},
 		PageParams:       p,
 		ValidatorFilters: vf,
-		idRequest:        idRequest{committeeId},
 	})
 	if err != nil {
 		return
