@@ -57,6 +57,15 @@ message SparseCompactMerkleProof {
   bytes SiblingData = 5;
 }
 
-message SMTNode {
-
+// Node represents a single element in a sparse Merkle tree
+// It stores the cryptographic hash of data and the structural information
+// required to traverse and reconstruct the tree
+message Node {
+  // Value: is the cryptographic hash of the data included in the database
+  // the ValueHash is included in the parent hash
+  bytes Value = 1;
+  // LeftChildKey: is the key for the left child node. Nil means no child
+  bytes LeftChildKey = 2;
+  // RightChildKey: is the key for the right child node. Nil means no child
+  bytes RightChildKey = 3;
 }

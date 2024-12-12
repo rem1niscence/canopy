@@ -41,7 +41,7 @@ func TestFuzzTxn(t *testing.T) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").
 		WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	store := NewTxn(NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), stateStorePrefix))
+	store, err := NewStoreInMemory(lib.NewDefaultLogger())
 	keys := make([]string, 0)
 	compareStore := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), stateStorePrefix)
 	for i := 0; i < 1000; i++ {

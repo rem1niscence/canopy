@@ -12,7 +12,8 @@ import (
 func TestTxnWriteSetGet(t *testing.T) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	parent := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), stateStorePrefix)
+	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
+	require.NoError(t, err)
 	test := NewTxn(parent)
 	defer func() { parent.Close(); db.Close(); test.Discard() }()
 	require.NoError(t, test.Set([]byte("1/a"), []byte("a")))
@@ -38,7 +39,7 @@ func TestTxnWriteSetGet(t *testing.T) {
 func TestTxnWriteDelete(t *testing.T) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	parent := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), stateStorePrefix)
+	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
 	test := NewTxn(parent)
 	defer func() { parent.Close(); db.Close(); test.Discard() }()
 	require.NoError(t, test.Set([]byte("1/a"), []byte("a")))
@@ -59,7 +60,7 @@ func TestTxnWriteDelete(t *testing.T) {
 func TestTxnIterateNilPrefix(t *testing.T) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	parent := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), stateStorePrefix)
+	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
 	test := NewTxn(parent)
 	defer func() { parent.Close(); db.Close(); test.Discard() }()
 	bulkSetKV(t, test, "", "c", "a", "b")
@@ -106,7 +107,7 @@ func TestTxnIterateNilPrefix(t *testing.T) {
 func TestTxnIterateBasic(t *testing.T) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	parent := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), stateStorePrefix)
+	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
 	test := NewTxn(parent)
 	defer func() { parent.Close(); db.Close(); test.Discard() }()
 	bulkSetKV(t, test, "0/", "c", "a", "b")
@@ -155,7 +156,7 @@ func TestTxnIterateBasic(t *testing.T) {
 func TestTxnIterateMixed(t *testing.T) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	parent := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), stateStorePrefix)
+	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
 	test := NewTxn(parent)
 	defer func() { parent.Close(); db.Close(); test.Discard() }()
 	bulkSetKV(t, parent, "1/", "f", "e", "d")
@@ -221,7 +222,7 @@ func TestTxnIterateMixed(t *testing.T) {
 func TestTxnIterateMixedWithDeletedValues(t *testing.T) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	parent := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), stateStorePrefix)
+	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
 	test := NewTxn(parent)
 	defer func() { parent.Close(); db.Close(); test.Discard() }()
 	bulkSetKV(t, parent, "1/", "f", "e", "d")
@@ -266,7 +267,7 @@ func TestTxnIterateMixedWithDeletedValues(t *testing.T) {
 func TestTxnIterate(t *testing.T) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	parent := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), stateStorePrefix)
+	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
 	compare := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), stateStorePrefix)
 	test := NewTxn(parent)
 	defer func() { parent.Close(); compare.Close(); db.Close(); test.Discard() }()

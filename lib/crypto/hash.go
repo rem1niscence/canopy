@@ -12,7 +12,6 @@ const (
 )
 
 var (
-	MinHash = bytes.Repeat([]byte{0x00}, HashSize)
 	MaxHash = bytes.Repeat([]byte{0xFF}, HashSize)
 )
 
@@ -29,6 +28,13 @@ func Hasher() hash.Hash { return sha256.New() }
 func Hash(msg []byte) []byte {
 	h := sha256.Sum256(msg)
 	return h[:]
+}
+
+// ShortHash() executes the global hashing algorithm on input bytes
+// and truncates the output to 20 bytes
+func ShortHash(msg []byte) []byte {
+	h := sha256.Sum256(msg)
+	return h[:20]
 }
 
 // HashString() returns the hex byte version of a hash

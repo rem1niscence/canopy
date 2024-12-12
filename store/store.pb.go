@@ -252,6 +252,76 @@ func (x *SparseCompactMerkleProof) GetSiblingData() []byte {
 	return nil
 }
 
+// Node represents a single element in a sparse Merkle tree
+// It stores the cryptographic hash of data and the structural information
+// required to traverse and reconstruct the tree
+type Node struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Value: is the cryptographic hash of the data included in the database
+	// the ValueHash is included in the parent hash
+	Value []byte `protobuf:"bytes,1,opt,name=Value,proto3" json:"Value,omitempty"`
+	// LeftChildKey: is the key for the left child node. Nil means no child
+	LeftChildKey []byte `protobuf:"bytes,2,opt,name=LeftChildKey,proto3" json:"LeftChildKey,omitempty"`
+	// RightChildKey: is the key for the right child node. Nil means no child
+	RightChildKey []byte `protobuf:"bytes,3,opt,name=RightChildKey,proto3" json:"RightChildKey,omitempty"`
+}
+
+func (x *Node) Reset() {
+	*x = Node{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_store_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Node) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Node) ProtoMessage() {}
+
+func (x *Node) ProtoReflect() protoreflect.Message {
+	mi := &file_store_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Node.ProtoReflect.Descriptor instead.
+func (*Node) Descriptor() ([]byte, []int) {
+	return file_store_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Node) GetValue() []byte {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *Node) GetLeftChildKey() []byte {
+	if x != nil {
+		return x.LeftChildKey
+	}
+	return nil
+}
+
+func (x *Node) GetRightChildKey() []byte {
+	if x != nil {
+		return x.RightChildKey
+	}
+	return nil
+}
+
 var File_store_proto protoreflect.FileDescriptor
 
 var file_store_proto_rawDesc = []byte{
@@ -280,10 +350,16 @@ var file_store_proto_rawDesc = []byte{
 	0x52, 0x0c, 0x4e, 0x75, 0x6d, 0x53, 0x69, 0x64, 0x65, 0x4e, 0x6f, 0x64, 0x65, 0x73, 0x12, 0x20,
 	0x0a, 0x0b, 0x53, 0x69, 0x62, 0x6c, 0x69, 0x6e, 0x67, 0x44, 0x61, 0x74, 0x61, 0x18, 0x05, 0x20,
 	0x01, 0x28, 0x0c, 0x52, 0x0b, 0x53, 0x69, 0x62, 0x6c, 0x69, 0x6e, 0x67, 0x44, 0x61, 0x74, 0x61,
-	0x42, 0x28, 0x5a, 0x26, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63,
-	0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2d, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x63, 0x61,
-	0x6e, 0x6f, 0x70, 0x79, 0x2f, 0x73, 0x74, 0x6f, 0x72, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x33,
+	0x22, 0x66, 0x0a, 0x04, 0x4e, 0x6f, 0x64, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x56, 0x61, 0x6c, 0x75,
+	0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x22,
+	0x0a, 0x0c, 0x4c, 0x65, 0x66, 0x74, 0x43, 0x68, 0x69, 0x6c, 0x64, 0x4b, 0x65, 0x79, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x0c, 0x52, 0x0c, 0x4c, 0x65, 0x66, 0x74, 0x43, 0x68, 0x69, 0x6c, 0x64, 0x4b,
+	0x65, 0x79, 0x12, 0x24, 0x0a, 0x0d, 0x52, 0x69, 0x67, 0x68, 0x74, 0x43, 0x68, 0x69, 0x6c, 0x64,
+	0x4b, 0x65, 0x79, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0d, 0x52, 0x69, 0x67, 0x68, 0x74,
+	0x43, 0x68, 0x69, 0x6c, 0x64, 0x4b, 0x65, 0x79, 0x42, 0x28, 0x5a, 0x26, 0x67, 0x69, 0x74, 0x68,
+	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2d, 0x6e, 0x65,
+	0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2f, 0x73, 0x74, 0x6f,
+	0x72, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -298,11 +374,12 @@ func file_store_proto_rawDescGZIP() []byte {
 	return file_store_proto_rawDescData
 }
 
-var file_store_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_store_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_store_proto_goTypes = []interface{}{
 	(*CommitID)(nil),                 // 0: types.CommitID
 	(*StoreMerkleProof)(nil),         // 1: types.StoreMerkleProof
 	(*SparseCompactMerkleProof)(nil), // 2: types.SparseCompactMerkleProof
+	(*Node)(nil),                     // 3: types.Node
 }
 var file_store_proto_depIdxs = []int32{
 	2, // 0: types.StoreMerkleProof.proof:type_name -> types.SparseCompactMerkleProof
@@ -355,6 +432,18 @@ func file_store_proto_init() {
 				return nil
 			}
 		}
+		file_store_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Node); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -362,7 +451,7 @@ func file_store_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_store_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

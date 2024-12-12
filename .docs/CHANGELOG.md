@@ -1,9 +1,15 @@
 # CHANGELOG
 
+## [Unreleased] - 12/12/2024
+
+- Added the SMT implementation in store package
+
 ## [Unreleased] - 12/5/2024
+
 - Started the SMT logic in store package
 
 ## [Unreleased] - 12/4/2024
+
 - Fixed bugs in the `block_explorer`
 - Fixed `block-by-height` CLI bug
 - Renamed `block-by-height` to block in cli

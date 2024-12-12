@@ -47,7 +47,7 @@ const (
 	// the replica sends its VRF output to the other replicas.
 	Phase_ELECTION Phase = 1
 	// election_vote:
-	// Each replicas send ELECTION votes (signature) for the leader based on the lowest VRF value
+	// Each replica sends ELECTION votes (signature) for the leader based on the lowest VRF value
 	// if no candidates exist, the process falls back to a stake-weighted-pseudorandom selection.
 	Phase_ELECTION_VOTE Phase = 2
 	// propose:
