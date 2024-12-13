@@ -12,7 +12,7 @@ import (
 // StoreI defines the interface for interacting with blockchain storage
 type StoreI interface {
 	RWStoreI                                     // reading and writing
-	ProveStoreI                                  // proving membership / non-membership
+	ProveStoreI                                  // proving membership / non-membership TODO
 	RWIndexerI                                   // reading and writing indexer
 	NewTxn() StoreTxnI                           // wrap the store in a discardable txn
 	Root() ([]byte, ErrorI)                      // get the merkle root from the store

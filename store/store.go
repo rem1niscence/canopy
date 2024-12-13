@@ -57,7 +57,7 @@ type Store struct {
 	db       *badger.DB  // underlying database
 	writer   *badger.Txn // the batch writer that allows committing it all at once
 	ss       *TxnWrapper // reference to the state store
-	sc       *SMTWrapper // reference to the state commitment store
+	sc       *SMT        // reference to the state commitment store
 	*Indexer             // reference to the indexer store
 	log      lib.LoggerI // logger
 }
@@ -74,7 +74,7 @@ func New(config lib.Config, l lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 func NewStore(path string, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	// use badger DB in managed mode to allow easy versioning
 	// memTableSize is set to 2GB (max) to allow 300MB (15%) of writes in a
-	// single batch. It is currently unknown why the 15% limit is set
+	// single batch. It is seemingly unknown why the 15% limit is set
 	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt).
 		WithLoggingLevel(badger.ERROR).WithMemTableSize(int64(2 * units.GB)))
@@ -107,7 +107,7 @@ func NewStoreWithDB(db *badger.DB, log lib.LoggerI) (*Store, lib.ErrorI) {
 		db:      db,
 		writer:  writer,
 		ss:      NewTxnWrapper(writer, log, stateStorePrefix),
-		sc:      NewSMTWrapper(NewTxnWrapper(writer, log, stateCommitmentPrefix), id.Root, log),
+		sc:      NewDefaultSMT(NewTxnWrapper(writer, log, stateCommitmentPrefix)),
 		Indexer: &Indexer{NewTxnWrapper(writer, log, indexerPrefix)},
 		root:    id.Root,
 	}, nil
@@ -115,11 +115,6 @@ func NewStoreWithDB(db *badger.DB, log lib.LoggerI) (*Store, lib.ErrorI) {
 
 // NewReadOnly() returns a store without a writer - meant for historical read only queries
 func (s *Store) NewReadOnly(version uint64) (lib.StoreI, lib.ErrorI) {
-	// get the latest CommitID (height and hash)
-	id, err := s.getCommitID(version)
-	if err != nil {
-		return nil, err
-	}
 	// make a reader for the specified version
 	reader := s.db.NewTransactionAt(version, false)
 	// return the store object
@@ -128,7 +123,7 @@ func (s *Store) NewReadOnly(version uint64) (lib.StoreI, lib.ErrorI) {
 		log:     s.log,
 		db:      s.db,
 		ss:      NewTxnWrapper(reader, s.log, stateStorePrefix),
-		sc:      NewSMTWrapper(NewTxnWrapper(reader, s.log, stateCommitmentPrefix), id.Root, s.log),
+		sc:      NewDefaultSMT(NewTxnWrapper(reader, s.log, stateCommitmentPrefix)),
 		Indexer: s.Indexer,
 	}, nil
 }
@@ -144,7 +139,7 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 		db:      s.db,
 		writer:  writer,
 		ss:      NewTxnWrapper(writer, s.log, stateStorePrefix),
-		sc:      NewSMTWrapper(NewTxnWrapper(writer, s.log, stateCommitmentPrefix), s.root, s.log),
+		sc:      NewDefaultSMT(NewTxnWrapper(writer, s.log, stateCommitmentPrefix)),
 		Indexer: &Indexer{NewTxnWrapper(writer, s.log, indexerPrefix)},
 		root:    bytes.Clone(s.root),
 	}, nil
@@ -154,12 +149,8 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	// update the version (height) number
 	s.version++
-	// pseudo commit the Sparse Merkle Tree (to the Transaction not the actual DB)
-	// update the in memory root
-	s.root, err = s.sc.Commit()
-	if err != nil {
-		return nil, err
-	}
+	// get the root from the sparse merkle tree at the current state
+	s.root = s.sc.Root()
 	// set the new CommitID (to the Transaction not the actual DB)
 	if err = s.setCommitID(s.version, s.root); err != nil {
 		return nil, err
@@ -169,7 +160,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 		return nil, ErrCommitDB(e)
 	}
 	// reset the writer for the next height
-	s.resetWriter(s.root)
+	s.resetWriter()
 	// return the root
 	return bytes.Clone(s.root), nil
 }
@@ -196,17 +187,12 @@ func (s *Store) Delete(k []byte) lib.ErrorI {
 
 // GetProof() uses the StateCommitStore to prove membership and non-membership
 func (s *Store) GetProof(k []byte) ([]byte, []byte, lib.ErrorI) {
-	val, err := s.ss.Get(k)
-	if err != nil {
-		return nil, nil, err
-	}
-	proof, _, err := s.sc.GetProof(k)
-	return proof, val, err
+	panic("not (yet) implemented")
 }
 
 // VerifyProof() checks the validity of a member or non-member proof from the StateCommitStore
 // by verifying the proof against the provided key, value, and proof data.
-func (s *Store) VerifyProof(k, v, p []byte) bool { return s.sc.VerifyProof(k, v, p) }
+func (s *Store) VerifyProof(k, v, p []byte) bool { panic("not (yet) implemented") }
 
 // Iterator() returns an object for scanning the StateStore starting from the provided prefix.
 // The iterator allows forward traversal of key-value pairs that match the prefix.
@@ -230,10 +216,10 @@ func (s *Store) DB() *badger.DB { return s.db }
 
 // Root() retrieves the root hash of the StateCommitStore, representing the current root of the
 // Sparse Merkle Tree. This hash is used for verifying the integrity and consistency of the state.
-func (s *Store) Root() (root []byte, err lib.ErrorI) { return s.sc.Root() }
+func (s *Store) Root() (root []byte, err lib.ErrorI) { return s.sc.Root(), nil }
 
 func (s *Store) Reset() {
-	s.resetWriter(s.root)
+	s.resetWriter()
 }
 
 // Discard() closes the writer
@@ -242,11 +228,11 @@ func (s *Store) Discard() {
 }
 
 // resetWriter() closes the writer, and creates a new writer, and sets the writer to the 3 main abstractions
-func (s *Store) resetWriter(root []byte) {
+func (s *Store) resetWriter() {
 	s.writer.Discard()
 	s.writer = s.db.NewTransactionAt(s.version, true)
 	s.ss.setDB(s.writer)
-	s.sc.setDB(NewTxnWrapper(s.writer, s.log, stateCommitmentPrefix), root)
+	s.sc = NewDefaultSMT(NewTxnWrapper(s.writer, s.log, stateCommitmentPrefix))
 	s.Indexer.setDB(NewTxnWrapper(s.writer, s.log, indexerPrefix))
 }
 
@@ -281,11 +267,11 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 	if err = w.Set([]byte(lastCommitIDPrefix), value); err != nil {
 		return err
 	}
-	key := s.commitIDKey(version)
+	k := s.commitIDKey(version)
 	if err != nil {
 		return err
 	}
-	return w.Set(key, value)
+	return w.Set(k, value)
 }
 
 // getLatestCommitID() retrieves the latest CommitID from the database

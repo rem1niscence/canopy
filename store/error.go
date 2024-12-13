@@ -65,6 +65,6 @@ func ErrInvalidKey() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidKey, lib.StorageModule, "found store key is invalid")
 }
 
-func ErrOddLengthBranch() lib.ErrorI {
-	return lib.NewError(lib.CodeOddLengthMerkleBranch, lib.StorageModule, "the merkle branch length is odd")
+func ErrReserveKeyWrite(key string) lib.ErrorI {
+	return lib.NewError(lib.CodeReserveKeyWrite, lib.StorageModule, fmt.Sprintf("cannot write a reserve key %s", key))
 }

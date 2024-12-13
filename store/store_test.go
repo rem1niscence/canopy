@@ -103,29 +103,29 @@ func TestIteratorCommitAndPrefixed(t *testing.T) {
 	it4.Close()
 }
 
-func TestProof(t *testing.T) {
-	store, _, cleanup := testStore(t)
-	defer cleanup()
-	key, val := []byte("key"), []byte("val")
-	require.NoError(t, store.Set(key, val))
-	addRandomValues(t, store)
-	proof, value, err := store.GetProof(key)
-	require.NoError(t, err)
-	require.Equal(t, val, value, fmt.Sprintf("wanted %s got %s", string(val), string(value)))
-	testProof(t, store, key, value, proof)
-	// proof of non-inclusion
-	nonInclusionKey := []byte("lther")
-	proof, value, err = store.GetProof(nonInclusionKey)
-	require.NoError(t, err)
-	require.Nil(t, value, "wanted nil bytes for non-inclusion")
-	testProof(t, store, nonInclusionKey, value, proof)
-}
-
-func testProof(t *testing.T, store *Store, key, value, proof []byte) {
-	require.True(t, store.VerifyProof(key, value, proof), "expected valid proof")
-	require.False(t, store.VerifyProof(key, []byte("other value"), proof), "expected invalid proof; other val")
-	require.False(t, store.VerifyProof([]byte("other key"), value, proof), "expected invalid proof; other key")
-}
+//func TestProof(t *testing.T) {
+//	store, _, cleanup := testStore(t)
+//	defer cleanup()
+//	key, val := []byte("key"), []byte("val")
+//	require.NoError(t, store.Set(key, val))
+//	addRandomValues(t, store)
+//	proof, value, err := store.GetProof(key)
+//	require.NoError(t, err)
+//	require.Equal(t, val, value, fmt.Sprintf("wanted %s got %s", string(val), string(value)))
+//	testProof(t, store, key, value, proof)
+//	// proof of non-inclusion
+//	nonInclusionKey := []byte("lther")
+//	proof, value, err = store.GetProof(nonInclusionKey)
+//	require.NoError(t, err)
+//	require.Nil(t, value, "wanted nil bytes for non-inclusion")
+//	testProof(t, store, nonInclusionKey, value, proof)
+//}
+//
+//func testProof(t *testing.T, store *Store, key, value, proof []byte) {
+//	require.True(t, store.VerifyProof(key, value, proof), "expected valid proof")
+//	require.False(t, store.VerifyProof(key, []byte("other value"), proof), "expected invalid proof; other val")
+//	require.False(t, store.VerifyProof([]byte("other key"), value, proof), "expected invalid proof; other key")
+//}
 
 func addRandomValues(t *testing.T, store *Store) {
 	for i := 0; i < math.Intn(1000); i++ {

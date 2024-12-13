@@ -507,8 +507,7 @@ func TestSet(t *testing.T) {
 				rootKey = test.rootKey
 			}
 			// create the smt
-			smt, err := NewSMT(rootKey, test.keyBitSize, memStore)
-			require.NoError(t, err)
+			smt := NewSMT(rootKey, test.keyBitSize, memStore)
 			// execute the traversal code
 			require.NoError(t, smt.Set(test.targetKey, test.targetValue))
 			// create an iterator to check out the values of the store
@@ -520,7 +519,7 @@ func TestSet(t *testing.T) {
 				// convert the value to a node
 				require.NoError(t, lib.Unmarshal(it.Value(), &got.Node))
 				// convert the key to a node key
-				got.Key.bytesToKey(it.Key())
+				got.Key.fromBytes(it.Key())
 				// compare got vs expected
 				//fmt.Printf("%08b %v\n", got.Key.mostSigBytes, got.Key.leastSigBits)
 				require.Equal(t, test.expected.Nodes[i].Key.bytes(), got.Key.bytes(), fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
@@ -866,8 +865,7 @@ func TestDelete(t *testing.T) {
 				rootKey = test.rootKey
 			}
 			// create the smt
-			smt, err := NewSMT(rootKey, test.keyBitSize, memStore)
-			require.NoError(t, err)
+			smt := NewSMT(rootKey, test.keyBitSize, memStore)
 			// execute the traversal code
 			require.NoError(t, smt.Delete(test.targetKey))
 			// create an iterator to check out the values of the store
@@ -879,7 +877,7 @@ func TestDelete(t *testing.T) {
 				// convert the value to a node
 				require.NoError(t, lib.Unmarshal(it.Value(), &got.Node))
 				// convert the key to a node key
-				got.Key.bytesToKey(it.Key())
+				got.Key.fromBytes(it.Key())
 				// compare got vs expected
 				//fmt.Printf("%08b %v\n", got.Key.mostSigBytes, got.Key.leastSigBits)
 				require.Equal(t, test.expected.Nodes[i].Key.bytes(), got.Key.bytes(), fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
@@ -1297,8 +1295,7 @@ func TestTraverse(t *testing.T) {
 				rootKey = test.rootKey
 			}
 			// create the smt
-			smt, err := NewSMT(rootKey, test.keyBitSize, memStore)
-			require.NoError(t, err)
+			smt := NewSMT(rootKey, test.keyBitSize, memStore)
 			// set target
 			smt.target = test.target
 			// execute the traversal code
@@ -1451,8 +1448,7 @@ func TestNewSMT(t *testing.T) {
 				}
 			}
 			// execute the function call
-			_, err = NewSMT(RootKey, MaxKeyBitLength, memStore)
-			require.NoError(t, err)
+			_ = NewSMT(RootKey, MaxKeyBitLength, memStore)
 			// create an iterator to check out the values of the store
 			it, err := memStore.Iterator(nil)
 			require.NoError(t, err)
@@ -1462,7 +1458,7 @@ func TestNewSMT(t *testing.T) {
 				// convert the value to a node
 				require.NoError(t, lib.Unmarshal(it.Value(), &got.Node))
 				// convert the key to a node key
-				got.Key.bytesToKey(it.Key())
+				got.Key.fromBytes(it.Key())
 				// compare got vs expected
 				require.EqualExportedValues(t, test.expected.Nodes[i], got)
 			}
@@ -1765,7 +1761,7 @@ func TestKeyDecode(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			got := new(key)
-			got.bytesToKey(test.data)
+			got.fromBytes(test.data)
 			require.Equal(t, test.expectedKey, got)
 		})
 	}

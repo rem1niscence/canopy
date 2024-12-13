@@ -1,11 +1,9 @@
 package store
 
 import (
-	"fmt"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/require"
-	"strings"
 	"testing"
 )
 
@@ -275,15 +273,8 @@ func TestTxnIterate(t *testing.T) {
 	require.NoError(t, compare.Set([]byte("a"), []byte("a")))
 	revIt, err := test.RevIterator([]byte(prefixEnd([]byte("a"))))
 	require.NoError(t, err)
-	for ; revIt.Valid(); revIt.Next() {
-		fmt.Println(string(revIt.Key()))
-	}
 	revIt.Close()
 	revIt, err = compare.RevIterator(prefixEnd([]byte("a")))
 	require.NoError(t, err)
-	for ; revIt.Valid(); revIt.Next() {
-		fmt.Println(string(revIt.Key()))
-	}
 	revIt.Close()
-	fmt.Println(strings.HasPrefix("a", "a"))
 }

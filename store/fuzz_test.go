@@ -109,16 +109,6 @@ func getRandomBytes(t *testing.T, n int) []byte {
 	return bz
 }
 
-//var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
-//
-//func getRandomBytes(t *testing.T, n int) []byte {
-//	b := make([]rune, n)
-//	for i := range b {
-//		b[i] = letterRunes[math.Intn(len(letterRunes))]
-//	}
-//	return []byte(string(b))
-//}
-
 func getRandomOperation(_ *testing.T) TestingOp {
 	return TestingOp(math.Intn(6))
 }
