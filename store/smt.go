@@ -11,85 +11,71 @@ import (
 // SMT: An optimized sparse Merkle tree
 // =====================================================
 //
-// 1. Any leaf nodes without values are set to nil. A parent node is also nil
-//    if both children are nil.
-// 2. If a parent has exactly one non-nil child, replace the parent with
-//    the non-nil child.
-// 3. A tree always starts with two children: (0x0...) and (FxF...), and a Root.
+// This is an optimized sparse Merkle tree (SMT) designed for key-value storage.
+// It combines properties of prefix trees and Merkle trees to efficiently handle
+// sparse datasets and cryptographic integrity.
 //
-// -----------------------------------------------------
-// Variables:
-// -----------------------------------------------------
-// - Target: The node (or its ID) being inserted or deleted.
-// - Current: The currently selected node (or its ID).
-// - GCP: The greatest common prefix between the Target and Current's keys,
-//   representing the shared path.
-// - Path_Bit: The currently selected bit.
+//  - Sparse Structure: Keys are organized by their binary representation,
+//     with internal nodes storing common prefixes to reduce redundant paths
 //
-// -----------------------------------------------------
-// 1) Traversal: Navigate the tree downward to locate the target or its
-// closest position.
-// -----------------------------------------------------
-// - Start at the root: (Current = Root) and (gcp = ∅).
-// - LOOP:
-//   1. Calculate the path bit:
-//      - path_bit is the first bit in Target.key after gcp.
-//   2. Traverse to the next node:
-//      - If path_bit = 0, move left: Current = Current.LeftChild.
-//      - If path_bit = 1, move right: Current = Current.RightChild.
-//   3. Calculate the gcp:
-//      - gcp is the greatest common prefix between the Target.key and
-//        the Current.key.
-//   4. Exit the loop if:
-//      - Current.key is not gcp, OR
-//      - Target is gcp.
+//  - Merkle Hashing: Each node stores a hash derived from its children, enabling
+//     cryptographic proofs for efficient verification of data integrity
 //
-// -----------------------------------------------------
-// 2.a) Upsert: Insert or update the target node.
-// -----------------------------------------------------
-// - If gcp = Target_Key:
-//   - Set Current = Target and skip to step 5.
-// - Create a new node:
-//   - new_node = create(key = gcp).
-// - Replace the reference to Current in its parent with new_node:
-//   - If Current is parent.LeftChild: parent.LeftChild = new_node.
-//   - Else: parent.RightChild = new_node.
-// - Set Current and Target as children of new_node:
-//   - If path_bit = 0: new_node.Children = {Target, Current}.
-//   - If path_bit = 1: new_node.Children = {Current, Target}.
-// - Point to parent for ReHash:
-//   - Current = new_node.parent.
+//  - Optimized Traversals: Operations like insertion, deletion, and lookup focus
+//     only on the relevant parts of the tree, minimizing unnecessary traversal of empty nodes
 //
-// -----------------------------------------------------
-// 2.b) Delete: Remove the target node.
-// -----------------------------------------------------
-// - If gcp = Target_Key:
-//   - Delete Current.
-//   - Else: Exit.
-// - Replace the reference to parent in the grandparent with
-//   Current.sibling:
-//   - If parent is grandparent.LeftChild: grandparent.LeftChild =
-//     Current.sibling.
-//   - Else: grandparent.RightChild = Current.sibling.
-// - Delete the parent node:
-//   - delete(Current.parent).
-// - Point to grandparent for ReHash:
-//   - Current = grandparent.
+//  - Key-Value Operations: Supports upserts and deletions by dynamically creating
+//     or removing nodes while maintaining the Merkle tree structure
 //
-// -----------------------------------------------------
-// 3) ReHash: Recalculate hashes from the current node upwards.
-// -----------------------------------------------------
-// - LOOP:
-//   1. Update Current.value:
-//      Current.value = Hash(Current.LeftChild.value,
-//                          Current.RightChild.value).
-//   2. If Current is the root, finish.
-//   3. Otherwise, move up:
-//      Current = Current.parent.
+// OPTIMIZATIONS OVER REGULAR SMT:
+// 1. Any leaf nodes without values are set to nil. A parent node is also nil if both children are nil
+// 2. If a parent has exactly one non-nil child, replace the parent with the non-nil child
+// 3. A tree always starts with two children: (0x0...) and (FxF...), and a Root
+//
+// ALGORITHM:
+//	1. Tree Traversal
+//	    - Navigate down the tree to set *current* to the closest node based on the binary of the target key
+//	2.a Upsert (Insert or Update)
+//	    - If the target already matches *current*: Update the existing node
+//	    - Otherwise: Create a new node to represent the parent of the target node and *current*
+//	    - Replace the pointer to *current* within its old parent with the new parent
+//	    - Assign the *current* node and the target as children of the new parent
+//	2.b Delete
+//	    - If the target matches *current*:
+//	      - Delete *current*
+//	      - Replace the pointer to *current's parent* within *current's grandparent* with the *current's* sibling
+//	      - Delete *current's* parent node
+//	3. ReHash
+//	    - Update hash values for all ancestor nodes of the modified node, moving upward until the root
+//
+// Examples:
+//
+//      INSERT 1101                 DELETE 010
+//
+//                     BEFORE
+//         root                        root
+//        /    \                     /      \
+//      0000    1                 *0*        1
+//            /   \               / \       /  \
+//          1000  111          000 *010*  101  111
+//               /   \
+//             1110  1111
+//
+//
+//                       AFTER
+//         root                        root
+//        /    \                     /      \
+//      0000    1                  000       1
+//            /   \                         /  \
+//          1000 *11*                     101   111
+//               /  \
+//           *1101*  111
+//                  /   \
+//                1110  1111
 //
 // =====================================================
 
-const MaxKeyBitLength = 160
+const MaxKeyBitLength = 160 // the maximum leaf key bits (20 bytes)
 
 type SMT struct {
 	// store: an abstraction of the database where the tree is being stored
@@ -125,6 +111,11 @@ type OpData struct {
 	current *node
 	// traversed: a descending list of traversed nodes from root to parent of current
 	traversed *NodeList
+}
+
+// NewDefaultSMT() creates a new abstraction fo the SMT object using default parameters
+func NewDefaultSMT(store lib.RWStoreI) (smt *SMT) {
+	return NewSMT(RootKey, MaxKeyBitLength, store)
 }
 
 // NewSMT() creates a new abstraction of the SMT object
@@ -412,6 +403,20 @@ func (s *SMT) getNode(key []byte) (n *node, err lib.ErrorI) {
 	// set the key in the node for convenience
 	n.Key.fromBytes(key)
 	return
+}
+
+// validateTarget() checks the target to ensure it's not a reserved key like root, minimum or maximum
+func (s *SMT) validateTarget() lib.ErrorI {
+	if bytes.Equal(s.root.Key.bytes(), s.target.Key.bytes()) {
+		return ErrReserveKeyWrite("root")
+	}
+	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{0}, 20), s.keyBitLength).bytes(), s.target.Key.bytes()) {
+		return ErrReserveKeyWrite("minimum")
+	}
+	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{0}, 20), s.keyBitLength).bytes(), s.target.Key.bytes()) {
+		return ErrReserveKeyWrite("maximum")
+	}
+	return nil
 }
 
 // NODE KEY CODE BELOW
@@ -706,22 +711,3 @@ var (
 		255, 255, 255, 255, 255, 255, 255, 255,
 	}
 )
-
-// NewDefaultSMT() creates a new abstraction fo the SMT object using default parameters
-func NewDefaultSMT(store lib.RWStoreI) (smt *SMT) {
-	return NewSMT(RootKey, MaxKeyBitLength, store)
-}
-
-// validateTarget() checks the target to ensure it's not a reserved key like root, minimum or maximum
-func (s *SMT) validateTarget() lib.ErrorI {
-	if bytes.Equal(s.root.Key.bytes(), s.target.Key.bytes()) {
-		return ErrReserveKeyWrite("root")
-	}
-	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{0}, 20), s.keyBitLength).bytes(), s.target.Key.bytes()) {
-		return ErrReserveKeyWrite("minimum")
-	}
-	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{0}, 20), s.keyBitLength).bytes(), s.target.Key.bytes()) {
-		return ErrReserveKeyWrite("maximum")
-	}
-	return nil
-}
