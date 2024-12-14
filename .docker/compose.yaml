@@ -7,33 +7,16 @@ services:
       context: ..
       dockerfile: .docker/Dockerfile
       args:
-        BUILD_PATH: cmd
+        BUILD_PATH: cmd/cli
     ports:
       - 3000:3000
     restart: always
     environment:
       LOG_LEVEL: -4 # Debug
-    env_file:
-      - .env
     networks:
       - canopy
+    command: ["start"]
 
-  node-2:
-    container_name: node-2
-    build:
-      context: ..
-      dockerfile: .docker/Dockerfile
-      args:
-        BUILD_PATH: cmd
-    ports:
-      - 3001:3001
-    restart: always
-    environment:
-      LOG_LEVEL: -4 # Debug
-    env_file:
-      - .env
-    networks:
-      - canopy
 networks:
   canopy:
     driver: bridge
