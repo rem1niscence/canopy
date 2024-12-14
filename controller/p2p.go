@@ -329,7 +329,6 @@ func (c *Controller) ListenForBlock() {
 				return
 			}
 			if err != nil {
-				c.log.Debugf("peer block was invalid: %s", err.Error())
 				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
 				return
 			}
@@ -467,7 +466,7 @@ func (c *Controller) ListenForTx() {
 				c.P2P.ChangeReputation(senderID, p2p.InvalidTxRep)
 				return
 			}
-			c.log.Infof("Received valid transaction %s from %s for chain %d", crypto.HashString(txMsg.Tx), lib.BytesToString(senderID), txMsg.CommitteeId)
+			c.log.Infof("Received valid transaction %s from %s for chain %d", crypto.ShortHashString(txMsg.Tx), lib.BytesToString(senderID)[:20], txMsg.CommitteeId)
 			// bump peer reputation positively
 			c.P2P.ChangeReputation(senderID, p2p.GoodTxRep)
 			// gossip the transaction to peers

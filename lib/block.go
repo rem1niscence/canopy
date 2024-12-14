@@ -29,7 +29,7 @@ func (x *BlockHeader) Check(networkID, committeeID uint64) ErrorI {
 		return ErrWrongLengthBlockHash()
 	}
 	// check StateRoot hash size
-	if len(x.StateRoot) != crypto.HashSize {
+	if len(x.StateRoot) != crypto.ShortHashSize {
 		return ErrWrongLengthStateRoot()
 	}
 	// check TransactionRoot hash size

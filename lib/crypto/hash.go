@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	HashSize = sha256.Size
+	HashSize      = sha256.Size
+	ShortHashSize = 20
 )
 
 var (
@@ -36,6 +37,9 @@ func ShortHash(msg []byte) []byte {
 	h := sha256.Sum256(msg)
 	return h[:20]
 }
+
+// ShortHashString() returns the hex byte version of a short hash
+func ShortHashString(msg []byte) string { return hex.EncodeToString(ShortHash(msg)) }
 
 // HashString() returns the hex byte version of a hash
 func HashString(msg []byte) string { return hex.EncodeToString(Hash(msg)) }

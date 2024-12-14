@@ -1,7 +1,7 @@
 import {Table} from "react-bootstrap";
 import Truncate from 'react-truncate-inside';
 import {
-    convertTransaction, cpyObj, formatIfTime, formatNumberWCommas,
+    convertTransaction, cpyObj, formatIfTime, formatNumberWCommas, formatTime,
     isHex, isNumber, pagination, upperCaseAndRepUnderscore
 } from "@/components/util";
 
@@ -18,6 +18,9 @@ function formatValue(k, v, openModal) {
         return <a href={"#"} onClick={() => openModal(v)} style={{cursor: "pointer"}}>
             <Truncate text={v}/>
         </a>
+    }
+    if (k.includes("time")) {
+        return formatTime(v)
     }
     if (isNumber(v)) {
         return formatNumberWCommas(v)

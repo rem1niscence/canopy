@@ -967,6 +967,10 @@ func heightAndAddressParams(w http.ResponseWriter, r *http.Request, callback fun
 	if !ok {
 		return
 	}
+	if req.Address == nil {
+		write(w, types.ErrAddressEmpty(), http.StatusBadRequest)
+		return
+	}
 	p, err := callback(state, req.Address)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
@@ -1085,6 +1089,10 @@ func addrIndexer(w http.ResponseWriter, r *http.Request, callback func(s lib.Sto
 		return
 	}
 	defer s.Discard()
+	if req.Address == nil {
+		write(w, types.ErrAddressEmpty(), http.StatusBadRequest)
+		return
+	}
 	p, err := callback(s, crypto.NewAddressFromBytes(req.Address), req.PageParams)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)

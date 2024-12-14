@@ -3,6 +3,8 @@ package crypto
 import (
 	// This is the VDF used in Harmony Project. It is based on Benjanmin Wesolowski's paper "Efficient verifiable delay functions"(https://eprint.iacr.org/2018/623.pdf)
 	"github.com/harmony-one/vdf/src/vdf_go"
+	"io"
+	"log"
 	"sync/atomic"
 	"time"
 )
@@ -15,6 +17,10 @@ const (
 	// BitSize of 2048 is required by the harmony-one VDF library
 	BitSize = 2048
 )
+
+func init() {
+	log.SetOutput(io.Discard) // this is required because harmony's vdf prints to stdout
+}
 
 // VDFService is a structure that wraps Verifiable Delay Functionality
 // Verifiable Delay Function (VDF) is a cryptographic algorithm that requires a specific,

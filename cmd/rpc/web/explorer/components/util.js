@@ -47,10 +47,8 @@ export function formatBytes(a, b = 2) {
 }
 
 export function formatTime(value) {
-    const milliseconds = Math.floor(value / 1000)
-    const date = new Date(milliseconds)
-    // let d = new Date(Date.parse(value + " UTC"))
-    // console.log(d)
+    const date = new Date(Math.floor(value / 1000))
+    console.log(date.toLocaleTimeString())
     return date.toLocaleTimeString()
 }
 
@@ -162,10 +160,10 @@ export function formatBlock(blk) {
 
 export function formatCertificateResults(qc) {
     return {
-        "certificate_height":qc.header.height,
-        "network_id":qc.header.networkID,
-        "committee_id":qc.header.committeeID,
-        "block_hash":qc.blockHash,
-        "results_hash":qc.resultsHash,
+        "certificate_height": qc.header.height,
+        "network_id": qc.header.networkID,
+        "committee_id": qc.header.committeeID,
+        "block_hash": qc.blockHash,
+        "results_hash": qc.resultsHash,
     }
 }
