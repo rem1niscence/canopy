@@ -13,7 +13,7 @@ func TestCheckBlockHeader(t *testing.T) {
 	// predefine a block in order to make a valid hash
 	validBlock := &BlockHeader{
 		ProposerAddress:   newTestAddressBytes(t),
-		StateRoot:         crypto.Hash([]byte("hash")),
+		StateRoot:         crypto.ShortHash([]byte("hash")),
 		TransactionRoot:   crypto.Hash([]byte("hash")),
 		ValidatorRoot:     crypto.Hash([]byte("hash")),
 		NextValidatorRoot: crypto.Hash([]byte("hash")),
@@ -81,7 +81,7 @@ func TestCheckBlockHeader(t *testing.T) {
 			blockHeader: &BlockHeader{
 				ProposerAddress: newTestAddressBytes(t),
 				Hash:            crypto.Hash([]byte("hash")),
-				StateRoot:       crypto.Hash([]byte("hash")),
+				StateRoot:       crypto.ShortHash([]byte("hash")),
 				TransactionRoot: []byte("wrong_size"),
 			},
 			error: "wrong length transaction root",
@@ -92,7 +92,7 @@ func TestCheckBlockHeader(t *testing.T) {
 			blockHeader: &BlockHeader{
 				ProposerAddress: newTestAddressBytes(t),
 				Hash:            crypto.Hash([]byte("hash")),
-				StateRoot:       crypto.Hash([]byte("hash")),
+				StateRoot:       crypto.ShortHash([]byte("hash")),
 				TransactionRoot: crypto.Hash([]byte("hash")),
 				ValidatorRoot:   []byte("wrong_size"),
 			},
@@ -104,7 +104,7 @@ func TestCheckBlockHeader(t *testing.T) {
 			blockHeader: &BlockHeader{
 				ProposerAddress:   newTestAddressBytes(t),
 				Hash:              crypto.Hash([]byte("hash")),
-				StateRoot:         crypto.Hash([]byte("hash")),
+				StateRoot:         crypto.ShortHash([]byte("hash")),
 				TransactionRoot:   crypto.Hash([]byte("hash")),
 				ValidatorRoot:     crypto.Hash([]byte("hash")),
 				NextValidatorRoot: []byte("wrong_size"),
@@ -117,7 +117,7 @@ func TestCheckBlockHeader(t *testing.T) {
 			blockHeader: &BlockHeader{
 				ProposerAddress:   newTestAddressBytes(t),
 				Hash:              crypto.Hash([]byte("hash")),
-				StateRoot:         crypto.Hash([]byte("hash")),
+				StateRoot:         crypto.ShortHash([]byte("hash")),
 				TransactionRoot:   crypto.Hash([]byte("hash")),
 				ValidatorRoot:     crypto.Hash([]byte("hash")),
 				NextValidatorRoot: crypto.Hash([]byte("hash")),
@@ -131,7 +131,7 @@ func TestCheckBlockHeader(t *testing.T) {
 			blockHeader: &BlockHeader{
 				ProposerAddress:   newTestAddressBytes(t),
 				Hash:              crypto.Hash([]byte("hash")),
-				StateRoot:         crypto.Hash([]byte("hash")),
+				StateRoot:         crypto.ShortHash([]byte("hash")),
 				TransactionRoot:   crypto.Hash([]byte("hash")),
 				ValidatorRoot:     crypto.Hash([]byte("hash")),
 				NextValidatorRoot: crypto.Hash([]byte("hash")),
@@ -146,7 +146,7 @@ func TestCheckBlockHeader(t *testing.T) {
 				Height:            2,
 				ProposerAddress:   newTestAddressBytes(t),
 				Hash:              crypto.Hash([]byte("hash")),
-				StateRoot:         crypto.Hash([]byte("hash")),
+				StateRoot:         crypto.ShortHash([]byte("hash")),
 				TransactionRoot:   crypto.Hash([]byte("hash")),
 				ValidatorRoot:     crypto.Hash([]byte("hash")),
 				NextValidatorRoot: crypto.Hash([]byte("hash")),
@@ -161,7 +161,7 @@ func TestCheckBlockHeader(t *testing.T) {
 			blockHeader: &BlockHeader{
 				ProposerAddress:   newTestAddressBytes(t),
 				Hash:              crypto.Hash([]byte("hash")),
-				StateRoot:         crypto.Hash([]byte("hash")),
+				StateRoot:         crypto.ShortHash([]byte("hash")),
 				TransactionRoot:   crypto.Hash([]byte("hash")),
 				ValidatorRoot:     crypto.Hash([]byte("hash")),
 				NextValidatorRoot: crypto.Hash([]byte("hash")),
@@ -188,7 +188,7 @@ func TestCheckBlockHeader(t *testing.T) {
 				Height:            2,
 				ProposerAddress:   newTestAddressBytes(t),
 				Hash:              crypto.Hash([]byte("hash")),
-				StateRoot:         crypto.Hash([]byte("hash")),
+				StateRoot:         crypto.ShortHash([]byte("hash")),
 				TransactionRoot:   crypto.Hash([]byte("hash")),
 				ValidatorRoot:     crypto.Hash([]byte("hash")),
 				NextValidatorRoot: crypto.Hash([]byte("hash")),
@@ -213,7 +213,7 @@ func TestCheckBlockHeader(t *testing.T) {
 			blockHeader: &BlockHeader{
 				ProposerAddress:   newTestAddressBytes(t),
 				Hash:              crypto.Hash([]byte("hash")),
-				StateRoot:         crypto.Hash([]byte("hash")),
+				StateRoot:         crypto.ShortHash([]byte("hash")),
 				TransactionRoot:   crypto.Hash([]byte("hash")),
 				ValidatorRoot:     crypto.Hash([]byte("hash")),
 				NextValidatorRoot: crypto.Hash([]byte("hash")),
@@ -338,7 +338,7 @@ func TestCheckBlock(t *testing.T) {
 	// predefine a valid block header
 	validBlock := Block{BlockHeader: &BlockHeader{
 		ProposerAddress:   newTestAddressBytes(t),
-		StateRoot:         crypto.Hash([]byte("hash")),
+		StateRoot:         crypto.ShortHash([]byte("hash")),
 		TransactionRoot:   crypto.Hash([]byte("hash")),
 		ValidatorRoot:     crypto.Hash([]byte("hash")),
 		NextValidatorRoot: crypto.Hash([]byte("hash")),
