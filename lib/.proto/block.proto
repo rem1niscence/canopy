@@ -63,7 +63,7 @@ message BlockHeader {
   bytes proposer_address = 13;
   // vdf: the verifiable delay proof for this block. The VDF serves as a protection mechanism against historical
   // forking attacks
-  VDF_2 vdf = 14;
+  VDF vdf = 14;
   // last_quorum_certificate: The quorum certificate from the previous block is included in the block header to ensure
   // all nodes have the same record of blockchain certificates, preventing discrepancies where the same block
   // could be accepted with different super-majorities of signatures across nodes.

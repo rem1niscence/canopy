@@ -45,7 +45,7 @@ message ProtoClassGroup {
 // A Verifiable Delay Function is a cryptographic function that takes a set amount of time to compute, even on powerful
 // hardware, and produces a result that any node may quickly verify. In Canopy it's used as a proxy for time to deter
 // historical forking attacks like a 'long-range-attack'.
-message VDF_2 {
+message VDF {
   // proof: a proof of function completion given a specific seed
   bytes proof = 1;
   // output: the final output of the calculated 'squarings'

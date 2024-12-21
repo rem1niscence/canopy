@@ -45,7 +45,7 @@ message Message {
   repeated BadProposerEvidence bad_proposer_evidence = 6;
   // vdf: a Verifiable Delay Function is a cryptographic function that takes a fixed time to compute
   // but is fast to verify, deterring historical fork attacks like the long-range-attack
-  VDF_2 vdf = 7;
+  VDF vdf = 7;
   // signature: the digital signature of the sender of the consensus message
   Signature signature = 8;
 }

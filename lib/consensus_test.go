@@ -1257,19 +1257,3 @@ func TestDoubleSignerEquals(t *testing.T) {
 		})
 	}
 }
-
-func TestVDFJSON(t *testing.T) {
-	expected := VDF{
-		Proof:      crypto.Hash([]byte("proof")),
-		Iterations: 999,
-	}
-	// convert structure to json bytes
-	gotBytes, err := json.Marshal(expected)
-	require.NoError(t, err)
-	// convert bytes to structure
-	got := new(VDF)
-	// unmarshal into bytes
-	require.NoError(t, json.Unmarshal(gotBytes, got))
-	// compare got vs expected
-	require.Equal(t, &expected, got)
-}

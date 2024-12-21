@@ -3,8 +3,10 @@ package crypto
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -141,4 +143,25 @@ func TestInterruptGenerator(t *testing.T) {
 	y, proof := GenerateVDF(seed, 10000, stop)
 	require.Nil(t, y)
 	require.Nil(t, proof)
+}
+
+func TestVDFJSON(t *testing.T) {
+	expected := &VDF{
+		Proof:      Hash([]byte("proof")),
+		Output:     Hash([]byte("output")),
+		Iterations: 999,
+	}
+	// convert structure to json bytes
+	gotBytes, err := json.Marshal(expected)
+	require.NoError(t, err)
+	// convert bytes to structure
+	got := new(VDF)
+	// unmarshal into bytes
+	require.NoError(t, json.Unmarshal(gotBytes, got))
+	// compare got vs expected
+	require.EqualExportedValues(t, expected, got)
+}
+
+func TestMP(t *testing.T) {
+	sync.Pool{}
 }

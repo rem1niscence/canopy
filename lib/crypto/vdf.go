@@ -445,7 +445,7 @@ func (x *VDF) UnmarshalJSON(b []byte) (err error) {
 	*x = VDF{
 		Proof:      proof,
 		Output:     output,
-		Iterations: x.Iterations,
+		Iterations: j.Iterations,
 	}
 	return
 }

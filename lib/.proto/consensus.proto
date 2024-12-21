@@ -106,16 +106,6 @@ message View {
   Phase phase = 6;
 }
 
-// A Verifiable Delay Function is a cryptographic function that takes a set amount of time to compute, even on powerful
-// hardware, and produces a result that any node may quickly verify. In Canopy it's used as a proxy for time to deter
-// historical forking attacks like a 'long-range-attack'.
-message VDF {
-  // proof: a proof of function completion given a specific seed
-  bytes proof = 1;
-  // iterations: number of serial executions (proxy for time)
-  uint64 iterations = 2;
-}
-
 // An Aggregate Signature is a single, compact signature created by combining multiple individual signatures from
 // different participants. It allows verification that each participant signed the same message, which saves space
 // and improves efficiency in blockchain and consensus protocols by reducing the need to store or verify multiple

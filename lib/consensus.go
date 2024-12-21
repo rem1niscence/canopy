@@ -481,27 +481,3 @@ func (x *DoubleSigner) Equals(d *DoubleSigner) bool {
 	}
 	return slices.Equal(x.Heights, d.Heights)
 }
-
-// MarshalJSON() implements the json.Marshaller interface
-func (x VDF) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&jsonVDF{
-		Proof:      x.Proof,
-		Iterations: x.Iterations,
-	})
-}
-
-// UnmarshalJSON() implements the json.Unmarshaler interface
-func (x *VDF) UnmarshalJSON(b []byte) error {
-	j := new(jsonVDF)
-	if err := json.Unmarshal(b, j); err != nil {
-		return err
-	}
-	x.Proof, x.Iterations = j.Proof, j.Iterations
-	return nil
-}
-
-// jsonVDF represents the json.Marshaller and json.Unmarshaler implementation of VDF
-type jsonVDF struct {
-	Proof      HexBytes `json:"proof,omitempty"`      // proof of function completion given a specific seed
-	Iterations uint64   `json:"iterations,omitempty"` // number of iterations (proxy for time)
-}

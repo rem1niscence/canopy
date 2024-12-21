@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/big"
+	"time"
 )
 
 /*
@@ -473,6 +474,42 @@ func safeGCD(a, b *big.Int) (gcd, x, y *big.Int) {
 		y.Neg(y)
 	}
 	return gcd, x, y
+}
+
+// BigIntPool is a thread unsafe simple pool which enables the sequential reuse of big ints for memory / garbage collector efficiency
+type BigIntPool struct {
+	// map of all big ints keyed by unix nano timestamp
+	free map[int64]*big.Int
+}
+
+// NewBigIntPool() constructs a BigIntPool
+func NewBigIntPool() *BigIntPool { return &BigIntPool{free: make(map[int64]*big.Int)} }
+
+// New() returns a big int, if
+func (bp *BigIntPool) New() (i *big.Int) {
+	var k int64
+	// if there are currently no big ints available
+	if len(bp.free) == 0 {
+		return new(big.Int)
+	}
+	// else get one from the map
+	for k, i = range bp.free {
+		break
+	}
+	// delete from the map
+	delete(bp.free, k)
+	return
+}
+
+func (bp *BigIntPool) Release(b *big.Int) {
+	// can't add nil
+	if b == nil {
+		return
+	}
+	// reset the big int
+	b.SetUint64(0)
+	// add to the map
+	bp.free[time.Now().UnixNano()] = b
 }
 
 // Public to allow others to import
