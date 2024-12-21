@@ -22,7 +22,7 @@ type BFT struct {
 	Results       *lib.CertificateResult // the current Result being voted on (reward and slash recipients)
 	SortitionData *SortitionData         // the current data being used for VRF+CDF Leader Election
 	VDFService    *crypto.VDFService     // the verifiable delay service, run once per block as a deterrent against long-range-attacks
-	HighVDF       *lib.VDF               // the highest VDF among replicas - if the chain is using VDF for long-range-attack protection
+	HighVDF       *crypto.VDF            // the highest VDF among replicas - if the chain is using VDF for long-range-attack protection
 
 	ByzantineEvidence *ByzantineEvidence // evidence of faulty or malicious Validators collected during the BFT process
 	PartialQCs        PartialQCs         // potentially implicating evidence that may turn into ByzantineEvidence if paired with an equivocating QC
@@ -77,7 +77,7 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, canopyHeight, hei
 		PhaseTimer:        lib.NewTimer(),
 		OptimisticTimer:   lib.NewTimer(),
 		VDFService:        vdf,
-		HighVDF:           new(lib.VDF),
+		HighVDF:           new(crypto.VDF),
 	}, nil
 }
 
@@ -103,18 +103,19 @@ func (b *BFT) Start() {
 		// OPTIMISTIC TIMEOUT
 		// - This triggers when Round 10 phase sleep has expired, this functionality only works well after Round 10
 		// - Allows an intermittent 'Optimistic' check to see if node can move on before PhaseTimer actually triggers
-		case <-b.OptimisticTimer.C:
-			func() {
-				b.Controller.Lock()
-				defer b.Controller.Unlock()
-				// if self doesn't have +2/3rds (or leader msg) already, reset the timer and sleep again
-				if !b.PhaseHas23Maj() {
-					lib.ResetTimer(b.OptimisticTimer, b.WaitTime(b.Phase, 10))
-					return
-				}
-				// if self has +2/3 (or leader msg) already, move forward Optimistically
-				b.HandlePhase()
-			}()
+		//case <-b.OptimisticTimer.C:
+		//	fmt.Println("OPTIMISTIC") TODO
+		//	func() {
+		//		b.Controller.Lock()
+		//		defer b.Controller.Unlock()
+		//		// if self doesn't have +2/3rds (or leader msg) already, reset the timer and sleep again
+		//		if !b.PhaseHas23Maj() {
+		//			lib.ResetTimer(b.OptimisticTimer, b.WaitTime(b.Phase, 10))
+		//			return
+		//		}
+		//		// if self has +2/3 (or leader msg) already, move forward Optimistically
+		//		b.HandlePhase()
+		//	}()
 
 		// RESET BFT
 		// - This triggers when receiving a new Commit Block (QC) from either Canopy (a) or a sub-chain (b)
@@ -233,12 +234,10 @@ func (b *BFT) StartElectionVotePhase() {
 	// select Proposer (set is required for self-send)
 	b.ProposerKey = SelectProposerFromCandidates(b.GetElectionCandidates(), b.SortitionData, b.ValidatorSet.ValidatorSet)
 	defer func() { b.ProposerKey = nil }()
+	fmt.Println("selected proposer key")
 	// get locally produced Verifiable delay function
-	proof, iterations := b.VDFService.Finish()
-	b.HighVDF = &lib.VDF{
-		Proof:      proof,
-		Iterations: uint64(iterations),
-	}
+	b.HighVDF = b.VDFService.Finish()
+	fmt.Println("sending vote to proposer")
 	// sign and send vote to Proposer
 	b.SendToProposer(b.CommitteeId, &Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
@@ -265,7 +264,6 @@ func (b *BFT) StartProposePhase() {
 	b.log.Info(b.View.ToString())
 	vote, as, err := b.GetMajorityVote()
 	if err != nil {
-		b.log.Error(err.Error())
 		return
 	}
 	// produce new proposal or use highQC as the proposal
@@ -581,9 +579,9 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	if keepLocks == nil || !keepLocks[0] {
 		b.HighQC = nil
 		// begin the verifiable delay function for the next height
-		if err := b.RunVDF(); err != nil {
-			b.log.Errorf("RunVDF() failed with error, %s", err.Error())
-		}
+		//if err := b.RunVDF(); err != nil {
+		//	b.log.Errorf("RunVDF() failed with error, %s", err.Error())
+		//}
 		b.Height++
 		b.CanopyHeight = b.Controller.GetCanopyHeight()
 	}
@@ -682,7 +680,7 @@ func (b *BFT) SetWaitTimers(phaseWaitTime, optimisticWaitTIme, processTime time.
 	}
 	// calculate the phase timer and the optimistic timer by subtracting the process time
 	phaseWaitTime, optimisticWaitTime := subtract(phaseWaitTime, processTime), subtract(optimisticWaitTIme, processTime)
-	b.log.Debugf("Setting consensus timer: %s", phaseWaitTime.Round(time.Second))
+	b.log.Debugf("Setting consensus timer: %s", phaseWaitTime.Seconds())
 	// set Phase and Optimistic timers to go off in their respective timeouts
 	lib.ResetTimer(b.PhaseTimer, phaseWaitTime)
 	lib.ResetTimer(b.OptimisticTimer, optimisticWaitTime)
@@ -724,16 +722,13 @@ func (b *BFT) VDFSeed(publicKey []byte) ([]byte, lib.ErrorI) {
 	return append(lastQuorumCertificate.BlockHash, publicKey...), nil
 }
 
-// FinishVDF() completes the VDF, if finished the output will be non-nil and iterations will be non-zero
-func (b *BFT) FinishVDF() (output []byte, iterations int) { return b.VDFService.Finish() }
-
 // VerifyVDF() validates the VDF from a Replica
 func (b *BFT) VerifyVDF(vote *Message) (bool, lib.ErrorI) {
 	seed, err := b.VDFSeed(vote.Signature.PublicKey)
 	if err != nil {
 		return false, err
 	}
-	return b.VDFService.VerifyVDF(seed, vote.Vdf.Proof, int(vote.Vdf.Iterations)), nil
+	return b.VDFService.VerifyVDF(seed, vote.Vdf), nil
 }
 
 // ResetBFTChan() is a callback trigger that allows the caller to Reset the BFT to Round 0 with a varying sleep
@@ -765,7 +760,7 @@ type (
 		// GetCanopyHeight returns the height of the base-chain
 		GetCanopyHeight() uint64
 		// ProduceProposal() is a plugin call to produce a Proposal object as a Leader
-		ProduceProposal(committeeID uint64, be *ByzantineEvidence, vdf *lib.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
+		ProduceProposal(committeeID uint64, be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
 		// ValidateCertificate() is a plugin call to validate a Certificate object as a Replica
 		ValidateCertificate(committeeID uint64, qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
 		// LoadCommittee() loads the ValidatorSet operating under CommitteeID

@@ -82,7 +82,7 @@ func (p *Plugin) Start() {
 }
 
 // ProduceProposal() creates a new Proposal using the Mempool
-func (p *Plugin) ProduceProposal(vdf *lib.VDF) (blockBytes []byte, rewardRecipients *lib.RewardRecipients, err lib.ErrorI) {
+func (p *Plugin) ProduceProposal(vdf *crypto.VDF) (blockBytes []byte, rewardRecipients *lib.RewardRecipients, err lib.ErrorI) {
 	// reset the state machine once this code completes
 	defer func() { p.FSM.Reset() }()
 	pubKey, _ := crypto.BytesToBLS12381Public(p.PublicKey)
@@ -102,21 +102,26 @@ func (p *Plugin) ProduceProposal(vdf *lib.VDF) (blockBytes []byte, rewardRecipie
 	if err != nil {
 		return
 	}
+	// extract the vdf iterations if any
+	var vdfIterations uint64
+	if vdf != nil {
+		vdfIterations = vdf.Iterations
+	}
 	// re-validate all transactions in the mempool as a fail-safe
 	p.Mempool.checkMempool()
 	transactions, numTxs := p.Mempool.GetTransactions(maxBlockSize)
 	// create a block header structure
 	header := &lib.BlockHeader{
-		Height:                height + 1,                                                // increment the height
-		NetworkId:             p.FSM.NetworkID,                                           // ensure only applicable for the proper network
-		Time:                  uint64(time.Now().UnixMicro()),                            // set the time of the block
-		NumTxs:                uint64(numTxs),                                            // set the number of transactions
-		TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(numTxs),           // calculate the total transactions
-		LastBlockHash:         lastBlock.BlockHeader.LastBlockHash,                       // use the last block hash to 'chain' the blocks
-		ProposerAddress:       pubKey.Address().Bytes(),                                  // set self as proposer address
-		LastQuorumCertificate: qc,                                                        // add last QC to lock-in a commit certificate
-		TotalVdfIterations:    lastBlock.BlockHeader.TotalVdfIterations + vdf.Iterations, // add last total iterations to current iterations
-		Vdf:                   vdf,                                                       // attach the vdf proof
+		Height:                height + 1,                                               // increment the height
+		NetworkId:             p.FSM.NetworkID,                                          // ensure only applicable for the proper network
+		Time:                  uint64(time.Now().UnixMicro()),                           // set the time of the block
+		NumTxs:                uint64(numTxs),                                           // set the number of transactions
+		TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(numTxs),          // calculate the total transactions
+		LastBlockHash:         lastBlock.BlockHeader.LastBlockHash,                      // use the last block hash to 'chain' the blocks
+		ProposerAddress:       pubKey.Address().Bytes(),                                 // set self as proposer address
+		LastQuorumCertificate: qc,                                                       // add last QC to lock-in a commit certificate
+		TotalVdfIterations:    lastBlock.BlockHeader.TotalVdfIterations + vdfIterations, // add last total iterations to current iterations
+		Vdf:                   vdf,                                                      // attach the vdf proof
 	}
 	// create a block structure
 	block := &lib.Block{

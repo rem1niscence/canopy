@@ -35,3 +35,21 @@ message ProtoPrivKey {
   // of a public key
   bytes privkey = 1;
 }
+
+// ProtoClassGroup represents a mathematical class group with coefficients a and b
+message ProtoClassGroup {
+  bytes a = 1; // a value in ax^2 + bxy + cy^2
+  bytes b = 2; // b value in ax^2 + bxy + cy^2
+}
+
+// A Verifiable Delay Function is a cryptographic function that takes a set amount of time to compute, even on powerful
+// hardware, and produces a result that any node may quickly verify. In Canopy it's used as a proxy for time to deter
+// historical forking attacks like a 'long-range-attack'.
+message VDF_2 {
+  // proof: a proof of function completion given a specific seed
+  bytes proof = 1;
+  // output: the final output of the calculated 'squarings'
+  bytes output = 2;
+  // iterations: number of serial executions (proxy for time)
+  uint64 iterations = 3;
+}

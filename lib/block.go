@@ -117,7 +117,7 @@ type jsonBlockHeader struct {
 	ValidatorRoot         HexBytes           `json:"validator_root,omitempty"`
 	NextValidatorRoot     HexBytes           `json:"next_validator_root,omitempty"`
 	ProposerAddress       HexBytes           `json:"proposer_address,omitempty"`
-	VDF                   *VDF               `json:"vdf,omitempty"`
+	VDF                   *crypto.VDF        `json:"vdf,omitempty"`
 	LastQuorumCertificate *QuorumCertificate `json:"last_quorum_certificate,omitempty"`
 }
 

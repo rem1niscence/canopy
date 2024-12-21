@@ -28,6 +28,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	pprof2 "runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
@@ -223,6 +225,21 @@ func StartRPC(a *app2.Controller, c lib.Config, l lib.LoggerI) {
 			Addr:    localhost + colon + c.AdminPort,
 			Handler: cor.Handler(http.TimeoutHandler(router.NewAdmin(), timeout, ErrServerTimeout().Error())),
 		}).ListenAndServe().Error())
+	}()
+	go func() {
+		fileName := "heap1.out"
+		for range time.Tick(time.Second * 10) {
+			f, err := os.Create(filepath.Join(c.DataDirPath, fileName))
+			if err != nil {
+				l.Fatalf("could not create memory profile: ", err)
+			}
+			runtime.GC() // get up-to-date statistics
+			if err = pprof2.WriteHeapProfile(f); err != nil {
+				l.Fatalf("could not write memory profile: ", err)
+			}
+			f.Close()
+			fileName = "heap2.out"
+		}
 	}()
 	//l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
 	//runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)

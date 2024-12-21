@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/canopy-network/canopy/lib"
@@ -322,7 +323,14 @@ func TestID(t *testing.T) {
 }
 
 func TestMaxPacketSize(t *testing.T) {
-	maxPacket, _ := lib.Marshal(&Packet{StreamId: lib.Topic_BLOCK, Eof: true, Bytes: make([]byte, maxDataChunkSize)})
+	a, err := lib.NewAny(&Packet{
+		StreamId: lib.Topic_INVALID,
+		Eof:      true,
+		Bytes:    bytes.Repeat([]byte("F"), maxDataChunkSize),
+	})
+	require.NoError(t, err)
+	envelope := &Envelope{Payload: a}
+	maxPacket, _ := lib.Marshal(envelope)
 	require.Equal(t, len(maxPacket), maxPacketSize)
 }
 

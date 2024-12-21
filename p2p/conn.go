@@ -12,16 +12,17 @@ import (
 )
 
 const (
-	maxDataChunkSize    = 1024                   // maximum size of the chunk of bytes in a packet
-	maxPacketSize       = 1031                   // maximum size of the full packet maxDataChunkSize + header data
-	pingInterval        = 30 * time.Second       // how often a ping is to be sent
-	sendInterval        = 100 * time.Millisecond // the minimum time between sends
-	pongTimeoutDuration = 20 * time.Second       // how long the sender of a ping waits for a pong before throwing an error
-	queueSendTimeout    = 10 * time.Second       // how long a message waits to be queued before throwing an error
-	dataFlowRatePerS    = 500 * units.KB         // the maximum number of bytes that may be sent or received per second per MultiConn
-	maxMessageSize      = 10 * units.Megabyte    // the maximum total size of a message once all the packets are added up
-	maxChanSize         = 100                    // maximum number of items in a channel before blocking
-	maxQueueSize        = 100                    // maximum number of items in a queue before blocking
+	maxDataChunkSize    = 1024 - packetHeaderSize // maximum size of the chunk of bytes in a packet
+	maxPacketSize       = 1024                    // maximum size of the full packet
+	packetHeaderSize    = 47                      // the overhead of the protobuf packet header
+	pingInterval        = 30 * time.Second        // how often a ping is to be sent
+	sendInterval        = 100 * time.Millisecond  // the minimum time between sends
+	pongTimeoutDuration = 20 * time.Second        // how long the sender of a ping waits for a pong before throwing an error
+	queueSendTimeout    = 10 * time.Second        // how long a message waits to be queued before throwing an error
+	dataFlowRatePerS    = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
+	maxMessageSize      = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
+	maxChanSize         = 100                     // maximum number of items in a channel before blocking
+	maxQueueSize        = 100                     // maximum number of items in a queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
@@ -155,7 +156,7 @@ func (c *MultiConn) startSendService() {
 			err = c.sendWireBytes(new(Pong), m)
 		case <-c.receivedPong: // fires when receive service got a 'pong' message
 			// reset the pong timer
-			lib.ResetTimer(pongTimer, pongTimeoutDuration)
+			lib.StopTimer(pongTimer)
 		case <-c.quitSending: // fires when Stop() is called
 			return
 		}

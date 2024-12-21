@@ -111,8 +111,9 @@ func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKe
 	}
 	// finalize the encrypted connection by setting the exchanged information
 	c.Address = &lib.PeerAddress{
-		PublicKey: peerSig.PublicKey,
-		PeerMeta:  peerMeta,
+		PublicKey:  peerSig.PublicKey,
+		NetAddress: conn.RemoteAddr().String(),
+		PeerMeta:   peerMeta,
 	}
 	return
 }

@@ -523,7 +523,7 @@ type testController struct {
 	sendToReplicasChan map[uint64]chan lib.Signable
 }
 
-func (t *testController) ProduceProposal(_ uint64, _ *ByzantineEvidence, _ *lib.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI) {
+func (t *testController) ProduceProposal(_ uint64, _ *ByzantineEvidence, _ *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI) {
 	block = crypto.Hash([]byte("mock"))
 	results = &lib.CertificateResult{
 		RewardRecipients: &lib.RewardRecipients{

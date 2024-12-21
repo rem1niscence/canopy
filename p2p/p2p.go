@@ -136,6 +136,11 @@ func (p *P2P) ListenForInboundPeers(listenAddress *lib.PeerAddress) {
 				_ = c.Close()
 				return
 			}
+			if netAddress == "" {
+				p.log.Debugf("Closing ephemeral connection due to no net address %s", c.RemoteAddr().String())
+				_ = c.Close()
+				return
+			}
 			// tries to create a full peer from the ephemeral connection and just the net address
 			if err = p.AddPeer(c, &lib.PeerInfo{Address: &lib.PeerAddress{NetAddress: netAddress}}, false); err != nil {
 				_ = c.Close()
@@ -227,7 +232,11 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err l
 		}
 	}
 	// overwrite the incomplete peer info with the complete and authenticated info
-	info.Address = connection.Address
+	info.Address = &lib.PeerAddress{
+		PublicKey:  connection.Address.PublicKey,
+		NetAddress: info.Address.NetAddress,
+		PeerMeta:   connection.Address.PeerMeta,
+	}
 	// disconnect immediately if prompted by params
 	if disconnect {
 		connection.Stop()
@@ -270,7 +279,7 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err l
 func (p *P2P) DialWithBackoff(peerInfo *lib.PeerAddress) {
 	dialAndLog := func() (err error) {
 		if err = p.Dial(peerInfo, false); err != nil {
-			p.log.Errorf("Dial %s@%s failed: %s", peerInfo.PublicKey, peerInfo.NetAddress, err.Error())
+			p.log.Errorf("Dial %s@%s failed: %s", lib.BytesToString(peerInfo.PublicKey), peerInfo.NetAddress, err.Error())
 		}
 		return
 	}
@@ -287,6 +296,10 @@ func (p *P2P) OnPeerError(err error, publicKey []byte, remoteAddr string) {
 	peer, _ := p.PeerSet.Remove(publicKey)
 	if peer != nil {
 		peer.stop.Do(peer.conn.Stop)
+		// if peer is a 'must connect' try to connect back
+		if peer.IsMustConnect {
+			go p.DialWithBackoff(peer.Address)
+		}
 	}
 	p.book.Remove(publicKey)
 }

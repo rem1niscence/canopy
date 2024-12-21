@@ -4,6 +4,7 @@ import (
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/plugin"
 )
 
@@ -53,7 +54,7 @@ func (c *Controller) GetChain(committeeID uint64) (*Chain, lib.ErrorI) {
 }
 
 // ProduceProposal() uses the associated `plugin` to create a Proposal with the candidate block and the `bft` to populate the byzantine evidence
-func (c *Controller) ProduceProposal(committeeID uint64, be *bft.ByzantineEvidence, vdf *lib.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI) {
+func (c *Controller) ProduceProposal(committeeID uint64, be *bft.ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI) {
 	if committeeID == lib.CanopyCommitteeId {
 		reset := c.ValidatorProposalConfig()
 		defer func() { reset() }()

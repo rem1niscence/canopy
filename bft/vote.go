@@ -148,7 +148,7 @@ func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 		}
 		// handle VDF
 		if vote.Vdf != nil && vote.Vdf.Iterations != 0 {
-			if vote.Vdf.Iterations > b.HighVDF.Iterations {
+			if b.HighVDF == nil || vote.Vdf.Iterations > b.HighVDF.Iterations {
 				ok, err := b.VerifyVDF(vote)
 				if err != nil {
 					return err

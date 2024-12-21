@@ -380,7 +380,8 @@ func (c *Controller) ListenForConsensus() {
 		func() {
 			// lock the controller for thread safety
 			c.Lock()
-			defer c.Unlock()
+			defer func() { c.Unlock(); c.log.Debug("Done handling inbound consensus message") }()
+			c.log.Debug("Handling inbound consensus message")
 			// try to cast the p2p message to a 'consensus message'
 			consMsg, ok := msg.Message.(*lib.ConsensusMessage)
 			// if cast unsuccessful
@@ -508,14 +509,11 @@ func (c *Controller) ListenForBlockRequests() {
 					c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
 					return
 				}
+				c.log.Debugf("Received a block request from %s", lib.BytesToString(senderID[:20]))
 				// get the chain from the controller map
 				chain, err := c.GetChain(request.CommitteeId)
 				if err != nil {
 					c.log.Error(err.Error())
-					return
-				}
-				// if the chain is syncing, return without handling
-				if chain.isSyncing.Load() {
 					return
 				}
 				// create an empty QC that will be populated if the request is more than 'height only'
@@ -529,6 +527,7 @@ func (c *Controller) ListenForBlockRequests() {
 						return
 					}
 				}
+				c.log.Debugf("Responding to a block request from %s", lib.BytesToString(senderID[:20]))
 				// send the block back to the requester
 				c.SendBlock(request.CommitteeId, chain.Plugin.Height(), chain.Plugin.TotalVDFIterations(), certificate, senderID)
 			}()
@@ -660,11 +659,12 @@ func (c *Controller) checkPeerQC(maxBlockSize int, view *lib.View, v lib.Validat
 // pollMaxHeight() polls all peers for their local MaxHeight and totalVDFIterations for a specific committeeID
 // NOTE: unlike other P2P transmissions - RequestBlock enforces a minimum reputation on `mustConnects`
 // to ensure a byzantine validator cannot cause syncing issues above max_height
-func (c *Controller) pollMaxHeight(committeeID uint64, backoff int) (maxHeight, minimumVDFIterations uint64, syncingPeers []string) {
+func (c *Controller) pollMaxHeight(committeeID uint64, backoff int) (max, minVDFIterations uint64, syncingPeers []string) {
+	maxHeight, minimumVDFIterations := -1, -1
 	// empty inbox to start fresh
 	c.emptyInbox(Block)
 	// ask all peers
-	c.log.Info("Polling all peers for max height")
+	c.log.Infof("Polling chain peers for max height")
 	syncingPeers = make([]string, 0)
 	// ask only for MaxHeight not the actual QC
 	c.RequestBlock(committeeID, true)
@@ -677,24 +677,25 @@ func (c *Controller) pollMaxHeight(committeeID uint64, backoff int) (maxHeight, 
 				c.P2P.ChangeReputation(m.Sender.Address.PublicKey, p2p.InvalidMsgRep)
 				continue
 			}
+			c.log.Debugf("Received a block response from peer %s with max height at %d", lib.BytesToString(m.Sender.Address.PublicKey)[:20], maxHeight)
 			// don't listen to any peers below the minimumVDFIterations
-			if response.TotalVdfIterations < minimumVDFIterations {
+			if int(response.TotalVdfIterations) < minimumVDFIterations {
 				continue
 			}
 			// reset syncing variables if peer exceeds the previous minimumVDFIterations
-			if response.TotalVdfIterations > minimumVDFIterations {
-				maxHeight, minimumVDFIterations = response.MaxHeight, response.TotalVdfIterations
+			if int(response.TotalVdfIterations) > minimumVDFIterations {
+				maxHeight, minimumVDFIterations = int(response.MaxHeight), int(response.TotalVdfIterations)
 				syncingPeers = make([]string, 0)
 			}
 			// add to syncing peer list
 			syncingPeers = append(syncingPeers, lib.BytesToString(c.PublicKey))
 		case <-time.After(p2p.PollMaxHeightTimeoutS * time.Second * time.Duration(backoff)):
-			if maxHeight == 0 { // genesis file is 0 and first height is 1
+			if maxHeight == -1 || minimumVDFIterations == -1 {
 				c.log.Warn("no heights received from peers. Trying again")
 				return c.pollMaxHeight(committeeID, backoff+1)
 			}
 			c.log.Debugf("Waiting peer max height is %d", maxHeight)
-			return
+			return uint64(maxHeight), uint64(minimumVDFIterations), syncingPeers
 		}
 	}
 }

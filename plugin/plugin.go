@@ -3,6 +3,7 @@ package plugin
 import (
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"time"
 )
 
@@ -25,7 +26,7 @@ type (
 		// ResetAndStartBFTTimer() resets and starts the bft trigger timer
 		ResetAndStartBFTTimer()
 		// ProduceProposal() produce a proposal <block candidate and reward recipients >; ex. reap the mempool and create a block and determine who is paid for the block reward
-		ProduceProposal(vdf *lib.VDF) (block []byte, recipients *lib.RewardRecipients, err lib.ErrorI)
+		ProduceProposal(vdf *crypto.VDF) (block []byte, recipients *lib.RewardRecipients, err lib.ErrorI)
 		// ValidateCertificate() is this certificate valid according to the 3rd party chain
 		ValidateCertificate(committeeHeight uint64, qc *lib.QuorumCertificate) lib.ErrorI
 		// IntegratedChain() returns if this chain is using external consensus or integrated consensus

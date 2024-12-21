@@ -9,14 +9,37 @@ services:
       args:
         BUILD_PATH: cmd/cli
     ports:
-      - 3000:3000
-    restart: always
-    environment:
-      LOG_LEVEL: -4 # Debug
+      - 3000:3000  # not doing anything currently
     networks:
       - canopy
-    command: ["start"]
+    command: [ "start" ]
+    volumes:
+      - ./volumes/node_1:/root/.canopy
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
 
+  node-2:
+    container_name: node-2
+    build:
+      context: ..
+      dockerfile: .docker/Dockerfile
+      args:
+        BUILD_PATH: cmd/cli
+    ports:
+      - 3001:3001 # not doing anything currently
+    networks:
+      - canopy
+    command: [ "start" ]
+    volumes:
+      - ./volumes/node_2:/root/.canopy
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
 networks:
   canopy:
     driver: bridge

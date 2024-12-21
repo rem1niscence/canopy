@@ -183,6 +183,131 @@ func (x *ProtoPrivKey) GetPrivkey() []byte {
 	return nil
 }
 
+// ProtoClassGroup represents a mathematical class group with coefficients a and b
+type ProtoClassGroup struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	A []byte `protobuf:"bytes,1,opt,name=a,proto3" json:"a,omitempty"` // a value in ax^2 + bxy + cy^2
+	B []byte `protobuf:"bytes,2,opt,name=b,proto3" json:"b,omitempty"` // b value in ax^2 + bxy + cy^2
+}
+
+func (x *ProtoClassGroup) Reset() {
+	*x = ProtoClassGroup{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_crypto_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ProtoClassGroup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProtoClassGroup) ProtoMessage() {}
+
+func (x *ProtoClassGroup) ProtoReflect() protoreflect.Message {
+	mi := &file_crypto_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProtoClassGroup.ProtoReflect.Descriptor instead.
+func (*ProtoClassGroup) Descriptor() ([]byte, []int) {
+	return file_crypto_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ProtoClassGroup) GetA() []byte {
+	if x != nil {
+		return x.A
+	}
+	return nil
+}
+
+func (x *ProtoClassGroup) GetB() []byte {
+	if x != nil {
+		return x.B
+	}
+	return nil
+}
+
+// A Verifiable Delay Function is a cryptographic function that takes a set amount of time to compute, even on powerful
+// hardware, and produces a result that any node may quickly verify. In Canopy it's used as a proxy for time to deter
+// historical forking attacks like a 'long-range-attack'.
+type VDF struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// proof: a proof of function completion given a specific seed
+	Proof []byte `protobuf:"bytes,1,opt,name=proof,proto3" json:"proof,omitempty"`
+	// output: the final output of the calculated 'squarings'
+	Output []byte `protobuf:"bytes,2,opt,name=output,proto3" json:"output,omitempty"`
+	// iterations: number of serial executions (proxy for time)
+	Iterations uint64 `protobuf:"varint,3,opt,name=iterations,proto3" json:"iterations,omitempty"`
+}
+
+func (x *VDF) Reset() {
+	*x = VDF{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_crypto_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *VDF) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VDF) ProtoMessage() {}
+
+func (x *VDF) ProtoReflect() protoreflect.Message {
+	mi := &file_crypto_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VDF.ProtoReflect.Descriptor instead.
+func (*VDF) Descriptor() ([]byte, []int) {
+	return file_crypto_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *VDF) GetProof() []byte {
+	if x != nil {
+		return x.Proof
+	}
+	return nil
+}
+
+func (x *VDF) GetOutput() []byte {
+	if x != nil {
+		return x.Output
+	}
+	return nil
+}
+
+func (x *VDF) GetIterations() uint64 {
+	if x != nil {
+		return x.Iterations
+	}
+	return 0
+}
+
 var File_crypto_proto protoreflect.FileDescriptor
 
 var file_crypto_proto_rawDesc = []byte{
@@ -195,10 +320,18 @@ var file_crypto_proto_rawDesc = []byte{
 	0x70, 0x75, 0x62, 0x6b, 0x65, 0x79, 0x22, 0x28, 0x0a, 0x0c, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50,
 	0x72, 0x69, 0x76, 0x4b, 0x65, 0x79, 0x12, 0x18, 0x0a, 0x07, 0x70, 0x72, 0x69, 0x76, 0x6b, 0x65,
 	0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x70, 0x72, 0x69, 0x76, 0x6b, 0x65, 0x79,
-	0x42, 0x2d, 0x5a, 0x2b, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63,
-	0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2d, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x63, 0x61,
-	0x6e, 0x6f, 0x70, 0x79, 0x2f, 0x6c, 0x69, 0x62, 0x2f, 0x63, 0x72, 0x79, 0x70, 0x74, 0x6f, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x22, 0x2d, 0x0a, 0x0f, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x43, 0x6c, 0x61, 0x73, 0x73, 0x47, 0x72,
+	0x6f, 0x75, 0x70, 0x12, 0x0c, 0x0a, 0x01, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x01,
+	0x61, 0x12, 0x0c, 0x0a, 0x01, 0x62, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x01, 0x62, 0x22,
+	0x55, 0x0a, 0x05, 0x56, 0x44, 0x46, 0x5f, 0x32, 0x12, 0x14, 0x0a, 0x05, 0x70, 0x72, 0x6f, 0x6f,
+	0x66, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x70, 0x72, 0x6f, 0x6f, 0x66, 0x12, 0x16,
+	0x0a, 0x06, 0x6f, 0x75, 0x74, 0x70, 0x75, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06,
+	0x6f, 0x75, 0x74, 0x70, 0x75, 0x74, 0x12, 0x1e, 0x0a, 0x0a, 0x69, 0x74, 0x65, 0x72, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x69, 0x74, 0x65, 0x72,
+	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x42, 0x2d, 0x5a, 0x2b, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62,
+	0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2d, 0x6e, 0x65, 0x74, 0x77,
+	0x6f, 0x72, 0x6b, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2f, 0x6c, 0x69, 0x62, 0x2f, 0x63,
+	0x72, 0x79, 0x70, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -213,11 +346,13 @@ func file_crypto_proto_rawDescGZIP() []byte {
 	return file_crypto_proto_rawDescData
 }
 
-var file_crypto_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_crypto_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_crypto_proto_goTypes = []interface{}{
-	(*ProtoAddress)(nil), // 0: types.ProtoAddress
-	(*ProtoPubKey)(nil),  // 1: types.ProtoPubKey
-	(*ProtoPrivKey)(nil), // 2: types.ProtoPrivKey
+	(*ProtoAddress)(nil),    // 0: types.ProtoAddress
+	(*ProtoPubKey)(nil),     // 1: types.ProtoPubKey
+	(*ProtoPrivKey)(nil),    // 2: types.ProtoPrivKey
+	(*ProtoClassGroup)(nil), // 3: types.ProtoClassGroup
+	(*VDF)(nil),             // 4: types.VDF
 }
 var file_crypto_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -269,6 +404,30 @@ func file_crypto_proto_init() {
 				return nil
 			}
 		}
+		file_crypto_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ProtoClassGroup); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_crypto_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*VDF); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -276,7 +435,7 @@ func file_crypto_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_crypto_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
