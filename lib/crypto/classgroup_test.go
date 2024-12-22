@@ -2,36 +2,36 @@ package crypto
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"math/big"
 	"testing"
 )
 
 func TestClassDiscriminant(t *testing.T) {
 	t12_11_3 := NewClassGroup(big.NewInt(12), big.NewInt(11), big.NewInt(3))
-	assert.Equal(t, "-23", t12_11_3.Discriminant().String(), "they should be equal")
+	require.Equal(t, "-23", t12_11_3.Discriminant().String(), "they should be equal")
 
 	t93_109_32 := NewClassGroup(big.NewInt(93), big.NewInt(109), big.NewInt(32))
-	assert.Equal(t, "-23", t93_109_32.Discriminant().String(), "they should be equal")
+	require.Equal(t, "-23", t93_109_32.Discriminant().String(), "they should be equal")
 
 	D := big.NewInt(-103)
 	e_id := newClassGroup(bigOne, bigOne, D)
-	assert.Equal(t, NewClassGroup(big.NewInt(1), big.NewInt(1), big.NewInt(26)), e_id, "they should be equal")
-	assert.Equal(t, e_id.Discriminant(), D, "they should be equal")
+	require.Equal(t, NewClassGroup(big.NewInt(1), big.NewInt(1), big.NewInt(26)), e_id, "they should be equal")
+	require.Equal(t, e_id.Discriminant(), D, "they should be equal")
 
 	e := newClassGroup(big.NewInt(2), big.NewInt(1), D)
-	assert.Equal(t, NewClassGroup(big.NewInt(2), big.NewInt(1), big.NewInt(13)), e, "they should be equal")
-	assert.Equal(t, e.Discriminant(), D, "they should be equal")
+	require.Equal(t, NewClassGroup(big.NewInt(2), big.NewInt(1), big.NewInt(13)), e, "they should be equal")
+	require.Equal(t, e.Discriminant(), D, "they should be equal")
 }
 
 func TestNormalized(t *testing.T) {
 	f := NewClassGroup(big.NewInt(195751), big.NewInt(1212121), big.NewInt(1876411))
-	assert.Equal(t, NewClassGroup(big.NewInt(195751), big.NewInt(37615), big.NewInt(1807)), f.Normalized(), "they should be equal")
+	require.Equal(t, NewClassGroup(big.NewInt(195751), big.NewInt(37615), big.NewInt(1807)), f.Normalized(), "they should be equal")
 }
 
 func TestReduced(t *testing.T) {
 	f := NewClassGroup(big.NewInt(195751), big.NewInt(1212121), big.NewInt(1876411))
-	assert.Equal(t, NewClassGroup(big.NewInt(1), big.NewInt(1), big.NewInt(1)), f.Reduced(), "they should be equal")
+	require.Equal(t, NewClassGroup(big.NewInt(1), big.NewInt(1), big.NewInt(1)), f.Reduced(), "they should be equal")
 }
 
 func check(a, b, c *big.Int, t *testing.T) {
@@ -43,7 +43,7 @@ func check(a, b, c *big.Int, t *testing.T) {
 		a_coefficient := new(big.Int).Add(r, new(big.Int).Mul(s, big.NewInt(int64(k))))
 		aac := a_coefficient.Mul(a_coefficient, a)
 		aac.Mod(aac, c)
-		assert.Equal(t, aac, b, fmt.Sprintf("diff when k = %d", k))
+		require.Equal(t, aac, b, fmt.Sprintf("diff when k = %d", k))
 	}
 }
 
@@ -64,7 +64,7 @@ func TestMultiplication1(t *testing.T) {
 	t93_109_32 := NewClassGroup(big.NewInt(93), big.NewInt(109), big.NewInt(32))
 
 	a := t12_11_3.Multiply(t93_109_32)
-	assert.Equal(t, a, NewClassGroup(big.NewInt(1), big.NewInt(1), big.NewInt(6)), "they should be equal")
+	require.Equal(t, a, NewClassGroup(big.NewInt(1), big.NewInt(1), big.NewInt(6)), "they should be equal")
 }
 
 func TestMultiplication2(t *testing.T) {
@@ -73,11 +73,11 @@ func TestMultiplication2(t *testing.T) {
 
 	x := CloneClassGroup(t12_11_3)
 	y := t12_11_3.Multiply(x)
-	assert.Equal(t, y, NewClassGroup(big.NewInt(2), big.NewInt(1), big.NewInt(3)), "they should be equal")
+	require.Equal(t, y, NewClassGroup(big.NewInt(2), big.NewInt(1), big.NewInt(3)), "they should be equal")
 
 	x = CloneClassGroup(t93_109_32)
 	y = t93_109_32.Multiply(x)
-	assert.Equal(t, y, NewClassGroup(big.NewInt(2), big.NewInt(-1), big.NewInt(3)), "they should be equal")
+	require.Equal(t, y, NewClassGroup(big.NewInt(2), big.NewInt(-1), big.NewInt(3)), "they should be equal")
 }
 
 func TestMultiplication3(t *testing.T) {
@@ -85,7 +85,7 @@ func TestMultiplication3(t *testing.T) {
 	t93_109_32 := NewClassGroup(big.NewInt(93), big.NewInt(109), big.NewInt(32))
 
 	a := t12_11_3.Multiply(t93_109_32)
-	assert.Equal(t, a, NewClassGroup(big.NewInt(1), big.NewInt(1), big.NewInt(6)), "they should be equal")
+	require.Equal(t, a, NewClassGroup(big.NewInt(1), big.NewInt(1), big.NewInt(6)), "they should be equal")
 }
 
 func TestMultiplication4(t *testing.T) {
@@ -93,17 +93,20 @@ func TestMultiplication4(t *testing.T) {
 	y := NewClassGroup(big.NewInt(565721958), big.NewInt(740), big.NewInt(4486780496))
 
 	a := x.Multiply(y)
-	assert.Equal(t, a, NewClassGroup(big.NewInt(-1), big.NewInt(0), big.NewInt(2538270247313468068)), "they should be equal")
+	fmt.Println(a.a.String(), a.b.String(), a.c.String())
+	require.Equal(t, a.a, big.NewInt(-1))
+	require.Zero(t, a.b.Cmp(bigZero))
+	require.Equal(t, a.c, big.NewInt(2538270247313468068))
 }
 
 func TestSquare1(t *testing.T) {
 	x := NewClassGroup(big.NewInt(12), big.NewInt(11), big.NewInt(3))
 	y := x.Square()
-	assert.Equal(t, y, NewClassGroup(big.NewInt(2), big.NewInt(1), big.NewInt(3)), "they should be equal")
+	require.Equal(t, y, NewClassGroup(big.NewInt(2), big.NewInt(1), big.NewInt(3)), "they should be equal")
 }
 
 func TestSquare2(t *testing.T) {
 	x := NewClassGroup(big.NewInt(93), big.NewInt(109), big.NewInt(32))
 	y := x.Square()
-	assert.Equal(t, y, NewClassGroup(big.NewInt(2), big.NewInt(-1), big.NewInt(3)), "they should be equal")
+	require.Equal(t, y, NewClassGroup(big.NewInt(2), big.NewInt(-1), big.NewInt(3)), "they should be equal")
 }

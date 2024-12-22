@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/big"
-	"time"
+	"sync"
 )
 
 /*
@@ -22,6 +22,8 @@ var (
 	big65536 = big.NewInt(65536)
 	bigM     = big.NewInt(int64(8 * 3 * 5 * 7 * 11 * 13))
 	m        = bigM.Int64()
+
+	bip = NewBigIntPool()
 )
 
 // ClassGroup is a set of equivalence classes of certain algebraic objects, like ideals or binary quadratic forms
@@ -45,34 +47,197 @@ func CloneClassGroup(cg *ClassGroup) *ClassGroup { return &ClassGroup{a: cg.a, b
 // NewClassGroupFromABDiscriminant() calculates c using D = b^2 - 4ac and returns a class group object
 func newClassGroup(a, b, discriminant *big.Int) *ClassGroup {
 	// 4ac = b^2 - discriminant
-	fourAC := new(big.Int).Mul(b, b)
+	fourAC := bip.New().Mul(b, b)
 	// subtract the discriminant
 	fourAC.Sub(fourAC, discriminant)
 	// c = floor(4ac / 4a)
-	c := floorDivision(fourAC, new(big.Int).Mul(a, bigFour))
+	fourA := bip.New()
+	c := floorDivision(fourAC, fourA.Mul(a, bigFour))
+	// cleanup big ints for memory efficiency
+	bip.Recycle(fourAC, fourA)
 	// return the class group
 	return NewClassGroup(a, b, c)
+}
+
+// Multiply performs multiplication of two elements from the class group
+// and returns the resulting class group element
+// NOTE: this function re-uses big.int instances for memory efficiency
+// so the variable names won't match the commented equations
+func (group *ClassGroup) Multiply(other *ClassGroup) *ClassGroup {
+	// Step 0: Reduce both class groups for efficient arithmetic operations
+	x := group.Reduced()
+	y := other.Reduced()
+	defer func() { x.Discard(); y.Discard() }()
+	// variables for storing intermediate results
+	a, b, c, d1, e1 := bip.New(), bip.New(), bip.New(), bip.New(), bip.New()
+	defer bip.Recycle(d1, e1)
+	// Step 1: Calculate intermediate value g = (b1+b2) // 2
+	g := floorDivision(e1.Add(x.b, y.b), bigTwo)
+	defer bip.Recycle(g)
+	// Step 2: Calculate intermediate value h = b2 - b1
+	h := floorDivision(d1.Sub(y.b, x.b), bigTwo)
+	defer bip.Recycle(h)
+	// Step 3: Calculate intermediate value w as the GCD of a2 and the (GCD of a1 and g)
+	var tmp3, tmp4 *big.Int
+	gcd, tmp1, tmp2 := safeGCD(y.a, g)
+	y.c, tmp3, tmp4 = safeGCD(x.a, gcd)
+	defer bip.Recycle(gcd, tmp1, tmp2, tmp3, tmp4)
+	// Step 4:
+	// Calculate intermediate value s = a1 // w
+	// Calculate intermediate value t = a2 // w
+	// Calculate intermediate value u = g // w
+	s := floorDivision(x.a, y.c)
+	t := floorDivision(y.a, y.c)
+	u := floorDivision(g, y.c)
+	defer bip.Recycle(s, t, u)
+	// Step 5: Solve the modular equation for k and constant_factor
+	// k, constant_factor = mod.solve_mod(t * u, h * u + s * c1, s * t)
+	k, constFactor, solvable := solveMod(c.Mul(t, u), g.Add(g.Mul(h, u), b.Mul(s, x.c)), a.Mul(s, t))
+	defer bip.Recycle(k, constFactor)
+	if !solvable {
+		return nil // Return nil if the modular equation is unsolvable
+	}
+
+	// Step 6: Solve for n in another modular equation
+	// n, constant_factor_2 = mod.solve_mod(t * constant_factor, h - t * k, s)
+	n1, step, solvable := solveMod(c.Mul(t, constFactor), g.Sub(h, g.Mul(t, k)), s)
+	defer bip.Recycle(n1, step)
+	if !solvable {
+		return nil // Return nil if this equation is unsolvable
+	}
+
+	// Step 7: Compute intermediate value k = k_temp + constant_factor * n
+	k.Add(k, c.Mul(constFactor, n1))
+
+	// Step 8: Compute intermediate value l as (t * k - h) // s
+	l := floorDivision(c.Sub(a.Mul(t, k), h), s)
+	defer bip.Recycle(l)
+	// Step 9:
+	// Compute a = h * u
+	// Compute intermediate value m as (t * u * k - h * u - s * c1) // (s * t)
+	c.Mul(t, u)
+	c.Mul(c, k)
+	a.Mul(h, u)
+	c.Sub(c, a)
+	c.Sub(c, b)
+	a.Mul(s, t)
+	x.b = floorDivision(c, a)
+
+	// Step 10: Compute b = (j * u + m * r) - (k * t + l * s)
+	b.Mul(y.c, u)
+	g.Mul(k, t)
+	h.Mul(l, s)
+	g.Add(g, h)
+	b.Sub(b, g)
+
+	// Step 12: Compute c = k * l - j * m
+	c.Mul(k, l)
+	g.Mul(y.c, x.b)
+	c.Sub(c, g)
+
+	return NewClassGroup(a, b, c).Reduced()
+}
+
+// Pow() executes an exponential function (group^n) on a class group and returns the resulting class group
+func (group *ClassGroup) Pow(n int64) *ClassGroup {
+	// initialize the result as the Identity element of the group (group^0)
+	result := group.Identity()
+	// shallow copy the current ClassGroup to avoid modifying the original pointer while performing exponentiation
+	x := CloneClassGroup(group)
+	// while n is greater than 0, perform exponentiation by squaring
+	for n > 0 {
+		// if the current bit of n is 1, multiply the result
+		if n%2 == 1 {
+			if result = result.Multiply(x); result == nil {
+				return nil
+			}
+		}
+		// square the base (x = x^2)
+		if x = x.Square(); x == nil {
+			return nil
+		}
+		// move to the next higher bit by dividing n by 2
+		n /= 2
+	}
+	// return the result (group^n)
+	return result
+}
+
+// BigPow() executes an exponential function (group^n) on a class group and returns the resulting class group
+func (group *ClassGroup) BigPow(z *big.Int) *ClassGroup {
+	// initialize the result as the Identity element of the group (group^0)
+	result := group.Identity()
+	// clone the current ClassGroup to avoid modifying the original while performing exponentiation
+	x := CloneClassGroup(group)
+	// clone the big int
+	n := bip.New().Set(z)
+	defer bip.Recycle(n)
+	// while n is greater than zero
+	for n.Sign() > 0 {
+		// if the current bit of n is 1, multiply the result
+		if n.Bit(0) == 1 {
+			if result = result.Multiply(x); result == nil {
+				return nil
+			}
+		}
+		// square the base (x = x^2)
+		if x = x.Square(); x == nil {
+			return nil
+		}
+		// move to the next higher bit by right shifting n
+		n.Rsh(n, 1)
+	}
+	// return the result (group^n)
+	return result
+}
+
+// Square() executes a pow(2) operation on the class group
+func (group *ClassGroup) Square() *ClassGroup {
+	mod, _, solvable := solveMod(group.b, group.c, group.a)
+	if !solvable {
+		return nil
+	}
+	// create new a,b,c for resulting class group
+	A, B, C := bip.New(), bip.New(), bip.New()
+
+	// A = a^2
+	A.Mul(group.a, group.a)
+
+	// B = b − 2a * mod
+	temp := bip.New().Mul(group.a, mod)
+	defer bip.Recycle(temp)
+	temp.Mul(temp, bigTwo)
+	B.Sub(group.b, temp)
+
+	// C = mod^2 − (mod − c) / a
+	C.Mul(mod, mod)
+	temp.Mul(group.b, mod)
+	temp.Sub(temp, group.c)
+	temp.Div(temp, group.a)
+	C.Sub(C, temp)
+
+	// Return the reduced class group
+	return NewClassGroup(A, B, C).Reduced()
 }
 
 // Normalized() ensures that the coefficient b is always in the range -a < b <= a
 // making subsequent computations, such as reductions or multiplications more straightforward
 // by starting from a consistent state
 func (group *ClassGroup) Normalized() *ClassGroup {
-	a := new(big.Int).Set(group.a)
-	b := new(big.Int).Set(group.b)
-	c := new(big.Int).Set(group.c)
-	r := new(big.Int).Neg(a)
-	t := new(big.Int)
-
+	a := bip.New().Set(group.a)
+	b := bip.New().Set(group.b)
+	c := bip.New().Set(group.c)
+	r1 := bip.New().Neg(a)
+	t := bip.New()
+	defer bip.Recycle(r1, t)
 	// if already normalized where -a < b <= a
-	if (b.Cmp(r) == 1) && (b.Cmp(a) < 1) {
+	if (b.Cmp(r1) == 1) && (b.Cmp(a) < 1) {
 		return group
 	}
 
 	// r = floor((a - b) / (2 * a))
-	r.Sub(a, b)
-	r = floorDivision(r, t.Mul(a, bigTwo))
-
+	r := floorDivision(r1.Sub(a, b), t.Mul(a, bigTwo))
+	defer bip.Recycle(r)
 	// b = b + 2 * r * a
 	t.Mul(bigTwo, r)
 	t.Mul(t, a)
@@ -93,9 +258,10 @@ func (group *ClassGroup) Normalized() *ClassGroup {
 // This creates smaller coefficients to optimize arithmetic operations
 func (group *ClassGroup) Reduced() *ClassGroup {
 	g := group.Normalized()
-	a, b, c := new(big.Int).Set(g.a), new(big.Int).Set(g.b), new(big.Int).Set(g.c)
-	tempA, tempB, tempS := new(big.Int), new(big.Int), new(big.Int)
-	tempX, tempC2 := new(big.Int), new(big.Int)
+	a, b, c := bip.New().Set(g.a), bip.New().Set(g.b), bip.New().Set(g.c)
+	tempA, tempB, tempS := bip.New(), bip.New(), bip.New()
+	tempX, tempC2 := bip.New(), bip.New()
+	defer bip.Recycle(tempA, tempB, tempS, tempX, tempC2)
 
 	// this loop iteratively reduces the quadratic form represented by (a, b, c)
 	// until it meets the reduction criteria:
@@ -128,7 +294,7 @@ func (group *ClassGroup) Reduced() *ClassGroup {
 
 // Identity() returns the element that, when combined with any other element in the group, leaves the other element unchanged
 func (group *ClassGroup) Identity() *ClassGroup {
-	return newClassGroup(bigOne, bigOne, group.Discriminant())
+	return newClassGroup(bip.New().Set(bigOne), bip.New().Set(bigOne), group.Discriminant())
 }
 
 // The discriminant is a constant and may be calculated from a,b,c
@@ -136,171 +302,16 @@ func (group *ClassGroup) Identity() *ClassGroup {
 func (group *ClassGroup) Discriminant() *big.Int {
 	if group.d == nil {
 		// b^2
-		group.d = new(big.Int).Mul(group.b, group.b)
+		group.d = bip.New().Mul(group.b, group.b)
 		// 4*a
-		fourAC := new(big.Int).Mul(bigFour, group.a)
+		fourAC := bip.New().Mul(bigFour, group.a)
+		defer bip.Recycle(fourAC)
 		// 4a*c
 		fourAC.Mul(fourAC, group.c)
 		// b^2-4ac
 		group.d.Sub(group.d, fourAC)
 	}
 	return group.d
-}
-
-// Multiply performs multiplication of two elements from the class group
-// and returns the resulting class group element
-// NOTE: this function re-uses big.int instances for memory efficiency
-// so the variable names won't match the commented equations
-func (group *ClassGroup) Multiply(other *ClassGroup) *ClassGroup {
-	// Step 0: Reduce both class groups for efficient arithmetic operations
-	x := group.Reduced()
-	y := other.Reduced()
-
-	// variables for storing intermediate results
-	a, b, c, d, e := new(big.Int), new(big.Int), new(big.Int), new(big.Int), new(big.Int)
-
-	// Step 1: Calculate intermediate value g = (b1+b2) // 2
-	e = floorDivision(e.Add(x.b, y.b), bigTwo)
-
-	// Step 2: Calculate intermediate value h = b2 - b1
-	d = floorDivision(d.Sub(y.b, x.b), bigTwo)
-
-	// Step 3: Calculate intermediate value w as the GCD of a2 and the (GCD of a1 and g)
-	gcd, _, _ := safeGCD(y.a, e)
-	y.c, _, _ = safeGCD(x.a, gcd)
-
-	// Step 4:
-	// Calculate intermediate value s = a1 // w
-	// Calculate intermediate value t = a2 // w
-	// Calculate intermediate value u = g // w
-	x.a = floorDivision(x.a, y.c)
-	y.a = floorDivision(y.a, y.c)
-	y.b = floorDivision(e, y.c)
-
-	// Step 5: Solve the modular equation for k and constant_factor
-	// k, constant_factor = mod.solve_mod(t * u, h * u + s * c1, s * t)
-	k, constFactor, solvable := solveMod(c.Mul(y.a, y.b), e.Add(e.Mul(d, y.b), b.Mul(x.a, x.c)), a.Mul(x.a, y.a))
-	if !solvable {
-		return nil // Return nil if the modular equation is unsolvable
-	}
-
-	// Step 6: Solve for n in another modular equation
-	// n, constant_factor_2 = mod.solve_mod(t * constant_factor, h - t * k, s)
-	n, _, solvable := solveMod(c.Mul(y.a, constFactor), e.Sub(d, e.Mul(y.a, k)), x.a)
-	if !solvable {
-		return nil // Return nil if this equation is unsolvable
-	}
-
-	// Step 7: Compute intermediate value k = k_temp + constant_factor * n
-	k.Add(k, c.Mul(constFactor, n))
-
-	// Step 8: Compute intermediate value l as (t * k - h) // s
-	n = floorDivision(c.Sub(a.Mul(y.a, k), d), x.a)
-
-	// Step 9:
-	// Compute a = h * u
-	// Compute intermediate value m as (t * u * k - h * u - s * c1) // (s * t)
-	c.Mul(y.a, y.b)
-	c.Mul(c, k)
-	a.Mul(d, y.b)
-	c.Sub(c, a)
-	c.Sub(c, b)
-	a.Mul(x.a, y.a)
-	x.b = floorDivision(c, a)
-
-	// Step 10: Compute b = (j * u + m * r) - (k * t + l * s)
-	b.Mul(y.c, y.b)
-	e.Mul(k, y.a)
-	d.Mul(n, x.a)
-	e.Add(e, d)
-	b.Sub(b, e)
-
-	// Step 12: Compute c = k * l - j * m
-	c.Mul(k, n)
-	e.Mul(y.c, x.b)
-	c.Sub(c, e)
-
-	return NewClassGroup(a, b, c).Reduced()
-}
-
-// Pow() executes an exponential function (group^n) on a class group and returns the resulting class group
-func (group *ClassGroup) Pow(n int64) *ClassGroup {
-	// initialize the result as the Identity element of the group (group^0)
-	result := group.Identity()
-	// clone the current ClassGroup to avoid modifying the original while performing exponentiation
-	x := CloneClassGroup(group)
-	// while n is greater than 0, perform exponentiation by squaring
-	for n > 0 {
-		// if the current bit of n is 1, multiply the result
-		if n%2 == 1 {
-			if result = result.Multiply(x); result == nil {
-				return nil
-			}
-		}
-		// square the base (x = x^2)
-		if x = x.Square(); x == nil {
-			return nil
-		}
-		// move to the next higher bit by dividing n by 2
-		n /= 2
-	}
-	// return the result (group^n)
-	return result
-}
-
-// BigPow() executes an exponential function (group^n) on a class group and returns the resulting class group
-func (group *ClassGroup) BigPow(z *big.Int) *ClassGroup {
-	// initialize the result as the Identity element of the group (group^0)
-	result := group.Identity()
-	// clone the current ClassGroup to avoid modifying the original while performing exponentiation
-	x := CloneClassGroup(group)
-	// clone the big int
-	n := new(big.Int).Set(z)
-	// while n is greater than zero
-	for n.Sign() > 0 {
-		// if the current bit of n is 1, multiply the result
-		if n.Bit(0) == 1 {
-			if result = result.Multiply(x); result == nil {
-				return nil
-			}
-		}
-		// square the base (x = x^2)
-		if x = x.Square(); x == nil {
-			return nil
-		}
-		// move to the next higher bit by right shifting n
-		n.Rsh(n, 1)
-	}
-	// return the result (group^n)
-	return result
-}
-
-// Square() executes a pow(2) operation on the class group
-func (group *ClassGroup) Square() *ClassGroup {
-	mod, _, solvable := solveMod(group.b, group.c, group.a)
-	if !solvable {
-		return nil
-	}
-	// create new a,b,c for resulting class group
-	A, B, C := new(big.Int), new(big.Int), new(big.Int)
-
-	// A = a^2
-	A.Mul(group.a, group.a)
-
-	// B = b − 2a * mod
-	temp := new(big.Int).Mul(group.a, mod)
-	temp.Mul(temp, big.NewInt(2))
-	B.Sub(group.b, temp)
-
-	// C = mod^2 − (mod − c) / a
-	C.Mul(mod, mod)
-	temp.Mul(group.b, mod)
-	temp.Sub(temp, group.c)
-	temp.Div(temp, group.a)
-	C.Sub(C, temp)
-
-	// Return the reduced class group
-	return NewClassGroup(A, B, C).Reduced()
 }
 
 // Encode() converts the ClassGroup into bytes
@@ -335,11 +346,15 @@ func (group *ClassGroup) Equal(other *ClassGroup) bool {
 	return g.a.Cmp(o.a) == 0 && g.b.Cmp(o.b) == 0 && g.c.Cmp(o.c) == 0
 }
 
+// Discard() recycles the big ints used for the class group
+func (group *ClassGroup) Discard() { bip.Recycle(group.a, group.b, group.c) }
+
 // NewDiscriminant generates a 2048-bit discriminant using a seed
 // The discriminant % 8 == 7 and is a negated random prime p between 13 - 2^4096
 func NewDiscriminant(seed []byte) *big.Int {
 	// define big ints
-	n, negN, temp := new(big.Int), new(big.Int), new(big.Int)
+	n, negN, temp := bip.New(), bip.New(), bip.New()
+	defer bip.Recycle(negN, temp)
 	// create entropy by hashing the seed
 	entropy := Hash(seed)
 	// convert entropy (minus the last 2 bytes) to a big integer
@@ -387,7 +402,7 @@ func NewDiscriminant(seed []byte) *big.Int {
 			// if the number is not marked in the sieve and is a probable prime:
 			if !marked && t.ProbablyPrime(1) {
 				// return the negation of the prime number (as per the discriminant's requirements)
-				return temp.Neg(t)
+				return n.Neg(t)
 			}
 		}
 		// if no prime is found, increment n to move to the next range: n = n + m * (1 << 16)
@@ -398,21 +413,23 @@ func NewDiscriminant(seed []byte) *big.Int {
 
 // encodeBigInt() encodes a big integer as a big-endian byte slice but preserves the sign using the first byte
 func encodeBigInt(i *big.Int) []byte {
+	x := bip.New().Set(i)
+	defer bip.Recycle(x)
 	buf := new(bytes.Buffer)
-	if i.Sign() < 0 {
+	if x.Sign() < 0 {
 		buf.WriteByte(1) // Negative sign
-		i = new(big.Int).Neg(i)
+		x.Neg(i)
 	} else {
 		buf.WriteByte(0) // Positive sign
 	}
-	buf.Write(i.Bytes())
+	buf.Write(x.Bytes())
 	return buf.Bytes()
 }
 
 // decodeBigInt() decodes a big integer from a big-endian byte slice with a sign byte
 func decodeBigInt(data []byte) *big.Int {
 	sign := data[0]
-	i := new(big.Int).SetBytes(data[1:])
+	i := bip.New().SetBytes(data[1:])
 	if sign == 1 {
 		i.Neg(i)
 	}
@@ -423,8 +440,8 @@ func decodeBigInt(data []byte) *big.Int {
 func floorDivision(x, y *big.Int) *big.Int {
 	var r big.Int
 	// perform integer division: x / y
-	q, _ := new(big.Int).QuoRem(x, y, &r)
-
+	q, tmp := bip.New().QuoRem(x, y, &r)
+	defer bip.Recycle(tmp)
 	// check for cases where the division result needs adjustment to ensure floor division
 	// round down to the nearest integer less than or equal to the exact result
 	// This adjustment is necessary when:
@@ -442,7 +459,7 @@ func floorDivision(x, y *big.Int) *big.Int {
 // - t: The step size, such that all solutions are of the form s + k * t (where k is any integer)
 // - solvable: A boolean indicating if a solution exists
 func solveMod(a, b, m *big.Int) (solution, step *big.Int, solvable bool) {
-	solution = new(big.Int)
+	solution = bip.New()
 	// find GCD of a and m, and the coefficients d and e
 	gcd, x, _ := safeGCD(a, m)
 	// check if b is divisible by gcd
@@ -455,15 +472,16 @@ func solveMod(a, b, m *big.Int) (solution, step *big.Int, solvable bool) {
 	solution.Mul(solution, x) // solution = (b / gcd) * x
 	solution.Mod(solution, m) // solution = solution mod m
 	// compute the step size // step = m / gcd
-	return solution, new(big.Int).Div(m, gcd), true
+	return solution, bip.New().Div(m, gcd), true
 }
 
 // safeGCD() extends big.Int GCD to handle non positive inputs
 func safeGCD(a, b *big.Int) (gcd, x, y *big.Int) {
-	gcd, x, y = new(big.Int), new(big.Int), new(big.Int)
+	gcd, x, y = bip.New(), bip.New(), bip.New()
 	// handle non-positive inputs
-	absA := new(big.Int).Abs(a)
-	absB := new(big.Int).Abs(b)
+	absA := bip.New().Abs(a)
+	absB := bip.New().Abs(b)
+	defer bip.Recycle(absA, absB)
 	// compute GCD
 	gcd.GCD(x, y, absA, absB)
 	// adjust coefficients if inputs were negative
@@ -476,40 +494,62 @@ func safeGCD(a, b *big.Int) (gcd, x, y *big.Int) {
 	return gcd, x, y
 }
 
-// BigIntPool is a thread unsafe simple pool which enables the sequential reuse of big ints for memory / garbage collector efficiency
 type BigIntPool struct {
-	// map of all big ints keyed by unix nano timestamp
-	free map[int64]*big.Int
+	mu      sync.Mutex
+	free    []*big.Int
+	maxSize int
 }
 
-// NewBigIntPool() constructs a BigIntPool
-func NewBigIntPool() *BigIntPool { return &BigIntPool{free: make(map[int64]*big.Int)} }
+// NewBigIntPool() constructs a big int pool
+func NewBigIntPool() *BigIntPool {
+	return &BigIntPool{
+		mu:      sync.Mutex{},
+		free:    make([]*big.Int, 0),
+		maxSize: 50,
+	}
+}
 
-// New() returns a big int, if
-func (bp *BigIntPool) New() (i *big.Int) {
-	var k int64
-	// if there are currently no big ints available
-	if len(bp.free) == 0 {
+// New() pops a bigInt from the list
+func (bp *BigIntPool) New() (b *big.Int) {
+	bp.mu.Lock()
+	defer bp.mu.Unlock()
+	// check the length of the free list
+	length := len(bp.free)
+	if length == 0 {
+		// if none, create a new big.Int
 		return new(big.Int)
 	}
-	// else get one from the map
-	for k, i = range bp.free {
-		break
-	}
-	// delete from the map
-	delete(bp.free, k)
+	// get the last index
+	lastIdx := length - 1
+	// get the last element
+	b = bp.free[lastIdx]
+	// shrink the list
+	bp.free = bp.free[:lastIdx]
 	return
 }
 
-func (bp *BigIntPool) Release(b *big.Int) {
-	// can't add nil
-	if b == nil {
-		return
+// Recycle releases a big.int to the pool
+func (bp *BigIntPool) Recycle(ints ...*big.Int) {
+	bp.mu.Lock()
+	defer bp.mu.Unlock()
+	// get the size of the pool
+	size := len(bp.free)
+	// for each big int
+	for _, b := range ints {
+		// don't allow growth past the max size
+		if size >= bp.maxSize {
+			return
+		}
+		// only set non nil big ints
+		if b != nil {
+			// reset the big int
+			b.SetInt64(0)
+			// add to the list
+			bp.free = append(bp.free, b)
+		}
+		// increment the size
+		size++
 	}
-	// reset the big int
-	b.SetUint64(0)
-	// add to the map
-	bp.free[time.Now().UnixNano()] = b
 }
 
 // Public to allow others to import

@@ -357,7 +357,9 @@ func verifyProof(x, y, proof *ClassGroup, T int) (result bool) {
 	// calculate B = hashPrime(xBytes, yBytes), a prime derived from the serialized inputs
 	B := hashPrime(x.Encode(), y.Encode())
 	// r = 2^T mod B
-	r := new(big.Int).Exp(bigTwo, big.NewInt(int64(T)), B)
+	TBig := bip.New().SetInt64(int64(T))
+	r := bip.New().Exp(bigTwo, TBig, B)
+	defer bip.Recycle(r, TBig)
 	// proof^B
 	if pToB = proof.BigPow(B); pToB == nil {
 		return
@@ -380,7 +382,7 @@ func hashPrime(x, y []byte) *big.Int {
 	buffer := make([]byte, 8+len(x)+len(y))
 	copy(buffer[8:], x)
 	copy(buffer[8+len(x):], y)
-	z := new(big.Int)
+	z := bip.New()
 	// reference the portion of the buffer for iBuf
 	iBuf := buffer[:8]
 	for i := 0; ; i++ {
@@ -399,9 +401,10 @@ func hashPrime(x, y []byte) *big.Int {
 // where the sum of all get_block(i) * 2^ki equals t^T // B
 func getBlock(i, k, T int, B *big.Int) *big.Int {
 	// create temporary variables for intermediate calculations
-	baseValue := new(big.Int) // 2^k
-	expValue := new(big.Int)  // 2^(T - k*(i+1))
-	result := new(big.Int)
+	baseValue := bip.New() // 2^k
+	expValue := bip.New()  // 2^(T - k*(i+1))
+	result := bip.New()
+	defer bip.Recycle(baseValue, expValue, result)
 	// calculate 2^k
 	baseValue.SetInt64(int64(math.Pow(2, float64(k))))
 	// calculate 2^(T - k*(i + 1))

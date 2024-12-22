@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/require"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -107,6 +106,7 @@ func TestProofAndVerify(t *testing.T) {
 			got := append(y, proof...)
 			require.Equal(t, test.expected, hex.EncodeToString(got))
 			require.Equal(t, true, VerifyVDF(test.seed, y, proof, test.iterations))
+			fmt.Println(len(bip.free))
 		})
 	}
 }
@@ -160,8 +160,4 @@ func TestVDFJSON(t *testing.T) {
 	require.NoError(t, json.Unmarshal(gotBytes, got))
 	// compare got vs expected
 	require.EqualExportedValues(t, expected, got)
-}
-
-func TestMP(t *testing.T) {
-	sync.Pool{}
 }
