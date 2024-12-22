@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math"
 	"math/big"
 	"sort"
@@ -47,12 +48,14 @@ func NewVDFService(targetTime time.Duration) (vdf *VDFService) {
 // Run() *blocking call*:  generates a VDF proof using the current params state of the VDF Service object
 // The design is to save the results
 func (vdf *VDFService) Run(seed []byte) {
+	fmt.Println("CALLING VDF RUN")
 	if vdf == nil {
 		return
 	}
 	// - Run() and not running locks and starts a run
 	// - Run() and already running returns
 	if !vdf.running.CompareAndSwap(false, true) {
+		fmt.Println("VDF ALREADY RUNNING")
 		return
 	}
 	// clear the results object
@@ -72,6 +75,7 @@ func (vdf *VDFService) Run(seed []byte) {
 		// exit
 		return
 	}
+	fmt.Println("DONE RUNNING VDF")
 	// save the result
 	vdf.Results = VDF{
 		Proof:      proof,
@@ -86,11 +90,13 @@ func (vdf *VDFService) Run(seed []byte) {
 // - already running signals a stop in the running thread and returns
 // - not running returns
 func (vdf *VDFService) Finish() (results *VDF) {
+	fmt.Println("CALLING VDF FINISH")
 	if vdf == nil {
 		return
 	}
 	// if service has not yet completed, signal to stop
 	if vdf.running.Load() {
+		fmt.Println("CALLING VDF STOP")
 		vdf.stopChan <- struct{}{} // NOTE: multiple sequential calls to stop is not supported
 		return
 	}

@@ -234,10 +234,8 @@ func (b *BFT) StartElectionVotePhase() {
 	// select Proposer (set is required for self-send)
 	b.ProposerKey = SelectProposerFromCandidates(b.GetElectionCandidates(), b.SortitionData, b.ValidatorSet.ValidatorSet)
 	defer func() { b.ProposerKey = nil }()
-	fmt.Println("selected proposer key")
 	// get locally produced Verifiable delay function
 	b.HighVDF = b.VDFService.Finish()
-	fmt.Println("sending vote to proposer")
 	// sign and send vote to Proposer
 	b.SendToProposer(b.CommitteeId, &Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
@@ -579,9 +577,9 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	if keepLocks == nil || !keepLocks[0] {
 		b.HighQC = nil
 		// begin the verifiable delay function for the next height
-		//if err := b.RunVDF(); err != nil {
-		//	b.log.Errorf("RunVDF() failed with error, %s", err.Error())
-		//}
+		if err := b.RunVDF(); err != nil {
+			b.log.Errorf("RunVDF() failed with error, %s", err.Error())
+		}
 		b.Height++
 		b.CanopyHeight = b.Controller.GetCanopyHeight()
 	}

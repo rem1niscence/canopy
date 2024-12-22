@@ -350,9 +350,10 @@ func (s *Stream) chunkNextSend() (chunk []byte, eof bool) {
 
 // handlePacket() merge the new packet with the previously received ones until the entire message is complete (EOF signal)
 func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
+	msgAssemblerLen, packetLen := len(s.msgAssembler), len(packet.Bytes)
 	// if the addition of this new packet pushes the total message size above max
-	if int(maxMessageSize) < len(s.msgAssembler)+len(packet.Bytes) {
-		s.msgAssembler = make([]byte, 0, maxMessageSize)
+	if int(maxMessageSize) < msgAssemblerLen+packetLen {
+		s.msgAssembler = s.msgAssembler[:0]
 		return MaxMessageExceededSlash, ErrMaxMessageSize()
 	}
 	// combine this packet with the previously received ones
@@ -377,7 +378,7 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		// add to inbox for other parts of the app to read
 		s.inbox <- m
 		// reset receiving buffer
-		s.msgAssembler = make([]byte, 0, maxMessageSize)
+		s.msgAssembler = s.msgAssembler[:0]
 	}
 	return 0, nil
 }
