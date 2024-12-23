@@ -72,16 +72,32 @@ type Logger struct {
 }
 
 // Debug() logs a message at the Debug level with blue color
-func (l *Logger) Debug(msg string) { l.write(colorString(BLUE, "DEBUG: "+msg)) }
+func (l *Logger) Debug(msg string) {
+	if l.config.Level <= DebugLevel {
+		l.write(colorString(BLUE, "DEBUG: "+msg))
+	}
+}
 
 // Info() logs a message at the Info level with green color
-func (l *Logger) Info(msg string) { l.write(colorString(GREEN, "INFO: "+msg)) }
+func (l *Logger) Info(msg string) {
+	if l.config.Level <= InfoLevel {
+		l.write(colorString(GREEN, "INFO: "+msg))
+	}
+}
 
 // Warn() logs a message at the Warn level with yellow color
-func (l *Logger) Warn(msg string) { l.write(colorString(YELLOW, "WARN: "+msg)) }
+func (l *Logger) Warn(msg string) {
+	if l.config.Level <= WarnLevel {
+		l.write(colorString(YELLOW, "WARN: "+msg))
+	}
+}
 
 // Error() logs a message at the Error level with red color
-func (l *Logger) Error(msg string) { l.write(colorString(RED, "ERROR: "+msg)) }
+func (l *Logger) Error(msg string) {
+	if l.config.Level <= ErrorLevel {
+		l.write(colorString(RED, "ERROR: "+msg))
+	}
+}
 
 // Print() logs a message without any specific log level or color
 func (l *Logger) Print(msg string) { l.write(msg) }
@@ -94,22 +110,30 @@ func (l *Logger) Fatal(msg string) {
 
 // Debugf() logs a formatted message at the Debug level with blue color
 func (l *Logger) Debugf(format string, args ...interface{}) {
-	l.write(colorStringWithFormat(BLUE, "DEBUG: "+format, args...))
+	if l.config.Level <= DebugLevel {
+		l.write(colorStringWithFormat(BLUE, "DEBUG: "+format, args...))
+	}
 }
 
 // Infof() logs a formatted message at the Info level with green color
 func (l *Logger) Infof(format string, args ...interface{}) {
-	l.write(colorStringWithFormat(GREEN, "INFO: "+format, args...))
+	if l.config.Level <= InfoLevel {
+		l.write(colorStringWithFormat(GREEN, "INFO: "+format, args...))
+	}
 }
 
 // Warnf() logs a formatted message at the Warn level with yellow color
 func (l *Logger) Warnf(format string, args ...interface{}) {
-	l.write(colorStringWithFormat(YELLOW, "WARN: "+format, args...))
+	if l.config.Level <= WarnLevel {
+		l.write(colorStringWithFormat(YELLOW, "WARN: "+format, args...))
+	}
 }
 
 // Errorf() logs a formatted message at the Error level with red color
 func (l *Logger) Errorf(format string, args ...interface{}) {
-	l.write(colorStringWithFormat(RED, "ERROR: "+format, args...))
+	if l.config.Level <= ErrorLevel {
+		l.write(colorStringWithFormat(RED, "ERROR: "+format, args...))
+	}
 }
 
 // Fatalf() logs a formatted error message and terminates the program

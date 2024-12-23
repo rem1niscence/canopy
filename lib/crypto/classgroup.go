@@ -349,6 +349,10 @@ func (group *ClassGroup) Equal(other *ClassGroup) bool {
 // Discard() recycles the big ints used for the class group
 func (group *ClassGroup) Discard() { bip.Recycle(group.a, group.b, group.c) }
 
+// TODO consider updating the library to be similar to big.Int like (group *ClassGroup) Multiply(x, y) where it sets to group
+//
+//	This design would ultimately save GC pressure because Class Groups could be explicitly reused instead of always creating a new instance
+
 // NewDiscriminant generates a 2048-bit discriminant using a seed
 // The discriminant % 8 == 7 and is a negated random prime p between 13 - 2^4096
 func NewDiscriminant(seed []byte) *big.Int {
@@ -505,7 +509,7 @@ func NewBigIntPool() *BigIntPool {
 	return &BigIntPool{
 		mu:      sync.Mutex{},
 		free:    make([]*big.Int, 0),
-		maxSize: 50,
+		maxSize: 100,
 	}
 }
 

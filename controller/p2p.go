@@ -352,7 +352,7 @@ func (c *Controller) ListenForBlock() {
 						continue
 					}
 					// reset & update the consensus module
-					chain.Consensus.ResetBFTChan() <- bft.ResetBFT{UpdatedCommitteeSet: newCommittee, UpdatedCanopyHeight: newCanopyHeight}
+					chain.Consensus.ResetBFTChan() <- bft.ResetBFT{UpdatedCommitteeSet: newCommittee, UpdatedCanopyHeight: newCanopyHeight, ProcessTime: 0}
 				}
 				// update the peer 'must connect'
 				c.UpdateP2PMustConnect()

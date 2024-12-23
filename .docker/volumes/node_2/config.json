@@ -1,0 +1,42 @@
+{
+  "logLevel": "info",
+  "WalletPort": "50000",
+  "ExplorerPort": "50001",
+  "RPCPort": "50002",
+  "AdminPort": "50003",
+  "RPCUrl": "http://localhost",
+  "TimeoutS": 3,
+  "DataDirPath": "/root/.canopy",
+  "DBName": "canopy",
+  "InMemory": false,
+  "NetworkID": 1,
+  "ListenAddress": "0.0.0.0:9000",
+  "ExternalAddress": "node21:9000",
+  "MaxInbound": 21,
+  "MaxOutbound": 7,
+  "TrustedPeerIDs": null,
+  "DialPeers": [
+    "b88a5928e54cbf0a36e0b98f5bcf02de9a9a1deba6994739f9160181a609f516eb702936a0cbf4c1f2e7e6be5b8272f2@tcp://node-1:9000"
+  ],
+  "BannedPeerIDs": null,
+  "BannedIPs": null,
+  "ElectionTimeoutMS": 5000,
+  "ElectionVoteTimeoutMS": 2000,
+  "ProposeTimeoutMS": 2000,
+  "ProposeVoteTimeoutMS": 2000,
+  "PrecommitTimeoutMS": 2000,
+  "PrecommitVoteTimeoutMS": 2000,
+  "CommitTimeoutMS": 2000,
+  "CommitProcessMS": 5000,
+  "RoundInterruptTimeoutMS": 5000,
+  "MaxTotalBytes": 1000000,
+  "MaxTransactionCount": 5000,
+  "IndividualMaxTxSize": 4000,
+  "DropPercentage": 35,
+  "Plugins": [
+    {
+      "ID": 1,
+      "Name": "Canopy Network"
+    }
+  ]
+}

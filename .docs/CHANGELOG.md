@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [Unreleased] - 12/23/2024
+
+- Fixed log level
+- Removed HarmonyOne VDF implementation in favor of a memory optimized implementation (saves +1.5GB Mem)
+- Fixed bft (process time) bug
+- Fixed optimistic timer trigger
+- Added logging to VDF
+- 2x'd the round delay in the pacemaker
+- Added volumes to create a 2 node network
+
 ## [Unreleased] - 12/12/2024
 
 - Added the SMT implementation in store package

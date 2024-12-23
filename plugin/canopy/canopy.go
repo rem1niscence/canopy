@@ -363,7 +363,7 @@ func (p *Plugin) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
 	}
 	// delete the block transactions in the mempool
 	for _, tx := range blk.Transactions {
-		p.log.Debugf("tx %s was included in a block so removing from mempool", crypto.HashString(tx))
+		p.log.Debugf("Tx %s was included in a block so removing from mempool", crypto.HashString(tx))
 		p.Mempool.DeleteTransaction(tx)
 	}
 	// rescan mempool to ensure validity of all transactions
@@ -474,7 +474,7 @@ func (m *Mempool) HandleTransaction(tx []byte) lib.ErrorI {
 		return err
 	}
 	// cache the results for RPC display
-	m.log.Infof("added tx %s to mempool for checking", crypto.HashString(tx))
+	m.log.Infof("Added tx %s to mempool for checking", crypto.HashString(tx))
 	m.cachedResults = append(m.cachedResults, result)
 	// recheck the mempool if necessary
 	if recheck {

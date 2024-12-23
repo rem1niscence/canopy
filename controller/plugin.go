@@ -6,6 +6,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/plugin"
+	"time"
 )
 
 // HandleTransaction() accepts or rejects inbound txs based on the mempool state
@@ -102,7 +103,9 @@ func (c *Controller) ResetBFTCallback(committeeID uint64) {
 		return
 	}
 	// reset the consensus for that particular chain
-	chain.Consensus.ResetBFTChan() <- bft.ResetBFT{}
+	chain.Consensus.ResetBFTChan() <- bft.ResetBFT{
+		ProcessTime: time.Duration(0),
+	}
 }
 
 // CANOPY (BASE CHAIN) SPECIFIC FUNCTIONALITY BELOW

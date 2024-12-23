@@ -1,0 +1,76 @@
+{
+  "time": "2024-12-14 20:10:52",
+  "accounts": [
+    {
+      "address": "851e90eaef1fa27debaee2c2591503bdeec1d123",
+      "amount": 1000000
+    },
+    {
+      "address": "02cd4e5eb53ea665702042a6ed6d31d616054dc5",
+      "amount": 1000000
+    }
+  ],
+  "nonSigners": null,
+  "validators": [
+    {
+      "address": "851e90eaef1fa27debaee2c2591503bdeec1d123",
+      "public_key": "b88a5928e54cbf0a36e0b98f5bcf02de9a9a1deba6994739f9160181a609f516eb702936a0cbf4c1f2e7e6be5b8272f2",
+      "committees": [
+        1
+      ],
+      "net_address": "tcp://node-1:9000",
+      "staked_amount": 1000000000,
+      "output": "851e90eaef1fa27debaee2c2591503bdeec1d123"
+    },
+    {
+      "address": "02cd4e5eb53ea665702042a6ed6d31d616054dc5",
+      "public_key": "98d45087a99bcbfde91993502e77dde869d4485c3778fe46513958320da560823d56a0108f4cf3513393f4d561bc489b",
+      "committees": [
+        1
+      ],
+      "net_address": "tcp://node-2:9000",
+      "staked_amount": 1000000000,
+      "output": "02cd4e5eb53ea665702042a6ed6d31d616054dc5"
+    }
+  ],
+  "params": {
+    "Consensus": {
+      "block_size": 1000000,
+      "protocol_version": "1/0"
+    },
+    "Validator": {
+      "validator_unstaking_blocks": 2,
+      "validator_max_pause_blocks": 4380,
+      "validator_double_sign_slash_percentage": 10,
+      "validator_bad_proposal_slash_percentage": 1,
+      "validator_non_sign_slash_percentage": 1,
+      "validator_max_non_sign": 4,
+      "validator_non_sign_window": 10,
+      "validator_max_committees": 15,
+      "validator_max_committee_size": 100,
+      "validator_early_withdrawal_penalty": 20,
+      "validator_delegate_unstaking_blocks": 2,
+      "validator_minimum_order_size": 100000000000,
+      "validator_stake_percent_for_subsidized_committee": 33,
+      "validator_max_slash_per_committee": 15
+    },
+    "Fee": {
+      "message_send_fee": 10000,
+      "message_stake_fee": 10000,
+      "message_edit_stake_fee": 10000,
+      "message_unstake_fee": 10000,
+      "message_pause_fee": 10000,
+      "message_unpause_fee": 10000,
+      "message_change_parameter_fee": 10000,
+      "message_dao_transfer_fee": 10000,
+      "message_subsidy_fee": 10000,
+      "message_create_order_fee": 10000,
+      "message_edit_order_fee": 10000,
+      "message_delete_order_fee": 10000
+    },
+    "Governance": {
+      "dao_reward_percentage": 10
+    }
+  },
+  "supply": null
+}

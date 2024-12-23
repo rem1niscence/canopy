@@ -21,7 +21,7 @@ type BFT struct {
 	Block         []byte                 // the current Block being voted on (the foundational unit of the blockchain)
 	Results       *lib.CertificateResult // the current Result being voted on (reward and slash recipients)
 	SortitionData *SortitionData         // the current data being used for VRF+CDF Leader Election
-	VDFService    *crypto.VDFService     // the verifiable delay service, run once per block as a deterrent against long-range-attacks
+	VDFService    *lib.VDFService        // the verifiable delay service, run once per block as a deterrent against long-range-attacks
 	HighVDF       *crypto.VDF            // the highest VDF among replicas - if the chain is using VDF for long-range-attack protection
 
 	ByzantineEvidence *ByzantineEvidence // evidence of faulty or malicious Validators collected during the BFT process
@@ -45,11 +45,11 @@ type BFT struct {
 func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, canopyHeight, height uint64, vs ValSet,
 	con Controller, vdfEnabled bool, l lib.LoggerI) (*BFT, lib.ErrorI) {
 	// determine if using a Verifiable Delay Function for long-range-attack protection
-	var vdf *crypto.VDFService
+	var vdf *lib.VDFService
 	// calculate the targetTime from commitProcess and set the VDF
 	if vdfEnabled {
 		vdfTargetTime := time.Duration(float64(c.CommitProcessMS)*CommitProcessToVDFTargetCoefficient) * time.Millisecond
-		vdf = crypto.NewVDFService(vdfTargetTime)
+		vdf = lib.NewVDFService(vdfTargetTime, l)
 	}
 	return &BFT{
 		View: &lib.View{
@@ -103,19 +103,18 @@ func (b *BFT) Start() {
 		// OPTIMISTIC TIMEOUT
 		// - This triggers when Round 10 phase sleep has expired, this functionality only works well after Round 10
 		// - Allows an intermittent 'Optimistic' check to see if node can move on before PhaseTimer actually triggers
-		//case <-b.OptimisticTimer.C:
-		//	fmt.Println("OPTIMISTIC") TODO
-		//	func() {
-		//		b.Controller.Lock()
-		//		defer b.Controller.Unlock()
-		//		// if self doesn't have +2/3rds (or leader msg) already, reset the timer and sleep again
-		//		if !b.PhaseHas23Maj() {
-		//			lib.ResetTimer(b.OptimisticTimer, b.WaitTime(b.Phase, 10))
-		//			return
-		//		}
-		//		// if self has +2/3 (or leader msg) already, move forward Optimistically
-		//		b.HandlePhase()
-		//	}()
+		case <-b.OptimisticTimer.C:
+			func() {
+				b.Controller.Lock()
+				defer b.Controller.Unlock()
+				// if self doesn't have +2/3rds (or leader msg) already, reset the timer and sleep again
+				if !b.PhaseHas23Maj() {
+					lib.ResetTimer(b.OptimisticTimer, b.WaitTime(b.Phase, 10))
+					return
+				}
+				// if self has +2/3 (or leader msg) already, move forward Optimistically
+				b.HandlePhase()
+			}()
 
 		// RESET BFT
 		// - This triggers when receiving a new Commit Block (QC) from either Canopy (a) or a sub-chain (b)
@@ -234,6 +233,7 @@ func (b *BFT) StartElectionVotePhase() {
 	// select Proposer (set is required for self-send)
 	b.ProposerKey = SelectProposerFromCandidates(b.GetElectionCandidates(), b.SortitionData, b.ValidatorSet.ValidatorSet)
 	defer func() { b.ProposerKey = nil }()
+	b.log.Debugf("Voting %s as the proposer", lib.BytesToTruncatedString(b.ProposerKey))
 	// get locally produced Verifiable delay function
 	b.HighVDF = b.VDFService.Finish()
 	// sign and send vote to Proposer
@@ -264,6 +264,7 @@ func (b *BFT) StartProposePhase() {
 	if err != nil {
 		return
 	}
+	b.log.Info("Self is the proposer")
 	// produce new proposal or use highQC as the proposal
 	if b.HighQC == nil {
 		b.Block, b.Results, err = b.ProduceProposal(b.CommitteeId, b.ByzantineEvidence, b.HighVDF)
@@ -305,6 +306,7 @@ func (b *BFT) StartProposeVotePhase() {
 		return
 	}
 	b.ProposerKey = msg.Signature.PublicKey
+	b.log.Infof("Proposer is %s 👑", lib.BytesToTruncatedString(b.ProposerKey))
 	// if locked, confirm safe to unlock
 	if b.HighQC != nil {
 		if err := b.SafeNode(msg); err != nil {
@@ -649,7 +651,7 @@ func (b *BFT) WaitTime(phase Phase, round uint64) (waitTime time.Duration) {
 	case Commit:
 		waitTime = b.waitTime(b.Config.CommitTimeoutMS, round)
 	case CommitProcess:
-		waitTime = b.waitTime(b.Config.CommitProcessMS, 0)
+		waitTime = b.waitTime(b.Config.CommitProcessMS, round)
 	case RoundInterrupt:
 		waitTime = b.waitTime(b.Config.RoundInterruptTimeoutMS, round)
 	case Pacemaker:
@@ -660,7 +662,7 @@ func (b *BFT) WaitTime(phase Phase, round uint64) (waitTime time.Duration) {
 
 // waitTime() calculates the waiting time for a specific sleepTime configuration and Round number (helper)
 func (b *BFT) waitTime(sleepTimeMS int, round uint64) time.Duration {
-	return time.Duration(uint64(sleepTimeMS)*(round+1)) * time.Millisecond
+	return time.Duration(uint64(sleepTimeMS)*(2*round+1)) * time.Millisecond
 }
 
 // SetWaitTimers() sets the phase and optimistic timers
@@ -669,16 +671,17 @@ func (b *BFT) waitTime(sleepTimeMS int, round uint64) time.Duration {
 // This design balances synchronization speed during adverse conditions with maximizing voter participation under normal conditions
 func (b *BFT) SetWaitTimers(phaseWaitTime, optimisticWaitTIme, processTime time.Duration) {
 	subtract := func(wt, pt time.Duration) (t time.Duration) {
-		if wt > pt {
-			t = wt - pt
-		} else {
-			t = 0
+		if pt > 700*time.Hour {
+			return wt
 		}
-		return
+		if wt <= pt {
+			return 0
+		}
+		return wt - pt
 	}
 	// calculate the phase timer and the optimistic timer by subtracting the process time
 	phaseWaitTime, optimisticWaitTime := subtract(phaseWaitTime, processTime), subtract(optimisticWaitTIme, processTime)
-	b.log.Debugf("Setting consensus timer: %s", phaseWaitTime.Seconds())
+	b.log.Debugf("Setting consensus timer: %.2fS", phaseWaitTime.Seconds())
 	// set Phase and Optimistic timers to go off in their respective timeouts
 	lib.ResetTimer(b.PhaseTimer, phaseWaitTime)
 	lib.ResetTimer(b.OptimisticTimer, optimisticWaitTime)
