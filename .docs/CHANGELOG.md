@@ -9,6 +9,7 @@
 - Added logging to VDF
 - 2x'd the round delay in the pacemaker
 - Added volumes to create a 2 node network
+- Deprecated bad_proposer logic
 
 ## [Unreleased] - 12/12/2024
 

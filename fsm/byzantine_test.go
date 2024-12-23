@@ -76,20 +76,6 @@ func TestHandleByzantine(t *testing.T) {
 				},
 			}),
 		},
-		{
-			name:   "bad proposer",
-			detail: "a valid bad proposer included",
-			qc: newTestQC(t, testQCParams{
-				idxSigned:     map[int]bool{0: true, 1: true, 2: true, 3: true},
-				committeeKeys: keyGroups,
-				committee:     validators,
-				results: &lib.CertificateResult{
-					SlashRecipients: &lib.SlashRecipients{
-						BadProposers: [][]byte{keyGroups[0].PublicKey.Bytes()},
-					},
-				},
-			}),
-		},
 	}
 
 	// run the test cases
@@ -168,20 +154,7 @@ func TestHandleByzantine(t *testing.T) {
 				}
 			}()
 
-			// STEP 3) validate 'bad proposer' logic
-			func() {
-				if test.qc.Results.SlashRecipients != nil && test.qc.Results.SlashRecipients.BadProposers != nil {
-					publicKey, e := crypto.BytesToBLS12381Public(test.qc.Results.SlashRecipients.BadProposers[0])
-					require.NoError(t, e)
-					// get the validator associated with the bad proposer
-					validator, e := sm.GetValidator(publicKey.Address())
-					require.NoError(t, e)
-					// validate the slash of the bad proposer
-					require.Less(t, validator.StakedAmount, stakeAmount)
-				}
-			}()
-
-			// STEP 4) validate 'double signer' logic
+			// STEP 3) validate 'double signer' logic
 			func() {
 				if test.qc.Results.SlashRecipients != nil && test.qc.Results.SlashRecipients.DoubleSigners != nil {
 					// retrieve the double signers
@@ -557,90 +530,6 @@ func TestHandleDoubleSigners(t *testing.T) {
 	}
 }
 
-func TestHandleBadProposers(t *testing.T) {
-	stakeAmount := uint64(100)
-	tests := []struct {
-		name         string
-		detail       string
-		badProposers [][]byte
-		error        string
-	}{
-		{
-			name:   "0",
-			detail: "there are no bad proposers and no slashes",
-		},
-		{
-			name:         "bad pub key",
-			detail:       "invalid public key is passed",
-			badProposers: [][]byte{newTestAddressBytes(t)},
-			error:        "publicKeyFromBytes() failed with err",
-		},
-		{
-			name:         "1 bad proposer",
-			detail:       "there is 1 bad proposer",
-			badProposers: [][]byte{newTestPublicKeyBytes(t)},
-		},
-		{
-			name:         "2 bad proposers",
-			detail:       "there is 2 unique bad proposer",
-			badProposers: [][]byte{newTestPublicKeyBytes(t), newTestPublicKeyBytes(t, 1)},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var pubs []crypto.PublicKeyI
-			// create a state machine instance with default parameters
-			sm := newTestStateMachine(t)
-			// preset the validators
-			for _, badProposer := range test.badProposers {
-				// if the bad proposer is empty, skip
-				if len(badProposer) != crypto.BLS12381PubKeySize {
-					continue
-				}
-				// add the validator stake to total supply
-				require.NoError(t, sm.AddToTotalSupply(stakeAmount))
-				// add the validator stake to supply
-				require.NoError(t, sm.AddToStakedSupply(stakeAmount))
-				// get the address of the bad proposer
-				pub, err := crypto.NewPublicKeyFromBytes(badProposer)
-				require.NoError(t, err)
-				// save the public key for later use in the test
-				pubs = append(pubs, pub)
-				// set the bad proposer as a validator in state
-				require.NoError(t, sm.SetValidator(&types.Validator{
-					Address:      pub.Address().Bytes(),
-					PublicKey:    pub.Bytes(),
-					StakedAmount: stakeAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
-				}))
-				// add to the committee supply
-				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyCommitteeId, stakeAmount))
-			}
-			// get the validator params
-			valParams, err := sm.GetParamsVal()
-			require.NoError(t, err)
-			// run the function call
-			err = sm.HandleBadProposers(lib.CanopyCommitteeId, valParams, test.badProposers)
-			if err != nil {
-				// check for expected error
-				require.NotEmpty(t, test.error)
-				require.ErrorContains(t, err, test.error)
-				return
-			}
-			// validate the slash
-			for i := range test.badProposers {
-				// get the validator
-				validator, e := sm.GetValidator(pubs[i].Address())
-				require.NoError(t, e)
-				// calculate the expected stake after slash
-				expected := lib.Uint64ReducePercentage(stakeAmount, valParams.ValidatorBadProposalSlashPercentage)
-				// validate the slash
-				require.Equal(t, validator.StakedAmount, expected)
-			}
-		})
-	}
-}
-
 func TestForceUnstakeValidator(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -744,7 +633,6 @@ func TestSlash(t *testing.T) {
 	const (
 		doubleSignerSlash = "double_signer"
 		nonSignerSlash    = "non_signer"
-		badProposerSlash  = "bad_proposer"
 	)
 	tests := []struct {
 		name       string
@@ -803,24 +691,6 @@ func TestSlash(t *testing.T) {
 			},
 		},
 		{
-			name:   "one bad proposer",
-			detail: "one validator slashed as a bad proposer",
-			validators: []*types.Validator{
-				{
-					Address:      newTestAddressBytes(t),
-					StakedAmount: stakeAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
-				},
-			},
-			slashes: []slash{
-				{
-					Type:        badProposerSlash,
-					Address:     newTestAddressBytes(t),
-					CommitteeId: lib.CanopyCommitteeId,
-				},
-			},
-		},
-		{
 			name:   "one slashed for all",
 			detail: "one validator slashed with all types",
 			validators: []*types.Validator{
@@ -838,11 +708,6 @@ func TestSlash(t *testing.T) {
 				},
 				{
 					Type:        nonSignerSlash,
-					Address:     newTestAddressBytes(t),
-					CommitteeId: lib.CanopyCommitteeId,
-				},
-				{
-					Type:        badProposerSlash,
 					Address:     newTestAddressBytes(t),
 					CommitteeId: lib.CanopyCommitteeId,
 				},
@@ -875,22 +740,12 @@ func TestSlash(t *testing.T) {
 					CommitteeId: lib.CanopyCommitteeId,
 				},
 				{
-					Type:        badProposerSlash,
-					Address:     newTestAddressBytes(t),
-					CommitteeId: lib.CanopyCommitteeId,
-				},
-				{
 					Type:        doubleSignerSlash,
 					Address:     newTestAddressBytes(t, 1),
 					CommitteeId: lib.CanopyCommitteeId,
 				},
 				{
 					Type:        nonSignerSlash,
-					Address:     newTestAddressBytes(t, 1),
-					CommitteeId: lib.CanopyCommitteeId,
-				},
-				{
-					Type:        badProposerSlash,
 					Address:     newTestAddressBytes(t, 1),
 					CommitteeId: lib.CanopyCommitteeId,
 				},
@@ -931,9 +786,6 @@ func TestSlash(t *testing.T) {
 				case doubleSignerSlash:
 					err = sm.SlashDoubleSigners(s.CommitteeId, valParams, [][]byte{s.Address})
 					expected = lib.Uint64ReducePercentage(expected, valParams.ValidatorDoubleSignSlashPercentage)
-				case badProposerSlash:
-					err = sm.SlashBadProposers(s.CommitteeId, valParams, [][]byte{s.Address})
-					expected = lib.Uint64ReducePercentage(expected, valParams.ValidatorBadProposalSlashPercentage)
 				case nonSignerSlash:
 					err = sm.SlashNonSigners(s.CommitteeId, valParams, [][]byte{s.Address})
 					expected = lib.Uint64ReducePercentage(expected, valParams.ValidatorNonSignSlashPercentage)

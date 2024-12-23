@@ -9,8 +9,7 @@ import (
 // ByzantineEvidence represents a collection of evidence that supports byzantine behavior during the BFT lifecycle
 // this Evidence is circulated to the Leader of a Round and is processed in the execution of Reward Transactions
 type ByzantineEvidence struct {
-	DSE DoubleSignEvidences  // Evidence of `DoubleSigning`: Signing two different messages for the same View is against protocol rules (breaks protocol safety)
-	BPE BadProposerEvidences // Evidence of `BadProposer`: Faulty leaders are punished as their lack of participation halts the BFT process until the next Round
+	DSE DoubleSignEvidences // Evidence of `DoubleSigning`: Signing two different messages for the same View is against protocol rules (breaks protocol safety)
 }
 
 // ValidateByzantineEvidence() ensures the DoubleSigners in the Proposal are supported by the ByzantineEvidence
@@ -44,22 +43,6 @@ func (b *BFT) ValidateByzantineEvidence(slashRecipients *lib.SlashRecipients, be
 					}
 				}
 				return true
-			}) {
-				return lib.ErrMismatchEvidenceAndHeader()
-			}
-		}
-	}
-	if slashRecipients.BadProposers != nil {
-		// generate a Bad Proposers list from the provided evidence
-		badProposers, err := b.ProcessBPE(be.BPE.Evidence...)
-		if err != nil {
-			return err
-		}
-		// this validation ensures that the bad proposers are justified, but there may be additional evidence included without any error
-		for _, bp := range slashRecipients.BadProposers {
-			// check if the Bad Proposer in the Proposal is within our locally generated Bad Proposers list
-			if !slices.ContainsFunc(badProposers, func(badProposer []byte) bool {
-				return bytes.Equal(badProposer, bp)
 			}) {
 				return lib.ErrMismatchEvidenceAndHeader()
 			}
@@ -351,108 +334,4 @@ func (b *BFT) addDSEByCandidate(dse *DoubleSignEvidences) {
 			}
 		}
 	}
-}
-
-// BAD PROPOSER EVIDENCE BELOW
-
-// NewBPE() creates a list of BadProposerEvidences with a builtin de-duplicator
-func NewBPE(bpe ...[]*BadProposerEvidence) BadProposerEvidences {
-	bp := make([]*BadProposerEvidence, 0)
-	if bpe != nil {
-		bp = bpe[0]
-	}
-	return BadProposerEvidences{
-		Evidence:     bp,
-		DeDuplicator: make(map[string]bool),
-	}
-}
-
-// ProcessBPE() validates each piece of bad proposer evidence and returns a list of bad proposers
-func (b *BFT) ProcessBPE(x ...*BadProposerEvidence) (badProposers [][]byte, err lib.ErrorI) {
-	for _, ev := range x {
-		cert, e := b.LoadCertificate(b.CommitteeId, b.Height-1)
-		if e != nil {
-			return nil, e
-		}
-		// validate the evidence
-		if !ev.Check(cert.ProposerKey, b.View, b.ValidatorSet) {
-			return nil, lib.ErrInvalidEvidence()
-		}
-		// validate the evidence height
-		if ev.ElectionVoteQc.Header.Height != b.Height-1 {
-			return nil, lib.ErrWrongHeight()
-		}
-	}
-	// de duplicate the list
-	dedupe := make(map[string]struct{})
-	for _, bp := range x {
-		proposerKey := lib.BytesToString(bp.ElectionVoteQc.ProposerKey)
-		if _, exists := dedupe[proposerKey]; exists {
-			continue
-		}
-		badProposers, dedupe[proposerKey] = append(badProposers, bp.ElectionVoteQc.ProposerKey), struct{}{}
-	}
-	return
-}
-
-// GetLocalBPE() generates local BPE from any 'proposers' who did not complete their task of leading the round
-func (b *BFT) GetLocalBPE() BadProposerEvidences {
-	e := NewBPE()
-	for r := uint64(0); r < b.Round; r++ {
-		if msg := b.getProposal(r, ProposeVote); msg != nil && msg.Qc != nil {
-			if err := b.AddBPE(&e, &BadProposerEvidence{ElectionVoteQc: msg.Qc}, true); err != nil {
-				b.log.Error(err.Error())
-			}
-		}
-	}
-	return e
-}
-
-// AddBPE() attempts to add a piece of bad proposer evidence to the list
-func (b *BFT) AddBPE(bpe *BadProposerEvidences, ev *BadProposerEvidence, local bool) lib.ErrorI {
-	// sanity check the evidence
-	if !ev.Check(b.ProposerKey, b.View, b.ValidatorSet) {
-		return lib.ErrInvalidEvidence()
-	}
-	// validate the evidence height
-	validationHeight := b.Height - 1
-	// if it's locally generated evidence, then it's at the COMMIT_PROCESS phase and should be the same height
-	if local {
-		validationHeight = b.Height
-	}
-	// validate the evidence height
-	if ev.ElectionVoteQc.Header.Height != validationHeight {
-		return lib.ErrWrongHeight()
-	}
-	// prepare de duplicator
-	if bpe.DeDuplicator == nil {
-		bpe.DeDuplicator = make(map[string]bool)
-	}
-	// add evidence to list and de-duplicator
-	bz, _ := lib.Marshal(ev.ElectionVoteQc.Header)
-	key := lib.BytesToString(bz) + lib.BytesToString(ev.ElectionVoteQc.ProposerKey)
-	if _, isDuplicate := bpe.DeDuplicator[key]; !isDuplicate {
-		bpe.Evidence = append(bpe.Evidence, ev)
-		bpe.DeDuplicator[key] = true
-	}
-	return nil
-}
-
-// Check() performs a full validation of bad proposer evidence
-func (x *BadProposerEvidence) Check(trueLeader []byte, view *lib.View, vs lib.ValidatorSet) (ok bool) {
-	if x == nil {
-		return
-	}
-	// ensure this is a valid election vote quorum certificate
-	isPartialQC, err := x.ElectionVoteQc.Check(vs, 0, view, false)
-	if isPartialQC || err != nil || x.ElectionVoteQc.Header.Phase != lib.Phase_ELECTION_VOTE {
-		return
-	}
-	// the true leader cannot be a 'bad proposer' even if was faulty before
-	// This is because non-consensus participants cannot determine the exact Round when the Consensus was completed
-	// Without this check, a valid ElectionQC for the true leader could be wrongly used as evidence
-	if bytes.Equal(x.ElectionVoteQc.ProposerKey, trueLeader) {
-		return
-	}
-	return true
 }

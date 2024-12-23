@@ -78,10 +78,6 @@ func (c *Controller) ProduceProposal(committeeID uint64, be *bft.ByzantineEviden
 	if err != nil {
 		c.log.Warn(err.Error()) // still produce proposal
 	}
-	results.SlashRecipients.BadProposers, err = chain.Consensus.ProcessBPE(be.BPE.Evidence...)
-	if err != nil {
-		c.log.Warn(err.Error()) // still produce proposal
-	}
 	return
 }
 

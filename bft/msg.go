@@ -182,7 +182,6 @@ func (x *Message) SignBytes() (signBytes []byte) {
 			Vrf:                    x.Vrf,
 			HighQc:                 x.HighQc,
 			LastDoubleSignEvidence: x.LastDoubleSignEvidence,
-			BadProposerEvidence:    x.BadProposerEvidence,
 		}
 		// phase ELECTION doesn't have a QC, but also
 		// the sign bytes function is used prior to the

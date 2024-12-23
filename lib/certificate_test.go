@@ -250,22 +250,6 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 			error: "invalid payment recipients count",
 		},
 		{
-			name:   "invalid bad proposer",
-			detail: "a bad proposers can't be nil",
-			result: &CertificateResult{
-				RewardRecipients: &RewardRecipients{
-					PaymentPercents: []*PaymentPercents{{
-						Address: newTestAddressBytes(t),
-						Percent: 100,
-					}},
-				},
-				SlashRecipients: &SlashRecipients{
-					BadProposers: [][]byte{nil},
-				},
-			},
-			error: "bad proposer is invalid",
-		},
-		{
 			name:   "invalid double signer",
 			detail: "a double signer can't be nil",
 			result: &CertificateResult{

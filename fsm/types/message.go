@@ -445,11 +445,6 @@ func (x *MessageCertificateResults) Check() lib.ErrorI {
 	if results.RewardRecipients.NumberOfSamples != 0 {
 		return ErrInvalidNumOfSamples()
 	}
-	if results.SlashRecipients != nil {
-		if len(results.SlashRecipients.DoubleSigners) > 33 || len(results.SlashRecipients.BadProposers) > 5 { // TODO enforce this at the evidence level to not exceed these limits
-			return ErrInvalidSlashRecipients()
-		}
-	}
 	if results.Checkpoint != nil {
 		if len(results.Checkpoint.BlockHash) > 100 {
 			return lib.ErrInvalidBlockHash()

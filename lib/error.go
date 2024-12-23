@@ -131,15 +131,15 @@ const (
 	CodeInvalidBlockTime                ErrorCode = 34
 	CodeInvalidEvidence                 ErrorCode = 35
 	CodeMismatchEvidenceAndHeader       ErrorCode = 36
-	CodeMismatchBadProposerCount        ErrorCode = 37
-	CodeWrongMaxHeight                  ErrorCode = 38
-	CodeExpectedBlockSizeLimit          ErrorCode = 39
-	CodeNonNilCertResults               ErrorCode = 40
-	CodeInvalidMemo                     ErrorCode = 41
-	CodeNilCertResult                   ErrorCode = 42
-	CodeNilBuyOrder                     ErrorCode = 43
-	CodeInvalidBuyerReceiveAddress      ErrorCode = 44
-	CodeEmptyTransaction                ErrorCode = 45
+
+	CodeWrongMaxHeight             ErrorCode = 38
+	CodeExpectedBlockSizeLimit     ErrorCode = 39
+	CodeNonNilCertResults          ErrorCode = 40
+	CodeInvalidMemo                ErrorCode = 41
+	CodeNilCertResult              ErrorCode = 42
+	CodeNilBuyOrder                ErrorCode = 43
+	CodeInvalidBuyerReceiveAddress ErrorCode = 44
+	CodeEmptyTransaction           ErrorCode = 45
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -217,18 +217,18 @@ const (
 	CodeInvalidSlashRecipients            ErrorCode = 70
 	CodeCanopyHeight                      ErrorCode = 71
 	CodeInvalidQCCommitteeHeight          ErrorCode = 72
-	CodeInvalidBadProposer                ErrorCode = 73
-	CodeOrderNotFound                     ErrorCode = 74
-	CodeUnauthorizedOrderChange           ErrorCode = 75
-	CodeMinimumOrderSize                  ErrorCode = 76
-	CodeOrderAlreadyAccepted              ErrorCode = 77
-	CodeInvalidBuyOrder                   ErrorCode = 78
-	CodeDuplicateBuyOrder                 ErrorCode = 79
-	CodeInvalidBuyerDeadline              ErrorCode = 80
-	CodeInvalidCloseOrder                 ErrorCode = 81
-	CodeInvalidResetOrder                 ErrorCode = 82
-	CodeInvalidCheckpoint                 ErrorCode = 83
-	CodeInvalidSellOrder                  ErrorCode = 84
+
+	CodeOrderNotFound           ErrorCode = 74
+	CodeUnauthorizedOrderChange ErrorCode = 75
+	CodeMinimumOrderSize        ErrorCode = 76
+	CodeOrderAlreadyAccepted    ErrorCode = 77
+	CodeInvalidBuyOrder         ErrorCode = 78
+	CodeDuplicateBuyOrder       ErrorCode = 79
+	CodeInvalidBuyerDeadline    ErrorCode = 80
+	CodeInvalidCloseOrder       ErrorCode = 81
+	CodeInvalidResetOrder       ErrorCode = 82
+	CodeInvalidCheckpoint       ErrorCode = 83
+	CodeInvalidSellOrder        ErrorCode = 84
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -502,10 +502,6 @@ func ErrMismatchEvidenceAndHeader() ErrorI {
 	return NewError(CodeMismatchEvidenceAndHeader, ConsensusModule, "mismatch evidence and block header")
 }
 
-func ErrMismatchBadProducerCount() ErrorI {
-	return NewError(CodeMismatchBadProposerCount, ConsensusModule, "mismatch bad proposer count")
-}
-
 func ErrInvalidNetAddrString(s string) ErrorI {
 	return NewError(CodeInvalidNetAddressString, P2PModule, fmt.Sprintf("invalid net address string: %s", s))
 }
@@ -560,10 +556,6 @@ func ErrInvalidDoubleSignHeights() ErrorI {
 
 func ErrInvalidDoubleSigner() ErrorI {
 	return NewError(CodeInvalidDoubleSigner, ConsensusModule, "double signer is invalid")
-}
-
-func ErrInvalidBadProposer() ErrorI {
-	return NewError(CodeInvalidBadProposer, ConsensusModule, "bad proposer is invalid")
 }
 
 func ErrMismatchResultsHash() ErrorI {

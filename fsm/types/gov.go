@@ -59,7 +59,6 @@ func DefaultParams() *Params {
 			ValidatorUnstakingBlocks:                    2,
 			ValidatorMaxPauseBlocks:                     4380,
 			ValidatorDoubleSignSlashPercentage:          10,
-			ValidatorBadProposalSlashPercentage:         1,
 			ValidatorNonSignSlashPercentage:             1,
 			ValidatorMaxNonSign:                         4,
 			ValidatorNonSignWindow:                      10,
@@ -243,7 +242,6 @@ var _ ParamSpace = &ValidatorParams{}
 const (
 	ParamValidatorUnstakingBlocks                    = "validator_unstaking_blocks"                       // number of blocks a committee member must be 'unstaking' for
 	ParamValidatorMaxPauseBlocks                     = "validator_max_pause_blocks"                       // maximum blocks a validator may be paused for before force-unstaking
-	ParamValidatorBadProposeSlashPercentage          = "validator_bad_propose_slash_percentage"           // how much a bad proposer is slashed (% of stake)
 	ParamValidatorNonSignSlashPercentage             = "validator_non_sign_slash_percentage"              // how much a non-signer is slashed if exceeds threshold in window (% of stake)
 	ParamValidatorMaxNonSign                         = "validator_max_non_sign"                           // how much a committee member can not sign before being slashed
 	ParamValidatorNonSignWindow                      = "validator_non_sign_window"                        // how frequently the non-sign-count is reset
@@ -264,9 +262,6 @@ func (x *ValidatorParams) Check() lib.ErrorI {
 	}
 	if x.ValidatorMaxPauseBlocks == 0 {
 		return ErrInvalidParam(ParamValidatorMaxPauseBlocks)
-	}
-	if x.ValidatorBadProposalSlashPercentage > 100 {
-		return ErrInvalidParam(ParamValidatorBadProposeSlashPercentage)
 	}
 	if x.ValidatorNonSignSlashPercentage > 100 {
 		return ErrInvalidParam(ParamValidatorNonSignSlashPercentage)
@@ -308,8 +303,6 @@ func (x *ValidatorParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.ValidatorUnstakingBlocks = value
 	case ParamValidatorMaxPauseBlocks:
 		x.ValidatorMaxPauseBlocks = value
-	case ParamValidatorBadProposeSlashPercentage:
-		x.ValidatorBadProposalSlashPercentage = value
 	case ParamValidatorNonSignWindow:
 		x.ValidatorNonSignWindow = value
 	case ParamValidatorMaxNonSign:

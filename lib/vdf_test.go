@@ -12,7 +12,7 @@ func TestVDF(t *testing.T) {
 	// define a seed
 	seed := []byte("seed")
 	// create a new vdf service
-	vdfService := &VDFService{running: &atomic.Bool{}, Iterations: 1000}
+	vdfService := &VDFService{running: &atomic.Bool{}, Iterations: 1000, log: NewDefaultLogger()}
 	// generates a VDF proof using the current params state of the VDF Service object
 	vdfService.Run(seed)
 	// finish the vdf
@@ -26,7 +26,7 @@ func TestVDFPrematureExit(t *testing.T) {
 	// define a seed
 	seed, iterations := []byte("seed"), 1000
 	// create a new vdf service
-	vdfService := &VDFService{TargetTime: time.Second, stopChan: make(chan struct{}), running: &atomic.Bool{}, Iterations: iterations}
+	vdfService := &VDFService{TargetTime: time.Second, stopChan: make(chan struct{}), running: &atomic.Bool{}, Iterations: iterations, log: NewDefaultLogger()}
 	// generates a VDF proof using the current params state of the VDF Service object
 	go vdfService.Run(seed)
 out:

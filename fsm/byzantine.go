@@ -21,10 +21,6 @@ func (s *StateMachine) HandleByzantine(qc *lib.QuorumCertificate, vs *lib.Consen
 	}
 	// sanity check the slash recipient isn't nil
 	if slashRecipients != nil {
-		// slash proposers who missed or skipped their proposal turn after provably receiving a valid ElectionQC confirming they were the proposer
-		if err = s.HandleBadProposers(qc.Header.CommitteeId, params, slashRecipients.BadProposers); err != nil {
-			return 0, err
-		}
 		// set in state and slash double signers
 		if err = s.HandleDoubleSigners(qc.Header.CommitteeId, params, slashRecipients.DoubleSigners); err != nil {
 			return 0, err
@@ -181,27 +177,9 @@ func (s *StateMachine) IsValidDoubleSigner(height uint64, address []byte) bool {
 	return isValid
 }
 
-// HandleBadProposers() is a pass through call to SlashBadProposers but converts public keys into addresses
-func (s *StateMachine) HandleBadProposers(committeeId uint64, params *types.ValidatorParams, badProposerPublicKeys [][]byte) lib.ErrorI {
-	var badList [][]byte
-	for _, badProposer := range badProposerPublicKeys {
-		pubKey, err := crypto.NewPublicKeyFromBytes(badProposer)
-		if err != nil {
-			return lib.ErrPubKeyFromBytes(err)
-		}
-		badList = append(badList, pubKey.Address().Bytes())
-	}
-	return s.SlashBadProposers(committeeId, params, badList)
-}
-
 // SlashNonSigners() burns the staked tokens of non-(QC)-signers
 func (s *StateMachine) SlashNonSigners(committeeId uint64, params *types.ValidatorParams, nonSigners [][]byte) lib.ErrorI {
 	return s.SlashValidators(nonSigners, committeeId, params.ValidatorNonSignSlashPercentage, params)
-}
-
-// SlashNonSigners() burns the staked tokens of bad proposers
-func (s *StateMachine) SlashBadProposers(committeeId uint64, params *types.ValidatorParams, badProposers [][]byte) lib.ErrorI {
-	return s.SlashValidators(badProposers, committeeId, params.ValidatorBadProposalSlashPercentage, params)
 }
 
 // SlashNonSigners() burns the staked tokens of double signers

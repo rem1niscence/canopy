@@ -343,11 +343,6 @@ func (x *PaymentPercents) UnmarshalJSON(b []byte) error {
 // CheckBasic() validates the ProposalMeta structure
 func (x *SlashRecipients) CheckBasic() ErrorI {
 	if x != nil {
-		for _, r := range x.BadProposers {
-			if r == nil {
-				return ErrInvalidBadProposer()
-			}
-		}
 		for _, r := range x.DoubleSigners {
 			if r == nil {
 				return ErrInvalidDoubleSigner()
@@ -360,7 +355,6 @@ func (x *SlashRecipients) CheckBasic() ErrorI {
 // jsonSlashRecipients is the SlashRecipients implementation of json.Marshaller and json.Unmarshaler
 type jsonSlashRecipients struct {
 	DoubleSigners []*DoubleSigner `json:"double_signers,omitempty"` // who did the bft decide was a double signer
-	BadProposers  []HexBytes      `json:"bad_proposers,omitempty"`  // who did the bft decide was a bad proposer
 }
 
 // UnmarshalJSON() satisfies the json.Unmarshaler interface
@@ -369,27 +363,15 @@ func (x *SlashRecipients) UnmarshalJSON(i []byte) error {
 	if err := json.Unmarshal(i, j); err != nil {
 		return err
 	}
-	var badProposers [][]byte
-	for _, bp := range j.BadProposers {
-		badProposers = append(badProposers, bp)
-	}
 	*x = SlashRecipients{
 		DoubleSigners: j.DoubleSigners,
-		BadProposers:  badProposers,
 	}
 	return nil
 }
 
 // MarshalJSON() satisfies the json.Marshaller interface
 func (x *SlashRecipients) MarshalJSON() ([]byte, error) {
-	var badProposers []HexBytes
-	for _, bp := range x.BadProposers {
-		badProposers = append(badProposers, bp)
-	}
-	return json.Marshal(jsonSlashRecipients{
-		DoubleSigners: x.DoubleSigners,
-		BadProposers:  badProposers,
-	})
+	return json.Marshal(jsonSlashRecipients{DoubleSigners: x.DoubleSigners})
 }
 
 // ORDERS CODE BELOW

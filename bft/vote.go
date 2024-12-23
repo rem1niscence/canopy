@@ -164,12 +164,6 @@ func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 				return err
 			}
 		}
-		// combine bad proposer evidence
-		for _, evidence := range vote.BadProposerEvidence {
-			if err := b.AddBPE(&b.ByzantineEvidence.BPE, evidence, false); err != nil {
-				return err
-			}
-		}
 	}
 	return nil
 }

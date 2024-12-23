@@ -1883,7 +1883,6 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			DoubleSigners: []*lib.DoubleSigner{
 				{PubKey: newTestPublicKeyBytes(t), Heights: []uint64{1}},
 			},
-			BadProposers: [][]byte{newTestPublicKeyBytes(t)},
 		},
 		Orders: &lib.Orders{
 			BuyOrders: []*lib.BuyOrder{{

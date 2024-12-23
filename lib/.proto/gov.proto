@@ -80,39 +80,36 @@ message ValidatorParams {
   // performing a double-sign (signing two different blocks for the same block height and round,
   // supporting conflicting versions of the blockchain)
   uint64 validator_double_sign_slash_percentage = 3;
-  // bad_proposal_slash_percentage: is the percentage of staked tokens that are slashed when a Validator is caught
-  // failing to complete a consensus round when they are elected leader.
-  uint64 validator_bad_proposal_slash_percentage = 4;
   // non_sign_slash_percentage: is the percentage of staked tokens that are slashed when a Validator doesn't sign a
   // number of blocks over the max_non_sign threshold within the non_sign_window blocks.
-  uint64 validator_non_sign_slash_percentage = 5;
+  uint64 validator_non_sign_slash_percentage = 4;
   // max_non_sign: is the maximum number of blocks a Validator may not sign before being slashed, a threshold system
   // provides lee-way for accidental non-sign faults
-  uint64 validator_max_non_sign = 6;
+  uint64 validator_max_non_sign = 5;
   // non_sign_window: is the period of blocks in which a validator’s count of missed signatures (non-signs) is tracked
   // before it is reset. During this window, if a validator fails to sign blocks, the missed count is incremented
   // Once the window expires, the non-sign count is reset, providing the validator a chance to recover without immediate
   // penalties
-  uint64 validator_non_sign_window = 7;
+  uint64 validator_non_sign_window = 6;
   // max_committees: is the maximum number of committees a validator is allowed to stake for
-  uint64 validator_max_committees = 8;
+  uint64 validator_max_committees = 7;
   // max_committee_size: is the maximum number of active validators a committee may have participating in BFT at any
   // one view
-  uint64 validator_max_committee_size = 9;
+  uint64 validator_max_committee_size = 8;
   // early_withdrawal_penalty: is the percent reward deduction if NOT compounding validator rewards
-  uint64 validator_early_withdrawal_penalty = 10;
+  uint64 validator_early_withdrawal_penalty = 9;
   // delegate_unstaking_blocks: is the number of blocks a delegate validator's staked tokens must remain locked.
   // Since there's no slashing of delegates, this variable affects economic stability more than security
-  uint64 validator_delegate_unstaking_blocks = 11;
+  uint64 validator_delegate_unstaking_blocks = 10;
   // minimum_order_size: is the minimum amount a 'sell order' must sell in order to be valid
-  uint64 validator_minimum_order_size = 12;
+  uint64 validator_minimum_order_size = 11;
   // stake_percent_for_subsidized_committee: is the minimum percentage of total stake that a committee must have
   // committed to it in order to be considered "subsidized" by the protocol
-  uint64 validator_stake_percent_for_subsidized_committee = 13;
+  uint64 validator_stake_percent_for_subsidized_committee = 12;
   // max_slash_per_committee: is the maximum slash per committee per block that a validator may receive.
   // If the slash exceeds maximum, the validator will be auto-removed from the committee to protect all parties from
   // cascading failures.
-  uint64 validator_max_slash_per_committee = 14;
+  uint64 validator_max_slash_per_committee = 13;
 }
 
 // FeeParams is the parameter space that defines various amounts for transaction fees

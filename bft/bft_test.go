@@ -133,12 +133,11 @@ func TestStartElectionVotePhase(t *testing.T) {
 			default:
 				c.simElectionPhase(t)
 			}
-			expectedDoubleSignEvidence, expectedBadProposerEvidence := DoubleSignEvidences{}, BadProposerEvidences{}
+			expectedDoubleSignEvidence := DoubleSignEvidences{}
 			if test.hasBE {
-				expectedDoubleSignEvidence.Evidence, expectedBadProposerEvidence.Evidence = c.newTestDoubleSignEvidence(t), c.newTestBadProposerEvidence(t)
+				expectedDoubleSignEvidence.Evidence = c.newTestDoubleSignEvidence(t)
 				c.bft.ByzantineEvidence = &ByzantineEvidence{
 					DSE: expectedDoubleSignEvidence,
-					BPE: expectedBadProposerEvidence,
 				}
 			}
 			pub, _, expectedView := c.valKeys[0].PublicKey(), c.valKeys[0], lib.View{
@@ -164,8 +163,6 @@ func TestStartElectionVotePhase(t *testing.T) {
 					require.Equal(t, msg.Qc.ProposerKey, c.valKeys[2].PublicKey().Bytes())
 				}
 				if test.hasBE {
-					require.NotNil(t, msg.BadProposerEvidence)
-					require.Equal(t, expectedBadProposerEvidence.Evidence, msg.BadProposerEvidence)
 					require.NotNil(t, msg.LastDoubleSignEvidence)
 					require.Equal(t, expectedDoubleSignEvidence.Evidence, msg.LastDoubleSignEvidence)
 				}
@@ -256,8 +253,7 @@ func TestStartProposePhase(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, expectedAggSig, msg.Qc.Signature.Signature)
 				if test.hasBE {
-					expectedBPE, expectedDSE := c.newTestBadProposerEvidence(t), c.newTestDoubleSignEvidence(t)
-					require.EqualExportedValues(t, expectedBPE[0].ElectionVoteQc, msg.BadProposerEvidence[0].ElectionVoteQc)
+					expectedDSE := c.newTestDoubleSignEvidence(t)
 					require.EqualExportedValues(t, expectedDSE[0].VoteA, msg.LastDoubleSignEvidence[0].VoteA)
 					require.EqualExportedValues(t, expectedDSE[0].VoteB, msg.LastDoubleSignEvidence[0].VoteB)
 				}
@@ -322,7 +318,7 @@ func TestStartProposeVotePhase(t *testing.T) {
 				highQC = c.setupTestableHighQC(t, test.livenessLocked, !test.invalidHighQC)
 			}
 			if test.hasBE {
-				be.DSE.Evidence, be.BPE.Evidence = c.newTestDoubleSignEvidence(t), c.newTestBadProposerEvidence(t)
+				be.DSE.Evidence = c.newTestDoubleSignEvidence(t)
 			}
 			block, results := c.simProposePhase(t, 0, test.validProposal, be, highQC, 0)
 			expectedView := lib.View{
@@ -352,10 +348,8 @@ func TestStartProposeVotePhase(t *testing.T) {
 				require.Equal(t, results.Hash(), msg.Qc.ResultsHash)
 				if test.hasBE {
 					require.NotNil(t, be.DSE)
-					require.NotNil(t, be.BPE)
 				}
 				require.Equal(t, c.bft.ByzantineEvidence.DSE.Evidence, be.DSE.Evidence)
-				require.Equal(t, c.bft.ByzantineEvidence.BPE.Evidence, be.BPE.Evidence)
 			}
 		})
 	}
@@ -590,7 +584,6 @@ func TestStartCommitProcessPhase(t *testing.T) {
 		proposalReceived bool
 		validProposal    bool
 		isProposer       bool
-		hasBPE           bool
 		hasPartialQCDSE  bool
 		hasEVDSE         bool
 	}{
@@ -617,14 +610,6 @@ func TestStartCommitProcessPhase(t *testing.T) {
 			validProposal:    true,
 		},
 		{
-			name:             "received +2/3 prop vote and has BPE stored",
-			detail:           `received +2/3 quorum on the precommit votes from replicas and has bad proposer evidence stored from round 0`,
-			proposalReceived: true,
-			isProposer:       true,
-			validProposal:    true,
-			hasBPE:           true,
-		},
-		{
 			name:             "received +2/3 prop vote and has partial qc DSE stored",
 			detail:           `received +2/3 quorum on the precommit votes from replicas and has double sign evidence stored in the form of a conflicting partial qc`,
 			proposalReceived: true,
@@ -645,11 +630,6 @@ func TestStartCommitProcessPhase(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// setup
 			c := newTestConsensus(t, CommitProcess, 3)
-			if test.hasBPE {
-				c.bft.ProposerKey = nil
-				c.simProposePhase(t, 0, true, ByzantineEvidence{}, nil, 0)
-				c.bft.ProposerKey = c.valKeys[0].PublicKey().Bytes()
-			}
 			if test.hasPartialQCDSE {
 				c.simPrecommitPhase(t, 1)
 				c.newPartialQCDoubleSign(t, Precommit)
@@ -695,9 +675,6 @@ func TestStartCommitProcessPhase(t *testing.T) {
 				expectedAggSig, err := multiKey.AggregateSignatures()
 				require.NoError(t, err)
 				require.Equal(t, expectedAggSig, qc.Signature.Signature)
-				if test.hasBPE {
-					require.Len(t, c.bft.ByzantineEvidence.BPE.Evidence, 1)
-				}
 				if test.hasPartialQCDSE || test.hasEVDSE {
 					require.Len(t, c.bft.ByzantineEvidence.DSE.Evidence, 1)
 				}
@@ -978,7 +955,7 @@ func TestGetPhaseWaitTime(t *testing.T) {
 			detail:           "the wait time for round interrupt phase",
 			phase:            Propose,
 			round:            3,
-			expectedWaitTime: time.Duration(lib.DefaultConfig().ProposeTimeoutMS) * time.Millisecond * (3 + 1),
+			expectedWaitTime: time.Duration(lib.DefaultConfig().ProposeTimeoutMS) * time.Millisecond * (6 + 1),
 		},
 	}
 	for _, test := range tests {

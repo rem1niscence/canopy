@@ -119,7 +119,6 @@ func (tc *testConsensus) simElectionVotePhase(t *testing.T, propIdx int, BE, liv
 			// if 'has byzantine evidence' then fill the DoubleSigners and Bad Proposers of the message
 			if BE {
 				m.LastDoubleSignEvidence = tc.newTestDoubleSignEvidence(t)
-				m.BadProposerEvidence = tc.newTestBadProposerEvidence(t)
 			}
 			// if has 'highQc, fill the highQC appropriately
 			if liveHQC || safeHQC {
@@ -140,7 +139,7 @@ func (tc *testConsensus) simProposePhase(t *testing.T, propIdx int, validProp bo
 	// simulate the PROPOSE phase with a callback
 	block, results = tc.simLead(t, justifyPropose, round, Propose, func(m *Message) {
 		// set the hQC, BE, and proposer key
-		m.HighQc, m.LastDoubleSignEvidence, m.BadProposerEvidence, m.Qc.ProposerKey = hQC, be.DSE.Evidence, be.BPE.Evidence, tc.valKeys[propIdx].PublicKey().Bytes()
+		m.HighQc, m.LastDoubleSignEvidence, m.Qc.ProposerKey = hQC, be.DSE.Evidence, tc.valKeys[propIdx].PublicKey().Bytes()
 		// if proposal not valid, generate an invalid proposal and hash pair
 		if !validProp {
 			m.Qc.Block, m.Qc.BlockHash = []byte(""), crypto.Hash([]byte(""))
@@ -450,37 +449,6 @@ func (tc *testConsensus) newTestDoubleSignEvidence(t *testing.T) []*DoubleSignEv
 	return []*DoubleSignEvidence{{
 		VoteA: qcA,
 		VoteB: qcB,
-	}}
-}
-
-// newTestBadProposerEvidence() fabricates bad proposer evidence for the testing suite
-func (tc *testConsensus) newTestBadProposerEvidence(t *testing.T) []*BadProposerEvidence {
-	// create a certificate for the Election Vote that justifies that Validator 1 *should have* proposed a block
-	view := tc.view(ElectionVote)
-	view.Height = 0 // TODO, bad proposer evidence timing is not 100% defined still
-	qcA := &lib.QuorumCertificate{
-		Header:      view,
-		ProposerKey: tc.valKeys[1].PublicKey().Bytes(),
-	}
-	// create the justification
-	mk := tc.valSet.MultiKey.Copy()
-	// have all replicas sign it
-	for _, pk := range tc.valKeys {
-		_, idx, e := tc.valSet.GetValidatorAndIdx(pk.PublicKey().Bytes())
-		require.NoError(t, e)
-		require.NoError(t, mk.AddSigner(pk.Sign(qcA.SignBytes()), idx))
-	}
-	// aggregate the signature
-	aggSig, e := mk.AggregateSignatures()
-	require.NoError(t, e)
-	// finalize the evidence
-	qcA.Signature = &lib.AggregateSignature{
-		Signature: aggSig,
-		Bitmap:    mk.Bitmap(),
-	}
-	// wrap it in a BPE structure
-	return []*BadProposerEvidence{{
-		ElectionVoteQc: qcA,
 	}}
 }
 

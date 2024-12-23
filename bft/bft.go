@@ -63,7 +63,6 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, canopyHeight, hei
 		ValidatorSet: vs,
 		ByzantineEvidence: &ByzantineEvidence{
 			DSE: DoubleSignEvidences{},
-			BPE: BadProposerEvidences{},
 		},
 		PartialQCs:        make(PartialQCs),
 		PacemakerMessages: make(PacemakerMessages),
@@ -244,7 +243,6 @@ func (b *BFT) StartElectionVotePhase() {
 		},
 		HighQc:                 b.HighQC,                         // forward highest known 'Lock' for this Height, so the new Proposer may satisfy SAFE-NODE-PREDICATE
 		LastDoubleSignEvidence: b.ByzantineEvidence.DSE.Evidence, // forward any evidence of DoubleSigning
-		BadProposerEvidence:    b.ByzantineEvidence.BPE.Evidence, // forward any evidence of a BadProposer
 		Vdf:                    b.HighVDF,                        // forward local VDF to the candidate
 	})
 }
@@ -287,7 +285,6 @@ func (b *BFT) StartProposePhase() {
 		},
 		HighQc:                 b.HighQC,                         // nil or justifies the proposal
 		LastDoubleSignEvidence: b.ByzantineEvidence.DSE.Evidence, // evidence is attached (if any) to validate the Proposal
-		BadProposerEvidence:    b.ByzantineEvidence.BPE.Evidence, // evidence is attached (if any) to validate the Proposal
 	})
 }
 
@@ -318,7 +315,6 @@ func (b *BFT) StartProposeVotePhase() {
 	// aggregate any evidence submitted from the replicas
 	byzantineEvidence := &ByzantineEvidence{
 		DSE: NewDSE(msg.LastDoubleSignEvidence),
-		BPE: NewBPE(msg.BadProposerEvidence),
 	}
 	// check candidate block against plugin
 	if err := b.ValidateCertificate(b.CommitteeId, msg.Qc, byzantineEvidence); err != nil {
@@ -455,7 +451,6 @@ func (b *BFT) StartCommitProcessPhase() {
 	// preset the Byzantine Evidence for the next height
 	b.ByzantineEvidence = &ByzantineEvidence{
 		DSE: b.GetLocalDSE(),
-		BPE: b.GetLocalBPE(),
 	}
 	// gossip committed block message to peers
 	b.GossipBlock(b.CommitteeId, msg.Qc)

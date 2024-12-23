@@ -103,7 +103,6 @@ func TestSignBytes(t *testing.T) {
 					},
 				},
 				LastDoubleSignEvidence: c.newTestDoubleSignEvidence(t),
-				BadProposerEvidence:    c.newTestBadProposerEvidence(t),
 				Signature: &lib.Signature{
 					PublicKey: []byte("some omitted pubkey"),
 					Signature: []byte("some omitted signature"),
@@ -118,7 +117,6 @@ func TestSignBytes(t *testing.T) {
 					Vrf:                    msg.Vrf,
 					HighQc:                 msg.HighQc,
 					LastDoubleSignEvidence: msg.LastDoubleSignEvidence,
-					BadProposerEvidence:    msg.BadProposerEvidence,
 				}
 				if msg.Qc != nil {
 					expectedMsg.Qc = &QC{

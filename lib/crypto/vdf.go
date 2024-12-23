@@ -21,10 +21,10 @@ func GenerateVDF(seed []byte, iterations int, stop <-chan struct{}) (out []byte,
 	_, classGroup := initVDF(seed)
 	// calculate the vdf and return the out and proof
 	y, proof := calculateVDF(classGroup, iterations, stop)
-	defer func() { y.Discard(); proof.Discard() }()
 	if y == nil || proof == nil {
 		return
 	} else {
+		defer func() { y.Discard(); proof.Discard() }()
 		return y.Encode(), proof.Encode()
 	}
 }
