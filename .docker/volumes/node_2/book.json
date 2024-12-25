@@ -10,7 +10,8 @@
           ],
           "signature": "p4BZuzPzjWZyCJJ76zqk7We6TS2wwJhE+HJ+X6sm3GdD2rfy4feNWZhv68eIeft7ElkdlRr06eZvpD/4GwxrJ1KGMiSCQA3e/VgD39NcwWEWBlAF5by7MFuNhiZ8CgNS"
         }
-      }
+      },
+      "consecutive_failed_dial": 1
     }
   ],
   "BookSize": 1

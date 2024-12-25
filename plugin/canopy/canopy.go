@@ -173,7 +173,7 @@ func (p *Plugin) ValidateCertificate(_ uint64, qc *lib.QuorumCertificate) (err l
 		return lib.ErrMismatchBlockHash()
 	}
 	// play the block against the state machine
-	_, err = p.ApplyAndValidateBlock(blk)
+	_, err = p.ApplyAndValidateBlock(blk, true)
 	return
 }
 
@@ -220,7 +220,7 @@ func (p *Plugin) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (still
 
 // ApplyAndValidateBlock() plays the block against the State Machine and
 // compares the block header against a results from the state machine
-func (p *Plugin) ApplyAndValidateBlock(b *lib.Block) (*lib.BlockResult, lib.ErrorI) {
+func (p *Plugin) ApplyAndValidateBlock(b *lib.Block, checkTime bool) (*lib.BlockResult, lib.ErrorI) {
 	// basic structural checks on the block
 	if err := b.Check(p.Config.NetworkID, p.CommitteeId); err != nil {
 		return nil, err
@@ -235,7 +235,7 @@ func (p *Plugin) ApplyAndValidateBlock(b *lib.Block) (*lib.BlockResult, lib.Erro
 	}
 	// compare the resulting header against the block header (should be identical)
 	p.log.Debugf("Validating block header %s for height %d", blockHash, blockHeight)
-	if err = p.CompareBlockHeaders(b.BlockHeader, header); err != nil {
+	if err = p.CompareBlockHeaders(b.BlockHeader, header, checkTime); err != nil {
 		return nil, err
 	}
 	// return a valid block result
@@ -247,7 +247,7 @@ func (p *Plugin) ApplyAndValidateBlock(b *lib.Block) (*lib.BlockResult, lib.Erro
 }
 
 // CompareBlockHeaders() compares two block headers for equality and validates the last quorum certificate and block time
-func (p *Plugin) CompareBlockHeaders(candidate *lib.BlockHeader, compare *lib.BlockHeader) lib.ErrorI {
+func (p *Plugin) CompareBlockHeaders(candidate *lib.BlockHeader, compare *lib.BlockHeader, checkTime bool) lib.ErrorI {
 	// compare the block headers for equality
 	hash, e := compare.SetHash()
 	if e != nil {
@@ -279,9 +279,12 @@ func (p *Plugin) CompareBlockHeaders(candidate *lib.BlockHeader, compare *lib.Bl
 			return lib.ErrNoMaj23()
 		}
 	}
-	// validate the timestamp in the block header
-	if err := p.validateBlockTime(candidate); err != nil {
-		return err
+	// check the timestamp if actively in BFT - else it's been validated by the validator set
+	if checkTime {
+		// validate the timestamp in the block header
+		if err := p.validateBlockTime(candidate); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -339,7 +342,7 @@ func (p *Plugin) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
 		return err
 	}
 	// apply the block against the state machine
-	blockResult, err := p.ApplyAndValidateBlock(blk)
+	blockResult, err := p.ApplyAndValidateBlock(blk, false)
 	if err != nil {
 		return err
 	}
@@ -393,7 +396,7 @@ func (p *Plugin) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
 
 // LoadCertificate() loads the quorum certificate for a specific height
 func (p *Plugin) LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
-	return p.FSM.LoadCertificateHashesOnly(height)
+	return p.FSM.LoadCertificate(height)
 }
 
 // GetFSM() is a Canopy specific plugin call - returns the state machine object for Canopy

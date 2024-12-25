@@ -131,15 +131,15 @@ const (
 	CodeInvalidBlockTime                ErrorCode = 34
 	CodeInvalidEvidence                 ErrorCode = 35
 	CodeMismatchEvidenceAndHeader       ErrorCode = 36
-
-	CodeWrongMaxHeight             ErrorCode = 38
-	CodeExpectedBlockSizeLimit     ErrorCode = 39
-	CodeNonNilCertResults          ErrorCode = 40
-	CodeInvalidMemo                ErrorCode = 41
-	CodeNilCertResult              ErrorCode = 42
-	CodeNilBuyOrder                ErrorCode = 43
-	CodeInvalidBuyerReceiveAddress ErrorCode = 44
-	CodeEmptyTransaction           ErrorCode = 45
+	CodeInvalidTxTime                   ErrorCode = 37
+	CodeWrongMaxHeight                  ErrorCode = 38
+	CodeExpectedBlockSizeLimit          ErrorCode = 39
+	CodeNonNilCertResults               ErrorCode = 40
+	CodeInvalidMemo                     ErrorCode = 41
+	CodeNilCertResult                   ErrorCode = 42
+	CodeNilBuyOrder                     ErrorCode = 43
+	CodeInvalidBuyerReceiveAddress      ErrorCode = 44
+	CodeEmptyTransaction                ErrorCode = 45
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -476,6 +476,10 @@ func ErrInvalidValidatorIndex() ErrorI {
 
 func ErrInvalidBlockTime() ErrorI {
 	return NewError(CodeInvalidBlockTime, ConsensusModule, "invalid block time")
+}
+
+func ErrInvalidTxTime() ErrorI {
+	return NewError(CodeInvalidTxTime, ConsensusModule, "invalid tx time")
 }
 
 func ErrInvalidMemo() ErrorI {

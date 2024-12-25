@@ -134,6 +134,8 @@ func (b *BFT) Start() {
 					b.SetWaitTimers(0, b.WaitTime(CommitProcess, 10), 0)
 				} else { // (b) Target block reset
 					b.log.Info("Resetting BFT timers after receiving a new Target block (NEW_HEIGHT)")
+					// set the height of the bft (this is usefule during syncing)
+					b.Height = resetBFT.Height
 					// reset BFT variables and start VDF
 					b.NewHeight()
 					// start BFT over after sleeping CommitProcessMS
@@ -214,6 +216,7 @@ func (b *BFT) StartElectionPhase() {
 	})
 	// if is a possible proposer candidate, then send the VRF to other Replicas for the ElectionVote
 	if isCandidate {
+		b.log.Info("Self is a leader candidate 🗳️")
 		b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
 			Header: b.View.Copy(),
 			Vrf:    vrf,
@@ -229,8 +232,13 @@ func (b *BFT) StartElectionPhase() {
 // - With this vote, the Replica attaches any Byzantine evidence or 'Locked' QC they have collected as well as their VDF output
 func (b *BFT) StartElectionVotePhase() {
 	b.log.Info(b.View.ToString())
+	// get the candidates from messages received
+	candidates := b.GetElectionCandidates()
+	if len(candidates) == 0 {
+		b.log.Warn("No election candidates, falling back to weighted pseudorandom")
+	}
 	// select Proposer (set is required for self-send)
-	b.ProposerKey = SelectProposerFromCandidates(b.GetElectionCandidates(), b.SortitionData, b.ValidatorSet.ValidatorSet)
+	b.ProposerKey = SelectProposerFromCandidates(candidates, b.SortitionData, b.ValidatorSet.ValidatorSet)
 	defer func() { b.ProposerKey = nil }()
 	b.log.Debugf("Voting %s as the proposer", lib.BytesToTruncatedString(b.ProposerKey))
 	// get locally produced Verifiable delay function
@@ -352,6 +360,7 @@ func (b *BFT) StartPrecommitPhase() {
 	vote, as, err := b.GetMajorityVote()
 	if err != nil {
 		b.log.Error(err.Error())
+		b.RoundInterrupt()
 		return
 	}
 	// send PRECOMMIT msg to Replicas
@@ -413,6 +422,7 @@ func (b *BFT) StartCommitPhase() {
 	vote, as, err := b.GetMajorityVote()
 	if err != nil {
 		b.log.Error(err.Error())
+		b.RoundInterrupt()
 		return
 	}
 	// SEND MSG TO REPLICAS
@@ -733,6 +743,7 @@ func (b *BFT) ResetBFTChan() chan ResetBFT { return b.resetBFT }
 // ResetBFT is a structure that allows the Controller to reset the BFT either due to a Target chain block or Canopy block
 type ResetBFT struct {
 	UpdatedCanopyHeight uint64        // new Canopy height
+	Height              uint64        // new height after syncing
 	UpdatedCommitteeSet ValSet        // new Committee from the Canopy block
 	ProcessTime         time.Duration // process Target block time
 }

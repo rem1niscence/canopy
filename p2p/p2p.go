@@ -75,7 +75,7 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l li
 		channels:               channels,
 		config:                 c,
 		meta:                   meta.Sign(p),
-		PeerSet:                NewPeerSet(c),
+		PeerSet:                NewPeerSet(c, p, l),
 		book:                   peerBook,
 		mustConnectReceiver:    make(chan []*lib.PeerAddress, maxChanSize),
 		maxMembersPerCommittee: int(maxMembersPerCommittee),

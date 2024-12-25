@@ -56,7 +56,6 @@ func TestSortitionAndVerifyCandidate(t *testing.T) {
 func TestWhenIsCandidate(t *testing.T) {
 	for i := 1; i < 8; i++ {
 		c := newTestConsensus(t, Election, i)
-		fmt.Println("NUM VALIDATORS ", i)
 		for j := 0; j < len(c.valKeys); j++ {
 			privateKey := c.valKeys[j]
 			sortitionData := newTestSortitionData(t, c)

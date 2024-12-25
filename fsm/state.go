@@ -240,8 +240,8 @@ func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
 	return consParams.BlockSize, nil
 }
 
-// LoadCertificateWithProposal() loads a quorum certificate
-func (s *StateMachine) LoadCertificateWithProposal(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
+// LoadCertificate() loads a quorum certificate
+func (s *StateMachine) LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
 	//if height <= 1 {
 	//	height = 1
 	//}
@@ -257,7 +257,7 @@ func (s *StateMachine) LoadCertificateHashesOnly(height uint64) (*lib.QuorumCert
 	//if height <= 1 {
 	//	height = 1
 	//}
-	qc, err := s.LoadCertificateWithProposal(height)
+	qc, err := s.LoadCertificate(height)
 	if err != nil {
 		return nil, err
 	}

@@ -100,7 +100,9 @@ func (c *Controller) ResetBFTCallback(committeeID uint64) {
 	}
 	// reset the consensus for that particular chain
 	chain.Consensus.ResetBFTChan() <- bft.ResetBFT{
-		ProcessTime: time.Duration(0),
+		Height:              chain.Plugin.Height() - 1,
+		UpdatedCanopyHeight: c.CanopyFSM().Height(),
+		ProcessTime:         time.Duration(0),
 	}
 }
 

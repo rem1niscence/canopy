@@ -78,25 +78,28 @@ func (p *P2P) SendPeerBookRequests() {
 		if peerInfo == nil || err != nil {
 			continue
 		}
-		p.log.Debugf("Sent peer Book request to %s", lib.BytesToString(peerInfo.Address.PublicKey))
+		p.log.Debugf("Sent peer Book request to %s", lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
 		select {
 		// fires when received the response to the request
 		case msg := <-p.Inbox(lib.Topic_PEERS_RESPONSE):
-			p.log.Debugf("Received peer Book response from %s", lib.BytesToString(msg.Sender.Address.PublicKey))
+			p.log.Debugf("Received peer Book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 			senderID := msg.Sender.Address.PublicKey
 			// ensure PeerBookResponse message type
 			peerBookResponseMsg, ok := msg.Message.(*PeerBookResponseMessage)
 			if !ok {
+				p.log.Warnf("Invalid peer book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 				p.ChangeReputation(senderID, InvalidMsgRep)
 				continue
 			}
 			// ensure it's the expected sender
 			if !bytes.Equal(msg.Sender.Address.PublicKey, peerInfo.Address.PublicKey) {
+				p.log.Warnf("Unexpected peer book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 				p.ChangeReputation(senderID, UnexpectedMsgRep)
 				continue
 			}
 			// if they sent too many peers
 			if len(peerBookResponseMsg.Book) > MaxPeersExchangedPerChain*len(p.meta.Chains) {
+				p.log.Warnf("Too many peers sent from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 				p.ChangeReputation(senderID, ExceedMaxPBLenRep)
 				continue
 			}
@@ -107,6 +110,7 @@ func (p *P2P) SendPeerBookRequests() {
 			p.ChangeReputation(senderID, GoodPeerBookRespRep)
 			// fires when request times out
 		case <-time.After(PeerBookRequestTimeoutS * time.Second):
+			p.log.Warnf("Peer book timeout from %s", lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
 			p.ChangeReputation(peerInfo.Address.PublicKey, PeerBookReqTimeoutRep)
 			continue
 		}
@@ -136,6 +140,7 @@ func (p *P2P) ListenForPeerBookRequests() {
 			}
 			// only should be PeerBookMessage in this channel
 			if _, ok := msg.Message.(*PeerBookRequestMessage); !ok {
+				p.log.Warnf("Received invalid peer Book request from %s", lib.BytesToString(msg.Sender.Address.PublicKey))
 				p.ChangeReputation(requesterID, InvalidMsgRep)
 				continue
 			}

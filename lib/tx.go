@@ -92,7 +92,7 @@ func (x *Transaction) CheckBasic() ErrorI {
 		return ErrEmptySignature()
 	}
 	if x.Time == 0 {
-		return ErrInvalidBlockTime()
+		return ErrInvalidTxTime()
 	}
 	if len(x.Memo) > 100 {
 		return ErrInvalidMemo()

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [Unreleased] - 12/25/2024
+- Fixed load certificate bug
+- Fixed peer reputation issue with already in mempool
+- Fixed peer reputation issue with block wrong height
+- Fixed invalid block time issue when syncing
+- Fixed rate limit issue
+
 ## [Unreleased] - 12/23/2024
 
 - Fixed log level

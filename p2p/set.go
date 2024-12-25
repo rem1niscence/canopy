@@ -1,7 +1,9 @@
 package p2p
 
 import (
+	"bytes"
 	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"sync"
 )
@@ -19,9 +21,11 @@ type PeerSet struct {
 	outbound     map[uint64]int     // outbound count
 	sync.RWMutex                    // read / write mutex
 	config       lib.P2PConfig      // p2p configuration
+	publicKey    []byte             // self public key
+	logger       lib.LoggerI
 }
 
-func NewPeerSet(c lib.Config) PeerSet {
+func NewPeerSet(c lib.Config, priv crypto.PrivateKeyI, logger lib.LoggerI) PeerSet {
 	inbound, outbound := make(map[uint64]int), make(map[uint64]int)
 	for _, p := range c.Plugins {
 		inbound[p.ID], outbound[p.ID] = 0, 0
@@ -33,6 +37,8 @@ func NewPeerSet(c lib.Config) PeerSet {
 		outbound:    outbound,
 		RWMutex:     sync.RWMutex{},
 		config:      c.P2PConfig,
+		publicKey:   priv.PublicKey().Bytes(),
+		logger:      logger,
 	}
 }
 
@@ -51,6 +57,10 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 	pubKey := lib.BytesToString(p.Address.PublicKey)
 	if _, found := ps.m[pubKey]; found {
 		return ErrPeerAlreadyExists(pubKey)
+	}
+	// ensure peer is not self
+	if bytes.Equal(p.Address.PublicKey, ps.publicKey) {
+		return nil
 	}
 	// if trusted or must connect, don't check inbound/outbound limits nor increment counts
 	if p.IsTrusted || p.IsMustConnect {
@@ -106,6 +116,10 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 	}
 	// for each must connect
 	for _, peer := range mustConnect {
+		// ensure peer is not self
+		if bytes.Equal(peer.PublicKey, ps.publicKey) {
+			return nil
+		}
 		publicKey := lib.BytesToString(peer.PublicKey)
 		// if has peer, just update metadata
 		if p, found := ps.m[publicKey]; found {
@@ -134,6 +148,7 @@ func (ps *PeerSet) ChangeReputation(publicKey []byte, delta int32) {
 	}
 	// if peer isn't trusted nor is 'must connect' and the reputation is below minimum
 	if !peer.IsTrusted && !peer.IsMustConnect && peer.Reputation < MinimumPeerReputation {
+		ps.logger.Warnf("Peer %s reputation too low; removing", lib.BytesToTruncatedString(peer.Address.PublicKey))
 		peer.stop.Do(func() {
 			peer.conn.Stop()
 		})
