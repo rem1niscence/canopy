@@ -294,3 +294,7 @@ func ErrInvalidBuyerDeadline() lib.ErrorI {
 func ErrInvalidCheckpoint() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidCheckpoint, lib.StateMachineModule, "checkpoint is invalid")
 }
+
+func ErrInvalidStartPollHeight() lib.ErrorI {
+	return lib.NewError(lib.CodeStartPollHeight, lib.StateMachineModule, "start poll height is invalid")
+}

@@ -98,6 +98,7 @@ func (b *BFT) getVoteSet(vote *Message) (voteSet *VoteSet) {
 
 // addSigToVoteSet() adds the digital signature from the Replica to the VoteSet
 func (b *BFT) addSigToVoteSet(vote *Message, voteSet *VoteSet) (err lib.ErrorI) {
+	b.log.Debugf("Adding vote from replica: %s", lib.BytesToTruncatedString(vote.Signature.PublicKey))
 	val, idx, err := b.ValidatorSet.GetValidatorAndIdx(vote.Signature.PublicKey)
 	if err != nil {
 		return err
@@ -137,7 +138,7 @@ func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 			if err != nil {
 				return err
 			}
-			if err = vote.HighQc.CheckHighQC(0, b.View, stateCommitteeHeight, vs); err != nil {
+			if err = vote.HighQc.CheckHighQC(lib.GlobalMaxBlockSize, b.View, stateCommitteeHeight, vs); err != nil {
 				return err
 			}
 			// save the highQC if it's higher than any the Leader currently is aware of

@@ -229,7 +229,7 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 			name:   "nil",
 			detail: "certificate result is nil or empty",
 			result: nil,
-			error:  "certificate result is nil",
+			error:  "certificate results is empty",
 		},
 		{
 			name:   "nil reward recipient",

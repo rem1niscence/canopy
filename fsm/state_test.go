@@ -89,7 +89,7 @@ func TestApplyBlock(t *testing.T) {
 	// define a key group to use in testing
 	kg := newTestKeyGroup(t)
 	// predefine a send-transaction to insert into the block
-	sendTx, err := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), 1, 1)
+	sendTx, err := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), 1, 1, "")
 	txn := sendTx.(*lib.Transaction)
 	// set the timestamp to a fixed time for validity checking
 	txn.Time = timestamp

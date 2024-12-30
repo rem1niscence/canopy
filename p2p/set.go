@@ -249,6 +249,7 @@ func (ps *PeerSet) send(peer *Peer, topic lib.Topic, msg proto.Message) lib.Erro
 	if err != nil {
 		return err
 	}
+	ps.logger.Debugf("Sending %s message to %s", topic, lib.BytesToTruncatedString(peer.Address.PublicKey))
 	peer.conn.Send(topic, &Envelope{Payload: a})
 	return nil
 }

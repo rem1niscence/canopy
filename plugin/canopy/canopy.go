@@ -173,7 +173,7 @@ func (p *Plugin) ValidateCertificate(_ uint64, qc *lib.QuorumCertificate) (err l
 		return lib.ErrMismatchBlockHash()
 	}
 	// play the block against the state machine
-	_, err = p.ApplyAndValidateBlock(blk, true)
+	_, err = p.ApplyAndValidateBlock(blk, false)
 	return
 }
 
@@ -220,7 +220,7 @@ func (p *Plugin) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (still
 
 // ApplyAndValidateBlock() plays the block against the State Machine and
 // compares the block header against a results from the state machine
-func (p *Plugin) ApplyAndValidateBlock(b *lib.Block, checkTime bool) (*lib.BlockResult, lib.ErrorI) {
+func (p *Plugin) ApplyAndValidateBlock(b *lib.Block, commit bool) (*lib.BlockResult, lib.ErrorI) {
 	// basic structural checks on the block
 	if err := b.Check(p.Config.NetworkID, p.CommitteeId); err != nil {
 		return nil, err
@@ -235,11 +235,15 @@ func (p *Plugin) ApplyAndValidateBlock(b *lib.Block, checkTime bool) (*lib.Block
 	}
 	// compare the resulting header against the block header (should be identical)
 	p.log.Debugf("Validating block header %s for height %d", blockHash, blockHeight)
-	if err = p.CompareBlockHeaders(b.BlockHeader, header, checkTime); err != nil {
+	if err = p.CompareBlockHeaders(b.BlockHeader, header, commit); err != nil {
 		return nil, err
 	}
 	// return a valid block result
-	p.log.Infof("Block %s is valid for height %d ✅ ", blockHash, blockHeight)
+	p.log.Infof("Block %s with %d txs is valid for height %d ✅ ", blockHash, len(b.Transactions), blockHeight)
+	// if valid & committing - update poll.json based on the transactions
+	if commit {
+		p.ParsePolls(b)
+	}
 	return &lib.BlockResult{
 		BlockHeader:  b.BlockHeader,
 		Transactions: txResults,
@@ -247,7 +251,7 @@ func (p *Plugin) ApplyAndValidateBlock(b *lib.Block, checkTime bool) (*lib.Block
 }
 
 // CompareBlockHeaders() compares two block headers for equality and validates the last quorum certificate and block time
-func (p *Plugin) CompareBlockHeaders(candidate *lib.BlockHeader, compare *lib.BlockHeader, checkTime bool) lib.ErrorI {
+func (p *Plugin) CompareBlockHeaders(candidate *lib.BlockHeader, compare *lib.BlockHeader, commit bool) lib.ErrorI {
 	// compare the block headers for equality
 	hash, e := compare.SetHash()
 	if e != nil {
@@ -280,7 +284,7 @@ func (p *Plugin) CompareBlockHeaders(candidate *lib.BlockHeader, compare *lib.Bl
 		}
 	}
 	// check the timestamp if actively in BFT - else it's been validated by the validator set
-	if checkTime {
+	if !commit {
 		// validate the timestamp in the block header
 		if err := p.validateBlockTime(candidate); err != nil {
 			return err
@@ -330,6 +334,8 @@ func (p *Plugin) HandleTx(tx []byte) lib.ErrorI {
 // - atomically writes all to the underlying db
 // - sets up the app for the next height
 func (p *Plugin) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
+	start := time.Now()
+	defer lib.TimeTrack(start)
 	// reset the store once this code finishes
 	// NOTE: if code execution gets to `store.Commit()` - this will effectively be a noop
 	defer func() { p.FSM.Reset() }()
@@ -342,7 +348,7 @@ func (p *Plugin) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
 		return err
 	}
 	// apply the block against the state machine
-	blockResult, err := p.ApplyAndValidateBlock(blk, false)
+	blockResult, err := p.ApplyAndValidateBlock(blk, true)
 	if err != nil {
 		return err
 	}
@@ -484,6 +490,39 @@ func (m *Mempool) HandleTransaction(tx []byte) lib.ErrorI {
 		m.checkMempool()
 	}
 	return nil
+}
+
+// ParsePolls() parses the valid block for the poll transactions to update the polls.json
+func (p *Plugin) ParsePolls(b *lib.Block) {
+	var ap types.ActivePolls
+	// load the active polls from the json file
+	if err := ap.NewFromFile(p.Config.DataDirPath); err == nil {
+		var fee uint64
+		// get the fee for the message
+		fee, err = p.FSM.GetFeeForMessage(&types.MessageSend{})
+		if err != nil {
+
+		}
+		// for each transaction in the block
+		for _, transaction := range b.Transactions {
+			// unmarshal the transaction
+			tx := new(lib.Transaction)
+			_ = lib.Unmarshal(transaction, tx)
+			// get the public key object
+			pub, e := crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey)
+			if e != nil {
+				break
+			}
+			// get the fee multiplier
+			feeX := int(float64(tx.Fee) / float64(fee))
+			// check for a poll transaction
+			ap.CheckForPollTransaction(pub.Address(), tx.Memo, feeX, p.Height(), p.Config.DataDirPath)
+		}
+		// save to
+		if err = ap.SaveToFile(p.Config.DataDirPath); err != nil {
+			p.log.Error(err.Error())
+		}
+	}
 }
 
 // checkMempool() validates all transactions the mempool using the mempool (ephemeral copy) state and evicts any that are invalid

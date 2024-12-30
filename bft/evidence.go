@@ -194,7 +194,7 @@ func (x *DoubleSignEvidence) Check(vs lib.ValidatorSet, view *lib.View, minimumE
 	}
 	// ensure large payloads are empty as they are unnecessary for this message
 	if x.VoteA.Block != nil || x.VoteB.Block != nil {
-		return lib.ErrExpectedMaxBlockSize()
+		return lib.ErrNilBlock()
 	}
 	if x.VoteA.Results != nil || x.VoteB.Results != nil {
 		return lib.ErrNonNilCertResults()

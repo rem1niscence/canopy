@@ -124,7 +124,7 @@ func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommi
 	// invalid 'historical committee', must be before the last committee height saved in the state
 	// if not, there is a potential for a long range attack
 	if stateCommitteeHeight > x.Header.CanopyHeight {
-		return ErrInvalidQCCommitteeHeight()
+		return ErrWrongCanopyHeight()
 	}
 	// enforce same target height
 	if x.Header.Height != view.Height {
@@ -132,7 +132,7 @@ func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommi
 	}
 	// a valid HighQC must have the phase must be PRECOMMIT_VOTE
 	// as that's the phase where replicas 'Lock'
-	if x.Header.Phase != Phase_PRECOMMIT_VOTE {
+	if x.Header.Phase != Phase_PROPOSE_VOTE {
 		return ErrWrongPhase()
 	}
 	// the block hash nor results hash cannot be nil for a HighQC
@@ -201,7 +201,7 @@ func (x *QuorumCertificate) UnmarshalJSON(b []byte) (err error) {
 // CheckBasic() provides basic 'sanity' checks on the CertificateResult structure
 func (x *CertificateResult) CheckBasic() ErrorI {
 	if x == nil {
-		return ErrNilCertificateResult()
+		return ErrNilCertResults()
 	}
 	if err := x.RewardRecipients.CheckBasic(); err != nil {
 		return err

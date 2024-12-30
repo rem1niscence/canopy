@@ -149,7 +149,7 @@ func (l *Logger) Printf(format string, args ...interface{}) {
 
 // write() outputs the log message with a timestamp to the configured writer
 func (l *Logger) write(msg string) {
-	timeColored := colorString(GRAY, time.Now().Format(time.DateTime))
+	timeColored := colorString(GRAY, time.Now().Format(time.StampMilli))
 	if _, err := l.config.Out.Write([]byte(fmt.Sprintf("%s %s\n", timeColored, msg))); err != nil {
 		fmt.Println(newLogError(err))
 	}

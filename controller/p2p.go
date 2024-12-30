@@ -116,7 +116,7 @@ func (c *Controller) SendCertificateResultsTx(committeeID uint64, qc *lib.Quorum
 	defer func() { qc.Block = blk }()
 	// it's good practice to omit the block when sending the transaction as it's not relevant to canopy
 	qc.Block = nil
-	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, 0)
+	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, 0, "")
 	if err != nil {
 		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return
@@ -397,8 +397,8 @@ func (c *Controller) ListenForConsensus() {
 		}
 		func() {
 			// lock the controller for thread safety
-			//c.Lock()
-			//defer func() { c.Unlock(); c.log.Debug("Done handling inbound consensus message") }()
+			c.Lock()
+			defer func() { c.Unlock(); c.log.Debug("Done handling inbound consensus message") }()
 			c.log.Debug("Handling inbound consensus message")
 			// try to cast the p2p message to a 'consensus message'
 			consMsg, ok := msg.Message.(*lib.ConsensusMessage)
@@ -514,8 +514,8 @@ func (c *Controller) ListenForBlockRequests() {
 		case msg := <-c.P2P.Inbox(BlockRequest):
 			func() {
 				// lock the controller for thread safety
-				//c.Lock()
-				//defer c.Unlock()
+				c.Lock()
+				defer c.Unlock()
 				// create a convenience variable for the sender of the block request
 				senderID := msg.Sender.Address.PublicKey
 				// check with the rate limiter to see if *this peer* or *all peers* are blocked
@@ -680,7 +680,7 @@ func (c *Controller) checkPeerQC(maxBlockSize int, view *lib.View, v lib.Validat
 	// else there's a potential for a long-range attack
 	if qc.Header.CanopyHeight < view.CanopyHeight {
 		c.P2P.ChangeReputation(senderID, p2p.InvalidJustifyRep)
-		return lib.ErrInvalidQCCommitteeHeight()
+		return lib.ErrWrongCanopyHeight()
 	}
 	return nil
 }

@@ -3,12 +3,18 @@ package lib
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+	"log"
 	"math"
 	"math/big"
+	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -230,6 +236,27 @@ func UnmarshalJSON(bz []byte, ptr any) ErrorI {
 	return nil
 }
 
+// NewJSONFromFile() reads a json object from file
+func NewJSONFromFile(o any, dataDirPath, filePath string) ErrorI {
+	bz, err := os.ReadFile(filepath.Join(dataDirPath, filePath))
+	if err != nil {
+		return ErrReadFile(err)
+	}
+	return UnmarshalJSON(bz, &o)
+}
+
+// SaveJSONToFile() saves a json object to a file
+func SaveJSONToFile(j any, dataDirPath, filePath string) (err ErrorI) {
+	bz, err := MarshalJSONIndent(j)
+	if err != nil {
+		return
+	}
+	if e := os.WriteFile(filepath.Join(dataDirPath, filePath), bz, os.ModePerm); e != nil {
+		return ErrWriteFile(e)
+	}
+	return
+}
+
 // NewAny() converts a proto.Message into an anypb.Any type
 func NewAny(message proto.Message) (*anypb.Any, ErrorI) {
 	a, err := anypb.New(message)
@@ -419,4 +446,21 @@ func Delimit(toAppend ...[]byte) (res []byte) {
 		res = append(res, withTerminatingDelim...)
 	}
 	return
+}
+
+// TimeTrack() a utility function to benchmark the time
+func TimeTrack(start time.Time) {
+	elapsed := time.Since(start)
+
+	// Skip this function, and fetch the PC and file for its parent.
+	pc, _, _, _ := runtime.Caller(1)
+
+	// Retrieve a function object this functions parent.
+	funcObj := runtime.FuncForPC(pc)
+
+	// Regex to extract just the function name (and not the module path).
+	runtimeFunc := regexp.MustCompile(`^.*\.(.*)$`)
+	name := runtimeFunc.ReplaceAllString(funcObj.Name(), "$1")
+
+	log.Println(fmt.Sprintf("%s took %s", name, elapsed))
 }

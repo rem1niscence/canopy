@@ -116,7 +116,7 @@ func (tc *testConsensus) simElectionVotePhase(t *testing.T, propIdx int, BE, liv
 		// test the aggregation of messages by only using the replica at index 1 to report BE and HQC
 		// in the real world, it's unlikely that only one replica would have BE and HQC
 		if idx == 1 {
-			// if 'has byzantine evidence' then fill the DoubleSigners and Bad Proposers of the message
+			// if 'has byzantine evidence' then fill the DoubleSigners for the message
 			if BE {
 				m.LastDoubleSignEvidence = tc.newTestDoubleSignEvidence(t)
 			}
@@ -124,7 +124,6 @@ func (tc *testConsensus) simElectionVotePhase(t *testing.T, propIdx int, BE, liv
 			if liveHQC || safeHQC {
 				highQC := tc.setupTestableHighQC(t, liveHQC, true)
 				m.Qc.Block, m.Qc.Results, m.HighQc = highQC.Block, highQC.Results, highQC
-				highQC.Block, highQC.Results = nil, nil
 			}
 		}
 		return true
@@ -292,19 +291,19 @@ func (tc *testConsensus) simVote(t *testing.T, round uint64, phase Phase, callba
 // sets up the BFT to accept or reject it under various conditions
 func (tc *testConsensus) setupTestableHighQC(t *testing.T, liveness, shouldUnlock bool) (highQc *QC) {
 	// setup a test consensus instance to fabricate a highQC
-	round, c := uint64(0), newTestConsensus(t, PrecommitVote, 3)
+	round, c := uint64(0), newTestConsensus(t, ProposeVote, 3)
 	// if the highQC should use 'Liveness' to pass the SafeNodePredicate, then set the round to 1
 	if liveness {
 		round = 1
 	}
 	// create a justification for a highQC
-	justifyHQC, _, _ := c.simPrecommitVotePhase(t, 0, round)
+	justifyHQC, _, _ := c.simProposeVotePhase(t, false, true, round)
 	aggSig, e := justifyHQC.AggregateSignatures()
 	require.NoError(t, e)
 	// create the actual highQC
 	blk, blkHash, results, resHash := tc.proposal(t)
 	highQc = &QC{
-		Header:      tc.view(PrecommitVote, round),
+		Header:      tc.view(ProposeVote, round),
 		Block:       blk,
 		Results:     results,
 		BlockHash:   blkHash,
@@ -314,11 +313,11 @@ func (tc *testConsensus) setupTestableHighQC(t *testing.T, liveness, shouldUnloc
 			Bitmap:    justifyHQC.Bitmap(),
 		},
 	}
-	// lock the node on some arbitrary hQC to be able to test the 'Unlocking' situations
+	// lock the node on some arbitrary hQC to be able to test the 'Unlocking' situations (only for liveness)
 	tc.bft.HighQC = &QC{
-		Header:  tc.view(PrecommitVote, 0),
-		Block:   tc.bft.Block,
+		Header:  tc.view(ProposeVote, 0),
 		Results: tc.bft.Results,
+		Block:   tc.bft.Block,
 	}
 	// setup 'Unlocking' situations
 	if shouldUnlock {
@@ -329,8 +328,10 @@ func (tc *testConsensus) setupTestableHighQC(t *testing.T, liveness, shouldUnloc
 		} else {
 			// if safety, the Proposal must be the same as the current 'Lock'
 			tc.bft.HighQC = &QC{
-				Header:      tc.view(PrecommitVote, 0),
+				Header:      tc.view(ProposeVote, 0),
+				Results:     results,
 				ResultsHash: resHash,
+				Block:       blk,
 				BlockHash:   blkHash,
 			}
 			tc.bft.Block, tc.bft.Results = blk, results

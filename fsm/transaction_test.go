@@ -15,7 +15,7 @@ func TestApplyTransaction(t *testing.T) {
 	// predefine a keygroup for signing the transaction
 	kg := newTestKeyGroup(t)
 	// predefine a send-transaction to insert into the block
-	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1)
+	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, "")
 	require.NoError(t, e)
 	tests := []struct {
 		name          string
@@ -103,7 +103,7 @@ func TestCheckTx(t *testing.T) {
 	// predefine a keygroup for signing the transaction
 	kg := newTestKeyGroup(t)
 	// predefine a send-transaction to insert into the block
-	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1)
+	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, "")
 	require.NoError(t, e)
 	// convert the object to bytes
 	tx, e := lib.Marshal(sendTx)

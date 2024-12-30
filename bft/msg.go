@@ -30,7 +30,7 @@ func (b *BFT) HandleMessage(message proto.Message) lib.ErrorI {
 			// store Vote
 			return b.AddVote(msg)
 		case msg.IsProposerMessage(): // consensus message from the Leader
-			// validate the Leader messsage
+			// validate the Leader message
 			partialQC, err := b.CheckProposerMessage(msg)
 			if err != nil {
 				b.log.Errorf("Received invalid proposal from %s", lib.BytesToString(msg.Signature.PublicKey))
@@ -109,17 +109,25 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 			return false, lib.ErrWrongCanopyHeight()
 		}
 		if x.Qc.Header.Height < b.LoadCommitteeHeightInState(b.CommitteeId) {
-			return false, lib.ErrInvalidQCCommitteeHeight()
+			return false, lib.ErrWrongCanopyHeight()
 		}
 		if x.Header.Phase == Propose {
 			// ensure the sender is justified as the proposer
 			if !bytes.Equal(x.Qc.ProposerKey, x.Signature.PublicKey) {
 				return false, lib.ErrInvalidProposerPubKey()
 			}
+			// ensure the block isn't nil
+			if x.Qc.Block == nil {
+				return false, lib.ErrNilBlock()
+			}
+			// ensure the results aren't nil
+			if x.Qc.Results == nil {
+				return false, lib.ErrNilCertResults()
+			}
 		} else {
 			// in PRECOMMIT or COMMIT phase
 			if b.Block == nil || b.Results == nil {
-				return false, lib.ErrWrongPhase()
+				return false, lib.ErrEmptyMessage()
 			}
 			// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
 			if !bytes.Equal(x.Qc.BlockHash, crypto.Hash(b.Block)) {

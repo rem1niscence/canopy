@@ -50,6 +50,8 @@ func init() {
 	adminCmd.AddCommand(txCreateOrderCmd)
 	adminCmd.AddCommand(txEditOrderCmd)
 	adminCmd.AddCommand(txDeleteOrderCmd)
+	adminCmd.AddCommand(txStartPollCmd)
+	adminCmd.AddCommand(txVotePoll)
 	adminCmd.AddCommand(resourceUsageCmd)
 	adminCmd.AddCommand(peerInfoCmd)
 	adminCmd.AddCommand(peerBookCmd)
@@ -231,6 +233,24 @@ var (
 		Args:  cobra.MinimumNArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
 			writeTxResultToConsole(client.TxDeleteOrder(argGetAddr(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), getPassword(), !sim, fee))
+		},
+	}
+
+	txStartPollCmd = &cobra.Command{
+		Use:   "tx-start-poll <address> <poll-hash> <url> <end-block> --fee=50000 --simulate=true",
+		Short: "start a straw poll on canopy - use the simulate flag to generate json only",
+		Args:  cobra.MinimumNArgs(4),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeTxResultToConsole(client.TxStartPoll(argGetAddr(args[0]), args[1], args[2], uint64(argToInt(args[3])), getPassword(), !sim, fee))
+		},
+	}
+
+	txVotePoll = &cobra.Command{
+		Use:   "tx-vote-poll <address> <poll-hash> <url> <end-block> --fee=10000 --simulate=true",
+		Short: "vote on a straw poll for canopy - use the simulate flag to generate json only",
+		Args:  cobra.MinimumNArgs(4),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeTxResultToConsole(client.TxStartPoll(argGetAddr(args[0]), args[1], args[2], uint64(argToInt(args[3])), getPassword(), !sim, fee))
 		},
 	}
 

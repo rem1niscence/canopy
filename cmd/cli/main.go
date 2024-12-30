@@ -124,8 +124,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			panic(err)
 		}
 	}
-	proposalsFilePath := filepath.Join(dataDirPath, lib.ProposalsFilePath)
-	if _, err := os.Stat(proposalsFilePath); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(filepath.Join(dataDirPath, lib.ProposalsFilePath)); errors.Is(err, os.ErrNotExist) {
 		log.Infof("Creating %s file", lib.ProposalsFilePath)
 		proposals := make(types.GovProposals)
 		a, _ := lib.NewAny(&lib.StringWrapper{Value: "example"})
@@ -140,6 +139,16 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			panic(err)
 		}
 		if err = proposals.SaveToFile(dataDirPath); err != nil {
+			panic(err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dataDirPath, lib.PollsFilePath)); errors.Is(err, os.ErrNotExist) {
+		log.Infof("Creating %s file", lib.PollsFilePath)
+		polls := types.ActivePolls{
+			Polls:    map[string]map[string]bool{},
+			PollMeta: map[string]*types.StartPoll{},
+		}
+		if err = polls.SaveToFile(dataDirPath); err != nil {
 			panic(err)
 		}
 	}

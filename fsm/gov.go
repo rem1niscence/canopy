@@ -259,3 +259,75 @@ func (s *StateMachine) getParams(space string, ptr any, emptyErr func() lib.Erro
 	}
 	return nil
 }
+
+// PollsToResults() coverts the polling objects to a compressed result based on the voting power
+func (s *StateMachine) PollsToResults(polls types.ActivePolls) (result types.Poll, err lib.ErrorI) {
+	result = make(types.Poll)
+	// create caches to span over multiple
+	accountCache, valList := map[string]uint64{}, map[string]uint64{} // address -> power (tokens)
+	// get the canopy validator set
+	members, err := s.GetCommitteeMembers(lib.CanopyCommitteeId)
+	if err != nil {
+		return
+	}
+	// get the supply
+	supply, err := s.GetSupply()
+	if err != nil {
+		return
+	}
+	// add the canopy validators to the cache
+	for _, member := range members.ValidatorSet.ValidatorSet {
+		public, _ := crypto.NewPublicKeyFromBytes(member.PublicKey)
+		valList[public.Address().String()] = member.VotingPower
+	}
+	// for each poll
+	for proposalHash, addresses := range polls.Polls {
+		r := types.PollResult{
+			ProposalHash: proposalHash,
+			Accounts:     types.VoteStats{TotalTokens: supply.Total},
+			Validators:   types.VoteStats{TotalTokens: members.TotalPower},
+		}
+		// for each vote
+		for address, approve := range addresses {
+			// check if is validator
+			valPower, isValidator := valList[address]
+			if isValidator {
+				// add validator vote
+				r.Validators.TotalVotedTokens += valPower
+				if approve {
+					r.Validators.ApproveTokens += valPower
+				} else {
+					r.Validators.RejectTokens += valPower
+				}
+			}
+			// check account balance
+			accTokens, inCache := accountCache[address]
+			if !inCache {
+				// if not in cache
+				addr, _ := crypto.NewAddressFromString(address)
+				// get the account from the state
+				accTokens, _ = s.GetAccountBalance(addr)
+				// set in cache
+				accountCache[address] = accTokens
+			}
+			// add account vote
+			r.Accounts.TotalVotedTokens += accTokens
+			if approve {
+				r.Accounts.ApproveTokens += accTokens
+			} else {
+				r.Accounts.RejectTokens += accTokens
+			}
+		}
+		// calculate stats for validators
+		r.Validators.ApprovePercentage = uint64(float64(r.Validators.ApproveTokens) / float64(r.Validators.TotalTokens) * 100)
+		r.Validators.RejectPercentage = uint64(float64(r.Validators.RejectTokens) / float64(r.Validators.TotalTokens) * 100)
+		r.Validators.VotedPercentage = uint64(float64(r.Validators.ApproveTokens+r.Validators.RejectTokens) / float64(r.Validators.TotalTokens) * 100)
+		// calculate stats for accounts
+		r.Accounts.ApprovePercentage = uint64(float64(r.Accounts.ApproveTokens) / float64(r.Accounts.TotalTokens) * 100)
+		r.Accounts.RejectPercentage = uint64(float64(r.Accounts.RejectTokens) / float64(r.Accounts.TotalTokens) * 100)
+		r.Accounts.VotedPercentage = uint64(float64(r.Accounts.ApproveTokens+r.Accounts.RejectTokens) / float64(r.Accounts.TotalTokens) * 100)
+		// set results
+		result[proposalHash] = r
+	}
+	return
+}

@@ -443,6 +443,10 @@ func decodeBigInt(data []byte) *big.Int {
 // floorDivision() executes integer division for big.Int
 func floorDivision(x, y *big.Int) *big.Int {
 	var r big.Int
+	// ensure no divide by zero
+	if y.Cmp(bigZero) == 0 {
+		return bip.New()
+	}
 	// perform integer division: x / y
 	q, tmp := bip.New().QuoRem(x, y, &r)
 	defer bip.Recycle(tmp)

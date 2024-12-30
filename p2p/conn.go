@@ -28,7 +28,7 @@ const (
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
 	PollMaxHeightTimeoutS   = 5   // wait time for polling the maximum height of the peers
 	SyncTimeoutS            = 5   // wait time to receive an individual block (certificate) from a peer during syncing
-	MaxBlockReqPerWindow    = 10  // maximum block (certificate) requests per window per requester
+	MaxBlockReqPerWindow    = 20  // maximum block (certificate) requests per window per requester
 	BlockReqWindowS         = 2   // the 'window of time' before resetting limits for block (certificate) requests
 	GoodPeerBookRespRep     = 3   // reputation points for a good peer book response
 	GoodBlockRep            = 3   // rep boost for sending us a valid block (certificate)
@@ -199,6 +199,7 @@ func (c *MultiConn) startReceiveService() {
 				}
 				// handle the packet within the stream
 				if slash, er := stream.handlePacket(info, x); er != nil {
+					c.log.Warnf(er.Error())
 					c.Error(er, slash)
 					return
 				}

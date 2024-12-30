@@ -483,7 +483,7 @@ func (c *Client) TxDeleteOrder(from string, orderId, committeeID uint64,
 	if err != nil {
 		return nil, nil, err
 	}
-	return c.transactionRequest(TxEditOrderRouteName, txRequest{
+	return c.transactionRequest(TxDeleteOrderRouteName, txRequest{
 		Fee:                  optFee,
 		Submit:               submit,
 		OrderId:              orderId,
@@ -491,6 +491,39 @@ func (c *Client) TxDeleteOrder(from string, orderId, committeeID uint64,
 		passwordRequest:      passwordRequest{Password: pwd},
 		txChangeParamRequest: txChangeParamRequest{},
 		committeesRequest:    committeesRequest{fmt.Sprintf("%d", committeeID)},
+	})
+}
+
+func (c *Client) TxStartPoll(from string, pollHash, url string, endBlock uint64,
+	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxStartPollRouteName, txRequest{
+		Fee:                  optFee,
+		Submit:               submit,
+		PollHash:             pollHash,
+		PollURL:              url,
+		addressRequest:       addressRequest{Address: fromHex},
+		passwordRequest:      passwordRequest{Password: pwd},
+		txChangeParamRequest: txChangeParamRequest{EndBlock: endBlock},
+	})
+}
+
+func (c *Client) TxVotePoll(from string, pollHash string, pollApprove bool,
+	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxStartPollRouteName, txRequest{
+		Fee:             optFee,
+		Submit:          submit,
+		PollHash:        pollHash,
+		PollApprove:     pollApprove,
+		addressRequest:  addressRequest{Address: fromHex},
+		passwordRequest: passwordRequest{Password: pwd},
 	})
 }
 

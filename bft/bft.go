@@ -240,7 +240,7 @@ func (b *BFT) StartElectionVotePhase() {
 	// select Proposer (set is required for self-send)
 	b.ProposerKey = SelectProposerFromCandidates(candidates, b.SortitionData, b.ValidatorSet.ValidatorSet)
 	defer func() { b.ProposerKey = nil }()
-	b.log.Debugf("Voting %s as the proposer", lib.BytesToTruncatedString(b.ProposerKey))
+	b.log.Infof("Voting %s as the proposer", lib.BytesToTruncatedString(b.ProposerKey))
 	// get locally produced Verifiable delay function
 	b.HighVDF = b.VDFService.Finish()
 	// sign and send vote to Proposer
@@ -278,6 +278,8 @@ func (b *BFT) StartProposePhase() {
 			b.log.Error(err.Error())
 			return
 		}
+	} else {
+		b.Block, b.Results = b.HighQC.Block, b.HighQC.Results
 	}
 	// send PROPOSE message to the replicas
 	b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
@@ -396,6 +398,8 @@ func (b *BFT) StartPrecommitVotePhase() {
 	}
 	// `lock` on the proposal (only by satisfying the SAFE-NODE-PREDICATE or COMMIT can this node unlock)
 	b.HighQC = msg.Qc
+	b.HighQC.Block = b.Block
+	b.HighQC.Results = b.Results
 	// send vote to the proposer
 	b.SendToProposer(b.CommitteeId, &Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
@@ -675,6 +679,7 @@ func (b *BFT) waitTime(sleepTimeMS int, round uint64) time.Duration {
 // - Optimistic Timeout enables 'Optimistic Responsiveness Mode' starting from Round 10, allowing faster consensus
 // This design balances synchronization speed during adverse conditions with maximizing voter participation under normal conditions
 func (b *BFT) SetWaitTimers(phaseWaitTime, optimisticWaitTIme, processTime time.Duration) {
+	b.log.Debugf("Process time: %.2fs, Wait time: %.2fs", processTime.Seconds(), phaseWaitTime.Seconds())
 	subtract := func(wt, pt time.Duration) (t time.Duration) {
 		if pt > 700*time.Hour {
 			return wt
@@ -686,7 +691,7 @@ func (b *BFT) SetWaitTimers(phaseWaitTime, optimisticWaitTIme, processTime time.
 	}
 	// calculate the phase timer and the optimistic timer by subtracting the process time
 	phaseWaitTime, optimisticWaitTime := subtract(phaseWaitTime, processTime), subtract(optimisticWaitTIme, processTime)
-	b.log.Debugf("Setting consensus timer: %.2fS", phaseWaitTime.Seconds())
+	b.log.Debugf("Setting consensus timer: %.2fs", phaseWaitTime.Seconds())
 	// set Phase and Optimistic timers to go off in their respective timeouts
 	lib.ResetTimer(b.PhaseTimer, phaseWaitTime)
 	lib.ResetTimer(b.OptimisticTimer, optimisticWaitTime)

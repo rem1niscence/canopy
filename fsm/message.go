@@ -342,6 +342,7 @@ func (s *StateMachine) HandleMessageDAOTransfer(msg *types.MessageDAOTransfer) l
 
 // HandleMessageCertificateResults() is the proper handler for a `CertificateResults` message
 func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertificateResults) lib.ErrorI {
+	s.log.Debugf("Handling certificate results msg with height %d:%d", msg.Qc.Header.Height, msg.Qc.Header.CanopyHeight)
 	// define convenience variables
 	results, committeeId, store := msg.Qc.Results, msg.Qc.Header.CommitteeId, s.store.(lib.StoreI)
 	// get the validator params from state

@@ -68,7 +68,7 @@ func TestTransactionCheckBasic(t *testing.T) {
 				Fee:         0,
 				Memo:        "",
 			},
-			error: "invalid block time",
+			error: "invalid tx time",
 		},
 		{
 			name:   "memo is invalid",
@@ -79,7 +79,7 @@ func TestTransactionCheckBasic(t *testing.T) {
 				Signature:   sig,
 				Time:        uint64(time.Now().UnixMicro()),
 				Fee:         0,
-				Memo:        strings.Repeat("F", 101),
+				Memo:        strings.Repeat("F", 201),
 			},
 			error: "invalid memo",
 		},

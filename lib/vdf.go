@@ -35,7 +35,7 @@ type VDFService struct {
 
 // NewVDFService() creates a new instance of the VDF service
 func NewVDFService(targetTime time.Duration, log LoggerI) (vdf *VDFService) {
-	vdf = &VDFService{TargetTime: targetTime, stopChan: make(chan struct{}), running: &atomic.Bool{}, log: log}
+	vdf = &VDFService{TargetTime: targetTime, stopChan: make(chan struct{}, 100), running: &atomic.Bool{}, log: log}
 	vdf.estimateIterationsPerSecond()
 	return
 }
@@ -96,7 +96,7 @@ func (vdf *VDFService) Finish() (results *crypto.VDF) {
 	}
 	// if service has not yet completed, signal to stop
 	if vdf.running.Load() {
-		vdf.log.Debugf("Prematurely stopping VDF service")
+		vdf.log.Warn("Prematurely stopping VDF service")
 		vdf.stopChan <- struct{}{} // NOTE: multiple sequential calls to stop is not supported
 		return
 	}

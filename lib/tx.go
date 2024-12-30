@@ -94,7 +94,7 @@ func (x *Transaction) CheckBasic() ErrorI {
 	if x.Time == 0 {
 		return ErrInvalidTxTime()
 	}
-	if len(x.Memo) > 100 {
+	if len(x.Memo) > 200 {
 		return ErrInvalidMemo()
 	}
 	return nil

@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [Unreleased] - 12/29/2024
+- Added straw poll functionality (untested)
+
 ## [Unreleased] - 12/25/2024
 - Fixed load certificate bug
 - Fixed peer reputation issue with already in mempool

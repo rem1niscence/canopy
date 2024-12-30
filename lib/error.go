@@ -140,6 +140,7 @@ const (
 	CodeNilBuyOrder                     ErrorCode = 43
 	CodeInvalidBuyerReceiveAddress      ErrorCode = 44
 	CodeEmptyTransaction                ErrorCode = 45
+	CodeHashSize                        ErrorCode = 46
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -229,6 +230,7 @@ const (
 	CodeInvalidResetOrder       ErrorCode = 82
 	CodeInvalidCheckpoint       ErrorCode = 83
 	CodeInvalidSellOrder        ErrorCode = 84
+	CodeStartPollHeight         ErrorCode = 85
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -332,10 +334,6 @@ func ErrStringToBytes(err error) ErrorI {
 
 func ErrNilBlock() ErrorI {
 	return NewError(CodeNilBlock, MainModule, "block is nil")
-}
-
-func ErrNilCertificateResult() ErrorI {
-	return NewError(CodeNilCertResult, MainModule, "certificate result is nil")
 }
 
 func ErrNilRewardRecipients() ErrorI {
@@ -616,4 +614,8 @@ func ErrInvalidBuyerReceiveAddress() ErrorI {
 
 func ErrNilCertResults() ErrorI {
 	return NewError(CodeNilCertResult, MainModule, "the certificate results is empty")
+}
+
+func ErrHashSize() ErrorI {
+	return NewError(CodeHashSize, MainModule, "wrong hash size")
 }

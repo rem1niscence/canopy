@@ -102,6 +102,8 @@ const (
 	TxCreateOrderRouteName     = "tx-create-order"
 	TxEditOrderRouteName       = "tx-edit-order"
 	TxDeleteOrderRouteName     = "tx-delete-order"
+	TxStartPollRouteName       = "tx-start-poll"
+	TxVotePollRouteName        = "tx-vote-poll"
 	ResourceUsageRouteName     = "resource-usage"
 	PeerInfoRouteName          = "peer-info"
 	ConsensusInfoRouteName     = "consensus-info"
@@ -183,6 +185,8 @@ var (
 		TxEditOrderRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-edit-order", HandlerFunc: TransactionEditOrder, AdminOnly: true},
 		TxDeleteOrderRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-delete-order", HandlerFunc: TransactionDeleteOrder, AdminOnly: true},
 		TxSubsidyRouteName:         {Method: http.MethodPost, Path: "/v1/admin/subsidy", HandlerFunc: TransactionSubsidy, AdminOnly: true},
+		TxStartPollRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-start-poll", HandlerFunc: TransactionStartPoll, AdminOnly: true},
+		TxVotePollRouteName:        {Method: http.MethodPost, Path: "/v1/admin/tx-vote-poll", HandlerFunc: TransactionVotePoll, AdminOnly: true},
 		ResourceUsageRouteName:     {Method: http.MethodGet, Path: "/v1/admin/resource-usage", HandlerFunc: ResourceUsage, AdminOnly: true},
 		PeerInfoRouteName:          {Method: http.MethodGet, Path: "/v1/admin/peer-info", HandlerFunc: PeerInfo, AdminOnly: true},
 		ConsensusInfoRouteName:     {Method: http.MethodGet, Path: "/v1/admin/consensus-info", HandlerFunc: ConsensusInfo, AdminOnly: true},
@@ -226,7 +230,7 @@ func StartRPC(a *app2.Controller, c lib.Config, l lib.LoggerI) {
 			Handler: cor.Handler(http.TimeoutHandler(router.NewAdmin(), timeout, ErrServerTimeout().Error())),
 		}).ListenAndServe().Error())
 	}()
-	go func() {
+	go func() { // TODO remove DEBUG ONLY
 		fileName := "heap1.out"
 		for range time.Tick(time.Second * 10) {
 			f, err := os.Create(filepath.Join(c.DataDirPath, fileName))
@@ -241,6 +245,7 @@ func StartRPC(a *app2.Controller, c lib.Config, l lib.LoggerI) {
 			fileName = "heap2.out"
 		}
 	}()
+	go updatePollResults()
 	//l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
 	//runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
 	//l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
@@ -317,32 +322,6 @@ func Poll(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	}
 	if _, err := w.Write(bz); err != nil {
 		logger.Error(err.Error())
-	}
-}
-
-func pollValidators(frequency time.Duration) {
-	s, e := store.NewStoreWithDB(db, logger)
-	if e != nil {
-		panic(e)
-	}
-	defer s.Discard()
-	for {
-		state, err := fsm.New(conf, s, logger)
-		if err != nil {
-			logger.Error(err.Error())
-			time.Sleep(frequency)
-			continue
-		}
-		vals, err := state.GetCanopyCommitteeMembers()
-		if err != nil {
-			logger.Error(err.Error())
-			time.Sleep(frequency)
-			continue
-		}
-		pollMux.Lock()
-		poll = types.PollValidators(vals, router[ProposalsRouteName].Path, logger)
-		pollMux.Unlock()
-		time.Sleep(frequency)
 	}
 }
 
@@ -613,6 +592,10 @@ type txRequest struct {
 	ReceiveAmount   uint64       `json:"receiveAmount"`
 	ReceiveAddress  lib.HexBytes `json:"receiveAddress"`
 	OrderId         uint64       `json:"orderId"`
+	Memo            string       `json:"memo"`
+	PollHash        string       `json:"pollHash"`
+	PollURL         string       `json:"pollURL"`
+	PollApprove     bool         `json:"pollApprove"`
 	addressRequest
 	passwordRequest
 	txChangeParamRequest
@@ -633,7 +616,7 @@ func TransactionSend(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		if err != nil {
 			return nil, err
 		}
-		return types.NewSendTransaction(p, toAddress, ptr.Amount, ptr.Fee)
+		return types.NewSendTransaction(p, toAddress, ptr.Amount, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -647,7 +630,7 @@ func TransactionStake(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		if err != nil {
 			return nil, err
 		}
-		return types.NewStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal)
+		return types.NewStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal, ptr.Memo)
 	})
 }
 
@@ -661,25 +644,25 @@ func TransactionEditStake(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if err != nil {
 			return nil, err
 		}
-		return types.NewEditStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.EarlyWithdrawal)
+		return types.NewEditStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.EarlyWithdrawal, ptr.Memo)
 	})
 }
 
 func TransactionUnstake(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewUnstakeTx(p, ptr.Fee)
+		return types.NewUnstakeTx(p, ptr.Fee, ptr.Memo)
 	})
 }
 
 func TransactionPause(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewPauseTx(p, ptr.Fee)
+		return types.NewPauseTx(p, ptr.Fee, ptr.Memo)
 	})
 }
 
 func TransactionUnpause(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewUnpauseTx(p, ptr.Fee)
+		return types.NewUnpauseTx(p, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -691,20 +674,20 @@ func TransactionChangeParam(w http.ResponseWriter, r *http.Request, _ httprouter
 			return nil, err
 		}
 		if isString {
-			return types.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, ptr.Fee)
+			return types.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, ptr.Fee, ptr.Memo)
 		} else {
 			paramValue, err := strconv.ParseUint(ptr.ParamValue, 10, 64)
 			if err != nil {
 				return nil, err
 			}
-			return types.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, ptr.Fee)
+			return types.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, ptr.Fee, ptr.Memo)
 		}
 	})
 }
 
 func TransactionDAOTransfer(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewDAOTransferTx(p, ptr.Amount, ptr.StartBlock, ptr.EndBlock, ptr.Fee)
+		return types.NewDAOTransferTx(p, ptr.Amount, ptr.StartBlock, ptr.EndBlock, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -714,7 +697,7 @@ func TransactionSubsidy(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 		if c, err := StringToCommittees(ptr.committees); err == nil {
 			committeeId = c[0]
 		}
-		return types.NewSubsidyTx(p, ptr.Amount, committeeId, ptr.OpCode, ptr.Fee)
+		return types.NewSubsidyTx(p, ptr.Amount, committeeId, ptr.OpCode, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -724,7 +707,7 @@ func TransactionCreateOrder(w http.ResponseWriter, r *http.Request, _ httprouter
 		if c, err := StringToCommittees(ptr.committees); err == nil {
 			committeeId = c[0]
 		}
-		return types.NewCreateOrderTx(p, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee)
+		return types.NewCreateOrderTx(p, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -734,7 +717,7 @@ func TransactionEditOrder(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if c, err := StringToCommittees(ptr.committees); err == nil {
 			committeeId = c[0]
 		}
-		return types.NewEditOrderTx(p, ptr.OrderId, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee)
+		return types.NewEditOrderTx(p, ptr.OrderId, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -744,7 +727,19 @@ func TransactionDeleteOrder(w http.ResponseWriter, r *http.Request, _ httprouter
 		if c, err := StringToCommittees(ptr.committees); err == nil {
 			committeeId = c[0]
 		}
-		return types.NewDeleteOrderTx(p, ptr.OrderId, committeeId, ptr.Fee)
+		return types.NewDeleteOrderTx(p, ptr.OrderId, committeeId, ptr.Fee, ptr.Memo)
+	})
+}
+
+func TransactionStartPoll(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		return types.NewStartPollTransaction(p, ptr.PollHash, ptr.PollHash, ptr.EndBlock, ptr.Fee)
+	})
+}
+
+func TransactionVotePoll(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		return types.NewVotePollTransaction(p, ptr.PollHash, ptr.PollApprove, ptr.Fee)
 	})
 }
 
@@ -913,6 +908,36 @@ func ResourceUsage(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) 
 			WrittenBytesIO:  ioCounters[0].BytesSent,
 		},
 	}, http.StatusOK)
+}
+
+// updatePollResults() updates the poll results based on the current token power
+func updatePollResults() {
+	for {
+		var p types.ActivePolls
+		if err := func() (err error) {
+			if err = p.NewFromFile(conf.DataDirPath); err != nil {
+				return
+			}
+			// cleanup old polls
+			p.Cleanup(app.CanopyFSM().Height())
+			if err = p.SaveToFile(conf.DataDirPath); err != nil {
+				return
+			}
+			// convert the poll to a result
+			result, err := app.CanopyFSM().PollsToResults(p)
+			if err != nil {
+				return
+			}
+			// update the rpc accessible version
+			pollMux.Lock()
+			poll = result
+			pollMux.Unlock()
+			return
+		}(); err != nil {
+			logger.Error(err.Error())
+		}
+		time.Sleep(time.Minute * 5)
+	}
 }
 
 func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error)) {
