@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	bus "github.com/canopy-network/canopy/controller"
+	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -494,24 +494,7 @@ func (c *Client) TxDeleteOrder(from string, orderId, committeeID uint64,
 	})
 }
 
-func (c *Client) TxStartPoll(from string, pollHash, url string, endBlock uint64,
-	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
-	fromHex, err := lib.NewHexBytesFromString(from)
-	if err != nil {
-		return nil, nil, err
-	}
-	return c.transactionRequest(TxStartPollRouteName, txRequest{
-		Fee:                  optFee,
-		Submit:               submit,
-		PollHash:             pollHash,
-		PollURL:              url,
-		addressRequest:       addressRequest{Address: fromHex},
-		passwordRequest:      passwordRequest{Password: pwd},
-		txChangeParamRequest: txChangeParamRequest{EndBlock: endBlock},
-	})
-}
-
-func (c *Client) TxVotePoll(from string, pollHash string, pollApprove bool,
+func (c *Client) TxStartPoll(from string, pollJSON json.RawMessage,
 	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	fromHex, err := lib.NewHexBytesFromString(from)
 	if err != nil {
@@ -520,7 +503,22 @@ func (c *Client) TxVotePoll(from string, pollHash string, pollApprove bool,
 	return c.transactionRequest(TxStartPollRouteName, txRequest{
 		Fee:             optFee,
 		Submit:          submit,
-		PollHash:        pollHash,
+		PollJSON:        pollJSON,
+		addressRequest:  addressRequest{Address: fromHex},
+		passwordRequest: passwordRequest{Password: pwd},
+	})
+}
+
+func (c *Client) TxVotePoll(from string, pollJSON json.RawMessage, pollApprove bool,
+	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxStartPollRouteName, txRequest{
+		Fee:             optFee,
+		Submit:          submit,
+		PollJSON:        pollJSON,
 		PollApprove:     pollApprove,
 		addressRequest:  addressRequest{Address: fromHex},
 		passwordRequest: passwordRequest{Password: pwd},
@@ -539,8 +537,8 @@ func (c *Client) PeerInfo() (returned *peerInfoResponse, err lib.ErrorI) {
 	return
 }
 
-func (c *Client) ConsensusInfo() (returned *bus.ConsensusSummary, err lib.ErrorI) {
-	returned = new(bus.ConsensusSummary)
+func (c *Client) ConsensusInfo() (returned *controller.ConsensusSummary, err lib.ErrorI) {
+	returned = new(controller.ConsensusSummary)
 	err = c.get(ConsensusInfoRouteName, returned, true)
 	return
 }
@@ -603,7 +601,7 @@ func (c *Client) txStake(from, netAddr string, amt uint64, committees, output st
 		addressRequest:       addressRequest{Address: fromHex},
 		passwordRequest:      passwordRequest{Password: pwd},
 		txChangeParamRequest: txChangeParamRequest{},
-		committeesRequest:    committeesRequest{committees: committees},
+		committeesRequest:    committeesRequest{Committees: committees},
 	})
 }
 

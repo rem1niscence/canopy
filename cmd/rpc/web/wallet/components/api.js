@@ -15,7 +15,12 @@ const txPausePath = "/v1/admin/tx-pause"
 const txUnpausePath = "/v1/admin/tx-unpause"
 const txChangeParamPath = "/v1/admin/tx-change-param"
 const txDaoTransfer = "/v1/admin/tx-dao-transfer"
-export const consensusInfoPath = "/v1/admin/consensus-info"
+const txCreateOrder = "/v1/admin/tx-create-order"
+const txEditOrder = "/v1/admin/tx-edit-order"
+const txDeleteOrder = "/v1/admin/tx-delete-order"
+const txStartPoll = "/v1/admin/tx-start-poll"
+const txVotePoll = "/v1/admin/tx-vote-poll"
+export const consensusInfoPath = "/v1/admin/consensus-info?id=1"
 export const configPath = "/v1/admin/config"
 export const peerBookPath = "/v1/admin/peer-book"
 export const peerInfoPath = "/v1/admin/peer-info"
@@ -82,41 +87,60 @@ function voteRequest(json, approve) {
     return JSON.stringify({approve: approve, proposal: json})
 }
 
+function pollRequest(address, json, password, approve) {
+    return JSON.stringify({address:address, pollJSON: json, pollApprove: approve, password: password, submit: true, })
+}
+
 function addressAndPwdRequest(address, password) {
-    return JSON.stringify({address: address, password: password})
+    return JSON.stringify({address: address, password: password, submit: true})
 }
 
 function pkAndPwdRequest(pk, password) {
     return JSON.stringify({privateKey: pk, password: password})
 }
 
-function newTxRequest(address, netAddress, amount, output, sequence, fee, submit, password) {
-    const request = {}
-    request.address = address
-    request.netAddress = netAddress
-    request.amount = amount
-    request.output = output
-    request.sequence = sequence
-    request.fee = fee
-    request.submit = submit
-    request.password = password
-    return JSON.stringify(request)
+function newTxRequest(address, netAddress, amount, output, memo, fee, submit, password) {
+    return JSON.stringify({
+        address: address,
+        netAddress: netAddress,
+        amount: amount,
+        output: output,
+        memo: memo,
+        fee: fee,
+        submit: submit,
+        password: password,
+    });
 }
 
-function newGovTxRequest(address, amount, paramSpace, paramKey, paramValue, startBlock, endBlock, sequence, fee, submit, password) {
-    const request = {}
-    request.address = address
-    request.amount = amount
-    request.paramSpace = paramSpace
-    request.paramKey = paramKey
-    request.paramValue = paramValue
-    request.startBlock = startBlock
-    request.endBlock = endBlock
-    request.sequence = sequence
-    request.fee = fee
-    request.submit = submit
-    request.password = password
-    return JSON.stringify(request)
+function newSwapTxRequest(address, committeeId, orderId, sellAmount, receiveAmount, receiveAddress, memo, fee, submit, password) {
+    return JSON.stringify({
+        address: address,
+        committees: committeeId.toString(),
+        orderId: orderId,
+        amount: sellAmount,
+        receiveAmount: receiveAmount,
+        receiveAddress: receiveAddress,
+        memo: memo,
+        fee: fee,
+        submit: submit,
+        password: password,
+    })
+}
+
+function newGovTxRequest(address, amount, paramSpace, paramKey, paramValue, startBlock, endBlock, memo, fee, submit, password) {
+    return JSON.stringify({
+        address: address,
+        amount: amount,
+        paramSpace: paramSpace,
+        paramKey: paramKey,
+        paramValue: paramValue,
+        startBlock: startBlock,
+        endBlock: endBlock,
+        memo: memo,
+        fee: fee,
+        submit: submit,
+        password: password,
+    });
 }
 
 export async function Keystore() {
@@ -159,6 +183,14 @@ export async function DelVote(json) {
     return POST(adminRPCURL, delVotePath, voteRequest(JSON.parse(json)))
 }
 
+export async function StartPoll(address, json, password) {
+    return POST(adminRPCURL, txStartPoll, pollRequest(address, JSON.parse(json), password))
+}
+
+export async function VotePoll(address, json, approve, password) {
+    return POST(adminRPCURL, txVotePoll, pollRequest(address, JSON.parse(json), password, approve))
+}
+
 export async function AccountWithTxs(height, address, page) {
     let result = {}
     result.account = await Account(height, address)
@@ -196,36 +228,48 @@ export async function Resource() {
     return GET(adminRPCURL, resourcePath)
 }
 
-export async function TxSend(address, recipient, amount, sequence, fee, password, submit) {
-    return POST(adminRPCURL, txSendPath, newTxRequest(address, "", amount, recipient, Number(sequence), Number(fee), submit, password))
+export async function TxSend(address, recipient, amount, memo, fee, password, submit) {
+    return POST(adminRPCURL, txSendPath, newTxRequest(address, "", amount, recipient, memo, Number(fee), submit, password))
 }
 
-export async function TxStake(address, netAddress, amount, output, sequence, fee, password, submit) {
-    return POST(adminRPCURL, txStakePath, newTxRequest(address, netAddress, amount, output, Number(sequence), Number(fee), submit, password))
+export async function TxStake(address, netAddress, amount, output, memo, fee, password, submit) {
+    return POST(adminRPCURL, txStakePath, newTxRequest(address, netAddress, amount, output, memo, Number(fee), submit, password))
 }
 
-export async function TxEditStake(address, netAddress, amount, output, sequence, fee, password, submit) {
-    return POST(adminRPCURL, txEditStakePath, newTxRequest(address, netAddress, amount, output, Number(sequence), Number(fee), submit, password))
+export async function TxEditStake(address, netAddress, amount, output, memo, fee, password, submit) {
+    return POST(adminRPCURL, txEditStakePath, newTxRequest(address, netAddress, amount, output, memo, Number(fee), submit, password))
 }
 
-export async function TxUnstake(address, sequence, fee, password, submit) {
-    return POST(adminRPCURL, txUnstakePath, newTxRequest(address, "", 0, "", Number(sequence), Number(fee), submit, password))
+export async function TxUnstake(address, memo, fee, password, submit) {
+    return POST(adminRPCURL, txUnstakePath, newTxRequest(address, "", 0, "", memo, Number(fee), submit, password))
 }
 
-export async function TxPause(address, sequence, fee, password, submit) {
-    return POST(adminRPCURL, txPausePath, newTxRequest(address, "", 0, "", Number(sequence), Number(fee), submit, password))
+export async function TxPause(address, memo, fee, password, submit) {
+    return POST(adminRPCURL, txPausePath, newTxRequest(address, "", 0, "", memo, Number(fee), submit, password))
 }
 
-export async function TxUnpause(address, sequence, fee, password, submit) {
-    return POST(adminRPCURL, txUnpausePath, newTxRequest(address, "", 0, "", Number(sequence), Number(fee), submit, password))
+export async function TxUnpause(address, memo, fee, password, submit) {
+    return POST(adminRPCURL, txUnpausePath, newTxRequest(address, "", 0, "", memo, Number(fee), submit, password))
 }
 
-export async function TxChangeParameter(address, paramSpace, paramKey, paramValue, startBlock, endBlock, sequence, fee, password, submit) {
-    return POST(adminRPCURL, txChangeParamPath, newGovTxRequest(address, 0, paramSpace, paramKey, paramValue, Number(startBlock), Number(endBlock), Number(sequence), Number(fee), submit, password))
+export async function TxChangeParameter(address, paramSpace, paramKey, paramValue, startBlock, endBlock, memo, fee, password, submit) {
+    return POST(adminRPCURL, txChangeParamPath, newGovTxRequest(address, 0, paramSpace, paramKey, paramValue, Number(startBlock), Number(endBlock), memo, Number(fee), submit, password))
 }
 
-export async function TxDAOTransfer(address, amount, startBlock, endBlock, sequence, fee, password, submit) {
-    return POST(adminRPCURL, txDaoTransfer, newGovTxRequest(address, Number(amount), "", "", "", Number(startBlock), Number(endBlock), Number(sequence), Number(fee), submit, password))
+export async function TxDAOTransfer(address, amount, startBlock, endBlock, memo, fee, password, submit) {
+    return POST(adminRPCURL, txDaoTransfer, newGovTxRequest(address, Number(amount), "", "", "", Number(startBlock), Number(endBlock), memo, Number(fee), submit, password))
+}
+
+export async function TxCreateOrder(address, committeeId, sellAmount, receiveAmount, receiveAddress, memo, fee, password, submit) {
+    return POST(adminRPCURL, txCreateOrder, newSwapTxRequest(address, committeeId, 0, Number(sellAmount), Number(receiveAmount), receiveAddress, memo, Number(fee), submit, password))
+}
+
+export async function TxEditOrder(address, committeeId, orderId, sellAmount, receiveAmount, receiveAddress, memo, fee, password, submit) {
+    return POST(adminRPCURL, txEditOrder, newSwapTxRequest(address, committeeId, Number(orderId), Number(sellAmount), Number(receiveAmount), receiveAddress, memo, Number(fee), submit, password))
+}
+
+export async function TxDeleteOrder(address, committeeId, orderId, memo, fee, password, submit) {
+    return POST(adminRPCURL, txDeleteOrder, newSwapTxRequest(address, committeeId, Number(orderId), 0, 0, "", memo, Number(fee), submit, password))
 }
 
 export async function RawTx(json) {

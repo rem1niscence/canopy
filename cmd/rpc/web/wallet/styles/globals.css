@@ -434,7 +434,7 @@
 }
 
 .poll-carousel {
-    height: 320px;
+    height: 480px;
     width: 80%;
 }
 
@@ -479,16 +479,32 @@
 }
 
 .accord-body-container {
-    width: 400px !important;
+    width: 450px !important;
     height: 200px !important;
+    margin: 0 auto !important;
+}
+
+.accord-pass-container {
+    width: 450px !important;
     margin: 0 auto !important;
 }
 
 .poll-prop-name {
     width: 100%;
     margin: 0 auto;
-    margin-top: 70px;
     font-weight: 800;
+}
+
+.poll-prop-hash {
+    margin: 0 auto;
+    font-weight: 600;
+    color: black;
+}
+
+.poll-prop-url {
+    margin: 0 auto;
+    font-weight: 300;
+    color: black;
 }
 
 .poll-container {

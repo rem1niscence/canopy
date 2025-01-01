@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [Unreleased] - 12/30/2024
+- Fixed total supply bug where it counts burned rewards
+- Wallet UI fixes
+- Added swap transactions to the web wallet
+- Added polling to the web wallet
+
 ## [Unreleased] - 12/29/2024
 - Added straw poll functionality (untested)
 
@@ -156,7 +162,7 @@
 
 ## [Unreleased] - 08/06/2024
 
-- FSM changes for `committees`
+- FSM changes for `Committees`
 - FSM changes for `message_equity_grant`
 - Proto changes to remove non-determinism i.e `maps`
 

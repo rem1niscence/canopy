@@ -494,8 +494,7 @@ func prefixForParamSpace(space string) string {
 */
 
 const (
-	minPollEmbedSize     = 85    // minPollEmbedSize is (below) the minimum length string a memo must be to be a poll
-	minStartPollFeeX     = 5     // minStartPollFeeX defines the minimum multiplier of the required base fee - in order to start a poll
+	minPollEmbedSize     = 80    // minPollEmbedSize is (below) the minimum length string a memo must be to be a poll
 	prunePollAfterBlocks = 40320 // prunePollAfterBlocks is the amount of blocks a poll is maintained before being pruned
 	maxPollLengthBlocks  = 10000 // maxPollLengthBlocks is the maximum length a poll may run in blocks
 )
@@ -508,25 +507,28 @@ type ActivePolls struct {
 }
 
 // CheckForPollTransaction() populates the poll.json file from embeds if the embed exists in the memo field
-func (p *ActivePolls) CheckForPollTransaction(sender crypto.AddressI, memo string, feeX int, height uint64, path string) {
+func (p *ActivePolls) CheckForPollTransaction(sender crypto.AddressI, memo string, height uint64, path string) lib.ErrorI {
 	if len(memo) < minPollEmbedSize {
-		return
+		return nil
 	}
-	// to start a poll - ensure the tx fee is an X multiple above the base fee
-	if feeX >= minStartPollFeeX {
-		// check for start poll embed
-		if startPoll, err := checkMemoForStartPoll(height, memo); err == nil {
-			p.NewPoll(startPoll)
-			return
+	// check for start poll embed
+	if startPoll, err := checkMemoForStartPoll(height, memo); err == nil {
+		p.NewPoll(startPoll)
+		if e := p.SaveToFile(path); e != nil {
+			return e
 		}
+		return nil
 	}
 	// check for vote poll embed
 	if votePoll, err := checkMemoForVotePoll(memo); err == nil {
 		p.VotePoll(sender, votePoll, height)
-		return
+		if e := p.SaveToFile(path); e != nil {
+			return e
+		}
+		return nil
 	}
 	// no embed
-	return
+	return nil
 }
 
 // NewPoll() creates a new poll from the start poll embed
@@ -534,8 +536,8 @@ func (p *ActivePolls) NewPoll(startPoll *StartPoll) {
 	if _, exists := p.Polls[startPoll.StartPoll]; exists {
 		return
 	}
-	p.Polls[startPoll.Url] = make(map[string]bool)
-	p.PollMeta[startPoll.Url] = startPoll
+	p.Polls[startPoll.StartPoll] = make(map[string]bool)
+	p.PollMeta[startPoll.StartPoll] = startPoll
 }
 
 // VotePoll() upserts a vote to a specific poll
@@ -555,7 +557,7 @@ func (p *ActivePolls) VotePoll(sender crypto.AddressI, votePoll *VotePoll, heigh
 func (p *ActivePolls) Cleanup(height uint64) {
 	// close any polls that are past the end_height
 	for hash, poll := range p.PollMeta {
-		if height-poll.EndHeight >= prunePollAfterBlocks {
+		if int(height-poll.EndHeight) >= prunePollAfterBlocks {
 			delete(p.PollMeta, hash)
 			delete(p.Polls, hash) // defensive
 		}
@@ -563,8 +565,8 @@ func (p *ActivePolls) Cleanup(height uint64) {
 }
 
 // NewFromFile() creates a new polls object from a file
-func (p ActivePolls) NewFromFile(dataDirPath string) lib.ErrorI {
-	return lib.NewJSONFromFile(&p, dataDirPath, lib.PollsFilePath)
+func (p *ActivePolls) NewFromFile(dataDirPath string) lib.ErrorI {
+	return lib.NewJSONFromFile(p, dataDirPath, lib.PollsFilePath)
 }
 
 // SaveToFile() persists the polls object to a json file
@@ -582,16 +584,20 @@ type StartPoll struct {
 
 // NewStartPollTransaction() isn't an actual transaction type - rather it's a protocol built on top of send transactions to allow simple straw polling on Canopy.
 // This model is plugin specific and does not need to be followed for other chains.
-func NewStartPollTransaction(from crypto.PrivateKeyI, pollHash, url string, endHeight, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	// validate the poll hash
-	if err := validatePollHash(pollHash); err != nil {
+func NewStartPollTransaction(from crypto.PrivateKeyI, pollJSON json.RawMessage, fee uint64) (lib.TransactionI, lib.ErrorI) {
+	// extract the params from the pollJSON
+	extract := struct {
+		URL      string `json:"URL"`      // optional
+		EndBlock uint64 `json:"endBlock"` // required
+	}{}
+	if err := lib.UnmarshalJSON(pollJSON, &extract); err != nil {
 		return nil, err
 	}
 	// encode the structure to the memo
 	memoBytes, err := lib.MarshalJSON(StartPoll{
-		StartPoll: pollHash,
-		Url:       url,
-		EndHeight: endHeight,
+		StartPoll: crypto.HashString(pollJSON),
+		Url:       extract.URL,
+		EndHeight: extract.EndBlock,
 	})
 	if err != nil {
 		return nil, err
@@ -607,16 +613,12 @@ type VotePoll struct {
 	Approve  bool   `json:"Approve"`
 }
 
-// NewStartPollTransaction() isn't an actual transaction type - rather it's a protocol built on top of send transactions to allow simple straw polling on Canopy.
+// NewVotePollTransaction() isn't an actual transaction type - rather it's a protocol built on top of send transactions to allow simple straw polling on Canopy.
 // This model is plugin specific and does not need to be followed for other chains.
-func NewVotePollTransaction(from crypto.PrivateKeyI, pollHash string, approve bool, fee uint64) (lib.TransactionI, lib.ErrorI) {
-	// validate the poll hash
-	if err := validatePollHash(pollHash); err != nil {
-		return nil, err
-	}
+func NewVotePollTransaction(from crypto.PrivateKeyI, pollJSON json.RawMessage, approve bool, fee uint64) (lib.TransactionI, lib.ErrorI) {
 	// encode the structure to the memo
 	memoBytes, err := lib.MarshalJSON(VotePoll{
-		VotePoll: pollHash,
+		VotePoll: crypto.HashString(pollJSON),
 		Approve:  approve,
 	})
 	if err != nil {
@@ -672,6 +674,7 @@ type Poll map[string]PollResult
 // PollResult is a structure that represents the current state of a 'Poll' for a 'Proposal'
 type PollResult struct {
 	ProposalHash string    `json:"proposalHash"` // the hash of the proposal
+	ProposalURL  string    `json:"proposalURL"`  // the url of the proposal
 	Accounts     VoteStats `json:"accounts"`     // vote statistics for accounts
 	Validators   VoteStats `json:"validators"`   // vote statistics for validators
 }
@@ -734,8 +737,8 @@ func (p GovProposals) Del(proposal GovProposal) {
 }
 
 // NewFromFile() creates a new polls object from a file
-func (p GovProposals) NewFromFile(dataDirPath string) lib.ErrorI {
-	return lib.NewJSONFromFile(&p, dataDirPath, lib.ProposalsFilePath)
+func (p *GovProposals) NewFromFile(dataDirPath string) lib.ErrorI {
+	return lib.NewJSONFromFile(p, dataDirPath, lib.ProposalsFilePath)
 }
 
 // SaveToFile() persists the polls object to a json file

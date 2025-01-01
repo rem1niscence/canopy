@@ -2,7 +2,7 @@ import {useState} from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from 'react-truncate-inside';
 import {Button, Card, Col, Form, InputGroup, Modal, Row, Table, ToastContainer, Toast, Spinner} from "react-bootstrap";
-import {KeystoreGet, KeystoreImport, KeystoreNew, TxEditStake, TxPause, TxSend, TxStake, TxUnpause, TxUnstake} from "@/components/api";
+import {KeystoreGet, KeystoreImport, KeystoreNew, TxCreateOrder, TxDeleteOrder, TxEditOrder, TxEditStake, TxPause, TxSend, TxStake, TxUnpause, TxUnstake} from "@/components/api";
 import {copy, formatNumber, getFormInputs, objEmpty, onFormSubmit, renderToast, withTooltip} from "@/components/util";
 
 export default function Accounts({keygroup, account, validator}) {
@@ -60,35 +60,50 @@ export default function Accounts({keygroup, account, validator}) {
         const submit = Object.keys(state.txResult).length !== 0
         switch (state.txType) {
             case "send":
-                TxSend(r.sender, r.recipient, Number(r.amount), Number(r.sequence),
+                TxSend(r.sender, r.recipient, Number(r.amount), r.memo,
                     Number(r.fee), r.password, submit).then(function (result) {
                     setState({...state, showSubmit: !submit, txResult: result})
                 })
                 return
             case "stake":
-                TxStake(r.sender, r["net_address"], Number(r.amount), r.output, Number(r.sequence),
+                TxStake(r.sender, r["net_address"], Number(r.amount), r.output, r.memo,
                     Number(r.fee), r.password, submit).then(function (result) {
                     setState({...state, showSubmit: !submit, txResult: result})
                 })
                 return
             case "edit-stake":
-                TxEditStake(r.sender, r["net_address"], Number(r.amount), r.output, Number(r.sequence),
+                TxEditStake(r.sender, r["net_address"], Number(r.amount), r.output, r.memo,
                     Number(r.fee), r.password, submit).then(function (result) {
                     setState({...state, showSubmit: !submit, txResult: result})
                 })
                 return
             case "unstake":
-                TxUnstake(r.sender, Number(r.sequence), Number(r.fee), r.password, submit).then(function (result) {
+                TxUnstake(r.sender, r.memo, Number(r.fee), r.password, submit).then(function (result) {
                     setState({...state, showSubmit: !submit, txResult: result})
                 })
                 return
             case "pause":
-                TxPause(r.sender, Number(r.sequence), Number(r.fee), r.password, submit).then(function (result) {
+                TxPause(r.sender, r.memo, Number(r.fee), r.password, submit).then(function (result) {
                     setState({...state, showSubmit: !submit, txResult: result})
                 })
                 return
             case "unpause":
-                TxUnpause(r.sender, Number(r.sequence), Number(r.fee), r.password, submit).then(function (result) {
+                TxUnpause(r.sender, r.memo, Number(r.fee), r.password, submit).then(function (result) {
+                    setState({...state, showSubmit: !submit, txResult: result})
+                })
+                return
+            case "create_order":
+                TxCreateOrder(r.sender, r.committeeId, r.amount, r.receiveAmount, r.receiveAddress, r.memo, Number(r.fee), r.password, submit).then(function (result) {
+                    setState({...state, showSubmit: !submit, txResult: result})
+                })
+                return
+            case "edit_order":
+                TxEditOrder(r.sender, r.committeeId, r.orderId, r.amount, r.receiveAmount, r.receiveAddress, r.memo, Number(r.fee), r.password, submit).then(function (result) {
+                    setState({...state, showSubmit: !submit, txResult: result})
+                })
+                return
+            case "delete_order":
+                TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, Number(r.fee), r.password, submit).then(function (result) {
                     setState({...state, showSubmit: !submit, txResult: result})
                 })
                 return
@@ -140,7 +155,7 @@ export default function Accounts({keygroup, account, validator}) {
         if (emptyPK && emptyTxRes) {
             return <></>
         }
-        return <JsonView value={emptyPK ? state.txResult : state.pk} shortenTextAfterLength={100} displayDataTypes={false}/>
+        return <JsonView value={emptyPK ? {result: state.txResult} : state.pk} shortenTextAfterLength={100} displayDataTypes={false}/>
     }
 
     const renderAccSumTabCol = (detail, i) => (
@@ -154,15 +169,14 @@ export default function Accounts({keygroup, account, validator}) {
     )
 
     const renderForm = (v, i) => {
-        return Object.keys(state.txResult).length === 0 ? (
-            <InputGroup key={i} className="mb-3" size="lg">
-                {withTooltip(
-                    <InputGroup.Text className="input-text">{v.inputText}</InputGroup.Text>, v.tooltip, i, "auto"
-                )}
-                <Form.Control placeholder={v.placeholder} required={v.required} defaultValue={v.defaultValue} min={0}
-                              type={v.type} minLength={v.minLength} maxLength={v.maxLength} aria-label={v.label}/>
-            </InputGroup>
-        ) : <></>
+        return <InputGroup key={i} className="mb-3" size="lg">
+            {withTooltip(
+                <InputGroup.Text className="input-text">{v.inputText}</InputGroup.Text>, v.tooltip, i, "auto"
+            )}
+            <Form.Control placeholder={v.placeholder} required={v.required} defaultValue={v.defaultValue} min={0}
+                          type={v.type} minLength={v.minLength} maxLength={v.maxLength} aria-label={v.label}/>
+        </InputGroup>
+
     }
 
     const renderModal = (show, title, txType, onFormSub, acc, val, onHide, btnType) => {
@@ -189,7 +203,7 @@ export default function Accounts({keygroup, account, validator}) {
 
 
     if (!keygroup || Object.keys(keygroup).length === 0 || !account.account) {
-        return renderModal(true, "UPLOAD PRIVATE OR CREATE KEY", "pass-and-pk", onImportOrGenerateSubmit)
+        return renderModal(true, "UPLOAD PRIVATE OR CREATE KEY", "pass-and-pk", onImportOrGenerateSubmit, null, null, null, "import-or-generate")
     }
 
     return <>
@@ -206,7 +220,11 @@ export default function Accounts({keygroup, account, validator}) {
                 {title: "EDIT", name: "edit-stake", src: "edit-stake"},
                 {title: "UNSTAKE", name: "unstake", src: "unstake"},
                 {title: "PAUSE", name: "pause", src: "pause"},
-                {title: "PLAY", name: "unpause", src: "unpause"},].map((v, i) => (
+                {title: "PLAY", name: "unpause", src: "unpause"},
+                {title: "SWAP", name: "create_order", src: "swap"},
+                {title: "REPRICE", name: "edit_order", src: "edit_order"},
+                {title: "VOID", name: "delete_order", src: "delete_order"},
+            ].map((v, i) => (
                 <div key={i} className="send-receive-button-container">
                     <img className="send-receive-button" onClick={() => showModal(v.name)} src={"./" + v.src + ".png"}
                          alt="send-button"/>
@@ -216,7 +234,7 @@ export default function Accounts({keygroup, account, validator}) {
             <Row className="account-summary-container">
                 {[
                     {title: "Account Type", info: getAccountType()},
-                    {title: "Account Type", info: getValidatorAmount(), after: " cnpy"},
+                    {title: "Stake Amount", info: getValidatorAmount(), after: " cnpy"},
                     {title: "Staked Status", info: getStakedStatus()}].map((v, i) => (
                     <Col key={i}>
                         <Card className="account-summary-container-card">
@@ -259,7 +277,7 @@ export default function Accounts({keygroup, account, validator}) {
                     {account.combined.slice(0, 5).map((v, i) => (
                         <tr key={i}>
                             <td>{v.height}</td>
-                            <td>{v.transaction.msg.amount}</td>
+                            <td>{v.transaction.msg.amount == null ? (v.transaction.msg.AmountForSale == null ? "N/A":v.transaction.msg.AmountForSale): v.transaction.msg.amount}</td>
                             {renderAccSumTabCol(v.recipient == null ? v.sender : v.recipient, i)}
                             <td>{v.message_type}</td>
                             {renderAccSumTabCol(v.tx_hash, i)}

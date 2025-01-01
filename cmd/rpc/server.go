@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/alecthomas/units"
-	app2 "github.com/canopy-network/canopy/controller"
+	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
@@ -74,8 +74,8 @@ const (
 	PollRouteName                 = "poll"
 	CommitteeRouteName            = "committee"
 	CommitteeDataRouteName        = "committee-data"
-	CommitteesDataRouteName       = "committees-data"
-	SubsidizedCommitteesRouteName = "subsidized-committees"
+	CommitteesDataRouteName       = "Committees-data"
+	SubsidizedCommitteesRouteName = "subsidized-Committees"
 	OrderRouteName                = "order"
 	OrdersRouteName               = "orders"
 	// debug
@@ -119,7 +119,7 @@ const (
 const SoftwareVersion = "0.0.0-alpha"
 
 var (
-	app    *app2.Controller
+	app    *controller.Controller
 	db     *badger.DB
 	conf   lib.Config
 	logger lib.LoggerI
@@ -136,8 +136,8 @@ var (
 		ValidatorsRouteName:           {Method: http.MethodPost, Path: "/v1/query/validators", HandlerFunc: Validators},
 		CommitteeRouteName:            {Method: http.MethodPost, Path: "/v1/query/committee", HandlerFunc: Committee},
 		CommitteeDataRouteName:        {Method: http.MethodPost, Path: "/v1/query/committee-data", HandlerFunc: CommitteeData},
-		CommitteesDataRouteName:       {Method: http.MethodPost, Path: "/v1/query/committees-data", HandlerFunc: CommitteesData},
-		SubsidizedCommitteesRouteName: {Method: http.MethodPost, Path: "/v1/query/subsidized-committees", HandlerFunc: SubsidizedCommittees},
+		CommitteesDataRouteName:       {Method: http.MethodPost, Path: "/v1/query/Committees-data", HandlerFunc: CommitteesData},
+		SubsidizedCommitteesRouteName: {Method: http.MethodPost, Path: "/v1/query/subsidized-Committees", HandlerFunc: SubsidizedCommittees},
 		NonSignersRouteName:           {Method: http.MethodPost, Path: "/v1/query/non-signers", HandlerFunc: NonSigners},
 		ParamRouteName:                {Method: http.MethodPost, Path: "/v1/query/params", HandlerFunc: Params},
 		SupplyRouteName:               {Method: http.MethodPost, Path: "/v1/query/supply", HandlerFunc: Supply},
@@ -209,7 +209,7 @@ const (
 	explorerStaticDir = "web/explorer/out"
 )
 
-func StartRPC(a *app2.Controller, c lib.Config, l lib.LoggerI) {
+func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	cor := cors.New(cors.Options{
 		AllowedOrigins: []string{"http://localhost:" + c.WalletPort, "http://localhost:" + c.ExplorerPort},
 		AllowedMethods: []string{"GET", "OPTIONS", "POST"},
@@ -250,7 +250,6 @@ func StartRPC(a *app2.Controller, c lib.Config, l lib.LoggerI) {
 	//runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
 	//l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
 	//runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
-	//go pollValidators(time.Minute)
 }
 
 func Version(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -581,21 +580,20 @@ func KeystoreGetKeyGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 }
 
 type txRequest struct {
-	Amount          uint64       `json:"amount"`
-	NetAddress      string       `json:"netAddress"`
-	Output          string       `json:"output"`
-	OpCode          string       `json:"opCode"`
-	Fee             uint64       `json:"fee"`
-	Delegate        bool         `json:"delegate"`
-	EarlyWithdrawal bool         `json:"earlyWithdrawal"`
-	Submit          bool         `json:"submit"`
-	ReceiveAmount   uint64       `json:"receiveAmount"`
-	ReceiveAddress  lib.HexBytes `json:"receiveAddress"`
-	OrderId         uint64       `json:"orderId"`
-	Memo            string       `json:"memo"`
-	PollHash        string       `json:"pollHash"`
-	PollURL         string       `json:"pollURL"`
-	PollApprove     bool         `json:"pollApprove"`
+	Amount          uint64          `json:"amount"`
+	NetAddress      string          `json:"netAddress"`
+	Output          string          `json:"output"`
+	OpCode          string          `json:"opCode"`
+	Fee             uint64          `json:"fee"`
+	Delegate        bool            `json:"delegate"`
+	EarlyWithdrawal bool            `json:"earlyWithdrawal"`
+	Submit          bool            `json:"submit"`
+	ReceiveAmount   uint64          `json:"receiveAmount"`
+	ReceiveAddress  lib.HexBytes    `json:"receiveAddress"`
+	OrderId         uint64          `json:"orderId"`
+	Memo            string          `json:"memo"`
+	PollJSON        json.RawMessage `json:"pollJSON"`
+	PollApprove     bool            `json:"pollApprove"`
 	addressRequest
 	passwordRequest
 	txChangeParamRequest
@@ -626,7 +624,7 @@ func TransactionStake(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		if err != nil {
 			return nil, err
 		}
-		committees, err := StringToCommittees(ptr.committees)
+		committees, err := StringToCommittees(ptr.Committees)
 		if err != nil {
 			return nil, err
 		}
@@ -640,7 +638,7 @@ func TransactionEditStake(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if err != nil {
 			return nil, err
 		}
-		committees, err := StringToCommittees(ptr.committees)
+		committees, err := StringToCommittees(ptr.Committees)
 		if err != nil {
 			return nil, err
 		}
@@ -694,7 +692,7 @@ func TransactionDAOTransfer(w http.ResponseWriter, r *http.Request, _ httprouter
 func TransactionSubsidy(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		committeeId := uint64(0)
-		if c, err := StringToCommittees(ptr.committees); err == nil {
+		if c, err := StringToCommittees(ptr.Committees); err == nil {
 			committeeId = c[0]
 		}
 		return types.NewSubsidyTx(p, ptr.Amount, committeeId, ptr.OpCode, ptr.Fee, ptr.Memo)
@@ -704,7 +702,7 @@ func TransactionSubsidy(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 func TransactionCreateOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		committeeId := uint64(0)
-		if c, err := StringToCommittees(ptr.committees); err == nil {
+		if c, err := StringToCommittees(ptr.Committees); err == nil {
 			committeeId = c[0]
 		}
 		return types.NewCreateOrderTx(p, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee, ptr.Memo)
@@ -714,7 +712,7 @@ func TransactionCreateOrder(w http.ResponseWriter, r *http.Request, _ httprouter
 func TransactionEditOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		committeeId := uint64(0)
-		if c, err := StringToCommittees(ptr.committees); err == nil {
+		if c, err := StringToCommittees(ptr.Committees); err == nil {
 			committeeId = c[0]
 		}
 		return types.NewEditOrderTx(p, ptr.OrderId, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee, ptr.Memo)
@@ -724,7 +722,7 @@ func TransactionEditOrder(w http.ResponseWriter, r *http.Request, _ httprouter.P
 func TransactionDeleteOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		committeeId := uint64(0)
-		if c, err := StringToCommittees(ptr.committees); err == nil {
+		if c, err := StringToCommittees(ptr.Committees); err == nil {
 			committeeId = c[0]
 		}
 		return types.NewDeleteOrderTx(p, ptr.OrderId, committeeId, ptr.Fee, ptr.Memo)
@@ -733,13 +731,13 @@ func TransactionDeleteOrder(w http.ResponseWriter, r *http.Request, _ httprouter
 
 func TransactionStartPoll(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewStartPollTransaction(p, ptr.PollHash, ptr.PollHash, ptr.EndBlock, ptr.Fee)
+		return types.NewStartPollTransaction(p, ptr.PollJSON, ptr.Fee)
 	})
 }
 
 func TransactionVotePoll(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewVotePollTransaction(p, ptr.PollHash, ptr.PollApprove, ptr.Fee)
+		return types.NewVotePollTransaction(p, ptr.PollJSON, ptr.PollApprove, ptr.Fee)
 	})
 }
 
@@ -913,7 +911,7 @@ func ResourceUsage(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) 
 // updatePollResults() updates the poll results based on the current token power
 func updatePollResults() {
 	for {
-		var p types.ActivePolls
+		p := new(types.ActivePolls)
 		if err := func() (err error) {
 			if err = p.NewFromFile(conf.DataDirPath); err != nil {
 				return
@@ -1152,7 +1150,7 @@ type addressRequest struct {
 }
 
 type committeesRequest struct {
-	committees string
+	Committees string
 }
 
 func StringToCommittees(s string) (committees []uint64, err error) {

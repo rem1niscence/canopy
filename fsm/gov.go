@@ -261,7 +261,7 @@ func (s *StateMachine) getParams(space string, ptr any, emptyErr func() lib.Erro
 }
 
 // PollsToResults() coverts the polling objects to a compressed result based on the voting power
-func (s *StateMachine) PollsToResults(polls types.ActivePolls) (result types.Poll, err lib.ErrorI) {
+func (s *StateMachine) PollsToResults(polls *types.ActivePolls) (result types.Poll, err lib.ErrorI) {
 	result = make(types.Poll)
 	// create caches to span over multiple
 	accountCache, valList := map[string]uint64{}, map[string]uint64{} // address -> power (tokens)
@@ -275,6 +275,11 @@ func (s *StateMachine) PollsToResults(polls types.ActivePolls) (result types.Pol
 	if err != nil {
 		return
 	}
+	// get the dao account
+	dao, err := s.GetPool(lib.DAOPoolID)
+	if err != nil {
+		return
+	}
 	// add the canopy validators to the cache
 	for _, member := range members.ValidatorSet.ValidatorSet {
 		public, _ := crypto.NewPublicKeyFromBytes(member.PublicKey)
@@ -284,7 +289,8 @@ func (s *StateMachine) PollsToResults(polls types.ActivePolls) (result types.Pol
 	for proposalHash, addresses := range polls.Polls {
 		r := types.PollResult{
 			ProposalHash: proposalHash,
-			Accounts:     types.VoteStats{TotalTokens: supply.Total},
+			ProposalURL:  polls.PollMeta[proposalHash].Url,
+			Accounts:     types.VoteStats{TotalTokens: supply.Total - supply.Staked - dao.Amount},
 			Validators:   types.VoteStats{TotalTokens: members.TotalPower},
 		}
 		// for each vote

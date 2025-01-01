@@ -3,15 +3,26 @@ import Truncate from 'react-truncate-inside';
 import Container from "react-bootstrap/Container";
 import JsonView from "@uiw/react-json-view";
 import Form from 'react-bootstrap/Form';
-import {PieChart, Pie, ResponsiveContainer, Cell,} from 'recharts';
 import {Accordion, Button, Carousel, Col, InputGroup, Modal, Row, Spinner, Table} from "react-bootstrap";
-import {AddVote, DelVote, Params, Poll, Proposals, RawTx, TxChangeParameter, TxDAOTransfer} from "@/components/api";
+import {AddVote, DelVote, Params, Poll, Proposals, RawTx, StartPoll, TxChangeParameter, TxDAOTransfer, VotePoll} from "@/components/api";
 import {copy, getFormInputs, objEmpty, onFormSubmit, placeholders, renderToast, withTooltip} from "@/components/util";
+import React from 'react';
+import {Bar} from 'react-chartjs-2';
+import {
+    Chart as ChartJS,
+    BarElement,
+    CategoryScale,
+    LinearScale,
+    Tooltip,
+    Legend,
+} from 'chart.js';
+
+ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 export default function Governance({account: accountWithTxs}) {
     const [state, setState] = useState({
-        txResult: {}, rawTx: {}, showModal: false, apiResults: {}, paramSpace: "", voteAccord: "1",
-        propAccord: "1", txPropType: 0, toast: "", voteJSON: {},
+        txResult: {}, rawTx: {}, showPropModal: false, apiResults: {}, paramSpace: "", voteOnPollAccord: "1", voteOnProposalAccord: "1",
+        propAccord: "1", txPropType: 0, toast: "", voteJSON: {}, pwd: "",
     })
     const queryAPI = () => {
         Promise.all([Poll(), Proposals(), Params(0)]).then((r => {
@@ -28,33 +39,36 @@ export default function Governance({account: accountWithTxs}) {
     }
     if (objEmpty(state.apiResults.poll)) {
         state.apiResults.poll = placeholders.poll
+    } else {
+        state.apiResults.poll["PLACEHOLDER EXAMPLE"] = placeholders.poll["PLACEHOLDER EXAMPLE"]
     }
     if (objEmpty(state.apiResults.proposals)) {
         state.apiResults.proposals = placeholders.proposals
     }
-    const addVoteAPI = (json, approve) => AddVote(json, approve).then(_ => setState({...state, voteAccord: "1", toast: "Voted!"}))
-    const delVoteAPI = (json) => DelVote(json).then(_ => setState({...state, voteAccord: "1", toast: "Deleted!"}))
-    const handleClose = () => setState({...state, paramSpace: "", txResult: {}, showModal: false})
-    const handleOpen = (type) => setState({...state, txPropType: type, paramSpace: "", txResult: {}, showModal: true})
+    const addVoteAPI = (json, approve) => AddVote(json, approve).then(_ => setState({...state, voteOnProposalAccord: "1", toast: "Voted!"}))
+    const delVoteAPI = (json) => DelVote(json).then(_ => setState({...state, voteOnProposalAccord: "1", toast: "Deleted!"}))
+    const startPollAPI = (address, json, password) => StartPoll(address, json, password).then(_ => setState({...state, voteOnPollAccord: "1", toast: "Started Poll!"}))
+    const votePollAPI = (address, json, approve, password) => VotePoll(address, json, approve, password).then(_ => setState({...state, voteOnPollAccord: "1", toast: "Voted!"}))
+    const handleClose = () => setState({...state, paramSpace: "", txResult: {}, showPropModal: false})
+    const handlePropOpen = (type) => setState({...state, txPropType: type, showPropModal: true, paramSpace: "", txResult: {}})
     const sendRawTx = (j) => RawTx(j).then(r => {
-        console.log(r)
         copy(state, setState, r, "tx hash copied to keyboard!")
     })
-    const createDAOTransferTx = (address, amount, startBlock, endBlock, seq, fee, password) => {
-        TxDAOTransfer(address, amount, startBlock, endBlock, seq, fee, password, false).then(res => {
+    const createDAOTransferTx = (address, amount, startBlock, endBlock, memo, fee, password) => {
+        TxDAOTransfer(address, amount, startBlock, endBlock, memo, fee, password, false).then(res => {
             setState({...state, txResult: res})
         })
     }
-    const createParamChangeTx = (address, paramSpace, paramKey, paramValue, startBlock, endBlock, seq, fee, password) => {
-        TxChangeParameter(address, paramSpace, paramKey, paramValue, startBlock, endBlock, seq, fee, password, false).then(res => {
+    const createParamChangeTx = (address, paramSpace, paramKey, paramValue, startBlock, endBlock, memo, fee, password) => {
+        TxChangeParameter(address, paramSpace, paramKey, paramValue, startBlock, endBlock, memo, fee, password, false).then(res => {
             setState({...state, txResult: res})
         })
     }
-    const onSubmit = (e) => onFormSubmit(state, e, (r) => {
+    const onPropSubmit = (e) => onFormSubmit(state, e, (r) => {
         if (state.txPropType === 0) {
-            createParamChangeTx(r.sender, r.param_space, r.param_key, r.param_value, r.start_block, r.end_block, r.sequence, r.fee, r.password)
+            createParamChangeTx(r.sender, r.param_space, r.param_key, r.param_value, r.start_block, r.end_block, r.memo, r.fee, r.password)
         } else {
-            createDAOTransferTx(r.sender, r.amount, r.start_block, r.end_block, r.sequence, r.fee, r.password)
+            createDAOTransferTx(r.sender, r.amount, r.start_block, r.end_block, r.memo, r.fee, r.password)
         }
     })
     const renderJSONViewer = () => (
@@ -70,16 +84,6 @@ export default function Governance({account: accountWithTxs}) {
             </Button>
         </>
     )
-    const renderPiLabel = ({cx, cy, midAngle, innerRadius, outerRadius, percent, idx}) => {
-        const radius = innerRadius + (outerRadius - innerRadius) * 0.15, c = idx === 0
-        const x = cx + radius * Math.cos(-midAngle * Math.PI / 180)
-        const y = cy + radius * Math.sin(-midAngle * Math.PI / 180)
-        return (
-            <text className="pi-label" x={x} y={y - 5} textAnchor={x > cx ? 'start' : 'end'} fill={c ? "#ebebeb" : "#222222"}>
-                {c ? "YES: " : "NO: " + `${(percent * 100).toFixed(0)}%`}
-            </text>
-        )
-    }
     const renderHeader = (title, img) => (
         <>
             <img className="governance-header-image" alt="vote" src={img}/>
@@ -89,7 +93,7 @@ export default function Governance({account: accountWithTxs}) {
             <br/><br/>
         </>
     )
-    const renderAccord = (title, keyName, targetName, buttons, placeholder = placeholders.params) => {
+    const renderAccord = (title, keyName, targetName, buttons, showPwd, placeholder = placeholders.params) => {
         let s = {...state}, activeKey = state[keyName], ph = JSON.stringify(placeholder, null, "  ")
         const onSelect = (i) => {
             s[keyName] = i
@@ -99,11 +103,19 @@ export default function Governance({account: accountWithTxs}) {
             s[targetName] = e.target.value
             setState({...s, voteJSON: e.target.value})
         }
+        const onPwdChange = (e) => {
+            setState({...s, pwd: e.target.value})
+        }
         return <Accordion className="accord" activeKey={activeKey} onSelect={onSelect}>
             <Accordion.Item className="accord-item" eventKey="0">
                 <Accordion.Header>{title}</Accordion.Header>
                 <Accordion.Body>
-                    <Form.Control className="accord-body-container" placeholder={ph} as="textarea" onChange={onChange}/>
+                    <Form.Control className="accord-body-container" defaultValue={ph} as="textarea" onChange={onChange}/>
+                    <br/>
+                    <InputGroup style={{display: showPwd ? "" : "none"}} className="accord-pass-container" size="lg">
+                        <InputGroup.Text>Password</InputGroup.Text>
+                        <Form.Control onChange={onPwdChange} required={true} type={"password"}/>
+                    </InputGroup>
                     {buttons.map((k) => (
                         <Button className="propose-button" onClick={k.onClick} variant="outline-dark">{k.title}</Button>
                     ))}
@@ -117,39 +129,50 @@ export default function Governance({account: accountWithTxs}) {
             <Carousel className="poll-carousel" interval={null} data-bs-theme="dark">
                 {Array.from(Object.entries(state.apiResults.poll)).map((entry, idx) => {
                     const [key, val] = entry;
-                    const pollData = [
-                        {"name": 'YES', "value": val.approvedPower, "color": "#7749c0"},
-                        {"name": 'NO', "value": val.rejectedPower, "color": "#FFF"},
-                    ]
                     return <Carousel.Item key={idx}>
+                        <h6 className="poll-prop-hash">{val.proposalHash}</h6>
+                        <a href={val.proposalURL} className="poll-prop-url">{val.proposalURL}</a>
                         <Container className="poll-carousel-container" fluid>
-                            <Row>
-                                <Col className="poll-column">
-                                    <h6 className="poll-prop-name"><Truncate text={"PROPOSAL: #" + key}/></h6>
-                                    <div className="poll-container">
-                                        <Form.Control className="poll-form" as="textarea" value={JSON.stringify(val.proposalJSON, null, 2)}
-                                                      onClick={() => copy(state, setState, JSON.stringify(val.proposalJSON, null, 2))}
-                                        />
-                                    </div>
-                                </Col>
-                                <Col className="poll-column">
-                                    <h6 className="poll-prop-name" id="poll-pi-header">{"Reporting: " + val.totalVotedPercent + "%"}</h6>
-                                    <ResponsiveContainer height={385}>
-                                        <PieChart style={{margin: "0 auto"}}>
-                                            <Pie data={pollData} cx="50%" cy="32%" labelLine={false} label={renderPiLabel} outerRadius={105}>
-                                                {pollData.map((e, i) => (
-                                                    <Cell className="pi-cell" key={`cell-${i}`} fill={e.color}/>
-                                                ))}
-                                            </Pie>
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </Col>
-                            </Row>
+                            <Bar data={{
+                                labels: [val.accounts.votedPercent + '% Accounts Reporting', val.validators.votedPercent + '% Validators Reporting'], // Categories
+                                datasets: [
+                                    {
+                                        label: '% Voted YES',
+                                        data: [val.accounts.approvedPercent, val.validators.approvedPercent],
+                                        backgroundColor: '#7749c0',
+                                    },
+                                    {
+                                        label: '% Voted NO',
+                                        data: [val.accounts.rejectPercent, val.validators.rejectPercent],
+                                        backgroundColor: '#000',
+                                    },
+                                ],
+                            }} options={{
+                                responsive: true,
+                                plugins: {
+                                    tooltip: {
+                                        enabled: true, // Enable tooltips for more detail
+                                    },
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        max: 100, // Percentage scale
+                                    },
+                                },
+                            }}/>
+                            <br/>
                         </Container>
                     </Carousel.Item>
                 })}
             </Carousel>
-            {renderHeader("vote", "./vote.png")}
+            <br/>
+            {renderAccord("START OR VOTE ON POLL", "voteOnPollAccord", "voteJSON", [
+                {title: "START NEW", onClick: () => startPollAPI(accountWithTxs.account.address, state.voteJSON, state.pwd)},
+                {title: "APPROVE", onClick: () => votePollAPI(accountWithTxs.account.address, state.voteJSON, true, state.pwd)},
+                {title: "REJECT", onClick: () => votePollAPI(accountWithTxs.account.address, state.voteJSON, false, state.pwd)},
+            ], true, placeholders.pollJSON)}
+            {renderHeader("propose", "./proposal.png")}
             <Table className="vote-table" bordered responsive hover>
                 <thead>
                 <tr>
@@ -173,21 +196,21 @@ export default function Governance({account: accountWithTxs}) {
                 }))}
                 </tbody>
             </Table>
-            {renderAccord("VOTE ON PROPOSAL", "voteAccord", "voteJSON", [
+            {renderAccord("VOTE ON PROPOSAL", "voteOnProposalAccord", "voteJSON", [
                 {title: "APPROVE", onClick: () => addVoteAPI(state.voteJSON, true)},
                 {title: "REJECT", onClick: () => addVoteAPI(state.voteJSON, false)},
                 {title: "DELETE", onClick: () => delVoteAPI(state.voteJSON)},
-            ])}
+            ], false)}
             {renderToast(state, setState)}
-            {renderHeader("propose", "./proposal.png")}
+            <br/>
             {renderAccord("EXISTING PROPOSAL", "propAccord", "rawTx", [
                 {title: "SUBMIT", onClick: () => sendRawTx(state.rawTx)}
-            ], placeholders.rawTx)}
-            <Button className="propose-button" onClick={() => handleOpen(0)} variant="outline-dark">New Protocol Change</Button>
-            <Button className="propose-button" onClick={() => handleOpen(1)} variant="outline-dark">New Treasury Subsidy</Button>
+            ], false, placeholders.rawTx)}
+            <Button className="propose-button" onClick={() => handlePropOpen(0)} variant="outline-dark">New Protocol Change</Button>
+            <Button className="propose-button" onClick={() => handlePropOpen(1)} variant="outline-dark">New Treasury Subsidy</Button>
             <br/><br/>
-            <Modal show={state.showModal} size="lg" onHide={handleClose}>
-                <Form onSubmit={onSubmit}>
+            <Modal show={state.showPropModal} size="lg" onHide={handleClose}>
+                <Form onSubmit={onPropSubmit}>
                     <Modal.Header closeButton>
                         <Modal.Title>{state.txPropType === 0 ? "Change Parameter" : "Treasury Subsidy"}</Modal.Title>
                     </Modal.Header>

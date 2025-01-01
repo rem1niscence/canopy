@@ -334,8 +334,6 @@ func (p *Plugin) HandleTx(tx []byte) lib.ErrorI {
 // - atomically writes all to the underlying db
 // - sets up the app for the next height
 func (p *Plugin) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
-	start := time.Now()
-	defer lib.TimeTrack(start)
 	// reset the store once this code finishes
 	// NOTE: if code execution gets to `store.Commit()` - this will effectively be a noop
 	defer func() { p.FSM.Reset() }()
@@ -497,12 +495,6 @@ func (p *Plugin) ParsePolls(b *lib.Block) {
 	var ap types.ActivePolls
 	// load the active polls from the json file
 	if err := ap.NewFromFile(p.Config.DataDirPath); err == nil {
-		var fee uint64
-		// get the fee for the message
-		fee, err = p.FSM.GetFeeForMessage(&types.MessageSend{})
-		if err != nil {
-
-		}
 		// for each transaction in the block
 		for _, transaction := range b.Transactions {
 			// unmarshal the transaction
@@ -513,10 +505,10 @@ func (p *Plugin) ParsePolls(b *lib.Block) {
 			if e != nil {
 				break
 			}
-			// get the fee multiplier
-			feeX := int(float64(tx.Fee) / float64(fee))
 			// check for a poll transaction
-			ap.CheckForPollTransaction(pub.Address(), tx.Memo, feeX, p.Height(), p.Config.DataDirPath)
+			if err = ap.CheckForPollTransaction(pub.Address(), tx.Memo, p.Height(), p.Config.DataDirPath); err != nil {
+				p.log.Error(err.Error())
+			}
 		}
 		// save to
 		if err = ap.SaveToFile(p.Config.DataDirPath); err != nil {

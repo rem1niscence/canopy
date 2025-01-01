@@ -102,11 +102,18 @@ func (s *StateMachine) DistributeCommitteeRewards() lib.ErrorI {
 		if e != nil {
 			return e
 		}
+		var totalDistributed uint64
 		// for each payment percent issued
 		for _, stub := range data.PaymentPercents {
-			if err = s.DistributeCommitteeReward(stub, rewardPool.Amount, data.NumberOfSamples, paramsVal); err != nil {
-				return err
+			distributed, er := s.DistributeCommitteeReward(stub, rewardPool.Amount, data.NumberOfSamples, paramsVal)
+			if er != nil {
+				return er
 			}
+			totalDistributed += distributed
+		}
+		// ensure the non-distributed (burned) is removed from the 'total supply'
+		if err = s.SubFromTotalSupply(rewardPool.Amount - totalDistributed); err != nil {
+			return err
 		}
 		// zero out the reward pool
 		rewardPool.Amount = 0
@@ -125,7 +132,7 @@ func (s *StateMachine) DistributeCommitteeRewards() lib.ErrorI {
 }
 
 // DistributeCommitteeReward() issues a single committee reward unit based on an individual 'Payment Stub'
-func (s *StateMachine) DistributeCommitteeReward(stub *lib.PaymentPercents, rewardPoolAmount, numberOfSamples uint64, valParams *types.ValidatorParams) lib.ErrorI {
+func (s *StateMachine) DistributeCommitteeReward(stub *lib.PaymentPercents, rewardPoolAmount, numberOfSamples uint64, valParams *types.ValidatorParams) (distributed uint64, err lib.ErrorI) {
 	address := crypto.NewAddress(stub.Address)
 	// full_reward = truncate ( percentage / number_of_samples * available_reward )
 	fullReward := uint64(float64(stub.Percent) / float64(numberOfSamples*100) * float64(rewardPoolAmount))
@@ -135,14 +142,15 @@ func (s *StateMachine) DistributeCommitteeReward(stub *lib.PaymentPercents, rewa
 	validator, _ := s.GetValidator(address)
 	// if non validator, send EarlyWithdrawalReward to the address
 	if validator == nil {
-		return s.AccountAdd(address, earlyWithdrawalReward)
+		// add directly to the account
+		return earlyWithdrawalReward, s.AccountAdd(address, earlyWithdrawalReward)
 	}
 	// if validator and compounding, send full reward to the stake of the validator
 	if validator.Compound && validator.UnstakingHeight == 0 {
-		return s.UpdateValidatorStake(validator, validator.Committees, fullReward)
+		return fullReward, s.UpdateValidatorStake(validator, validator.Committees, fullReward)
 	}
 	// if validator is not compounding, send earlyWithdrawalReward reward to the output address of the validator
-	return s.AccountAdd(crypto.NewAddress(validator.Output), earlyWithdrawalReward)
+	return earlyWithdrawalReward, s.AccountAdd(crypto.NewAddress(validator.Output), earlyWithdrawalReward)
 }
 
 // GetCommitteeMembers() retrieves the ValidatorSet that is responsible for the 'committeeId'

@@ -105,10 +105,13 @@ func waitForKill() {
 	l.Infof("Exit command %s received", s)
 }
 
+// InitializeDataDirectory() populates the data directory with configuration and data files if missing
 func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config, privateValKey crypto.PrivateKeyI) {
+	// make the data dir if missing
 	if err := os.MkdirAll(dataDirPath, os.ModePerm); err != nil {
 		panic(err)
 	}
+	// make the config.json file if missing
 	configFilePath := filepath.Join(dataDirPath, lib.ConfigFilePath)
 	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
 		log.Infof("Creating %s file", lib.ConfigFilePath)
@@ -116,6 +119,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			panic(err)
 		}
 	}
+	// make the private key file if missing
 	privateValKeyPath := filepath.Join(dataDirPath, lib.ValKeyPath)
 	if _, err := os.Stat(privateValKeyPath); errors.Is(err, os.ErrNotExist) {
 		blsPrivateKey, _ := crypto.NewBLS12381PrivateKey()
@@ -124,8 +128,10 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			panic(err)
 		}
 	}
+	// make the proposals.json file if missing
 	if _, err := os.Stat(filepath.Join(dataDirPath, lib.ProposalsFilePath)); errors.Is(err, os.ErrNotExist) {
 		log.Infof("Creating %s file", lib.ProposalsFilePath)
+		// create an example proposal
 		proposals := make(types.GovProposals)
 		a, _ := lib.NewAny(&lib.StringWrapper{Value: "example"})
 		if err = proposals.Add(&types.MessageChangeParameter{
@@ -142,30 +148,45 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			panic(err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(dataDirPath, lib.PollsFilePath)); errors.Is(err, os.ErrNotExist) {
+	// load the private key object
+	privateValKey, err := crypto.NewBLS12381PrivateKeyFromFile(privateValKeyPath)
+	if err != nil {
+		panic(err)
+	}
+	// make the poll.json file if missing
+	if _, err = os.Stat(filepath.Join(dataDirPath, lib.PollsFilePath)); errors.Is(err, os.ErrNotExist) {
 		log.Infof("Creating %s file", lib.PollsFilePath)
-		polls := types.ActivePolls{
-			Polls:    map[string]map[string]bool{},
-			PollMeta: map[string]*types.StartPoll{},
+		// create an example poll
+		examplePollHash := crypto.HashString([]byte("example"))
+		polls := &types.ActivePolls{
+			Polls: map[string]map[string]bool{
+				examplePollHash: {privateValKey.PublicKey().Address().String(): true},
+			},
+			PollMeta: map[string]*types.StartPoll{
+				examplePollHash: {
+					StartPoll: examplePollHash,
+					Url:       "https://forum.cnpy.network/something",
+					EndHeight: 1000000000000,
+				},
+			},
 		}
 		if err = polls.SaveToFile(dataDirPath); err != nil {
 			panic(err)
 		}
 	}
-	privateValKey, err := crypto.NewBLS12381PrivateKeyFromFile(privateValKeyPath)
-	if err != nil {
-		panic(err)
-	}
-	c, err = lib.NewConfigFromFile(configFilePath)
-	if err != nil {
-		panic(err)
-	}
-	c.DataDirPath = dataDirPath
+	// create the genesis file if missing
 	genesisFilePath := filepath.Join(dataDirPath, lib.GenesisFilePath)
 	if _, err = os.Stat(genesisFilePath); errors.Is(err, os.ErrNotExist) {
 		log.Infof("Creating %s file", lib.GenesisFilePath)
 		WriteDefaultGenesisFile(privateValKey, genesisFilePath)
 	}
+	// load the config object
+	c, err = lib.NewConfigFromFile(configFilePath)
+	if err != nil {
+		panic(err)
+	}
+	// set the data-directory
+	c.DataDirPath = dataDirPath
 	return
 }
 

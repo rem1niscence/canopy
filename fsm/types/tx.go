@@ -154,6 +154,7 @@ func NewTransaction(pk crypto.PrivateKeyI, msg lib.MessageI, fee uint64, memo st
 		Signature:   nil,
 		Time:        uint64(time.Now().UnixMicro()), // stateless, prune friendly - replay / hash-collision protection
 		Fee:         fee,
+		Memo:        memo,
 	}
 	return tx, tx.Sign(pk)
 }

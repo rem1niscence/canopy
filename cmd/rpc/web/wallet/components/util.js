@@ -59,7 +59,7 @@ export function getFormInputs(type, account, validator) {
         amount: {
             "placeholder": "amount value for the tx",
             "defaultValue": amount,
-            "tooltip": "required: the amount of currency being sent",
+            "tooltip": "required: the amount of currency being sent / sold",
             "label": "amount",
             "inputText": "amount",
             "feedback": "please choose an amount for the tx",
@@ -67,6 +67,51 @@ export function getFormInputs(type, account, validator) {
             "type": "number",
             "minLength": 1,
             "maxLength": 100,
+        },
+        receiveAmount: {
+            "placeholder": "amount of counter asset to receive",
+            "defaultValue": amount,
+            "tooltip": "required: the amount of counter asset being received",
+            "label": "receiveAmount",
+            "inputText": "rec-amount",
+            "feedback": "please choose a receive amount for the tx",
+            "required": true,
+            "type": "number",
+            "minLength": 1,
+            "maxLength": 100,
+        },
+        orderId: {
+            "placeholder": "the id of the existing order",
+            "tooltip": "required: the unique identifier of the order",
+            "label": "orderId",
+            "inputText": "order-id",
+            "feedback": "please input an order id",
+            "required": true,
+            "type": "number",
+            "minLength": 1,
+            "maxLength": 100,
+        },
+        committeeId: {
+            "placeholder": "the id of the committee / counter asset",
+            "tooltip": "required: the unique identifier of the committee / counter asset",
+            "label": "committeeId",
+            "inputText": "commit-Id",
+            "feedback": "please input a committeeId id",
+            "required": true,
+            "type": "number",
+            "minLength": 1,
+            "maxLength": 100,
+        },
+        receiveAddress: {
+            "placeholder": "the address where the counter asset will be sent",
+            "tooltip": "required: the sender of the transaction",
+            "label": "receiveAddress",
+            "inputText": "rec-addr",
+            "feedback": "please choose an address to receive the counter asset to",
+            "required": true,
+            "type": "text",
+            "minLength": 40,
+            "maxLength": 40,
         },
         output: {
             "placeholder": "output of the node",
@@ -140,17 +185,15 @@ export function getFormInputs(type, account, validator) {
             "minLength": 0,
             "maxLength": 40,
         },
-        seq: {
-            "placeholder": "opt: sequence num of account",
+        memo: {
+            "placeholder": "opt: note attached with the transaction",
             "defaultValue": "",
-            "tooltip": "a sequential number that helps prevent replay attacks. blank = default",
-            "label": "sequence",
-            "inputText": "sequence",
-            "feedback": "please choose a valid number",
+            "tooltip": "an optional note attached to the transaction - blank is recommended",
+            "label": "memo",
+            "inputText": "memo",
             "required": false,
-            "type": "number",
             "minLength": 0,
-            "maxLength": 40,
+            "maxLength": 200,
         },
         fee: {
             "placeholder": "opt: transaction fee",
@@ -179,15 +222,21 @@ export function getFormInputs(type, account, validator) {
     }
     switch (type) {
         case "send":
-            return [a.address, a.rec, a.amount, a.seq, a.fee, a.password]
+            return [a.address, a.rec, a.amount, a.memo, a.fee, a.password]
         case "stake":
-            return [a.address, a.netAddr, a.amount, a.output, a.seq, a.fee, a.password]
+            return [a.address, a.netAddr, a.amount, a.output, a.memo, a.fee, a.password]
+        case "create_order":
+            return [a.address, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password]
+        case "edit_order":
+            return [a.address, a.committeeId, a.orderId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password]
+        case "delete_order":
+            return [a.address, a.committeeId, a.orderId, a.memo, a.fee, a.password]
         case "edit-stake":
-            return [a.address, a.netAddr, a.amount, a.output, a.seq, a.fee, a.password]
+            return [a.address, a.netAddr, a.amount, a.output, a.memo, a.fee, a.password]
         case "change-param":
-            return [a.address, a.paramSpace, a.paramKey, a.paramValue, a.startBlock, a.endBlock, a.seq, a.fee, a.password]
+            return [a.address, a.paramSpace, a.paramKey, a.paramValue, a.startBlock, a.endBlock, a.memo, a.fee, a.password]
         case "dao-transfer":
-            return [a.address, a.amount, a.startBlock, a.endBlock, a.seq, a.fee, a.password]
+            return [a.address, a.amount, a.startBlock, a.endBlock, a.memo, a.fee, a.password]
         case "pass-and-addr":
             return [a.address, a.password]
         case "pass-and-pk":
@@ -195,37 +244,31 @@ export function getFormInputs(type, account, validator) {
         case "pass-only":
             return [a.password]
         default:
-            return [a.address, a.seq, a.fee, a.password]
+            return [a.address, a.memo, a.fee, a.password]
     }
 }
 
 export const placeholders = {
     poll: {
-        "2cbb73b8abdacf233f4c9b081991f1692145624a95004f496a95d3cce4d492a3": {
-            "proposalJSON": {
-                "parameter_space": "cons|fee|val|gov",
-                "parameter_key": "protocol_version",
-                "parameter_value": "example",
-                "start_height": 1,
-                "end_height": 1000000,
-                "signer": "4646464646464646464646464646464646464646464646464646464646464646"
+        "PLACEHOLDER EXAMPLE": {
+            "proposalHash": "PLACEHOLDER EXAMPLE",
+            "proposalURL": "https://discord.com/channels/1310733928436600912/1323330593701761204",
+            "accounts": {
+                "approvedPercent": 38,
+                "rejectPercent": 62,
+                "votedPercent": 35
             },
-            "approvedPower": 1000000000000000000,
-            "approvedPercent": 100,
-            "rejectedPercent": 0,
-            "totalVotedPercent": 100,
-            "rejectedPower": 0,
-            "totalVotedPower": 1000000000000000000,
-            "totalPower": 1000000000000000000,
-            "approveVotes": null,
-            "rejectVotes": [
-                {
-                    "public_key": "a0807d42a5adfa6ef8ac3cac37a2651e838407b20986db170c5caa88b9c0c7b77e7b3ededd75242261fa6cbc3d7b0165",
-                    "voting_power": 1000000000000000000,
-                    "net_address": "http://localhost:9000"
-                }
-            ]
+            "validators": {
+                "approvedPercent": 76,
+                "rejectPercent": 24,
+                "votedPercent": 77
+            }
         }
+    },
+    pollJSON: {
+        "proposal": "canopy network is the best",
+        "endBlock": 100,
+        "URL": "https://discord.com/link-to-thread"
     },
     proposals: {
         "2cbb73b8abdacf233f4c9b081991f1692145624a95004f496a95d3cce4d492a4": {
@@ -262,7 +305,7 @@ export const placeholders = {
             "public_key": "a88b9c0c7b77e7f8ac...",
             "signature": "8f6d016d04e350..."
         },
-        "sequence": 1,
+        "memo": "",
         "fee": 10000
     }
 
