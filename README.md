@@ -60,7 +60,7 @@ Flags:
 
 <p align="center">To run Canopy unit tests, use the Go testing tools:</p>
 
-<pre><code>go test ./...</code></pre>
+<pre><code>make test</code></pre>
 
 <h1 align="center">How to contribute</h1>
 
@@ -93,7 +93,7 @@ Flags:
 
 <p align="center">To build the project, run the following command:</p>
 
-<pre><code>go build -o ~/go/bin/canopy ./cmd/cli/...</code></pre>
+<pre><code>make build</code></pre>
 
 <h1 align="center">Contact</h1>
 <div align="center">
