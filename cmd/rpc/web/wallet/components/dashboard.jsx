@@ -1,74 +1,65 @@
-import {useEffect, useState} from "react";
-import dynamic from "next/dynamic";
-import Truncate from 'react-truncate-inside';
-import {formatNumber, getRatio} from "@/components/util";
-import Container from "react-bootstrap/Container";
-import {Button, Card, Carousel, Col, Row, Spinner} from "react-bootstrap";
-import {YAxis, Tooltip, Legend, AreaChart, Area,} from 'recharts';
-import {
-    adminRPCURL, configPath, ConsensusInfo, consensusInfoPath, Logs, logsPath,
-    peerBookPath, PeerInfo, peerInfoPath, Resource,
-} from "@/components/api";
+import {useEffect, useState} from "react"
+import dynamic from "next/dynamic"
+import Truncate from 'react-truncate-inside'
+import {formatNumber, getRatio} from "@/components/util"
+import Container from "react-bootstrap/Container"
+import {Button, Card, Carousel, Col, Row, Spinner} from "react-bootstrap"
+import {YAxis, Tooltip, Legend, AreaChart, Area,} from 'recharts'
+import {adminRPCURL, configPath, ConsensusInfo, consensusInfoPath, Logs, logsPath, peerBookPath, PeerInfo, peerInfoPath, Resource} from "@/components/api"
 
 const LazyLog = dynamic(() => import('react-lazylog').then((mod) => mod.LazyLog), {ssr: false})
 
+// Dashboard() is the main component of this file
 export default function Dashboard() {
     const [state, setState] = useState({logs: "retrieving logs...", pauseLogs: false, resource: [], consensusInfo: {}, peerInfo: {}})
 
-    const queryAPI = () => {
-        let promises = [ConsensusInfo(), PeerInfo(), Resource()]
-        if (!state.pauseLogs) {
-            promises.push(Logs())
-        }
-        Promise.all(promises).then((v) => {
-            let res
-            if (state.resource.length >= 30) {
-                const [del, ...nextResource] = state.resource;
-                res = [...nextResource, v[2]]
-            } else {
-                res = [...state.resource, v[2]]
-            }
-            if (!state.pauseLogs) {
-                setState({...state, consensusInfo: v[0], peerInfo: v[1], logs: v[3].toString(), resource: res})
-                return
-            }
-            setState({...state, consensusInfo: v[0], peerInfo: v[1], resource: res})
+    // queryAPI() executes the page api calls
+    function queryAPI() {
+        const promises = [ConsensusInfo(), PeerInfo(), Resource()]
+        if (!state.pauseLogs) promises.push(Logs())
+
+        Promise.all(promises).then(([consensusInfo, peerInfo, resource, logs]) => {
+            setState((prevState) => {
+                const updatedResource = prevState.resource.length >= 30
+                    ? [...prevState.resource.slice(1), resource]
+                    : [...prevState.resource, resource]
+
+                return {
+                    ...prevState,
+                    consensusInfo,
+                    peerInfo,
+                    resource: updatedResource,
+                    ...(prevState.pauseLogs ? {} : {logs: logs.toString()}),
+                }
+            })
         })
     }
 
-    const getRoundProgress = (consensusInfo) => {
-        switch (consensusInfo.view.phase) {
-            case "ELECTION":
-                return Number(0 / 8 * 100)
-            case "ELECTION-VOTE":
-                return Number(1 / 8 * 100)
-            case "PROPOSE":
-                return Number(2 / 8 * 100)
-            case "PROPOSE-VOTE":
-                return Number(3 / 8 * 100)
-            case "PRECOMMIT":
-                return Number(4 / 8 * 100)
-            case "PRECOMMIT-VOTE":
-                return Number(5 / 8 * 100)
-            case "COMMIT":
-                return Number(6 / 8 * 100)
-            case "COMMIT-PROCESS":
-                return Number(7 / 8 * 100)
+    // getRoundProgress() converts the round to a percentage to represent progress
+    function getRoundProgress(consensusInfo) {
+        const progressMap = {
+            "ELECTION": 0,
+            "ELECTION-VOTE": 1,
+            "PROPOSE": 2,
+            "PROPOSE-VOTE": 3,
+            "PRECOMMIT": 4,
+            "PRECOMMIT-VOTE": 5,
+            "COMMIT": 6,
+            "COMMIT-PROCESS": 7,
         }
-        return 100
+        return (progressMap[consensusInfo.view.phase] / 8 * 100)
     }
 
+    // execute every second
     useEffect(() => {
-        const interval = setInterval(() => {
-            queryAPI()
-        }, 1000);
-        return () => clearInterval(interval);
-    });
-    if (state.consensusInfo.view == null || state.peerInfo.id == null) {
+        const interval = setInterval(queryAPI, 1000)
+        return () => clearInterval(interval)
+    }, [])
+    // if loading
+    if (!state.consensusInfo.view || !state.peerInfo.id) {
         queryAPI()
         return <Spinner id="spinner"/>
     }
-
     let inPeer = Number(state.peerInfo.numInbound), ouPeer = Number(state.peerInfo.numOutbound), v = state.consensusInfo.view
     inPeer = inPeer ? inPeer : 0
     ouPeer = ouPeer ? ouPeer : 0
@@ -104,19 +95,21 @@ export default function Dashboard() {
         ]
     }]
 
-    const renderButtonCarouselItem = (props) => {
+    // renderButtonCarouselItem() generates the button for the carousel
+    function renderButtonCarouselItem(props) {
         return (
             <Carousel.Item>
                 <Card className="carousel-item-container">
                     <Card.Body>
                         <Card.Title>EXPLORE RAW JSON</Card.Title>
                         <div>
-                            {props.map((k, i) => (
-                                <Button key={i} className="carousel-btn" onClick={() => window.open(k.url, "_blank")} variant="outline-secondary">
-                                    {k.title}
+                            {props.map((item, index) => (
+                                <Button key={index} className="carousel-btn" variant="outline-secondary"
+                                        onClick={() => window.open(item.url, "_blank")}
+                                >
+                                    {item.title}
                                 </Button>
                             ))}
-                            <br/><br/>
                         </div>
                     </Card.Body>
                 </Card>
@@ -124,6 +117,7 @@ export default function Dashboard() {
         )
     }
 
+    // return the dashboard rendering
     return <div className="content-container" id="dashboard-container">
         <Container id="dashboard-inner" fluid>
             <Row>
@@ -157,12 +151,18 @@ export default function Dashboard() {
         <LazyLog enableSearch={true} id="lazy-log" text={state.logs.replace("\n", '')}/>
         <Container id="charts-container">
             {[
-                [{yax: "PROCESS", n1: "CPU %", d1: "process.usedCPUPercent", n2: "RAM %", d2: "process.usedMemoryPercent"},
-                    {yax: "SYSTEM", n1: "CPU %", d1: "system.usedCPUPercent", n2: "RAM %", d2: "system.usedRAMPercent"}],
-                [{yax: "DISK", n1: "Disk %", d1: "system.usedDiskPercent", n2: ""},
-                    {yax: "IN OUT", removeTick: true, n1: "Received", d1: "system.ReceivedBytesIO", n2: "Written", d2: "system.WrittenBytesIO"}],
-                [{yax: "THREADS", n1: "Thread Count", d1: "process.threadCount", n2: ""},
-                    {yax: "FILES", n1: "File Descriptors", d1: "process.fdCount", n2: ""}],
+                [
+                    {yax: "PROCESS", n1: "CPU %", d1: "process.usedCPUPercent", n2: "RAM %", d2: "process.usedMemoryPercent"},
+                    {yax: "SYSTEM", n1: "CPU %", d1: "system.usedCPUPercent", n2: "RAM %", d2: "system.usedRAMPercent"}
+                ],
+                [
+                    {yax: "DISK", n1: "Disk %", d1: "system.usedDiskPercent", n2: ""},
+                    {yax: "IN OUT", removeTick: true, n1: "Received", d1: "system.ReceivedBytesIO", n2: "Written", d2: "system.WrittenBytesIO"}
+                ],
+                [
+                    {yax: "THREADS", n1: "Thread Count", d1: "process.threadCount", n2: ""},
+                    {yax: "FILES", n1: "File Descriptors", d1: "process.fdCount", n2: ""}
+                ],
             ].map((k, i) => (
                 <Row key={i}>
                     {[...Array(2)].map((_, i) => {

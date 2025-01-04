@@ -10,8 +10,8 @@ const navbarIconsAndTip = [
 ]
 
 const socials = [
-    {url: "https://discord.com", icon: "./discord-filled.png"},
-    {url: "https://x.com", icon: "./twitter.png"}
+    {url: "https://discord.gg/pNcSJj7Wdh", icon: "./discord-filled.png"},
+    {url: "https://x.com/CNPYNetwork", icon: "./twitter.png"}
 ]
 
 export default function Navigation({keystore, setActiveKey, keyIdx, setNavIdx}) {

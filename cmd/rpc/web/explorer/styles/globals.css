@@ -121,10 +121,35 @@ input::placeholder {
     font-family: Arial, Helvetica, sans-serif;
 }
 
-input {
+.main-input {
     background-image: url("../public/search.png");
     background-repeat: no-repeat;
     background-position: left center;
+    background-size: 25px;
+    background-origin: content-box;
+}
+
+.search-table {
+    float: right;
+    text-align: center;
+    border-radius: 2px;
+    border: none;
+    background-image: url("../public/filter.png");
+    background-repeat: no-repeat;
+    background-position: right center;
+    background-size: 25px;
+    background-origin: content-box;
+}
+
+.chain-table {
+    float: right;
+    text-align: center;
+    border-radius: 2px;
+    width: 50px;
+    border: none;
+    background-image: url("../public/chain.png");
+    background-repeat: no-repeat;
+    background-position: right center;
     background-size: 25px;
     background-origin: content-box;
 }

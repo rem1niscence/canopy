@@ -1,10 +1,10 @@
-import Container from 'react-bootstrap/Container';
-import Navbar from 'react-bootstrap/Navbar';
-import {Form} from "react-bootstrap";
-import {convertIfNumber} from "@/components/util";
+import Container from 'react-bootstrap/Container'
+import Navbar from 'react-bootstrap/Navbar'
+import {Form} from "react-bootstrap"
+import {convertIfNumber} from "@/components/util"
 
-function Navigation({openModal}) {
-    let q = "", urls = {discord: "https://discord.com", x: "https://x.com"};
+export default function Navigation({openModal}) {
+    let q = "", urls = {discord: "https://discord.gg/pNcSJj7Wdh", x: "https://x.com/CNPYNetwork"}
     return <>
         <Navbar sticky="top" data-bs-theme="light" className="nav-bar">
             <Container>
@@ -13,7 +13,7 @@ function Navigation({openModal}) {
                 </Navbar.Brand>
                 <div className="nav-bar-center">
                     <Form onSubmit={() => openModal(convertIfNumber(q), 0)}>
-                        <Form.Control type="search" className="nav-bar-search me-2"
+                        <Form.Control type="search" className="main-input nav-bar-search me-2"
                                       placeholder="search by address, hash, or height"
                                       onChange={(e) => {
                                           q = e.target.value
@@ -29,7 +29,5 @@ function Navigation({openModal}) {
                 </a>
             </Container>
         </Navbar>
-    </>;
+    </>
 }
-
-export default Navigation;

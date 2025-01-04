@@ -7,7 +7,6 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"time"
 )
 
 var (
@@ -141,7 +140,7 @@ type jsonTx struct {
 	Type      string          `json:"type,omitempty"`
 	Msg       json.RawMessage `json:"msg,omitempty"`
 	Signature *Signature      `json:"signature,omitempty"`
-	Time      string          `json:"time,omitempty"`
+	Time      uint64          `json:"time,omitempty"`
 	Fee       uint64          `json:"fee,omitempty"`
 	Memo      string          `json:"memo,omitempty"`
 }
@@ -164,7 +163,7 @@ func (x Transaction) MarshalJSON() ([]byte, error) {
 		Type:      x.MessageType,
 		Msg:       bz,
 		Signature: x.Signature,
-		Time:      time.UnixMicro(int64(x.Time)).Format(time.DateTime),
+		Time:      x.Time,
 		Fee:       x.Fee,
 		Memo:      x.Memo,
 	})
@@ -188,15 +187,11 @@ func (x *Transaction) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-	t, e := time.Parse(time.DateTime, j.Time)
-	if e != nil {
-		return e
-	}
 	*x = Transaction{
 		MessageType: j.Type,
 		Msg:         a,
 		Signature:   j.Signature,
-		Time:        uint64(t.UnixMicro()),
+		Time:        j.Time,
 		Fee:         j.Fee,
 		Memo:        j.Memo,
 	}

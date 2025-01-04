@@ -1,5 +1,7 @@
 const rpcURL = "http://127.0.0.1:50002"
 
+// RPC PATHS BELOW
+
 const blocksPath = "/v1/query/blocks"
 const blockByHashPath = "/v1/query/block-by-hash"
 const blockByHeightPath = "/v1/query/block-by-height"
@@ -15,7 +17,25 @@ const accountPath = "/v1/query/account"
 const validatorPath = "/v1/query/validator"
 const paramsPath = "/v1/query/params"
 const supplyPath = "/v1/query/supply"
+const ordersPath = "/v1/query/orders"
 
+// POST
+
+export async function POST(request, path) {
+    let resp = await fetch(rpcURL + path, {
+        method: 'POST',
+        body: request,
+    })
+        .catch(rejected => {
+            console.log(rejected);
+        });
+    if (resp == null) {
+        return {}
+    }
+    return resp.json()
+}
+
+// REQUEST OBJECTS BELOW
 
 function heightRequest(height) {
     return JSON.stringify({height: height})
@@ -45,19 +65,7 @@ function validatorsReq(page, height, committee) {
     return JSON.stringify({height: height, pageNumber: page, perPage: 10, committee: committee})
 }
 
-export async function POST(request, path) {
-    let resp = await fetch(rpcURL + path, {
-        method: 'POST',
-        body: request,
-    })
-        .catch(rejected => {
-            console.log(rejected);
-        });
-    if (resp == null) {
-        return {}
-    }
-    return resp.json()
-}
+// API CALLS BELOW
 
 export function Blocks(page, _) {
     return POST(pageHeightReq(page, 0), blocksPath)
@@ -131,43 +139,43 @@ export function Pending(page, _) {
     return POST(pageAddrReq(page, ""), pendingPath)
 }
 
-export async function getModalData(query, page) {
-    let noResult = "no result found"
-    if (typeof query === "string") {
-        if (query.length === 64) {
-            let block = await BlockByHash(query)
-            if (block.block_header == null || block.block_header.hash == null) {
-                let tx = await TxByHash(query)
-                if (tx == null || tx.sender == null) {
-                    return noResult
-                }
-                return tx
-            }
-            return {"block": block}
-        } else if (query.length === 40) {
-            let val = await Validator(0, query)
-            let acc = await AccountWithTxs(0, query, page)
-            if (acc.account.address == null && val.address == null) {
-                return noResult
-            } else if (acc.account.address == null) {
-                return {"validator": val}
-            } else if (val.address == null) {
-                return acc
-            }
-            acc.validator = val
-            return acc
-        }
-        return noResult
-    } else {
-        let block = await BlockByHeight(query)
-        if (block.block_header == null || block.block_header.hash == null) {
-            return noResult
-        }
-        return {"block": block}
-    }
+export function Orders(committee_id) {
+    return POST(heightAndIDRequest(0, committee_id), ordersPath)
 }
 
+// COMPONENT SPECIFIC API CALLS BELOW
 
+// getModalData() executes API call(s) and prepares data for the modal component based on the search type
+export async function getModalData(query, page) {
+    const noResult = "no result found";
+
+    // Handle string query cases
+    if (typeof query === "string") {
+        // Block by hash
+        if (query.length === 64) {
+            const block = await BlockByHash(query);
+            if (block?.block_header?.hash) return {"block": block};
+
+            const tx = await TxByHash(query);
+            return tx?.sender ? tx : noResult;
+        }
+
+        // Validator or account by address
+        if (query.length === 40) {
+            const [val, acc] = await Promise.all([Validator(0, query), AccountWithTxs(0, query, page)]);
+            if (!acc.account.address && !val.address) return noResult;
+            return acc.account.address ? {...acc, validator: val} : {"validator": val};
+        }
+
+        return noResult;
+    }
+
+    // Handle block by height
+    const block = await BlockByHeight(query);
+    return block?.block_header?.hash ? {"block": block} : noResult;
+}
+
+// getCardData() executes api calls and prepares the data for the cards
 export async function getCardData() {
     let cardData = {}
     cardData.blocks = await Blocks(1, 0)
@@ -178,8 +186,8 @@ export async function getCardData() {
     return cardData
 }
 
-
-export async function getDataForTable(page, category) {
+// getTableData() executes an api call for the table based on the page and category
+export async function getTableData(page, category, committee) {
     switch (category) {
         case 0:
             return await Blocks(page, 0)
@@ -193,5 +201,9 @@ export async function getDataForTable(page, category) {
             return await Validators(page, 0)
         case 5:
             return await Params(page, 0)
+        case 6:
+            return await Orders(committee)
+        case 7:
+            return await Supply(0)
     }
 }

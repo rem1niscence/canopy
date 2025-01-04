@@ -1,9 +1,9 @@
-import Navigation from "@/components/navbar/navbar";
+import Navigation from "@/components/navbar";
 import {AccountWithTxs, Keystore, Validator} from "@/components/api";
 import {useEffect, useState} from "react";
-import Accounts from "@/components/account/account";
-import Dashboard from "@/components/dashboard/dashboard";
-import Governance from "@/components/governance/governance";
+import Accounts from "@/components/account";
+import Dashboard from "@/components/dashboard";
+import Governance from "@/components/governance";
 import {Spinner} from "react-bootstrap";
 
 export default function Home() {

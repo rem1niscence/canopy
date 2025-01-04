@@ -1,12 +1,18 @@
 import {OverlayTrigger, Toast, ToastContainer, Tooltip} from "react-bootstrap";
 
+// getFormInputs() returns the form input based on the type
+// account and validator is passed to assist with auto fill
 export function getFormInputs(type, account, validator) {
-    let amount = type === "edit-stake" ? validator["staked_amount"] : null
-    let netAddr = validator ? validator["net_address"] : ""
-    let output = validator ? validator["output"] : ""
+    let amount = null
+    let netAddr = validator && validator.address ? validator.net_address : ""
+    let output = validator && validator.address ? validator.output : ""
     let address = account != null ? account.address : ""
-    address = type !== "send" && validator ? validator.address : address
-    address = type === "stake" && validator.address ? "WARNING: validator already staked" : address
+    let committeeList = validator && validator.address ? validator.committees.join(','): ""
+    address = type !== "send" && validator && validator.address ? validator.address : address
+    address = type === "stake" && validator && validator.address ? "WARNING: validator already staked" : address
+    if (type === "edit-stake" || type === "stake") {
+        amount = validator && validator.address ? validator.staked_amount : null
+    }
     let a = {
         privateKey: {
             "placeholder": "opt: private key hex to import",
@@ -31,6 +37,18 @@ export function getFormInputs(type, account, validator) {
             "type": "text",
             "minLength": 40,
             "maxLength": 40,
+        },
+        committees: {
+            "placeholder": "1, 22, 50",
+            "defaultValue": committeeList,
+            "tooltip": "Required: Comma-separated list of committee chain IDs to stake for",
+            "label": "committees",
+            "inputText": "committees",
+            "feedback": "please input atleast 1 committee",
+            "required": true,
+            "type": "text",
+            "minLength": 1,
+            "maxLength": 200,
         },
         netAddr: {
             "placeholder": "url of the node",
@@ -224,7 +242,7 @@ export function getFormInputs(type, account, validator) {
         case "send":
             return [a.address, a.rec, a.amount, a.memo, a.fee, a.password]
         case "stake":
-            return [a.address, a.netAddr, a.amount, a.output, a.memo, a.fee, a.password]
+            return [a.address, a.committees, a.netAddr, a.amount, a.output, a.memo, a.fee, a.password]
         case "create_order":
             return [a.address, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password]
         case "edit_order":
@@ -232,7 +250,7 @@ export function getFormInputs(type, account, validator) {
         case "delete_order":
             return [a.address, a.committeeId, a.orderId, a.memo, a.fee, a.password]
         case "edit-stake":
-            return [a.address, a.netAddr, a.amount, a.output, a.memo, a.fee, a.password]
+            return [a.address, a.committees, a.netAddr, a.amount, a.output, a.memo, a.fee, a.password]
         case "change-param":
             return [a.address, a.paramSpace, a.paramKey, a.paramValue, a.startBlock, a.endBlock, a.memo, a.fee, a.password]
         case "dao-transfer":
@@ -248,6 +266,7 @@ export function getFormInputs(type, account, validator) {
     }
 }
 
+// placeholders is a dummy object to assist in the user experience and provide consistency
 export const placeholders = {
     poll: {
         "PLACEHOLDER EXAMPLE": {
@@ -311,10 +330,12 @@ export const placeholders = {
 
 }
 
+// numberWithCommas() formats a number with commas as thousand separators
 export function numberWithCommas(x) {
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+// formatNumber() formats a number with optional division and compact notation
 export function formatNumber(nString, div = true, cutoff = 1000000000000000) {
     if (nString == null) {
         return "zero"
@@ -328,11 +349,13 @@ export function formatNumber(nString, div = true, cutoff = 1000000000000000) {
     return Intl.NumberFormat("en", {notation: "compact", maximumSignificantDigits: 8}).format(nString)
 }
 
+// copy() copies text to clipboard and triggers a toast notification
 export function copy(state, setState, detail, toastText = "Copied!") {
     navigator.clipboard.writeText(detail)
     setState({...state, toast: toastText})
 }
 
+// renderToast() displays a toast notification with a customizable message
 export function renderToast(state, setState) {
     return <ToastContainer id="toast" position={"bottom-end"}>
         <Toast bg={"dark"} onClose={() => setState({...state, toast: ""})} show={state.toast != ""} delay={2000} autohide>
@@ -341,6 +364,7 @@ export function renderToast(state, setState) {
     </ToastContainer>
 }
 
+// onFormSubmit() handles form submission and passes form data to a callback
 export function onFormSubmit(state, e, callback) {
     e.preventDefault()
     let r = {}
@@ -353,37 +377,26 @@ export function onFormSubmit(state, e, callback) {
     callback(r)
 }
 
+// withTooltip() wraps an element with a tooltip component
 export function withTooltip(obj, text, key, dir = "right") {
     return <OverlayTrigger key={key} placement={dir} delay={{show: 250, hide: 400}}
                            overlay={<Tooltip id="button-tooltip">{text}</Tooltip>}
     >{obj}</OverlayTrigger>
 }
 
+// getRatio() calculates the simplest ratio between two numbers
 export function getRatio(a, b) {
-    if (a > b) {
-        var bg = a;
-        var sm = b;
-    } else {
-        var bg = b;
-        var sm = a;
-    }
-    for (var i = 1; i < 1000000; i++) {
-        var d = sm / i;
-        var res = bg / d;
-        var howClose = Math.abs(res - res.toFixed(0));
-        if (howClose < .1) {
-            if (a > b) {
-                return res.toFixed(0) + ':' + i;
-            } else {
-                return i + ':' + res.toFixed(0);
-            }
+    const [bg, sm] = a > b ? [a, b] : [b, a];
+    for (let i = 1; i < 1000000; i++) {
+        const d = sm / i;
+        const res = bg / d;
+        if (Math.abs(res - Math.round(res)) < 0.1) {
+            return a > b ? `${Math.round(res)}:${i}` : `${i}:${Math.round(res)}`;
         }
     }
 }
 
+// objEmpty() checks if an object is null, undefined, or empty
 export function objEmpty(o) {
-    if (!o) {
-        return true
-    }
-    return Object.keys(o).length === 0
+    return !o || Object.keys(o).length === 0;
 }

@@ -118,7 +118,7 @@ func (t *Indexer) GetBlocks(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 			nextBlock := results[count-1]
 			blockTime := time.UnixMicro(int64(block.BlockHeader.Time))
 			nextBlkTime := time.UnixMicro(int64(nextBlock.BlockHeader.Time))
-			nextBlock.Meta.Took = nextBlkTime.Sub(blockTime).Truncate(time.Second).String()
+			nextBlock.Meta.Took = uint64(nextBlkTime.Sub(blockTime).Milliseconds())
 		} else {
 			page.PerPage += 1 // modify the perPage to get 1 additional block the block meta may be filled in
 		}

@@ -187,8 +187,8 @@ func (c *Client) Order(height, orderId, committeeId uint64) (p *types.SellOrder,
 	return
 }
 
-func (c *Client) Orders(height, committeeId uint64) (p *types.OrderBook, err lib.ErrorI) {
-	p = new(types.OrderBook)
+func (c *Client) Orders(height, committeeId uint64) (p *types.OrderBooks, err lib.ErrorI) {
+	p = new(types.OrderBooks)
 	err = c.heightAndIdRequest(OrdersRouteName, height, committeeId, p)
 	return
 }

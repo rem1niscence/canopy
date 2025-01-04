@@ -1,64 +1,54 @@
-import Tooltip from "react-bootstrap/Tooltip";
-import OverlayTrigger from "react-bootstrap/OverlayTrigger";
 import React from 'react';
-import {Pagination} from "react-bootstrap";
+import { Tooltip, OverlayTrigger, Pagination } from "react-bootstrap";
 
-export function formatNumberWCommas(x) {
+// convertNumberWCommas() formats a number with commas
+export function convertNumberWCommas(x) {
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-export function formatNumber(nString, cutoff = 1000000) {
+// convertNumber() formats a number with commas or in compact notation
+export function convertNumber(nString, cutoff = 1000000) {
     if (Number(nString) < cutoff) {
-        return formatNumberWCommas(nString)
+        return convertNumberWCommas(nString)
     }
     return Intl.NumberFormat("en", {notation: "compact", maximumSignificantDigits: 3}).format(nString)
 }
 
-function string_to_milliseconds(str) {
-    const units = {
-        yr: {re: /(\d+|\d*\.\d+)\s*(Y)/i, s: 1000 * 60 * 60 * 24 * 365}, // Case insensitive "Y"
-        mo: {re: /(\d+|\d*\.\d+)\s*(M|[Mm][Oo])/, s: 1000 * 60 * 60 * 24 * 30}, // Case insensitive "mo" or sensitive "M"
-        wk: {re: /(\d+|\d*\.\d+)\s*(W)/i, s: 1000 * 60 * 60 * 24 * 7}, // Case insensitive "W"
-        dy: {re: /(\d+|\d*\.\d+)\s*(D)/i, s: 1000 * 60 * 60 * 24}, // Case insensitive "D"
-        hr: {re: /(\d+|\d*\.\d+)\s*(h)/i, s: 1000 * 60 * 60}, // Case insensitive "h"
-        mn: {re: /(\d+|\d*\.\d+)\s*(m(?![so])|[Mm][Ii]?[Nn])/, s: 1000 * 60}, // Case insensitive "min"/"mn" or sensitive "m" (if not followed by "s" or "o")
-        sc: {re: /(\d+|\d*\.\d+)\s*(s)/i, s: 1000}, // Case insensitive "s"
-        ms: {re: /(\d+|\d*\.\d+)\s*(ms|mil)/i, s: 1}, // Case insensitive "ms"/"mil"
-    };
-    return Object.values(units).reduce((sum, unit) => sum + (str.match(unit.re)?.[1] * unit.s || 0), 0);
-}
-
+// addMS() adds milliseconds to a Date object
 Date.prototype.addMS = function (s) {
     this.setTime(this.getTime() + (s));
     return this;
 }
 
+// addDate() adds a duration to a date and returns the result as a time string
 export function addDate(value, duration) {
     const milliseconds = Math.floor(value / 1000)
     const date = new Date(milliseconds)
-    let ms = string_to_milliseconds(duration)
-    return date.addMS(ms).toLocaleTimeString()
+    return date.addMS(duration).toLocaleTimeString()
 }
 
-export function formatBytes(a, b = 2) {
+// convertBytes() converts a byte value to a human-readable format
+export function convertBytes(a, b = 2) {
     if (!+a) return "0 Bytes";
     const c = 0 > b ? 0 : b, d = Math.floor(Math.log(a) / Math.log(1024));
     return `${parseFloat((a / Math.pow(1024, d)).toFixed(c))} ${["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"][d]}`
 }
 
-export function formatTime(value) {
+// convertTime() converts a timestamp to a time string
+export function convertTime(value) {
     const date = new Date(Math.floor(value / 1000))
-    console.log(date.toLocaleTimeString())
     return date.toLocaleTimeString()
 }
 
-export function formatIfTime(key, value) {
+// convertIfTime() checks if the key is related to time and converts it if true
+export function convertIfTime(key, value) {
     if (key.includes("time")) {
-        return formatTime(value)
+        return convertTime(value)
     }
     return value
 }
 
+// convertIfNumber() attempts to convert a string to a number
 export function convertIfNumber(str) {
     if (!isNaN(str) && !isNaN(parseFloat(str))) {
         return Number(str)
@@ -67,17 +57,19 @@ export function convertIfNumber(str) {
     }
 }
 
+// withTooltip() adds a tooltip to an element
 export function withTooltip(obj, text, key, dir = "right") {
     return <OverlayTrigger key={key} placement={dir} delay={{show: 250, hide: 400}}
                            overlay={<Tooltip id="button-tooltip">{text}</Tooltip>}
     >{obj}</OverlayTrigger>
 }
 
-
+// isNumber() checks if the value is a number
 export function isNumber(n) {
     return !isNaN(parseFloat(n)) && !isNaN(n - 0)
 }
 
+// isHex() checks if the string is a valid hex color code
 export function isHex(h) {
     if (isNumber(h)) {
         return false
@@ -86,6 +78,7 @@ export function isHex(h) {
     return hexRe.test(h)
 }
 
+// upperCaseAndRepUnderscore() capitalizes each word in a string and replaces underscores with spaces
 export function upperCaseAndRepUnderscore(str) {
     let i, frags = str.split('_');
     for (i = 0; i < frags.length; i++) {
@@ -94,16 +87,12 @@ export function upperCaseAndRepUnderscore(str) {
     return frags.join(' ');
 }
 
-export function convertTransaction(v) {
-    let value = Object.assign({}, v)
-    delete value.transaction
-    return convertNonIndexTransaction(value)
-}
-
+// cpyObj() creates a shallow copy of an object
 export function cpyObj(v) {
     return Object.assign({}, v)
 }
 
+// pagination() generates pagination controls for a given data set
 export function pagination(data, callback) {
     let pageSquares = []
     if ("perPage" in data) {
@@ -122,16 +111,19 @@ export function pagination(data, callback) {
     return <Pagination className="pagination">{pageSquares}<Pagination.Ellipsis/></Pagination>
 }
 
+// isEmpty() checks if an object is empty
 export function isEmpty(obj) {
     return Object.keys(obj).length === 0
 }
 
+// clipboard() copies a value to the clipboard and shows a toast message
 export function clipboard(state, setState, detail) {
     navigator.clipboard.writeText(detail)
     setState({...state, showToast: true})
 }
 
-export function convertNonIndexTransaction(tx) {
+// convertTx() sanitizes and simplifies a transaction object
+export function convertTx(tx) {
     if (tx.recipient == null) {
         tx.recipient = tx.sender
     }
@@ -140,30 +132,4 @@ export function convertNonIndexTransaction(tx) {
     }
     tx = JSON.parse(JSON.stringify(tx, ["sender", "recipient", "message_type", "height", "index", "tx_hash", "fee", "sequence"], 4))
     return tx
-}
-
-export function convertNonIndexTransactions(txs) {
-    for (let i = 0; i < txs.length; i++) {
-        txs[i] = convertNonIndexTransaction(txs[i])
-    }
-    return txs
-}
-
-export function formatBlock(blk) {
-    // list of values to omit
-    let {
-        last_quorum_certificate, next_validator_root, state_root, transaction_root,
-        validator_root, last_block_hash, network_id, vdf, ...value
-    } = blk.block.block_header
-    return value
-}
-
-export function formatCertificateResults(qc) {
-    return {
-        "certificate_height": qc.header.height,
-        "network_id": qc.header.networkID,
-        "committee_id": qc.header.committeeID,
-        "block_hash": qc.blockHash,
-        "results_hash": qc.resultsHash,
-    }
 }

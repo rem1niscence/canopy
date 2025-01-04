@@ -94,6 +94,6 @@ message BlockResult {
 message BlockResultMeta {
   // size: number of bytes in the block
   uint64 size = 1;
-  // took: duration string of the block (string representing the duration in the form "72h3m0.5s")
-  string took = 2;
+  // took: duration string of the block in milliseconds
+  uint64 took = 2;
 }

@@ -112,8 +112,6 @@ const (
 	LogsRouteName              = "logs"
 	AddVoteRouteName           = "add-vote"
 	DelVoteRouteName           = "del-vote"
-	ExplorerRouteName          = "explorer"
-	WalletRouteName            = "wallet"
 )
 
 const SoftwareVersion = "0.0.0-alpha"
@@ -246,10 +244,10 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 		}
 	}()
 	go updatePollResults()
-	//l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
-	//runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
-	//l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
-	//runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
+	l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
+	runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
+	l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
+	runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
 }
 
 func Version(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -462,7 +460,16 @@ func Order(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func Orders(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (any, lib.ErrorI) { return s.GetOrderBook(id) })
+	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (any, lib.ErrorI) {
+		if id == 0 {
+			return s.GetOrderBooks()
+		}
+		b, err := s.GetOrderBook(id)
+		if err != nil {
+			return nil, err
+		}
+		return &types.OrderBooks{OrderBooks: []*types.OrderBook{b}}, nil
+	})
 }
 
 func Params(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {

@@ -211,8 +211,10 @@ var (
 	certCmd = &cobra.Command{
 		Use:   "certificate <height>",
 		Short: "query a quorum certificate for a height",
-		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 {
+				args = append(args, "0")
+			}
 			writeToConsole(client.CertByHeight(uint64(argToInt(args[0]))))
 		},
 	}
@@ -220,8 +222,10 @@ var (
 	blkByHeightCmd = &cobra.Command{
 		Use:   "block <height> ",
 		Short: "query a block at a height",
-		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 {
+				args = append(args, "0")
+			}
 			writeToConsole(client.BlockByHeight(uint64(argToInt(args[0]))))
 		},
 	}

@@ -1,11 +1,11 @@
-import Navigation from "@/components/navbar/navbar";
-import Sidebar from "@/components/sidebar/sidebar";
-import DataTable from "@/components/table/table"
-import DetailModal from "@/components/modal/modal"
-import Cards from "@/components/cards/cards";
+import Navigation from "@/components/navbar";
+import Sidebar from "@/components/sidebar";
+import DTable from "@/components/table"
+import DetailModal from "@/components/modal"
+import Cards from "@/components/cards";
 import {useEffect, useState} from "react";
 import {Spinner, Toast, ToastContainer} from "react-bootstrap";
-import {getCardData, getDataForTable, getModalData} from "@/components/api";
+import {getCardData, getTableData, getModalData, Orders} from "@/components/api";
 
 export default function Home() {
     const [state, setState] = useState({
@@ -15,6 +15,12 @@ export default function Home() {
         tablePage: 0,
         tableData: {},
         showToast: false,
+
+        sortColumn: null,
+        sortDirection: 'asc',
+        filterText: '',
+        committee: 1,
+
         modalState: {
             show: false,
             page: 0,
@@ -25,7 +31,7 @@ export default function Home() {
     });
 
     function getCardAndTableData(setLoading) {
-        Promise.all([getDataForTable(state.tablePage, state.category), getCardData()]).then((values) => {
+        Promise.all([getTableData(state.tablePage, state.category, state.committee), getCardData()]).then((values) => {
             if (setLoading) {
                 return setState({...state,  loading: false, tableData: values[0], cardData: values[1]})
             }
@@ -37,8 +43,11 @@ export default function Home() {
         setState({...state, modalState: {show: true, query: query, page: 0, accOnly: false, data: await getModalData(query, 0)}})
     }
 
-    async function selectTable(category, page) {
-        setState({...state, category: category, tablePage: page, tableData: await getDataForTable(page, category)})
+    async function selectTable(category, page, committee) {
+        if (committee == null) {
+            committee = state.committee
+        }
+        setState({...state, committee: committee, category: category, tablePage: page, tableData: await getTableData(page, category, committee)})
     }
 
     useEffect(() => {
@@ -60,7 +69,7 @@ export default function Home() {
                 <Sidebar {...props}/>
                 <div id="pageContent">
                     <Cards {...props}/>
-                    <DataTable {...props} />
+                    <DTable {...props} />
                     <DetailModal {...props} />
                     <ToastContainer id="toast" position={"bottom-end"}>
                         <Toast bg={"dark"} onClose={onToastClose} show={state.showToast} delay={2000} autohide>

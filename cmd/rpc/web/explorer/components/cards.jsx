@@ -1,60 +1,64 @@
 import {Card, Col, Row} from "react-bootstrap";
 import Truncate from 'react-truncate-inside';
-import {addDate, formatBytes, formatNumber, formatTime} from "@/components/util";
+import {addDate, convertBytes, convertNumber, convertTime} from "@/components/util";
 
 const cardImages = ["./block-filled.png", "./chart-up.png", "./transaction-filled.png", "./lock-filled.png"]
 const cardTitles = ["Latest Block", "Supply", "Transactions", "Validators"]
 
-function getCardInfo1(props, idx) {
+// getCardHeader() returns the header information for the card
+function getCardHeader(props, idx) {
     const blks = props.blocks
     switch (idx) {
         case 0:
-            return formatNumber(blks.results[0].block_header.height)
+            return convertNumber(blks.results[0].block_header.height)
         case 1:
-            return formatNumber(props.supply.total)
+            return convertNumber(props.supply.total)
         case 2:
             if (blks.results[0].block_header.num_txs == null) {
                 return "+0"
             }
-            return "+" + formatNumber(blks.results[0].block_header.num_txs)
+            return "+" + convertNumber(blks.results[0].block_header.num_txs)
         case 3:
             let totalStake = 0
             props.canopyCommittee.results.forEach(function (validator) {
                 totalStake += Number(validator.staked_amount)
             })
-            return <>{formatNumber(totalStake)}<span style={{fontSize: "14px"}}>{" stake"}</span></>
+            return <>{convertNumber(totalStake)}<span style={{fontSize: "14px"}}>{" stake"}</span></>
     }
 }
 
-function getCardInfo2(props, idx) {
+// getCardSubHeader() returns the sub header of the card (right below the header)
+function getCardSubHeader(props, idx) {
     const v = props.blocks
     switch (idx) {
         case 0:
-            return formatTime(v.results[0].block_header.time)
+            return convertTime(v.results[0].block_header.time)
         case 1:
-            return formatNumber(Number(props.supply.total) - Number(props.supply.staked), 1000) + " liquid"
+            return convertNumber(Number(props.supply.total) - Number(props.supply.staked), 1000) + " liquid"
         case 2:
-            return "blk size: " + formatBytes(v.results[0].meta.size)
+            return "blk size: " + convertBytes(v.results[0].meta.size)
         case 3:
             return props.canopyCommittee.results.length + " unique vals"
     }
 }
 
-function getCardInfo3(props, idx) {
+// getCardRightAligned() returns the data for the right aligned note
+function getCardRightAligned(props, idx) {
     const v = props.blocks
     switch (idx) {
         case 0:
             return v.results[0].meta.took
         case 1:
-            return formatNumber(props.supply.staked, 1000) + " staked"
+            return convertNumber(props.supply.staked, 1000) + " staked"
         case 2:
             return "block #" + v.results[0].block_header.height
         case 3:
-            return "stake threshold " + formatNumber(props.params.Validator.validator_stake_percent_for_subsidized_committee, 1000) + "%"
+            return "stake threshold " + convertNumber(props.params.Validator.validator_stake_percent_for_subsidized_committee, 1000) + "%"
     }
 }
 
-function getCardInfo4(props, idx) {
+// getCardNote() returns the data for the small text above the footer
+function getCardNote(props, idx) {
     const v = props.blocks
     switch (idx) {
         case 0:
@@ -63,17 +67,16 @@ function getCardInfo4(props, idx) {
         case 1:
             return "+" + Number(50) + "/blk"
         case 2:
-            return "TOTAL " + formatNumber(v.results[0].block_header.total_txs)
+            return "TOTAL " + convertNumber(v.results[0].block_header.total_txs)
         case 3:
-            return "MaxStake: " + formatNumber(props.canopyCommittee.results[0].staked_amount, 1000)
-
+            return "MaxStake: " + convertNumber(props.canopyCommittee.results[0].staked_amount, 1000)
         default:
             return "?"
     }
 }
 
-
-function getCardInfo5(props, idx) {
+// getCardFooter() returns the data for the footer of the card
+function getCardFooter(props, idx) {
     const v = props.blocks
     switch (idx) {
         case 0:
@@ -81,7 +84,7 @@ function getCardInfo5(props, idx) {
         case 1:
             let s = "DAO pool supply: "
             if (props.pool != null) {
-                return s + formatNumber(props.pool.amount, 1000)
+                return s + convertNumber(props.pool.amount, 1000)
             }
             return s
         case 2:
@@ -92,7 +95,7 @@ function getCardInfo5(props, idx) {
             txs.forEach(function (tx) {
                 totalFee += Number(tx.transaction.fee)
             })
-            return "Average fee in last blk: " + formatNumber(totalFee / txs.length, 1000000)
+            return "Average fee in last blk: " + convertNumber(totalFee / txs.length, 1000000)
         case 3:
             let totalStake = 0
             props.canopyCommittee.results.forEach(function (validator) {
@@ -102,12 +105,13 @@ function getCardInfo5(props, idx) {
     }
 }
 
-function getOnClick(props, index) {
+// getCardOnClick() returns the callback function when a certain card is clicked
+function getCardOnClick(props, index) {
     if (index === 0) {
         return () => props.openModal(0)
     } else {
         if (index === 1) {
-            return () => props.selectTable(3, 0)
+            return () => props.selectTable(7, 0)
         } else if (index === 2) {
             return () => props.selectTable(1, 0)
         }
@@ -115,23 +119,24 @@ function getOnClick(props, index) {
     }
 }
 
+// Cards() returns the main component
 export default function Cards(props) {
     const cardData = props.state.cardData
     return (<Row sm={1} md={2} lg={4} className="g-4">
         {Array.from({length: 4}, (_, idx) => {
             return <Col key={idx}>
                 <Card className="text-center">
-                    <Card.Body className="card-body" onClick={getOnClick(props, idx)}>
+                    <Card.Body className="card-body" onClick={getCardOnClick(props, idx)}>
                         <div className="card-image" style={{backgroundImage: "url(" + cardImages[idx] + ")"}}/>
                         <Card.Title className="card-title">{cardTitles[idx]}</Card.Title>
-                        <h5>{getCardInfo1(cardData, idx)}</h5>
+                        <h5>{getCardHeader(cardData, idx)}</h5>
                         <Card.Text>
-                            <span>{getCardInfo2(cardData, idx)}</span>
-                            <span className="card-info-3">{getCardInfo3(cardData, idx)}</span>
+                            <span>{getCardSubHeader(cardData, idx)}</span>
+                            <span className="card-info-3">{getCardRightAligned(cardData, idx)}</span>
                             <br/>
-                            <span className="card-info-4">{getCardInfo4(cardData, idx)}</span>
+                            <span className="card-info-4">{getCardNote(cardData, idx)}</span>
                         </Card.Text>
-                        <Card.Footer className="card-footer">{getCardInfo5(cardData, idx)}</Card.Footer>
+                        <Card.Footer className="card-footer">{getCardFooter(cardData, idx)}</Card.Footer>
                     </Card.Body>
                 </Card>
             </Col>
