@@ -1160,7 +1160,8 @@ type committeesRequest struct {
 	Committees string
 }
 
-func StringToCommittees(s string) (committees []uint64, err error) {
+func StringToCommittees(s string) (committees []uint64, error error) {
+	fmt.Println(s)
 	i, err := strconv.ParseUint(s, 10, 64) // single int is an option for subsidy txn
 	if err == nil {
 		return []uint64{i}, nil
