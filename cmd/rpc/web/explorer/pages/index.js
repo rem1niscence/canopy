@@ -56,10 +56,14 @@ export default function Home() {
         }, 4000);
         return () => clearInterval(interval);
     });
-
-    if (state.loading) {
+    if (state.loading || !state.cardData.blocks || Object.keys(state.cardData.blocks).length === 0 || state.cardData.blocks.results.length === 0) {
         getCardAndTableData(true)
-        return <Spinner id="spinner"/>
+        return <>
+            <Spinner id="spinner"/>
+            <br /> <br />
+            <center><h3>Waiting to explore!</h3></center>
+            <center><h7>... loading or no blocks yet ...</h7></center>
+        </>
     } else {
         const props = {state, setState, openModal, selectTable}
         const onToastClose = () => setState({...state, showToast: false})

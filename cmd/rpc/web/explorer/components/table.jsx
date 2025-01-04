@@ -54,6 +54,7 @@ function convertBlock(v) {
         validator_root, last_block_hash, network_id, total_vdf_iterations, vdf, ...value
     } = cpyObj(v.block_header)
     value.num_txs = "num_txs" in v.block_header ? v.block_header.num_txs : "0"
+    value.total_txs = "total_txs" in v.block_header ? v.block_header.total_txs : "0"
     return JSON.parse(JSON.stringify(value, ["height", "hash", "time", "num_txs", "total_txs", "proposer_address"], 4))
 }
 
@@ -100,16 +101,14 @@ function convertCommitteeSupply(v, total) {
 
 // getHeader() returns the appropriate header for the table based on the object type
 function getHeader(v) {
-    const headers = {
-        "tx-results-page": "Transactions",
-        "pending-results-page": "Pending",
-        "block-results-page": "Blocks",
-        "accounts": "Accounts",
-        "validators": "Validators",
-        "Consensus": "Governance",
-        "committee_staked": "Committees",
-    }
-    return headers[v.type] || "Sell Orders"
+    if (v.type === "tx-results-page") return "Transactions"
+    if (v.type === "pending-results-page") return "Pending"
+    if (v.type === "block-results-page") return "Blocks"
+    if (v.type === "accounts") return "Accounts"
+    if (v.type === "validators") return "Validators"
+    if ("Consensus" in v) return "Governance"
+    if ("committee_staked" in v) return "Committees"
+    return "Sell Orders"
 }
 
 // getTableBody() determines the body of the table based on the provided object type
