@@ -13,6 +13,7 @@ import (
 	"github.com/canopy-network/canopy/plugin/canopy"
 	"github.com/canopy-network/canopy/store"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"log"
@@ -109,14 +110,14 @@ func waitForKill() {
 func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config, privateValKey crypto.PrivateKeyI) {
 	// make the data dir if missing
 	if err := os.MkdirAll(dataDirPath, os.ModePerm); err != nil {
-		panic(err)
+		log.Fatal(err.Error())
 	}
 	// make the config.json file if missing
 	configFilePath := filepath.Join(dataDirPath, lib.ConfigFilePath)
 	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
 		log.Infof("Creating %s file", lib.ConfigFilePath)
 		if err = lib.DefaultConfig().WriteToFile(configFilePath); err != nil {
-			panic(err)
+			log.Fatal(err.Error())
 		}
 	}
 	// make the private key file if missing
@@ -125,8 +126,29 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 		blsPrivateKey, _ := crypto.NewBLS12381PrivateKey()
 		log.Infof("Creating %s file", lib.ValKeyPath)
 		if err = crypto.PrivateKeyToFile(blsPrivateKey, privateValKeyPath); err != nil {
-			panic(err)
+			log.Fatal(err.Error())
 		}
+		// get the password from the user
+		log.Infof("Enter password for your new private key:")
+		password, e := term.ReadPassword(int(os.Stdin.Fd()))
+		if e != nil {
+			log.Fatal(e.Error())
+		}
+		// load the keystore from file
+		k, e := crypto.NewKeystoreFromFile(dataDirPath)
+		if e != nil {
+			log.Fatal(e.Error())
+		}
+		// import the validator key
+		address, e := k.ImportRaw(blsPrivateKey.Bytes(), string(password))
+		if e != nil {
+			log.Fatal(e.Error())
+		}
+		// save keystore to the file
+		if e = k.SaveToFile(dataDirPath); e != nil {
+			log.Fatal(e.Error())
+		}
+		log.Infof("Imported validator key %s to keystore", address)
 	}
 	// make the proposals.json file if missing
 	if _, err := os.Stat(filepath.Join(dataDirPath, lib.ProposalsFilePath)); errors.Is(err, os.ErrNotExist) {
@@ -142,16 +164,16 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			EndHeight:      1000000,
 			Signer:         []byte(strings.Repeat("F", crypto.HashSize*2)),
 		}, true); err != nil {
-			panic(err)
+			log.Fatal(err.Error())
 		}
 		if err = proposals.SaveToFile(dataDirPath); err != nil {
-			panic(err)
+			log.Fatal(err.Error())
 		}
 	}
 	// load the private key object
 	privateValKey, err := crypto.NewBLS12381PrivateKeyFromFile(privateValKeyPath)
 	if err != nil {
-		panic(err)
+		log.Fatal(err.Error())
 	}
 	// make the poll.json file if missing
 	if _, err = os.Stat(filepath.Join(dataDirPath, lib.PollsFilePath)); errors.Is(err, os.ErrNotExist) {
@@ -171,7 +193,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			},
 		}
 		if err = polls.SaveToFile(dataDirPath); err != nil {
-			panic(err)
+			log.Fatal(err.Error())
 		}
 	}
 	// create the genesis file if missing
@@ -183,7 +205,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 	// load the config object
 	c, err = lib.NewConfigFromFile(configFilePath)
 	if err != nil {
-		panic(err)
+		log.Fatal(err.Error())
 	}
 	// set the data-directory
 	c.DataDirPath = dataDirPath
