@@ -3,7 +3,7 @@
     {
       "Address": {
         "public_key": "b88a5928e54cbf0a36e0b98f5bcf02de9a9a1deba6994739f9160181a609f516eb702936a0cbf4c1f2e7e6be5b8272f2",
-        "net_address": "172.28.0.3:57216",
+        "net_address": "172.18.0.2:55544",
         "peer_meta": {
           "chains": [
             1

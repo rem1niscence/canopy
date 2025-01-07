@@ -1,18 +1,4 @@
 {
-  "Book": [
-    {
-      "Address": {
-        "public_key": "98d45087a99bcbfde91993502e77dde869d4485c3778fe46513958320da560823d56a0108f4cf3513393f4d561bc489b",
-        "net_address": "node-2:9000",
-        "peer_meta": {
-          "chains": [
-            1
-          ],
-          "signature": "k6VEo9uuTTf6WhhuEedGwJd89A1S6v2qtKHePo9qTf8GATrX+E655aNrfNNGpw2UArMDRTDh9xPexpjCCdxj8naxS8oNEihs3JqACIEn0UTgvlmuGkawdMQm7j8zclAd"
-        }
-      },
-      "consecutive_failed_dial": 1
-    }
-  ],
-  "BookSize": 1
+  "Book": [],
+  "BookSize": 0
 }
