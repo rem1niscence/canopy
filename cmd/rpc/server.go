@@ -224,7 +224,7 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	l.Infof("Starting Admin RPC server at %s:%s", localhost, c.AdminPort)
 	go func() {
 		l.Fatal((&http.Server{
-			Addr:    localhost + colon + c.AdminPort,
+			Addr:    colon + c.AdminPort,
 			Handler: cor.Handler(http.TimeoutHandler(router.NewAdmin(), timeout, ErrServerTimeout().Error())),
 		}).ListenAndServe().Error())
 	}()
