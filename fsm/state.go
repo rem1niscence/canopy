@@ -182,12 +182,9 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 	if height == 0 {
 		height = s.height
 	}
-	if height == 0 {
-		return nil, lib.ErrWrongHeight()
+	if height <= 1 {
+		height = 1 // 1 is first non-genesis height
 	}
-	//if height <= 1 {
-	//	height = 1 // 1 is first non-genesis height
-	//}
 	//if s.height == height {
 	//	return s, nil
 	//}
@@ -204,24 +201,30 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 
 // LoadCommittee() loads the Consensus Validators for a particular committee at a particular height
 func (s *StateMachine) LoadCommittee(committeeID uint64, height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	fsm, err := s.TimeMachine(height)
-	if err != nil {
-		return lib.ValidatorSet{}, err
+	if height != s.Height() {
+		fsm, err := s.TimeMachine(height)
+		if err != nil {
+			return lib.ValidatorSet{}, err
+		}
+		return fsm.GetCommitteeMembers(committeeID)
 	}
-	vs, err := fsm.GetCommitteeMembers(committeeID)
-	if err != nil {
-		return lib.ValidatorSet{}, err
-	}
-	return vs, nil
+	return s.GetCommitteeMembers(committeeID)
 }
 
 // LoadCanopyCommittee() loads the Committee for ID 0
 func (s *StateMachine) LoadCanopyCommittee(height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	fsm, err := s.TimeMachine(height)
-	if err != nil {
-		return lib.ValidatorSet{}, err
+	if height != s.Height() {
+		fsm, err := s.TimeMachine(height)
+		if err != nil {
+			return lib.ValidatorSet{}, err
+		}
+		vs, err := fsm.GetCanopyCommitteeMembers()
+		if err != nil {
+			return lib.ValidatorSet{}, err
+		}
+		return lib.NewValidatorSet(vs)
 	}
-	vs, err := fsm.GetCanopyCommitteeMembers()
+	vs, err := s.GetCanopyCommitteeMembers()
 	if err != nil {
 		return lib.ValidatorSet{}, err
 	}
