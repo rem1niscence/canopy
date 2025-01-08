@@ -249,11 +249,13 @@ var (
 	}
 
 	txsByHeightCmd = &cobra.Command{
-		Use:   "txs-by-height <height> --per-page=10 --page-number=1",
+		Use:   "transactions <height> --per-page=10 --page-number=1",
 		Short: "query txs at a certain height",
-		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			height = uint64(argToInt(args[0]))
+			height = uint64(0)
+			if len(args) != 0 {
+				height = uint64(argToInt(args[0]))
+			}
 			writeToConsole(client.TransactionsByHeight(getPaginatedArgs()))
 		},
 	}

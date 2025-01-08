@@ -9,7 +9,9 @@ services:
       args:
         BUILD_PATH: cmd/cli
     ports:
-      - 3000:3000  # not doing anything currently
+      - 50000:50000 # Wallet
+      - 50001:50001 # Explorer
+      - 50002:50002 # RPC
     networks:
       - canopy
     command: [ "start" ]
@@ -29,7 +31,9 @@ services:
       args:
         BUILD_PATH: cmd/cli
     ports:
-      - 3001:3001 # not doing anything currently
+      - 40000:50000 # Wallet
+      - 40001:50001 # Explorer
+      - 40002:50002 # RPC
     networks:
       - canopy
     command: [ "start" ]

@@ -1357,11 +1357,7 @@ func getDoubleStateMachineFromHeightParams(w http.ResponseWriter, r *http.Reques
 }
 
 func getStateMachineWithHeight(height uint64, w http.ResponseWriter) (sm *fsm.StateMachine, ok bool) {
-	s, ok := setupStore(w)
-	if !ok {
-		return
-	}
-	return setupStateMachine(height, s, w)
+	return setupStateMachine(height, w)
 }
 
 func setupStore(w http.ResponseWriter) (lib.StoreI, bool) {
@@ -1374,17 +1370,10 @@ func setupStore(w http.ResponseWriter) (lib.StoreI, bool) {
 }
 
 // TODO likely a memory leak here from un-discarded stores
-func setupStateMachine(height uint64, s lib.StoreI, w http.ResponseWriter) (*fsm.StateMachine, bool) {
-	state, err := fsm.New(conf, s, logger)
+func setupStateMachine(height uint64, w http.ResponseWriter) (*fsm.StateMachine, bool) {
+	state, err := app.CanopyFSM().TimeMachine(height)
 	if err != nil {
-		write(w, ErrNewFSM(err), http.StatusInternalServerError)
-		return nil, false
-	}
-	if height != 0 {
-		state, err = state.TimeMachine(height)
-		if err != nil {
-			write(w, ErrTimeMachine(err), http.StatusInternalServerError)
-		}
+		write(w, ErrTimeMachine(err), http.StatusInternalServerError)
 	}
 	return state, true
 }
