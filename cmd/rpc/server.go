@@ -196,10 +196,10 @@ var (
 	}
 )
 
-//go:embed all:web/explorer/out
+//go:embed all:/cmd/rpc/web/explorer/out
 var explorerFS embed.FS
 
-//go:embed all:web/wallet/out
+//go:embed all:/cmd/rpc/web/explorer/out
 var walletFS embed.FS
 
 const (
