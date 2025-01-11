@@ -119,7 +119,4 @@ Flags:
   <a href="https://discord.gg/pNcSJj7Wdh">
     <img src="https://img.shields.io/badge/discord-online-blue.svg">
   </a>
-  <a href="https://research.canopy.network">
-    <img src="https://img.shields.io/discourse/https/research.canopy.network/posts.svg">
-  </a>
 </div>
