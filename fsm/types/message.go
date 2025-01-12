@@ -87,9 +87,9 @@ func (x *MessageSend) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageSend struct {
-	FromAddress lib.HexBytes `json:"from_address,omitempty"`
-	ToAddress   lib.HexBytes `json:"to_address,omitempty"`
-	Amount      uint64       `json:"amount,omitempty"`
+	FromAddress lib.HexBytes `json:"from_address"`
+	ToAddress   lib.HexBytes `json:"to_address"`
+	Amount      uint64       `json:"amount"`
 }
 
 var _ lib.MessageI = &MessageStake{} // interface enforcement
@@ -123,6 +123,8 @@ func (x MessageStake) MarshalJSON() ([]byte, error) {
 		Committees:    x.Committees,
 		NetAddress:    x.NetAddress,
 		OutputAddress: x.OutputAddress,
+		Delegate:      x.Delegate,
+		Compound:      x.Compound,
 	})
 }
 
@@ -135,19 +137,23 @@ func (x *MessageStake) UnmarshalJSON(b []byte) (err error) {
 	*x = MessageStake{
 		PublicKey:     j.PublicKey,
 		Amount:        j.Amount,
-		Committees:    x.Committees,
+		Committees:    j.Committees,
 		NetAddress:    j.NetAddress,
 		OutputAddress: j.OutputAddress,
+		Delegate:      j.Delegate,
+		Compound:      j.Compound,
 	}
 	return
 }
 
 type jsonMessageStake struct {
-	PublicKey     lib.HexBytes `json:"public_key,omitempty"`
-	Amount        uint64       `json:"amount,omitempty"`
-	Committees    []uint64     `json:"committees,omitempty"`
-	NetAddress    string       `json:"net_address,omitempty"`
-	OutputAddress lib.HexBytes `json:"output_address,omitempty"`
+	PublicKey     lib.HexBytes `json:"public_key"`
+	Amount        uint64       `json:"amount"`
+	Committees    []uint64     `json:"committees"`
+	NetAddress    string       `json:"net_address"`
+	OutputAddress lib.HexBytes `json:"output_address"`
+	Delegate      bool         `json:"delegate"`
+	Compound      bool         `json:"compound"`
 }
 
 var _ lib.MessageI = &MessageEditStake{} // interface enforcement
@@ -181,6 +187,7 @@ func (x MessageEditStake) MarshalJSON() ([]byte, error) {
 		Committees:    x.Committees,
 		NetAddress:    x.NetAddress,
 		OutputAddress: x.OutputAddress,
+		Compound:      x.Compound,
 	})
 }
 
@@ -193,19 +200,21 @@ func (x *MessageEditStake) UnmarshalJSON(b []byte) (err error) {
 	*x = MessageEditStake{
 		Address:       j.Address,
 		Amount:        j.Amount,
-		Committees:    x.Committees,
+		Committees:    j.Committees,
 		NetAddress:    j.NetAddress,
 		OutputAddress: j.OutputAddress,
+		Compound:      j.Compound,
 	}
 	return
 }
 
 type jsonMessageEditStake struct {
-	Address       lib.HexBytes `json:"address,omitempty"`
-	Amount        uint64       `json:"amount,omitempty"`
-	Committees    []uint64     `json:"committees,omitempty"`
-	NetAddress    string       `json:"net_address,omitempty"`
-	OutputAddress lib.HexBytes `json:"output_address,omitempty"`
+	Address       lib.HexBytes `json:"address"`
+	Amount        uint64       `json:"amount"`
+	Committees    []uint64     `json:"committees"`
+	NetAddress    string       `json:"net_address"`
+	OutputAddress lib.HexBytes `json:"output_address"`
+	Compound      bool         `json:"compound"`
 }
 
 var _ lib.MessageI = &MessageUnstake{} // interface enforcement
@@ -232,7 +241,7 @@ func (x *MessageUnstake) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonHexAddressMsg struct {
-	Address lib.HexBytes `json:"address,omitempty"`
+	Address lib.HexBytes `json:"address"`
 }
 
 var _ lib.MessageI = &MessagePause{} // interface enforcement
@@ -358,12 +367,12 @@ func (x *MessageChangeParameter) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageChangeParameter struct {
-	ParameterSpace string       `json:"parameter_space,omitempty"`
-	ParameterKey   string       `json:"parameter_key,omitempty"`
-	ParameterValue any          `json:"parameter_value,omitempty"`
-	StartHeight    uint64       `json:"start_height,omitempty"`
-	EndHeight      uint64       `json:"end_height,omitempty"`
-	Signer         lib.HexBytes `json:"signer,omitempty"`
+	ParameterSpace string       `json:"parameter_space"`
+	ParameterKey   string       `json:"parameter_key"`
+	ParameterValue any          `json:"parameter_value"`
+	StartHeight    uint64       `json:"start_height"`
+	EndHeight      uint64       `json:"end_height"`
+	Signer         lib.HexBytes `json:"signer"`
 }
 
 func (x *MessageChangeParameter) Name() string      { return MessageChangeParameterName }
@@ -413,10 +422,10 @@ func (x *MessageDAOTransfer) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageDaoTransfer struct {
-	Address     lib.HexBytes `json:"address,omitempty"`
-	Amount      uint64       `json:"amount,omitempty"`
-	StartHeight uint64       `json:"start_height,omitempty"`
-	EndHeight   uint64       `json:"end_height,omitempty"`
+	Address     lib.HexBytes `json:"address"`
+	Amount      uint64       `json:"amount"`
+	StartHeight uint64       `json:"start_height"`
+	EndHeight   uint64       `json:"end_height"`
 }
 
 var _ lib.MessageI = &MessageCertificateResults{} // interface enforcement
@@ -477,7 +486,7 @@ func (x *MessageCertificateResults) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageCertificateResults struct {
-	Qc *lib.QuorumCertificate `json:"qc,omitempty"`
+	Qc *lib.QuorumCertificate `json:"qc"`
 }
 
 var _ lib.MessageI = &MessageSubsidy{} // interface enforcement
@@ -526,10 +535,10 @@ func (x *MessageSubsidy) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageSubsidy struct {
-	Address     lib.HexBytes `json:"address,omitempty"`
-	CommitteeId uint64       `json:"committee_id,omitempty"`
-	Amount      uint64       `json:"amount,omitempty"`
-	Opcode      string       `json:"opcode,omitempty"`
+	Address     lib.HexBytes `json:"address"`
+	CommitteeId uint64       `json:"committee_id"`
+	Amount      uint64       `json:"amount"`
+	Opcode      string       `json:"opcode"`
 }
 
 var _ lib.MessageI = &MessageCreateOrder{} // interface enforcement
@@ -577,11 +586,11 @@ func (x *MessageCreateOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageCreateOrder struct {
-	CommitteeId          uint64       `json:"CommitteeId,omitempty"`
-	AmountForSale        uint64       `json:"AmountForSale,omitempty"`
-	RequestedAmount      uint64       `json:"RequestedAmount,omitempty"`
-	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress,omitempty"`
-	SellersSellAddress   lib.HexBytes `json:"SellersSellAddress,omitempty"`
+	CommitteeId          uint64       `json:"CommitteeId"`
+	AmountForSale        uint64       `json:"AmountForSale"`
+	RequestedAmount      uint64       `json:"RequestedAmount"`
+	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress"`
+	SellersSellAddress   lib.HexBytes `json:"SellersSellAddress"`
 }
 
 var _ lib.MessageI = &MessageEditOrder{} // interface enforcement
@@ -629,11 +638,11 @@ func (x *MessageEditOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageEditOrder struct {
-	OrderId              uint64       `json:"OrderId,omitempty"`
-	CommitteeId          uint64       `json:"CommitteeId,omitempty"`
-	AmountForSale        uint64       `json:"AmountForSale,omitempty"`
-	RequestedAmount      uint64       `json:"RequestedAmount,omitempty"`
-	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress,omitempty"`
+	OrderId              uint64       `json:"OrderId"`
+	CommitteeId          uint64       `json:"CommitteeId"`
+	AmountForSale        uint64       `json:"AmountForSale"`
+	RequestedAmount      uint64       `json:"RequestedAmount"`
+	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress"`
 }
 
 var _ lib.MessageI = &MessageDeleteOrder{} // interface enforcement
@@ -667,8 +676,8 @@ func (x *MessageDeleteOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageDeleteOrder struct {
-	OrderId     uint64 `json:"OrderId,omitempty"`
-	CommitteeId uint64 `json:"CommitteeId,omitempty"`
+	OrderId     uint64 `json:"OrderId"`
+	CommitteeId uint64 `json:"CommitteeId"`
 }
 
 // checkAmount() validates the amount sent in the Message

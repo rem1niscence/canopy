@@ -22,14 +22,14 @@ const transactionButtons = [
 export default function Accounts({keygroup, account, validator}) {
     const [state, setState] = useState(
         {
-            showModal: false, txType: "send", txResult: {}, showSubmit: true, showPKModal: false,
+            showModal: false, txType: "send", txResult: {}, showSubmit: true, showPKModal: false, showPKImportModal: false,
             showNewModal: false, pk: {}, toast: "", showSpinner: false
         }
     ), acc = account.account
 
     // resetState() resets the state back to its initial
     function resetState() {
-        setState({...state, pk: {}, txResult: {}, showSubmit: true, showModal: false, showPKModal: false, showNewModal: false})
+        setState({...state, pk: {}, txResult: {}, showSubmit: true, showModal: false, showPKModal: false, showNewModal: false, showPKImportModal: false})
     }
 
     // showModal() makes the modal visible
@@ -83,12 +83,12 @@ export default function Accounts({keygroup, account, validator}) {
     function onTxFormSubmit(e) {
         onFormSubmit(state, e, (r) => {
             const submit = Object.keys(state.txResult).length !== 0
-
+            console.log(r)
             // Mapping transaction types to their respective functions
             const txMap = {
                 "send": () => TxSend(r.sender, r.recipient, Number(r.amount), r.memo, r.fee, r.password, submit),
-                "stake": () => TxStake(r.sender, r.committees, r.net_address, Number(r.amount), r.output, r.memo, r.fee, r.password, submit),
-                "edit-stake": () => TxEditStake(r.sender, r.committees, r.net_address, Number(r.amount), r.output, r.memo, r.fee, r.password, submit),
+                "stake": () => TxStake(r.sender, r.committees, r.net_address, Number(r.amount), r.delegate, r.earlyWithdrawal, r.output, r.memo, r.fee, r.password, submit),
+                "edit-stake": () => TxEditStake(r.sender, r.committees, r.net_address, Number(r.amount), r.earlyWithdrawal, r.output, r.memo, r.fee, r.password, submit),
                 "unstake": () => TxUnstake(r.sender, r.memo, r.fee, r.password, submit),
                 "pause": () => TxPause(r.sender, r.memo, r.fee, r.password, submit),
                 "unpause": () => TxUnpause(r.sender, r.memo, r.fee, r.password, submit),
@@ -121,6 +121,11 @@ export default function Accounts({keygroup, account, validator}) {
         switch (type) {
             case "import-or-generate":
                 return renderSubmitBtn("Import or Generate Key")
+            case "import-pk":
+                return <>
+                    {renderSubmitBtn("Import Key", "outline-danger")}
+                    {renderCloseBtn(resetState)}
+                </>
             case "new-pk":
                 return <>
                     {renderSubmitBtn("Generate New Key")}
@@ -307,6 +312,10 @@ export default function Accounts({keygroup, account, validator}) {
             {renderTransactions()}
             {renderToast(state, setState)}
             {renderModal(state.showPKModal, "Private Key", "pass-and-addr", onPKFormSubmit, acc, null, resetState, "reveal-pk")}
+            {renderModal(state.showPKImportModal, "Private Key", "pass-and-pk", () => {
+                onImportOrGenerateSubmit();
+                resetState()
+            }, acc, null, resetState, "import-pk")}
             {renderModal(state.showNewModal, "Private Key", "pass-only", onNewPKFormSubmit, null, null, resetState, "new-pk")}
             <Button
                 id="pk-button"
@@ -314,6 +323,13 @@ export default function Accounts({keygroup, account, validator}) {
                 onClick={() => setState({...state, showNewModal: true})}
             >
                 New Private Key
+            </Button>
+            <Button
+                id="import-pk-button"
+                variant="outline-secondary"
+                onClick={() => setState({...state, showPKImportModal: true})}
+            >
+                Import Private Key
             </Button>
             <Button
                 id="reveal-pk-button"

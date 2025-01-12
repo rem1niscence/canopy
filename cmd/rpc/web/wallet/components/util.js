@@ -5,6 +5,8 @@ import {OverlayTrigger, Toast, ToastContainer, Tooltip} from "react-bootstrap";
 export function getFormInputs(type, account, validator) {
     let amount = null
     let netAddr = validator && validator.address ? validator.net_address : ""
+    let delegate = validator && validator.address ? validator.delegate : false
+    let compound = validator && validator.address ? validator.compound : false
     let output = validator && validator.address ? validator.output : ""
     let address = account != null ? account.address : ""
     let committeeList = validator && validator.address ? validator.committees.join(','): ""
@@ -29,7 +31,7 @@ export function getFormInputs(type, account, validator) {
         address: {
             "placeholder": "id of the node",
             "defaultValue": address,
-            "tooltip": "required: the sender of the transaction",
+            "tooltip": "the sender of the transaction",
             "label": "sender",
             "inputText": "address",
             "feedback": "please choose an address to send the transaction from",
@@ -41,7 +43,7 @@ export function getFormInputs(type, account, validator) {
         committees: {
             "placeholder": "1, 22, 50",
             "defaultValue": committeeList,
-            "tooltip": "Required: Comma-separated list of committee chain IDs to stake for",
+            "tooltip": "comma separated list of committee chain IDs to stake for",
             "label": "committees",
             "inputText": "committees",
             "feedback": "please input atleast 1 committee",
@@ -53,7 +55,7 @@ export function getFormInputs(type, account, validator) {
         netAddr: {
             "placeholder": "url of the node",
             "defaultValue": netAddr,
-            "tooltip": "required: the url of the validator for consensus and polling",
+            "tooltip": "the url of the validator for consensus and polling",
             "label": "net_address",
             "inputText": "net-addr",
             "feedback": "please choose a net address for the validator",
@@ -62,10 +64,34 @@ export function getFormInputs(type, account, validator) {
             "minLength": 5,
             "maxLength": 50,
         },
+        earlyWithdrawal: {
+            "placeholder": "early withdrawal rewards for 20% penalty",
+            "defaultValue": !compound,
+            "tooltip": "validator NOT reinvesting their rewards to their stake, incurring a 20% penalty",
+            "label": "earlyWithdrawal",
+            "inputText": "withdrawal",
+            "feedback": "please choose if your validator to earlyWithdrawal or not",
+            "required": true,
+            "type": "text",
+            "minLength": 4,
+            "maxLength": 5,
+        },
+        delegate: {
+            "placeholder": "validator delegation status",
+            "defaultValue": delegate,
+            "tooltip": "validator is passively delegating rather than actively validating. NOTE: THIS FIELD IS FIXED AND CANNOT BE UPDATED WITH EDIT-STAKE",
+            "label": "delegate",
+            "inputText": "delegate",
+            "feedback": "please choose if your validator is delegating or not",
+            "required": true,
+            "type": "text",
+            "minLength": 4,
+            "maxLength": 5,
+        },
         rec: {
             "placeholder": "recipient of the tx",
             "defaultValue": "",
-            "tooltip": "required: the recipient of the transaction",
+            "tooltip": "the recipient of the transaction",
             "label": "recipient",
             "inputText": "recipient",
             "feedback": "please choose a recipient for the transaction",
@@ -77,7 +103,7 @@ export function getFormInputs(type, account, validator) {
         amount: {
             "placeholder": "amount value for the tx",
             "defaultValue": amount,
-            "tooltip": "required: the amount of currency being sent / sold",
+            "tooltip": "the amount of currency being sent / sold",
             "label": "amount",
             "inputText": "amount",
             "feedback": "please choose an amount for the tx",
@@ -89,7 +115,7 @@ export function getFormInputs(type, account, validator) {
         receiveAmount: {
             "placeholder": "amount of counter asset to receive",
             "defaultValue": amount,
-            "tooltip": "required: the amount of counter asset being received",
+            "tooltip": "the amount of counter asset being received",
             "label": "receiveAmount",
             "inputText": "rec-amount",
             "feedback": "please choose a receive amount for the tx",
@@ -100,7 +126,7 @@ export function getFormInputs(type, account, validator) {
         },
         orderId: {
             "placeholder": "the id of the existing order",
-            "tooltip": "required: the unique identifier of the order",
+            "tooltip": "the unique identifier of the order",
             "label": "orderId",
             "inputText": "order-id",
             "feedback": "please input an order id",
@@ -111,7 +137,7 @@ export function getFormInputs(type, account, validator) {
         },
         committeeId: {
             "placeholder": "the id of the committee / counter asset",
-            "tooltip": "required: the unique identifier of the committee / counter asset",
+            "tooltip": "the unique identifier of the committee / counter asset",
             "label": "committeeId",
             "inputText": "commit-Id",
             "feedback": "please input a committeeId id",
@@ -122,7 +148,7 @@ export function getFormInputs(type, account, validator) {
         },
         receiveAddress: {
             "placeholder": "the address where the counter asset will be sent",
-            "tooltip": "required: the sender of the transaction",
+            "tooltip": "the sender of the transaction",
             "label": "receiveAddress",
             "inputText": "rec-addr",
             "feedback": "please choose an address to receive the counter asset to",
@@ -134,7 +160,7 @@ export function getFormInputs(type, account, validator) {
         output: {
             "placeholder": "output of the node",
             "defaultValue": output,
-            "tooltip": "required: the non-custodial address where rewards and stake is directed to",
+            "tooltip": "the non-custodial address where rewards and stake is directed to",
             "label": "output",
             "inputText": "output",
             "feedback": "please choose an output address for the validator",
@@ -146,7 +172,7 @@ export function getFormInputs(type, account, validator) {
         paramSpace: {
             "placeholder": "",
             "defaultValue": "",
-            "tooltip": "required: the category 'space' of the parameter",
+            "tooltip": "the category 'space' of the parameter",
             "label": "param_space",
             "inputText": "param space",
             "feedback": "please choose a space for the parameter change",
@@ -158,7 +184,7 @@ export function getFormInputs(type, account, validator) {
         paramKey: {
             "placeholder": "",
             "defaultValue": "",
-            "tooltip": "required: the identifier of the parameter",
+            "tooltip": "the identifier of the parameter",
             "label": "param_key",
             "inputText": "param key",
             "feedback": "please choose a key for the parameter change",
@@ -170,7 +196,7 @@ export function getFormInputs(type, account, validator) {
         paramValue: {
             "placeholder": "",
             "defaultValue": "",
-            "tooltip": "required: the newly proposed value of the parameter",
+            "tooltip": "the newly proposed value of the parameter",
             "label": "param_value",
             "inputText": "param val",
             "feedback": "please choose a value for the parameter change",
@@ -182,7 +208,7 @@ export function getFormInputs(type, account, validator) {
         startBlock: {
             "placeholder": "1",
             "defaultValue": "",
-            "tooltip": "required: the block when voting starts",
+            "tooltip": "the block when voting starts",
             "label": "start_block",
             "inputText": "start blk",
             "feedback": "please choose a height for start block",
@@ -194,7 +220,7 @@ export function getFormInputs(type, account, validator) {
         endBlock: {
             "placeholder": "100",
             "defaultValue": "",
-            "tooltip": "required: the block when voting is counted",
+            "tooltip": "the block when voting is counted",
             "label": "end_block",
             "inputText": "end blk",
             "feedback": "please choose a height for end block",
@@ -242,7 +268,7 @@ export function getFormInputs(type, account, validator) {
         case "send":
             return [a.address, a.rec, a.amount, a.memo, a.fee, a.password]
         case "stake":
-            return [a.address, a.committees, a.netAddr, a.amount, a.output, a.memo, a.fee, a.password]
+            return [a.address, a.committees, a.netAddr, a.amount, a.delegate, a.earlyWithdrawal, a.output, a.memo, a.fee, a.password]
         case "create_order":
             return [a.address, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password]
         case "edit_order":
@@ -250,7 +276,7 @@ export function getFormInputs(type, account, validator) {
         case "delete_order":
             return [a.address, a.committeeId, a.orderId, a.memo, a.fee, a.password]
         case "edit-stake":
-            return [a.address, a.committees, a.netAddr, a.amount, a.output, a.memo, a.fee, a.password]
+            return [a.address, a.committees, a.netAddr, a.amount, a.earlyWithdrawal, a.output, a.memo, a.fee, a.password]
         case "change-param":
             return [a.address, a.paramSpace, a.paramKey, a.paramValue, a.startBlock, a.endBlock, a.memo, a.fee, a.password]
         case "dao-transfer":

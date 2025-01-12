@@ -277,6 +277,22 @@
     margin: 10px;
 }
 
+
+#import-pk-button {
+    color: grey;
+    border-color: grey;
+    margin: 10px;
+}
+
+#import-pk-button:hover {
+    background-color: grey;
+    color: white;
+}
+
+#import-pk-button:hover {
+    margin: 10px;
+}
+
 .recent-transactions-table {
     margin: 0 auto;
     width: 70%;

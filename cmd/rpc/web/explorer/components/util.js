@@ -45,6 +45,9 @@ export function convertIfTime(key, value) {
     if (key.includes("time")) {
         return convertTime(value)
     }
+    if (typeof value === "boolean") {
+        return String(value)
+    }
     return value
 }
 

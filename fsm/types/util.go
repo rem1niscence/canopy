@@ -141,14 +141,16 @@ func (x *Pool) UnmarshalJSON(bz []byte) (err error) {
 
 // validator is the json.Marshaller and json.Unmarshaler implementation for the Validator object
 type validator struct {
-	Address         *crypto.Address           `json:"address,omitempty"`
-	PublicKey       *crypto.BLS12381PublicKey `json:"public_key,omitempty"`
-	Committees      []uint64                  `json:"committees,omitempty"`
-	NetAddress      string                    `json:"net_address,omitempty"`
-	StakedAmount    uint64                    `json:"staked_amount,omitempty"`
-	MaxPausedHeight uint64                    `json:"max_paused_height,omitempty"`
-	UnstakingHeight uint64                    `json:"unstaking_height,omitempty"`
-	Output          *crypto.Address           `json:"output,omitempty"`
+	Address         *crypto.Address           `json:"address"`
+	PublicKey       *crypto.BLS12381PublicKey `json:"public_key"`
+	Committees      []uint64                  `json:"committees"`
+	NetAddress      string                    `json:"net_address"`
+	StakedAmount    uint64                    `json:"staked_amount"`
+	MaxPausedHeight uint64                    `json:"max_paused_height"`
+	UnstakingHeight uint64                    `json:"unstaking_height"`
+	Output          *crypto.Address           `json:"output"`
+	Delegate        bool                      `json:"delegate"`
+	Compound        bool                      `json:"compound"`
 }
 
 // MarshalJSON() is the json.Marshaller implementation for the Validator object
@@ -160,12 +162,14 @@ func (x *Validator) MarshalJSON() ([]byte, error) {
 	return json.Marshal(validator{
 		Address:         crypto.NewAddressFromBytes(x.Address).(*crypto.Address),
 		PublicKey:       publicKey.(*crypto.BLS12381PublicKey),
+		Committees:      x.Committees,
 		NetAddress:      x.NetAddress,
 		StakedAmount:    x.StakedAmount,
-		Committees:      x.Committees,
 		MaxPausedHeight: x.MaxPausedHeight,
 		UnstakingHeight: x.UnstakingHeight,
 		Output:          crypto.NewAddressFromBytes(x.Output).(*crypto.Address),
+		Delegate:        x.Delegate,
+		Compound:        x.Compound,
 	})
 }
 
@@ -175,9 +179,18 @@ func (x *Validator) UnmarshalJSON(bz []byte) error {
 	if err := json.Unmarshal(bz, val); err != nil {
 		return err
 	}
-	x.Address, x.PublicKey, x.Committees = val.Address.Bytes(), val.PublicKey.Bytes(), val.Committees
-	x.StakedAmount, x.NetAddress, x.Output = val.StakedAmount, val.NetAddress, val.Output.Bytes()
-	x.MaxPausedHeight, x.UnstakingHeight = val.MaxPausedHeight, val.UnstakingHeight
+	*x = Validator{
+		Address:         val.Address.Bytes(),
+		PublicKey:       val.PublicKey.Bytes(),
+		NetAddress:      val.NetAddress,
+		StakedAmount:    val.StakedAmount,
+		Committees:      val.Committees,
+		MaxPausedHeight: val.MaxPausedHeight,
+		UnstakingHeight: val.UnstakingHeight,
+		Output:          val.Output.Bytes(),
+		Delegate:        val.Delegate,
+		Compound:        val.Compound,
+	}
 	return nil
 }
 
