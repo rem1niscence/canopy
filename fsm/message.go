@@ -210,7 +210,7 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 	var amountToAdd uint64
 	switch {
 	case msg.Amount < val.StakedAmount: // amount less than stake
-		return types.ErrInvalidAmount()
+		// let it through, but use the old stake amount for to avoid race conditions when combined with auto-compounding
 	case msg.Amount == val.StakedAmount: // amount equals stake
 	case msg.Amount > val.StakedAmount: // amount greater than stake
 		amountToAdd = msg.Amount - val.StakedAmount
