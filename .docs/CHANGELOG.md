@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [Unreleased] - 1/12/2024
+- Removed json omitempty for Messages 
+- Added `out` directories to git for Web Wallet & Block Explorer
+- Auto-import the key-stores in the 2 node setup
+- Added password prompt when first starting to import
+- Added delegate and compound functionality to web wallet
+
 ## [Unreleased] - 12/30/2024
 - Fixed total supply bug where it counts burned rewards
 - Wallet UI fixes
