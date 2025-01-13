@@ -98,9 +98,15 @@ func (c *Controller) ResetBFTCallback(committeeID uint64) {
 		c.log.Errorf("failed retrieving committee when trigger occurred %s", err.Error())
 		return
 	}
+	newCommittee, e := c.LoadCommittee(chain.Consensus.CommitteeId, c.CanopyFSM().Height())
+	if e != nil {
+		c.log.Error(e.Error())
+		return
+	}
 	// reset the consensus for that particular chain
 	chain.Consensus.ResetBFTChan() <- bft.ResetBFT{
 		Height:              chain.Plugin.Height() - 1,
+		UpdatedCommitteeSet: newCommittee,
 		UpdatedCanopyHeight: c.CanopyFSM().Height(),
 		ProcessTime:         time.Duration(0),
 	}

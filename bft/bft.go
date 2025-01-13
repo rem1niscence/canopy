@@ -135,7 +135,7 @@ func (b *BFT) Start() {
 				} else { // (b) Target block reset
 					b.log.Info("Resetting BFT timers after receiving a new Target block (NEW_HEIGHT)")
 					// set the height of the bft (this is usefule during syncing)
-					b.Height = resetBFT.Height
+					b.Height, b.ValidatorSet = resetBFT.Height, resetBFT.UpdatedCommitteeSet
 					// reset BFT variables and start VDF
 					b.NewHeight()
 					// start BFT over after sleeping CommitProcessMS

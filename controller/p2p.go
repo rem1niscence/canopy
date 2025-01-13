@@ -353,19 +353,19 @@ func (c *Controller) ListenForBlock() {
 				newCanopyHeight := c.CanopyFSM().Height()
 				// for each chain (that isn't canopy)
 				for _, chain := range c.Chains {
-					if chain.Consensus.CommitteeId == lib.CanopyCommitteeId {
-						// reset the canopy BFT as if it was a target chain
-						c.Chains[blockMessage.CommitteeId].Consensus.ResetBFTChan() <- bft.ResetBFT{
-							Height:              chain.Plugin.Height() - 1,
-							UpdatedCommitteeSet: bft.ValSet{},
-							ProcessTime:         time.Since(startTime),
-						}
-						continue
-					}
 					// load the new committee
 					newCommittee, e := c.LoadCommittee(chain.Consensus.CommitteeId, newCanopyHeight)
 					if e != nil {
 						c.log.Error(e.Error())
+						continue
+					}
+					if chain.Consensus.CommitteeId == lib.CanopyCommitteeId {
+						// reset the canopy BFT as if it was a target chain
+						c.Chains[blockMessage.CommitteeId].Consensus.ResetBFTChan() <- bft.ResetBFT{
+							Height:              chain.Plugin.Height() - 1,
+							UpdatedCommitteeSet: newCommittee,
+							ProcessTime:         time.Since(startTime),
+						}
 						continue
 					}
 					// reset & update the consensus module
@@ -374,9 +374,15 @@ func (c *Controller) ListenForBlock() {
 				// update the peer 'must connect'
 				c.UpdateP2PMustConnect()
 			} else {
-				chain := c.Chains[blockMessage.CommitteeId]
+				chain, canopyHeight := c.Chains[blockMessage.CommitteeId], c.CanopyFSM().Height()
+				// load the new committee
+				newCommittee, e := c.LoadCommittee(chain.Consensus.CommitteeId, canopyHeight)
+				if e != nil {
+					c.log.Error(e.Error())
+					return
+				}
 				// block for a different committee than Canopy (standard case)
-				chain.Consensus.ResetBFTChan() <- bft.ResetBFT{ProcessTime: time.Since(startTime), UpdatedCanopyHeight: c.CanopyFSM().Height(), Height: chain.Plugin.Height() - 1}
+				chain.Consensus.ResetBFTChan() <- bft.ResetBFT{UpdatedCommitteeSet: newCommittee, ProcessTime: time.Since(startTime), UpdatedCanopyHeight: c.CanopyFSM().Height(), Height: chain.Plugin.Height() - 1}
 			}
 		}()
 		// if quit signaled, exit the loop
@@ -776,10 +782,17 @@ func (c *Controller) finishSyncing(committeeID uint64) {
 	defer c.Unlock()
 	// get the chain from the controller map
 	chain := c.Chains[committeeID]
+	// load the new committee
+	newCommittee, e := c.LoadCommittee(chain.Consensus.CommitteeId, c.CanopyFSM().Height())
+	if e != nil {
+		c.log.Error(e.Error())
+		return
+	}
 	// signal a reset of bft for the chain
 	chain.Consensus.ResetBFTChan() <- bft.ResetBFT{
-		Height:      chain.Plugin.Height() - 1,
-		ProcessTime: time.Since(c.LoadLastCommitTime(committeeID, chain.Plugin.Height())),
+		Height:              chain.Plugin.Height() - 1,
+		UpdatedCommitteeSet: newCommittee,
+		ProcessTime:         time.Since(c.LoadLastCommitTime(committeeID, chain.Plugin.Height())),
 	}
 	// set syncing to false
 	chain.isSyncing.Store(false)
