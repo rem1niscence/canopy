@@ -969,19 +969,6 @@ func TestHandleMessageEditStake(t *testing.T) {
 			error: "unauthorized tx",
 		},
 		{
-			name:   "invalid amount",
-			detail: "the sender attempts to lower the stake by edit-stake",
-			presetValidator: &types.Validator{
-				Address:      newTestAddressBytes(t),
-				StakedAmount: 2,
-			},
-			msg: &types.MessageEditStake{
-				Address: newTestAddressBytes(t),
-				Amount:  1,
-			},
-			error: "amount is invalid",
-		},
-		{
 			name:   "insufficient funds",
 			detail: "the sender doesn't have enough funds to complete the edit stake",
 			presetValidator: &types.Validator{

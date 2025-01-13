@@ -429,6 +429,15 @@ func (b *BFT) StartCommitPhase() {
 		b.RoundInterrupt()
 		return
 	}
+	// send the proposal (reward) transaction
+	b.SendCertificateResultsTx(b.CommitteeId, &QC{
+		Header:      vote.Qc.Header,       // vote view
+		BlockHash:   crypto.Hash(b.Block), // vote block payload
+		ResultsHash: b.Results.Hash(),     // vote certificate results payload
+		Results:     b.Results,
+		ProposerKey: b.ProposerKey,
+		Signature:   as,
+	})
 	// SEND MSG TO REPLICAS
 	b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
 		Header: b.Copy(), // header
@@ -468,10 +477,6 @@ func (b *BFT) StartCommitProcessPhase() {
 	}
 	// gossip committed block message to peers
 	b.GossipBlock(b.CommitteeId, msg.Qc)
-	// if leader: send the proposal (reward) transaction
-	if b.SelfIsProposer() {
-		b.SendCertificateResultsTx(b.CommitteeId, msg.Qc)
-	}
 }
 
 // RoundInterrupt() begins the ROUND-INTERRUPT phase after any phase errors
