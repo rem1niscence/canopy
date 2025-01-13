@@ -592,9 +592,11 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	// COMMIT_MSG and sending it after the next block is produces
 	if keepLocks == nil || !keepLocks[0] {
 		b.HighQC = nil
-		// begin the verifiable delay function for the next height
-		if err := b.RunVDF(); err != nil {
-			b.log.Errorf("RunVDF() failed with error, %s", err.Error())
+		if b.SelfIsValidator() {
+			// begin the verifiable delay function for the next height
+			if err := b.RunVDF(); err != nil {
+				b.log.Errorf("RunVDF() failed with error, %s", err.Error())
+			}
 		}
 		b.Height++
 		b.CanopyHeight = b.Controller.GetCanopyHeight()

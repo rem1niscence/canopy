@@ -348,6 +348,7 @@ func (c *Controller) ListenForBlock() {
 			// gossip the block to the node's peers
 			c.GossipBlock(blockMessage.CommitteeId, qc)
 			// check if the block is for the Canopy (special case)
+			// CANOPY UPDATE
 			if blockMessage.CommitteeId == lib.CanopyCommitteeId {
 				// a new canopy block means all BFTs are reset with updated committees which prevents conflicting validator sets among peers
 				newCanopyHeight := c.CanopyFSM().Height()
@@ -374,6 +375,7 @@ func (c *Controller) ListenForBlock() {
 				// update the peer 'must connect'
 				c.UpdateP2PMustConnect()
 			} else {
+				// OTHER CHAIN UPDATE
 				chain, canopyHeight := c.Chains[blockMessage.CommitteeId], c.CanopyFSM().Height()
 				// load the new committee
 				newCommittee, e := c.LoadCommittee(chain.Consensus.CommitteeId, canopyHeight)
