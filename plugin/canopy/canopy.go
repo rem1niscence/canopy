@@ -22,7 +22,7 @@ var _ plugin.CanopyPlugin = new(Plugin)
 
 const (
 	// BlockTimeMinusConsensus is the block time less the time it takes to complete the BFT phase
-	BlockTimeMinusConsensus = 9*time.Minute + 40*time.Second
+	BlockTimeMinusConsensus = 9*time.Minute + 40*time.Second // TODO currently the consensus timing is not controlled by the committee plugin
 )
 
 // canopy.Plugin is the Canopy implementation of the plugin.Plugin interface
