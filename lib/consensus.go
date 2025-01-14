@@ -2,6 +2,7 @@ package lib
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -480,4 +481,58 @@ func (x *DoubleSigner) Equals(d *DoubleSigner) bool {
 		return false
 	}
 	return slices.Equal(x.Heights, d.Heights)
+}
+
+// SortitionData is the seed data for the IsCandidate and VRF functions
+type SortitionData struct {
+	LastProposerAddresses [][]byte // the last N proposers addresses prevents any grinding attacks
+	Height                uint64   // the height ensures unique proposer selection for each height
+	Round                 uint64   // the round ensures unique proposer selection for each round
+	TotalValidators       uint64   // the count of validators in the set
+	TotalPower            uint64   // the total power of all validators in the set
+	VotingPower           uint64   // the amount of voting power the node has
+}
+
+// PseudorandomParams are the input params to run the Stake-Weighted-Pseudorandom fallback leader selection algorithm
+type PseudorandomParams struct {
+	*SortitionData                      // seed data the peer used for sortition
+	ValidatorSet   *ConsensusValidators // the set of validators
+}
+
+// WeightedPseudorandom() runs the 'no candidates' backup algorithm
+// - generates an index for the 'token' that is our Leader from the seed data
+func WeightedPseudorandom(p *PseudorandomParams) (publicKey crypto.PublicKeyI) {
+	// convert the seed data to a 16 byte hash, so it may fit in a uint64 type
+	seed := FormatSortitionInput(p.LastProposerAddresses, p.Height, p.Round)[:16]
+	// convert the seedBytes into a uint64 number
+	seedUint64 := binary.BigEndian.Uint64(seed)
+	// ensure that number falls within our 'Total Power'
+	powerIndex := seedUint64 % p.TotalPower
+
+	powerCount := uint64(0)
+	// with this deterministically ordered validator set, iterate until exceeding the power index
+	// as that Validator has the exact randomly chosen 'token' that is the lottery winner
+	for _, v := range p.ValidatorSet.ValidatorSet {
+		// add the voting power to the count
+		powerCount += v.VotingPower
+		// if exceed the powerIndex, that Validator has the exact 'token'
+		if powerCount > powerIndex {
+			// set the winner and exit
+			publicKey, _ = crypto.BytesToBLS12381Public(v.PublicKey)
+			return
+		}
+	}
+	// failsafe: should not happen - use the last validator from the set as the winner
+	publicKey, _ = crypto.BytesToBLS12381Public(p.ValidatorSet.ValidatorSet[len(p.ValidatorSet.ValidatorSet)-1].PublicKey)
+	return
+}
+
+// FormatSortitionInput() returns the 'seed data' for the VRF function
+// `seed = lastNProposerPublicKeys + height + round`
+func FormatSortitionInput(lastNProposerPublicKeys [][]byte, height, round uint64) []byte {
+	var input string
+	for _, key := range lastNProposerPublicKeys {
+		input += BytesToString(key) + "/"
+	}
+	return crypto.Hash([]byte(input + fmt.Sprintf("%d/%d", height, round)))
 }

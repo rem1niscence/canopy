@@ -1,8 +1,6 @@
 package bft
 
 import (
-	"encoding/binary"
-	"fmt"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"math/big"
@@ -46,31 +44,15 @@ func init() {
 
 // SortitionParams are the input params to run the Sortition function
 type SortitionParams struct {
-	*SortitionData                    // the seed data used for sortition
-	PrivateKey     crypto.PrivateKeyI // the private key of the Validator
+	*lib.SortitionData                    // the seed data used for sortition
+	PrivateKey         crypto.PrivateKeyI // the private key of the Validator
 }
 
 // SortitionVerifyParams are the input params to verify the Sortition function
 type SortitionVerifyParams struct {
-	*SortitionData                   // seed data the peer used for sortition
-	Signature      []byte            // the VRF out of the peer
-	PublicKey      crypto.PublicKeyI // the public key of the peer
-}
-
-// SortitionData is the seed data for the IsCandidate and VRF functions
-type SortitionData struct {
-	LastProposerAddresses [][]byte // the last N proposers addresses prevents any grinding attacks
-	Height                uint64   // the height ensures unique proposer selection for each height
-	Round                 uint64   // the round ensures unique proposer selection for each round
-	TotalValidators       uint64   // the count of validators in the set
-	TotalPower            uint64   // the total power of all validators in the set
-	VotingPower           uint64   // the amount of voting power the node has
-}
-
-// PseudorandomParams are the input params to run the Stake-Weighted-Pseudorandom fallback leader selection algorithm
-type PseudorandomParams struct {
-	*SortitionData                          // seed data the peer used for sortition
-	ValidatorSet   *lib.ConsensusValidators // the set of validators
+	*lib.SortitionData                   // seed data the peer used for sortition
+	Signature          []byte            // the VRF out of the peer
+	PublicKey          crypto.PublicKeyI // the public key of the peer
 }
 
 // Sortition() runs the VRF and uses the Hash(output) to determine if IsCandidate
@@ -86,7 +68,7 @@ func VerifyCandidate(p *SortitionVerifyParams) (out []byte, isCandidate bool) {
 		return nil, false
 	}
 	// build the seed data
-	msg := formatInput(p.LastProposerAddresses, p.Height, p.Round)
+	msg := lib.FormatSortitionInput(p.LastProposerAddresses, p.Height, p.Round)
 	// validate the VRF out
 	if !p.PublicKey.VerifyBytes(msg, p.Signature) {
 		return nil, false
@@ -109,10 +91,10 @@ type VRFCandidate struct {
 }
 
 // SelectProposerFromCandidates() chooses the `Leader` by comparing the pre-validated VRF Candidates, no candidates falls back to StakeWeightedRandom selection
-func SelectProposerFromCandidates(candidates []VRFCandidate, data *SortitionData, v *lib.ConsensusValidators) (proposerPubKey []byte) {
+func SelectProposerFromCandidates(candidates []VRFCandidate, data *lib.SortitionData, v *lib.ConsensusValidators) (proposerPubKey []byte) {
 	// if there are no candidates, fallback to StakeWeightedRandom
 	if len(candidates) == 0 {
-		return weightedPseudorandom(&PseudorandomParams{
+		return lib.WeightedPseudorandom(&lib.PseudorandomParams{
 			SortitionData: data,
 			ValidatorSet:  v,
 		}).Bytes()
@@ -137,7 +119,7 @@ func SelectProposerFromCandidates(candidates []VRFCandidate, data *SortitionData
 // for applications like digital signatures, VRFs, and blockchain consensus mechanisms.
 func VRF(lastNProposers [][]byte, height, round uint64, privateKey crypto.PrivateKeyI) *lib.Signature {
 	// generate the seed data that all Validators use during this View
-	vrfIn := formatInput(lastNProposers, height, round)
+	vrfIn := lib.FormatSortitionInput(lastNProposers, height, round)
 	// sign it with the Private Key
 	return &lib.Signature{
 		PublicKey: privateKey.PublicKey().Bytes(),
@@ -154,34 +136,6 @@ func IsCandidate(votingPower, totalVotingPower, expectedCandidates uint64, vrfOu
 	candidateCutoff, _ := new(big.Float).Quo(vPower.Mul(vPower, expCand), totalVPower).Float64() // may be > 1 but that works fine
 	// if VRF is under the candidateCutoff
 	return toFloatBetween0And1(vrfOut) < candidateCutoff
-}
-
-// weightedPseudorandom() runs the 'no candidates' backup algorithm
-// - generates an index for the 'token' that is our Leader from the seed data
-func weightedPseudorandom(p *PseudorandomParams) (publicKey crypto.PublicKeyI) {
-	// convert the seed data to a 16 byte hash, so it may fit in a uint64 type
-	seed := formatInput(p.LastProposerAddresses, p.Height, p.Round)[:16]
-	// convert the seedBytes into a uint64 number
-	seedUint64 := binary.BigEndian.Uint64(seed)
-	// ensure that number falls within our 'Total Power'
-	powerIndex := seedUint64 % p.TotalPower
-
-	powerCount := uint64(0)
-	// with this deterministically ordered validator set, iterate until exceeding the power index
-	// as that Validator has the exact randomly chosen 'token' that is the lottery winner
-	for _, v := range p.ValidatorSet.ValidatorSet {
-		// add the voting power to the count
-		powerCount += v.VotingPower
-		// if exceed the powerIndex, that Validator has the exact 'token'
-		if powerCount > powerIndex {
-			// set the winner and exit
-			publicKey, _ = crypto.BytesToBLS12381Public(v.PublicKey)
-			return
-		}
-	}
-	// failsafe: should not happen - use the last validator from the set as the winner
-	publicKey, _ = crypto.BytesToBLS12381Public(p.ValidatorSet.ValidatorSet[len(p.ValidatorSet.ValidatorSet)-1].PublicKey)
-	return
 }
 
 // expectedCandidates() returns the number of expected candidates based on the committee size within the defined limits
@@ -202,14 +156,4 @@ func toFloatBetween0And1(vrfOut []byte) float64 {
 	f.SetInt(new(big.Int).SetBytes(vrfOut[:]))
 	prob, _ := new(big.Float).Quo(f, maxHashAsFloat).Float64()
 	return prob
-}
-
-// formatInput() returns the 'seed data' for the VRF function
-// `seed = lastNProposerPublicKeys + height + round`
-func formatInput(lastNProposerPublicKeys [][]byte, height, round uint64) []byte {
-	var input string
-	for _, key := range lastNProposerPublicKeys {
-		input += lib.BytesToString(key) + "/"
-	}
-	return crypto.Hash([]byte(input + fmt.Sprintf("%d/%d", height, round)))
 }

@@ -206,7 +206,7 @@ func (tc *testConsensus) simPacemakerPhase(t *testing.T) {
 func (tc *testConsensus) setSortitionData(t *testing.T) {
 	selfVal, err := tc.valSet.GetValidator(tc.valKeys[0].PublicKey().Bytes())
 	require.NoError(t, err)
-	tc.bft.SortitionData = &SortitionData{
+	tc.bft.SortitionData = &lib.SortitionData{
 		LastProposerAddresses: tc.cont.proposers.Addresses,
 		Height:                1,
 		Round:                 0,

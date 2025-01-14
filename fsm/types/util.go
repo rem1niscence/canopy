@@ -328,7 +328,7 @@ func (x *CommitteeData) addPercents(address []byte, percent uint64) {
 		// if already exists
 		if bytes.Equal(address, ep.Address) {
 			// simply add the percent to the previous
-			x.PaymentPercents[i].Percent += ep.Percent
+			x.PaymentPercents[i].Percent += percent
 			return
 		}
 	}

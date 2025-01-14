@@ -3,6 +3,7 @@ package bft
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"math"
@@ -81,7 +82,7 @@ func TestSortitionValidity(t *testing.T) {
 	isCandCount := uint64(0)
 	for i := 0; i < totalIterations; i++ {
 		if isCand := vrfAndCDF(SortitionParams{
-			SortitionData: &SortitionData{
+			SortitionData: &lib.SortitionData{
 				LastProposerAddresses: lastNProposers,
 				Height:                uint64(rand.Intn(math.MaxUint32)),
 				VotingPower:           uint64(power),
@@ -137,14 +138,14 @@ func TestSelectProposerFromCandidates(t *testing.T) {
 	}
 }
 
-func newTestSortitionData(t *testing.T, c *testConsensus) *SortitionData {
+func newTestSortitionData(t *testing.T, c *testConsensus) *lib.SortitionData {
 	var lastNProposers [][]byte
 	for _, k := range c.valKeys {
 		lastNProposers = append(lastNProposers, k.PublicKey().Address().Bytes())
 	}
 	val, err := c.valSet.GetValidator(c.valKeys[0].PublicKey().Bytes())
 	require.NoError(t, err)
-	sortitionData := &SortitionData{
+	sortitionData := &lib.SortitionData{
 		LastProposerAddresses: lastNProposers,
 		Height:                1,
 		Round:                 0,

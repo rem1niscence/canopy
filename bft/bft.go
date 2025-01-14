@@ -20,7 +20,7 @@ type BFT struct {
 	HighQC        *QC                    // the highest PRECOMMIT quorum certificate the node is aware of for this Height
 	Block         []byte                 // the current Block being voted on (the foundational unit of the blockchain)
 	Results       *lib.CertificateResult // the current Result being voted on (reward and slash recipients)
-	SortitionData *SortitionData         // the current data being used for VRF+CDF Leader Election
+	SortitionData *lib.SortitionData     // the current data being used for VRF+CDF Leader Election
 	VDFService    *lib.VDFService        // the verifiable delay service, run once per block as a deterrent against long-range-attacks
 	HighVDF       *crypto.VDF            // the highest VDF among replicas - if the chain is using VDF for long-range-attack protection
 
@@ -201,7 +201,7 @@ func (b *BFT) StartElectionPhase() {
 		return
 	}
 	// initialize the sortition parameters
-	b.SortitionData = &SortitionData{
+	b.SortitionData = &lib.SortitionData{
 		LastProposerAddresses: b.LoadLastProposers().Addresses, // LastProposers ensures defense against Grinding Attacks
 		Height:                b.Height,                        // height ensures a unique sortition seed for each height
 		Round:                 b.Round,                         // round ensures a unique sortition seed for each round

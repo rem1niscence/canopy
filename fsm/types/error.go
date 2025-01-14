@@ -298,3 +298,15 @@ func ErrInvalidCheckpoint() lib.ErrorI {
 func ErrInvalidStartPollHeight() lib.ErrorI {
 	return lib.NewError(lib.CodeStartPollHeight, lib.StateMachineModule, "start poll height is invalid")
 }
+
+func ErrInvalidNumberOfRewardRecipients() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidNumberOfRewardRecipients, lib.StateMachineModule, "invalid number of reward recipients")
+}
+
+func ErrInvalidProposerRewardPercent() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidProposerRewardPercent, lib.StateMachineModule, "invalid proposer reward percent")
+}
+
+func ErrInvalidDelegateReward() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidDelegatorReward, lib.StateMachineModule, "invalid delegate reward")
+}

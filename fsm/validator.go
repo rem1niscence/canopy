@@ -337,6 +337,31 @@ func (s *StateMachine) GetAuthorizedSignersForValidator(address []byte) (signers
 	return [][]byte{validator.Address, validator.Output}, nil
 }
 
+// PseudorandomSelectDelegate() selects a delegate randomly weighted based on their stake within a committee
+// if there's no committee, then fallback to the proposer's address
+func (s *StateMachine) PseudorandomSelectDelegate(proposerAddress []byte) (address []byte, err lib.ErrorI) {
+	// get the delegates
+	p, _ := s.GetAllDelegates(lib.CanopyCommitteeId)
+	if p.NumValidators == 0 {
+		return proposerAddress, nil
+	}
+	// get the last proposers
+	lastProposers, err := s.GetLastProposers()
+	if err != nil {
+		return nil, err
+	}
+	// use un-grindable weighted pseudorandom
+	return lib.WeightedPseudorandom(&lib.PseudorandomParams{
+		SortitionData: &lib.SortitionData{
+			LastProposerAddresses: lastProposers.Addresses,
+			Height:                s.Height(),
+			TotalValidators:       p.NumValidators,
+			TotalPower:            p.TotalPower,
+		},
+		ValidatorSet: p.ValidatorSet,
+	}).Address().Bytes(), nil
+}
+
 // validatorPubToAddr() is a convenience function that converts a BLS validator key to an address
 func (s *StateMachine) validatorPubToAddr(public []byte) ([]byte, lib.ErrorI) {
 	pk, er := crypto.NewPublicKeyFromBytes(public)

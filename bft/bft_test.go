@@ -82,7 +82,7 @@ func TestStartElectionPhase(t *testing.T) {
 					require.True(t, ok)
 					require.Equal(t, expectedView, *msg.Header)
 					require.Equal(t, pub.Bytes(), msg.Vrf.PublicKey)
-					require.Equal(t, private.Sign(formatInput(c.cont.proposers.Addresses, expectedView.Height, expectedView.Round)), msg.Vrf.Signature)
+					require.Equal(t, private.Sign(lib.FormatSortitionInput(c.cont.proposers.Addresses, expectedView.Height, expectedView.Round)), msg.Vrf.Signature)
 				}
 			}
 		})

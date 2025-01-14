@@ -110,6 +110,8 @@ func (p *Plugin) ProduceProposal(vdf *crypto.VDF) (blockBytes []byte, rewardReci
 	// re-validate all transactions in the mempool as a fail-safe
 	p.Mempool.checkMempool()
 	transactions, numTxs := p.Mempool.GetTransactions(maxBlockSize)
+	// calculate self address
+	selfAddress := pubKey.Address().Bytes()
 	// create a block header structure
 	header := &lib.BlockHeader{
 		Height:                height + 1,                                               // increment the height
@@ -118,7 +120,7 @@ func (p *Plugin) ProduceProposal(vdf *crypto.VDF) (blockBytes []byte, rewardReci
 		NumTxs:                uint64(numTxs),                                           // set the number of transactions
 		TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(numTxs),          // calculate the total transactions
 		LastBlockHash:         lastBlock.BlockHeader.LastBlockHash,                      // use the last block hash to 'chain' the blocks
-		ProposerAddress:       pubKey.Address().Bytes(),                                 // set self as proposer address
+		ProposerAddress:       selfAddress,                                              // set self as proposer address
 		LastQuorumCertificate: qc,                                                       // add last QC to lock-in a commit certificate
 		TotalVdfIterations:    lastBlock.BlockHeader.TotalVdfIterations + vdfIterations, // add last total iterations to current iterations
 		Vdf:                   vdf,                                                      // attach the vdf proof
@@ -138,12 +140,22 @@ func (p *Plugin) ProduceProposal(vdf *crypto.VDF) (blockBytes []byte, rewardReci
 	if err != nil {
 		return
 	}
+	// get the delegate and their cut from the state machine
+	delegate, delegateCut, err := p.GetDelegateToReward(selfAddress)
+	if err != nil {
+		return
+	}
 	// set block reward recipients
 	rewardRecipients = &lib.RewardRecipients{
 		PaymentPercents: []*lib.PaymentPercents{{
-			Address: header.ProposerAddress, // self is recipient of the reward
-			Percent: 100,                    // self gets 100% of the reward
-		}}}
+			Address: header.ProposerAddress, // proposer is a recipient of the reward
+			Percent: 100 - delegateCut,      // proposer gets what's left after the delegate's cut
+		},
+			{
+				Address: delegate,    // delegate is a recipient of the reward
+				Percent: delegateCut, // delegates cut is a governance parameter
+			},
+		}}
 	return
 }
 
@@ -154,6 +166,10 @@ func (p *Plugin) ValidateCertificate(_ uint64, qc *lib.QuorumCertificate) (err l
 	// ensure the block is not empty
 	if qc.Block == nil {
 		return lib.ErrNilBlock()
+	}
+	// ensure the results aren't empty
+	if qc.Results == nil && qc.Results.RewardRecipients != nil {
+		return lib.ErrNilCertResults()
 	}
 	// convert the block bytes into a Canopy block structure
 	blk := new(lib.Block)
@@ -172,8 +188,50 @@ func (p *Plugin) ValidateCertificate(_ uint64, qc *lib.QuorumCertificate) (err l
 	if bytes.Equal(qc.BlockHash, blockHash) {
 		return lib.ErrMismatchBlockHash()
 	}
+	// validate the reward recipients
+	if len(qc.Results.RewardRecipients.PaymentPercents) != 2 {
+		return types.ErrInvalidNumberOfRewardRecipients()
+	}
+	// get the proposer address
+	proposerPub, er := crypto.NewPublicKeyFromBytes(qc.ProposerKey)
+	if er != nil {
+		return lib.ErrPubKeyFromBytes(er)
+	}
+	// get the delegate and their cut from the state machine
+	delegate, delegateCut, err := p.GetDelegateToReward(proposerPub.Address().Bytes())
+	if err != nil {
+		return
+	}
+	// validate the reward amount for the proposer
+	proposerPaymentPercent := qc.Results.RewardRecipients.PaymentPercents[0]
+	if proposerPaymentPercent.Percent != 100-delegateCut {
+		return types.ErrInvalidProposerRewardPercent()
+	}
+	// validate the reward amount for the delegate
+	delegatorPaymentPercent := qc.Results.RewardRecipients.PaymentPercents[1]
+	if !bytes.Equal(delegatorPaymentPercent.Address, delegate) || delegatorPaymentPercent.Percent != delegateCut {
+		return types.ErrInvalidDelegateReward()
+	}
 	// play the block against the state machine
 	_, err = p.ApplyAndValidateBlock(blk, false)
+	return
+}
+
+// GetDelegateToReward() gets the pseudorandomly selected delegate to reward and their cut
+func (p *Plugin) GetDelegateToReward(proposerAddress []byte) (address []byte, delegateCut uint64, err lib.ErrorI) {
+	fsm, err := p.FSM.TimeMachine(p.Height())
+	if err != nil {
+		return
+	}
+	// get the validator params in order to have the reward percentage for the delegate
+	valParams, err := fsm.GetParamsVal()
+	if err != nil {
+		return
+	}
+	// set the percentage the delegate receives
+	delegateCut = valParams.ValidatorDelegateRewardPercentage
+	// get the delegate pseudorandom delegate
+	address, err = fsm.PseudorandomSelectDelegate(proposerAddress)
 	return
 }
 

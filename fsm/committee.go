@@ -283,6 +283,42 @@ func (s *StateMachine) DeleteCommitteeMember(address crypto.AddressI, committeeI
 
 // DELEGATIONS BELOW
 
+// GetAllDelegates() returns all delegates for a certain committeeID
+func (s *StateMachine) GetAllDelegates(committeeId uint64) (vs lib.ValidatorSet, err lib.ErrorI) {
+	it, err := s.RevIterator(types.DelegatePrefix(committeeId))
+	if err != nil {
+		return vs, err
+	}
+	defer it.Close()
+	// create a variable to hold the committee members
+	members := make([]*lib.ConsensusValidator, 0)
+	// loop through the iterator
+	for ; it.Valid(); it.Next() {
+		// get the address from the iterator key
+		address, e := types.AddressFromKey(it.Key())
+		if e != nil {
+			return vs, e
+		}
+		// get the validator from the address
+		val, e := s.GetValidator(address)
+		if e != nil {
+			return vs, e
+		}
+		// ensure the validator is not included in the committee if it's paused or unstaking
+		if val.MaxPausedHeight != 0 || val.UnstakingHeight != 0 {
+			continue
+		}
+		// add the member to the list
+		members = append(members, &lib.ConsensusValidator{
+			PublicKey:   val.PublicKey,
+			VotingPower: val.StakedAmount,
+			NetAddress:  val.NetAddress,
+		})
+	}
+	return lib.NewValidatorSet(&lib.ConsensusValidators{ValidatorSet: members})
+}
+
+// GetDelegatesPaginated() returns a page of delegates
 func (s *StateMachine) GetDelegatesPaginated(p lib.PageParams, committeeId uint64) (page *lib.Page, err lib.ErrorI) {
 	page, res := lib.NewPage(p, types.ValidatorsPageName), make(types.ValidatorPage, 0)
 	err = page.Load(types.DelegatePrefix(committeeId), true, &res, s.store, func(k, _ []byte) (err lib.ErrorI) {
