@@ -21,7 +21,7 @@ var _ lib.StoreTxnI = &Txn{}
 
 	CONTRACT:
 	- only safe when writing to another memory store like a badger.Txn() as Write() is not atomic.
-	- not thread safe
+	- not thread safe (can't use 1 txn across multiple threads)
 	- nil values are supported; deleted values are also set to nil
 	- keys must be smaller than 128 bytes
 	- Nested txns are theoretically supported, but iteration becomes increasingly inefficient
