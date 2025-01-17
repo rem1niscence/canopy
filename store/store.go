@@ -81,7 +81,7 @@ func NewStore(path string, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
-	return NewStoreWithDB(db, log)
+	return NewStoreWithDB(db, log, true)
 }
 
 // NewStoreInMemory() creates a new instance of a mem DB
@@ -91,15 +91,15 @@ func NewStoreInMemory(log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
-	return NewStoreWithDB(db, log)
+	return NewStoreWithDB(db, log, true)
 }
 
 // NewStoreWithDB() returns a Store object given a DB and a logger
-func NewStoreWithDB(db *badger.DB, log lib.LoggerI) (*Store, lib.ErrorI) {
+func NewStoreWithDB(db *badger.DB, log lib.LoggerI, write bool) (*Store, lib.ErrorI) {
 	// get the latest CommitID (height and hash)
 	id := getLatestCommitID(db, log)
 	// make a writable tx that reads from the last height
-	writer := db.NewTransactionAt(id.Height, true)
+	writer := db.NewTransactionAt(id.Height, write)
 	// return the store object
 	return &Store{
 		version: id.Height,

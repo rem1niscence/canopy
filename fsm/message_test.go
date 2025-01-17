@@ -1947,7 +1947,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
 					Height:       1,
-					CanopyHeight: 3,
+					CanopyHeight: 2,
 					CommitteeId:  lib.CanopyCommitteeId,
 				},
 			}},
@@ -1972,8 +1972,6 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
-			// increment height as height 2 ignores byzantine evidence
-			sm.height++
 			// check if the pool is subsidized
 			if !test.nonSubsidizedCommittee {
 				// subsidize the committee
@@ -2024,6 +2022,13 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 					Bitmap:    mk.Bitmap(),
 				}
 			}
+			// commit to lock in the validator set for the previous height
+			// this is required because LoadCommittee() doesn't read from the current
+			// database 'txn' rather the underlying db (which does not yet have the validator set)
+			_, err := sm.Store().(lib.StoreI).Commit()
+			require.NoError(t, err)
+			// increment height as height 2 ignores byzantine evidence
+			sm.height++
 			// preset some sell orders to test with
 			for i := 0; i < 3; i++ {
 				var buyerAddress []byte
@@ -2042,7 +2047,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				require.NoError(t, err)
 			}
 			// execute function call
-			err := sm.HandleMessageCertificateResults(test.msg)
+			err = sm.HandleMessageCertificateResults(test.msg)
 			// validate the expected error
 			require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {

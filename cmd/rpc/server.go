@@ -1361,7 +1361,7 @@ func getStateMachineWithHeight(height uint64, w http.ResponseWriter) (sm *fsm.St
 }
 
 func setupStore(w http.ResponseWriter) (lib.StoreI, bool) {
-	s, err := store.NewStoreWithDB(db, logger)
+	s, err := store.NewStoreWithDB(db, logger, false)
 	if err != nil {
 		write(w, ErrNewStore(err), http.StatusInternalServerError)
 		return nil, false
@@ -1412,7 +1412,7 @@ func (r routes) New() (router *httprouter.Router) {
 	router = httprouter.New()
 	for _, route := range r {
 		if !route.AdminOnly {
-			router.Handle(route.Method, route.Path, route.HandlerFunc)
+			router.Handle(route.Method, route.Path, logHandler{route.Path, route.HandlerFunc}.Handle)
 		}
 	}
 	return
@@ -1422,10 +1422,21 @@ func (r routes) NewAdmin() (router *httprouter.Router) {
 	router = httprouter.New()
 	for _, route := range r {
 		if route.AdminOnly {
-			router.Handle(route.Method, route.Path, route.HandlerFunc)
+			router.Handle(route.Method, route.Path, logHandler{route.Path, route.HandlerFunc}.Handle)
 		}
 	}
 	return
+}
+
+// logHandler allows debugging of incoming rpc calls by logging the inbound calls
+type logHandler struct {
+	path string
+	h    httprouter.Handle
+}
+
+func (h logHandler) Handle(resp http.ResponseWriter, req *http.Request, p httprouter.Params) {
+	//logger.Debug(h.path) can enable for developer debugging
+	h.h(resp, req, p)
 }
 
 func debugHandler(routeName string) httprouter.Handle {
