@@ -132,54 +132,54 @@ var (
 	}
 
 	txStakeCmd = &cobra.Command{
-		Use:     "tx-stake <address> <net-address> <amount> <committees> <output> --delegated --early-withdrawal --fee=10000 --simulate=true",
+		Use:     "tx-stake <address> <net-address> <amount> <committees> <output> <signer> --delegated --early-withdrawal --fee=10000 --simulate=true",
 		Short:   "stake a validator",
-		Long:    "tx-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of committeeIds> <address for rewards> --delegated --early-withdrawal  --fee=10000 --simulate=true",
-		Example: "tx-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9000 100000000 0,21,22 dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
-		Args:    cobra.MinimumNArgs(5),
+		Long:    "tx-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of committeeIds> <address for rewards> <signer address>--delegated --early-withdrawal  --fee=10000 --simulate=true",
+		Example: "tx-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9000 100000000 0,21,22 abc3c8dff19da7682f7fe5fde062c813b55c9abc dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
+		Args:    cobra.MinimumNArgs(6),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxStake(argGetAddr(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), delegate, earlyWithdrawal, getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxStake(argGetAddr(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), argGetAddr(args[5]), delegate, earlyWithdrawal, getPassword(), !sim, fee))
 		},
 	}
 
 	txEditStakeCmd = &cobra.Command{
-		Use:     "tx-edit-stake <address> <net-address> <amount> <committees> <output> --delegated --early-withdrawal --fee=10000 --simulate=true",
+		Use:     "tx-edit-stake <address> <net-address> <amount> <committees> <output> <signer> --delegated --early-withdrawal --fee=10000 --simulate=true",
 		Short:   "edit-stake an active validator. Use the existing value to not edit a field",
-		Long:    "tx-edit-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of committeeIds> <address for rewards> <address for rewards> --delegated --early-withdrawal  --fee=10000 --simulate=true",
-		Example: "tx-edit-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9001 100000001 0,21,22 dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
-		Args:    cobra.MinimumNArgs(5),
+		Long:    "tx-edit-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of committeeIds> <address for rewards> <address for rewards> <signer address> --delegated --early-withdrawal  --fee=10000 --simulate=true",
+		Example: "tx-edit-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9001 100000001 0,21,22 abc3c8dff19da7682f7fe5fde062c813b55c9abc dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
+		Args:    cobra.MinimumNArgs(6),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxEditStake(argGetAddr(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), delegate, earlyWithdrawal, getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxEditStake(argGetAddr(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), argGetAddr(args[5]), delegate, earlyWithdrawal, getPassword(), !sim, fee))
 		},
 	}
 
 	txUnstakeCmd = &cobra.Command{
 		Use:     "tx-unstake <address>  --fee=10000 --simulate=true",
 		Short:   "begin unstaking an active validator; may take some time to fully unstake",
-		Example: "tx-unstake dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
-		Args:    cobra.MinimumNArgs(1),
+		Example: "tx-unstake dfd3c8dff19da7682f7fe5fde062c813b55c9eee dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
+		Args:    cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxUnstake(argGetAddr(args[0]), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxUnstake(argGetAddr(args[0]), argGetAddr(args[1]), getPassword(), !sim, fee))
 		},
 	}
 
 	txPauseCmd = &cobra.Command{
 		Use:     "tx-pause <address>  --fee=10000 --simulate=true",
 		Short:   "pause an active validator",
-		Example: "tx-pause dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
-		Args:    cobra.MinimumNArgs(1),
+		Example: "tx-pause dfd3c8dff19da7682f7fe5fde062c813b55c9eee dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
+		Args:    cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxPause(argGetAddr(args[0]), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxPause(argGetAddr(args[0]), argGetAddr(args[1]), getPassword(), !sim, fee))
 		},
 	}
 
 	txUnpauseCmd = &cobra.Command{
-		Use:     "tx-unpause <address>  --fee=10000 --simulate=true",
+		Use:     "tx-unpause <address> <signer> --fee=10000 --simulate=true",
 		Short:   "unpause a paused validator",
-		Example: "tx-unpause dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
-		Args:    cobra.MinimumNArgs(1),
+		Example: "tx-unpause dfd3c8dff19da7682f7fe5fde062c813b55c9eee dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
+		Args:    cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxUnpause(argGetAddr(args[0]), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxUnpause(argGetAddr(args[0]), argGetAddr(args[1]), getPassword(), !sim, fee))
 		},
 	}
 

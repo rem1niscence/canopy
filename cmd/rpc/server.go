@@ -601,6 +601,7 @@ type txRequest struct {
 	Memo            string          `json:"memo"`
 	PollJSON        json.RawMessage `json:"pollJSON"`
 	PollApprove     bool            `json:"pollApprove"`
+	Signer          lib.HexBytes    `json:"signer"`
 	addressRequest
 	passwordRequest
 	txChangeParamRequest
@@ -635,7 +636,7 @@ func TransactionStake(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		if err != nil {
 			return nil, err
 		}
-		return types.NewStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal, ptr.Memo)
+		return types.NewStakeTx(p, crypto.NewAddress(ptr.Address), outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal, ptr.Memo)
 	})
 }
 
@@ -649,25 +650,25 @@ func TransactionEditStake(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if err != nil {
 			return nil, err
 		}
-		return types.NewEditStakeTx(p, outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.EarlyWithdrawal, ptr.Memo)
+		return types.NewEditStakeTx(p, crypto.NewAddress(ptr.Address), outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.EarlyWithdrawal, ptr.Memo)
 	})
 }
 
 func TransactionUnstake(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewUnstakeTx(p, ptr.Fee, ptr.Memo)
+		return types.NewUnstakeTx(p, crypto.NewAddress(ptr.Address), ptr.Fee, ptr.Memo)
 	})
 }
 
 func TransactionPause(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewPauseTx(p, ptr.Fee, ptr.Memo)
+		return types.NewPauseTx(p, crypto.NewAddress(ptr.Address), ptr.Fee, ptr.Memo)
 	})
 }
 
 func TransactionUnpause(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		return types.NewUnpauseTx(p, ptr.Fee, ptr.Memo)
+		return types.NewUnpauseTx(p, crypto.NewAddress(ptr.Address), ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -954,7 +955,11 @@ func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey 
 	if !ok {
 		return
 	}
-	privateKey, err := keystore.GetKey(ptr.Address, ptr.Password)
+	signer := ptr.Signer
+	if len(signer) == 0 {
+		signer = ptr.Address
+	}
+	privateKey, err := keystore.GetKey(signer, ptr.Password)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return

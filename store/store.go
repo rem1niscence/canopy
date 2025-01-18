@@ -124,7 +124,8 @@ func (s *Store) NewReadOnly(version uint64) (lib.StoreI, lib.ErrorI) {
 		db:      s.db,
 		ss:      NewTxnWrapper(reader, s.log, stateStorePrefix),
 		sc:      NewDefaultSMT(NewTxnWrapper(reader, s.log, stateCommitmentPrefix)),
-		Indexer: s.Indexer,
+		Indexer: &Indexer{NewTxnWrapper(reader, s.log, indexerPrefix)},
+		root:    bytes.Clone(s.root),
 	}, nil
 }
 

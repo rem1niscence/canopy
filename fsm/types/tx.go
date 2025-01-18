@@ -16,9 +16,9 @@ func NewSendTransaction(from crypto.PrivateKeyI, to crypto.AddressI, amount, fee
 }
 
 // NewStakeTx() creates a StakeTransaction object in the interface form of TransactionI
-func NewStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netAddress string, committees []uint64, amount, fee uint64, delegate, earlyWithdrawal bool, memo string) (lib.TransactionI, lib.ErrorI) {
-	return NewTransaction(from, &MessageStake{
-		PublicKey:     from.PublicKey().Bytes(),
+func NewStakeTx(signer crypto.PrivateKeyI, from, outputAddress crypto.AddressI, netAddress string, committees []uint64, amount, fee uint64, delegate, earlyWithdrawal bool, memo string) (lib.TransactionI, lib.ErrorI) {
+	return NewTransaction(signer, &MessageStake{
+		PublicKey:     from.Bytes(),
 		Amount:        amount,
 		Committees:    committees,
 		NetAddress:    netAddress,
@@ -29,9 +29,9 @@ func NewStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netAddre
 }
 
 // NewEditStakeTx() creates a EditStakeTransaction object in the interface form of TransactionI
-func NewEditStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netAddress string, committees []uint64, amount, fee uint64, earlyWithdrawal bool, memo string) (lib.TransactionI, lib.ErrorI) {
-	return NewTransaction(from, &MessageEditStake{
-		Address:       from.PublicKey().Address().Bytes(),
+func NewEditStakeTx(signer crypto.PrivateKeyI, from, outputAddress crypto.AddressI, netAddress string, committees []uint64, amount, fee uint64, earlyWithdrawal bool, memo string) (lib.TransactionI, lib.ErrorI) {
+	return NewTransaction(signer, &MessageEditStake{
+		Address:       from.Bytes(),
 		Amount:        amount,
 		Committees:    committees,
 		NetAddress:    netAddress,
@@ -41,18 +41,18 @@ func NewEditStakeTx(from crypto.PrivateKeyI, outputAddress crypto.AddressI, netA
 }
 
 // NewUnstakeTx() creates a UnstakeTransaction object in the interface form of TransactionI
-func NewUnstakeTx(from crypto.PrivateKeyI, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
-	return NewTransaction(from, &MessageUnstake{Address: from.PublicKey().Address().Bytes()}, fee, memo)
+func NewUnstakeTx(signer crypto.PrivateKeyI, from crypto.AddressI, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+	return NewTransaction(signer, &MessageUnstake{Address: from.Bytes()}, fee, memo)
 }
 
 // NewPauseTx() creates a PauseTransaction object in the interface form of TransactionI
-func NewPauseTx(from crypto.PrivateKeyI, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
-	return NewTransaction(from, &MessagePause{Address: from.PublicKey().Address().Bytes()}, fee, memo)
+func NewPauseTx(signer crypto.PrivateKeyI, from crypto.AddressI, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+	return NewTransaction(signer, &MessagePause{Address: from.Bytes()}, fee, memo)
 }
 
 // NewUnpauseTx() creates a UnpauseTransaction object in the interface form of TransactionI
-func NewUnpauseTx(from crypto.PrivateKeyI, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
-	return NewTransaction(from, &MessageUnpause{Address: from.PublicKey().Address().Bytes()}, fee, memo)
+func NewUnpauseTx(signer crypto.PrivateKeyI, from crypto.AddressI, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+	return NewTransaction(signer, &MessageUnpause{Address: from.Bytes()}, fee, memo)
 }
 
 // NewChangeParamTxUint64() creates a ChangeParamTransaction object (for uint64s) in the interface form of TransactionI

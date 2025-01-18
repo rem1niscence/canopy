@@ -83,15 +83,14 @@ export default function Accounts({keygroup, account, validator}) {
     function onTxFormSubmit(e) {
         onFormSubmit(state, e, (r) => {
             const submit = Object.keys(state.txResult).length !== 0
-            console.log(r)
             // Mapping transaction types to their respective functions
             const txMap = {
                 "send": () => TxSend(r.sender, r.recipient, Number(r.amount), r.memo, r.fee, r.password, submit),
-                "stake": () => TxStake(r.sender, r.committees, r.net_address, Number(r.amount), r.delegate, r.earlyWithdrawal, r.output, r.memo, r.fee, r.password, submit),
-                "edit-stake": () => TxEditStake(r.sender, r.committees, r.net_address, Number(r.amount), r.earlyWithdrawal, r.output, r.memo, r.fee, r.password, submit),
-                "unstake": () => TxUnstake(r.sender, r.memo, r.fee, r.password, submit),
-                "pause": () => TxPause(r.sender, r.memo, r.fee, r.password, submit),
-                "unpause": () => TxUnpause(r.sender, r.memo, r.fee, r.password, submit),
+                "stake": () => TxStake(r.sender, r.committees, r.net_address, Number(r.amount), r.delegate, r.earlyWithdrawal, r.output, r.signer, r.memo, r.fee, r.password, submit),
+                "edit-stake": () => TxEditStake(r.sender, r.committees, r.net_address, Number(r.amount), r.earlyWithdrawal, r.output, r.signer, r.memo, r.fee, r.password, submit),
+                "unstake": () => TxUnstake(r.sender, r.signer, r.memo, r.fee, r.password, submit),
+                "pause": () => TxPause(r.sender, r.signer, r.memo, r.fee, r.password, submit),
+                "unpause": () => TxUnpause(r.sender, r.signer, r.memo, r.fee, r.password, submit),
                 "create_order": () => TxCreateOrder(r.sender, r.committeeId, Number(r.amount), Number(r.receiveAmount), r.receiveAddress, r.memo, r.fee, r.password, submit),
                 "edit_order": () => TxEditOrder(r.sender, r.committeeId, Number(r.orderId), Number(r.amount), Number(r.receiveAmount), r.receiveAddress, r.memo, r.fee, r.password, submit),
                 "delete_order": () => TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, r.fee, r.password, submit)

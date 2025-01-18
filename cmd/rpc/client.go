@@ -353,24 +353,24 @@ func (c *Client) TxSend(from, rec string, amt uint64, pwd string, submit bool, o
 	})
 }
 
-func (c *Client) TxStake(from, netAddr string, amt uint64, committees, output string, delegate, earlyWithdrawal bool, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
-	return c.txStake(from, netAddr, amt, committees, output, delegate, earlyWithdrawal, pwd, submit, false, optFee)
+func (c *Client) TxStake(address, netAddr string, amt uint64, committees, output, signer string, delegate, earlyWithdrawal bool, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txStake(address, netAddr, amt, committees, output, delegate, earlyWithdrawal, signer, pwd, submit, false, optFee)
 }
 
-func (c *Client) TxEditStake(from, netAddr string, amt uint64, committees, output string, delegate, earlyWithdrawal bool, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
-	return c.txStake(from, netAddr, amt, committees, output, delegate, earlyWithdrawal, pwd, submit, true, optFee)
+func (c *Client) TxEditStake(address, netAddr string, amt uint64, committees, output, signer string, delegate, earlyWithdrawal bool, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txStake(address, netAddr, amt, committees, output, delegate, earlyWithdrawal, signer, pwd, submit, true, optFee)
 }
 
-func (c *Client) TxUnstake(from, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
-	return c.txAddress(TxUnstakeRouteName, from, pwd, submit, optFee)
+func (c *Client) TxUnstake(address, signer, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txAddress(TxUnstakeRouteName, address, signer, pwd, submit, optFee)
 }
 
-func (c *Client) TxPause(from, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
-	return c.txAddress(TxPauseRouteName, from, pwd, submit, optFee)
+func (c *Client) TxPause(address, signer, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txAddress(TxPauseRouteName, address, signer, pwd, submit, optFee)
 }
 
-func (c *Client) TxUnpause(from, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
-	return c.txAddress(TxUnpauseRouteName, from, pwd, submit, optFee)
+func (c *Client) TxUnpause(address, signer, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	return c.txAddress(TxUnpauseRouteName, address, signer, pwd, submit, optFee)
 }
 
 func (c *Client) TxChangeParam(from, pSpace, pKey, pValue string, startBlk, endBlk uint64,
@@ -567,26 +567,34 @@ func (c *Client) Logs() (logs string, err lib.ErrorI) {
 	return string(bz), nil
 }
 
-func (c *Client) txAddress(route string, from, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+func (c *Client) txAddress(route string, from, signer, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	fromHex, err := lib.NewHexBytesFromString(from)
 	if err != nil {
 		return nil, nil, err
 	}
+	signerHex, err := lib.NewHexBytesFromString(signer)
+	if err != nil {
+		return nil, nil, err
+	}
 	return c.transactionRequest(route, txRequest{
-
 		Fee:             optFee,
 		Submit:          submit,
+		Signer:          signerHex,
 		addressRequest:  addressRequest{Address: fromHex},
 		passwordRequest: passwordRequest{Password: pwd},
 	})
 }
 
-func (c *Client) txStake(from, netAddr string, amt uint64, committees, output string, delegate, earlyWithdrawal bool, pwd string, submit, edit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+func (c *Client) txStake(from, netAddr string, amt uint64, committees, output string, delegate, earlyWithdrawal bool, signer, pwd string, submit, edit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	route := TxStakeRouteName
 	if edit {
 		route = TxEditStakeRouteName
 	}
 	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	signerHex, err := lib.NewHexBytesFromString(signer)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -598,6 +606,7 @@ func (c *Client) txStake(from, netAddr string, amt uint64, committees, output st
 		Delegate:             delegate,
 		EarlyWithdrawal:      earlyWithdrawal,
 		Submit:               submit,
+		Signer:               signerHex,
 		addressRequest:       addressRequest{Address: fromHex},
 		passwordRequest:      passwordRequest{Password: pwd},
 		txChangeParamRequest: txChangeParamRequest{},

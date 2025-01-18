@@ -9,6 +9,7 @@ export function getFormInputs(type, account, validator) {
     let compound = validator && validator.address ? validator.compound : false
     let output = validator && validator.address ? validator.output : ""
     let address = account != null ? account.address : ""
+    let signer = account != null ? account.address : ""
     let committeeList = validator && validator.address ? validator.committees.join(','): ""
     address = type !== "send" && validator && validator.address ? validator.address : address
     address = type === "stake" && validator && validator.address ? "WARNING: validator already staked" : address
@@ -169,6 +170,18 @@ export function getFormInputs(type, account, validator) {
             "minLength": 40,
             "maxLength": 40,
         },
+        signer: {
+            "placeholder": "signer of the transaction",
+            "defaultValue": signer,
+            "tooltip": "the signing address that authorizes the transaction",
+            "label": "signer",
+            "inputText": "signer",
+            "feedback": "please choose a signer address",
+            "required": true,
+            "type": "text",
+            "minLength": 40,
+            "maxLength": 40,
+        },
         paramSpace: {
             "placeholder": "",
             "defaultValue": "",
@@ -268,7 +281,7 @@ export function getFormInputs(type, account, validator) {
         case "send":
             return [a.address, a.rec, a.amount, a.memo, a.fee, a.password]
         case "stake":
-            return [a.address, a.committees, a.netAddr, a.amount, a.delegate, a.earlyWithdrawal, a.output, a.memo, a.fee, a.password]
+            return [a.address, a.committees, a.netAddr, a.amount, a.delegate, a.earlyWithdrawal, a.output, a.signer, a.memo, a.fee, a.password]
         case "create_order":
             return [a.address, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password]
         case "edit_order":
@@ -276,11 +289,15 @@ export function getFormInputs(type, account, validator) {
         case "delete_order":
             return [a.address, a.committeeId, a.orderId, a.memo, a.fee, a.password]
         case "edit-stake":
-            return [a.address, a.committees, a.netAddr, a.amount, a.earlyWithdrawal, a.output, a.memo, a.fee, a.password]
+            return [a.address, a.committees, a.netAddr, a.amount, a.earlyWithdrawal, a.output, a.signer, a.memo, a.fee, a.password]
         case "change-param":
             return [a.address, a.paramSpace, a.paramKey, a.paramValue, a.startBlock, a.endBlock, a.memo, a.fee, a.password]
         case "dao-transfer":
             return [a.address, a.amount, a.startBlock, a.endBlock, a.memo, a.fee, a.password]
+        case "pause":
+        case "unpause":
+        case "unstake":
+            return [a.address, a.signer, a.memo, a.fee, a.password]
         case "pass-and-addr":
             return [a.address, a.password]
         case "pass-and-pk":
