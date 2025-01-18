@@ -59,7 +59,7 @@ func TestStartElectionPhase(t *testing.T) {
 			if !test.isCandidate {
 				// if not supposed to be a 'candidate', ensure no ELECTION message sent
 				select {
-				case <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
+				case <-c.cont.sendToReplicasChan:
 					t.Fatal("unexpected message")
 				case <-time.After(100 * time.Millisecond):
 					return
@@ -77,7 +77,7 @@ func TestStartElectionPhase(t *testing.T) {
 				select {
 				case <-time.After(testTimeout):
 					t.Fatal("timeout")
-				case m := <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
+				case m := <-c.cont.sendToReplicasChan:
 					msg, ok := m.(*Message)
 					require.True(t, ok)
 					require.Equal(t, expectedView, *msg.Header)
@@ -152,7 +152,7 @@ func TestStartElectionVotePhase(t *testing.T) {
 			select {
 			case <-time.After(testTimeout):
 				t.Fatal("timeout")
-			case m := <-c.cont.sendToProposerChan[lib.CanopyCommitteeId]:
+			case m := <-c.cont.sendToProposerChan:
 				msg, ok := m.(*Message)
 				require.True(t, ok)
 				require.NotNil(t, msg.Qc)
@@ -237,7 +237,7 @@ func TestStartProposePhase(t *testing.T) {
 				if test.receiveEVQC {
 					t.Fatal("timeout")
 				}
-			case m := <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
+			case m := <-c.cont.sendToReplicasChan:
 				if !test.receiveEVQC {
 					t.Fatal("unexpected message")
 				}
@@ -246,7 +246,7 @@ func TestStartProposePhase(t *testing.T) {
 				require.Equal(t, expectedView, *msg.Header)
 				require.NotNil(t, msg.Qc)
 				require.Equal(t, expectedQCView.Phase, msg.Qc.Header.Phase)
-				block, results, e := c.cont.ProduceProposal(lib.CanopyCommitteeId, nil, nil)
+				block, results, e := c.cont.ProduceProposal(nil, nil)
 				require.NoError(t, e)
 				require.Equal(t, block, msg.Qc.Block)
 				require.Equal(t, results.Hash(), msg.Qc.Results.Hash())
@@ -337,7 +337,7 @@ func TestStartProposeVotePhase(t *testing.T) {
 				if test.validProposal {
 					t.Fatal("timeout")
 				}
-			case m := <-c.cont.sendToProposerChan[lib.CanopyCommitteeId]:
+			case m := <-c.cont.sendToProposerChan:
 				if !test.validProposal || test.invalidHighQC {
 					t.Fatal("unexpected message")
 				}
@@ -407,7 +407,7 @@ func TestStartPrecommitPhase(t *testing.T) {
 				if test.has23MajPropVote {
 					t.Fatal("timeout")
 				}
-			case m := <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
+			case m := <-c.cont.sendToReplicasChan:
 				if !test.has23MajPropVote {
 					t.Fatal("unexpected message")
 				}
@@ -488,7 +488,7 @@ func TestStartPrecommitVotePhase(t *testing.T) {
 				if test.validProposal {
 					t.Fatal("timeout")
 				}
-			case m := <-c.cont.sendToProposerChan[lib.CanopyCommitteeId]:
+			case m := <-c.cont.sendToProposerChan:
 				if !test.validProposal {
 					t.Fatal("unexpected message received")
 				}
@@ -554,7 +554,7 @@ func TestStartCommitPhase(t *testing.T) {
 			}
 			if test.has23MajPropVote {
 				multiKey, blockHash, resultsHash = c.simPrecommitVotePhase(t, 0)
-				c.bft.Block, c.bft.Results, _ = c.cont.ProduceProposal(lib.CanopyCommitteeId, nil, nil)
+				c.bft.Block, c.bft.Results, _ = c.cont.ProduceProposal(nil, nil)
 			}
 			go c.bft.StartCommitPhase()
 			// receive the cert results txn
@@ -563,7 +563,7 @@ func TestStartCommitPhase(t *testing.T) {
 				if test.has23MajPropVote {
 					t.Fatal("timeout")
 				}
-			case qc := <-c.cont.gossipCertChan[lib.CanopyCommitteeId]:
+			case qc := <-c.cont.gossipCertChan:
 				require.NotNil(t, qc)
 				require.Equal(t, qc.Header.Phase, expectedQCView.Phase)
 				require.Equal(t, blockHash, qc.BlockHash)
@@ -578,7 +578,7 @@ func TestStartCommitPhase(t *testing.T) {
 				if test.has23MajPropVote {
 					t.Fatal("timeout")
 				}
-			case m := <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
+			case m := <-c.cont.sendToReplicasChan:
 				msg, ok := m.(*Message)
 				require.True(t, ok)
 				require.NotNil(t, msg.Qc)
@@ -683,7 +683,7 @@ func TestStartCommitProcessPhase(t *testing.T) {
 				if test.validProposal {
 					t.Fatal("timeout")
 				}
-			case qc := <-c.cont.gossipCertChan[lib.CanopyCommitteeId]:
+			case qc := <-c.cont.gossipCertChan:
 				require.Equal(t, qc.Header.Phase, expectedQCView.Phase)
 				require.Equal(t, qc.Block, block)
 				require.Equal(t, crypto.Hash(block), qc.BlockHash)
@@ -707,7 +707,7 @@ func TestRoundInterrupt(t *testing.T) {
 	select {
 	case <-time.After(testTimeout):
 		t.Fatal("timeout")
-	case m := <-c.cont.sendToReplicasChan[lib.CanopyCommitteeId]:
+	case m := <-c.cont.sendToReplicasChan:
 		msg, ok := m.(*Message)
 		require.True(t, ok)
 		require.EqualExportedValues(t, msg.Qc.Header, &lib.View{
@@ -1022,10 +1022,10 @@ func TestSafeNode(t *testing.T) {
 			c2.bft.Round++
 			c2.simPrecommitPhase(t, 1) // higher lock
 			go c2.bft.StartPrecommitVotePhase()
-			<-c2.cont.sendToProposerChan[lib.CanopyCommitteeId]
+			<-c2.cont.sendToProposerChan
 			c.simPrecommitPhase(t, 0) // lock
 			go c.bft.StartPrecommitVotePhase()
-			<-c.cont.sendToProposerChan[lib.CanopyCommitteeId]
+			<-c.cont.sendToProposerChan
 			var err lib.ErrorI
 			switch {
 			case test.unlockBySafety:

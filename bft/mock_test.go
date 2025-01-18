@@ -29,10 +29,10 @@ func newTestConsensus(t *testing.T, phase Phase, numValidators int) (tc *testCon
 	tc.cont = &testController{
 		Mutex:              sync.Mutex{},
 		proposers:          &proposers,
-		valSet:             map[uint64]map[uint64]ValSet{0: {lib.CanopyCommitteeId: tc.valSet}, 1: {lib.CanopyCommitteeId: tc.valSet}},
-		gossipCertChan:     map[uint64]chan *lib.QuorumCertificate{lib.CanopyCommitteeId: make(chan *lib.QuorumCertificate)},
-		sendToProposerChan: map[uint64]chan lib.Signable{lib.CanopyCommitteeId: make(chan lib.Signable)},
-		sendToReplicasChan: map[uint64]chan lib.Signable{lib.CanopyCommitteeId: make(chan lib.Signable)},
+		valSet:             map[uint64]ValSet{lib.CanopyCommitteeId: tc.valSet},
+		gossipCertChan:     make(chan *lib.QuorumCertificate),
+		sendToProposerChan: make(chan lib.Signable),
+		sendToReplicasChan: make(chan lib.Signable),
 	}
 	// create the bft object using the mocks
 	tc.bft, err = New(lib.DefaultConfig(), tc.valKeys[0], lib.CanopyCommitteeId, 1, 1, tc.valSet, tc.cont, false, lib.NewDefaultLogger())
@@ -473,7 +473,7 @@ func (tc *testConsensus) view(phase Phase, round ...uint64) *lib.View {
 
 // proposal() generates a mock block and result objects using the mock controller and their corresponding hashes
 func (tc *testConsensus) proposal(t *testing.T) (blk, blkHash []byte, results *lib.CertificateResult, resultsHash []byte) {
-	blk, results, err := tc.cont.ProduceProposal(lib.CanopyCommitteeId, nil, nil)
+	blk, results, err := tc.cont.ProduceProposal(nil, nil)
 	require.NoError(t, err)
 	blkHash, resultsHash = crypto.Hash(blk), results.Hash()
 	return
@@ -486,13 +486,13 @@ var _ Controller = &testController{}
 type testController struct {
 	sync.Mutex
 	proposers          *lib.Proposers
-	valSet             map[uint64]map[uint64]ValSet // height -> id -> valset
-	gossipCertChan     map[uint64]chan *lib.QuorumCertificate
-	sendToProposerChan map[uint64]chan lib.Signable
-	sendToReplicasChan map[uint64]chan lib.Signable
+	valSet             map[uint64]ValSet // height -> id -> valset
+	gossipCertChan     chan *lib.QuorumCertificate
+	sendToProposerChan chan lib.Signable
+	sendToReplicasChan chan lib.Signable
 }
 
-func (t *testController) ProduceProposal(_ uint64, _ *ByzantineEvidence, _ *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI) {
+func (t *testController) ProduceProposal(_ *ByzantineEvidence, _ *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI) {
 	block = crypto.Hash([]byte("mock"))
 	results = &lib.CertificateResult{
 		RewardRecipients: &lib.RewardRecipients{
@@ -505,40 +505,40 @@ func (t *testController) ProduceProposal(_ uint64, _ *ByzantineEvidence, _ *cryp
 	return
 }
 
-func (t *testController) ValidateCertificate(_ uint64, qc *lib.QuorumCertificate, _ *ByzantineEvidence) lib.ErrorI {
+func (t *testController) ValidateCertificate(qc *lib.QuorumCertificate, _ *ByzantineEvidence) lib.ErrorI {
 	if len(qc.Block) == expectedCandidateLen {
 		return nil
 	}
 	return ErrEmptyMessage()
 }
 
-func (t *testController) LoadCommittee(committeeID uint64, canopyHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
-	return t.valSet[canopyHeight][committeeID], nil
+func (t *testController) LoadCommittee(canopyHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
+	return t.valSet[canopyHeight], nil
 }
-func (t *testController) LoadCertificate(_ uint64, _ uint64) (*lib.QuorumCertificate, lib.ErrorI) {
+func (t *testController) LoadCertificate(_ uint64) (*lib.QuorumCertificate, lib.ErrorI) {
 	return nil, nil
 }
 
-func (t *testController) SendCertificateResultsTx(committeeID uint64, certificate *lib.QuorumCertificate) {
-	t.gossipCertChan[committeeID] <- certificate
+func (t *testController) SendCertificateResultsTx(certificate *lib.QuorumCertificate) {
+	t.gossipCertChan <- certificate
 }
 
-func (t *testController) SendToReplicas(committeeID uint64, _ lib.ValidatorSet, msg lib.Signable) {
-	t.sendToReplicasChan[committeeID] <- msg
+func (t *testController) SendToReplicas(_ lib.ValidatorSet, msg lib.Signable) {
+	t.sendToReplicasChan <- msg
 }
 
-func (t *testController) SendToProposer(committeeID uint64, msg lib.Signable) {
-	t.sendToProposerChan[committeeID] <- msg
+func (t *testController) SendToProposer(msg lib.Signable) {
+	t.sendToProposerChan <- msg
 }
 
 func (t *testController) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) { return 0, nil }
 func (t *testController) IsValidDoubleSigner(_ uint64, _ []byte) bool     { return true }
-func (t *testController) Syncing(_ uint64) *atomic.Bool                   { return &atomic.Bool{} }
-func (t *testController) LoadCommitteeHeightInState(_ uint64) uint64      { return 0 }
-func (t *testController) GetCanopyHeight() uint64                         { return 0 }
+func (t *testController) Syncing() *atomic.Bool                           { return &atomic.Bool{} }
+func (t *testController) LoadCommitteeHeightInState() uint64              { return 0 }
+func (t *testController) GetHeight() uint64                               { return 0 }
 func (t *testController) LoadLastProposers() *lib.Proposers               { return t.proposers }
-func (t *testController) GossipBlock(committeeID uint64, cert *lib.QuorumCertificate) {
-	t.gossipCertChan[committeeID] <- cert
+func (t *testController) GossipBlock(cert *lib.QuorumCertificate) {
+	t.gossipCertChan <- cert
 }
 
 const expectedCandidateLen = crypto.HashSize

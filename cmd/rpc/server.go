@@ -212,7 +212,7 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 		AllowedOrigins: []string{"http://localhost:" + c.WalletPort, "http://localhost:" + c.ExplorerPort},
 		AllowedMethods: []string{"GET", "OPTIONS", "POST"},
 	})
-	s, timeout := a.CanopyFSM().Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
+	s, timeout := a.FSM.Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
 	app, conf, db, logger = a, c, s.DB(), l
 	l.Infof("Starting RPC server at 0.0.0.0:%s", c.RPCPort)
 	go func() {
@@ -924,13 +924,17 @@ func updatePollResults() {
 			if err = p.NewFromFile(conf.DataDirPath); err != nil {
 				return
 			}
+			sm, err := app.FSM.TimeMachine(0)
+			if err != nil {
+				return err
+			}
 			// cleanup old polls
-			p.Cleanup(app.CanopyFSM().Height())
+			p.Cleanup(sm.Height())
 			if err = p.SaveToFile(conf.DataDirPath); err != nil {
 				return
 			}
 			// convert the poll to a result
-			result, err := app.CanopyFSM().PollsToResults(p)
+			result, err := sm.PollsToResults(p)
 			if err != nil {
 				return
 			}
@@ -1307,7 +1311,7 @@ func submitTx(w http.ResponseWriter, tx any) (ok bool) {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
-	if err = app.SendTxMsg(lib.CanopyCommitteeId, bz); err != nil {
+	if err = app.SendTxMsg(bz); err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
@@ -1376,7 +1380,7 @@ func setupStore(w http.ResponseWriter) (lib.StoreI, bool) {
 
 // TODO likely a memory leak here from un-discarded stores
 func setupStateMachine(height uint64, w http.ResponseWriter) (*fsm.StateMachine, bool) {
-	state, err := app.CanopyFSM().TimeMachine(height)
+	state, err := app.FSM.TimeMachine(height)
 	if err != nil {
 		write(w, ErrTimeMachine(err), http.StatusInternalServerError)
 	}

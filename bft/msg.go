@@ -87,7 +87,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 			return
 		}
 		// load the proper committee
-		vals, err = b.LoadCommittee(b.CommitteeId, x.Qc.Header.CanopyHeight) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
+		vals, err = b.LoadCommittee(x.Qc.Header.CanopyHeight) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
 		if err != nil {
 			return false, err
 		}
@@ -108,7 +108,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 		if x.Header.CanopyHeight != b.CanopyHeight {
 			return false, lib.ErrWrongCanopyHeight()
 		}
-		if x.Qc.Header.Height < b.LoadCommitteeHeightInState(b.CommitteeId) {
+		if x.Qc.Header.Height < b.LoadCommitteeHeightInState() {
 			return false, lib.ErrWrongCanopyHeight()
 		}
 		if x.Header.Phase == Propose {

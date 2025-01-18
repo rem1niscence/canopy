@@ -26,5 +26,8 @@ build-explorer:
 docker-up:
 	cd $(DOCKER_DIR) && docker-compose down && docker-compose up --build
 
+docker-down:
+	cd $(DOCKER_DIR) && docker-compose down
+
 docker-up-fast:
 	cd $(DOCKER_DIR) && docker-compose down && docker-compose up

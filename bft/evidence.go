@@ -75,7 +75,7 @@ func (b *BFT) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.DoubleSigne
 		}
 		// load the Validator set for this Committee at that height
 		committeeHeight := x.VoteA.Header.CanopyHeight
-		vs, err := b.LoadCommittee(b.CommitteeId, committeeHeight)
+		vs, err := b.LoadCommittee(committeeHeight)
 		if err != nil {
 			return nil, err
 		}
@@ -262,7 +262,7 @@ func (b *BFT) addDSEByPartialQC(dse *DoubleSignEvidences) {
 				continue
 			}
 			// Load the certificate that contains the competing QC
-			certificate, err := b.LoadCertificate(b.CommitteeId, evidenceHeight)
+			certificate, err := b.LoadCertificate(evidenceHeight)
 			if err != nil {
 				continue
 			}

@@ -72,7 +72,7 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, canopyHeight, hei
 		log:               l,
 		Controller:        con,
 		resetBFT:          make(chan ResetBFT, 1),
-		syncing:           con.Syncing(committeeID),
+		syncing:           con.Syncing(),
 		PhaseTimer:        lib.NewTimer(),
 		OptimisticTimer:   lib.NewTimer(),
 		VDFService:        vdf,
@@ -217,7 +217,7 @@ func (b *BFT) StartElectionPhase() {
 	// if is a possible proposer candidate, then send the VRF to other Replicas for the ElectionVote
 	if isCandidate {
 		b.log.Info("Self is a leader candidate 🗳️")
-		b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
+		b.SendToReplicas(b.ValidatorSet, &Message{
 			Header: b.View.Copy(),
 			Vrf:    vrf,
 		})
@@ -244,7 +244,7 @@ func (b *BFT) StartElectionVotePhase() {
 	// get locally produced Verifiable delay function
 	b.HighVDF = b.VDFService.Finish()
 	// sign and send vote to Proposer
-	b.SendToProposer(b.CommitteeId, &Message{
+	b.SendToProposer(&Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
 			Header:      b.View.Copy(),
 			ProposerKey: b.ProposerKey, // using voting power, authorizes Candidate to act as the 'Leader'
@@ -273,7 +273,7 @@ func (b *BFT) StartProposePhase() {
 	b.log.Info("Self is the proposer")
 	// produce new proposal or use highQC as the proposal
 	if b.HighQC == nil {
-		b.Block, b.Results, err = b.ProduceProposal(b.CommitteeId, b.ByzantineEvidence, b.HighVDF)
+		b.Block, b.Results, err = b.ProduceProposal(b.ByzantineEvidence, b.HighVDF)
 		if err != nil {
 			b.log.Error(err.Error())
 			return
@@ -282,7 +282,7 @@ func (b *BFT) StartProposePhase() {
 		b.Block, b.Results = b.HighQC.Block, b.HighQC.Results
 	}
 	// send PROPOSE message to the replicas
-	b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
+	b.SendToReplicas(b.ValidatorSet, &Message{
 		Header: b.View.Copy(),
 		Qc: &QC{
 			Header:      vote.Qc.Header, // the current view
@@ -327,7 +327,7 @@ func (b *BFT) StartProposeVotePhase() {
 		DSE: NewDSE(msg.LastDoubleSignEvidence),
 	}
 	// check candidate block against plugin
-	if err := b.ValidateCertificate(b.CommitteeId, msg.Qc, byzantineEvidence); err != nil {
+	if err := b.ValidateCertificate(msg.Qc, byzantineEvidence); err != nil {
 		b.log.Error(err.Error())
 		b.RoundInterrupt()
 		return
@@ -337,7 +337,7 @@ func (b *BFT) StartProposeVotePhase() {
 	b.Block, b.Results = msg.Qc.Block, msg.Qc.Results
 	b.ByzantineEvidence = byzantineEvidence // BE stored in case of round interrupt and replicas locked on a proposal with BE
 	// send vote to the proposer
-	b.SendToProposer(b.CommitteeId, &Message{
+	b.SendToProposer(&Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
 			Header:      b.View.Copy(),
 			BlockHash:   crypto.Hash(b.Block),
@@ -366,7 +366,7 @@ func (b *BFT) StartPrecommitPhase() {
 		return
 	}
 	// send PRECOMMIT msg to Replicas
-	b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
+	b.SendToReplicas(b.ValidatorSet, &Message{
 		Header: b.Copy(),
 		Qc: &QC{
 			Header:      vote.Qc.Header,       // vote view
@@ -401,7 +401,7 @@ func (b *BFT) StartPrecommitVotePhase() {
 	b.HighQC.Block = b.Block
 	b.HighQC.Results = b.Results
 	// send vote to the proposer
-	b.SendToProposer(b.CommitteeId, &Message{
+	b.SendToProposer(&Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
 			Header:      b.View.Copy(),
 			BlockHash:   crypto.Hash(b.Block),
@@ -430,7 +430,7 @@ func (b *BFT) StartCommitPhase() {
 		return
 	}
 	// send the proposal (reward) transaction
-	b.SendCertificateResultsTx(b.CommitteeId, &QC{
+	b.SendCertificateResultsTx(&QC{
 		Header:      vote.Qc.Header,       // vote view
 		BlockHash:   crypto.Hash(b.Block), // vote block payload
 		ResultsHash: b.Results.Hash(),     // vote certificate results payload
@@ -439,7 +439,7 @@ func (b *BFT) StartCommitPhase() {
 		Signature:   as,
 	})
 	// SEND MSG TO REPLICAS
-	b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
+	b.SendToReplicas(b.ValidatorSet, &Message{
 		Header: b.Copy(), // header
 		Qc: &QC{
 			Header:      vote.Qc.Header,       // vote view
@@ -476,7 +476,7 @@ func (b *BFT) StartCommitProcessPhase() {
 		DSE: b.GetLocalDSE(),
 	}
 	// gossip committed block message to peers
-	b.GossipBlock(b.CommitteeId, msg.Qc)
+	b.GossipBlock(msg.Qc)
 }
 
 // RoundInterrupt() begins the ROUND-INTERRUPT phase after any phase errors
@@ -486,7 +486,7 @@ func (b *BFT) RoundInterrupt() {
 	b.log.Warn(b.View.ToString())
 	b.Phase = RoundInterrupt
 	// send pacemaker message
-	b.SendToReplicas(b.CommitteeId, b.ValidatorSet, &Message{
+	b.SendToReplicas(b.ValidatorSet, &Message{
 		Qc: &lib.QuorumCertificate{
 			Header: b.View.Copy(),
 		},
@@ -599,7 +599,7 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 			}
 		}
 		b.Height++
-		b.CanopyHeight = b.Controller.GetCanopyHeight()
+		b.CanopyHeight = b.Controller.GetHeight()
 	}
 	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
@@ -698,7 +698,7 @@ func (b *BFT) SetWaitTimers(phaseWaitTime, optimisticWaitTIme, processTime time.
 	}
 	// calculate the phase timer and the optimistic timer by subtracting the process time
 	phaseWaitTime, optimisticWaitTime := subtract(phaseWaitTime, processTime), subtract(optimisticWaitTIme, processTime)
-	b.log.Debugf("Setting consensus timer: %.2fs", phaseWaitTime.Seconds())
+	b.log.Debugf("Setting consensus timer: %f sec", phaseWaitTime.Seconds())
 	// set Phase and Optimistic timers to go off in their respective timeouts
 	lib.ResetTimer(b.PhaseTimer, phaseWaitTime)
 	lib.ResetTimer(b.OptimisticTimer, optimisticWaitTime)
@@ -730,7 +730,7 @@ func (b *BFT) RunVDF() lib.ErrorI {
 
 // VDFSeed() generates the seed for the verifiable delay service
 func (b *BFT) VDFSeed(publicKey []byte) ([]byte, lib.ErrorI) {
-	lastQuorumCertificate, err := b.LoadCertificate(b.CommitteeId, b.Height-1)
+	lastQuorumCertificate, err := b.LoadCertificate(b.Height - 1)
 	if err != nil {
 		return nil, err
 	}
@@ -777,17 +777,17 @@ type (
 		Lock()
 		Unlock()
 		// GetCanopyHeight returns the height of the base-chain
-		GetCanopyHeight() uint64
+		GetHeight() uint64
 		// ProduceProposal() is a plugin call to produce a Proposal object as a Leader
-		ProduceProposal(committeeID uint64, be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
+		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
 		// ValidateCertificate() is a plugin call to validate a Certificate object as a Replica
-		ValidateCertificate(committeeID uint64, qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
+		ValidateCertificate(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
 		// LoadCommittee() loads the ValidatorSet operating under CommitteeID
-		LoadCommittee(committeeID uint64, canopyHeight uint64) (lib.ValidatorSet, lib.ErrorI)
+		LoadCommittee(canopyHeight uint64) (lib.ValidatorSet, lib.ErrorI)
 		// LastCommitteeRewardHeight() loads the last height a committee member executed a Proposal (reward) transaction
-		LoadCommitteeHeightInState(committeeID uint64) uint64
+		LoadCommitteeHeightInState() uint64
 		// LoadCertificate() gets the Quorum Certificate from the committeeID-> plugin at a certain height
-		LoadCertificate(committeeID uint64, height uint64) (*lib.QuorumCertificate, lib.ErrorI)
+		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
 		// LoadLastProposers() loads the last Canopy committee proposers for sortition data
 		LoadLastProposers() *lib.Proposers
 		// LoadMinimumEvidenceHeight() loads the Canopy enforced minimum height for valid Byzantine Evidence
@@ -795,15 +795,15 @@ type (
 		// IsValidDoubleSigner() checks to see if the double signer is valid for this specific height
 		IsValidDoubleSigner(height uint64, address []byte) bool
 		// SendCertMsg() is a P2P call to gossip a completed Quorum Certificate with a Proposal
-		GossipBlock(committeeID uint64, certificate *lib.QuorumCertificate)
+		GossipBlock(certificate *lib.QuorumCertificate)
 		// SendCertificateResultsTx() is a P2P call that allows a Leader to submit their CertificateResults (reward) transaction
-		SendCertificateResultsTx(committeeID uint64, certificate *lib.QuorumCertificate)
+		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
 		// SendConsMsgToReplicas() is a P2P call to directly send a Consensus message to all Replicas
-		SendToReplicas(committeeID uint64, replicas lib.ValidatorSet, msg lib.Signable)
+		SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 		// SendConsMsgToProposer() is a P2P call to directly send a Consensus message to the Leader
-		SendToProposer(committeeID uint64, msg lib.Signable)
+		SendToProposer(msg lib.Signable)
 		// Syncing() returns true if the plugin is currently syncing
-		Syncing(committeeID uint64) *atomic.Bool
+		Syncing() *atomic.Bool
 	}
 )
 

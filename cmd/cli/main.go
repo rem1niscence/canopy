@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"github.com/canopy-network/canopy/cmd/rpc"
 	"github.com/canopy-network/canopy/controller"
+	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"github.com/canopy-network/canopy/plugin/canopy"
 	"github.com/canopy-network/canopy/store"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -69,10 +69,12 @@ func Start() {
 	if err != nil {
 		l.Fatal(err.Error())
 	}
-	// register all plugins as active
-	RegisterAllPlugins(config, validatorKey, db, l)
+	sm, err := fsm.New(config, db, l)
+	if err != nil {
+		l.Fatal(err.Error())
+	}
 	// create a new instance of the application
-	app, err := controller.New(config, validatorKey, l)
+	app, err := controller.New(lib.CanopyCommitteeId, sm, config, validatorKey, l)
 	if err != nil {
 		l.Fatal(err.Error())
 	}
@@ -87,14 +89,6 @@ func Start() {
 	// exit
 	os.Exit(0)
 
-}
-
-// RegisterAllPlugins() registers plugins with the controller - creating consensus instances for each
-func RegisterAllPlugins(c lib.Config, valKey crypto.PrivateKeyI, db lib.StoreI, l lib.LoggerI) {
-	// register a new Canopy plugin
-	if err := canopy.RegisterNew(c, lib.CanopyCommitteeId, valKey, db, l); err != nil {
-		l.Fatal(err.Error())
-	}
 }
 
 // waitForKill() blocks until a kill signal is received
