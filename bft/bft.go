@@ -772,38 +772,40 @@ type (
 	ValSet = lib.ValidatorSet
 
 	// Controller defines the expected parent interface for the BFT structure, providing various callback functions
-	// that manage interactions with BFT and other parts of the application like Plugins, P2P and Storage
+	// that manage interactions with BFT and other parts of the application like FSM, P2P and Storage
 	Controller interface {
 		Lock()
 		Unlock()
-		// GetCanopyHeight returns the height of the base-chain
+		// GetHeight returns the height of the base-chain
 		GetHeight() uint64
 		// ProduceProposal() is a plugin call to produce a Proposal object as a Leader
 		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
 		// ValidateCertificate() is a plugin call to validate a Certificate object as a Replica
 		ValidateCertificate(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
-		// LoadCommittee() loads the ValidatorSet operating under CommitteeID
-		LoadCommittee(canopyHeight uint64) (lib.ValidatorSet, lib.ErrorI)
-		// LastCommitteeRewardHeight() loads the last height a committee member executed a Proposal (reward) transaction
-		LoadCommitteeHeightInState() uint64
 		// LoadCertificate() gets the Quorum Certificate from the committeeID-> plugin at a certain height
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
+		// GossipBlock() is a P2P call to gossip a completed Quorum Certificate with a Proposal
+		GossipBlock(certificate *lib.QuorumCertificate)
+		// SendToReplicas() is a P2P call to directly send a Consensus message to all Replicas
+		SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
+		// SendToProposer() is a P2P call to directly send a Consensus message to the Leader
+		SendToProposer(msg lib.Signable)
+		// Syncing() returns true if the plugin is currently syncing
+		Syncing() *atomic.Bool
+
+		/* Base-Chain Functionality Below*/
+		// SendCertificateResultsTx() is a P2P call that allows a Leader to submit their CertificateResults (reward) transaction
+		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
+		// LoadCommittee() loads the ValidatorSet operating under CommitteeID
+		LoadCommittee(canopyHeight uint64) (lib.ValidatorSet, lib.ErrorI)
+		// LoadCommitteeHeightInState() loads the last height a committee member executed a Proposal (reward) transaction
+		LoadCommitteeHeightInState() uint64
 		// LoadLastProposers() loads the last Canopy committee proposers for sortition data
 		LoadLastProposers() *lib.Proposers
 		// LoadMinimumEvidenceHeight() loads the Canopy enforced minimum height for valid Byzantine Evidence
 		LoadMinimumEvidenceHeight() (uint64, lib.ErrorI)
 		// IsValidDoubleSigner() checks to see if the double signer is valid for this specific height
 		IsValidDoubleSigner(height uint64, address []byte) bool
-		// SendCertMsg() is a P2P call to gossip a completed Quorum Certificate with a Proposal
-		GossipBlock(certificate *lib.QuorumCertificate)
-		// SendCertificateResultsTx() is a P2P call that allows a Leader to submit their CertificateResults (reward) transaction
-		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
-		// SendConsMsgToReplicas() is a P2P call to directly send a Consensus message to all Replicas
-		SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
-		// SendConsMsgToProposer() is a P2P call to directly send a Consensus message to the Leader
-		SendToProposer(msg lib.Signable)
-		// Syncing() returns true if the plugin is currently syncing
-		Syncing() *atomic.Bool
 	}
 )
 

@@ -193,6 +193,24 @@ func (c *Client) Orders(height, committeeId uint64) (p *types.OrderBooks, err li
 	return
 }
 
+func (c *Client) LastProposers(height uint64) (p *lib.Proposers, err lib.ErrorI) {
+	p = new(lib.Proposers)
+	err = c.heightRequest(LastProposersRouteName, height, p)
+	return
+}
+
+func (c *Client) IsValidDoubleSigner(height uint64, address string) (p *bool, err lib.ErrorI) {
+	p = new(bool)
+	err = c.heightAndAddressRequest(IsValidDoubleSignerRouteName, height, address, p)
+	return
+}
+
+func (c *Client) MinimumEvidenceHeight(height uint64) (p *uint64, err lib.ErrorI) {
+	p = new(uint64)
+	err = c.heightRequest(MinimumEvidenceHeightRouteName, height, p)
+	return
+}
+
 func (c *Client) Supply(height uint64) (p *types.Supply, err lib.ErrorI) {
 	p = new(types.Supply)
 	err = c.heightRequest(SupplyRouteName, height, p)

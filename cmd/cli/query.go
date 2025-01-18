@@ -55,6 +55,9 @@ func init() {
 	queryCmd.AddCommand(pendingTxsCmd)
 	queryCmd.AddCommand(proposalsCmd)
 	queryCmd.AddCommand(pollCmd)
+	queryCmd.AddCommand(lastProposersCmd)
+	queryCmd.AddCommand(minimumEvidenceHeightCmd)
+	queryCmd.AddCommand(isValidDoubleSignerCmd)
 }
 
 var (
@@ -311,6 +314,32 @@ var (
 		Short: "query the nodes polling results on governance proposals",
 		Run: func(cmd *cobra.Command, args []string) {
 			writeToConsole(client.Poll())
+		},
+	}
+
+	lastProposersCmd = &cobra.Command{
+		Use:   "last-proposers --height=1",
+		Short: "query the last proposers used in leader election",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.LastProposers(height))
+		},
+	}
+
+	minimumEvidenceHeightCmd = &cobra.Command{
+		Use:   "minimum-evidence-height --height=1",
+		Short: "query the minimum BFT evidence height used to determine if BFT evidence is valid",
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.MinimumEvidenceHeight(height))
+		},
+	}
+
+	isValidDoubleSignerCmd = &cobra.Command{
+		Use:   "valid-double-signer <address> --height=1",
+		Short: "query if a double signer is valid at some height",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.IsValidDoubleSigner(height, args[0]))
 		},
 	}
 )
