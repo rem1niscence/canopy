@@ -296,17 +296,29 @@ func (c *Controller) CompareBlockHeaders(candidate *lib.BlockHeader, compare *li
 		return lib.ErrUnequalBlockHash()
 	}
 	// validate the last quorum certificate of the block header
-	// by using the historical canopy committee
+	// by using the historical committee
 	if candidate.Height > 2 {
-		lastBlockHeight := candidate.Height - 1
-		vs, err := c.FSM.LoadCanopyCommittee(lastBlockHeight)
+		lastCertificate, err := c.FSM.LoadCertificateHashesOnly(candidate.Height - 1)
+		if err != nil {
+			return err
+		}
+		// validate the expected QC hash
+		if candidate.LastQuorumCertificate == nil ||
+			candidate.LastQuorumCertificate.Header == nil ||
+			!bytes.Equal(candidate.LastQuorumCertificate.BlockHash, lastCertificate.BlockHash) ||
+			!bytes.Equal(candidate.LastQuorumCertificate.ResultsHash, lastCertificate.ResultsHash) {
+			return lib.ErrInvalidLastQuorumCertificate()
+		}
+		// load the committee for the last qc
+		committeeHeight := candidate.LastQuorumCertificate.Header.CanopyHeight
+		vs, err := c.LoadCommittee(committeeHeight)
 		if err != nil {
 			return err
 		}
 		// check the last QC
 		isPartialQC, err := candidate.LastQuorumCertificate.Check(vs, 0, &lib.View{
-			Height:       lastBlockHeight,
-			CanopyHeight: lastBlockHeight,
+			Height:       candidate.Height - 1,
+			CanopyHeight: committeeHeight,
 			NetworkId:    c.Config.NetworkID,
 			CommitteeId:  c.CommitteeID,
 		}, true)
@@ -363,19 +375,18 @@ func (c *Controller) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (s
 
 // GetDelegateToReward() gets the pseudorandomly selected delegate to reward and their cut
 func (c *Controller) GetDelegateToReward(proposerAddress []byte) (address []byte, delegateCut uint64, err lib.ErrorI) {
-	fsm, err := c.FSM.TimeMachine(c.FSM.Height())
-	if err != nil {
-		return
-	}
 	// get the validator params in order to have the reward percentage for the delegate
-	valParams, err := fsm.GetParamsVal()
+	valParams, err := c.FSM.GetParamsVal()
 	if err != nil {
 		return
 	}
 	// set the percentage the delegate receives
 	delegateCut = valParams.ValidatorDelegateRewardPercentage
 	// get the delegate pseudorandom delegate
-	address, err = fsm.PseudorandomSelectDelegate(proposerAddress)
+	address = c.BaseChainInfo.DelegateLotteryWinner
+	if bytes.Equal(address, crypto.MaxHash[:20]) {
+		address = proposerAddress
+	}
 	return
 }
 
@@ -396,33 +407,6 @@ func (c *Controller) validateBlockTime(header *lib.BlockHeader) lib.ErrorI {
 		return lib.ErrInvalidBlockTime()
 	}
 	return nil
-}
-
-// ResetBFTCallback() is the function the `plugin` calls to let the controller's bft know to reset and start over
-func (c *Controller) ResetBFTCallback(committeeID uint64) {
-	var err lib.ErrorI
-	// lock the controller for thread safety
-	c.Lock()
-	defer c.Unlock()
-	// update the canopy committee members
-	if c.Consensus.ValidatorSet, err = c.FSM.GetCommitteeMembers(committeeID); err != nil {
-		c.log.Errorf("failed retrieving committee when trigger occurred %s", err.Error())
-		return
-	}
-	newCommittee, e := c.LoadCommittee(c.FSM.Height())
-	if e != nil {
-		c.log.Error(e.Error())
-		return
-	}
-	// get height
-	height := c.FSM.Height()
-	// reset the consensus for that particular chain
-	c.Consensus.ResetBFTChan() <- bft.ResetBFT{
-		Height:              height - 1,
-		UpdatedCommitteeSet: newCommittee,
-		UpdatedCanopyHeight: height,
-		ProcessTime:         time.Duration(0),
-	}
 }
 
 // ValidatorProposalConfig() is how the Validator is configured for `base chain` specific parameter upgrades

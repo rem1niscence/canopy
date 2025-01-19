@@ -535,7 +535,7 @@ func (t *testController) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) { retu
 func (t *testController) IsValidDoubleSigner(_ uint64, _ []byte) bool     { return true }
 func (t *testController) Syncing() *atomic.Bool                           { return &atomic.Bool{} }
 func (t *testController) LoadCommitteeHeightInState() uint64              { return 0 }
-func (t *testController) GetHeight() uint64                               { return 0 }
+func (t *testController) BaseChainHeight() uint64                         { return 0 }
 func (t *testController) LoadLastProposers() *lib.Proposers               { return t.proposers }
 func (t *testController) GossipBlock(cert *lib.QuorumCertificate) {
 	t.gossipCertChan <- cert

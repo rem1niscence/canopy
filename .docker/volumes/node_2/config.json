@@ -5,6 +5,8 @@
   "RPCPort": "50002",
   "AdminPort": "50003",
   "RPCUrl": "http://localhost",
+  "BaseChainRPCURL": "http://localhost:50002",
+  "BaseChainPollMS": 333,
   "TimeoutS": 3,
   "DataDirPath": "/root/.canopy",
   "DBName": "canopy",

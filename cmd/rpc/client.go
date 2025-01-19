@@ -175,6 +175,12 @@ func (c *Client) CommitteesData(height uint64) (p *types.CommitteesData, err lib
 	return
 }
 
+func (c *Client) BaseChainInfo(height, committeeId uint64) (p *lib.BaseChainInfo, err lib.ErrorI) {
+	p = new(lib.BaseChainInfo)
+	err = c.heightAndIdRequest(BaseChainInfoRouteName, height, committeeId, p)
+	return
+}
+
 func (c *Client) SubsidizedCommittees(height uint64) (p *[]uint64, err lib.ErrorI) {
 	p = new([]uint64)
 	err = c.heightRequest(SubsidizedCommitteesRouteName, height, p)
@@ -205,9 +211,24 @@ func (c *Client) IsValidDoubleSigner(height uint64, address string) (p *bool, er
 	return
 }
 
+func (c *Client) ValidatorSet(height uint64, id uint64) (v lib.ValidatorSet, err lib.ErrorI) {
+	p := new(lib.ConsensusValidators)
+	err = c.heightAndIdRequest(ValidatorSetRouteName, height, id, p)
+	if err != nil {
+		return lib.ValidatorSet{}, err
+	}
+	return lib.NewValidatorSet(p)
+}
+
 func (c *Client) MinimumEvidenceHeight(height uint64) (p *uint64, err lib.ErrorI) {
 	p = new(uint64)
 	err = c.heightRequest(MinimumEvidenceHeightRouteName, height, p)
+	return
+}
+
+func (c *Client) DelegateLottery(height, id uint64) (p *lib.HexBytes, err lib.ErrorI) {
+	p = new(lib.HexBytes)
+	err = c.heightAndIdRequest(DelegateLotteryRouteName, height, id, p)
 	return
 }
 
@@ -751,10 +772,15 @@ func (c *Client) heightAndIdRequest(routeName string, height, id uint64, ptr any
 }
 
 func (c *Client) url(routeName string, admin ...bool) string {
-	if admin != nil && admin[0] {
-		return "http://" + localhost + colon + c.adminPort + router[routeName].Path
+	// if rpc port and admin ports are defined then it's a local RPC deployment
+	if c.rpcPort != "" && c.adminPort != "" {
+		if admin != nil && admin[0] {
+			return "http://" + localhost + colon + c.adminPort + router[routeName].Path
+		}
+		return c.rpcURL + colon + c.rpcPort + router[routeName].Path
 	}
-	return c.rpcURL + colon + c.rpcPort + router[routeName].Path
+	// if rpc port is not defined then it's consider a remote RPC deployment
+	return c.rpcURL + router[routeName].Path
 }
 
 func (c *Client) post(routeName string, json []byte, ptr any, admin ...bool) lib.ErrorI {

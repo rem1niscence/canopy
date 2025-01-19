@@ -339,9 +339,9 @@ func (s *StateMachine) GetAuthorizedSignersForValidator(address []byte) (signers
 
 // PseudorandomSelectDelegate() selects a delegate randomly weighted based on their stake within a committee
 // if there's no committee, then fallback to the proposer's address
-func (s *StateMachine) PseudorandomSelectDelegate(proposerAddress []byte) (address []byte, err lib.ErrorI) {
+func (s *StateMachine) PseudorandomSelectDelegate(id uint64, proposerAddress []byte) (address lib.HexBytes, err lib.ErrorI) {
 	// get the delegates
-	p, _ := s.GetAllDelegates(lib.CanopyCommitteeId)
+	p, _ := s.GetAllDelegates(id)
 	if p.NumValidators == 0 {
 		return proposerAddress, nil
 	}

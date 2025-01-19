@@ -13,21 +13,27 @@ import (
 	"time"
 )
 
+// TODO
+// - Change state to not accept ports just IP or host in service URL
+// - Change P2P to extrapolate port from the url + chain-id
+
 var _ bft.Controller = new(Controller)
 
 // Controller acts as the 'manager' of the modules of the application
 type Controller struct {
-	FSM         *fsm.StateMachine
-	Mempool     *Mempool
-	Consensus   *bft.BFT           // the async consensus process between the committee members for the chain
-	isSyncing   *atomic.Bool       // is the chain currently being downloaded from peers
-	P2P         *p2p.P2P           // the P2P module the node uses to connect to the network
-	PublicKey   []byte             // self public key
-	PrivateKey  crypto.PrivateKeyI // self private key
-	CommitteeID uint64             // the global committee id for this chain
-	Config      lib.Config         // node configuration
-	log         lib.LoggerI        // object for logging
-	sync.Mutex                     // mutex for thread safety
+	FSM             *fsm.StateMachine
+	BaseChainInfo   lib.BaseChainInfo
+	RemoteCallbacks lib.RemoteCallbacks
+	Mempool         *Mempool
+	Consensus       *bft.BFT           // the async consensus process between the committee members for the chain
+	isSyncing       *atomic.Bool       // is the chain currently being downloaded from peers
+	P2P             *p2p.P2P           // the P2P module the node uses to connect to the network
+	PublicKey       []byte             // self public key
+	PrivateKey      crypto.PrivateKeyI // self private key
+	CommitteeID     uint64             // the global committee id for this chain
+	Config          lib.Config         // node configuration
+	log             lib.LoggerI        // object for logging
+	sync.Mutex                         // mutex for thread safety
 }
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
@@ -79,9 +85,21 @@ func (c *Controller) Start() {
 	c.P2P.Start()
 	// start internal Controller listeners for P2P
 	c.StartListeners()
-	// sync and start each bft module
-	go c.Sync()
-	go c.Consensus.Start()
+	go func() {
+		c.log.Warnf("Attempting to connect to the base-chain")
+		t := time.NewTicker(time.Second)
+		defer t.Stop()
+		for range t.C {
+			if c.BaseChainInfo.Height != 0 {
+				break
+			}
+		}
+		// start internal Controller listeners for P2P
+		c.StartListeners()
+		// sync and start each bft module
+		go c.Sync()
+		go c.Consensus.Start()
+	}()
 }
 
 // Stop() terminates the Controller service
@@ -97,9 +115,29 @@ func (c *Controller) Stop() {
 	c.P2P.Stop()
 }
 
+// UpdateBaseChainInfo() receives updates from the base-chain thread
+func (c *Controller) UpdateBaseChainInfo(info *lib.BaseChainInfo) {
+	c.Lock()
+	defer c.Unlock()
+	// update the base-chain info
+	c.BaseChainInfo = *info
+	// signal to reset consensus
+	c.Consensus.ResetBFT <- bft.ResetBFT{IsBaseChainUpdate: true}
+	// update the peer 'must connect'
+	c.UpdateP2PMustConnect()
+}
+
 // LoadCommittee() gets the ValidatorSet that is authorized to come to Consensus agreement on the Proposal for a specific height/committeeId
 func (c *Controller) LoadCommittee(height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	return c.FSM.LoadCommittee(c.CommitteeID, height)
+	// if loading from expected height
+	if height == c.BaseChainInfo.Height {
+		return lib.NewValidatorSet(c.BaseChainInfo.ValidatorSet.ValidatorSet)
+	}
+	if height == c.BaseChainInfo.Height-1 {
+		return lib.NewValidatorSet(c.BaseChainInfo.LastValidatorSet.ValidatorSet)
+	}
+	c.log.Warnf("Executing remote LoadCommittee call with requested height %d and base-chain height %d", height, c.BaseChainInfo.Height)
+	return c.RemoteCallbacks.ValidatorSet(height, c.CommitteeID)
 }
 
 // LoadCertificate() gets the Quorum Block from the committeeID-> plugin at a certain height
@@ -109,12 +147,18 @@ func (c *Controller) LoadCertificate(height uint64) (*lib.QuorumCertificate, lib
 
 // LoadMinimumEvidenceHeight() gets the minimum evidence height from Canopy
 func (c *Controller) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) {
-	return c.FSM.LoadMinimumEvidenceHeight()
+	return c.BaseChainInfo.MinimumEvidenceHeight, nil
 }
 
 // IsValidDoubleSigner() Canopy checks if the double signer is valid at a certain height
 func (c *Controller) IsValidDoubleSigner(height uint64, address []byte) bool {
-	return c.FSM.IsValidDoubleSigner(height, address) // may only be charged once per height
+	c.log.Warnf("Executing remote IsValidDoubleSigner call with requested height %d and address %s", height, lib.BytesToString(address))
+	isValidDoubleSigner, err := c.RemoteCallbacks.IsValidDoubleSigner(height, lib.BytesToString(address))
+	if err != nil {
+		c.log.Errorf("IsValidDoubleSigner remote call failed with error: %s", err.Error())
+		return false
+	}
+	return *isValidDoubleSigner
 }
 
 // LoadLastCommitTime() gets a timestamp from the most recent Quorum Block
@@ -135,38 +179,26 @@ func (c *Controller) LoadLastCommitTime(height uint64) time.Time {
 	return time.UnixMicro(int64(block.BlockHeader.Time))
 }
 
-// LoadProposerKeys() gets the last Canopy proposer keys
+// LoadProposerKeys() gets the last Base-Chain proposer keys
 func (c *Controller) LoadLastProposers() *lib.Proposers {
-	// load the last proposers from Canopy
-	keys, err := c.FSM.GetLastProposers()
-	if err != nil {
-		c.log.Error(err.Error())
-		return nil
-	}
-	// return the
-	return &lib.Proposers{Addresses: keys.Addresses}
+	// return the last proposers from the Base-Chain
+	return c.BaseChainInfo.LastProposers
 }
 
 // LoadCommitteeHeightInState() returns the last height the committee submitted a proposal for rewards
 func (c *Controller) LoadCommitteeHeightInState() uint64 {
-	// load the committee data from the canopy fsm
-	data, err := c.FSM.GetCommitteeData(c.CommitteeID)
-	// if the data doesn't exist return 0
-	if data == nil || err != nil {
-		return 0
-	}
 	// return the committee height
-	return data.LastCanopyHeightUpdated
+	return c.BaseChainInfo.LastCanopyHeightUpdated
 }
 
 // Syncing() returns if any of the supported chains are currently syncing
 func (c *Controller) Syncing() *atomic.Bool { return c.isSyncing }
 
-// GetHeight() returns the height of the canopy base-chain
-func (c *Controller) GetHeight() uint64 { return c.FSM.Height() }
+// BaseChainHeight() returns the height of the canopy base-chain
+func (c *Controller) BaseChainHeight() uint64 { return c.BaseChainInfo.Height }
 
 // ConsensusSummary() for the RPC - returns the summary json object of the bft for a specific chainID
-func (c *Controller) ConsensusSummary(committeeID uint64) ([]byte, lib.ErrorI) {
+func (c *Controller) ConsensusSummary() ([]byte, lib.ErrorI) {
 	// lock for thread safety
 	c.Lock()
 	defer c.Unlock()

@@ -29,7 +29,7 @@ type BFT struct {
 	PacemakerMessages PacemakerMessages  // View messages from the current ValidatorSet allowing the node to synchronize to the highest +2/3 seen Round
 
 	Controller               // reference to the Controller for callbacks like producing and validating the proposal via the plugin or gossiping commit message
-	resetBFT   chan ResetBFT // trigger that resets the BFT due to a new Target block or a new Canopy block
+	ResetBFT   chan ResetBFT // trigger that resets the BFT due to a new Target block or a new Canopy block
 	syncing    *atomic.Bool  // if chain for this committee is currently catching up to latest height
 
 	PhaseTimer      *time.Timer // ensures the node waits for a configured duration (Round x phaseTimeout) to allow for full voter participation
@@ -71,7 +71,7 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, canopyHeight, hei
 		Config:            c,
 		log:               l,
 		Controller:        con,
-		resetBFT:          make(chan ResetBFT, 1),
+		ResetBFT:          make(chan ResetBFT, 1),
 		syncing:           con.Syncing(),
 		PhaseTimer:        lib.NewTimer(),
 		OptimisticTimer:   lib.NewTimer(),
@@ -116,30 +116,21 @@ func (b *BFT) Start() {
 			}()
 
 		// RESET BFT
-		// - This triggers when receiving a new Commit Block (QC) from either Canopy (a) or a sub-chain (b)
-		case resetBFT := <-b.resetBFT:
+		// - This triggers when receiving a new Commit Block (QC) from either Base-Chain (a) or the Target-Chain (b)
+		case resetBFT := <-b.ResetBFT:
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
-				if resetBFT.UpdatedCanopyHeight != 0 { // (a) Canopy block reset
-					if b.CommitteeId == lib.CanopyCommitteeId {
-						return // ignore if Canopy Committee, as the Target reset notification is the correct reset path
-					}
-					b.log.Info("Resetting BFT timers after receiving a new Canopy block")
-					// update the new committee
-					b.CanopyHeight, b.ValidatorSet = resetBFT.UpdatedCanopyHeight, resetBFT.UpdatedCommitteeSet
-					// reset back to round 0 but maintain locks to prevent 'fork attacks'
-					b.NewHeight(true)
-					// immediately reset and start the height over again with the new Validator set
-					b.SetWaitTimers(0, b.WaitTime(CommitProcess, 10), 0)
-				} else { // (b) Target block reset
-					b.log.Info("Resetting BFT timers after receiving a new Target block (NEW_HEIGHT)")
-					// set the height of the bft (this is usefule during syncing)
-					b.Height, b.ValidatorSet = resetBFT.Height, resetBFT.UpdatedCommitteeSet
-					// reset BFT variables and start VDF
-					b.NewHeight()
+				// if is a base-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
+				// else increment the height and don't maintain locks
+				b.NewHeight(resetBFT.IsBaseChainUpdate)
+				// if not a base chain update, reset the timers
+				if !resetBFT.IsBaseChainUpdate {
+					b.log.Info("Reset BFT (NEW_HEIGHT)")
 					// start BFT over after sleeping CommitProcessMS
 					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
+				} else {
+					b.log.Info("Reset BFT (NEW_COMMITTEE)")
 				}
 			}()
 		}
@@ -579,6 +570,8 @@ func (b *BFT) NewRound(newHeight bool) {
 
 // NewHeight() initializes / resets consensus variables preparing for the NewHeight
 func (b *BFT) NewHeight(keepLocks ...bool) {
+	var err lib.ErrorI
+	b.log.Debugf("NewHeight: %v", keepLocks)
 	// reset VotesForHeight
 	b.Votes = make(VotesForHeight)
 	// reset ProposalsForHeight
@@ -594,12 +587,11 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 		b.HighQC = nil
 		if b.SelfIsValidator() {
 			// begin the verifiable delay function for the next height
-			if err := b.RunVDF(); err != nil {
+			if err = b.RunVDF(); err != nil {
 				b.log.Errorf("RunVDF() failed with error, %s", err.Error())
 			}
 		}
 		b.Height++
-		b.CanopyHeight = b.Controller.GetHeight()
 	}
 	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
@@ -609,6 +601,13 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.NewRound(true)
 	// set phase to Election
 	b.Phase = Election
+	// update canopy height
+	b.CanopyHeight = b.Controller.BaseChainHeight()
+	// update the validator set
+	b.ValidatorSet, err = b.Controller.LoadCommittee(b.CanopyHeight)
+	if err != nil {
+		b.log.Errorf("LoadCommittee() failed with err: %s", err.Error())
+	}
 }
 
 // SafeNode is the codified Hotstuff SafeNodePredicate:
@@ -749,17 +748,6 @@ func (b *BFT) VerifyVDF(vote *Message) (bool, lib.ErrorI) {
 	return b.VDFService.VerifyVDF(seed, vote.Vdf), nil
 }
 
-// ResetBFTChan() is a callback trigger that allows the caller to Reset the BFT to Round 0 with a varying sleep
-func (b *BFT) ResetBFTChan() chan ResetBFT { return b.resetBFT }
-
-// ResetBFT is a structure that allows the Controller to reset the BFT either due to a Target chain block or Canopy block
-type ResetBFT struct {
-	UpdatedCanopyHeight uint64        // new Canopy height
-	Height              uint64        // new height after syncing
-	UpdatedCommitteeSet ValSet        // new Committee from the Canopy block
-	ProcessTime         time.Duration // process Target block time
-}
-
 // phaseToString() converts the phase object to a human-readable string
 func phaseToString(p Phase) string {
 	return fmt.Sprintf("%d_%s", p, lib.Phase_name[int32(p)])
@@ -777,7 +765,7 @@ type (
 		Lock()
 		Unlock()
 		// GetHeight returns the height of the base-chain
-		GetHeight() uint64
+		BaseChainHeight() uint64
 		// ProduceProposal() is a plugin call to produce a Proposal object as a Leader
 		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
 		// ValidateCertificate() is a plugin call to validate a Certificate object as a Replica
@@ -808,6 +796,11 @@ type (
 		IsValidDoubleSigner(height uint64, address []byte) bool
 	}
 )
+
+type ResetBFT struct {
+	IsBaseChainUpdate bool
+	ProcessTime       time.Duration
+}
 
 const (
 	Election       = lib.Phase_ELECTION

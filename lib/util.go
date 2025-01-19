@@ -448,6 +448,33 @@ func Delimit(toAppend ...[]byte) (res []byte) {
 	return
 }
 
+// Retry is a simple exponential backoff retry structure in the form of doubling the timeout
+type Retry struct {
+	waitTimeMS uint64
+	maxLoops   uint64
+	loopCount  uint64
+}
+
+// NewRetry() constructs a new Retry given parameters
+func NewRetry(waitTimeMS, maxLoops uint64) *Retry {
+	return &Retry{
+		waitTimeMS: waitTimeMS,
+		maxLoops:   maxLoops,
+	}
+}
+
+// WaitAndDoRetry() sleeps the appropriate time and returns false if maxed out retry
+func (r *Retry) WaitAndDoRetry() bool {
+	if r.maxLoops <= r.loopCount {
+		return false
+	}
+	time.Sleep(time.Duration(r.waitTimeMS) * time.Millisecond)
+	// double the timeout
+	r.waitTimeMS += r.waitTimeMS
+	r.loopCount++
+	return true
+}
+
 // TimeTrack() a utility function to benchmark the time
 func TimeTrack(start time.Time) {
 	elapsed := time.Since(start)

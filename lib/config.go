@@ -63,23 +63,27 @@ func (m *MainConfig) GetLogLevel() int32 {
 // RPC CONFIG BELOW
 
 type RPCConfig struct {
-	WalletPort   string // the port where the web wallet is hosted
-	ExplorerPort string // the port where the block explorer is hosted
-	RPCPort      string // the port where the rpc server is hosted
-	AdminPort    string // the port where the admin rpc server is hosted
-	RPCUrl       string // the url without port where the rpc server is hosted
-	TimeoutS     int    // the rpc request timeout in seconds
+	WalletPort      string // the port where the web wallet is hosted
+	ExplorerPort    string // the port where the block explorer is hosted
+	RPCPort         string // the port where the rpc server is hosted
+	AdminPort       string // the port where the admin rpc server is hosted
+	RPCUrl          string // the url without port where the rpc server is hosted
+	BaseChainRPCURL string // the url of the base-chain's rpc
+	BaseChainPollMS uint64 // how often to poll the base chain in milliseconds
+	TimeoutS        int    // the rpc request timeout in seconds
 }
 
 // DefaultRPCConfig() sets rpc url to localhost and sets wallet, explorer, rpc, and admin ports from [50000-50003]
 func DefaultRPCConfig() RPCConfig {
 	return RPCConfig{
-		WalletPort:   "50000",
-		ExplorerPort: "50001",
-		RPCPort:      "50002",
-		AdminPort:    "50003",
-		RPCUrl:       "http://localhost",
-		TimeoutS:     3,
+		WalletPort:      "50000",
+		ExplorerPort:    "50001",
+		RPCPort:         "50002",
+		AdminPort:       "50003",
+		RPCUrl:          "http://localhost",
+		BaseChainRPCURL: "http://localhost:50002",
+		BaseChainPollMS: 1000,
+		TimeoutS:        3,
 	}
 }
 

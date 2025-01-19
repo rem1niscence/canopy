@@ -9,7 +9,6 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/p2p"
 	"math/rand"
-	"slices"
 	"time"
 )
 
@@ -118,22 +117,6 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 	if err != nil {
 		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return
-	}
-	// check if committee is subsidized
-	subsidizedCommittees, err := c.FSM.GetSubsidizedCommittees()
-	if err != nil {
-		c.log.Errorf("Auto-certificate-results-txn stopped due error: %s", err.Error())
-		return
-	}
-	// get the pool (of funds for the committee) from the canopy blockchain
-	pool, err := c.FSM.GetPool(qc.Header.CommitteeId)
-	if err != nil {
-		c.log.Errorf("Auto-certificate-results-txn stopped due error: %s", err.Error())
-		return
-	}
-	if !slices.Contains(subsidizedCommittees, c.CommitteeID) && pool.Amount == 0 {
-		c.log.Errorf("Auto-certificate-results-txn as committee is not subsidized")
-		return // not subsidized
 	}
 	// convert the transaction into bytes
 	bz, err := lib.Marshal(tx)
@@ -328,42 +311,8 @@ func (c *Controller) ListenForBlock() {
 			}
 			// gossip the block to the node's peers
 			c.GossipBlock(qc)
-			// check if the block is for the Canopy (special case)
-			// CANOPY UPDATE
-			if blockMessage.CommitteeId == lib.CanopyCommitteeId {
-				// a new canopy block means all BFTs are reset with updated committees which prevents conflicting validator sets among peers
-				newCanopyHeight := c.FSM.Height()
-				// load the new committee
-				newCommittee, e := c.LoadCommittee(newCanopyHeight)
-				if e != nil {
-					c.log.Error(e.Error())
-					return
-				}
-				if c.Consensus.CommitteeId == lib.CanopyCommitteeId {
-					// reset the canopy BFT as if it was a target chain
-					c.Consensus.ResetBFTChan() <- bft.ResetBFT{
-						Height:              c.FSM.Height() - 1,
-						UpdatedCommitteeSet: newCommittee,
-						ProcessTime:         time.Since(startTime),
-					}
-					return
-				}
-				// reset & update the consensus module
-				c.Consensus.ResetBFTChan() <- bft.ResetBFT{UpdatedCommitteeSet: newCommittee, UpdatedCanopyHeight: newCanopyHeight, ProcessTime: 0, Height: c.FSM.Height() - 1}
-				// update the peer 'must connect'
-				c.UpdateP2PMustConnect()
-			} else {
-				// OTHER CHAIN UPDATE
-				canopyHeight := c.FSM.Height()
-				// load the new committee
-				newCommittee, e := c.LoadCommittee(canopyHeight)
-				if e != nil {
-					c.log.Error(e.Error())
-					return
-				}
-				// block for a different committee than Canopy (standard case)
-				c.Consensus.ResetBFTChan() <- bft.ResetBFT{UpdatedCommitteeSet: newCommittee, ProcessTime: time.Since(startTime), UpdatedCanopyHeight: c.FSM.Height(), Height: c.FSM.Height() - 1}
-			}
+			// reset consensus
+			c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
 		}()
 		// if quit signaled, exit the loop
 		if quit {
@@ -539,14 +488,8 @@ func (c *Controller) ListenForBlockRequests() {
 func (c *Controller) UpdateP2PMustConnect() {
 	// define a list
 	noDuplicates := make(map[string]*lib.PeerAddress)
-	// get the list of committee members
-	committee, err := c.FSM.GetCommitteeMembers(c.CommitteeID)
-	if err != nil {
-		c.log.Errorf("unable to get must connect peers for committee %d with error %s", c.CommitteeID, err.Error())
-		return
-	}
 	// for each member of the committee
-	for _, member := range committee.ValidatorSet.ValidatorSet {
+	for _, member := range c.BaseChainInfo.ValidatorSet.ValidatorSet.ValidatorSet {
 		// convert the public key to a string
 		pkString := lib.BytesToString(member.PublicKey)
 		// check the de-duplication map to see if the peer object already exists
@@ -584,7 +527,7 @@ func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc
 	// validate the quorum certificate
 	if err = c.checkPeerQC(c.LoadMaxBlockSize(), &lib.View{
 		Height:       c.FSM.Height(),
-		CanopyHeight: c.LoadCommitteeHeightInState(),
+		CanopyHeight: c.BaseChainInfo.Height,
 		NetworkId:    c.Config.NetworkID,
 		CommitteeId:  msg.CommitteeId,
 	}, v, qc, senderID); err != nil {
@@ -690,15 +633,9 @@ func (c *Controller) pollMaxHeight(backoff int) (max, minVDFIterations uint64, s
 
 // singleNodeNetwork() returns true if there are no other participants in the committee besides self
 func (c *Controller) singleNodeNetwork() bool {
-	// load the committee for Canopy
-	valSet, err := c.LoadCommittee(c.FSM.Height())
-	if err != nil {
-		c.log.Error(err.Error())
-		return false
-	}
 	// if self is the only validator, return true
-	return len(valSet.ValidatorSet.ValidatorSet) == 1 &&
-		bytes.Equal(valSet.ValidatorSet.ValidatorSet[0].PublicKey, c.PublicKey)
+	return c.BaseChainInfo.ValidatorSet.NumValidators == 1 &&
+		bytes.Equal(c.BaseChainInfo.ValidatorSet.ValidatorSet.ValidatorSet[0].PublicKey, c.PublicKey)
 }
 
 // emptyInbox() discards all unread messages for a specific topic
@@ -727,18 +664,8 @@ func (c *Controller) finishSyncing() {
 	// lock the controller
 	c.Lock()
 	defer c.Unlock()
-	// load the new committee
-	newCommittee, e := c.LoadCommittee(c.FSM.Height())
-	if e != nil {
-		c.log.Error(e.Error())
-		return
-	}
 	// signal a reset of bft for the chain
-	c.Consensus.ResetBFTChan() <- bft.ResetBFT{
-		Height:              c.FSM.Height() - 1,
-		UpdatedCommitteeSet: newCommittee,
-		ProcessTime:         time.Since(c.LoadLastCommitTime(c.FSM.Height())),
-	}
+	c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(c.LoadLastCommitTime(c.FSM.Height()))}
 	// set syncing to false
 	c.isSyncing.Store(false)
 	// enable listening for a block

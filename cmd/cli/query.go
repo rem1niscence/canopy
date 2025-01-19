@@ -58,6 +58,9 @@ func init() {
 	queryCmd.AddCommand(lastProposersCmd)
 	queryCmd.AddCommand(minimumEvidenceHeightCmd)
 	queryCmd.AddCommand(isValidDoubleSignerCmd)
+	queryCmd.AddCommand(delegateLotteryCmd)
+	queryCmd.AddCommand(baseChainInfoCmd)
+	queryCmd.AddCommand(validatorSetCmd)
 }
 
 var (
@@ -340,6 +343,35 @@ var (
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			writeToConsole(client.IsValidDoubleSigner(height, args[0]))
+		},
+	}
+
+	delegateLotteryCmd = &cobra.Command{
+		Use:   "delegate-lottery <committee-id> --height=1",
+		Short: "query the winner of the delegate lottery",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.DelegateLottery(uint64(argToInt(args[0])), height))
+		},
+	}
+
+	baseChainInfoCmd = &cobra.Command{
+		Use:   "base-chain-info <committee-id> --height=1",
+		Short: "query the base chain information needed to complete consensus",
+		Long:  "query the base chain information needed to complete consensus: this is a local call so will only work if self is the base-chain",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.BaseChainInfo(uint64(argToInt(args[0])), height))
+		},
+	}
+
+	validatorSetCmd = &cobra.Command{
+		Use:   "validator-set <committee-id> --height=1",
+		Short: "query the validator set for a committee at a certain height",
+		Long:  "query the validator set for a committee at a certain height",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.ValidatorSet(uint64(argToInt(args[0])), height))
 		},
 	}
 )

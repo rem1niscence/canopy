@@ -141,6 +141,7 @@ const (
 	CodeInvalidBuyerReceiveAddress      ErrorCode = 44
 	CodeEmptyTransaction                ErrorCode = 45
 	CodeHashSize                        ErrorCode = 46
+	CodeInvalidLastQC                   ErrorCode = 47
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -505,6 +506,10 @@ func ErrInvalidProposerPubKey() ErrorI {
 
 func ErrMismatchEvidenceAndHeader() ErrorI {
 	return NewError(CodeMismatchEvidenceAndHeader, ConsensusModule, "mismatch evidence and block header")
+}
+
+func ErrInvalidLastQuorumCertificate() ErrorI {
+	return NewError(CodeInvalidLastQC, ConsensusModule, "last quorum certificate is invalid")
 }
 
 func ErrInvalidNetAddrString(s string) ErrorI {

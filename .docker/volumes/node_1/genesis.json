@@ -19,7 +19,7 @@
         1
       ],
       "net_address": "tcp://node-1:9000",
-      "staked_amount": 1000000000,
+      "staked_amount": 4000000000,
       "output": "851e90eaef1fa27debaee2c2591503bdeec1d123"
     },
     {

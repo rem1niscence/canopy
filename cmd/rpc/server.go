@@ -28,8 +28,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-	pprof2 "runtime/pprof"
 	"strconv"
 	"strings"
 	"sync"
@@ -81,6 +79,9 @@ const (
 	LastProposersRouteName         = "last-proposers"
 	IsValidDoubleSignerRouteName   = "valid-double-signer"
 	MinimumEvidenceHeightRouteName = "minimum-evidence-height"
+	DelegateLotteryRouteName       = "delegate-lottery"
+	BaseChainInfoRouteName         = "base-chain-info"
+	ValidatorSetRouteName          = "validator-set"
 	// debug
 	DebugBlockedRouteName = "blocked"
 	DebugHeapRouteName    = "heap"
@@ -162,9 +163,12 @@ var (
 		LastProposersRouteName:         {Method: http.MethodPost, Path: "/v1/query/last-proposers", HandlerFunc: LastProposers},
 		IsValidDoubleSignerRouteName:   {Method: http.MethodPost, Path: "/v1/query/valid-double-signer", HandlerFunc: IsValidDoubleSigner},
 		MinimumEvidenceHeightRouteName: {Method: http.MethodPost, Path: "/v1/query/minimum-evidence-height", HandlerFunc: MinimumEvidenceHeight},
+		DelegateLotteryRouteName:       {Method: http.MethodPost, Path: "/v1/query/delegate-lottery", HandlerFunc: DelegateLottery},
 		PendingRouteName:               {Method: http.MethodPost, Path: "/v1/query/pending", HandlerFunc: Pending},
 		ProposalsRouteName:             {Method: http.MethodGet, Path: "/v1/gov/proposals", HandlerFunc: Proposals},
 		PollRouteName:                  {Method: http.MethodGet, Path: "/v1/gov/poll", HandlerFunc: Poll},
+		BaseChainInfoRouteName:         {Method: http.MethodPost, Path: "/v1/query/base-chain-info", HandlerFunc: BaseChainInfo},
+		ValidatorSetRouteName:          {Method: http.MethodPost, Path: "/v1/query/validator-set", HandlerFunc: ValidatorSet},
 		// debug
 		DebugBlockedRouteName: {Method: http.MethodPost, Path: "/debug/blocked", HandlerFunc: debugHandler(DebugBlockedRouteName)},
 		DebugHeapRouteName:    {Method: http.MethodPost, Path: "/debug/heap", HandlerFunc: debugHandler(DebugHeapRouteName)},
@@ -234,26 +238,55 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 			Handler: cor.Handler(http.TimeoutHandler(router.NewAdmin(), timeout, ErrServerTimeout().Error())),
 		}).ListenAndServe().Error())
 	}()
-	go func() { // TODO remove DEBUG ONLY
-		fileName := "heap1.out"
-		for range time.Tick(time.Second * 10) {
-			f, err := os.Create(filepath.Join(c.DataDirPath, fileName))
-			if err != nil {
-				l.Fatalf("could not create memory profile: ", err)
-			}
-			runtime.GC() // get up-to-date statistics
-			if err = pprof2.WriteHeapProfile(f); err != nil {
-				l.Fatalf("could not write memory profile: ", err)
-			}
-			f.Close()
-			fileName = "heap2.out"
-		}
-	}()
 	go updatePollResults()
+	go PollBaseChainInfo()
 	l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
 	runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
 	l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
 	runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
+}
+
+// PollBaseChainInfo() retrieves the information from the base-chain required for consensus
+func PollBaseChainInfo() {
+	var baseChainHeight uint64
+	// create a rpc client
+	rpcClient := NewClient(conf.BaseChainRPCURL, "", "")
+	// set the apps callbacks
+	app.RemoteCallbacks = lib.RemoteCallbacks{
+		ValidatorSet:        rpcClient.ValidatorSet,
+		IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
+	}
+	// execute the loop every conf.BaseChainPollMS duration
+	ticker := time.NewTicker(time.Duration(conf.BaseChainPollMS) * time.Millisecond)
+	for range ticker.C {
+		// query the base chain height
+		height, err := rpcClient.Height()
+		if err != nil {
+			logger.Errorf("GetBaseChainHeight failed with err %s", err.Error())
+			continue
+		}
+		// check if a new height was received
+		if *height <= baseChainHeight {
+			//logger.Debugf("Up to date with base chain height %d", baseChainHeight)
+			continue
+		}
+		// update the base chain hegiht
+		baseChainHeight = *height
+		// if a new height received
+		logger.Infof("New BaseChain Height %d detected!", baseChainHeight)
+		// execute the requests to get the base chain information
+		for retry := lib.NewRetry(conf.BaseChainPollMS, 25); retry.WaitAndDoRetry(); {
+			// retrieve the base-chain info
+			baseChainInfo, e := rpcClient.BaseChainInfo(baseChainHeight, app.CommitteeID)
+			if e == nil {
+				// update the controller with new base-chain info
+				app.UpdateBaseChainInfo(baseChainInfo)
+				logger.Info("Updated BaseChain information")
+				break
+			}
+			logger.Errorf("GetBaseChainInfo failed with err %s", e.Error())
+		}
+	}
 }
 
 func Version(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -443,6 +476,65 @@ func Committee(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	})
 }
 
+func ValidatorSet(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
+		members, err := s.GetCommitteeMembers(id, false)
+		if err != nil {
+			return nil, err
+		}
+		return members.ValidatorSet, nil
+	})
+}
+
+func BaseChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
+		// get the previous state machine height
+		lastSM, err := s.TimeMachine(s.Height() - 1)
+		if err != nil {
+			return nil, err
+		}
+		// get the committee
+		validatorSet, err := s.GetCommitteeMembers(id, false)
+		if err != nil {
+			return nil, err
+		}
+		// get the previous committee
+		lastValidatorSet, err := lastSM.GetCommitteeMembers(id, false)
+		if err != nil {
+			return nil, err
+		}
+		// get the last proposers
+		lastProposers, err := s.GetLastProposers()
+		if err != nil {
+			return nil, err
+		}
+		// get the minimum evidence height
+		minimumEvidenceHeight, err := s.LoadMinimumEvidenceHeight()
+		if err != nil {
+			return nil, err
+		}
+		// get the committee data
+		committeeData, err := s.GetCommitteeData(id)
+		if err != nil {
+			return nil, err
+		}
+		// get the delegate lottery winner
+		delegateLotteryWinner, err := s.PseudorandomSelectDelegate(id, crypto.MaxHash[:20])
+		if err != nil {
+			return nil, err
+		}
+		return &lib.BaseChainInfo{
+			Height:                  s.Height(),
+			ValidatorSet:            validatorSet,
+			LastValidatorSet:        lastValidatorSet,
+			LastProposers:           lastProposers,
+			MinimumEvidenceHeight:   minimumEvidenceHeight,
+			LastCanopyHeightUpdated: committeeData.LastCanopyHeightUpdated,
+			DelegateLotteryWinner:   delegateLotteryWinner,
+		}, nil
+	})
+}
+
 func CommitteeData(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
 		return s.GetCommitteeData(id)
@@ -487,6 +579,12 @@ func LastProposers(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 func MinimumEvidenceHeight(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	heightParams(w, r, func(s *fsm.StateMachine) (interface{}, lib.ErrorI) {
 		return s.LoadMinimumEvidenceHeight()
+	})
+}
+
+func DelegateLottery(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
+		return s.PseudorandomSelectDelegate(id, crypto.MaxHash[:20])
 	})
 }
 
@@ -778,7 +876,7 @@ func ConsensusInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		write(w, err, http.StatusBadRequest)
 		return
 	}
-	summary, err := app.ConsensusSummary(parseUint64FromString(r.Form.Get("id")))
+	summary, err := app.ConsensusSummary()
 	if err != nil {
 		write(w, err, http.StatusInternalServerError)
 		return

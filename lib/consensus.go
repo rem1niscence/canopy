@@ -73,6 +73,73 @@ func (vs *ValidatorSet) GetValidatorAndIdx(publicKey []byte) (val *ConsensusVali
 	return nil, 0, ErrValidatorNotInSet(publicKey)
 }
 
+// BaseChainInfo maintains base-chain data needed for consensus
+type BaseChainInfo struct {
+	Height                  uint64       `json:"height"`
+	ValidatorSet            ValidatorSet `json:"validator_set"`
+	LastValidatorSet        ValidatorSet `json:"last_validator_set"`
+	LastProposers           *Proposers   `json:"last_proposers"`
+	MinimumEvidenceHeight   uint64       `json:"minimum_evidence_height"`
+	LastCanopyHeightUpdated uint64       ` json:"last_canopy_height_updated"`
+	DelegateLotteryWinner   HexBytes     `json:"delegate_lottery_winner"`
+}
+
+// baseChainInfoJSON is the encoding structure used for json for BaseChainInfo
+type baseChainInfoJSON struct {
+	Height                  uint64               `json:"height"`
+	Committee               *ConsensusValidators `json:"committee"`
+	LastCommittee           *ConsensusValidators `json:"lastCommittee"`
+	LastProposers           *Proposers           `json:"lastProposers"`
+	LastCanopyHeightUpdated uint64               ` json:"last_canopy_height_updated"`
+	MinimumEvidenceHeight   uint64               `json:"minimumEvidenceHeight"`
+	DelegateLotteryWinner   HexBytes             `json:"delegateLotteryWinner"`
+}
+
+// MarshalJSON() implements the json.Marshaller for BaseChainInfo
+func (b *BaseChainInfo) MarshalJSON() ([]byte, error) {
+	return json.Marshal(baseChainInfoJSON{
+		Height:                  b.Height,
+		Committee:               b.ValidatorSet.ValidatorSet,
+		LastCommittee:           b.LastValidatorSet.ValidatorSet,
+		LastProposers:           b.LastProposers,
+		LastCanopyHeightUpdated: b.LastCanopyHeightUpdated,
+		MinimumEvidenceHeight:   b.MinimumEvidenceHeight,
+		DelegateLotteryWinner:   b.DelegateLotteryWinner,
+	})
+}
+
+// UnmarshalJSON() implements the json.Unmarshaler for BaseChainInfo
+func (b *BaseChainInfo) UnmarshalJSON(bz []byte) (err error) {
+	j := new(baseChainInfoJSON)
+	if err = json.Unmarshal(bz, j); err != nil {
+		return
+	}
+	validatorSet, err := NewValidatorSet(j.Committee)
+	if err != nil {
+		return
+	}
+	lastValidatorSet, err := NewValidatorSet(j.LastCommittee)
+	if err != nil {
+		return
+	}
+	*b = BaseChainInfo{
+		Height:                  j.Height,
+		ValidatorSet:            validatorSet,
+		LastValidatorSet:        lastValidatorSet,
+		LastProposers:           j.LastProposers,
+		MinimumEvidenceHeight:   j.MinimumEvidenceHeight,
+		LastCanopyHeightUpdated: j.LastCanopyHeightUpdated,
+		DelegateLotteryWinner:   j.DelegateLotteryWinner,
+	}
+	return
+}
+
+// RemoteCallbacks are rpc client callbacks to the base-chain
+type RemoteCallbacks struct {
+	ValidatorSet        func(height, id uint64) (ValidatorSet, ErrorI)
+	IsValidDoubleSigner func(height uint64, address string) (p *bool, err ErrorI)
+}
+
 // CheckBasic() validates the basic structure and length of the AggregateSignature
 func (x *AggregateSignature) CheckBasic() ErrorI {
 	if x == nil {

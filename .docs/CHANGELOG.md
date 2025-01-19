@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [Unreleased] - 1/19/2024
+- Changed Canopy to act as a sub-chain to prepare for the sub-chain architecture
+- Added various rpc calls to support this architecture
+
 ## [Unreleased] - 1/12/2024
 - Removed json omitempty for Messages 
 - Added `out` directories to git for Web Wallet & Block Explorer
