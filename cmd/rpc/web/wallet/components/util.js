@@ -2,13 +2,14 @@ import {OverlayTrigger, Toast, ToastContainer, Tooltip} from "react-bootstrap";
 
 // getFormInputs() returns the form input based on the type
 // account and validator is passed to assist with auto fill
-export function getFormInputs(type, account, validator) {
+export function getFormInputs(type, keyGroup, account, validator) {
     let amount = null
     let netAddr = validator && validator.address ? validator.net_address : ""
     let delegate = validator && validator.address ? validator.delegate : false
     let compound = validator && validator.address ? validator.compound : false
     let output = validator && validator.address ? validator.output : ""
     let address = account != null ? account.address : ""
+    let pubKey = keyGroup != null ? keyGroup.publicKey : ""
     let signer = account != null ? account.address : ""
     let committeeList = validator && validator.address ? validator.committees.join(','): ""
     address = type !== "send" && validator && validator.address ? validator.address : address
@@ -30,9 +31,9 @@ export function getFormInputs(type, account, validator) {
             "maxLength": 128,
         },
         address: {
-            "placeholder": "id of the node",
+            "placeholder": "short public key of the node",
             "defaultValue": address,
-            "tooltip": "the sender of the transaction",
+            "tooltip": "the short public key id of the transaction",
             "label": "sender",
             "inputText": "address",
             "feedback": "please choose an address to send the transaction from",
@@ -40,6 +41,18 @@ export function getFormInputs(type, account, validator) {
             "type": "text",
             "minLength": 40,
             "maxLength": 40,
+        },
+        pubKey: {
+            "placeholder": "public key of the node",
+            "defaultValue": pubKey,
+            "tooltip": "the public key of the validator",
+            "label": "pubKey",
+            "inputText": "pubKey",
+            "feedback": "please choose a pubKey to send the transaction from",
+            "required": true,
+            "type": "text",
+            "minLength": 96,
+            "maxLength": 96,
         },
         committees: {
             "placeholder": "1, 22, 50",
@@ -281,7 +294,7 @@ export function getFormInputs(type, account, validator) {
         case "send":
             return [a.address, a.rec, a.amount, a.memo, a.fee, a.password]
         case "stake":
-            return [a.address, a.committees, a.netAddr, a.amount, a.delegate, a.earlyWithdrawal, a.output, a.signer, a.memo, a.fee, a.password]
+            return [a.address, a.pubKey, a.committees, a.netAddr, a.amount, a.delegate, a.earlyWithdrawal, a.output, a.signer, a.memo, a.fee, a.password]
         case "create_order":
             return [a.address, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password]
         case "edit_order":

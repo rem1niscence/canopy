@@ -99,9 +99,10 @@ function pkAndPwdRequest(pk, password) {
     return JSON.stringify({privateKey: pk, password: password})
 }
 
-function newTxRequest(address, committees, netAddress, amount, delegate, earlyWithdrawal, output, signer, memo, fee, submit, password) {
+function newTxRequest(address, pubKey, committees, netAddress, amount, delegate, earlyWithdrawal, output, signer, memo, fee, submit, password) {
     return JSON.stringify({
         address: address,
+        pubKey: pubKey,
         netAddress: netAddress,
         committees: committees,
         amount: amount,
@@ -236,24 +237,24 @@ export async function TxSend(address, recipient, amount, memo, fee, password, su
     return POST(adminRPCURL, txSendPath, newTxRequest(address, "", "", amount, false, false, recipient, "", memo, Number(fee), submit, password))
 }
 
-export async function TxStake(address, committees, netAddress, amount, delegate, earlyWithdrawal, output, signer, memo, fee, password, submit) {
-    return POST(adminRPCURL, txStakePath, newTxRequest(address, committees, netAddress, amount, delegate.toLowerCase() === "true", earlyWithdrawal.toLowerCase() === "true", output, signer, memo, Number(fee), submit, password))
+export async function TxStake(address, pubKey, committees, netAddress, amount, delegate, earlyWithdrawal, output, signer, memo, fee, password, submit) {
+    return POST(adminRPCURL, txStakePath, newTxRequest(address, pubKey, committees, netAddress, amount, delegate.toLowerCase() === "true", earlyWithdrawal.toLowerCase() === "true", output, signer, memo, Number(fee), submit, password))
 }
 
 export async function TxEditStake(address, committees, netAddress, amount, earlyWithdrawal, output, signer, memo, fee, password, submit) {
-    return POST(adminRPCURL, txEditStakePath, newTxRequest(address, committees, netAddress, amount, false, earlyWithdrawal.toLowerCase() === "true", output, signer, memo, Number(fee), submit, password))
+    return POST(adminRPCURL, txEditStakePath, newTxRequest(address, "", committees, netAddress, amount, false, earlyWithdrawal.toLowerCase() === "true", output, signer, memo, Number(fee), submit, password))
 }
 
 export async function TxUnstake(address, signer, memo, fee, password, submit) {
-    return POST(adminRPCURL, txUnstakePath, newTxRequest(address, "", "", 0, false, false, "", signer, memo, Number(fee), submit, password))
+    return POST(adminRPCURL, txUnstakePath, newTxRequest(address, "", "", "", 0, false, false, "", signer, memo, Number(fee), submit, password))
 }
 
 export async function TxPause(address, signer, memo, fee, password, submit) {
-    return POST(adminRPCURL, txPausePath, newTxRequest(address, "", "", 0, false, false, "", signer, memo, Number(fee), submit, password))
+    return POST(adminRPCURL, txPausePath, newTxRequest(address, "", "", "", 0, false, false, "", signer, memo, Number(fee), submit, password))
 }
 
 export async function TxUnpause(address, signer, memo, fee, password, submit) {
-    return POST(adminRPCURL, txUnpausePath, newTxRequest(address, "", "", 0, false, false, "", signer, memo, Number(fee), submit, password))
+    return POST(adminRPCURL, txUnpausePath, newTxRequest(address, "", "", "", 0, false, false, "", signer, memo, Number(fee), submit, password))
 }
 
 export async function TxChangeParameter(address, paramSpace, paramKey, paramValue, startBlock, endBlock, memo, fee, password, submit) {

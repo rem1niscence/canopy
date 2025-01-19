@@ -86,7 +86,7 @@ export default function Accounts({keygroup, account, validator}) {
             // Mapping transaction types to their respective functions
             const txMap = {
                 "send": () => TxSend(r.sender, r.recipient, Number(r.amount), r.memo, r.fee, r.password, submit),
-                "stake": () => TxStake(r.sender, r.committees, r.net_address, Number(r.amount), r.delegate, r.earlyWithdrawal, r.output, r.signer, r.memo, r.fee, r.password, submit),
+                "stake": () => TxStake(r.sender, r.pubKey, r.committees, r.net_address, Number(r.amount), r.delegate, r.earlyWithdrawal, r.output, r.signer, r.memo, r.fee, r.password, submit),
                 "edit-stake": () => TxEditStake(r.sender, r.committees, r.net_address, Number(r.amount), r.earlyWithdrawal, r.output, r.signer, r.memo, r.fee, r.password, submit),
                 "unstake": () => TxUnstake(r.sender, r.signer, r.memo, r.fee, r.password, submit),
                 "pause": () => TxPause(r.sender, r.signer, r.memo, r.fee, r.password, submit),
@@ -188,7 +188,7 @@ export default function Accounts({keygroup, account, validator}) {
     }
 
     // renderModal() returns the transaction modal
-    function renderModal(show, title, txType, onFormSub, acc, val, onHide, btnType) {
+    function renderModal(show, title, txType, onFormSub, keyGroup, acc, val, onHide, btnType) {
         return (
             <Modal show={show} size="lg" onHide={onHide}>
                 <Form onSubmit={onFormSub}>
@@ -196,7 +196,7 @@ export default function Accounts({keygroup, account, validator}) {
                         <Modal.Title>{title}</Modal.Title>
                     </Modal.Header>
                     <Modal.Body className="modal-body">
-                        {getFormInputs(txType, acc, val).map((v, i) => renderForm(v, i))}
+                        {getFormInputs(txType, keyGroup, acc, val).map((v, i) => renderForm(v, i))}
                         {renderJSONViewer()}
                         <Spinner style={{display: state.showSpinner ? "block" : "none", margin: "0 auto"}}/>
                     </Modal.Body>
@@ -282,7 +282,7 @@ export default function Accounts({keygroup, account, validator}) {
 
     // if no private key is preset
     if (!keygroup || Object.keys(keygroup).length === 0 || !account.account) {
-        return renderModal(true, "UPLOAD PRIVATE OR CREATE KEY", "pass-and-pk", onImportOrGenerateSubmit, null, null, null, "import-or-generate")
+        return renderModal(true, "UPLOAD PRIVATE OR CREATE KEY", "pass-and-pk", onImportOrGenerateSubmit, null, null, null, null, "import-or-generate")
     }
     // return the main component
     return <>
@@ -292,7 +292,7 @@ export default function Accounts({keygroup, account, validator}) {
             <br/>
             <hr style={{border: "1px dashed black", borderRadius: "5px", width: "60%", margin: "0 auto"}}/>
             <br/>
-            {renderModal(state.showModal, state.txType, state.txType, onTxFormSubmit, acc, validator, resetState)}
+            {renderModal(state.showModal, state.txType, state.txType, onTxFormSubmit, keygroup, acc, validator, resetState)}
             {transactionButtons.map(renderActionButton)}
             <Row className="account-summary-container">
                 {[
@@ -310,12 +310,12 @@ export default function Accounts({keygroup, account, validator}) {
             <br/>
             {renderTransactions()}
             {renderToast(state, setState)}
-            {renderModal(state.showPKModal, "Private Key", "pass-and-addr", onPKFormSubmit, acc, null, resetState, "reveal-pk")}
+            {renderModal(state.showPKModal, "Private Key", "pass-and-addr", onPKFormSubmit, keygroup, acc, null, resetState, "reveal-pk")}
             {renderModal(state.showPKImportModal, "Private Key", "pass-and-pk", () => {
                 onImportOrGenerateSubmit();
                 resetState()
-            }, acc, null, resetState, "import-pk")}
-            {renderModal(state.showNewModal, "Private Key", "pass-only", onNewPKFormSubmit, null, null, resetState, "new-pk")}
+            }, keygroup, acc, null, resetState, "import-pk")}
+            {renderModal(state.showNewModal, "Private Key", "pass-only", onNewPKFormSubmit, null, null, null, resetState, "new-pk")}
             <Button
                 id="pk-button"
                 variant="outline-secondary"

@@ -16,9 +16,9 @@ func NewSendTransaction(from crypto.PrivateKeyI, to crypto.AddressI, amount, fee
 }
 
 // NewStakeTx() creates a StakeTransaction object in the interface form of TransactionI
-func NewStakeTx(signer crypto.PrivateKeyI, from, outputAddress crypto.AddressI, netAddress string, committees []uint64, amount, fee uint64, delegate, earlyWithdrawal bool, memo string) (lib.TransactionI, lib.ErrorI) {
+func NewStakeTx(signer crypto.PrivateKeyI, from lib.HexBytes, outputAddress crypto.AddressI, netAddress string, committees []uint64, amount, fee uint64, delegate, earlyWithdrawal bool, memo string) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(signer, &MessageStake{
-		PublicKey:     from.Bytes(),
+		PublicKey:     from,
 		Amount:        amount,
 		Committees:    committees,
 		NetAddress:    netAddress,

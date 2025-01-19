@@ -710,6 +710,7 @@ func KeystoreGetKeyGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 
 type txRequest struct {
 	Amount          uint64          `json:"amount"`
+	PubKey          string          `json:"pubKey"`
 	NetAddress      string          `json:"netAddress"`
 	Output          string          `json:"output"`
 	OpCode          string          `json:"opCode"`
@@ -758,7 +759,11 @@ func TransactionStake(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		if err != nil {
 			return nil, err
 		}
-		return types.NewStakeTx(p, crypto.NewAddress(ptr.Address), outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal, ptr.Memo)
+		pk, err := crypto.NewPublicKeyFromString(ptr.PubKey)
+		if err != nil {
+			return nil, err
+		}
+		return types.NewStakeTx(p, pk.Bytes(), outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal, ptr.Memo)
 	})
 }
 
