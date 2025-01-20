@@ -3,7 +3,7 @@ import JsonView from "@uiw/react-json-view"
 import Truncate from 'react-truncate-inside'
 import {Button, Card, Col, Form, InputGroup, Modal, Row, Table, ToastContainer, Toast, Spinner} from "react-bootstrap"
 import {KeystoreGet, KeystoreImport, KeystoreNew, TxCreateOrder, TxDeleteOrder, TxEditOrder, TxEditStake, TxPause, TxSend, TxStake, TxUnpause, TxUnstake} from "@/components/api"
-import {copy, formatNumber, getFormInputs, objEmpty, onFormSubmit, renderToast, withTooltip} from "@/components/util"
+import {copy, sanitizeInput, numberFromCommas, formatNumberInput, formatNumber, getFormInputs, objEmpty, onFormSubmit, renderToast, withTooltip} from "@/components/util"
 
 // transactionButtons defines the icons for the transactions
 const transactionButtons = [
@@ -23,7 +23,7 @@ export default function Accounts({keygroup, account, validator}) {
     const [state, setState] = useState(
         {
             showModal: false, txType: "send", txResult: {}, showSubmit: true, showPKModal: false, showPKImportModal: false,
-            showNewModal: false, pk: {}, toast: "", showSpinner: false
+            showNewModal: false, pk: {}, toast: "", showSpinner: false,
         }
     ), acc = account.account
 
@@ -85,14 +85,14 @@ export default function Accounts({keygroup, account, validator}) {
             const submit = Object.keys(state.txResult).length !== 0
             // Mapping transaction types to their respective functions
             const txMap = {
-                "send": () => TxSend(r.sender, r.recipient, Number(r.amount), r.memo, r.fee, r.password, submit),
-                "stake": () => TxStake(r.sender, r.pubKey, r.committees, r.net_address, Number(r.amount), r.delegate, r.earlyWithdrawal, r.output, r.signer, r.memo, r.fee, r.password, submit),
-                "edit-stake": () => TxEditStake(r.sender, r.committees, r.net_address, Number(r.amount), r.earlyWithdrawal, r.output, r.signer, r.memo, r.fee, r.password, submit),
+                "send": () => TxSend(r.sender, r.recipient, numberFromCommas(r.amount), r.memo, r.fee, r.password, submit),
+                "stake": () => TxStake(r.sender, r.pubKey, r.committees, r.net_address, numberFromCommas(r.amount), r.delegate, r.earlyWithdrawal, r.output, r.signer, r.memo, r.fee, r.password, submit),
+                "edit-stake": () => TxEditStake(r.sender, r.committees, r.net_address, numberFromCommas(r.amount), r.earlyWithdrawal, r.output, r.signer, r.memo, r.fee, r.password, submit),
                 "unstake": () => TxUnstake(r.sender, r.signer, r.memo, r.fee, r.password, submit),
                 "pause": () => TxPause(r.sender, r.signer, r.memo, r.fee, r.password, submit),
                 "unpause": () => TxUnpause(r.sender, r.signer, r.memo, r.fee, r.password, submit),
-                "create_order": () => TxCreateOrder(r.sender, r.committeeId, Number(r.amount), Number(r.receiveAmount), r.receiveAddress, r.memo, r.fee, r.password, submit),
-                "edit_order": () => TxEditOrder(r.sender, r.committeeId, Number(r.orderId), Number(r.amount), Number(r.receiveAmount), r.receiveAddress, r.memo, r.fee, r.password, submit),
+                "create_order": () => TxCreateOrder(r.sender, r.committeeId, numberFromCommas(r.amount), numberFromCommas(r.receiveAmount), r.receiveAddress, r.memo, r.fee, r.password, submit),
+                "edit_order": () => TxEditOrder(r.sender, r.committeeId, numberFromCommas(r.orderId), numberFromCommas(r.amount), numberFromCommas(r.receiveAmount), r.receiveAddress, r.memo, r.fee, r.password, submit),
                 "delete_order": () => TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, r.fee, r.password, submit)
             }
 
@@ -180,11 +180,19 @@ export default function Accounts({keygroup, account, validator}) {
             {withTooltip(
                 <InputGroup.Text className="input-text">{v.inputText}</InputGroup.Text>, v.tooltip, i, "auto"
             )}
-            <Form.Control placeholder={v.placeholder} required={v.required} defaultValue={v.defaultValue}
-                          min={0} type={v.type} minLength={v.minLength} maxLength={v.maxLength} aria-label={v.label}
+            <Form.Control
+                className="input-text-field"  
+                onChange={v.type === "number" ? formatNumberInput : sanitizeInput}
+                type={v.type == "number" ? "text" : v.type} 
+                placeholder={v.placeholder} 
+                required={v.required} 
+                defaultValue={v.defaultValue}              
+                min={0} 
+                minLength={v.minLength} 
+                maxLength={v.maxLength} 
+                aria-label={v.label}
             />
         </InputGroup>
-
     }
 
     // renderModal() returns the transaction modal
