@@ -234,7 +234,7 @@ export async function Resource() {
 }
 
 export async function TxSend(address, recipient, amount, memo, fee, password, submit) {
-    return POST(adminRPCURL, txSendPath, newTxRequest(address, "", "", amount, false, false, recipient, "", memo, Number(fee), submit, password))
+    return POST(adminRPCURL, txSendPath, newTxRequest(address, "", "", "", amount, false, false, recipient, "", memo, Number(fee), submit, password))
 }
 
 export async function TxStake(address, pubKey, committees, netAddress, amount, delegate, earlyWithdrawal, output, signer, memo, fee, password, submit) {

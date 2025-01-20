@@ -88,7 +88,7 @@ func (c *Controller) ValidateCertificate(qc *lib.QuorumCertificate, evidence *bf
 	// validate the reward amount for the delegate
 	delegatorPaymentPercent := qc.Results.RewardRecipients.PaymentPercents[1]
 	if !bytes.Equal(delegatorPaymentPercent.Address, delegate) || delegatorPaymentPercent.Percent != delegateCut {
-		return types.ErrInvalidDelegateReward()
+		return types.ErrInvalidDelegateReward(delegatorPaymentPercent.Address, delegatorPaymentPercent.Percent)
 	}
 	// play the block against the state machine
 	_, err = c.ApplyAndValidateBlock(blk, false)

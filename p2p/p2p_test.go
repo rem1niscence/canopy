@@ -73,17 +73,17 @@ func TestSendToRand(t *testing.T) {
 	require.Equal(t, expectedMsg.ConsecutiveFailedDial, gotMsg.Book[0].ConsecutiveFailedDial)
 }
 
-func TestSendToChainPeers(t *testing.T) {
+func TestSendToPeers(t *testing.T) {
 	n1 := newStartedTestP2PNode(t)
 	n2 := newTestP2PNode(t)
-	n2.meta.Chains = []uint64{0}
+	n2.meta.ChainId = 1
 	startTestP2PNode(t, n2)
 	n1.UpdateMustConnects([]*lib.PeerAddress{n2.ID()})
 	n3 := newTestP2PNode(t)
-	n3.meta.Chains = []uint64{1}
+	n3.meta.ChainId = 2
 	startTestP2PNode(t, n3)
-	connectStartedNodes(t, n1, n2)
-	connectStartedNodes(t, n1, n3)
+	require.NoError(t, connectStartedNodes(t, n1, n2), "compatible peers")
+	require.Error(t, connectStartedNodes(t, n1, n3), "incompatible peers expected")
 	defer func() { n1.Stop(); n2.Stop(); n3.Stop() }()
 	expectedMsg := &BookPeer{
 		Address: &lib.PeerAddress{
@@ -93,7 +93,7 @@ func TestSendToChainPeers(t *testing.T) {
 		ConsecutiveFailedDial: 1,
 	}
 	go func() {
-		require.NoError(t, n1.SendToChainPeers(0, lib.Topic_PEERS_RESPONSE, &PeerBookResponseMessage{Book: []*BookPeer{expectedMsg}}))
+		require.NoError(t, n1.SendToPeers(lib.Topic_PEERS_RESPONSE, &PeerBookResponseMessage{Book: []*BookPeer{expectedMsg}}))
 		time.AfterFunc(testTimeout, func() { panic("timeout") })
 	}()
 	msg := <-n2.Inbox(lib.Topic_PEERS_RESPONSE)
@@ -103,30 +103,6 @@ func TestSendToChainPeers(t *testing.T) {
 	require.Equal(t, expectedMsg.Address.NetAddress, gotMsg.Book[0].Address.NetAddress)
 	require.Equal(t, expectedMsg.Address.PublicKey, gotMsg.Book[0].Address.PublicKey)
 	require.Equal(t, expectedMsg.ConsecutiveFailedDial, gotMsg.Book[0].ConsecutiveFailedDial)
-	select {
-	case <-n3.Inbox(lib.Topic_PEERS_RESPONSE):
-		t.Fatal("unexpected message received")
-	case <-time.After(200 * time.Millisecond):
-	}
-	go func() {
-		require.NoError(t, n1.SendToChainPeers(1, lib.Topic_PEERS_RESPONSE, &PeerBookResponseMessage{Book: []*BookPeer{expectedMsg}}))
-		time.AfterFunc(testTimeout, func() { panic("timeout") })
-	}()
-	msg = <-n3.Inbox(lib.Topic_PEERS_RESPONSE)
-	gotMsg, ok = msg.Message.(*PeerBookResponseMessage)
-	require.True(t, ok)
-	require.True(t, len(gotMsg.Book) == 1)
-	require.Equal(t, expectedMsg.Address.NetAddress, gotMsg.Book[0].Address.NetAddress)
-	require.Equal(t, expectedMsg.Address.PublicKey, gotMsg.Book[0].Address.PublicKey)
-	require.Equal(t, expectedMsg.ConsecutiveFailedDial, gotMsg.Book[0].ConsecutiveFailedDial)
-	for {
-		select {
-		case <-n2.Inbox(lib.Topic_PEERS_RESPONSE):
-			t.Fatal("unexpected message received")
-		case <-time.After(200 * time.Millisecond):
-			return
-		}
-	}
 }
 
 func TestDialReceive(t *testing.T) {
@@ -150,7 +126,7 @@ func TestStart(t *testing.T) {
 	random := private.PublicKey()
 	pm := &lib.PeerMeta{
 		NetworkId: 1,
-		Chains:    []uint64{1},
+		ChainId:   1,
 	}
 	n1.book.Add(&BookPeer{
 		Address: &lib.PeerAddress{
@@ -161,7 +137,7 @@ func TestStart(t *testing.T) {
 		ConsecutiveFailedDial: MaxFailedDialAttempts - 1,
 	})
 	// test validator receiver
-	n1.MustConnectReceiver() <- []*lib.PeerAddress{{
+	n1.MustConnectsReceiver <- []*lib.PeerAddress{{
 		PublicKey:  n2.pub,
 		NetAddress: n2.listener.Addr().String(),
 		PeerMeta:   pm,
@@ -222,7 +198,7 @@ func TestDialDisconnect(t *testing.T) {
 func TestConnectValidator(t *testing.T) {
 	n1, n2 := newStartedTestP2PNode(t), newStartedTestP2PNode(t)
 	defer func() { n1.Stop(); n2.Stop() }()
-	n1.MustConnectReceiver() <- []*lib.PeerAddress{
+	n1.MustConnectsReceiver <- []*lib.PeerAddress{
 		{
 			PublicKey:  n2.pub,
 			NetAddress: n2.listener.Addr().String(),
@@ -334,11 +310,13 @@ func TestMaxPacketSize(t *testing.T) {
 	require.Equal(t, len(maxPacket), maxPacketSize)
 }
 
-func connectStartedNodes(t *testing.T, n1, n2 testP2PNode) {
-	require.NoError(t, n1.Dial(&lib.PeerAddress{
+func connectStartedNodes(t *testing.T, n1, n2 testP2PNode) error {
+	if err := n1.Dial(&lib.PeerAddress{
 		PublicKey:  n2.pub,
 		NetAddress: n2.listener.Addr().String(),
-	}, false))
+	}, false); err != nil {
+		return err
+	}
 	peer, err := n1.PeerSet.GetPeerInfo(n2.pub)
 	require.NoError(t, err)
 	require.True(t, peer.IsOutbound)
@@ -356,6 +334,7 @@ o2:
 	peer, err = n2.PeerSet.GetPeerInfo(n1.pub)
 	require.NoError(t, err)
 	require.False(t, peer.IsOutbound)
+	return nil
 }
 
 func newStartedTestP2PNode(t *testing.T) testP2PNode {
@@ -393,7 +372,7 @@ func newTestP2PPair(t *testing.T) (n1, n2 testP2PNode, cleanup func()) {
 			PublicKey:  n2.pub,
 			NetAddress: c2.RemoteAddr().String(),
 			PeerMeta: &lib.PeerMeta{
-				Chains: []uint64{0, 1},
+				ChainId: 0,
 			},
 		}}, false))
 		wg.Done()
@@ -401,7 +380,7 @@ func newTestP2PPair(t *testing.T) (n1, n2 testP2PNode, cleanup func()) {
 	require.NoError(t, n2.AddPeer(c1, &lib.PeerInfo{Address: &lib.PeerAddress{
 		PublicKey:  n1.pub,
 		NetAddress: c1.RemoteAddr().String(),
-		PeerMeta:   &lib.PeerMeta{Chains: []uint64{0, 1}},
+		PeerMeta:   &lib.PeerMeta{ChainId: 0},
 	}},
 		false))
 	wg.Wait()
@@ -430,13 +409,12 @@ func newTestP2PNodeWithConfig(t *testing.T, c lib.Config, noLog ...bool) (n test
 	if len(noLog) == 1 && noLog[0] == true {
 		logger = lib.NewNullLogger()
 	}
-	n.P2P = New(n.priv, 1, c, logger)
+	n.P2P = New(n.priv, 1, 1, c, logger)
 	return
 }
 
 func newTestP2PConfig(_ *testing.T) lib.Config {
 	config := lib.DefaultConfig()
 	config.ListenAddress = ":0"
-	config.Plugins = []lib.PluginConfig{{ID: 0}, {ID: 1}}
 	return config
 }

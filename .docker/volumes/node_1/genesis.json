@@ -18,7 +18,7 @@
       "committees": [
         1
       ],
-      "net_address": "tcp://node-1:9000",
+      "net_address": "tcp://node-1",
       "staked_amount": 4000000000,
       "output": "851e90eaef1fa27debaee2c2591503bdeec1d123"
     },
@@ -28,7 +28,7 @@
       "committees": [
         1
       ],
-      "net_address": "tcp://node-2:9000",
+      "net_address": "tcp://node-2",
       "staked_amount": 1000000000,
       "output": "02cd4e5eb53ea665702042a6ed6d31d616054dc5"
     }

@@ -116,7 +116,7 @@ func (b *BFT) Start() {
 			}()
 
 		// RESET BFT
-		// - This triggers when receiving a new Commit Block (QC) from either Base-Chain (a) or the Target-Chain (b)
+		// - This triggers when receiving a new Commit Block (QC) from either Base-ChainId (a) or the Target-ChainId (b)
 		case resetBFT := <-b.ResetBFT:
 			func() {
 				b.Controller.Lock()
@@ -781,7 +781,7 @@ type (
 		// Syncing() returns true if the plugin is currently syncing
 		Syncing() *atomic.Bool
 
-		/* Base-Chain Functionality Below*/
+		/* Base-ChainId Functionality Below*/
 		// SendCertificateResultsTx() is a P2P call that allows a Leader to submit their CertificateResults (reward) transaction
 		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
 		// LoadCommittee() loads the ValidatorSet operating under CommitteeID

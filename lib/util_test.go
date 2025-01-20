@@ -362,6 +362,50 @@ func TestUint64ReducePercentage(t *testing.T) {
 	}
 }
 
+func TestValidURLInput(t *testing.T) {
+	tests := []struct {
+		name     string
+		expected bool
+	}{
+		{"localhost", true},                     // valid hostname
+		{"example.com", true},                   // valid hostname
+		{"192.168.1.1", true},                   // valid IPv4
+		{"[2001:db8::1]", true},                 // valid IPv6
+		{"127.0.0.1", true},                     // valid IPv4
+		{"[::1]", true},                         // valid IPv6
+		{"tcp://localhost", true},               // valid hostname with tcp://
+		{"tcp://example.com", true},             // valid hostname with tcp://
+		{"tcp://192.168.1.1", true},             // valid IPv4 with tcp://
+		{"tcp://[2001:db8::1]", true},           // valid IPv6 with tcp://
+		{"subdomain.example.com", true},         // valid subdomain
+		{"", false},                             // empty input
+		{"tcp://", false},                       // missing hostname/IP
+		{"192.168.1.1:443", false},              // invalid (port not allowed)
+		{"tcp://localhost:8080", false},         // invalid (port not allowed)
+		{"localhost:8080", false},               // invalid (port not allowed)
+		{"tcp://192.168.1.1:80", false},         // invalid (port not allowed)
+		{"example.com:1234", false},             // invalid (port not allowed)
+		{"localhost/extra", false},              // invalid (sub-path not allowed)
+		{"example.com/path/to/resource", false}, // invalid (sub-path not allowed)
+		{"192.168.1.1/resource", false},         // invalid (sub-path not allowed)
+		{"[::1]/path", false},                   // invalid (sub-path not allowed)
+		{"example.com#", false},                 // invalid (fragment not allowed)
+		{"example.com?", false},                 // invalid (query string not allowed)
+		{"example.com/path#fragment", false},    // invalid (path and fragment not allowed)
+		{"sub_domain.example.com", false},       // invalid (underscore not allowed in hostname)
+		{"example..com", false},                 // invalid (double dot in hostname)
+		{"example.com/", false},                 // invalid (trailing slash not allowed)
+		{"192.168.1.1/", false},                 // invalid (trailing slash not allowed)
+		{"[2001:db8::1]/", false},               // invalid (trailing slash not allowed)
+		{"exa mple.com", false},                 // invalid (space in hostname)
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.expected, ValidNetURLInput(test.name))
+		})
+	}
+}
+
 func TestResetTimer(t *testing.T) {
 	timer := NewTimer()
 	duration := 100 * time.Millisecond

@@ -83,7 +83,7 @@ func TestGetAllInfosAndBookPeers(t *testing.T) {
 	require.NoError(t, n1.Add(&Peer{
 		conn: newTestMultiConnMock(t, n3.pub, c, n1.P2P),
 		PeerInfo: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: n3.pub, PeerMeta: &lib.PeerMeta{
-			Chains: []uint64{0, 1},
+			ChainId: 1,
 		}}, IsOutbound: true},
 	}))
 	defer func() { cleanup() }()
@@ -110,7 +110,7 @@ func newTestMultiConnMock(_ *testing.T, peerPubKey []byte, conn net.Conn, p *P2P
 			PublicKey:  peerPubKey,
 			NetAddress: "",
 			PeerMeta: &lib.PeerMeta{
-				Chains: []uint64{0, 1},
+				ChainId: 1,
 			},
 		},
 		streams:       p.NewStreams(),

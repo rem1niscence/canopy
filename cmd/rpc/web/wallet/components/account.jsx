@@ -23,7 +23,7 @@ export default function Accounts({keygroup, account, validator}) {
     const [state, setState] = useState(
         {
             showModal: false, txType: "send", txResult: {}, showSubmit: true, showPKModal: false, showPKImportModal: false,
-            showNewModal: false, pk: {}, toast: "", showSpinner: false,
+            showNewModal: false, pk: {}, toast: "", showSpinner: false
         }
     ), acc = account.account
 

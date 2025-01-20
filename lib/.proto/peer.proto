@@ -70,8 +70,8 @@ message PeerMeta {
   // network_id: the identifier for the network the peer is part of
   // this ensures no conflicts among different peering networks (mainnet, testnet, etc.)
   uint64 network_id = 1;
-  // chains: a list of chain identifiers that the peer supports and/or participates in
-  repeated uint64 chains = 2;
+  // chain_id the chain identifiers that the peer supports and/or participates in
+  uint64 chain_id = 2;
   // signature: a cryptographic signature to verify the authenticity of the peer's metadata
   bytes signature = 3;
 }

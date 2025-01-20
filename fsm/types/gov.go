@@ -484,16 +484,16 @@ func prefixForParamSpace(space string) string {
 // POLLING CODE BELOW
 
 /*
-	Chain Polling Feature:
+	ChainId Polling Feature:
 	- Canopy straw polling
 	- Internal chain straw polling
 	- External chain straw polling
 
-	On-Chain
+	On-ChainId
 	1. Memo field signal 'START POLL' {Hash, Opt:URL, Start, End}
 	2. Memo field signal 'VOTE' {Hash, Y/N}
 
-	Off-Chain
+	Off-ChainId
 	1. 'poll.json' maintains status of poll at each height
 	2. 'poll.json' maintains historical poll stats for 1000 blocks
 	3. Query the state of addresses & validators each height to update polling power

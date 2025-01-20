@@ -307,6 +307,6 @@ func ErrInvalidProposerRewardPercent() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidProposerRewardPercent, lib.StateMachineModule, "invalid proposer reward percent")
 }
 
-func ErrInvalidDelegateReward() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidDelegatorReward, lib.StateMachineModule, "invalid delegate reward")
+func ErrInvalidDelegateReward(address lib.HexBytes, cut uint64) lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidDelegatorReward, lib.StateMachineModule, fmt.Sprintf("invalid delegate reward:\naddress: %s\ncut: %d%", address, cut))
 }

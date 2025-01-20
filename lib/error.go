@@ -142,6 +142,7 @@ const (
 	CodeEmptyTransaction                ErrorCode = 45
 	CodeHashSize                        ErrorCode = 46
 	CodeInvalidLastQC                   ErrorCode = 47
+	CodeMaxPort                         ErrorCode = 48
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -240,38 +241,39 @@ const (
 	P2PModule ErrorModule = "p2p"
 
 	// P2P Module Error Codes
-	CodeUnknownP2PMessage            ErrorCode = 1
-	CodeFailedRead                   ErrorCode = 2
-	CodeFailedWrite                  ErrorCode = 3
-	CodeMaxMessageSize               ErrorCode = 4
-	CodePongTimeout                  ErrorCode = 5
-	CodeBlacklisted                  ErrorCode = 6
-	CodeErrorGroup                   ErrorCode = 7
-	CodeConnDecrypt                  ErrorCode = 8
-	CodeChunkLargerThanMax           ErrorCode = 9
-	CodeFailedChallenge              ErrorCode = 10
-	CodeFailedDiffieHellman          ErrorCode = 11
-	CodeFailedHKDF                   ErrorCode = 12
-	CodePeerAlreadyExists            ErrorCode = 13
-	CodePeerNotFound                 ErrorCode = 14
-	CodeFailedDial                   ErrorCode = 15
-	CodeMismatchPeerPublicKey        ErrorCode = 16
-	CodeFailedListen                 ErrorCode = 17
-	CodeInvalidPeerPublicKey         ErrorCode = 18
-	CodeSignatureSwap                ErrorCode = 19
-	CodeMetaSwap                     ErrorCode = 20
-	CodeBadStream                    ErrorCode = 21
-	CodeBannedCountry                ErrorCode = 22
-	CodeIPLookup                     ErrorCode = 23
-	CodeBannedIP                     ErrorCode = 24
-	CodeNonTCPAddr                   ErrorCode = 25
-	CodeInvalidNetAddressString      ErrorCode = 26
-	CodeInvalidNetAddressPubKey      ErrorCode = 27
-	CodeInvalidNetAddressHostAndPort ErrorCode = 28
-	CodeMaxOutbound                  ErrorCode = 29
-	CodeMaxInbound                   ErrorCode = 30
-	CodeBannedID                     ErrorCode = 31
-	CodeIncompatiblePeer             ErrorCode = 32
+	CodeUnknownP2PMessage       ErrorCode = 1
+	CodeFailedRead              ErrorCode = 2
+	CodeFailedWrite             ErrorCode = 3
+	CodeMaxMessageSize          ErrorCode = 4
+	CodePongTimeout             ErrorCode = 5
+	CodeBlacklisted             ErrorCode = 6
+	CodeErrorGroup              ErrorCode = 7
+	CodeConnDecrypt             ErrorCode = 8
+	CodeChunkLargerThanMax      ErrorCode = 9
+	CodeFailedChallenge         ErrorCode = 10
+	CodeFailedDiffieHellman     ErrorCode = 11
+	CodeFailedHKDF              ErrorCode = 12
+	CodePeerAlreadyExists       ErrorCode = 13
+	CodePeerNotFound            ErrorCode = 14
+	CodeFailedDial              ErrorCode = 15
+	CodeMismatchPeerPublicKey   ErrorCode = 16
+	CodeFailedListen            ErrorCode = 17
+	CodeInvalidPeerPublicKey    ErrorCode = 18
+	CodeSignatureSwap           ErrorCode = 19
+	CodeMetaSwap                ErrorCode = 20
+	CodeBadStream               ErrorCode = 21
+	CodeBannedCountry           ErrorCode = 22
+	CodeIPLookup                ErrorCode = 23
+	CodeBannedIP                ErrorCode = 24
+	CodeNonTCPAddr              ErrorCode = 25
+	CodeInvalidNetAddressString ErrorCode = 26
+	CodeInvalidNetAddressPubKey ErrorCode = 27
+	CodeInvalidStateNetAddress  ErrorCode = 28
+	CodeMaxOutbound             ErrorCode = 29
+	CodeMaxInbound              ErrorCode = 30
+	CodeBannedID                ErrorCode = 31
+	CodeIncompatiblePeer        ErrorCode = 32
+	CodeInvalidNetAddress       ErrorCode = 33
 
 	StorageModule       ErrorModule = "store"
 	CodeOpenDB          ErrorCode   = 1
@@ -520,8 +522,12 @@ func ErrInvalidNetAddressPubKey(s string) ErrorI {
 	return NewError(CodeInvalidNetAddressPubKey, P2PModule, fmt.Sprintf("invalid net address public key: %s", s))
 }
 
-func ErrInvalidNetAddressHostAndPort(s string) ErrorI {
-	return NewError(CodeInvalidNetAddressHostAndPort, P2PModule, fmt.Sprintf("invalid net address host and port: %s", s))
+func ErrInvalidStateNetAddress(s string) ErrorI {
+	return NewError(CodeInvalidStateNetAddress, P2PModule, fmt.Sprintf("invalid state net address - optional tcp:// + ip or hostname but no ports or subpaths allowed: %s", s))
+}
+
+func ErrInvalidNetAddress(s string) ErrorI {
+	return NewError(CodeInvalidNetAddress, P2PModule, fmt.Sprintf("invalid net address host and port: %s", s))
 }
 
 func ErrTxFoundInMempool(hash string) ErrorI {
@@ -626,4 +632,8 @@ func ErrNilCertResults() ErrorI {
 
 func ErrHashSize() ErrorI {
 	return NewError(CodeHashSize, MainModule, "wrong hash size")
+}
+
+func ErrMaxPort() ErrorI {
+	return NewError(CodeMaxPort, MainModule, "max port exceeded")
 }
