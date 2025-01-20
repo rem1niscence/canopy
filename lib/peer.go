@@ -157,7 +157,7 @@ func (x *PeerAddress) FromString(s string) (e ErrorI) {
 	if !strings.HasPrefix(port, ":") {
 		port = ":" + port
 	}
-	x.NetAddress = u.Hostname() + port
+	x.NetAddress = strings.ReplaceAll(u.Hostname(), "tcp://", "") + port
 	x.PublicKey = pubKey.Bytes()
 	return
 }

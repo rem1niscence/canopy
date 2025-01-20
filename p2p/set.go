@@ -106,7 +106,7 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 	for _, peer := range mustConnect {
 		// ensure peer is not self
 		if bytes.Equal(peer.PublicKey, ps.publicKey) {
-			return nil
+			continue
 		}
 		publicKey := lib.BytesToString(peer.PublicKey)
 		// if has peer, just update metadata

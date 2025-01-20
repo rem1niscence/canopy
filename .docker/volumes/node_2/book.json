@@ -1,15 +1,4 @@
 {
-  "Book": [
-    {
-      "Address": {
-        "public_key": "b88a5928e54cbf0a36e0b98f5bcf02de9a9a1deba6994739f9160181a609f516eb702936a0cbf4c1f2e7e6be5b8272f2",
-        "net_address": "192.168.48.3:45902",
-        "peer_meta": {
-          "chain_id": 1,
-          "signature": "j4ODmoV2b851hSwoWzw/zgYQOztTUDZlL9TopoWbYiJOstT0c6IFwvfYq3ClW2woBXY9+xo+iCwpRR/uoXMsqWox4EitLmoHPF6OhLd6oM0L9APawR0qdQ+qgvIq35Ye"
-        }
-      }
-    }
-  ],
-  "BookSize": 1
+  "Book": [],
+  "BookSize": 0
 }

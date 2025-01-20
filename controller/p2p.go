@@ -9,6 +9,7 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/p2p"
 	"math/rand"
+	"strings"
 	"time"
 )
 
@@ -511,7 +512,7 @@ func (c *Controller) UpdateP2PMustConnect() {
 			// create the peer object
 			p = &lib.PeerAddress{
 				PublicKey:  member.PublicKey,
-				NetAddress: member.NetAddress + port,
+				NetAddress: strings.ReplaceAll(member.NetAddress, "tcp://", "") + port,
 				PeerMeta:   &lib.PeerMeta{ChainId: c.CommitteeID},
 			}
 		}

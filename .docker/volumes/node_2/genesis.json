@@ -8,6 +8,10 @@
     {
       "address": "02cd4e5eb53ea665702042a6ed6d31d616054dc5",
       "amount": 1000000
+    },
+    {
+      "address": "6f94783856d5ce46d24dd5946215086211d70776",
+      "amount": 1000000
     }
   ],
   "nonSigners": null,
@@ -31,6 +35,16 @@
       "net_address": "tcp://node-2",
       "staked_amount": 1000000000,
       "output": "02cd4e5eb53ea665702042a6ed6d31d616054dc5"
+    },
+    {
+      "address": "6f94783856d5ce46d24dd5946215086211d70776",
+      "public_key": "abda38eb50fbe53db9e9c3b141c6a1ec54ad40a4840e34784c975da4ee175eb4c5dd10b6d759ae8fdf8bc22511bbd97b",
+      "committees": [
+        1
+      ],
+      "net_address": "tcp://node-3",
+      "staked_amount": 1000000000,
+      "output": "6f94783856d5ce46d24dd5946215086211d70776"
     }
   ],
   "params": {

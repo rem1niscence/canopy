@@ -1,0 +1,13 @@
+{
+  "7bad44511419036edf4d2a3f88a5b92e857bc15ffc5fdb410dcc532cfc1796d2": {
+    "proposal": {
+      "parameter_space": "cons|fee|val|gov",
+      "parameter_key": "protocol_version",
+      "parameter_value": "example",
+      "start_height": 1,
+      "end_height": 1000000,
+      "signer": "46464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646"
+    },
+    "approve": true
+  }
+}

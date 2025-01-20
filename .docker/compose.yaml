@@ -46,6 +46,28 @@ services:
         limits:
           memory: 4G
           cpus: "2.0"
+  node-3:
+    container_name: node-3
+    build:
+      context: ..
+      dockerfile: .docker/Dockerfile
+      args:
+        BUILD_PATH: cmd/cli
+    ports:
+      - 30000:50000 # Wallet
+      - 30001:50001 # Explorer
+      - 30002:50002 # RPC
+      - 30003:50003 # Admin RPC
+    networks:
+      - canopy
+    command: [ "start" ]
+    volumes:
+      - ./volumes/node_3:/root/.canopy
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
 networks:
   canopy:
     driver: bridge
