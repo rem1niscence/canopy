@@ -1,4 +1,5 @@
-import {OverlayTrigger, Toast, ToastContainer, Tooltip} from "react-bootstrap";
+import { useState } from "react";
+import { OverlayTrigger, Toast, ToastContainer, Tooltip, Form } from "react-bootstrap";
 
 // getFormInputs() returns the form input based on the type
 // account and validator is passed to assist with auto fill
@@ -11,7 +12,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
     let address = account != null ? account.address : ""
     let pubKey = keyGroup != null ? keyGroup.publicKey : ""
     let signer = account != null ? account.address : ""
-    let committeeList = validator && validator.address ? validator.committees.join(','): ""
+    let committeeList = validator && validator.address ? validator.committees.join(',') : ""
     address = type !== "send" && validator && validator.address ? validator.address : address
     address = type === "stake" && validator && validator.address ? "WARNING: validator already staked" : address
     if (type === "edit-stake" || type === "stake") {
@@ -402,19 +403,19 @@ export function formatNumber(nString, div = true, cutoff = 1000000000000000) {
     if (Number(nString) < cutoff) {
         return numberWithCommas(nString)
     }
-    return Intl.NumberFormat("en", {notation: "compact", maximumSignificantDigits: 8}).format(nString)
+    return Intl.NumberFormat("en", { notation: "compact", maximumSignificantDigits: 8 }).format(nString)
 }
 
 // copy() copies text to clipboard and triggers a toast notification
 export function copy(state, setState, detail, toastText = "Copied!") {
     navigator.clipboard.writeText(detail)
-    setState({...state, toast: toastText})
+    setState({ ...state, toast: toastText })
 }
 
 // renderToast() displays a toast notification with a customizable message
 export function renderToast(state, setState) {
     return <ToastContainer id="toast" position={"bottom-end"}>
-        <Toast bg={"dark"} onClose={() => setState({...state, toast: ""})} show={state.toast != ""} delay={2000} autohide>
+        <Toast bg={"dark"} onClose={() => setState({ ...state, toast: "" })} show={state.toast != ""} delay={2000} autohide>
             <Toast.Body>{state.toast}</Toast.Body>
         </Toast>
     </ToastContainer>
@@ -435,8 +436,8 @@ export function onFormSubmit(state, e, callback) {
 
 // withTooltip() wraps an element with a tooltip component
 export function withTooltip(obj, text, key, dir = "right") {
-    return <OverlayTrigger key={key} placement={dir} delay={{show: 250, hide: 400}}
-                           overlay={<Tooltip id="button-tooltip">{text}</Tooltip>}
+    return <OverlayTrigger key={key} placement={dir} delay={{ show: 250, hide: 400 }}
+        overlay={<Tooltip id="button-tooltip">{text}</Tooltip>}
     >{obj}</OverlayTrigger>
 }
 
@@ -455,4 +456,36 @@ export function getRatio(a, b) {
 // objEmpty() checks if an object is null, undefined, or empty
 export function objEmpty(o) {
     return !o || Object.keys(o).length === 0;
+}
+
+// disallowedCharacters is a string of characters that are not allowed in form inputs.
+export const disallowedCharacters = ["\t", "\""]
+
+// sanitizeInput removes disallowed characters from the given event target value.
+// It is meant to be used as an onChange event handler.
+export const sanitizeInput = (event) => {
+    let value = event.target.value;
+
+    disallowedCharacters.forEach((char) => {
+        value = value.split(char).join('')
+    });
+
+    event.target.value = value;
+};
+
+// formatNumberInput is a function that formats a number input with commas as thousand separators.
+// It is meant to be used as an onChange event handler.
+export const formatNumberInput = (e) => {
+    const rawValue = e.target.value.replace(/,/g, "")
+    // Check if the input is a number and is greater than 0, a regex is used as isNaN  
+    // may allow for unexpected input like empty strings or null values.
+    if (/^\d*$/.test(rawValue) && rawValue[0] !== "0") {
+        e.target.value = numberWithCommas(rawValue)
+    }
+};
+
+// numberFromCommas is a function that converts a string of numbers formatted with commas 
+// as separators to a number.
+export const numberFromCommas = (str) => {
+    return Number(parseInt(str.replace(/,/g, ''), 10))
 }

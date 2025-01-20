@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [Unreleased] - 1/20/2024
+- Wallet UI fixes
+- Added wallet text input sanitizaiton
+- Added wallet number input formatting 
+
 ## [Unreleased] - 1/19/2024
 - Changed Canopy to act as a sub-chain to prepare for the sub-chain architecture
 - Added various rpc calls to support this architecture

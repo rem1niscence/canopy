@@ -161,6 +161,11 @@
     width: 125px;
 }
 
+.input-group .input-text-field::placeholder {
+    font-weight: lighter;
+    opacity: 0.4;
+}
+
 #dashboard-container {
     background-color: #000;
     mix-blend-mode: difference;
