@@ -3,12 +3,10 @@
     {
       "Address": {
         "public_key": "b88a5928e54cbf0a36e0b98f5bcf02de9a9a1deba6994739f9160181a609f516eb702936a0cbf4c1f2e7e6be5b8272f2",
-        "net_address": "172.24.0.2:42538",
+        "net_address": "192.168.48.3:45902",
         "peer_meta": {
-          "chains": [
-            1
-          ],
-          "signature": "p4BZuzPzjWZyCJJ76zqk7We6TS2wwJhE+HJ+X6sm3GdD2rfy4feNWZhv68eIeft7ElkdlRr06eZvpD/4GwxrJ1KGMiSCQA3e/VgD39NcwWEWBlAF5by7MFuNhiZ8CgNS"
+          "chain_id": 1,
+          "signature": "j4ODmoV2b851hSwoWzw/zgYQOztTUDZlL9TopoWbYiJOstT0c6IFwvfYq3ClW2woBXY9+xo+iCwpRR/uoXMsqWox4EitLmoHPF6OhLd6oM0L9APawR0qdQ+qgvIq35Ye"
         }
       }
     }

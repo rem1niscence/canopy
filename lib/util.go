@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -402,6 +403,39 @@ func RemoveIPV4Port(address string) (string, ErrorI) {
 	default:
 		return "", ErrInvalidArgument()
 	}
+}
+
+// ValidNetURLInput() validates the input netURL via regex
+// Allow:
+// - optional tcp:// prefix
+// - valid hostname
+// - valid ip4 and ip6 address
+//
+// Disallow:
+// - Ports
+// - Sub-paths
+func ValidNetURLInput(netURL string) bool {
+	// regex for optional tcp://, valid hostname, or IP with no ports
+	regex := `^(?:tcp:\/\/)?(?:localhost|(?:[a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+|(?:\d{1,3}\.){3}\d{1,3}|(?:\[[0-9a-fA-F:]+\]))$`
+
+	matched, err := regexp.MatchString(regex, netURL)
+	if err != nil {
+		return false
+	}
+	return matched
+}
+
+// AddToPort() adds some number to the port ensuring it doesn't exceed the max port
+func AddToPort(portStr string, add uint64) (string, ErrorI) {
+	portPart := portStr[1:]
+	port, _ := strconv.Atoi(portPart)
+	// add the given number to the port
+	newPort := port + int(add)
+	// ensure the new port doesn't exceed the max port number (65535)
+	if newPort > 65535 {
+		return "", ErrMaxPort()
+	}
+	return fmt.Sprintf(":%d", newPort), nil
 }
 
 // NewTimer() creates a 0 value initialized instance of a timer

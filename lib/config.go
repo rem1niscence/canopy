@@ -18,7 +18,6 @@ type Config struct {
 	P2PConfig          // peer-to-peer options
 	ConsensusConfig    // bft options
 	MempoolConfig      // mempool options
-	PluginsConfig      // committee software options
 }
 
 // DefaultConfig() returns a Config with developer set options
@@ -31,7 +30,6 @@ func DefaultConfig() Config {
 		P2PConfig:          DefaultP2PConfig(),
 		ConsensusConfig:    DefaultConsensusConfig(),
 		MempoolConfig:      DefaultMempoolConfig(),
-		PluginsConfig:      DefaultPluginConfig(),
 	}
 }
 
@@ -148,7 +146,7 @@ type P2PConfig struct {
 func DefaultP2PConfig() P2PConfig {
 	return P2PConfig{
 		NetworkID:       CanopyMainnetNetworkId,
-		ListenAddress:   "0.0.0.0:9000", // default RPC address is 9000
+		ListenAddress:   "0.0.0.0:9001", // default TCP address is 9001
 		ExternalAddress: "",
 		MaxInbound:      21,
 		MaxOutbound:     7,
@@ -218,19 +216,6 @@ type PluginConfig struct {
 type BasicAuth struct {
 	Username string
 	Password string
-}
-
-// DefaultPluginConfig() returns the developer created Plugins options
-func DefaultPluginConfig() PluginsConfig {
-	return PluginsConfig{Plugins: []PluginConfig{{
-		ID:   0,
-		Name: "example_name (this is not-critical an may be anything that is helpful)",
-		URL:  "http://example-of-my-fullnode.fake",
-		BasicAuth: BasicAuth{
-			Username: "user",
-			Password: "pass",
-		},
-	}}}
 }
 
 // WriteToFile() saves the Config object to a JSON file

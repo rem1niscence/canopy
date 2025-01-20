@@ -58,7 +58,7 @@ func New(committeeID uint64, fsm *fsm.StateMachine, c lib.Config, valKey crypto.
 		FSM:         fsm,
 		Mempool:     mempool,
 		isSyncing:   &atomic.Bool{},
-		P2P:         p2p.New(valKey, maxMembersPerCommittee, c, l),
+		P2P:         p2p.New(valKey, maxMembersPerCommittee, committeeID, c, l),
 		PublicKey:   valKey.PublicKey().Bytes(),
 		PrivateKey:  valKey,
 		CommitteeID: committeeID,
@@ -179,9 +179,9 @@ func (c *Controller) LoadLastCommitTime(height uint64) time.Time {
 	return time.UnixMicro(int64(block.BlockHeader.Time))
 }
 
-// LoadProposerKeys() gets the last Base-Chain proposer keys
+// LoadProposerKeys() gets the last Base-ChainId proposer keys
 func (c *Controller) LoadLastProposers() *lib.Proposers {
-	// return the last proposers from the Base-Chain
+	// return the last proposers from the Base-ChainId
 	return c.BaseChainInfo.LastProposers
 }
 

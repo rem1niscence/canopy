@@ -17,8 +17,8 @@ const (
 type PeerSet struct {
 	m            map[string]*Peer   // public key -> Peer
 	mustConnect  []*lib.PeerAddress // list of peers that must be connected to
-	inbound      map[uint64]int     // inbound count
-	outbound     map[uint64]int     // outbound count
+	inbound      int                // inbound count
+	outbound     int                // outbound count
 	sync.RWMutex                    // read / write mutex
 	config       lib.P2PConfig      // p2p configuration
 	publicKey    []byte             // self public key
@@ -26,15 +26,11 @@ type PeerSet struct {
 }
 
 func NewPeerSet(c lib.Config, priv crypto.PrivateKeyI, logger lib.LoggerI) PeerSet {
-	inbound, outbound := make(map[uint64]int), make(map[uint64]int)
-	for _, p := range c.Plugins {
-		inbound[p.ID], outbound[p.ID] = 0, 0
-	}
 	return PeerSet{
 		m:           make(map[string]*Peer),
 		mustConnect: make([]*lib.PeerAddress, 0),
-		inbound:     inbound,
-		outbound:    outbound,
+		inbound:     0,
+		outbound:    0,
 		RWMutex:     sync.RWMutex{},
 		config:      c.P2PConfig,
 		publicKey:   priv.PublicKey().Bytes(),
@@ -67,29 +63,21 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 		ps.set(p)
 		return nil
 	}
-	// use a ptr to reference the inbound / outbound counters
-	peerCounts, maxErr := new(map[uint64]int), lib.ErrorI(nil)
+	// check limits
+	if p.IsOutbound && ps.outbound >= ps.config.MaxOutbound {
+		return ErrMaxOutbound()
+	} else if !p.IsOutbound && ps.inbound >= ps.config.MaxInbound {
+		return ErrMaxInbound()
+	}
+	// increment counts
 	if p.IsOutbound {
-		peerCounts, maxErr = &ps.outbound, ErrMaxOutbound()
+		ps.outbound++
 	} else {
-		peerCounts, maxErr = &ps.inbound, ErrMaxInbound()
+		ps.inbound++
 	}
-	// limit inbound / outbound on non-trusted & non-must-connects
-	// for each chain the peer supports
-	for _, chain := range p.Address.PeerMeta.Chains {
-		// check if below limit and self hasChain
-		if count, selfHasChain := (*peerCounts)[chain]; selfHasChain && count < ps.config.MaxOutbound {
-			// increment counts
-			for _, c := range p.Address.PeerMeta.Chains {
-				(*peerCounts)[c]++
-			}
-			// set the peer
-			ps.set(p)
-			return nil
-		}
-	}
-	// all chains are at or above limit
-	return maxErr
+	// set the peer
+	ps.set(p)
+	return nil
 }
 
 // Remove() evicts a peer from the set
@@ -112,7 +100,7 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 	ps.mustConnect = mustConnect
 	for _, peer := range ps.m {
 		peer.IsMustConnect = false
-		ps.changeIOCount(false, peer.IsOutbound, peer.PeerInfo.Address.PeerMeta)
+		ps.changeIOCount(false, peer.IsOutbound)
 	}
 	// for each must connect
 	for _, peer := range mustConnect {
@@ -124,7 +112,7 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 		// if has peer, just update metadata
 		if p, found := ps.m[publicKey]; found {
 			ps.m[publicKey].IsMustConnect = true
-			ps.changeIOCount(true, p.IsOutbound, p.PeerInfo.Address.PeerMeta)
+			ps.changeIOCount(true, p.IsOutbound)
 		} else { // else add to 'ToDial' list
 			toDial = append(toDial, peer)
 		}
@@ -206,20 +194,18 @@ func (ps *PeerSet) SendTo(publicKey []byte, topic lib.Topic, msg proto.Message) 
 	return ps.send(peer, topic, msg)
 }
 
-// SendToChainPeers() sends a message to all peers with the chainId
-func (ps *PeerSet) SendToChainPeers(chainId uint64, topic lib.Topic, msg proto.Message, excludeBadRep ...bool) lib.ErrorI {
+// SendToPeers() sends a message to all peers
+func (ps *PeerSet) SendToPeers(topic lib.Topic, msg proto.Message, excludeBadRep ...bool) lib.ErrorI {
 	ps.RLock()
 	defer ps.RUnlock()
 	for _, p := range ps.m {
-		if p.HasChain(chainId) {
-			if len(excludeBadRep) == 1 && excludeBadRep[0] {
-				if p.Reputation < MinimumPeerReputation {
-					continue
-				}
+		if len(excludeBadRep) == 1 && excludeBadRep[0] {
+			if p.Reputation < MinimumPeerReputation {
+				continue
 			}
-			if err := ps.send(p, topic, msg); err != nil {
-				return err
-			}
+		}
+		if err := ps.send(p, topic, msg); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -257,36 +243,28 @@ func (ps *PeerSet) send(peer *Peer, topic lib.Topic, msg proto.Message) lib.Erro
 // remove() decrements the in/out counters, and deletes it from the set
 func (ps *PeerSet) remove(peer *Peer) {
 	if !peer.IsTrusted && !peer.IsMustConnect {
-		for _, chain := range peer.Address.PeerMeta.Chains {
-			if peer.IsOutbound {
-				if _, selfHasChain := ps.outbound[chain]; selfHasChain {
-					ps.outbound[chain]--
-				}
-			} else {
-				if _, selfHasChain := ps.inbound[chain]; selfHasChain {
-					ps.inbound[chain]--
-				}
-			}
+		if peer.IsOutbound {
+			ps.outbound--
+		} else {
+			ps.inbound--
 		}
 	}
 	ps.del(peer.PeerInfo.Address.PublicKey)
 }
 
-// changeIOCount() increments or decrements numInbound and numOutbound for each chain in the PeerMeta
-func (ps *PeerSet) changeIOCount(increment, outbound bool, meta *lib.PeerMeta) {
-	for _, c := range meta.Chains {
-		if outbound {
-			if increment {
-				ps.outbound[c]++
-			} else {
-				ps.outbound[c]--
-			}
+// changeIOCount() increments or decrements numInbound and numOutbound
+func (ps *PeerSet) changeIOCount(increment, outbound bool) {
+	if outbound {
+		if increment {
+			ps.outbound++
 		} else {
-			if increment {
-				ps.inbound[c]++
-			} else {
-				ps.inbound[c]--
-			}
+			ps.outbound--
+		}
+	} else {
+		if increment {
+			ps.inbound++
+		} else {
+			ps.inbound--
 		}
 	}
 }

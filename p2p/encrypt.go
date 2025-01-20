@@ -105,8 +105,8 @@ func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKe
 	if peerMeta.NetworkId != meta.NetworkId {
 		return nil, ErrIncompatiblePeer()
 	}
-	// ensure peer chains isn't too many
-	if len(peerMeta.Chains) > 100 {
+	// ensure peer chain is the same as ours
+	if peerMeta.ChainId != meta.ChainId {
 		return nil, ErrIncompatiblePeer()
 	}
 	// finalize the encrypted connection by setting the exchanged information

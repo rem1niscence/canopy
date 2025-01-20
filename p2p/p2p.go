@@ -10,7 +10,6 @@ import (
 	"github.com/phuslu/iploc"
 	"golang.org/x/net/netutil"
 	"google.golang.org/protobuf/proto"
-	"math"
 	"net"
 	"runtime/debug"
 	"slices"
@@ -39,7 +38,7 @@ type P2P struct {
 	meta                   *lib.PeerMeta
 	PeerSet                          // active set
 	book                   *PeerBook // not active set
-	mustConnectReceiver    chan []*lib.PeerAddress
+	MustConnectsReceiver   chan []*lib.PeerAddress
 	maxMembersPerCommittee int
 	bannedIPs              []net.IPAddr // banned IPs (non-string)
 	config                 lib.Config
@@ -47,7 +46,7 @@ type P2P struct {
 }
 
 // New() creates an initialized pointer instance of a P2P object
-func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l lib.LoggerI) *P2P {
+func New(p crypto.PrivateKeyI, maxMembersPerCommittee, committeeId uint64, c lib.Config, l lib.LoggerI) *P2P {
 	// Initialize the peer book
 	peerBook := NewPeerBook(p.PublicKey().Bytes(), c, l)
 	// Make inbound multiplexed channels
@@ -64,12 +63,7 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l li
 		}
 		bannedIPs = append(bannedIPs, *i)
 	}
-	// Load supported chains
-	var chains []uint64
-	for _, plug := range c.Plugins {
-		chains = append(chains, plug.ID)
-	}
-	meta := &lib.PeerMeta{Chains: chains}
+	meta := &lib.PeerMeta{ChainId: committeeId}
 	return &P2P{
 		privateKey:             p,
 		channels:               channels,
@@ -77,7 +71,7 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l li
 		meta:                   meta.Sign(p),
 		PeerSet:                NewPeerSet(c, p, l),
 		book:                   peerBook,
-		mustConnectReceiver:    make(chan []*lib.PeerAddress, maxChanSize),
+		MustConnectsReceiver:   make(chan []*lib.PeerAddress, maxChanSize),
 		maxMembersPerCommittee: int(maxMembersPerCommittee),
 		bannedIPs:              bannedIPs,
 		log:                    l,
@@ -88,7 +82,7 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l li
 func (p *P2P) Start() {
 	p.log.Info("Starting P2P 🤝 ")
 	// Listens for 'must connect peer ids' from the main internal controller
-	go p.ListenForMustConnects(p.mustConnectReceiver)
+	go p.ListenForMustConnects()
 	// Starts the peer address book exchange service
 	go p.StartPeerBookService()
 	// Listens for external inbound peers
@@ -152,22 +146,17 @@ func (p *P2P) ListenForInboundPeers(listenAddress *lib.PeerAddress) {
 
 // DialForOutboundPeers() uses the config and peer book to try to max out the outbound peer connections
 func (p *P2P) DialForOutboundPeers() {
-	dialing := &Dialing{
-		m: make(map[uint64]int),
-		l: sync.RWMutex{},
-	}
+	dialing := 0
 	// Try to connect to the DialPeers in the config
 	for _, peerString := range p.config.DialPeers {
-		peer := new(lib.PeerAddress)
+		peer := &lib.PeerAddress{PeerMeta: &lib.PeerMeta{NetworkId: p.meta.NetworkId, ChainId: p.meta.ChainId}}
 		if err := peer.FromString(peerString); err != nil {
 			p.log.Errorf("invalid dial peer %s: %s", peerString, err.Error())
 			continue
 		}
 		go func() {
-			// preload dial with backoff
-			dialing.AddDialing(math.MaxUint16) // unknown chains
-			// once dial with backoff finishes
-			defer dialing.RemoveDialing(math.MaxUint16) // unknown chains
+			// increment dialing
+			dialing++
 			// dial the peer with exponential backoff
 			p.DialWithBackoff(peer)
 		}()
@@ -176,27 +165,25 @@ func (p *P2P) DialForOutboundPeers() {
 	for {
 		time.Sleep(dialTimeout)
 		// for each supported plugin, try to max out peer config by dialing
-		for _, chain := range p.meta.Chains {
-			func() {
-				// exit if maxed out config or none left to dial
-				if (p.PeerSet.outbound[chain]+dialing.NumDialing(chain) >= p.config.MaxOutbound) || p.book.GetBookSizeForChain(chain) == 0 {
-					return
-				}
-				// get random peer for chain
-				rand := p.book.GetRandom(chain)
-				if rand == nil || p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) {
-					return
-				}
-				// sequential operation means we'll never be dialing more than 1 peer at a time
-				// the peer should be added before the next execution of the loop
-				dialing.AddDialing(chain)
-				defer dialing.RemoveDialing(chain)
-				if err := p.Dial(rand.Address, false); err != nil {
-					p.log.Warn(err.Error())
-					return
-				}
-			}()
-		}
+		func() {
+			// exit if maxed out config or none left to dial
+			if (p.PeerSet.outbound+dialing >= p.config.MaxOutbound) || p.book.GetBookSize() == 0 {
+				return
+			}
+			// get random peer for chain
+			rand := p.book.GetRandom()
+			if rand == nil || p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) {
+				return
+			}
+			// sequential operation means we'll never be dialing more than 1 peer at a time
+			// the peer should be added before the next execution of the loop
+			dialing++
+			defer func() { dialing-- }()
+			if err := p.Dial(rand.Address, false); err != nil {
+				p.log.Warn(err.Error())
+				return
+			}
+		}()
 	}
 }
 
@@ -335,28 +322,25 @@ func (p *P2P) SelfSend(fromPublicKey []byte, topic lib.Topic, payload proto.Mess
 
 // MaxPossiblePeers() sums the MaxIn, MaxOut, MaxCommitteeConnects and trusted peer IDs
 func (p *P2P) MaxPossiblePeers() int {
-	return (p.config.MaxInbound+p.config.MaxOutbound+p.maxMembersPerCommittee)*len(p.config.Plugins) + len(p.config.TrustedPeerIDs)
+	return (p.config.MaxInbound + p.config.MaxOutbound + p.maxMembersPerCommittee) + len(p.config.TrustedPeerIDs)
 }
 
 // MaxPossibleInbound() sums the MaxIn, MaxCommitteeConnects and trusted peer IDs
 func (p *P2P) MaxPossibleInbound() int {
-	return (p.config.MaxInbound+p.maxMembersPerCommittee)*len(p.config.Plugins) + len(p.config.TrustedPeerIDs)
+	return (p.config.MaxInbound + p.maxMembersPerCommittee) + len(p.config.TrustedPeerIDs)
 }
 
 // MaxPossibleOutbound() sums the MaxIn, MaxCommitteeConnects and trusted peer IDs
 func (p *P2P) MaxPossibleOutbound() int {
-	return (p.config.MaxOutbound+p.maxMembersPerCommittee)*len(p.config.Plugins) + len(p.config.TrustedPeerIDs)
+	return (p.config.MaxOutbound + p.maxMembersPerCommittee) + len(p.config.TrustedPeerIDs)
 }
 
 // Inbox() is a getter for the multiplexed stream with a specific topic
 func (p *P2P) Inbox(topic lib.Topic) chan *lib.MessageAndMetadata { return p.channels[topic] }
 
-// MustConnectReceiver() is a getter for the receiver that the controller uses to update 'must connect peers'
-func (p *P2P) MustConnectReceiver() chan []*lib.PeerAddress { return p.mustConnectReceiver }
-
 // ListenForMustConnects() is an internal listener that receives 'must connect peers' updates from the controller
-func (p *P2P) ListenForMustConnects(receiver chan []*lib.PeerAddress) {
-	for mustConnect := range receiver {
+func (p *P2P) ListenForMustConnects() {
+	for mustConnect := range p.MustConnectsReceiver {
 		// UpdateMustConnects() removes connections that are already established
 		for _, val := range p.UpdateMustConnects(mustConnect) {
 			go p.DialWithBackoff(val)
@@ -425,36 +409,4 @@ func (p *P2P) catchPanic() {
 	if r := recover(); r != nil {
 		p.log.Error(string(debug.Stack()))
 	}
-}
-
-// Dialing a thread safe map that logically maintains
-// a count for peering chains that are being dialed
-type Dialing struct {
-	m map[uint64]int
-	l sync.RWMutex
-}
-
-// AddDialing() increments the count for a list of chainIds that are currently being dialed
-func (d *Dialing) AddDialing(chainId ...uint64) {
-	d.l.Lock()
-	defer d.l.Unlock()
-	for _, chain := range chainId {
-		d.m[chain]++
-	}
-}
-
-// RemoveDialing() decrements the count for a list of chainIds that are currently being dialed
-func (d *Dialing) RemoveDialing(chainId ...uint64) {
-	d.l.Lock()
-	defer d.l.Unlock()
-	for _, chain := range chainId {
-		d.m[chain]--
-	}
-}
-
-// NumDialing() returns the count of peers currently being dialed for that id
-func (d *Dialing) NumDialing(chainId uint64) int {
-	d.l.RLock()
-	defer d.l.RUnlock()
-	return d.m[chainId]
 }

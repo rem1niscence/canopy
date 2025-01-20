@@ -21,11 +21,11 @@ func TestEncryptedConn(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		e1, err = NewHandshake(c1, &lib.PeerMeta{Chains: []uint64{0, 1}}, p1)
+		e1, err = NewHandshake(c1, &lib.PeerMeta{ChainId: 1}, p1)
 		wg.Done()
 		require.NoError(t, err)
 	}()
-	e2, err = NewHandshake(c2, &lib.PeerMeta{Chains: []uint64{0, 1}}, p2)
+	e2, err = NewHandshake(c2, &lib.PeerMeta{ChainId: 1}, p2)
 	require.NoError(t, err)
 	wg.Wait()
 	require.Equal(t, e1.Address.PublicKey, p2.PublicKey().Bytes())

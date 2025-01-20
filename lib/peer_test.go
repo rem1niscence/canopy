@@ -204,16 +204,21 @@ func TestPeerAddressFromString(t *testing.T) {
 			error:  "invalid net address public key",
 		},
 		{
-			name:   "bad public key",
+			name:   "port resolution",
 			detail: "the address string is missing an @ sign",
 			s:      newTestPublicKey(t).String() + "@tcp://0.0.0.0",
-			error:  "invalid net address host and port",
+			expected: &PeerAddress{
+				PeerMeta:   &PeerMeta{ChainId: 1},
+				PublicKey:  newTestPublicKeyBytes(t),
+				NetAddress: "0.0.0.0:9001",
+			},
 		},
 		{
 			name:   "valid url in string",
 			detail: "the address string is missing an @ sign",
 			s:      newTestPublicKey(t).String() + "@tcp://0.0.0.0:8080",
 			expected: &PeerAddress{
+				PeerMeta:   &PeerMeta{ChainId: 1},
 				PublicKey:  newTestPublicKeyBytes(t),
 				NetAddress: "0.0.0.0:8080",
 			},
@@ -223,6 +228,7 @@ func TestPeerAddressFromString(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// create a peer address object
 			peerAddress := new(PeerAddress)
+			peerAddress.PeerMeta = &PeerMeta{ChainId: 1}
 			// execute the function call
 			err := peerAddress.FromString(test.s)
 			// validate if an error is expected
@@ -247,29 +253,22 @@ func TestHasChain(t *testing.T) {
 		has         bool
 	}{
 		{
-			name:        "peer meta is nil",
-			detail:      "peer meta is nil or empty",
-			peerAddress: PeerAddress{},
-			chain:       0,
-			has:         false,
-		},
-		{
-			name:   "peer doesn't have the chain",
+			name:   "peer isn't on the chain",
 			detail: "peer meta doesn't contain the chain id",
 			peerAddress: PeerAddress{
 				PeerMeta: &PeerMeta{
-					Chains: []uint64{1},
+					ChainId: 1,
 				},
 			},
 			chain: 0,
 			has:   false,
 		},
 		{
-			name:   "peer has the chain",
+			name:   "peer is on the chain",
 			detail: "peer meta contains the chain id",
 			peerAddress: PeerAddress{
 				PeerMeta: &PeerMeta{
-					Chains: []uint64{0, 1, 2, 3, 4},
+					ChainId: 3,
 				},
 			},
 			chain: 3,
@@ -290,7 +289,7 @@ func TestPeerAddressCopy(t *testing.T) {
 		NetAddress: "8.8.8.8:8080",
 		PeerMeta: &PeerMeta{
 			NetworkId: 1,
-			Chains:    []uint64{1},
+			ChainId:   1,
 			Signature: []byte("sig"),
 		},
 	}
@@ -306,7 +305,7 @@ func TestPeerAddressJSON(t *testing.T) {
 		NetAddress: "8.8.8.8:8080",
 		PeerMeta: &PeerMeta{
 			NetworkId: 1,
-			Chains:    []uint64{1},
+			ChainId:   1,
 			Signature: []byte("sig"),
 		},
 	}
@@ -324,7 +323,7 @@ func TestPeerAddressJSON(t *testing.T) {
 func TestPeerMetaJSON(t *testing.T) {
 	expected := &PeerMeta{
 		NetworkId: 1,
-		Chains:    []uint64{1},
+		ChainId:   1,
 		Signature: []byte("sig"),
 	}
 	// convert structure to json bytes
@@ -341,7 +340,7 @@ func TestPeerMetaJSON(t *testing.T) {
 func TestPeerMetaCopy(t *testing.T) {
 	expected := &PeerMeta{
 		NetworkId: 1,
-		Chains:    []uint64{1},
+		ChainId:   1,
 		Signature: []byte("sig"),
 	}
 	// make a copy
@@ -360,7 +359,7 @@ func TestPeerInfoJSON(t *testing.T) {
 			NetAddress:    "8.8.8.8:8080",
 			PeerMeta: &PeerMeta{
 				NetworkId: 1,
-				Chains:    []uint64{1},
+				ChainId:   1,
 				Signature: []byte("sig"),
 			},
 		},
@@ -390,7 +389,7 @@ func TestPeerInfoCopy(t *testing.T) {
 			NetAddress:    "8.8.8.8:8080",
 			PeerMeta: &PeerMeta{
 				NetworkId: 1,
-				Chains:    []uint64{1},
+				ChainId:   1,
 				Signature: []byte("sig"),
 			},
 		},

@@ -18,7 +18,7 @@ import (
 
 const (
 	MaxFailedDialAttempts        = 5               // maximum times a peer may fail a churn management dial attempt before evicted from the peer book
-	MaxPeersExchangedPerChain    = 5               // maximum number of peers per chain that may be sent/received during a peer exchange
+	MaxPeersExchanged            = 5               // maximum number of peers per chain that may be sent/received during a peer exchange
 	MaxPeerBookRequestsPerWindow = 2               // maximum peer book request per window
 	PeerBookRequestWindowS       = 120             // seconds in a peer book request
 	PeerBookRequestTimeoutS      = 5               // timeout in seconds of the peer book
@@ -98,7 +98,7 @@ func (p *P2P) SendPeerBookRequests() {
 				continue
 			}
 			// if they sent too many peers
-			if len(peerBookResponseMsg.Book) > MaxPeersExchangedPerChain*len(p.meta.Chains) {
+			if len(peerBookResponseMsg.Book) > MaxPeersExchanged {
 				p.log.Warnf("Too many peers sent from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 				p.ChangeReputation(senderID, ExceedMaxPBLenRep)
 				continue
@@ -144,31 +144,22 @@ func (p *P2P) ListenForPeerBookRequests() {
 				p.ChangeReputation(requesterID, InvalidMsgRep)
 				continue
 			}
-			// get the info of the requester
-			peer, err := p.GetPeerInfo(requesterID)
-			if err != nil {
-				continue
-			}
 			p.book.l.RLock()
 			var response []*BookPeer
-			// for each chain of the remote peer
-		nextChain:
-			for _, c := range peer.Address.PeerMeta.Chains {
-				// grab up to MaxPeerExchangePerChain number of peers for that specific chain
-				for i := 0; i < MaxPeersExchangedPerChain; i++ {
-					toBeAdded := p.book.GetRandom(c)
-					if toBeAdded == nil {
-						continue nextChain // no peers for this chain
-					}
-					if !slices.ContainsFunc(response, func(p *BookPeer) bool { // ensure no duplicates
-						return bytes.Equal(p.Address.PublicKey, toBeAdded.Address.PublicKey)
-					}) {
-						response = append(response, toBeAdded) // add BookPeer to response
-					}
+			// grab up to MaxPeerExchangePerChain number of peers for that specific chain
+			for i := 0; i < MaxPeersExchanged; i++ {
+				toBeAdded := p.book.GetRandom()
+				if toBeAdded == nil {
+					break
+				}
+				if !slices.ContainsFunc(response, func(p *BookPeer) bool { // ensure no duplicates
+					return bytes.Equal(p.Address.PublicKey, toBeAdded.Address.PublicKey)
+				}) {
+					response = append(response, toBeAdded) // add BookPeer to response
 				}
 			}
 			// send response to the requester
-			err = p.SendTo(requesterID, lib.Topic_PEERS_RESPONSE, &PeerBookResponseMessage{Book: response})
+			err := p.SendTo(requesterID, lib.Topic_PEERS_RESPONSE, &PeerBookResponseMessage{Book: response})
 			p.book.l.RUnlock()
 			if err != nil {
 				p.log.Error(err.Error()) // log error
@@ -214,23 +205,21 @@ func (p *PeerBook) StartChurnManagement(dialAndDisconnect func(a *lib.PeerAddres
 }
 
 // GetRandom() returns a random peer from the Book that has a specific chain in the Meta
-func (p *PeerBook) GetRandom(chain uint64) *BookPeer {
-	peeringCandidates, numCandidates := p.GetPeersForChain(chain)
+func (p *PeerBook) GetRandom() *BookPeer {
+	peeringCandidates, numCandidates := p.GetPeers()
 	if numCandidates == 0 {
 		return nil
 	}
 	return peeringCandidates[rand.Intn(numCandidates)]
 }
 
-// GetPeersForChain() returns peers for a specific chainID (committeeID)
-func (p *PeerBook) GetPeersForChain(chain uint64) (peers []*BookPeer, count int) {
+// GetPeers() returns peers from the peer book
+func (p *PeerBook) GetPeers() (peers []*BookPeer, count int) {
 	p.l.RLock()
 	defer p.l.RUnlock()
 	for _, peer := range p.Book {
-		if peer.Address.HasChain(chain) {
-			count++
-			peers = append(peers, peer)
-		}
+		count++
+		peers = append(peers, peer)
 	}
 	return
 }
@@ -281,11 +270,11 @@ func (p *PeerBook) Remove(publicKey []byte) {
 	p.delAtIndex(i)
 }
 
-// GetBookSizeForChain() returns the peer count for a chainId
-func (p *PeerBook) GetBookSizeForChain(chainId uint64) int {
+// GetBookSize() returns the book peer count
+func (p *PeerBook) GetBookSize() int {
 	p.l.RLock()
 	defer p.l.RUnlock()
-	_, count := p.GetPeersForChain(chainId)
+	_, count := p.GetPeers()
 	return count
 }
 

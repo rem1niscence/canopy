@@ -6,7 +6,6 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
-	"net/url"
 )
 
 const (
@@ -714,14 +713,9 @@ func checkNetAddress(netAddress string) lib.ErrorI {
 	if netAddressLen < 1 || netAddressLen > 50 {
 		return ErrInvalidNetAddressLen()
 	}
-	// ensure the net address has a port
-	result, err := lib.RemoveIPV4Port(netAddress)
-	if err != nil {
-		return err
-	}
-	// ensure the net address is a valid URL or IPV4
-	if _, e := url.Parse(result); e != nil {
-		return lib.ErrInvalidNetAddressHostAndPort(netAddress)
+	// ensure the net address is a valid
+	if !lib.ValidNetURLInput(netAddress) {
+		return lib.ErrInvalidStateNetAddress(netAddress)
 	}
 	return nil
 }

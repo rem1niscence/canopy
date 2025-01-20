@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
-	"net"
 	"net/url"
 	"slices"
 	"strings"
@@ -132,7 +131,7 @@ func (x *PeerAddress) Copy() *PeerAddress {
 
 // FromString() creates a new PeerAddress object from string (without meta)
 // Peer String example: <some-public-key>@<some-net-address>
-func (x *PeerAddress) FromString(s string) ErrorI {
+func (x *PeerAddress) FromString(s string) (e ErrorI) {
 	arr := strings.Split(s, "@")
 	if len(arr) != 2 {
 		return ErrInvalidNetAddrString(s)
@@ -142,16 +141,36 @@ func (x *PeerAddress) FromString(s string) ErrorI {
 		return ErrInvalidNetAddressPubKey(arr[0])
 	}
 	u, er := url.Parse(arr[1])
-	if er != nil || u.Hostname() == "" || u.Port() == "" {
-		return ErrInvalidNetAddressHostAndPort(s)
+	if er != nil || u.Hostname() == "" {
+		return ErrInvalidNetAddress(s)
 	}
-	x.NetAddress = net.JoinHostPort(u.Hostname(), u.Port())
+	port := u.Port()
+	// resolve port automatically if not exists
+	// port definition exists everywhere except for in state
+	if port == "" {
+		port, e = ResolvePort(x.PeerMeta.ChainId)
+		if e != nil {
+			return
+		}
+	}
+	// ensure the port starts with a colon
+	if !strings.HasPrefix(port, ":") {
+		port = ":" + port
+	}
+	x.NetAddress = u.Hostname() + port
 	x.PublicKey = pubKey.Bytes()
-	return nil
+	return
+}
+
+// ResolvePort() executes a network wide protocol for determining what the p2p port of the peer is
+// This is useful to allow 1 URL in state to expand to many different routing paths for sub-chains
+// Example: ResolvePort(CHAIN-ID = 2) returns 9002
+func ResolvePort(chainId uint64) (string, ErrorI) {
+	return AddToPort(":9000", chainId)
 }
 
 // HasChain() returns if the PeerAddress's PeerMeta has this chain
-func (x *PeerAddress) HasChain(id uint64) bool { return x.PeerMeta.HasChain(id) }
+func (x *PeerAddress) HasChain(id uint64) bool { return x.PeerMeta.ChainId == id }
 
 // peerAddressJSON is the json.Marshaller and json.Unmarshaler representation fo the PeerAddress object
 type peerAddressJSON struct {
@@ -187,19 +206,6 @@ func (x *PeerMeta) Sign(key crypto.PrivateKeyI) *PeerMeta {
 	return x
 }
 
-// HasChain() is true if the PeerMeta contains the chainID
-func (x *PeerMeta) HasChain(id uint64) bool {
-	if x == nil {
-		return false
-	}
-	for _, c := range x.Chains {
-		if c == id {
-			return true
-		}
-	}
-	return false
-}
-
 // SignBytes() returns the canonical byte representation used to digitally sign the bytes
 func (x *PeerMeta) SignBytes() []byte {
 	sig := x.Signature
@@ -216,7 +222,7 @@ func (x *PeerMeta) Copy() *PeerMeta {
 	}
 	return &PeerMeta{
 		NetworkId: x.NetworkId,
-		Chains:    slices.Clone(x.Chains),
+		ChainId:   x.ChainId,
 		Signature: slices.Clone(x.Signature),
 	}
 }

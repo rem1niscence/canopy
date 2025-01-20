@@ -102,7 +102,7 @@ func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
 		return err
 	}
 	// gossip to all the peers for the chain
-	return c.P2P.SendToChainPeers(c.CommitteeID, Tx, msg)
+	return c.P2P.SendToPeers(Tx, msg)
 }
 
 // SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
@@ -147,8 +147,8 @@ func (c *Controller) GossipBlock(qc *lib.QuorumCertificate) {
 		TotalVdfIterations:  c.FSM.TotalVDFIterations(),
 		BlockAndCertificate: qc,
 	}
-	// gossip the block message to peers for a particular committee id
-	if err := c.P2P.SendToChainPeers(c.CommitteeID, Block, blockMessage); err != nil {
+	// gossip the block message to peers
+	if err := c.P2P.SendToPeers(Block, blockMessage); err != nil {
 		c.log.Errorf("unable to gossip block with err: %s", err.Error())
 	}
 	// if a single node network - send to self
@@ -179,8 +179,8 @@ func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
 		}
 	} else {
 		c.log.Debugf("Requesting block %d for chain %d from all", height, c.CommitteeID)
-		// send it to the chain peers
-		if err := c.P2P.SendToChainPeers(c.CommitteeID, BlockRequest, &lib.BlockRequestMessage{
+		// send it to the peers
+		if err := c.P2P.SendToPeers(BlockRequest, &lib.BlockRequestMessage{
 			CommitteeId: c.CommitteeID,
 			Height:      height,
 			HeightOnly:  heightOnly,
@@ -419,7 +419,7 @@ func (c *Controller) ListenForTx() {
 			// bump peer reputation positively
 			c.P2P.ChangeReputation(senderID, p2p.GoodTxRep)
 			// gossip the transaction to peers
-			if err := c.P2P.SendToChainPeers(txMsg.CommitteeId, Tx, msg.Message); err != nil {
+			if err := c.P2P.SendToPeers(Tx, msg.Message); err != nil {
 				c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
 			}
 		}()
@@ -488,8 +488,20 @@ func (c *Controller) ListenForBlockRequests() {
 func (c *Controller) UpdateP2PMustConnect() {
 	// define a list
 	noDuplicates := make(map[string]*lib.PeerAddress)
+	port, err := lib.ResolvePort(c.CommitteeID)
+	if err != nil {
+		if err != nil {
+			c.log.Error(err.Error())
+			return
+		}
+	}
+	// ensure self is a validator
+	var selfIsValidator bool
 	// for each member of the committee
 	for _, member := range c.BaseChainInfo.ValidatorSet.ValidatorSet.ValidatorSet {
+		if bytes.Equal(member.PublicKey, c.PublicKey) {
+			selfIsValidator = true
+		}
 		// convert the public key to a string
 		pkString := lib.BytesToString(member.PublicKey)
 		// check the de-duplication map to see if the peer object already exists
@@ -499,15 +511,17 @@ func (c *Controller) UpdateP2PMustConnect() {
 			// create the peer object
 			p = &lib.PeerAddress{
 				PublicKey:  member.PublicKey,
-				NetAddress: member.NetAddress,
-				PeerMeta:   &lib.PeerMeta{Chains: []uint64{c.CommitteeID}},
+				NetAddress: member.NetAddress + port,
+				PeerMeta:   &lib.PeerMeta{ChainId: c.CommitteeID},
 			}
-		} else {
-			// if the peer object already exists in the list, simply add this id to its list of chains
-			p.PeerMeta.Chains = append(p.PeerMeta.Chains, c.CommitteeID)
 		}
 		// add to the de-duplication map to ensure we don't doubly create peer objects
 		noDuplicates[pkString] = p
+	}
+	// if self isn't a validator - don't force P2P to connect to other validators
+	if !selfIsValidator {
+		c.log.Warnf("Self not a validator so not connecting to %d validators", len(noDuplicates))
+		return
 	}
 	// create a slice to send to the p2p module
 	var arr []*lib.PeerAddress
@@ -515,8 +529,9 @@ func (c *Controller) UpdateP2PMustConnect() {
 	for _, peerAddr := range noDuplicates {
 		arr = append(arr, peerAddr)
 	}
+	c.log.Infof("Updating must connects with %d validators", len(arr))
 	// send the slice to the p2p module
-	c.P2P.MustConnectReceiver() <- arr
+	c.P2P.MustConnectsReceiver <- arr
 }
 
 // handlePeerBlock() validates and handles inbound Quorum Certificates from remote peers
