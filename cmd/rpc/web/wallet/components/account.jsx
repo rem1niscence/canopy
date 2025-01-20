@@ -184,7 +184,7 @@ export default function Accounts({keygroup, account, validator}) {
                 className="input-text-field"  
                 onChange={v.type === "number" ? formatNumberInput : sanitizeInput}
                 type={v.type == "number" ? "text" : v.type} 
-                defaultValue={v.type === "number" ? numberWithCommas(v.defaultValue || 0) : v.defaultValue}              
+                defaultValue={v.type === "number" ? numberWithCommas(v.defaultValue || "") : v.defaultValue}              
                 placeholder={v.placeholder} 
                 required={v.required} 
                 min={0} 
