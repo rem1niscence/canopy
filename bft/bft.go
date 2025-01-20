@@ -601,6 +601,8 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.NewRound(true)
 	// set phase to Election
 	b.Phase = Election
+	// update height
+	b.Height = b.Controller.ChainHeight()
 	// update canopy height
 	b.CanopyHeight = b.Controller.BaseChainHeight()
 	// update the validator set
@@ -764,7 +766,9 @@ type (
 	Controller interface {
 		Lock()
 		Unlock()
-		// GetHeight returns the height of the base-chain
+		// ChainHeight returns the height of the target-chain
+		ChainHeight() uint64
+		// BaseChainHeight returns the height of the base-chain
 		BaseChainHeight() uint64
 		// ProduceProposal() is a plugin call to produce a Proposal object as a Leader
 		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)

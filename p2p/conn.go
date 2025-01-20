@@ -26,7 +26,7 @@ const (
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
-	PollMaxHeightTimeoutS   = 5   // wait time for polling the maximum height of the peers
+	PollMaxHeightTimeoutS   = 1   // wait time for polling the maximum height of the peers
 	SyncTimeoutS            = 5   // wait time to receive an individual block (certificate) from a peer during syncing
 	MaxBlockReqPerWindow    = 20  // maximum block (certificate) requests per window per requester
 	BlockReqWindowS         = 2   // the 'window of time' before resetting limits for block (certificate) requests

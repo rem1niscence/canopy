@@ -626,13 +626,12 @@ func (c *Controller) pollMaxHeight(backoff int) (max, minVDFIterations uint64, s
 			c.log.Debugf("Received a block response from peer %s with max height at %d", lib.BytesToTruncatedString(m.Sender.Address.PublicKey), maxHeight)
 			// don't listen to any peers below the minimumVDFIterations
 			if int(response.TotalVdfIterations) < minimumVDFIterations {
+				c.log.Error("Ignoring below minimumVDFIterations")
 				continue
 			}
 			// reset syncing variables if peer exceeds the previous minimumVDFIterations
-			if int(response.TotalVdfIterations) > minimumVDFIterations {
-				maxHeight, minimumVDFIterations = int(response.MaxHeight), int(response.TotalVdfIterations)
-				syncingPeers = make([]string, 0)
-			}
+			maxHeight, minimumVDFIterations = int(response.MaxHeight), int(response.TotalVdfIterations)
+			syncingPeers = make([]string, 0)
 			// add to syncing peer list
 			syncingPeers = append(syncingPeers, lib.BytesToString(m.Sender.Address.PublicKey))
 		case <-time.After(p2p.PollMaxHeightTimeoutS * time.Second * time.Duration(backoff)):

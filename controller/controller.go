@@ -197,6 +197,9 @@ func (c *Controller) Syncing() *atomic.Bool { return c.isSyncing }
 // BaseChainHeight() returns the height of the canopy base-chain
 func (c *Controller) BaseChainHeight() uint64 { return c.BaseChainInfo.Height }
 
+// ChainHeight() returns the height of this target chain
+func (c *Controller) ChainHeight() uint64 { return c.FSM.Height() }
+
 // ConsensusSummary() for the RPC - returns the summary json object of the bft for a specific chainID
 func (c *Controller) ConsensusSummary() ([]byte, lib.ErrorI) {
 	// lock for thread safety

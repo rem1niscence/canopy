@@ -492,6 +492,10 @@ type testController struct {
 	sendToReplicasChan chan lib.Signable
 }
 
+func (t *testController) ChainHeight() uint64 {
+	return t.BaseChainHeight()
+}
+
 func (t *testController) ProduceProposal(_ *ByzantineEvidence, _ *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI) {
 	block = crypto.Hash([]byte("mock"))
 	results = &lib.CertificateResult{
