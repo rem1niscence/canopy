@@ -49,7 +49,7 @@
       "validator_max_committee_size": 100,
       "validator_early_withdrawal_penalty": 20,
       "validator_delegate_unstaking_blocks": 2,
-      "validator_minimum_order_size": 100000000000,
+      "validator_minimum_order_size": 1000,
       "validator_stake_percent_for_subsidized_committee": 33,
       "validator_max_slash_per_committee": 15,
       "validator_delegate_reward_percentage": 10
