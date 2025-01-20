@@ -461,7 +461,7 @@ export function objEmpty(o) {
 // disallowedCharacters is a string of characters that are not allowed in form inputs.
 export const disallowedCharacters = ["\t", "\""];
 
-// sanitize input removes disallowed characters from the given event target value.
+// sanitizeInput removes disallowed characters from the given event target value.
 // It is meant to be used as an onChange event handler.
 export const sanitizeInput = (event) => {
     let value = event.target.value;
@@ -473,7 +473,7 @@ export const sanitizeInput = (event) => {
     event.target.value = value;
 };
 
-// handleNumberInput is a function that formats a number input with commas as thousand separators.
+// formatNumberInput is a function that formats a number input with commas as thousand separators.
 // It is meant to be used as an onChange event handler.
 export const formatNumberInput = (e) => {
     const rawValue = e.target.value.replace(/,/g, "");
