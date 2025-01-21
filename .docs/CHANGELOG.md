@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [Unreleased] - 1/21/2024
+- Set up prettier for both Wallet and Explorer
+
 ## [Unreleased] - 1/20/2024
 - Wallet UI fixes
 - Added wallet text input sanitizaiton
