@@ -14,12 +14,11 @@
   "NetworkID": 1,
   "ListenAddress": "0.0.0.0:9001",
   "ExternalAddress": "node-1",
+  "ChainId": 1,
   "MaxInbound": 21,
   "MaxOutbound": 7,
   "TrustedPeerIDs": null,
-  "DialPeers": [
-    "98d45087a99bcbfde91993502e77dde869d4485c3778fe46513958320da560823d56a0108f4cf3513393f4d561bc489b@tcp://node-2"
-  ],
+  "DialPeers": [],
   "BannedPeerIDs": null,
   "BannedIPs": null,
   "ElectionTimeoutMS": 2000,

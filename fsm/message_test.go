@@ -293,7 +293,7 @@ func TestHandleMessage(t *testing.T) {
 					AmountForSale:        amount,
 					RequestedAmount:      1000,
 					SellerReceiveAddress: newTestPublicKeyBytes(t),
-					SellersSellAddress:   newTestAddressBytes(t),
+					SellersSendAddress:   newTestAddressBytes(t),
 				}, lib.CanopyCommitteeId)
 				require.NoError(t, err)
 			},
@@ -331,7 +331,7 @@ func TestHandleMessage(t *testing.T) {
 					AmountForSale:        amount,
 					RequestedAmount:      1000,
 					SellerReceiveAddress: newTestPublicKeyBytes(t),
-					SellersSellAddress:   newTestAddressBytes(t),
+					SellersSendAddress:   newTestAddressBytes(t),
 				}, lib.CanopyCommitteeId)
 				require.NoError(t, err)
 			},
@@ -593,7 +593,7 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 			// preset an order
 			_, err := sm.CreateOrder(&types.SellOrder{
 				Committee:          lib.CanopyCommitteeId,
-				SellersSellAddress: newTestAddressBytes(t),
+				SellersSendAddress: newTestAddressBytes(t),
 			}, lib.CanopyCommitteeId)
 			require.NoError(t, err)
 			// execute function call
@@ -2041,7 +2041,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 					Committee:           lib.CanopyCommitteeId,
 					BuyerReceiveAddress: buyerAddress,
 					BuyerChainDeadline:  0,
-					SellersSellAddress:  newTestAddressBytes(t),
+					SellersSendAddress:  newTestAddressBytes(t),
 				}, lib.CanopyCommitteeId)
 				// ensure no error
 				require.NoError(t, err)
@@ -2279,7 +2279,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				AmountForSale:        test.msg.AmountForSale,
 				RequestedAmount:      test.msg.RequestedAmount,
 				SellerReceiveAddress: test.msg.SellerReceiveAddress,
-				SellersSellAddress:   test.msg.SellersSellAddress,
+				SellersSendAddress:   test.msg.SellersSellAddress,
 			}, order)
 		})
 	}
@@ -2319,7 +2319,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellerReceiveAddress: newTestAddressBytes(t),
 				BuyerReceiveAddress:  newTestAddressBytes(t, 1), // signals a buyer
 				BuyerChainDeadline:   100,                       // signals a buyer
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2340,7 +2340,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2359,7 +2359,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2379,7 +2379,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2393,7 +2393,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 		},
 		{
@@ -2407,7 +2407,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2421,7 +2421,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        2,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 		},
 		{
@@ -2433,7 +2433,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2447,7 +2447,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 		},
 	}
@@ -2458,7 +2458,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// define an address variable for convenience
 			if test.preset != nil {
-				address = crypto.NewAddress(test.preset.SellersSellAddress)
+				address = crypto.NewAddress(test.preset.SellersSendAddress)
 				// preset the minimum order size
 				valParams, err := sm.GetParamsVal()
 				require.NoError(t, err)
@@ -2534,7 +2534,7 @@ func TestHandleMessageDelete(t *testing.T) {
 				SellerReceiveAddress: newTestAddressBytes(t),
 				BuyerReceiveAddress:  newTestAddressBytes(t, 1), // signals a buyer
 				BuyerChainDeadline:   100,                       // signals a buyer
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageDeleteOrder{
 				OrderId:     0,
@@ -2551,7 +2551,7 @@ func TestHandleMessageDelete(t *testing.T) {
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageDeleteOrder{
 				OrderId:     0,
@@ -2566,7 +2566,7 @@ func TestHandleMessageDelete(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// define an address variable for convenience
 			if test.preset != nil {
-				address = crypto.NewAddress(test.preset.SellersSellAddress)
+				address = crypto.NewAddress(test.preset.SellersSendAddress)
 				// preset the account with tokens
 				require.NoError(t, sm.AccountAdd(address, test.presetAccount))
 				// get the proper order book

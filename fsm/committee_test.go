@@ -552,12 +552,6 @@ func TestGetCommitteeMembers(t *testing.T) {
 				// run the function call
 				got, e := sm.GetCommitteeMembers(id)
 				require.NoError(t, e)
-				// test 'GetCanopyCommitteeMembers'
-				if id == lib.CanopyCommitteeId {
-					canopyCommittee, er := sm.GetCanopyCommitteeMembers()
-					require.NoError(t, er)
-					require.Equal(t, got.ValidatorSet.ValidatorSet, canopyCommittee.ValidatorSet)
-				}
 				// ensure returned validator set is not nil
 				require.NotNil(t, got.ValidatorSet)
 				// ensure expected and got are the same size

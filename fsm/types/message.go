@@ -589,7 +589,7 @@ type jsonMessageCreateOrder struct {
 	AmountForSale        uint64       `json:"AmountForSale"`
 	RequestedAmount      uint64       `json:"RequestedAmount"`
 	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress"`
-	SellersSellAddress   lib.HexBytes `json:"SellersSellAddress"`
+	SellersSellAddress   lib.HexBytes `json:"SellersSendAddress"`
 }
 
 var _ lib.MessageI = &MessageEditOrder{} // interface enforcement

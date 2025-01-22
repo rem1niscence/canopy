@@ -5,7 +5,7 @@ import {formatNumber, getRatio} from "@/components/util"
 import Container from "react-bootstrap/Container"
 import {Button, Card, Carousel, Col, Row, Spinner} from "react-bootstrap"
 import {YAxis, Tooltip, Legend, AreaChart, Area,} from 'recharts'
-import {adminRPCURL, configPath, ConsensusInfo, consensusInfoPath, Logs, logsPath, peerBookPath, PeerInfo, peerInfoPath, Resource} from "@/components/api"
+import {getAdminRPCURL, configPath, ConsensusInfo, consensusInfoPath, Logs, logsPath, peerBookPath, PeerInfo, peerInfoPath, Resource} from "@/components/api"
 
 const LazyLog = dynamic(() => import('react-lazylog').then((mod) => mod.LazyLog), {ssr: false})
 
@@ -76,9 +76,9 @@ export default function Dashboard() {
                 dT: "ADDRESS: " + state.consensusInfo.address, d1: "", d2: "", d3: ""
             },],
         btnSlides: [
-            {url: adminRPCURL + consensusInfoPath, title: "QUORUM"},
-            {url: adminRPCURL + configPath, title: "CONFIG"},
-            {url: adminRPCURL + logsPath, title: "LOGGER"}
+            {url: getAdminRPCURL() + consensusInfoPath, title: "QUORUM"},
+            {url: getAdminRPCURL() + configPath, title: "CONFIG"},
+            {url: getAdminRPCURL() + logsPath, title: "LOGGER"}
         ]
     }, {
         slides:
@@ -90,8 +90,8 @@ export default function Dashboard() {
                 d3: "I / O RATIO " + (ioRatio ? ioRatio : "0:0")
             }],
         btnSlides: [
-            {url: adminRPCURL + peerBookPath, title: "PEER BOOK"},
-            {url: adminRPCURL + peerInfoPath, title: "PEER INFO"},
+            {url: getAdminRPCURL() + peerBookPath, title: "PEER BOOK"},
+            {url: getAdminRPCURL() + peerInfoPath, title: "PEER INFO"},
         ]
     }]
 

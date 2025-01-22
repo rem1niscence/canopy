@@ -1,5 +1,21 @@
-export const rpcURL = "http://127.0.0.1:50002"
-export const adminRPCURL = "http://127.0.0.1:50003"
+let rpcURL = "http://127.0.0.1:50002"; // Default RPC URL
+let adminRPCURL = "http://127.0.0.1:50003"; // Default Admin RPC URL
+
+if (typeof window !== 'undefined' && window.__CONFIG__) {
+    rpcURL = window.__CONFIG__.rpcURL
+    adminRPCURL = window.__CONFIG__.adminRPCURL
+} else {
+    console.log("config undefined")
+}
+
+export function getRpcURL() {
+    return rpcURL;
+}
+
+export function getAdminRPCURL() {
+    return adminRPCURL;
+}
+
 
 const keystorePath = "/v1/admin/keystore"
 const keystoreGetPath = "/v1/admin/keystore-get"

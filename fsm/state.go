@@ -82,12 +82,12 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 		return nil, nil, err
 	}
 	// load the previous validator set
-	lastValidatorSet, err := s.LoadCanopyCommittee(s.Height() - 1)
+	lastValidatorSet, err := s.LoadCommittee(s.Config.ChainId, s.Height()-1)
 	if err != nil {
 		return nil, nil, err
 	}
 	// load the next validator set
-	nextValidatorSet, err := s.LoadCanopyCommittee(s.Height())
+	nextValidatorSet, err := s.LoadCommittee(s.Config.ChainId, s.Height())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -203,19 +203,6 @@ func (s *StateMachine) LoadCommittee(committeeID uint64, height uint64) (lib.Val
 		return lib.ValidatorSet{}, err
 	}
 	return fsm.GetCommitteeMembers(committeeID)
-}
-
-// LoadCanopyCommittee() loads the Committee for ID 0
-func (s *StateMachine) LoadCanopyCommittee(height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	fsm, err := s.TimeMachine(height)
-	if err != nil {
-		return lib.ValidatorSet{}, err
-	}
-	vs, err := fsm.GetCanopyCommitteeMembers()
-	if err != nil {
-		return lib.ValidatorSet{}, err
-	}
-	return lib.NewValidatorSet(vs)
 }
 
 // GetMaxValidators() returns the max validators per committee

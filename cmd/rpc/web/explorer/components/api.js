@@ -1,4 +1,11 @@
-const rpcURL = "http://127.0.0.1:50002"
+// default values for the RPC URLs
+let rpcURL = "http://127.0.0.1:50002"
+
+if (typeof window !== 'undefined' && window.__CONFIG__) {
+    rpcURL = window.__CONFIG__.rpcURL
+} else {
+    console.log("config undefined")
+}
 
 // RPC PATHS BELOW
 

@@ -12,11 +12,12 @@ import (
 // - 'close' is a 'claimed' order whose 'buyer' sent the tokens to the seller before the deadline, thus the order is 'closed' and the tokens are moved from escrow to the buyer
 func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, committeeId uint64) lib.ErrorI {
 	if orders != nil {
-		// buy orders are a result of the committee witnessing a 'claim transaction' for the order on the 'buyer chain'
+		// buy orders are a result of the committee witnessing a 'reserve transaction' for the order on the 'buyer chain'
 		// think of 'buy orders' like reserving the 'sell order'
 		for _, buyOrder := range orders.BuyOrders {
 			if err := s.BuyOrder(buyOrder, committeeId); err != nil {
-				return err
+				// buy orders may error when base-chain
+				s.log.Warnf("BuyOrder failed (can happen due to race with base-chain): %s", err.Error())
 			}
 		}
 		// reset orders are a result of the committee witnessing 'no-action' from the buyer of the sell order aka NOT sending the
@@ -36,6 +37,82 @@ func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, committeeId uint
 		}
 	}
 	return nil
+}
+
+// ParseBuyOrder() parses a transaction for an embedded buy order messages in the memo field
+func (s *StateMachine) ParseBuyOrder(tx *lib.Transaction, deadlineBlocks uint64) (bo *lib.BuyOrder, ok bool) {
+	bo = new(lib.BuyOrder)
+	if err := lib.UnmarshalJSON([]byte(tx.Memo), bo); err == nil {
+		if len(bo.BuyerSendAddress) != 0 && len(bo.BuyerSendAddress) != 0 {
+			ok = true
+		}
+		// set the buyer deadline
+		bo.BuyerChainDeadline = s.Height() + deadlineBlocks
+	}
+	return
+}
+
+// ProcessBaseChainOrderBook() processes the order book from the base-chain and cross-references
+func (s *StateMachine) ProcessBaseChainOrderBook(book types.OrderBook, b *lib.BlockResult) (closeOrders, resetOrders []uint64) {
+	transferred := make(map[string]uint64) // [from+to] -> amount sent
+	// get all the 'Send' transactions from the block
+	for _, tx := range b.Transactions {
+		// ignore non-send
+		if tx.MessageType != types.MessageSendName {
+			continue
+		}
+		// parse send
+		msg, e := lib.FromAny(tx.Transaction.Msg)
+		if e != nil {
+			s.log.Error(e.Error())
+			continue
+		}
+		send, ok := msg.(*types.MessageSend)
+		if !ok {
+			s.log.Error("Non-send message with a send message name")
+			continue
+		}
+		// add to total transferred
+		transferred[lib.BytesToString(append(tx.Sender, tx.Recipient...))] += send.Amount
+	}
+	// for each order
+	for _, order := range book.Orders {
+		// skip buyer-less orders
+		if len(order.BuyerReceiveAddress) == 0 {
+			continue
+		}
+		// extract a key for the totalTransferred map
+		key := lib.BytesToString(append(order.BuyerSendAddress, order.SellerReceiveAddress...))
+		// see if expired
+		if s.height > order.BuyerChainDeadline {
+			// add to reset orders
+			resetOrders = append(resetOrders, order.Id)
+		} else if transferred[key] == order.RequestedAmount {
+			closeOrders = append(closeOrders, order.Id)
+		}
+	}
+	return
+}
+
+// ParseBuyOrders() parses the proposal block for memo commands to execute specialized 'buy order' functionality
+func (s *StateMachine) ParseBuyOrders(b *lib.BlockResult) (buyOrders []*lib.BuyOrder) {
+	valParams, err := s.GetParamsVal()
+	if err != nil {
+		s.log.Error(err.Error())
+		return
+	}
+	// for each transaction in the block
+	for _, tx := range b.Transactions {
+		deDupeBuyOrders := make(map[uint64]struct{})
+		// parse the transaction for embedded 'buy orders'
+		if buyOrder, ok := s.ParseBuyOrder(tx.Transaction, valParams.ValidatorBuyDeadlineBlocks); ok {
+			if _, found := deDupeBuyOrders[buyOrder.OrderId]; !found {
+				buyOrders = append(buyOrders, buyOrder)
+				deDupeBuyOrders[buyOrder.OrderId] = struct{}{}
+			}
+		}
+	}
+	return
 }
 
 // CreateOrder() adds an order to the order book for a committee in the state db
@@ -68,7 +145,7 @@ func (s *StateMachine) BuyOrder(buyOrder *lib.BuyOrder, committeeId uint64) (err
 	if err != nil {
 		return
 	}
-	if err = orderBook.BuyOrder(int(buyOrder.OrderId), buyOrder.BuyerReceiveAddress, buyOrder.BuyerChainDeadline); err != nil {
+	if err = orderBook.BuyOrder(int(buyOrder.OrderId), buyOrder.BuyerReceiveAddress, buyOrder.BuyerSendAddress, buyOrder.BuyerChainDeadline); err != nil {
 		return
 	}
 	err = s.SetOrderBook(orderBook)

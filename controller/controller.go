@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
+	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/p2p"
@@ -30,14 +31,13 @@ type Controller struct {
 	P2P             *p2p.P2P           // the P2P module the node uses to connect to the network
 	PublicKey       []byte             // self public key
 	PrivateKey      crypto.PrivateKeyI // self private key
-	CommitteeID     uint64             // the global committee id for this chain
 	Config          lib.Config         // node configuration
 	log             lib.LoggerI        // object for logging
 	sync.Mutex                         // mutex for thread safety
 }
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
-func New(committeeID uint64, fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (*Controller, lib.ErrorI) {
+func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (*Controller, lib.ErrorI) {
 	// make a convenience variable for the 'height' of the state machine
 	height := fsm.Height()
 	// load maxMembersPerCommittee param to set limits on P2P
@@ -55,24 +55,23 @@ func New(committeeID uint64, fsm *fsm.StateMachine, c lib.Config, valKey crypto.
 	}
 	// create a controller structure
 	controller := &Controller{
-		FSM:         fsm,
-		Mempool:     mempool,
-		isSyncing:   &atomic.Bool{},
-		P2P:         p2p.New(valKey, maxMembersPerCommittee, committeeID, c, l),
-		PublicKey:   valKey.PublicKey().Bytes(),
-		PrivateKey:  valKey,
-		CommitteeID: committeeID,
-		Config:      c,
-		log:         l,
-		Mutex:       sync.Mutex{},
+		FSM:        fsm,
+		Mempool:    mempool,
+		isSyncing:  &atomic.Bool{},
+		P2P:        p2p.New(valKey, maxMembersPerCommittee, c, l),
+		PublicKey:  valKey.PublicKey().Bytes(),
+		PrivateKey: valKey,
+		Config:     c,
+		log:        l,
+		Mutex:      sync.Mutex{},
 	}
 	// load the committee from the Canopy state
-	valSet, e := fsm.LoadCommittee(controller.CommitteeID, height)
+	valSet, e := fsm.LoadCommittee(c.ChainId, height)
 	if e != nil {
 		return nil, e // TODO is there a chicken and egg problem here with starting a new committee?
 	}
 	controller.isSyncing = &atomic.Bool{}
-	controller.Consensus, err = bft.New(c, valKey, controller.CommitteeID, height, height-1, valSet, controller, true, l)
+	controller.Consensus, err = bft.New(c, valKey, height, height-1, valSet, controller, true, l)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +136,17 @@ func (c *Controller) LoadCommittee(height uint64) (lib.ValidatorSet, lib.ErrorI)
 		return lib.NewValidatorSet(c.BaseChainInfo.LastValidatorSet.ValidatorSet)
 	}
 	c.log.Warnf("Executing remote LoadCommittee call with requested height %d and base-chain height %d", height, c.BaseChainInfo.Height)
-	return c.RemoteCallbacks.ValidatorSet(height, c.CommitteeID)
+	return c.RemoteCallbacks.ValidatorSet(height, c.Config.ChainId)
+}
+
+func (c *Controller) LoadBaseChainOrderBook(height uint64) (types.OrderBook, lib.ErrorI) {
+	// if loading from expected height
+	if height == c.BaseChainInfo.Height {
+		return lib.NewValidatorSet(c.BaseChainInfo.ValidatorSet.ValidatorSet)
+	}
+	if height == c.BaseChainInfo.Height-1 {
+		return lib.NewValidatorSet(c.BaseChainInfo.LastValidatorSet.ValidatorSet)
+	}
 }
 
 // LoadCertificate() gets the Quorum Block from the committeeID-> plugin at a certain height

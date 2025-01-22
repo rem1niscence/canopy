@@ -8,6 +8,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"math"
+	"slices"
 	"time"
 )
 
@@ -55,7 +56,7 @@ func (c *Controller) ValidateCertificate(qc *lib.QuorumCertificate, evidence *bf
 		return
 	}
 	// basic structural validations of the block
-	if err = blk.Check(c.Config.NetworkID, c.CommitteeID); err != nil {
+	if err = blk.Check(c.Config.NetworkID, c.Config.ChainId); err != nil {
 		return
 	}
 	// ensure the Proposal.BlockHash corresponds to the actual hash of the block
@@ -91,7 +92,29 @@ func (c *Controller) ValidateCertificate(qc *lib.QuorumCertificate, evidence *bf
 		return types.ErrInvalidDelegateReward(delegatorPaymentPercent.Address, delegatorPaymentPercent.Percent)
 	}
 	// play the block against the state machine
-	_, err = c.ApplyAndValidateBlock(blk, false)
+	blockResult, err := c.ApplyAndValidateBlock(blk, false)
+	if err != nil {
+		return
+	}
+	// validate the orders
+	if qc.Results.Orders == nil {
+		return types.ErrInvalidOrders()
+	}
+	// validate the buy orders
+	buyOrders := c.FSM.ParseBuyOrders(blockResult)
+	if !slices.Equal(buyOrders, qc.Results.Orders.BuyOrders) {
+		return types.ErrInvalidBuyOrder()
+	}
+	// process the base-chain order book against the state
+	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(types.OrderBook{}, blockResult)
+	// validate the close orders
+	if !slices.Equal(closeOrders, qc.Results.Orders.CloseOrders) {
+		return types.ErrInvalidBuyOrder()
+	}
+	// validate the reset orders
+	if !slices.Equal(resetOrders, qc.Results.Orders.ResetOrders) {
+		return types.ErrInvalidBuyOrder()
+	}
 	return
 }
 
@@ -106,7 +129,7 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 	if err != nil {
 		return
 	}
-	// get the Quorum Certificate without the Proposal
+	// get the last quorum certificate
 	qc, err := c.FSM.LoadCertificateHashesOnly(height - 1)
 	if err != nil {
 		return
@@ -144,11 +167,15 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 		BlockHeader:  header,
 		Transactions: transactions,
 	}
+	// capture the tentative block result here
+	blockResult := new(lib.BlockResult)
 	// apply the block against the state machine to fill in the merkle `roots` for the block header
-	block.BlockHeader, _, err = c.FSM.ApplyBlock(block)
+	block.BlockHeader, blockResult.Transactions, err = c.FSM.ApplyBlock(block)
 	if err != nil {
 		return
 	}
+	// update the block results
+	blockResult.BlockHeader = block.BlockHeader
 	// marshal the block into bytes
 	blk, err = lib.Marshal(block)
 	if err != nil {
@@ -159,6 +186,10 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 	if err != nil {
 		return
 	}
+	// parse the last block for buy orders and polling
+	buyOrders := c.FSM.ParseBuyOrders(blockResult)
+	// process the base-chain order book against the state
+	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(types.OrderBook{}, blockResult)
 	// set block reward recipients
 	results = &lib.CertificateResult{
 		RewardRecipients: &lib.RewardRecipients{
@@ -172,6 +203,12 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 				},
 			}},
 		SlashRecipients: new(lib.SlashRecipients),
+		Orders: &lib.Orders{
+			BuyOrders:   buyOrders,
+			ResetOrders: resetOrders,
+			CloseOrders: closeOrders,
+		},
+		Checkpoint: nil,
 	}
 	// use the bft object to fill in the Byzantine Evidence
 	results.SlashRecipients.DoubleSigners, err = c.Consensus.ProcessDSE(be.DSE.Evidence...)
@@ -231,6 +268,8 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
 	// rescan mempool to ensure validity of all transactions
 	c.log.Debug("Checking mempool for newly invalid transactions")
 	c.Mempool.checkMempool()
+	// parse committed block for straw polls
+	c.FSM.ParsePollTransactions(blockResult)
 	// atomically write this to the store
 	c.log.Debug("Committing to store")
 	if _, err = store.Commit(); err != nil {
@@ -257,7 +296,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
 // compares the block header against a results from the state machine
 func (c *Controller) ApplyAndValidateBlock(b *lib.Block, commit bool) (*lib.BlockResult, lib.ErrorI) {
 	// basic structural checks on the block
-	if err := b.Check(c.Config.NetworkID, c.CommitteeID); err != nil {
+	if err := b.Check(c.Config.NetworkID, c.Config.ChainId); err != nil {
 		return nil, err
 	}
 	// define convenience variables
@@ -275,10 +314,6 @@ func (c *Controller) ApplyAndValidateBlock(b *lib.Block, commit bool) (*lib.Bloc
 	}
 	// return a valid block result
 	c.log.Infof("Block %s with %d txs is valid for height %d ✅ ", blockHash, len(b.Transactions), blockHeight)
-	// if valid & committing - update poll.json based on the transactions
-	if commit {
-		c.ParsePolls(b)
-	}
 	return &lib.BlockResult{
 		BlockHeader:  b.BlockHeader,
 		Transactions: txResults,
@@ -320,7 +355,7 @@ func (c *Controller) CompareBlockHeaders(candidate *lib.BlockHeader, compare *li
 			Height:       candidate.Height - 1,
 			CanopyHeight: committeeHeight,
 			NetworkId:    c.Config.NetworkID,
-			CommitteeId:  c.CommitteeID,
+			CommitteeId:  c.Config.ChainId,
 		}, true)
 		if err != nil {
 			return err
@@ -498,33 +533,6 @@ func (m *Mempool) HandleTransaction(tx []byte) lib.ErrorI {
 		m.checkMempool()
 	}
 	return nil
-}
-
-// ParsePolls() parses the valid block for the poll transactions to update the polls.json
-func (c *Controller) ParsePolls(b *lib.Block) {
-	var ap types.ActivePolls
-	// load the active polls from the json file
-	if err := ap.NewFromFile(c.Config.DataDirPath); err == nil {
-		// for each transaction in the block
-		for _, transaction := range b.Transactions {
-			// unmarshal the transaction
-			tx := new(lib.Transaction)
-			_ = lib.Unmarshal(transaction, tx)
-			// get the public key object
-			pub, e := crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey)
-			if e != nil {
-				break
-			}
-			// check for a poll transaction
-			if err = ap.CheckForPollTransaction(pub.Address(), tx.Memo, c.FSM.Height(), c.Config.DataDirPath); err != nil {
-				c.log.Error(err.Error())
-			}
-		}
-		// save to
-		if err = ap.SaveToFile(c.Config.DataDirPath); err != nil {
-			c.log.Error(err.Error())
-		}
-	}
 }
 
 // checkMempool() validates all transactions the mempool using the mempool (ephemeral copy) state and evicts any that are invalid

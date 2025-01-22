@@ -1,9 +1,9 @@
 {
   "logLevel": "debug",
-  "WalletPort": "50000",
-  "ExplorerPort": "50001",
-  "RPCPort": "50002",
-  "AdminPort": "50003",
+  "WalletPort": "30000",
+  "ExplorerPort": "30001",
+  "RPCPort": "30002",
+  "AdminPort": "30003",
   "RPCUrl": "http://localhost",
   "BaseChainRPCURL": "http://localhost:50002",
   "BaseChainPollMS": 333,

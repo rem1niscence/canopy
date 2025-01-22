@@ -267,6 +267,10 @@ func ErrOrderAlreadyAccepted() lib.ErrorI {
 	return lib.NewError(lib.CodeOrderAlreadyAccepted, lib.StateMachineModule, "order already accepted")
 }
 
+func ErrInvalidOrders() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidOrders, lib.StateMachineModule, "orders are invalid")
+}
+
 func ErrInvalidBuyOrder() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidBuyOrder, lib.StateMachineModule, "buy order invalid")
 }

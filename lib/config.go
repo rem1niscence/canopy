@@ -9,6 +9,18 @@ import (
 	"strings"
 )
 
+const (
+	ConfigFilePath         = "config.json"
+	ValKeyPath             = "validator_key.json"
+	GenesisFilePath        = "genesis.json"
+	ProposalsFilePath      = "proposals.json"
+	PollsFilePath          = "polls.json"
+	UnknownCommitteeId     = uint64(0)
+	CanopyCommitteeId      = uint64(1)
+	DAOPoolID              = math.MaxUint32 + 1
+	CanopyMainnetNetworkId = 1
+)
+
 // Config is the structure of the user configuration options for a Canopy node
 type Config struct {
 	MainConfig         // main options spanning over all modules
@@ -37,10 +49,11 @@ func DefaultConfig() Config {
 
 type MainConfig struct {
 	LogLevel string `json:"logLevel"`
+	ChainId  uint64 `json:"chainId"`
 }
 
 // DefaultMainConfig() sets log level to 'info'
-func DefaultMainConfig() MainConfig { return MainConfig{"info"} }
+func DefaultMainConfig() MainConfig { return MainConfig{LogLevel: "info", ChainId: CanopyCommitteeId} }
 
 // GetLogLevel() parses the log string in the config file into a LogLevel Enum
 func (m *MainConfig) GetLogLevel() int32 {
@@ -239,15 +252,3 @@ func NewConfigFromFile(filepath string) (Config, error) {
 	}
 	return c, nil
 }
-
-const (
-	ConfigFilePath         = "config.json"
-	ValKeyPath             = "validator_key.json"
-	GenesisFilePath        = "genesis.json"
-	ProposalsFilePath      = "proposals.json"
-	PollsFilePath          = "polls.json"
-	UnknownCommitteeId     = uint64(0)
-	CanopyCommitteeId      = uint64(1)
-	DAOPoolID              = math.MaxUint32 + 1
-	CanopyMainnetNetworkId = 1
-)

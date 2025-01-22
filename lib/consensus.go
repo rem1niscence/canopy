@@ -138,6 +138,7 @@ func (b *BaseChainInfo) UnmarshalJSON(bz []byte) (err error) {
 type RemoteCallbacks struct {
 	ValidatorSet        func(height, id uint64) (ValidatorSet, ErrorI)
 	IsValidDoubleSigner func(height uint64, address string) (p *bool, err ErrorI)
+	Transaction         func(tx TransactionI) (hash *string, err ErrorI)
 }
 
 // CheckBasic() validates the basic structure and length of the AggregateSignature

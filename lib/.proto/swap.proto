@@ -50,14 +50,16 @@ message SellOrder {
   uint64 AmountForSale = 3;
   // requested_amount: amount of 'counter-asset' to receive
   uint64 RequestedAmount = 4;
-  // sellers_receive_address: the external chain address to receive the 'counter-asset'
+  // seller_receive_address: the external chain address to receive the 'counter-asset'
   bytes SellerReceiveAddress = 5;
-  // buyers_receive_address: the buyer Canopy address to receive the CNPY
-  bytes BuyerReceiveAddress = 6;
-  // buyers_chain_deadline: the external chain height deadline to send the 'tokens' to SellerReceiveAddress
-  uint64 BuyerChainDeadline = 7;
-  // sellers_sell_address: the signing address of seller who is selling the CNPY
-  bytes SellersSellAddress = 8;
+  // buyer_send_address: the address the buyer will be transferring the funds from
+  bytes BuyerSendAddress = 6;
+  // buyer_receive_address: the buyer Canopy address to receive the CNPY
+  bytes BuyerReceiveAddress = 7;
+  // buyer_chain_deadline: the external chain height deadline to send the 'tokens' to SellerReceiveAddress
+  uint64 BuyerChainDeadline = 8;
+  // sellers_send_address: the signing address of seller who is selling the CNPY
+  bytes SellersSendAddress = 9;
 }
 
 // OrderBooks: is a list of order book objects held in the blockchain state

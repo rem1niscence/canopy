@@ -250,6 +250,7 @@ const (
 	ParamValidatorStakePercentForSubsidizedCommittee = "validator_stake_percent_for_subsidized_committee" // the minimum percentage of total stake needed to be a 'paid committee'
 	ParamValidatorMaxSlashPerCommittee               = "validator_max_slash_per_committee"                // the maximum validator slash per committee per block
 	ParamValidatorDelegateRewardPercentage           = "validator_delegate_reward_percentage"             // the percentage of the block reward that is awarded to the delegates
+	ParamValidatorBuyDeadlineBlocks                  = "validator_buy_deadline_blocks"                    // the amount of blocks a 'buyer' has to complete an order they reserved
 )
 
 // Check() validates the Validator params
@@ -293,6 +294,9 @@ func (x *ValidatorParams) Check() lib.ErrorI {
 	if x.ValidatorDelegateRewardPercentage == 0 || x.ValidatorDelegateRewardPercentage > 100 {
 		return ErrInvalidParam(ParamValidatorDelegateRewardPercentage)
 	}
+	if x.ValidatorBuyDeadlineBlocks == 0 {
+		return ErrInvalidParam(ParamValidatorBuyDeadlineBlocks)
+	}
 	return nil
 }
 
@@ -327,6 +331,8 @@ func (x *ValidatorParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.ValidatorMaxSlashPerCommittee = value
 	case ParamValidatorDelegateRewardPercentage:
 		x.ValidatorDelegateRewardPercentage = value
+	case ParamValidatorBuyDeadlineBlocks:
+		x.ValidatorBuyDeadlineBlocks = value
 	default:
 		return ErrUnknownParam()
 	}

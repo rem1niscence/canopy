@@ -1,0 +1,1820 @@
+[90mJan 21 15:31:01.940[0m [34mDEBUG: Setting consensus timer: 1.995392 sec[0m
+[90mJan 21 15:31:01.967[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:01.971[0m [34mDEBUG: Received (ID: 1 H:180, CH:180, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:01.972[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:01.972[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:03.947[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:31:03.954[0m [34mDEBUG: Handling certificate results msg with height 179:180[0m
+[90mJan 21 15:31:03.959[0m [32mINFO: Added tx 541b7c9ae4855d0d15a9a79f2232ec9a3fcad5104eb8aceebc5fbfdcc2b930ec to mempool for checking[0m
+[90mJan 21 15:31:03.959[0m [32mINFO: Received valid transaction 541b7c9ae4855d0d15a9a79f2232ec9a3fcad510 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:31:03.963[0m [32mINFO: (ID: 1 H:180, CH:180, R:0, P:COMMIT)[0m
+[90mJan 21 15:31:03.965[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:03.967[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:31:03.968[0m [32mINFO: Successfully submitted the certificate-results-txn with hash 15048ad542b7fd9f26e1cb47fee2522bcb6a29dc0f1fe65e109abddb25e533de[0m
+[90mJan 21 15:31:03.968[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:03.970[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:03.971[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:31:03.971[0m [34mDEBUG: Setting consensus timer: 1.992837 sec[0m
+[90mJan 21 15:31:03.976[0m [34mDEBUG: Handling certificate results msg with height 180:180[0m
+[90mJan 21 15:31:03.980[0m [32mINFO: Added tx 15048ad542b7fd9f26e1cb47fee2522bcb6a29dc0f1fe65e109abddb25e533de to mempool for checking[0m
+[90mJan 21 15:31:03.980[0m [32mINFO: Received valid transaction 15048ad542b7fd9f26e1cb47fee2522bcb6a29dc from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:31:03.981[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:03.988[0m [34mDEBUG: Received (ID: 1 H:180, CH:180, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:03.989[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:05.965[0m [32mINFO: (ID: 1 H:180, CH:180, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:31:05.965[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:05.966[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:31:05.967[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:31:05.967[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:31:05.968[0m [34mDEBUG: Setting consensus timer: 1.997554 sec[0m
+[90mJan 21 15:31:05.969[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:31:05.972[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:05.973[0m [34mDEBUG: Applying block 060cf2a8a5e7af64d47e35be0c667cad1d58fc28516cc5f50d067183e5ce566b for height 180[0m
+[90mJan 21 15:31:05.977[0m [34mDEBUG: Handling certificate results msg with height 179:179[0m
+[90mJan 21 15:31:05.984[0m [34mDEBUG: Handling certificate results msg with height 178:179[0m
+[90mJan 21 15:31:05.988[0m [34mDEBUG: Validating block header 060cf2a8a5e7af64d47e35be0c667cad1d58fc28516cc5f50d067183e5ce566b for height 180[0m
+[90mJan 21 15:31:05.992[0m [32mINFO: Block 060cf2a8a5e7af64d47e35be0c667cad1d58fc28516cc5f50d067183e5ce566b with 2 txs is valid for height 180 ✅ [0m
+[90mJan 21 15:31:05.995[0m [34mDEBUG: Indexing quorum certificate for height 180[0m
+[90mJan 21 15:31:05.996[0m [34mDEBUG: Indexing last quorum certificate for height 179[0m
+[90mJan 21 15:31:05.996[0m [34mDEBUG: Indexing block 180[0m
+[90mJan 21 15:31:05.997[0m [34mDEBUG: Tx d74d62a545716f9ec016331001617b664e0e21f7a4b7fd0123f09c2ea8f527f3 was included in a block so removing from mempool[0m
+[90mJan 21 15:31:05.998[0m [34mDEBUG: Tx 760f2b90cf6ee6fba76e8a17a6db3a06a7e8b0003e9d5c3b2c13425e96d946f8 was included in a block so removing from mempool[0m
+[90mJan 21 15:31:05.998[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:31:06.001[0m [34mDEBUG: Handling certificate results msg with height 179:180[0m
+[90mJan 21 15:31:06.007[0m [34mDEBUG: Handling certificate results msg with height 180:180[0m
+[90mJan 21 15:31:06.010[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:31:06.011[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:180 🔒[0m
+[90mJan 21 15:31:06.012[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:31:06.013[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:31:06.013[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:31:06.014[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:06.014[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:31:06.015[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:31:06.015[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:31:06.018[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:31:06.018[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:31:06.019[0m [34mDEBUG: Process time: 0.05s, Wait time: 2.00s[0m
+[90mJan 21 15:31:06.019[0m [34mDEBUG: Setting consensus timer: 1.954101 sec[0m
+[90mJan 21 15:31:06.018[0m [34mDEBUG: Starting the VDF service with 3353 iterations[0m
+[90mJan 21 15:31:06.208[0m [32mINFO: New BaseChain Height 181 detected![0m
+[90mJan 21 15:31:06.545[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:31:06.546[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:31:06.547[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:31:06.549[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:31:07.974[0m [32mINFO: (ID: 1 H:181, CH:181, R:0, P:ELECTION)[0m
+[90mJan 21 15:31:07.976[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:31:07.977[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:07.979[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:07.979[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:31:07.980[0m [34mDEBUG: Setting consensus timer: 1.994570 sec[0m
+[90mJan 21 15:31:07.981[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:07.984[0m [34mDEBUG: Received (ID: 1 H:181, CH:181, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:07.985[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:08.576[0m [34mDEBUG: VDF service completed with 3353 iterations in 2.556798581s[0m
+[90mJan 21 15:31:08.578[0m [34mDEBUG: Adjusted iterations for next run to 2098[0m
+[90mJan 21 15:31:09.976[0m [32mINFO: (ID: 1 H:181, CH:181, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:31:09.980[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:31:09.980[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:31:09.982[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:09.982[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:31:09.983[0m [34mDEBUG: Setting consensus timer: 2.993894 sec[0m
+[90mJan 21 15:31:09.983[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:09.987[0m [34mDEBUG: Received (ID: 1 H:181, CH:181, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:09.987[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:09.988[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:12.978[0m [32mINFO: (ID: 1 H:181, CH:181, R:0, P:PROPOSE)[0m
+[90mJan 21 15:31:12.980[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:31:12.984[0m [34mDEBUG: Handling certificate results msg with height 179:180[0m
+[90mJan 21 15:31:12.991[0m [34mDEBUG: Handling certificate results msg with height 180:180[0m
+[90mJan 21 15:31:12.998[0m [34mDEBUG: Handling certificate results msg with height 179:180[0m
+[90mJan 21 15:31:13.004[0m [34mDEBUG: Handling certificate results msg with height 180:180[0m
+[90mJan 21 15:31:13.008[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:13.009[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:13.010[0m [34mDEBUG: Process time: 0.03s, Wait time: 3.00s[0m
+[90mJan 21 15:31:13.011[0m [34mDEBUG: Setting consensus timer: 2.968232 sec[0m
+[90mJan 21 15:31:13.011[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:13.017[0m [34mDEBUG: Received (ID: 1 H:181, CH:181, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:13.017[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:15.979[0m [32mINFO: (ID: 1 H:181, CH:181, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:31:15.980[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:31:15.981[0m [34mDEBUG: Applying block d94a0b8732755ca16a960f67b2bae2dec6b897db9a07981393f9714b7f6cba55 for height 181[0m
+[90mJan 21 15:31:15.985[0m [34mDEBUG: Handling certificate results msg with height 179:180[0m
+[90mJan 21 15:31:16.000[0m [34mDEBUG: Handling certificate results msg with height 180:180[0m
+[90mJan 21 15:31:16.005[0m [34mDEBUG: Validating block header d94a0b8732755ca16a960f67b2bae2dec6b897db9a07981393f9714b7f6cba55 for height 181[0m
+[90mJan 21 15:31:16.009[0m [32mINFO: Block d94a0b8732755ca16a960f67b2bae2dec6b897db9a07981393f9714b7f6cba55 with 2 txs is valid for height 181 ✅ [0m
+[90mJan 21 15:31:16.011[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:16.014[0m [34mDEBUG: Process time: 0.03s, Wait time: 2.00s[0m
+[90mJan 21 15:31:16.014[0m [34mDEBUG: Setting consensus timer: 1.965606 sec[0m
+[90mJan 21 15:31:16.015[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:16.019[0m [34mDEBUG: Received (ID: 1 H:181, CH:181, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:16.019[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:16.020[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:17.982[0m [32mINFO: (ID: 1 H:181, CH:181, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:31:17.983[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:17.984[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:17.985[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:31:17.986[0m [34mDEBUG: Setting consensus timer: 1.996385 sec[0m
+[90mJan 21 15:31:17.986[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:17.993[0m [34mDEBUG: Received (ID: 1 H:181, CH:181, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:17.994[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:19.983[0m [32mINFO: (ID: 1 H:181, CH:181, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:31:19.985[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:19.986[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:31:19.987[0m [34mDEBUG: Setting consensus timer: 1.997353 sec[0m
+[90mJan 21 15:31:19.987[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:19.991[0m [34mDEBUG: Received (ID: 1 H:181, CH:181, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:19.992[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:19.992[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:21.975[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:31:21.979[0m [34mDEBUG: Handling certificate results msg with height 180:181[0m
+[90mJan 21 15:31:21.984[0m [32mINFO: Added tx 87c6304b4b70c3134b0d273829bb40566936b523ade461b7345626e9b2b5e30d to mempool for checking[0m
+[90mJan 21 15:31:21.985[0m [32mINFO: Received valid transaction 87c6304b4b70c3134b0d273829bb40566936b523 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:31:21.985[0m [32mINFO: (ID: 1 H:181, CH:181, R:0, P:COMMIT)[0m
+[90mJan 21 15:31:21.987[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:21.989[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:31:21.990[0m [32mINFO: Successfully submitted the certificate-results-txn with hash 7b3ba2a825e05414d751cbf52289587e15022787319e104284acd38a4c76e670[0m
+[90mJan 21 15:31:21.991[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:21.992[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:21.993[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:31:21.993[0m [34mDEBUG: Setting consensus timer: 1.992429 sec[0m
+[90mJan 21 15:31:21.997[0m [34mDEBUG: Handling certificate results msg with height 181:181[0m
+[90mJan 21 15:31:22.001[0m [32mINFO: Added tx 7b3ba2a825e05414d751cbf52289587e15022787319e104284acd38a4c76e670 to mempool for checking[0m
+[90mJan 21 15:31:22.002[0m [32mINFO: Received valid transaction 7b3ba2a825e05414d751cbf52289587e15022787 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:31:22.002[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:22.009[0m [34mDEBUG: Received (ID: 1 H:181, CH:181, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:22.009[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:23.967[0m [32mINFO: (ID: 1 H:181, CH:181, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:31:23.967[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:23.968[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:31:23.968[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:31:23.969[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:31:23.969[0m [34mDEBUG: Setting consensus timer: 1.997794 sec[0m
+[90mJan 21 15:31:23.970[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:31:23.973[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:23.974[0m [34mDEBUG: Applying block d94a0b8732755ca16a960f67b2bae2dec6b897db9a07981393f9714b7f6cba55 for height 181[0m
+[90mJan 21 15:31:23.979[0m [34mDEBUG: Handling certificate results msg with height 179:180[0m
+[90mJan 21 15:31:23.988[0m [34mDEBUG: Handling certificate results msg with height 180:180[0m
+[90mJan 21 15:31:23.994[0m [34mDEBUG: Validating block header d94a0b8732755ca16a960f67b2bae2dec6b897db9a07981393f9714b7f6cba55 for height 181[0m
+[90mJan 21 15:31:23.997[0m [32mINFO: Block d94a0b8732755ca16a960f67b2bae2dec6b897db9a07981393f9714b7f6cba55 with 2 txs is valid for height 181 ✅ [0m
+[90mJan 21 15:31:24.001[0m [34mDEBUG: Indexing quorum certificate for height 181[0m
+[90mJan 21 15:31:24.001[0m [34mDEBUG: Indexing last quorum certificate for height 180[0m
+[90mJan 21 15:31:24.002[0m [34mDEBUG: Indexing block 181[0m
+[90mJan 21 15:31:24.003[0m [34mDEBUG: Tx 541b7c9ae4855d0d15a9a79f2232ec9a3fcad5104eb8aceebc5fbfdcc2b930ec was included in a block so removing from mempool[0m
+[90mJan 21 15:31:24.004[0m [34mDEBUG: Tx 15048ad542b7fd9f26e1cb47fee2522bcb6a29dc0f1fe65e109abddb25e533de was included in a block so removing from mempool[0m
+[90mJan 21 15:31:24.004[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:31:24.008[0m [34mDEBUG: Handling certificate results msg with height 180:181[0m
+[90mJan 21 15:31:24.013[0m [34mDEBUG: Handling certificate results msg with height 181:181[0m
+[90mJan 21 15:31:24.017[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:31:24.019[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:181 🔒[0m
+[90mJan 21 15:31:24.020[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:31:24.020[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:31:24.021[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:31:24.021[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:24.022[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:31:24.022[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:31:24.023[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:31:24.026[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:31:24.027[0m [34mDEBUG: Starting the VDF service with 2098 iterations[0m
+[90mJan 21 15:31:24.027[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:31:24.028[0m [34mDEBUG: Process time: 0.05s, Wait time: 2.00s[0m
+[90mJan 21 15:31:24.028[0m [34mDEBUG: Setting consensus timer: 1.947566 sec[0m
+[90mJan 21 15:31:24.170[0m [32mINFO: New BaseChain Height 182 detected![0m
+[90mJan 21 15:31:24.507[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:31:24.508[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:31:24.508[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:31:24.510[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:31:25.165[0m [34mDEBUG: VDF service completed with 2098 iterations in 1.137532184s[0m
+[90mJan 21 15:31:25.166[0m [34mDEBUG: Adjusted iterations for next run to 2950[0m
+[90mJan 21 15:31:25.978[0m [32mINFO: (ID: 1 H:182, CH:182, R:0, P:ELECTION)[0m
+[90mJan 21 15:31:25.981[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:31:25.981[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:25.983[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:25.984[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:31:25.984[0m [34mDEBUG: Setting consensus timer: 1.994705 sec[0m
+[90mJan 21 15:31:25.984[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:25.987[0m [34mDEBUG: Received (ID: 1 H:182, CH:182, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:25.988[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:27.980[0m [32mINFO: (ID: 1 H:182, CH:182, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:31:27.985[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:31:27.985[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:31:27.987[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:27.987[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:31:27.988[0m [34mDEBUG: Setting consensus timer: 2.992930 sec[0m
+[90mJan 21 15:31:27.988[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:27.992[0m [34mDEBUG: Received (ID: 1 H:182, CH:182, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:27.993[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:27.993[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:30.982[0m [32mINFO: (ID: 1 H:182, CH:182, R:0, P:PROPOSE)[0m
+[90mJan 21 15:31:30.983[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:31:30.988[0m [34mDEBUG: Handling certificate results msg with height 180:181[0m
+[90mJan 21 15:31:30.995[0m [34mDEBUG: Handling certificate results msg with height 181:181[0m
+[90mJan 21 15:31:31.002[0m [34mDEBUG: Handling certificate results msg with height 180:181[0m
+[90mJan 21 15:31:31.008[0m [34mDEBUG: Handling certificate results msg with height 181:181[0m
+[90mJan 21 15:31:31.012[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:31.014[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:31.014[0m [34mDEBUG: Process time: 0.03s, Wait time: 3.00s[0m
+[90mJan 21 15:31:31.015[0m [34mDEBUG: Setting consensus timer: 2.967216 sec[0m
+[90mJan 21 15:31:31.015[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:31.022[0m [34mDEBUG: Received (ID: 1 H:182, CH:182, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:31.022[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:33.984[0m [32mINFO: (ID: 1 H:182, CH:182, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:31:33.984[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:31:33.985[0m [34mDEBUG: Applying block c12b4ba73cd79a3e8b9cf704547d5588ad911d57c58853d67ce81628e547da93 for height 182[0m
+[90mJan 21 15:31:33.990[0m [34mDEBUG: Handling certificate results msg with height 180:181[0m
+[90mJan 21 15:31:33.998[0m [34mDEBUG: Handling certificate results msg with height 181:181[0m
+[90mJan 21 15:31:34.003[0m [34mDEBUG: Validating block header c12b4ba73cd79a3e8b9cf704547d5588ad911d57c58853d67ce81628e547da93 for height 182[0m
+[90mJan 21 15:31:34.006[0m [32mINFO: Block c12b4ba73cd79a3e8b9cf704547d5588ad911d57c58853d67ce81628e547da93 with 2 txs is valid for height 182 ✅ [0m
+[90mJan 21 15:31:34.008[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:34.008[0m [34mDEBUG: Process time: 0.02s, Wait time: 2.00s[0m
+[90mJan 21 15:31:34.009[0m [34mDEBUG: Setting consensus timer: 1.975268 sec[0m
+[90mJan 21 15:31:34.009[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:34.012[0m [34mDEBUG: Received (ID: 1 H:182, CH:182, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:34.013[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:34.013[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:35.985[0m [32mINFO: (ID: 1 H:182, CH:182, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:31:35.986[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:35.989[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:35.990[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:31:35.991[0m [34mDEBUG: Setting consensus timer: 1.995275 sec[0m
+[90mJan 21 15:31:35.992[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:35.998[0m [34mDEBUG: Received (ID: 1 H:182, CH:182, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:35.999[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:37.987[0m [32mINFO: (ID: 1 H:182, CH:182, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:31:37.989[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:37.990[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:31:37.990[0m [34mDEBUG: Setting consensus timer: 1.997514 sec[0m
+[90mJan 21 15:31:37.991[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:37.995[0m [34mDEBUG: Received (ID: 1 H:182, CH:182, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:37.996[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:37.996[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:39.986[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:31:39.992[0m [34mDEBUG: Handling certificate results msg with height 181:182[0m
+[90mJan 21 15:31:39.997[0m [32mINFO: Added tx ef0479d388fd5f413b0a00588150971ea2fe0ac976ef4953ea4ae6c02fa8bb2c to mempool for checking[0m
+[90mJan 21 15:31:39.997[0m [32mINFO: Received valid transaction ef0479d388fd5f413b0a00588150971ea2fe0ac9 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:31:39.998[0m [32mINFO: (ID: 1 H:182, CH:182, R:0, P:COMMIT)[0m
+[90mJan 21 15:31:40.000[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:40.002[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:31:40.003[0m [32mINFO: Successfully submitted the certificate-results-txn with hash a04c302c517f90788ef2653eb4ed01dbcfc11dab27718e4ddaaada166c10a4e4[0m
+[90mJan 21 15:31:40.003[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:40.005[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:40.006[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:31:40.007[0m [34mDEBUG: Setting consensus timer: 1.991858 sec[0m
+[90mJan 21 15:31:40.011[0m [34mDEBUG: Handling certificate results msg with height 182:182[0m
+[90mJan 21 15:31:40.015[0m [32mINFO: Added tx a04c302c517f90788ef2653eb4ed01dbcfc11dab27718e4ddaaada166c10a4e4 to mempool for checking[0m
+[90mJan 21 15:31:40.015[0m [32mINFO: Received valid transaction a04c302c517f90788ef2653eb4ed01dbcfc11dab from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:31:40.015[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:40.021[0m [34mDEBUG: Received (ID: 1 H:182, CH:182, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:40.022[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:42.000[0m [32mINFO: (ID: 1 H:182, CH:182, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:31:42.001[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:42.001[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:31:42.002[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:31:42.003[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:31:42.004[0m [34mDEBUG: Setting consensus timer: 1.997109 sec[0m
+[90mJan 21 15:31:42.004[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:31:42.008[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:42.009[0m [34mDEBUG: Applying block c12b4ba73cd79a3e8b9cf704547d5588ad911d57c58853d67ce81628e547da93 for height 182[0m
+[90mJan 21 15:31:42.015[0m [34mDEBUG: Handling certificate results msg with height 180:181[0m
+[90mJan 21 15:31:42.022[0m [34mDEBUG: Handling certificate results msg with height 181:181[0m
+[90mJan 21 15:31:42.027[0m [34mDEBUG: Validating block header c12b4ba73cd79a3e8b9cf704547d5588ad911d57c58853d67ce81628e547da93 for height 182[0m
+[90mJan 21 15:31:42.030[0m [32mINFO: Block c12b4ba73cd79a3e8b9cf704547d5588ad911d57c58853d67ce81628e547da93 with 2 txs is valid for height 182 ✅ [0m
+[90mJan 21 15:31:42.035[0m [34mDEBUG: Indexing quorum certificate for height 182[0m
+[90mJan 21 15:31:42.035[0m [34mDEBUG: Indexing last quorum certificate for height 181[0m
+[90mJan 21 15:31:42.036[0m [34mDEBUG: Indexing block 182[0m
+[90mJan 21 15:31:42.036[0m [34mDEBUG: Tx 87c6304b4b70c3134b0d273829bb40566936b523ade461b7345626e9b2b5e30d was included in a block so removing from mempool[0m
+[90mJan 21 15:31:42.037[0m [34mDEBUG: Tx 7b3ba2a825e05414d751cbf52289587e15022787319e104284acd38a4c76e670 was included in a block so removing from mempool[0m
+[90mJan 21 15:31:42.037[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:31:42.042[0m [34mDEBUG: Handling certificate results msg with height 181:182[0m
+[90mJan 21 15:31:42.047[0m [34mDEBUG: Handling certificate results msg with height 182:182[0m
+[90mJan 21 15:31:42.051[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:31:42.052[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:182 🔒[0m
+[90mJan 21 15:31:42.052[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:31:42.053[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:31:42.054[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:31:42.055[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:42.055[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:31:42.056[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:31:42.056[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:31:42.059[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:31:42.060[0m [34mDEBUG: Starting the VDF service with 2950 iterations[0m
+[90mJan 21 15:31:42.060[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:31:42.067[0m [34mDEBUG: Process time: 0.05s, Wait time: 2.00s[0m
+[90mJan 21 15:31:42.067[0m [34mDEBUG: Setting consensus timer: 1.948504 sec[0m
+[90mJan 21 15:31:42.151[0m [32mINFO: New BaseChain Height 183 detected![0m
+[90mJan 21 15:31:42.488[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:31:42.489[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:31:42.489[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:31:42.491[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:31:43.873[0m [34mDEBUG: VDF service completed with 2950 iterations in 1.81272587s[0m
+[90mJan 21 15:31:43.875[0m [34mDEBUG: Adjusted iterations for next run to 2603[0m
+[90mJan 21 15:31:44.017[0m [32mINFO: (ID: 1 H:183, CH:183, R:0, P:ELECTION)[0m
+[90mJan 21 15:31:44.019[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:31:44.019[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:44.021[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:44.022[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:31:44.022[0m [34mDEBUG: Setting consensus timer: 1.995302 sec[0m
+[90mJan 21 15:31:44.023[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:44.026[0m [34mDEBUG: Received (ID: 1 H:183, CH:183, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:44.027[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:46.019[0m [32mINFO: (ID: 1 H:183, CH:183, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:31:46.023[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:31:46.024[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:31:46.026[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:46.026[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:31:46.027[0m [34mDEBUG: Setting consensus timer: 2.993236 sec[0m
+[90mJan 21 15:31:46.027[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:46.031[0m [34mDEBUG: Received (ID: 1 H:183, CH:183, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:46.031[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:46.032[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:49.021[0m [32mINFO: (ID: 1 H:183, CH:183, R:0, P:PROPOSE)[0m
+[90mJan 21 15:31:49.022[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:31:49.027[0m [34mDEBUG: Handling certificate results msg with height 181:182[0m
+[90mJan 21 15:31:49.034[0m [34mDEBUG: Handling certificate results msg with height 182:182[0m
+[90mJan 21 15:31:49.041[0m [34mDEBUG: Handling certificate results msg with height 181:182[0m
+[90mJan 21 15:31:49.047[0m [34mDEBUG: Handling certificate results msg with height 182:182[0m
+[90mJan 21 15:31:49.052[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:49.053[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:49.054[0m [34mDEBUG: Process time: 0.03s, Wait time: 3.00s[0m
+[90mJan 21 15:31:49.055[0m [34mDEBUG: Setting consensus timer: 2.966634 sec[0m
+[90mJan 21 15:31:49.055[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:49.061[0m [34mDEBUG: Received (ID: 1 H:183, CH:183, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:49.062[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:52.023[0m [32mINFO: (ID: 1 H:183, CH:183, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:31:52.023[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:31:52.024[0m [34mDEBUG: Applying block e8e4914abbc949851712c50c6db5de5ddfe152c9d5f01d1b64c1dc0ababccf34 for height 183[0m
+[90mJan 21 15:31:52.028[0m [34mDEBUG: Handling certificate results msg with height 181:182[0m
+[90mJan 21 15:31:52.036[0m [34mDEBUG: Handling certificate results msg with height 182:182[0m
+[90mJan 21 15:31:52.041[0m [34mDEBUG: Validating block header e8e4914abbc949851712c50c6db5de5ddfe152c9d5f01d1b64c1dc0ababccf34 for height 183[0m
+[90mJan 21 15:31:52.044[0m [32mINFO: Block e8e4914abbc949851712c50c6db5de5ddfe152c9d5f01d1b64c1dc0ababccf34 with 2 txs is valid for height 183 ✅ [0m
+[90mJan 21 15:31:52.045[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:52.046[0m [34mDEBUG: Process time: 0.02s, Wait time: 2.00s[0m
+[90mJan 21 15:31:52.046[0m [34mDEBUG: Setting consensus timer: 1.976734 sec[0m
+[90mJan 21 15:31:52.047[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:52.050[0m [34mDEBUG: Received (ID: 1 H:183, CH:183, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:52.050[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:52.050[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:54.003[0m [32mINFO: (ID: 1 H:183, CH:183, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:31:54.004[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:54.006[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:54.006[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:31:54.007[0m [34mDEBUG: Setting consensus timer: 1.996235 sec[0m
+[90mJan 21 15:31:54.008[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:54.014[0m [34mDEBUG: Received (ID: 1 H:183, CH:183, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:54.014[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:56.005[0m [32mINFO: (ID: 1 H:183, CH:183, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:31:56.006[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:56.007[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:31:56.007[0m [34mDEBUG: Setting consensus timer: 1.997794 sec[0m
+[90mJan 21 15:31:56.008[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:56.012[0m [34mDEBUG: Received (ID: 1 H:183, CH:183, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:56.012[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:56.013[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:31:57.993[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:31:58.001[0m [34mDEBUG: Handling certificate results msg with height 182:183[0m
+[90mJan 21 15:31:58.008[0m [32mINFO: Added tx 86df00e61684a12a6a15e094ab581dba6e418d74c9cdf4f4ad8ca999f87c1d31 to mempool for checking[0m
+[90mJan 21 15:31:58.008[0m [32mINFO: Received valid transaction 86df00e61684a12a6a15e094ab581dba6e418d74 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:31:58.009[0m [32mINFO: (ID: 1 H:183, CH:183, R:0, P:COMMIT)[0m
+[90mJan 21 15:31:58.010[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:31:58.013[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:31:58.013[0m [32mINFO: Successfully submitted the certificate-results-txn with hash fe8b3388f52ce4aa296553e4d4cc48225cd8ad14ffda9e9a7a26c6f5face5f3b[0m
+[90mJan 21 15:31:58.014[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:31:58.015[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:31:58.016[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:31:58.016[0m [34mDEBUG: Setting consensus timer: 1.993054 sec[0m
+[90mJan 21 15:31:58.021[0m [34mDEBUG: Handling certificate results msg with height 183:183[0m
+[90mJan 21 15:31:58.025[0m [32mINFO: Added tx fe8b3388f52ce4aa296553e4d4cc48225cd8ad14ffda9e9a7a26c6f5face5f3b to mempool for checking[0m
+[90mJan 21 15:31:58.026[0m [32mINFO: Received valid transaction fe8b3388f52ce4aa296553e4d4cc48225cd8ad14 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:31:58.026[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:31:58.032[0m [34mDEBUG: Received (ID: 1 H:183, CH:183, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:31:58.033[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:00.010[0m [32mINFO: (ID: 1 H:183, CH:183, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:32:00.011[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:00.012[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:32:00.012[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:32:00.013[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:32:00.013[0m [34mDEBUG: Setting consensus timer: 1.997176 sec[0m
+[90mJan 21 15:32:00.014[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:32:00.019[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:00.019[0m [34mDEBUG: Applying block e8e4914abbc949851712c50c6db5de5ddfe152c9d5f01d1b64c1dc0ababccf34 for height 183[0m
+[90mJan 21 15:32:00.026[0m [34mDEBUG: Handling certificate results msg with height 181:182[0m
+[90mJan 21 15:32:00.033[0m [34mDEBUG: Handling certificate results msg with height 182:182[0m
+[90mJan 21 15:32:00.039[0m [34mDEBUG: Validating block header e8e4914abbc949851712c50c6db5de5ddfe152c9d5f01d1b64c1dc0ababccf34 for height 183[0m
+[90mJan 21 15:32:00.042[0m [32mINFO: Block e8e4914abbc949851712c50c6db5de5ddfe152c9d5f01d1b64c1dc0ababccf34 with 2 txs is valid for height 183 ✅ [0m
+[90mJan 21 15:32:00.046[0m [34mDEBUG: Indexing quorum certificate for height 183[0m
+[90mJan 21 15:32:00.047[0m [34mDEBUG: Indexing last quorum certificate for height 182[0m
+[90mJan 21 15:32:00.047[0m [34mDEBUG: Indexing block 183[0m
+[90mJan 21 15:32:00.047[0m [34mDEBUG: Tx ef0479d388fd5f413b0a00588150971ea2fe0ac976ef4953ea4ae6c02fa8bb2c was included in a block so removing from mempool[0m
+[90mJan 21 15:32:00.048[0m [34mDEBUG: Tx a04c302c517f90788ef2653eb4ed01dbcfc11dab27718e4ddaaada166c10a4e4 was included in a block so removing from mempool[0m
+[90mJan 21 15:32:00.048[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:32:00.053[0m [34mDEBUG: Handling certificate results msg with height 182:183[0m
+[90mJan 21 15:32:00.059[0m [34mDEBUG: Handling certificate results msg with height 183:183[0m
+[90mJan 21 15:32:00.063[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:32:00.064[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:183 🔒[0m
+[90mJan 21 15:32:00.065[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:32:00.066[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:32:00.067[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:32:00.067[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:00.068[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:32:00.068[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:32:00.069[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:32:00.071[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:32:00.072[0m [34mDEBUG: Starting the VDF service with 2603 iterations[0m
+[90mJan 21 15:32:00.072[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:32:00.077[0m [34mDEBUG: Process time: 0.05s, Wait time: 2.00s[0m
+[90mJan 21 15:32:00.078[0m [34mDEBUG: Setting consensus timer: 1.946166 sec[0m
+[90mJan 21 15:32:00.112[0m [32mINFO: New BaseChain Height 184 detected![0m
+[90mJan 21 15:32:00.448[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:32:00.449[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:32:00.449[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:32:00.452[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:32:01.214[0m [34mDEBUG: VDF service completed with 2603 iterations in 1.141650424s[0m
+[90mJan 21 15:32:01.216[0m [34mDEBUG: Adjusted iterations for next run to 3648[0m
+[90mJan 21 15:32:02.025[0m [32mINFO: (ID: 1 H:184, CH:184, R:0, P:ELECTION)[0m
+[90mJan 21 15:32:02.026[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:32:02.027[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:02.028[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:02.029[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:32:02.029[0m [34mDEBUG: Setting consensus timer: 1.996102 sec[0m
+[90mJan 21 15:32:02.030[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:02.032[0m [34mDEBUG: Received (ID: 1 H:184, CH:184, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:02.033[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:04.026[0m [32mINFO: (ID: 1 H:184, CH:184, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:32:04.030[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:32:04.030[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:32:04.032[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:04.032[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:32:04.033[0m [34mDEBUG: Setting consensus timer: 2.993634 sec[0m
+[90mJan 21 15:32:04.034[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:04.037[0m [34mDEBUG: Received (ID: 1 H:184, CH:184, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:04.038[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:04.038[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:07.027[0m [32mINFO: (ID: 1 H:184, CH:184, R:0, P:PROPOSE)[0m
+[90mJan 21 15:32:07.029[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:32:07.035[0m [34mDEBUG: Handling certificate results msg with height 182:183[0m
+[90mJan 21 15:32:07.046[0m [34mDEBUG: Handling certificate results msg with height 183:183[0m
+[90mJan 21 15:32:07.078[0m [34mDEBUG: Handling certificate results msg with height 182:183[0m
+[90mJan 21 15:32:07.101[0m [34mDEBUG: Handling certificate results msg with height 183:183[0m
+[90mJan 21 15:32:07.128[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:07.134[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:07.135[0m [34mDEBUG: Process time: 0.11s, Wait time: 3.00s[0m
+[90mJan 21 15:32:07.136[0m [34mDEBUG: Setting consensus timer: 2.892078 sec[0m
+[90mJan 21 15:32:07.139[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:07.175[0m [34mDEBUG: Received (ID: 1 H:184, CH:184, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:07.178[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:10.031[0m [32mINFO: (ID: 1 H:184, CH:184, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:32:10.031[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:32:10.032[0m [34mDEBUG: Applying block 07137f60b850ac273edd2be6d2d2bcac60d996f6fd7e8380d44bbb567b2425ee for height 184[0m
+[90mJan 21 15:32:10.036[0m [34mDEBUG: Handling certificate results msg with height 182:183[0m
+[90mJan 21 15:32:10.044[0m [34mDEBUG: Handling certificate results msg with height 183:183[0m
+[90mJan 21 15:32:10.048[0m [34mDEBUG: Validating block header 07137f60b850ac273edd2be6d2d2bcac60d996f6fd7e8380d44bbb567b2425ee for height 184[0m
+[90mJan 21 15:32:10.051[0m [32mINFO: Block 07137f60b850ac273edd2be6d2d2bcac60d996f6fd7e8380d44bbb567b2425ee with 2 txs is valid for height 184 ✅ [0m
+[90mJan 21 15:32:10.052[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:10.053[0m [34mDEBUG: Process time: 0.02s, Wait time: 2.00s[0m
+[90mJan 21 15:32:10.053[0m [34mDEBUG: Setting consensus timer: 1.977926 sec[0m
+[90mJan 21 15:32:10.054[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:10.057[0m [34mDEBUG: Received (ID: 1 H:184, CH:184, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:10.058[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:10.058[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:12.032[0m [32mINFO: (ID: 1 H:184, CH:184, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:32:12.033[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:12.035[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:12.035[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:32:12.036[0m [34mDEBUG: Setting consensus timer: 1.996617 sec[0m
+[90mJan 21 15:32:12.036[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:12.044[0m [34mDEBUG: Received (ID: 1 H:184, CH:184, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:12.044[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:14.034[0m [32mINFO: (ID: 1 H:184, CH:184, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:32:14.035[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:14.036[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:32:14.037[0m [34mDEBUG: Setting consensus timer: 1.997705 sec[0m
+[90mJan 21 15:32:14.037[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:14.042[0m [34mDEBUG: Received (ID: 1 H:184, CH:184, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:14.042[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:14.043[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:16.026[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:32:16.031[0m [34mDEBUG: Handling certificate results msg with height 183:184[0m
+[90mJan 21 15:32:16.036[0m [32mINFO: Added tx b6f4209b1fe7d62c684f013425b5b1a33a31acab40dbf0bd2e87c88e55799551 to mempool for checking[0m
+[90mJan 21 15:32:16.037[0m [32mINFO: Received valid transaction b6f4209b1fe7d62c684f013425b5b1a33a31acab from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:32:16.037[0m [32mINFO: (ID: 1 H:184, CH:184, R:0, P:COMMIT)[0m
+[90mJan 21 15:32:16.039[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:16.042[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:32:16.043[0m [32mINFO: Successfully submitted the certificate-results-txn with hash 6941e63fe928bc5b93ea25bfb7db941327d509a9e72f6f4689f31f0db131889e[0m
+[90mJan 21 15:32:16.044[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:16.046[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:16.046[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:32:16.047[0m [34mDEBUG: Setting consensus timer: 1.991314 sec[0m
+[90mJan 21 15:32:16.051[0m [34mDEBUG: Handling certificate results msg with height 184:184[0m
+[90mJan 21 15:32:16.055[0m [32mINFO: Added tx 6941e63fe928bc5b93ea25bfb7db941327d509a9e72f6f4689f31f0db131889e to mempool for checking[0m
+[90mJan 21 15:32:16.055[0m [32mINFO: Received valid transaction 6941e63fe928bc5b93ea25bfb7db941327d509a9 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:32:16.056[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:16.062[0m [34mDEBUG: Received (ID: 1 H:184, CH:184, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:16.063[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:18.039[0m [32mINFO: (ID: 1 H:184, CH:184, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:32:18.043[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:18.045[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:32:18.046[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:32:18.047[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:32:18.052[0m [34mDEBUG: Setting consensus timer: 1.992127 sec[0m
+[90mJan 21 15:32:18.053[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:32:18.058[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:18.058[0m [34mDEBUG: Applying block 07137f60b850ac273edd2be6d2d2bcac60d996f6fd7e8380d44bbb567b2425ee for height 184[0m
+[90mJan 21 15:32:18.064[0m [34mDEBUG: Handling certificate results msg with height 182:183[0m
+[90mJan 21 15:32:18.075[0m [34mDEBUG: Handling certificate results msg with height 183:183[0m
+[90mJan 21 15:32:18.082[0m [34mDEBUG: Validating block header 07137f60b850ac273edd2be6d2d2bcac60d996f6fd7e8380d44bbb567b2425ee for height 184[0m
+[90mJan 21 15:32:18.086[0m [32mINFO: Block 07137f60b850ac273edd2be6d2d2bcac60d996f6fd7e8380d44bbb567b2425ee with 2 txs is valid for height 184 ✅ [0m
+[90mJan 21 15:32:18.090[0m [34mDEBUG: Indexing quorum certificate for height 184[0m
+[90mJan 21 15:32:18.091[0m [34mDEBUG: Indexing last quorum certificate for height 183[0m
+[90mJan 21 15:32:18.091[0m [34mDEBUG: Indexing block 184[0m
+[90mJan 21 15:32:18.092[0m [34mDEBUG: Tx 86df00e61684a12a6a15e094ab581dba6e418d74c9cdf4f4ad8ca999f87c1d31 was included in a block so removing from mempool[0m
+[90mJan 21 15:32:18.092[0m [34mDEBUG: Tx fe8b3388f52ce4aa296553e4d4cc48225cd8ad14ffda9e9a7a26c6f5face5f3b was included in a block so removing from mempool[0m
+[90mJan 21 15:32:18.093[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:32:18.097[0m [34mDEBUG: Handling certificate results msg with height 183:184[0m
+[90mJan 21 15:32:18.103[0m [34mDEBUG: Handling certificate results msg with height 184:184[0m
+[90mJan 21 15:32:18.107[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:32:18.108[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:184 🔒[0m
+[90mJan 21 15:32:18.109[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:32:18.109[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:32:18.111[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:32:18.112[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:18.112[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:32:18.113[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:32:18.113[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:32:18.116[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:32:18.117[0m [34mDEBUG: Starting the VDF service with 3648 iterations[0m
+[90mJan 21 15:32:18.118[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:32:18.121[0m [34mDEBUG: Process time: 0.06s, Wait time: 2.00s[0m
+[90mJan 21 15:32:18.121[0m [34mDEBUG: Setting consensus timer: 1.940647 sec[0m
+[90mJan 21 15:32:18.428[0m [32mINFO: New BaseChain Height 185 detected![0m
+[90mJan 21 15:32:18.766[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:32:18.767[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:32:18.767[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:32:18.769[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:32:19.863[0m [34mDEBUG: VDF service completed with 3648 iterations in 1.745341954s[0m
+[90mJan 21 15:32:19.864[0m [34mDEBUG: Adjusted iterations for next run to 3344[0m
+[90mJan 21 15:32:20.063[0m [32mINFO: (ID: 1 H:185, CH:185, R:0, P:ELECTION)[0m
+[90mJan 21 15:32:20.065[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:32:20.066[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:20.068[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:20.071[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:32:20.072[0m [34mDEBUG: Setting consensus timer: 1.992594 sec[0m
+[90mJan 21 15:32:20.072[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:20.076[0m [34mDEBUG: Received (ID: 1 H:185, CH:185, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:20.077[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:22.066[0m [32mINFO: (ID: 1 H:185, CH:185, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:32:22.069[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:32:22.070[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:32:22.071[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:22.072[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:32:22.072[0m [34mDEBUG: Setting consensus timer: 2.993747 sec[0m
+[90mJan 21 15:32:22.073[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:22.077[0m [34mDEBUG: Received (ID: 1 H:185, CH:185, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:22.077[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:22.078[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:25.049[0m [32mINFO: (ID: 1 H:185, CH:185, R:0, P:PROPOSE)[0m
+[90mJan 21 15:32:25.050[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:32:25.054[0m [34mDEBUG: Handling certificate results msg with height 183:184[0m
+[90mJan 21 15:32:25.062[0m [34mDEBUG: Handling certificate results msg with height 184:184[0m
+[90mJan 21 15:32:25.071[0m [34mDEBUG: Handling certificate results msg with height 183:184[0m
+[90mJan 21 15:32:25.076[0m [34mDEBUG: Handling certificate results msg with height 184:184[0m
+[90mJan 21 15:32:25.081[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:25.082[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:25.082[0m [34mDEBUG: Process time: 0.03s, Wait time: 3.00s[0m
+[90mJan 21 15:32:25.083[0m [34mDEBUG: Setting consensus timer: 2.966336 sec[0m
+[90mJan 21 15:32:25.083[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:25.089[0m [34mDEBUG: Received (ID: 1 H:185, CH:185, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:25.089[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:28.050[0m [32mINFO: (ID: 1 H:185, CH:185, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:32:28.050[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:32:28.051[0m [34mDEBUG: Applying block d1344d1cc110ae6d79ca101b6a11d66fdf37519cdf14fd6695a1a48dfcc8e205 for height 185[0m
+[90mJan 21 15:32:28.055[0m [34mDEBUG: Handling certificate results msg with height 183:184[0m
+[90mJan 21 15:32:28.061[0m [34mDEBUG: Handling certificate results msg with height 184:184[0m
+[90mJan 21 15:32:28.064[0m [34mDEBUG: Validating block header d1344d1cc110ae6d79ca101b6a11d66fdf37519cdf14fd6695a1a48dfcc8e205 for height 185[0m
+[90mJan 21 15:32:28.068[0m [32mINFO: Block d1344d1cc110ae6d79ca101b6a11d66fdf37519cdf14fd6695a1a48dfcc8e205 with 2 txs is valid for height 185 ✅ [0m
+[90mJan 21 15:32:28.069[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:28.070[0m [34mDEBUG: Process time: 0.02s, Wait time: 2.00s[0m
+[90mJan 21 15:32:28.070[0m [34mDEBUG: Setting consensus timer: 1.980338 sec[0m
+[90mJan 21 15:32:28.071[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:28.074[0m [34mDEBUG: Received (ID: 1 H:185, CH:185, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:28.074[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:28.075[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:30.052[0m [32mINFO: (ID: 1 H:185, CH:185, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:32:30.053[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:30.055[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:30.055[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:32:30.056[0m [34mDEBUG: Setting consensus timer: 1.996326 sec[0m
+[90mJan 21 15:32:30.056[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:30.062[0m [34mDEBUG: Received (ID: 1 H:185, CH:185, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:30.063[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:32.053[0m [32mINFO: (ID: 1 H:185, CH:185, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:32:32.055[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:32.055[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:32:32.056[0m [34mDEBUG: Setting consensus timer: 1.997717 sec[0m
+[90mJan 21 15:32:32.056[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:32.060[0m [34mDEBUG: Received (ID: 1 H:185, CH:185, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:32.061[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:32.061[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:34.043[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:32:34.048[0m [34mDEBUG: Handling certificate results msg with height 184:185[0m
+[90mJan 21 15:32:34.053[0m [32mINFO: Added tx 8192983df7aba13868d456d691132d718f6b749bc9022514d22766780e242c8d to mempool for checking[0m
+[90mJan 21 15:32:34.053[0m [32mINFO: Received valid transaction 8192983df7aba13868d456d691132d718f6b749b from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:32:34.059[0m [32mINFO: (ID: 1 H:185, CH:185, R:0, P:COMMIT)[0m
+[90mJan 21 15:32:34.060[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:34.062[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:32:34.063[0m [32mINFO: Successfully submitted the certificate-results-txn with hash 855e6485086c381ea8cfc9b668a2a676dcf4f98611f1a6135ab59242b6b500a8[0m
+[90mJan 21 15:32:34.063[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:34.065[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:34.065[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:32:34.066[0m [34mDEBUG: Setting consensus timer: 1.993239 sec[0m
+[90mJan 21 15:32:34.069[0m [34mDEBUG: Handling certificate results msg with height 185:185[0m
+[90mJan 21 15:32:34.073[0m [32mINFO: Added tx 855e6485086c381ea8cfc9b668a2a676dcf4f98611f1a6135ab59242b6b500a8 to mempool for checking[0m
+[90mJan 21 15:32:34.073[0m [32mINFO: Received valid transaction 855e6485086c381ea8cfc9b668a2a676dcf4f986 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:32:34.074[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:34.079[0m [34mDEBUG: Received (ID: 1 H:185, CH:185, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:34.080[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:36.061[0m [32mINFO: (ID: 1 H:185, CH:185, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:32:36.061[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:36.062[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:32:36.063[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:32:36.063[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:32:36.064[0m [34mDEBUG: Setting consensus timer: 1.997343 sec[0m
+[90mJan 21 15:32:36.064[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:32:36.068[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:36.069[0m [34mDEBUG: Applying block d1344d1cc110ae6d79ca101b6a11d66fdf37519cdf14fd6695a1a48dfcc8e205 for height 185[0m
+[90mJan 21 15:32:36.074[0m [34mDEBUG: Handling certificate results msg with height 183:184[0m
+[90mJan 21 15:32:36.081[0m [34mDEBUG: Handling certificate results msg with height 184:184[0m
+[90mJan 21 15:32:36.087[0m [34mDEBUG: Validating block header d1344d1cc110ae6d79ca101b6a11d66fdf37519cdf14fd6695a1a48dfcc8e205 for height 185[0m
+[90mJan 21 15:32:36.091[0m [32mINFO: Block d1344d1cc110ae6d79ca101b6a11d66fdf37519cdf14fd6695a1a48dfcc8e205 with 2 txs is valid for height 185 ✅ [0m
+[90mJan 21 15:32:36.096[0m [34mDEBUG: Indexing quorum certificate for height 185[0m
+[90mJan 21 15:32:36.099[0m [34mDEBUG: Indexing last quorum certificate for height 184[0m
+[90mJan 21 15:32:36.101[0m [34mDEBUG: Indexing block 185[0m
+[90mJan 21 15:32:36.102[0m [34mDEBUG: Tx b6f4209b1fe7d62c684f013425b5b1a33a31acab40dbf0bd2e87c88e55799551 was included in a block so removing from mempool[0m
+[90mJan 21 15:32:36.102[0m [34mDEBUG: Tx 6941e63fe928bc5b93ea25bfb7db941327d509a9e72f6f4689f31f0db131889e was included in a block so removing from mempool[0m
+[90mJan 21 15:32:36.103[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:32:36.108[0m [34mDEBUG: Handling certificate results msg with height 184:185[0m
+[90mJan 21 15:32:36.116[0m [34mDEBUG: Handling certificate results msg with height 185:185[0m
+[90mJan 21 15:32:36.124[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:32:36.125[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:185 🔒[0m
+[90mJan 21 15:32:36.128[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:32:36.131[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:32:36.132[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:32:36.134[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:36.135[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:32:36.135[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:32:36.136[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:32:36.140[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:32:36.142[0m [34mDEBUG: Starting the VDF service with 3344 iterations[0m
+[90mJan 21 15:32:36.142[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:32:36.143[0m [34mDEBUG: Process time: 0.07s, Wait time: 2.00s[0m
+[90mJan 21 15:32:36.143[0m [34mDEBUG: Setting consensus timer: 1.929040 sec[0m
+[90mJan 21 15:32:36.391[0m [32mINFO: New BaseChain Height 186 detected![0m
+[90mJan 21 15:32:36.728[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:32:36.729[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:32:36.729[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:32:36.730[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:32:38.074[0m [32mINFO: (ID: 1 H:186, CH:186, R:0, P:ELECTION)[0m
+[90mJan 21 15:32:38.076[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:32:38.076[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:38.079[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:38.080[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:32:38.081[0m [34mDEBUG: Setting consensus timer: 1.994088 sec[0m
+[90mJan 21 15:32:38.081[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:38.085[0m [34mDEBUG: Received (ID: 1 H:186, CH:186, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:38.085[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:38.231[0m [34mDEBUG: VDF service completed with 3344 iterations in 2.089026332s[0m
+[90mJan 21 15:32:38.233[0m [34mDEBUG: Adjusted iterations for next run to 2561[0m
+[90mJan 21 15:32:40.076[0m [32mINFO: (ID: 1 H:186, CH:186, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:32:40.079[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:32:40.080[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:32:40.081[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:40.082[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:32:40.082[0m [34mDEBUG: Setting consensus timer: 2.993631 sec[0m
+[90mJan 21 15:32:40.083[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:40.087[0m [34mDEBUG: Received (ID: 1 H:186, CH:186, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:40.087[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:40.088[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:43.077[0m [32mINFO: (ID: 1 H:186, CH:186, R:0, P:PROPOSE)[0m
+[90mJan 21 15:32:43.078[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:32:43.082[0m [34mDEBUG: Handling certificate results msg with height 184:185[0m
+[90mJan 21 15:32:43.089[0m [34mDEBUG: Handling certificate results msg with height 185:185[0m
+[90mJan 21 15:32:43.096[0m [34mDEBUG: Handling certificate results msg with height 184:185[0m
+[90mJan 21 15:32:43.102[0m [34mDEBUG: Handling certificate results msg with height 185:185[0m
+[90mJan 21 15:32:43.116[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:43.148[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:43.149[0m [34mDEBUG: Process time: 0.07s, Wait time: 3.00s[0m
+[90mJan 21 15:32:43.150[0m [34mDEBUG: Setting consensus timer: 2.927739 sec[0m
+[90mJan 21 15:32:43.150[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:43.156[0m [34mDEBUG: Received (ID: 1 H:186, CH:186, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:43.157[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:46.078[0m [32mINFO: (ID: 1 H:186, CH:186, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:32:46.079[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:32:46.080[0m [34mDEBUG: Applying block 0d5db5378da2e39970d53984ea6e1f3d865c9ac211d04884cbbc14efc777970a for height 186[0m
+[90mJan 21 15:32:46.086[0m [34mDEBUG: Handling certificate results msg with height 184:185[0m
+[90mJan 21 15:32:46.094[0m [34mDEBUG: Handling certificate results msg with height 185:185[0m
+[90mJan 21 15:32:46.101[0m [34mDEBUG: Validating block header 0d5db5378da2e39970d53984ea6e1f3d865c9ac211d04884cbbc14efc777970a for height 186[0m
+[90mJan 21 15:32:46.106[0m [32mINFO: Block 0d5db5378da2e39970d53984ea6e1f3d865c9ac211d04884cbbc14efc777970a with 2 txs is valid for height 186 ✅ [0m
+[90mJan 21 15:32:46.111[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:46.112[0m [34mDEBUG: Process time: 0.03s, Wait time: 2.00s[0m
+[90mJan 21 15:32:46.113[0m [34mDEBUG: Setting consensus timer: 1.965919 sec[0m
+[90mJan 21 15:32:46.115[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:46.121[0m [34mDEBUG: Received (ID: 1 H:186, CH:186, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:46.123[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:46.125[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:48.082[0m [32mINFO: (ID: 1 H:186, CH:186, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:32:48.083[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:48.085[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:48.086[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:32:48.086[0m [34mDEBUG: Setting consensus timer: 1.995937 sec[0m
+[90mJan 21 15:32:48.087[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:48.094[0m [34mDEBUG: Received (ID: 1 H:186, CH:186, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:48.095[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:50.083[0m [32mINFO: (ID: 1 H:186, CH:186, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:32:50.086[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:50.086[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:32:50.087[0m [34mDEBUG: Setting consensus timer: 1.997097 sec[0m
+[90mJan 21 15:32:50.088[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:50.093[0m [34mDEBUG: Received (ID: 1 H:186, CH:186, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:50.094[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:50.095[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:52.075[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:32:52.081[0m [34mDEBUG: Handling certificate results msg with height 185:186[0m
+[90mJan 21 15:32:52.086[0m [32mINFO: Added tx 0f16215b7b275b0b1ecf97cf5fa043aa209a5ac9a13d93d63847591109720296 to mempool for checking[0m
+[90mJan 21 15:32:52.086[0m [32mINFO: Received valid transaction 0f16215b7b275b0b1ecf97cf5fa043aa209a5ac9 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:32:52.087[0m [32mINFO: (ID: 1 H:186, CH:186, R:0, P:COMMIT)[0m
+[90mJan 21 15:32:52.088[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:52.091[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:32:52.092[0m [32mINFO: Successfully submitted the certificate-results-txn with hash 3d1d7666a429e4017571d9f41383c0ba7edc47d5b3beeddf6bf2a6757b60695e[0m
+[90mJan 21 15:32:52.092[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:52.094[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:52.095[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:32:52.095[0m [34mDEBUG: Setting consensus timer: 1.992156 sec[0m
+[90mJan 21 15:32:52.099[0m [34mDEBUG: Handling certificate results msg with height 186:186[0m
+[90mJan 21 15:32:52.103[0m [32mINFO: Added tx 3d1d7666a429e4017571d9f41383c0ba7edc47d5b3beeddf6bf2a6757b60695e to mempool for checking[0m
+[90mJan 21 15:32:52.103[0m [32mINFO: Received valid transaction 3d1d7666a429e4017571d9f41383c0ba7edc47d5 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:32:52.104[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:52.110[0m [34mDEBUG: Received (ID: 1 H:186, CH:186, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:52.111[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:54.066[0m [32mINFO: (ID: 1 H:186, CH:186, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:32:54.067[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:54.067[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:32:54.068[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:32:54.069[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:32:54.069[0m [34mDEBUG: Setting consensus timer: 1.997220 sec[0m
+[90mJan 21 15:32:54.070[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:32:54.075[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:54.075[0m [34mDEBUG: Applying block 0d5db5378da2e39970d53984ea6e1f3d865c9ac211d04884cbbc14efc777970a for height 186[0m
+[90mJan 21 15:32:54.081[0m [34mDEBUG: Handling certificate results msg with height 184:185[0m
+[90mJan 21 15:32:54.088[0m [34mDEBUG: Handling certificate results msg with height 185:185[0m
+[90mJan 21 15:32:54.093[0m [34mDEBUG: Validating block header 0d5db5378da2e39970d53984ea6e1f3d865c9ac211d04884cbbc14efc777970a for height 186[0m
+[90mJan 21 15:32:54.096[0m [32mINFO: Block 0d5db5378da2e39970d53984ea6e1f3d865c9ac211d04884cbbc14efc777970a with 2 txs is valid for height 186 ✅ [0m
+[90mJan 21 15:32:54.101[0m [34mDEBUG: Indexing quorum certificate for height 186[0m
+[90mJan 21 15:32:54.101[0m [34mDEBUG: Indexing last quorum certificate for height 185[0m
+[90mJan 21 15:32:54.102[0m [34mDEBUG: Indexing block 186[0m
+[90mJan 21 15:32:54.102[0m [34mDEBUG: Tx 8192983df7aba13868d456d691132d718f6b749bc9022514d22766780e242c8d was included in a block so removing from mempool[0m
+[90mJan 21 15:32:54.103[0m [34mDEBUG: Tx 855e6485086c381ea8cfc9b668a2a676dcf4f98611f1a6135ab59242b6b500a8 was included in a block so removing from mempool[0m
+[90mJan 21 15:32:54.104[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:32:54.108[0m [34mDEBUG: Handling certificate results msg with height 185:186[0m
+[90mJan 21 15:32:54.113[0m [34mDEBUG: Handling certificate results msg with height 186:186[0m
+[90mJan 21 15:32:54.117[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:32:54.118[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:186 🔒[0m
+[90mJan 21 15:32:54.118[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:32:54.119[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:32:54.120[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:32:54.121[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:32:54.121[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:32:54.122[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:32:54.122[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:32:54.125[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:32:54.126[0m [34mDEBUG: Starting the VDF service with 2561 iterations[0m
+[90mJan 21 15:32:54.126[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:32:54.127[0m [34mDEBUG: Process time: 0.05s, Wait time: 2.00s[0m
+[90mJan 21 15:32:54.128[0m [34mDEBUG: Setting consensus timer: 1.948188 sec[0m
+[90mJan 21 15:32:54.351[0m [32mINFO: New BaseChain Height 187 detected![0m
+[90mJan 21 15:32:54.690[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:32:54.691[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:32:54.691[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:32:54.693[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:32:56.025[0m [34mDEBUG: VDF service completed with 2561 iterations in 1.897979494s[0m
+[90mJan 21 15:32:56.026[0m [34mDEBUG: Adjusted iterations for next run to 2158[0m
+[90mJan 21 15:32:56.078[0m [32mINFO: (ID: 1 H:187, CH:187, R:0, P:ELECTION)[0m
+[90mJan 21 15:32:56.079[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:32:56.080[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:32:56.081[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:32:56.082[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:32:56.082[0m [34mDEBUG: Setting consensus timer: 1.995634 sec[0m
+[90mJan 21 15:32:56.083[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:32:56.086[0m [34mDEBUG: Received (ID: 1 H:187, CH:187, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:32:56.087[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:32:57.256[0m [32mINFO: Exit command terminated received[0m
+[90mJan 21 15:41:26.929[0m [32mINFO: Starting P2P 🤝 [0m
+[90mJan 21 15:41:26.936[0m [34mDEBUG: Listening for inbound txs, block requests, and consensus messages[0m
+[90mJan 21 15:41:26.937[0m [34mDEBUG: Starting net.Listener on tcp://0.0.0.0:9001[0m
+[90mJan 21 15:41:26.937[0m [32mINFO: Starting RPC server at 0.0.0.0:50002[0m
+[90mJan 21 15:41:26.940[0m [32mINFO: Starting Admin RPC server at 127.0.0.1:50003[0m
+[90mJan 21 15:41:26.937[0m [33mWARN: Attempting to connect to the base-chain[0m
+[90mJan 21 15:41:26.941[0m [32mINFO: Starting Web Wallet 🔑 http://localhost:50000 ⬅️[0m
+[90mJan 21 15:41:26.943[0m [32mINFO: Starting Block Explorer 🔍️ http://localhost:50001 ⬅️[0m
+[90mJan 21 15:41:27.281[0m [32mINFO: New BaseChain Height 187 detected![0m
+[90mJan 21 15:41:27.622[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:41:27.622[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:41:27.943[0m [34mDEBUG: Listening for inbound txs, block requests, and consensus messages[0m
+[90mJan 21 15:41:27.944[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:41:27.946[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:41:27.944[0m [32mINFO: Sync started 🔄 for committee 1[0m
+[90mJan 21 15:41:27.947[0m [34mDEBUG: Listening for inbound blocks[0m
+[90mJan 21 15:41:27.947[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:41:27.949[0m [34mDEBUG: Starting the VDF service with 224 iterations[0m
+[90mJan 21 15:41:27.949[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:41:27.950[0m [34mDEBUG: Process time: 1737474087.95s, Wait time: 2.00s[0m
+[90mJan 21 15:41:27.951[0m [34mDEBUG: Setting consensus timer: 2.000000 sec[0m
+[90mJan 21 15:41:29.951[0m [32mINFO: (ID: 1 H:187, CH:187, R:0, P:ELECTION)[0m
+[90mJan 21 15:41:29.954[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:41:29.957[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:41:29.961[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:29.962[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:41:29.963[0m [34mDEBUG: Setting consensus timer: 1.989053 sec[0m
+[90mJan 21 15:41:29.964[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:29.968[0m [34mDEBUG: Received (ID: 1 H:187, CH:187, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:29.969[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:30.607[0m [34mDEBUG: VDF service completed with 224 iterations in 2.656890354s[0m
+[90mJan 21 15:41:30.608[0m [34mDEBUG: Adjusted iterations for next run to 134[0m
+[90mJan 21 15:41:31.953[0m [32mINFO: (ID: 1 H:187, CH:187, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:41:31.959[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:41:31.960[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:41:31.962[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:31.963[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:41:31.964[0m [34mDEBUG: Setting consensus timer: 2.989940 sec[0m
+[90mJan 21 15:41:31.964[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:31.970[0m [34mDEBUG: Received (ID: 1 H:187, CH:187, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:31.971[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:31.971[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:34.955[0m [32mINFO: (ID: 1 H:187, CH:187, R:0, P:PROPOSE)[0m
+[90mJan 21 15:41:34.958[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:41:34.964[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:41:34.966[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:34.967[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:41:34.968[0m [34mDEBUG: Setting consensus timer: 2.988005 sec[0m
+[90mJan 21 15:41:34.968[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:34.977[0m [34mDEBUG: Received (ID: 1 H:187, CH:187, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:34.977[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:37.957[0m [32mINFO: (ID: 1 H:187, CH:187, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:41:37.958[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:41:37.959[0m [34mDEBUG: Applying block 831829e9665ad4d9ada2cf5482725704a3e834a58906656334e03849112b1d66 for height 187[0m
+[90mJan 21 15:41:37.962[0m [34mDEBUG: Validating block header 831829e9665ad4d9ada2cf5482725704a3e834a58906656334e03849112b1d66 for height 187[0m
+[90mJan 21 15:41:37.966[0m [32mINFO: Block 831829e9665ad4d9ada2cf5482725704a3e834a58906656334e03849112b1d66 with 0 txs is valid for height 187 ✅ [0m
+[90mJan 21 15:41:37.968[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:37.969[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:41:37.969[0m [34mDEBUG: Setting consensus timer: 1.988046 sec[0m
+[90mJan 21 15:41:37.970[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:37.975[0m [34mDEBUG: Received (ID: 1 H:187, CH:187, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:37.976[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:37.976[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:39.959[0m [32mINFO: (ID: 1 H:187, CH:187, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:41:39.962[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:41:39.964[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:39.965[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:41:39.966[0m [34mDEBUG: Setting consensus timer: 1.993999 sec[0m
+[90mJan 21 15:41:39.967[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:39.974[0m [34mDEBUG: Received (ID: 1 H:187, CH:187, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:39.975[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:41.961[0m [32mINFO: (ID: 1 H:187, CH:187, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:41:41.965[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:41.966[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:41:41.966[0m [34mDEBUG: Setting consensus timer: 1.995441 sec[0m
+[90mJan 21 15:41:41.967[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:41.972[0m [34mDEBUG: Received (ID: 1 H:187, CH:187, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:41.972[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:41.974[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:43.964[0m [32mINFO: (ID: 1 H:187, CH:187, R:0, P:COMMIT)[0m
+[90mJan 21 15:41:43.968[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:41:43.972[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:41:43.973[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:41:43.974[0m [32mINFO: Successfully submitted the certificate-results-txn with hash 41a5fd190c4ae9cefaadfdf3fbd4e2d0ca4e2a131f77dc6a3bbe99616a416e6b[0m
+[90mJan 21 15:41:43.975[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:41:43.977[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:43.978[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:41:43.979[0m [34mDEBUG: Setting consensus timer: 1.986203 sec[0m
+[90mJan 21 15:41:43.983[0m [34mDEBUG: Handling certificate results msg with height 186:187[0m
+[90mJan 21 15:41:43.988[0m [32mINFO: Added tx 0ddcab97e6ce7059e405958734bf12eab812d0ad4cbc44b1182356a0c32d2132 to mempool for checking[0m
+[90mJan 21 15:41:43.988[0m [32mINFO: Received valid transaction 0ddcab97e6ce7059e405958734bf12eab812d0ad from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:41:43.992[0m [34mDEBUG: Handling certificate results msg with height 187:187[0m
+[90mJan 21 15:41:43.997[0m [32mINFO: Added tx 41a5fd190c4ae9cefaadfdf3fbd4e2d0ca4e2a131f77dc6a3bbe99616a416e6b to mempool for checking[0m
+[90mJan 21 15:41:43.997[0m [32mINFO: Received valid transaction 41a5fd190c4ae9cefaadfdf3fbd4e2d0ca4e2a13 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:41:43.998[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:44.004[0m [34mDEBUG: Received (ID: 1 H:187, CH:187, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:44.005[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:45.966[0m [32mINFO: (ID: 1 H:187, CH:187, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:41:45.967[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:41:45.968[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:41:45.969[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:41:45.970[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:41:45.971[0m [34mDEBUG: Setting consensus timer: 1.996230 sec[0m
+[90mJan 21 15:41:45.973[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:41:45.977[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:41:45.978[0m [34mDEBUG: Applying block 831829e9665ad4d9ada2cf5482725704a3e834a58906656334e03849112b1d66 for height 187[0m
+[90mJan 21 15:41:45.980[0m [34mDEBUG: Validating block header 831829e9665ad4d9ada2cf5482725704a3e834a58906656334e03849112b1d66 for height 187[0m
+[90mJan 21 15:41:45.984[0m [32mINFO: Block 831829e9665ad4d9ada2cf5482725704a3e834a58906656334e03849112b1d66 with 0 txs is valid for height 187 ✅ [0m
+[90mJan 21 15:41:45.987[0m [34mDEBUG: Indexing quorum certificate for height 187[0m
+[90mJan 21 15:41:45.988[0m [34mDEBUG: Indexing last quorum certificate for height 186[0m
+[90mJan 21 15:41:45.988[0m [34mDEBUG: Indexing block 187[0m
+[90mJan 21 15:41:45.989[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:41:45.995[0m [34mDEBUG: Handling certificate results msg with height 186:187[0m
+[90mJan 21 15:41:46.005[0m [34mDEBUG: Handling certificate results msg with height 187:187[0m
+[90mJan 21 15:41:46.011[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:41:46.012[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:187 🔒[0m
+[90mJan 21 15:41:46.013[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:41:46.013[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:41:46.014[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:41:46.015[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:41:46.015[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:41:46.016[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:41:46.017[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:41:46.021[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:41:46.023[0m [34mDEBUG: Starting the VDF service with 134 iterations[0m
+[90mJan 21 15:41:46.023[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:41:46.024[0m [34mDEBUG: Process time: 0.04s, Wait time: 2.00s[0m
+[90mJan 21 15:41:46.025[0m [34mDEBUG: Setting consensus timer: 1.956994 sec[0m
+[90mJan 21 15:41:46.257[0m [32mINFO: New BaseChain Height 188 detected![0m
+[90mJan 21 15:41:46.594[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:41:46.595[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:41:46.596[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:41:46.597[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:41:47.983[0m [32mINFO: (ID: 1 H:188, CH:188, R:0, P:ELECTION)[0m
+[90mJan 21 15:41:47.986[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:41:47.987[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:41:47.990[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:47.991[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:41:47.991[0m [34mDEBUG: Setting consensus timer: 1.992240 sec[0m
+[90mJan 21 15:41:47.992[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:47.997[0m [34mDEBUG: Received (ID: 1 H:188, CH:188, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:47.998[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:48.653[0m [34mDEBUG: VDF service completed with 134 iterations in 2.629076275s[0m
+[90mJan 21 15:41:48.654[0m [34mDEBUG: Adjusted iterations for next run to 81[0m
+[90mJan 21 15:41:49.985[0m [32mINFO: (ID: 1 H:188, CH:188, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:41:49.992[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:41:49.993[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:41:49.996[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:49.997[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:41:49.997[0m [34mDEBUG: Setting consensus timer: 2.988248 sec[0m
+[90mJan 21 15:41:49.998[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:50.002[0m [34mDEBUG: Received (ID: 1 H:188, CH:188, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:50.003[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:50.004[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:52.987[0m [32mINFO: (ID: 1 H:188, CH:188, R:0, P:PROPOSE)[0m
+[90mJan 21 15:41:52.990[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:41:52.998[0m [34mDEBUG: Handling certificate results msg with height 186:187[0m
+[90mJan 21 15:41:53.007[0m [34mDEBUG: Handling certificate results msg with height 187:187[0m
+[90mJan 21 15:41:53.016[0m [34mDEBUG: Handling certificate results msg with height 186:187[0m
+[90mJan 21 15:41:53.024[0m [34mDEBUG: Handling certificate results msg with height 187:187[0m
+[90mJan 21 15:41:53.030[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:41:53.032[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:53.033[0m [34mDEBUG: Process time: 0.05s, Wait time: 3.00s[0m
+[90mJan 21 15:41:53.034[0m [34mDEBUG: Setting consensus timer: 2.953536 sec[0m
+[90mJan 21 15:41:53.035[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:53.042[0m [34mDEBUG: Received (ID: 1 H:188, CH:188, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:53.043[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:55.968[0m [32mINFO: (ID: 1 H:188, CH:188, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:41:55.970[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:41:55.971[0m [34mDEBUG: Applying block 092b0b80638fcb14e48f9f5d2733e361f97b470896c7d4d1ea9f4219da8c0652 for height 188[0m
+[90mJan 21 15:41:55.976[0m [34mDEBUG: Handling certificate results msg with height 186:187[0m
+[90mJan 21 15:41:55.985[0m [34mDEBUG: Handling certificate results msg with height 187:187[0m
+[90mJan 21 15:41:55.992[0m [34mDEBUG: Validating block header 092b0b80638fcb14e48f9f5d2733e361f97b470896c7d4d1ea9f4219da8c0652 for height 188[0m
+[90mJan 21 15:41:55.997[0m [32mINFO: Block 092b0b80638fcb14e48f9f5d2733e361f97b470896c7d4d1ea9f4219da8c0652 with 2 txs is valid for height 188 ✅ [0m
+[90mJan 21 15:41:55.998[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:55.999[0m [34mDEBUG: Process time: 0.03s, Wait time: 2.00s[0m
+[90mJan 21 15:41:56.000[0m [34mDEBUG: Setting consensus timer: 1.969355 sec[0m
+[90mJan 21 15:41:56.000[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:56.004[0m [34mDEBUG: Received (ID: 1 H:188, CH:188, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:56.005[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:56.005[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:57.970[0m [32mINFO: (ID: 1 H:188, CH:188, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:41:57.974[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:41:57.976[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:57.977[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:41:57.978[0m [34mDEBUG: Setting consensus timer: 1.992765 sec[0m
+[90mJan 21 15:41:57.978[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:57.986[0m [34mDEBUG: Received (ID: 1 H:188, CH:188, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:57.987[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:41:59.971[0m [32mINFO: (ID: 1 H:188, CH:188, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:41:59.976[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:41:59.977[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:41:59.978[0m [34mDEBUG: Setting consensus timer: 1.994123 sec[0m
+[90mJan 21 15:41:59.979[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:41:59.985[0m [34mDEBUG: Received (ID: 1 H:188, CH:188, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:59.985[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:41:59.986[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:01.974[0m [32mINFO: (ID: 1 H:188, CH:188, R:0, P:COMMIT)[0m
+[90mJan 21 15:42:01.977[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:01.981[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:42:01.982[0m [32mINFO: Successfully submitted the certificate-results-txn with hash b5cc8ffe60ef486d9927e78451c0dfd91eec603ae13acdc4e4e6ada2b3d1ca0d[0m
+[90mJan 21 15:42:01.988[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:01.985[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:42:01.991[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:01.992[0m [34mDEBUG: Process time: 0.02s, Wait time: 2.00s[0m
+[90mJan 21 15:42:01.994[0m [34mDEBUG: Setting consensus timer: 1.982143 sec[0m
+[90mJan 21 15:42:01.998[0m [34mDEBUG: Handling certificate results msg with height 188:188[0m
+[90mJan 21 15:42:02.003[0m [32mINFO: Added tx b5cc8ffe60ef486d9927e78451c0dfd91eec603ae13acdc4e4e6ada2b3d1ca0d to mempool for checking[0m
+[90mJan 21 15:42:02.004[0m [32mINFO: Received valid transaction b5cc8ffe60ef486d9927e78451c0dfd91eec603a from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:42:02.009[0m [34mDEBUG: Handling certificate results msg with height 187:188[0m
+[90mJan 21 15:42:02.014[0m [32mINFO: Added tx 5002657927968e9c608b1563ed0978a647be08f51138da3174ed4f42ed5d3f47 to mempool for checking[0m
+[90mJan 21 15:42:02.015[0m [32mINFO: Received valid transaction 5002657927968e9c608b1563ed0978a647be08f5 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:42:02.015[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:02.023[0m [34mDEBUG: Received (ID: 1 H:188, CH:188, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:02.024[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:03.977[0m [32mINFO: (ID: 1 H:188, CH:188, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:42:03.980[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:03.981[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:42:03.982[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:42:03.983[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:42:03.984[0m [34mDEBUG: Setting consensus timer: 1.993672 sec[0m
+[90mJan 21 15:42:03.984[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:42:03.992[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:03.992[0m [34mDEBUG: Applying block 092b0b80638fcb14e48f9f5d2733e361f97b470896c7d4d1ea9f4219da8c0652 for height 188[0m
+[90mJan 21 15:42:04.000[0m [34mDEBUG: Handling certificate results msg with height 186:187[0m
+[90mJan 21 15:42:04.011[0m [34mDEBUG: Handling certificate results msg with height 187:187[0m
+[90mJan 21 15:42:04.018[0m [34mDEBUG: Validating block header 092b0b80638fcb14e48f9f5d2733e361f97b470896c7d4d1ea9f4219da8c0652 for height 188[0m
+[90mJan 21 15:42:04.023[0m [32mINFO: Block 092b0b80638fcb14e48f9f5d2733e361f97b470896c7d4d1ea9f4219da8c0652 with 2 txs is valid for height 188 ✅ [0m
+[90mJan 21 15:42:04.030[0m [34mDEBUG: Indexing quorum certificate for height 188[0m
+[90mJan 21 15:42:04.031[0m [34mDEBUG: Indexing last quorum certificate for height 187[0m
+[90mJan 21 15:42:04.032[0m [34mDEBUG: Indexing block 188[0m
+[90mJan 21 15:42:04.034[0m [34mDEBUG: Tx 0ddcab97e6ce7059e405958734bf12eab812d0ad4cbc44b1182356a0c32d2132 was included in a block so removing from mempool[0m
+[90mJan 21 15:42:04.035[0m [34mDEBUG: Tx 41a5fd190c4ae9cefaadfdf3fbd4e2d0ca4e2a131f77dc6a3bbe99616a416e6b was included in a block so removing from mempool[0m
+[90mJan 21 15:42:04.036[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:42:04.048[0m [34mDEBUG: Handling certificate results msg with height 188:188[0m
+[90mJan 21 15:42:04.059[0m [34mDEBUG: Handling certificate results msg with height 187:188[0m
+[90mJan 21 15:42:04.066[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:42:04.067[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:188 🔒[0m
+[90mJan 21 15:42:04.068[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:42:04.069[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:42:04.070[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:42:04.071[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:04.071[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:42:04.073[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:42:04.074[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:42:04.079[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:42:04.081[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:42:04.082[0m [34mDEBUG: Process time: 0.09s, Wait time: 2.00s[0m
+[90mJan 21 15:42:04.081[0m [34mDEBUG: Starting the VDF service with 81 iterations[0m
+[90mJan 21 15:42:04.083[0m [34mDEBUG: Setting consensus timer: 1.910948 sec[0m
+[90mJan 21 15:42:04.217[0m [32mINFO: New BaseChain Height 189 detected![0m
+[90mJan 21 15:42:04.378[0m [34mDEBUG: VDF service completed with 81 iterations in 294.765764ms[0m
+[90mJan 21 15:42:04.379[0m [34mDEBUG: Adjusted iterations for next run to 439[0m
+[90mJan 21 15:42:04.556[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:42:04.557[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:42:04.557[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:42:04.559[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:42:05.996[0m [32mINFO: (ID: 1 H:189, CH:189, R:0, P:ELECTION)[0m
+[90mJan 21 15:42:05.999[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:42:06.000[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:06.003[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:06.005[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:42:06.006[0m [34mDEBUG: Setting consensus timer: 1.991679 sec[0m
+[90mJan 21 15:42:06.006[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:06.010[0m [34mDEBUG: Received (ID: 1 H:189, CH:189, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:06.011[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:08.001[0m [32mINFO: (ID: 1 H:189, CH:189, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:42:08.005[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:42:08.006[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:42:08.009[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:08.010[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:42:08.010[0m [34mDEBUG: Setting consensus timer: 2.991173 sec[0m
+[90mJan 21 15:42:08.011[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:08.015[0m [34mDEBUG: Received (ID: 1 H:189, CH:189, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:08.016[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:08.017[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:11.003[0m [32mINFO: (ID: 1 H:189, CH:189, R:0, P:PROPOSE)[0m
+[90mJan 21 15:42:11.006[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:42:11.012[0m [34mDEBUG: Handling certificate results msg with height 188:188[0m
+[90mJan 21 15:42:11.020[0m [34mDEBUG: Handling certificate results msg with height 187:188[0m
+[90mJan 21 15:42:11.029[0m [34mDEBUG: Handling certificate results msg with height 188:188[0m
+[90mJan 21 15:42:11.041[0m [34mDEBUG: Handling certificate results msg with height 187:188[0m
+[90mJan 21 15:42:11.047[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:11.049[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:11.049[0m [34mDEBUG: Process time: 0.05s, Wait time: 3.00s[0m
+[90mJan 21 15:42:11.050[0m [34mDEBUG: Setting consensus timer: 2.953449 sec[0m
+[90mJan 21 15:42:11.050[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:11.057[0m [34mDEBUG: Received (ID: 1 H:189, CH:189, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:11.057[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:14.006[0m [32mINFO: (ID: 1 H:189, CH:189, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:42:14.040[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:42:14.087[0m [34mDEBUG: Applying block c2f548c4a86be014f767bf7ef123c880a5655d6b762f8317ab09126e027fdc14 for height 189[0m
+[90mJan 21 15:42:14.110[0m [34mDEBUG: Handling certificate results msg with height 188:188[0m
+[90mJan 21 15:42:14.142[0m [34mDEBUG: Handling certificate results msg with height 187:188[0m
+[90mJan 21 15:42:14.170[0m [34mDEBUG: Validating block header c2f548c4a86be014f767bf7ef123c880a5655d6b762f8317ab09126e027fdc14 for height 189[0m
+[90mJan 21 15:42:14.270[0m [32mINFO: Block c2f548c4a86be014f767bf7ef123c880a5655d6b762f8317ab09126e027fdc14 with 2 txs is valid for height 189 ✅ [0m
+[90mJan 21 15:42:14.400[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:14.410[0m [34mDEBUG: Process time: 0.41s, Wait time: 2.00s[0m
+[90mJan 21 15:42:14.439[0m [34mDEBUG: Setting consensus timer: 1.594209 sec[0m
+[90mJan 21 15:42:14.460[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:14.491[0m [34mDEBUG: Received (ID: 1 H:189, CH:189, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:14.509[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:14.522[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:16.057[0m [32mINFO: (ID: 1 H:189, CH:189, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:42:16.100[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:16.124[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:16.149[0m [34mDEBUG: Process time: 0.09s, Wait time: 2.00s[0m
+[90mJan 21 15:42:16.168[0m [34mDEBUG: Setting consensus timer: 1.907860 sec[0m
+[90mJan 21 15:42:16.179[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:16.219[0m [34mDEBUG: Received (ID: 1 H:189, CH:189, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:16.220[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:18.087[0m [32mINFO: (ID: 1 H:189, CH:189, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:42:18.096[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:18.098[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:42:18.100[0m [34mDEBUG: Setting consensus timer: 1.989291 sec[0m
+[90mJan 21 15:42:18.100[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:18.106[0m [34mDEBUG: Received (ID: 1 H:189, CH:189, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:18.107[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:18.107[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:20.093[0m [32mINFO: (ID: 1 H:189, CH:189, R:0, P:COMMIT)[0m
+[90mJan 21 15:42:20.108[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:20.141[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:42:20.145[0m [32mINFO: Successfully submitted the certificate-results-txn with hash c749763003841028b9280f48b3c41b7acef2a2a4d8caea9472097561f4445f62[0m
+[90mJan 21 15:42:20.152[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:20.187[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:20.205[0m [34mDEBUG: Process time: 0.11s, Wait time: 2.00s[0m
+[90mJan 21 15:42:20.212[0m [34mDEBUG: Setting consensus timer: 1.888966 sec[0m
+[90mJan 21 15:42:20.219[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:42:20.329[0m [34mDEBUG: Handling certificate results msg with height 189:189[0m
+[90mJan 21 15:42:20.385[0m [32mINFO: Added tx c749763003841028b9280f48b3c41b7acef2a2a4d8caea9472097561f4445f62 to mempool for checking[0m
+[90mJan 21 15:42:20.390[0m [32mINFO: Received valid transaction c749763003841028b9280f48b3c41b7acef2a2a4 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:42:20.400[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:20.441[0m [34mDEBUG: Received (ID: 1 H:189, CH:189, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:20.444[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:20.460[0m [34mDEBUG: Handling certificate results msg with height 188:189[0m
+[90mJan 21 15:42:20.566[0m [32mINFO: Added tx 40249229502420eec09ff62a534a6fe5ce72ce16beea052bb2e1c2df05009803 to mempool for checking[0m
+[90mJan 21 15:42:20.569[0m [32mINFO: Received valid transaction 40249229502420eec09ff62a534a6fe5ce72ce16 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:42:22.113[0m [32mINFO: (ID: 1 H:189, CH:189, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:42:22.114[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:22.115[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:42:22.119[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:42:22.121[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:42:22.121[0m [34mDEBUG: Setting consensus timer: 1.992172 sec[0m
+[90mJan 21 15:42:22.122[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:42:22.127[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:22.128[0m [34mDEBUG: Applying block c2f548c4a86be014f767bf7ef123c880a5655d6b762f8317ab09126e027fdc14 for height 189[0m
+[90mJan 21 15:42:22.133[0m [34mDEBUG: Handling certificate results msg with height 188:188[0m
+[90mJan 21 15:42:22.144[0m [34mDEBUG: Handling certificate results msg with height 187:188[0m
+[90mJan 21 15:42:22.154[0m [34mDEBUG: Validating block header c2f548c4a86be014f767bf7ef123c880a5655d6b762f8317ab09126e027fdc14 for height 189[0m
+[90mJan 21 15:42:22.158[0m [32mINFO: Block c2f548c4a86be014f767bf7ef123c880a5655d6b762f8317ab09126e027fdc14 with 2 txs is valid for height 189 ✅ [0m
+[90mJan 21 15:42:22.165[0m [34mDEBUG: Indexing quorum certificate for height 189[0m
+[90mJan 21 15:42:22.165[0m [34mDEBUG: Indexing last quorum certificate for height 188[0m
+[90mJan 21 15:42:22.166[0m [34mDEBUG: Indexing block 189[0m
+[90mJan 21 15:42:22.166[0m [34mDEBUG: Tx b5cc8ffe60ef486d9927e78451c0dfd91eec603ae13acdc4e4e6ada2b3d1ca0d was included in a block so removing from mempool[0m
+[90mJan 21 15:42:22.167[0m [34mDEBUG: Tx 5002657927968e9c608b1563ed0978a647be08f51138da3174ed4f42ed5d3f47 was included in a block so removing from mempool[0m
+[90mJan 21 15:42:22.167[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:42:22.172[0m [34mDEBUG: Handling certificate results msg with height 189:189[0m
+[90mJan 21 15:42:22.180[0m [34mDEBUG: Handling certificate results msg with height 188:189[0m
+[90mJan 21 15:42:22.184[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:42:22.189[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:189 🔒[0m
+[90mJan 21 15:42:22.191[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:42:22.191[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:42:22.193[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:42:22.193[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:22.194[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:42:22.197[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:42:22.197[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:42:22.199[0m [32mINFO: New BaseChain Height 190 detected![0m
+[90mJan 21 15:42:22.202[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:42:22.203[0m [34mDEBUG: Starting the VDF service with 439 iterations[0m
+[90mJan 21 15:42:22.203[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:42:22.205[0m [34mDEBUG: Process time: 0.07s, Wait time: 2.00s[0m
+[90mJan 21 15:42:22.206[0m [34mDEBUG: Setting consensus timer: 1.925726 sec[0m
+[90mJan 21 15:42:22.536[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:42:22.536[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:42:22.537[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:42:22.538[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:42:22.968[0m [34mDEBUG: VDF service completed with 439 iterations in 764.012547ms[0m
+[90mJan 21 15:42:22.969[0m [34mDEBUG: Adjusted iterations for next run to 919[0m
+[90mJan 21 15:42:24.115[0m [32mINFO: (ID: 1 H:190, CH:190, R:0, P:ELECTION)[0m
+[90mJan 21 15:42:24.116[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:42:24.117[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:24.119[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:24.120[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:42:24.120[0m [34mDEBUG: Setting consensus timer: 1.994720 sec[0m
+[90mJan 21 15:42:24.121[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:24.125[0m [34mDEBUG: Received (ID: 1 H:190, CH:190, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:24.126[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:26.117[0m [32mINFO: (ID: 1 H:190, CH:190, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:42:26.123[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:42:26.124[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:42:26.127[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:26.128[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:42:26.129[0m [34mDEBUG: Setting consensus timer: 2.988682 sec[0m
+[90mJan 21 15:42:26.129[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:26.134[0m [34mDEBUG: Received (ID: 1 H:190, CH:190, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:26.134[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:26.135[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:29.119[0m [32mINFO: (ID: 1 H:190, CH:190, R:0, P:PROPOSE)[0m
+[90mJan 21 15:42:29.122[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:42:29.129[0m [34mDEBUG: Handling certificate results msg with height 189:189[0m
+[90mJan 21 15:42:29.137[0m [34mDEBUG: Handling certificate results msg with height 188:189[0m
+[90mJan 21 15:42:29.145[0m [34mDEBUG: Handling certificate results msg with height 189:189[0m
+[90mJan 21 15:42:29.153[0m [34mDEBUG: Handling certificate results msg with height 188:189[0m
+[90mJan 21 15:42:29.157[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:29.160[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:29.161[0m [34mDEBUG: Process time: 0.04s, Wait time: 3.00s[0m
+[90mJan 21 15:42:29.161[0m [34mDEBUG: Setting consensus timer: 2.957975 sec[0m
+[90mJan 21 15:42:29.162[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:29.168[0m [34mDEBUG: Received (ID: 1 H:190, CH:190, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:29.169[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:32.121[0m [32mINFO: (ID: 1 H:190, CH:190, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:42:32.123[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:42:32.125[0m [34mDEBUG: Applying block 154da14baa5fd54cc57ddd56d518b41d660ad5bd603cfa07fd8bf1b5e44aee74 for height 190[0m
+[90mJan 21 15:42:32.133[0m [34mDEBUG: Handling certificate results msg with height 189:189[0m
+[90mJan 21 15:42:32.141[0m [34mDEBUG: Handling certificate results msg with height 188:189[0m
+[90mJan 21 15:42:32.148[0m [34mDEBUG: Validating block header 154da14baa5fd54cc57ddd56d518b41d660ad5bd603cfa07fd8bf1b5e44aee74 for height 190[0m
+[90mJan 21 15:42:32.152[0m [32mINFO: Block 154da14baa5fd54cc57ddd56d518b41d660ad5bd603cfa07fd8bf1b5e44aee74 with 2 txs is valid for height 190 ✅ [0m
+[90mJan 21 15:42:32.154[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:32.154[0m [34mDEBUG: Process time: 0.03s, Wait time: 2.00s[0m
+[90mJan 21 15:42:32.155[0m [34mDEBUG: Setting consensus timer: 1.966824 sec[0m
+[90mJan 21 15:42:32.156[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:32.160[0m [34mDEBUG: Received (ID: 1 H:190, CH:190, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:32.161[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:32.161[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:34.123[0m [32mINFO: (ID: 1 H:190, CH:190, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:42:34.127[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:34.129[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:34.131[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:42:34.131[0m [34mDEBUG: Setting consensus timer: 1.992739 sec[0m
+[90mJan 21 15:42:34.132[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:34.140[0m [34mDEBUG: Received (ID: 1 H:190, CH:190, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:34.141[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:36.125[0m [32mINFO: (ID: 1 H:190, CH:190, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:42:36.129[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:36.130[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:42:36.131[0m [34mDEBUG: Setting consensus timer: 1.995033 sec[0m
+[90mJan 21 15:42:36.132[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:36.136[0m [34mDEBUG: Received (ID: 1 H:190, CH:190, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:36.137[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:36.138[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:38.128[0m [32mINFO: (ID: 1 H:190, CH:190, R:0, P:COMMIT)[0m
+[90mJan 21 15:42:38.131[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:38.134[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:42:38.135[0m [32mINFO: Successfully submitted the certificate-results-txn with hash 0db3ca898683d10f99795105a022a9b2c5e48f93f87f7154f0c452be5c8f2558[0m
+[90mJan 21 15:42:38.136[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:38.138[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:38.139[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:42:38.140[0m [34mDEBUG: Setting consensus timer: 1.988493 sec[0m
+[90mJan 21 15:42:38.144[0m [34mDEBUG: Handling certificate results msg with height 190:190[0m
+[90mJan 21 15:42:38.149[0m [32mINFO: Added tx 0db3ca898683d10f99795105a022a9b2c5e48f93f87f7154f0c452be5c8f2558 to mempool for checking[0m
+[90mJan 21 15:42:38.149[0m [32mINFO: Received valid transaction 0db3ca898683d10f99795105a022a9b2c5e48f93 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:42:38.150[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:38.157[0m [34mDEBUG: Received (ID: 1 H:190, CH:190, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:38.158[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:38.254[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:42:38.261[0m [34mDEBUG: Handling certificate results msg with height 189:190[0m
+[90mJan 21 15:42:38.266[0m [32mINFO: Added tx bad191da09a4ae46cce6e6f1074718dfedd4f427e0f8c7861bce3ebfc7aaf749 to mempool for checking[0m
+[90mJan 21 15:42:38.267[0m [32mINFO: Received valid transaction bad191da09a4ae46cce6e6f1074718dfedd4f427 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:42:40.129[0m [32mINFO: (ID: 1 H:190, CH:190, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:42:40.130[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:40.130[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:42:40.131[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:42:40.132[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:42:40.132[0m [34mDEBUG: Setting consensus timer: 1.997090 sec[0m
+[90mJan 21 15:42:40.133[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:42:40.137[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:40.138[0m [34mDEBUG: Applying block 154da14baa5fd54cc57ddd56d518b41d660ad5bd603cfa07fd8bf1b5e44aee74 for height 190[0m
+[90mJan 21 15:42:40.142[0m [34mDEBUG: Handling certificate results msg with height 189:189[0m
+[90mJan 21 15:42:40.151[0m [34mDEBUG: Handling certificate results msg with height 188:189[0m
+[90mJan 21 15:42:40.156[0m [34mDEBUG: Validating block header 154da14baa5fd54cc57ddd56d518b41d660ad5bd603cfa07fd8bf1b5e44aee74 for height 190[0m
+[90mJan 21 15:42:40.159[0m [32mINFO: Block 154da14baa5fd54cc57ddd56d518b41d660ad5bd603cfa07fd8bf1b5e44aee74 with 2 txs is valid for height 190 ✅ [0m
+[90mJan 21 15:42:40.164[0m [34mDEBUG: Indexing quorum certificate for height 190[0m
+[90mJan 21 15:42:40.165[0m [34mDEBUG: Indexing last quorum certificate for height 189[0m
+[90mJan 21 15:42:40.165[0m [34mDEBUG: Indexing block 190[0m
+[90mJan 21 15:42:40.166[0m [34mDEBUG: Tx c749763003841028b9280f48b3c41b7acef2a2a4d8caea9472097561f4445f62 was included in a block so removing from mempool[0m
+[90mJan 21 15:42:40.166[0m [34mDEBUG: Tx 40249229502420eec09ff62a534a6fe5ce72ce16beea052bb2e1c2df05009803 was included in a block so removing from mempool[0m
+[90mJan 21 15:42:40.167[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:42:40.172[0m [34mDEBUG: Handling certificate results msg with height 190:190[0m
+[90mJan 21 15:42:40.178[0m [34mDEBUG: Handling certificate results msg with height 189:190[0m
+[90mJan 21 15:42:40.183[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:42:40.189[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:190 🔒[0m
+[90mJan 21 15:42:40.190[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:42:40.190[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:42:40.192[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:42:40.192[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:40.193[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:42:40.193[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:42:40.194[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:42:40.198[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:42:40.199[0m [34mDEBUG: Starting the VDF service with 919 iterations[0m
+[90mJan 21 15:42:40.199[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:42:40.200[0m [34mDEBUG: Process time: 0.06s, Wait time: 2.00s[0m
+[90mJan 21 15:42:40.201[0m [34mDEBUG: Setting consensus timer: 1.939145 sec[0m
+[90mJan 21 15:42:40.496[0m [32mINFO: New BaseChain Height 191 detected![0m
+[90mJan 21 15:42:40.835[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:42:40.836[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:42:40.836[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:42:40.838[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:42:41.761[0m [34mDEBUG: VDF service completed with 919 iterations in 1.561223154s[0m
+[90mJan 21 15:42:41.763[0m [34mDEBUG: Adjusted iterations for next run to 941[0m
+[90mJan 21 15:42:42.140[0m [32mINFO: (ID: 1 H:191, CH:191, R:0, P:ELECTION)[0m
+[90mJan 21 15:42:42.144[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:42:42.144[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:42.147[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:42.148[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:42:42.148[0m [34mDEBUG: Setting consensus timer: 1.992907 sec[0m
+[90mJan 21 15:42:42.149[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:42.153[0m [34mDEBUG: Received (ID: 1 H:191, CH:191, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:42.154[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:44.143[0m [32mINFO: (ID: 1 H:191, CH:191, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:42:44.148[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:42:44.149[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:42:44.151[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:44.152[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:42:44.152[0m [34mDEBUG: Setting consensus timer: 2.991166 sec[0m
+[90mJan 21 15:42:44.153[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:44.157[0m [34mDEBUG: Received (ID: 1 H:191, CH:191, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:44.158[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:44.158[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:47.146[0m [32mINFO: (ID: 1 H:191, CH:191, R:0, P:PROPOSE)[0m
+[90mJan 21 15:42:47.148[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:42:47.154[0m [34mDEBUG: Handling certificate results msg with height 190:190[0m
+[90mJan 21 15:42:47.162[0m [34mDEBUG: Handling certificate results msg with height 189:190[0m
+[90mJan 21 15:42:47.170[0m [34mDEBUG: Handling certificate results msg with height 190:190[0m
+[90mJan 21 15:42:47.179[0m [34mDEBUG: Handling certificate results msg with height 189:190[0m
+[90mJan 21 15:42:47.184[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:47.186[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:47.187[0m [34mDEBUG: Process time: 0.04s, Wait time: 3.00s[0m
+[90mJan 21 15:42:47.187[0m [34mDEBUG: Setting consensus timer: 2.958843 sec[0m
+[90mJan 21 15:42:47.188[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:47.193[0m [34mDEBUG: Received (ID: 1 H:191, CH:191, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:47.194[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:50.147[0m [32mINFO: (ID: 1 H:191, CH:191, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:42:50.148[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:42:50.150[0m [34mDEBUG: Applying block 1ead6244cd7eeb8a01f705587c5f3f35407c1e6e1fe7d9907248b0c0413c3169 for height 191[0m
+[90mJan 21 15:42:50.155[0m [34mDEBUG: Handling certificate results msg with height 190:190[0m
+[90mJan 21 15:42:50.166[0m [34mDEBUG: Handling certificate results msg with height 189:190[0m
+[90mJan 21 15:42:50.173[0m [34mDEBUG: Validating block header 1ead6244cd7eeb8a01f705587c5f3f35407c1e6e1fe7d9907248b0c0413c3169 for height 191[0m
+[90mJan 21 15:42:50.178[0m [32mINFO: Block 1ead6244cd7eeb8a01f705587c5f3f35407c1e6e1fe7d9907248b0c0413c3169 with 2 txs is valid for height 191 ✅ [0m
+[90mJan 21 15:42:50.180[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:50.181[0m [34mDEBUG: Process time: 0.03s, Wait time: 2.00s[0m
+[90mJan 21 15:42:50.182[0m [34mDEBUG: Setting consensus timer: 1.966542 sec[0m
+[90mJan 21 15:42:50.183[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:50.188[0m [34mDEBUG: Received (ID: 1 H:191, CH:191, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:50.189[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:50.190[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:52.151[0m [32mINFO: (ID: 1 H:191, CH:191, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:42:52.153[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:52.155[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:52.156[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:42:52.157[0m [34mDEBUG: Setting consensus timer: 1.994285 sec[0m
+[90mJan 21 15:42:52.158[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:52.165[0m [34mDEBUG: Received (ID: 1 H:191, CH:191, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:52.166[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:54.130[0m [32mINFO: (ID: 1 H:191, CH:191, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:42:54.132[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:54.133[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:42:54.134[0m [34mDEBUG: Setting consensus timer: 1.996606 sec[0m
+[90mJan 21 15:42:54.135[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:54.140[0m [34mDEBUG: Received (ID: 1 H:191, CH:191, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:54.141[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:54.141[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:56.132[0m [32mINFO: (ID: 1 H:191, CH:191, R:0, P:COMMIT)[0m
+[90mJan 21 15:42:56.134[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:56.136[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:42:56.137[0m [32mINFO: Successfully submitted the certificate-results-txn with hash 4cd2ca2db8ab9ee18189dc992fa9806c329c8b1065a8496ddacc511e94490d28[0m
+[90mJan 21 15:42:56.138[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:42:56.140[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:42:56.140[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:42:56.141[0m [34mDEBUG: Setting consensus timer: 1.991340 sec[0m
+[90mJan 21 15:42:56.145[0m [34mDEBUG: Handling certificate results msg with height 191:191[0m
+[90mJan 21 15:42:56.151[0m [32mINFO: Added tx 4cd2ca2db8ab9ee18189dc992fa9806c329c8b1065a8496ddacc511e94490d28 to mempool for checking[0m
+[90mJan 21 15:42:56.151[0m [32mINFO: Received valid transaction 4cd2ca2db8ab9ee18189dc992fa9806c329c8b10 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:42:56.152[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:42:56.159[0m [34mDEBUG: Received (ID: 1 H:191, CH:191, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:42:56.159[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:42:56.269[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:42:56.277[0m [34mDEBUG: Handling certificate results msg with height 190:191[0m
+[90mJan 21 15:42:56.282[0m [32mINFO: Added tx f5bdde53e4c5573b4409665bceb56c15e959cf3a2264c1879580c4f694df2c7c to mempool for checking[0m
+[90mJan 21 15:42:56.283[0m [32mINFO: Received valid transaction f5bdde53e4c5573b4409665bceb56c15e959cf3a from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:42:58.134[0m [32mINFO: (ID: 1 H:191, CH:191, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:42:58.138[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:58.139[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:42:58.141[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:42:58.142[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:42:58.142[0m [34mDEBUG: Setting consensus timer: 1.992425 sec[0m
+[90mJan 21 15:42:58.143[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:42:58.147[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:58.148[0m [34mDEBUG: Applying block 1ead6244cd7eeb8a01f705587c5f3f35407c1e6e1fe7d9907248b0c0413c3169 for height 191[0m
+[90mJan 21 15:42:58.153[0m [34mDEBUG: Handling certificate results msg with height 190:190[0m
+[90mJan 21 15:42:58.162[0m [34mDEBUG: Handling certificate results msg with height 189:190[0m
+[90mJan 21 15:42:58.170[0m [34mDEBUG: Validating block header 1ead6244cd7eeb8a01f705587c5f3f35407c1e6e1fe7d9907248b0c0413c3169 for height 191[0m
+[90mJan 21 15:42:58.174[0m [32mINFO: Block 1ead6244cd7eeb8a01f705587c5f3f35407c1e6e1fe7d9907248b0c0413c3169 with 2 txs is valid for height 191 ✅ [0m
+[90mJan 21 15:42:58.181[0m [34mDEBUG: Indexing quorum certificate for height 191[0m
+[90mJan 21 15:42:58.182[0m [34mDEBUG: Indexing last quorum certificate for height 190[0m
+[90mJan 21 15:42:58.183[0m [34mDEBUG: Indexing block 191[0m
+[90mJan 21 15:42:58.184[0m [34mDEBUG: Tx 0db3ca898683d10f99795105a022a9b2c5e48f93f87f7154f0c452be5c8f2558 was included in a block so removing from mempool[0m
+[90mJan 21 15:42:58.185[0m [34mDEBUG: Tx bad191da09a4ae46cce6e6f1074718dfedd4f427e0f8c7861bce3ebfc7aaf749 was included in a block so removing from mempool[0m
+[90mJan 21 15:42:58.185[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:42:58.192[0m [34mDEBUG: Handling certificate results msg with height 191:191[0m
+[90mJan 21 15:42:58.202[0m [34mDEBUG: Handling certificate results msg with height 190:191[0m
+[90mJan 21 15:42:58.207[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:42:58.208[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:191 🔒[0m
+[90mJan 21 15:42:58.209[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:42:58.209[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:42:58.211[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:42:58.212[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:42:58.213[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:42:58.213[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:42:58.214[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:42:58.218[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:42:58.219[0m [34mDEBUG: Starting the VDF service with 941 iterations[0m
+[90mJan 21 15:42:58.219[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:42:58.221[0m [34mDEBUG: Process time: 0.07s, Wait time: 2.00s[0m
+[90mJan 21 15:42:58.221[0m [34mDEBUG: Setting consensus timer: 1.930332 sec[0m
+[90mJan 21 15:42:58.454[0m [32mINFO: New BaseChain Height 192 detected![0m
+[90mJan 21 15:42:58.794[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:42:58.795[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:42:58.796[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:42:58.797[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:42:59.468[0m [34mDEBUG: VDF service completed with 941 iterations in 1.248002786s[0m
+[90mJan 21 15:42:59.469[0m [34mDEBUG: Adjusted iterations for next run to 1206[0m
+[90mJan 21 15:43:00.153[0m [32mINFO: (ID: 1 H:192, CH:192, R:0, P:ELECTION)[0m
+[90mJan 21 15:43:00.154[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:43:00.155[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:00.157[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:00.157[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:43:00.158[0m [34mDEBUG: Setting consensus timer: 1.995439 sec[0m
+[90mJan 21 15:43:00.158[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:00.162[0m [34mDEBUG: Received (ID: 1 H:192, CH:192, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:00.162[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:02.155[0m [32mINFO: (ID: 1 H:192, CH:192, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:43:02.160[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:43:02.161[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:43:02.163[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:02.164[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:43:02.165[0m [34mDEBUG: Setting consensus timer: 2.990717 sec[0m
+[90mJan 21 15:43:02.166[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:02.170[0m [34mDEBUG: Received (ID: 1 H:192, CH:192, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:02.170[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:02.172[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:05.158[0m [32mINFO: (ID: 1 H:192, CH:192, R:0, P:PROPOSE)[0m
+[90mJan 21 15:43:05.162[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:43:05.168[0m [34mDEBUG: Handling certificate results msg with height 191:191[0m
+[90mJan 21 15:43:05.176[0m [34mDEBUG: Handling certificate results msg with height 190:191[0m
+[90mJan 21 15:43:05.187[0m [34mDEBUG: Handling certificate results msg with height 191:191[0m
+[90mJan 21 15:43:05.195[0m [34mDEBUG: Handling certificate results msg with height 190:191[0m
+[90mJan 21 15:43:05.201[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:05.202[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:05.203[0m [34mDEBUG: Process time: 0.05s, Wait time: 3.00s[0m
+[90mJan 21 15:43:05.204[0m [34mDEBUG: Setting consensus timer: 2.954770 sec[0m
+[90mJan 21 15:43:05.204[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:05.212[0m [34mDEBUG: Received (ID: 1 H:192, CH:192, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:05.213[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:08.159[0m [32mINFO: (ID: 1 H:192, CH:192, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:43:08.161[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:43:08.162[0m [34mDEBUG: Applying block 935955f40a4500391cf6347ec520998ff675c9d79cb88754b85c0cba4386a699 for height 192[0m
+[90mJan 21 15:43:08.167[0m [34mDEBUG: Handling certificate results msg with height 191:191[0m
+[90mJan 21 15:43:08.175[0m [34mDEBUG: Handling certificate results msg with height 190:191[0m
+[90mJan 21 15:43:08.181[0m [34mDEBUG: Validating block header 935955f40a4500391cf6347ec520998ff675c9d79cb88754b85c0cba4386a699 for height 192[0m
+[90mJan 21 15:43:08.185[0m [32mINFO: Block 935955f40a4500391cf6347ec520998ff675c9d79cb88754b85c0cba4386a699 with 2 txs is valid for height 192 ✅ [0m
+[90mJan 21 15:43:08.187[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:08.187[0m [34mDEBUG: Process time: 0.03s, Wait time: 2.00s[0m
+[90mJan 21 15:43:08.188[0m [34mDEBUG: Setting consensus timer: 1.971719 sec[0m
+[90mJan 21 15:43:08.189[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:08.193[0m [34mDEBUG: Received (ID: 1 H:192, CH:192, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:08.194[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:08.194[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:10.161[0m [32mINFO: (ID: 1 H:192, CH:192, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:43:10.163[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:10.166[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:10.166[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:43:10.167[0m [34mDEBUG: Setting consensus timer: 1.994627 sec[0m
+[90mJan 21 15:43:10.168[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:10.176[0m [34mDEBUG: Received (ID: 1 H:192, CH:192, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:10.177[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:12.164[0m [32mINFO: (ID: 1 H:192, CH:192, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:43:12.167[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:12.168[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:43:12.169[0m [34mDEBUG: Setting consensus timer: 1.995078 sec[0m
+[90mJan 21 15:43:12.170[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:12.176[0m [34mDEBUG: Received (ID: 1 H:192, CH:192, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:12.177[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:12.177[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:14.166[0m [32mINFO: (ID: 1 H:192, CH:192, R:0, P:COMMIT)[0m
+[90mJan 21 15:43:14.169[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:14.172[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:43:14.173[0m [32mINFO: Successfully submitted the certificate-results-txn with hash d71c36337e75b866a7f4c210e18c621e433d25847e4aa478a07acafb32d51f89[0m
+[90mJan 21 15:43:14.174[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:14.176[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:14.177[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:43:14.178[0m [34mDEBUG: Setting consensus timer: 1.988907 sec[0m
+[90mJan 21 15:43:14.182[0m [34mDEBUG: Handling certificate results msg with height 192:192[0m
+[90mJan 21 15:43:14.186[0m [32mINFO: Added tx d71c36337e75b866a7f4c210e18c621e433d25847e4aa478a07acafb32d51f89 to mempool for checking[0m
+[90mJan 21 15:43:14.186[0m [32mINFO: Received valid transaction d71c36337e75b866a7f4c210e18c621e433d2584 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:43:14.187[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:14.194[0m [34mDEBUG: Received (ID: 1 H:192, CH:192, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:14.195[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:14.369[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:43:14.374[0m [34mDEBUG: Handling certificate results msg with height 191:192[0m
+[90mJan 21 15:43:14.379[0m [32mINFO: Added tx ff3ca3819c2e24362150f4be44662dada779e33600f04ad38fb74c3a6c6a1c90 to mempool for checking[0m
+[90mJan 21 15:43:14.380[0m [32mINFO: Received valid transaction ff3ca3819c2e24362150f4be44662dada779e336 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:43:16.168[0m [32mINFO: (ID: 1 H:192, CH:192, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:43:16.171[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:16.172[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:43:16.173[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:43:16.174[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:43:16.175[0m [34mDEBUG: Setting consensus timer: 1.994267 sec[0m
+[90mJan 21 15:43:16.176[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:43:16.180[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:16.181[0m [34mDEBUG: Applying block 935955f40a4500391cf6347ec520998ff675c9d79cb88754b85c0cba4386a699 for height 192[0m
+[90mJan 21 15:43:16.185[0m [34mDEBUG: Handling certificate results msg with height 191:191[0m
+[90mJan 21 15:43:16.193[0m [34mDEBUG: Handling certificate results msg with height 190:191[0m
+[90mJan 21 15:43:16.198[0m [34mDEBUG: Validating block header 935955f40a4500391cf6347ec520998ff675c9d79cb88754b85c0cba4386a699 for height 192[0m
+[90mJan 21 15:43:16.202[0m [32mINFO: Block 935955f40a4500391cf6347ec520998ff675c9d79cb88754b85c0cba4386a699 with 2 txs is valid for height 192 ✅ [0m
+[90mJan 21 15:43:16.208[0m [34mDEBUG: Indexing quorum certificate for height 192[0m
+[90mJan 21 15:43:16.208[0m [34mDEBUG: Indexing last quorum certificate for height 191[0m
+[90mJan 21 15:43:16.209[0m [34mDEBUG: Indexing block 192[0m
+[90mJan 21 15:43:16.210[0m [34mDEBUG: Tx 4cd2ca2db8ab9ee18189dc992fa9806c329c8b1065a8496ddacc511e94490d28 was included in a block so removing from mempool[0m
+[90mJan 21 15:43:16.210[0m [34mDEBUG: Tx f5bdde53e4c5573b4409665bceb56c15e959cf3a2264c1879580c4f694df2c7c was included in a block so removing from mempool[0m
+[90mJan 21 15:43:16.211[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:43:16.214[0m [34mDEBUG: Handling certificate results msg with height 192:192[0m
+[90mJan 21 15:43:16.221[0m [34mDEBUG: Handling certificate results msg with height 191:192[0m
+[90mJan 21 15:43:16.224[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:43:16.225[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:192 🔒[0m
+[90mJan 21 15:43:16.226[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:43:16.226[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:43:16.227[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:43:16.228[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:16.228[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:43:16.229[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:43:16.229[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:43:16.232[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:43:16.233[0m [34mDEBUG: Starting the VDF service with 1206 iterations[0m
+[90mJan 21 15:43:16.233[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:43:16.235[0m [34mDEBUG: Process time: 0.05s, Wait time: 2.00s[0m
+[90mJan 21 15:43:16.235[0m [34mDEBUG: Setting consensus timer: 1.947367 sec[0m
+[90mJan 21 15:43:16.437[0m [32mINFO: New BaseChain Height 193 detected![0m
+[90mJan 21 15:43:16.776[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:43:16.777[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:43:16.777[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:43:16.778[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:43:17.754[0m [34mDEBUG: VDF service completed with 1206 iterations in 1.520439176s[0m
+[90mJan 21 15:43:17.756[0m [34mDEBUG: Adjusted iterations for next run to 1269[0m
+[90mJan 21 15:43:18.184[0m [32mINFO: (ID: 1 H:193, CH:193, R:0, P:ELECTION)[0m
+[90mJan 21 15:43:18.186[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:43:18.187[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:18.190[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:18.191[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:43:18.191[0m [34mDEBUG: Setting consensus timer: 1.993064 sec[0m
+[90mJan 21 15:43:18.193[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:18.196[0m [34mDEBUG: Received (ID: 1 H:193, CH:193, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:18.197[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:20.187[0m [32mINFO: (ID: 1 H:193, CH:193, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:43:20.194[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:43:20.195[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:43:20.197[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:20.198[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:43:20.198[0m [34mDEBUG: Setting consensus timer: 2.989053 sec[0m
+[90mJan 21 15:43:20.199[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:20.203[0m [34mDEBUG: Received (ID: 1 H:193, CH:193, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:20.203[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:20.204[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:23.188[0m [32mINFO: (ID: 1 H:193, CH:193, R:0, P:PROPOSE)[0m
+[90mJan 21 15:43:23.192[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:43:23.197[0m [34mDEBUG: Handling certificate results msg with height 192:192[0m
+[90mJan 21 15:43:23.205[0m [34mDEBUG: Handling certificate results msg with height 191:192[0m
+[90mJan 21 15:43:23.213[0m [34mDEBUG: Handling certificate results msg with height 192:192[0m
+[90mJan 21 15:43:23.221[0m [34mDEBUG: Handling certificate results msg with height 191:192[0m
+[90mJan 21 15:43:23.227[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:23.228[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:23.229[0m [34mDEBUG: Process time: 0.04s, Wait time: 3.00s[0m
+[90mJan 21 15:43:23.230[0m [34mDEBUG: Setting consensus timer: 2.959086 sec[0m
+[90mJan 21 15:43:23.230[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:23.237[0m [34mDEBUG: Received (ID: 1 H:193, CH:193, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:23.237[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:26.170[0m [32mINFO: (ID: 1 H:193, CH:193, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:43:26.172[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:43:26.174[0m [34mDEBUG: Applying block abfc9130044d2a120158062a6e8191e960708b30b74779a2342f84f70ce4c9ff for height 193[0m
+[90mJan 21 15:43:26.183[0m [34mDEBUG: Handling certificate results msg with height 192:192[0m
+[90mJan 21 15:43:26.192[0m [34mDEBUG: Handling certificate results msg with height 191:192[0m
+[90mJan 21 15:43:26.198[0m [34mDEBUG: Validating block header abfc9130044d2a120158062a6e8191e960708b30b74779a2342f84f70ce4c9ff for height 193[0m
+[90mJan 21 15:43:26.202[0m [32mINFO: Block abfc9130044d2a120158062a6e8191e960708b30b74779a2342f84f70ce4c9ff with 2 txs is valid for height 193 ✅ [0m
+[90mJan 21 15:43:26.204[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:26.204[0m [34mDEBUG: Process time: 0.03s, Wait time: 2.00s[0m
+[90mJan 21 15:43:26.205[0m [34mDEBUG: Setting consensus timer: 1.965827 sec[0m
+[90mJan 21 15:43:26.206[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:26.209[0m [34mDEBUG: Received (ID: 1 H:193, CH:193, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:26.210[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:26.211[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:28.173[0m [32mINFO: (ID: 1 H:193, CH:193, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:43:28.176[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:28.178[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:28.179[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:43:28.180[0m [34mDEBUG: Setting consensus timer: 1.994142 sec[0m
+[90mJan 21 15:43:28.181[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:28.187[0m [34mDEBUG: Received (ID: 1 H:193, CH:193, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:28.188[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:30.176[0m [32mINFO: (ID: 1 H:193, CH:193, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:43:30.179[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:30.180[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:43:30.181[0m [34mDEBUG: Setting consensus timer: 1.995659 sec[0m
+[90mJan 21 15:43:30.183[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:30.187[0m [34mDEBUG: Received (ID: 1 H:193, CH:193, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:30.187[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:30.188[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:32.179[0m [32mINFO: (ID: 1 H:193, CH:193, R:0, P:COMMIT)[0m
+[90mJan 21 15:43:32.183[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:32.186[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:43:32.187[0m [32mINFO: Successfully submitted the certificate-results-txn with hash 5f528d244d830e35c6dc6986012906ec859a6cf4bb1cf948154918e5ca660153[0m
+[90mJan 21 15:43:32.188[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:32.191[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:32.192[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:43:32.192[0m [34mDEBUG: Setting consensus timer: 1.987326 sec[0m
+[90mJan 21 15:43:32.198[0m [34mDEBUG: Handling certificate results msg with height 193:193[0m
+[90mJan 21 15:43:32.204[0m [32mINFO: Added tx 5f528d244d830e35c6dc6986012906ec859a6cf4bb1cf948154918e5ca660153 to mempool for checking[0m
+[90mJan 21 15:43:32.205[0m [32mINFO: Received valid transaction 5f528d244d830e35c6dc6986012906ec859a6cf4 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:43:32.206[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:32.220[0m [34mDEBUG: Received (ID: 1 H:193, CH:193, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:32.221[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:32.374[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:43:32.381[0m [34mDEBUG: Handling certificate results msg with height 192:193[0m
+[90mJan 21 15:43:32.387[0m [32mINFO: Added tx ad00edcf59b42180c798742f577884456f2505df69ed1d1783cc938581d6b8db to mempool for checking[0m
+[90mJan 21 15:43:32.388[0m [32mINFO: Received valid transaction ad00edcf59b42180c798742f577884456f2505df from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:43:34.182[0m [32mINFO: (ID: 1 H:193, CH:193, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:43:34.184[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:34.185[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:43:34.186[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:43:34.187[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:43:34.187[0m [34mDEBUG: Setting consensus timer: 1.995244 sec[0m
+[90mJan 21 15:43:34.188[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:43:34.192[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:34.193[0m [34mDEBUG: Applying block abfc9130044d2a120158062a6e8191e960708b30b74779a2342f84f70ce4c9ff for height 193[0m
+[90mJan 21 15:43:34.197[0m [34mDEBUG: Handling certificate results msg with height 192:192[0m
+[90mJan 21 15:43:34.204[0m [34mDEBUG: Handling certificate results msg with height 191:192[0m
+[90mJan 21 15:43:34.209[0m [34mDEBUG: Validating block header abfc9130044d2a120158062a6e8191e960708b30b74779a2342f84f70ce4c9ff for height 193[0m
+[90mJan 21 15:43:34.213[0m [32mINFO: Block abfc9130044d2a120158062a6e8191e960708b30b74779a2342f84f70ce4c9ff with 2 txs is valid for height 193 ✅ [0m
+[90mJan 21 15:43:34.218[0m [34mDEBUG: Indexing quorum certificate for height 193[0m
+[90mJan 21 15:43:34.219[0m [34mDEBUG: Indexing last quorum certificate for height 192[0m
+[90mJan 21 15:43:34.219[0m [34mDEBUG: Indexing block 193[0m
+[90mJan 21 15:43:34.220[0m [34mDEBUG: Tx d71c36337e75b866a7f4c210e18c621e433d25847e4aa478a07acafb32d51f89 was included in a block so removing from mempool[0m
+[90mJan 21 15:43:34.221[0m [34mDEBUG: Tx ff3ca3819c2e24362150f4be44662dada779e33600f04ad38fb74c3a6c6a1c90 was included in a block so removing from mempool[0m
+[90mJan 21 15:43:34.221[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:43:34.225[0m [34mDEBUG: Handling certificate results msg with height 193:193[0m
+[90mJan 21 15:43:34.231[0m [34mDEBUG: Handling certificate results msg with height 192:193[0m
+[90mJan 21 15:43:34.235[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:43:34.238[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:193 🔒[0m
+[90mJan 21 15:43:34.239[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:43:34.240[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:43:34.240[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:43:34.241[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:34.241[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:43:34.242[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:43:34.242[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:43:34.245[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:43:34.246[0m [34mDEBUG: Starting the VDF service with 1269 iterations[0m
+[90mJan 21 15:43:34.246[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:43:34.250[0m [34mDEBUG: Process time: 0.05s, Wait time: 2.00s[0m
+[90mJan 21 15:43:34.250[0m [34mDEBUG: Setting consensus timer: 1.946395 sec[0m
+[90mJan 21 15:43:34.400[0m [32mINFO: New BaseChain Height 194 detected![0m
+[90mJan 21 15:43:34.738[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:43:34.739[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:43:34.739[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:43:34.741[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:43:35.395[0m [34mDEBUG: VDF service completed with 1269 iterations in 1.14851171s[0m
+[90mJan 21 15:43:35.395[0m [34mDEBUG: Adjusted iterations for next run to 1767[0m
+[90mJan 21 15:43:36.199[0m [32mINFO: (ID: 1 H:194, CH:194, R:0, P:ELECTION)[0m
+[90mJan 21 15:43:36.203[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:43:36.203[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:36.205[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:36.206[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:43:36.207[0m [34mDEBUG: Setting consensus timer: 1.993019 sec[0m
+[90mJan 21 15:43:36.207[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:36.211[0m [34mDEBUG: Received (ID: 1 H:194, CH:194, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:36.212[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:38.201[0m [32mINFO: (ID: 1 H:194, CH:194, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:43:38.208[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:43:38.209[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:43:38.211[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:38.211[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:43:38.212[0m [34mDEBUG: Setting consensus timer: 2.989575 sec[0m
+[90mJan 21 15:43:38.213[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:38.217[0m [34mDEBUG: Received (ID: 1 H:194, CH:194, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:38.217[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:38.218[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:41.203[0m [32mINFO: (ID: 1 H:194, CH:194, R:0, P:PROPOSE)[0m
+[90mJan 21 15:43:41.206[0m [32mINFO: Self is the proposer[0m
+[90mJan 21 15:43:41.211[0m [34mDEBUG: Handling certificate results msg with height 193:193[0m
+[90mJan 21 15:43:41.219[0m [34mDEBUG: Handling certificate results msg with height 192:193[0m
+[90mJan 21 15:43:41.228[0m [34mDEBUG: Handling certificate results msg with height 193:193[0m
+[90mJan 21 15:43:41.235[0m [34mDEBUG: Handling certificate results msg with height 192:193[0m
+[90mJan 21 15:43:41.240[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:41.241[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:41.242[0m [34mDEBUG: Process time: 0.04s, Wait time: 3.00s[0m
+[90mJan 21 15:43:41.242[0m [34mDEBUG: Setting consensus timer: 2.960833 sec[0m
+[90mJan 21 15:43:41.243[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:41.248[0m [34mDEBUG: Received (ID: 1 H:194, CH:194, R:0, P:PROPOSE) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:41.249[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:44.204[0m [32mINFO: (ID: 1 H:194, CH:194, R:0, P:PROPOSE_VOTE)[0m
+[90mJan 21 15:43:44.206[0m [32mINFO: Proposer is b88a5928e54cbf0a36e0 👑[0m
+[90mJan 21 15:43:44.207[0m [34mDEBUG: Applying block f6b051ecfed57c011b738c92770cdd23abaa30744228da42df6107b5934f6c8b for height 194[0m
+[90mJan 21 15:43:44.214[0m [34mDEBUG: Handling certificate results msg with height 193:193[0m
+[90mJan 21 15:43:44.223[0m [34mDEBUG: Handling certificate results msg with height 192:193[0m
+[90mJan 21 15:43:44.230[0m [34mDEBUG: Validating block header f6b051ecfed57c011b738c92770cdd23abaa30744228da42df6107b5934f6c8b for height 194[0m
+[90mJan 21 15:43:44.235[0m [32mINFO: Block f6b051ecfed57c011b738c92770cdd23abaa30744228da42df6107b5934f6c8b with 2 txs is valid for height 194 ✅ [0m
+[90mJan 21 15:43:44.239[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:44.242[0m [34mDEBUG: Process time: 0.04s, Wait time: 2.00s[0m
+[90mJan 21 15:43:44.243[0m [34mDEBUG: Setting consensus timer: 1.962520 sec[0m
+[90mJan 21 15:43:44.244[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:44.250[0m [34mDEBUG: Received (ID: 1 H:194, CH:194, R:0, P:PROPOSE_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:44.251[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:44.251[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:46.208[0m [32mINFO: (ID: 1 H:194, CH:194, R:0, P:PRECOMMIT)[0m
+[90mJan 21 15:43:46.213[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:46.220[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:46.223[0m [34mDEBUG: Process time: 0.02s, Wait time: 2.00s[0m
+[90mJan 21 15:43:46.225[0m [34mDEBUG: Setting consensus timer: 1.984617 sec[0m
+[90mJan 21 15:43:46.228[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:46.249[0m [34mDEBUG: Received (ID: 1 H:194, CH:194, R:0, P:PRECOMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:46.259[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:48.214[0m [32mINFO: (ID: 1 H:194, CH:194, R:0, P:PRECOMMIT_VOTE)[0m
+[90mJan 21 15:43:48.217[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:48.218[0m [34mDEBUG: Process time: 0.00s, Wait time: 2.00s[0m
+[90mJan 21 15:43:48.219[0m [34mDEBUG: Setting consensus timer: 1.995323 sec[0m
+[90mJan 21 15:43:48.220[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:48.225[0m [34mDEBUG: Received (ID: 1 H:194, CH:194, R:0, P:PRECOMMIT_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:48.226[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:48.227[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:50.216[0m [32mINFO: (ID: 1 H:194, CH:194, R:0, P:COMMIT)[0m
+[90mJan 21 15:43:50.234[0m [34mDEBUG: Sending certificate results txn for: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:50.273[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:43:50.283[0m [32mINFO: Successfully submitted the certificate-results-txn with hash 6051f95cd3d8a77008c7f611114ea08458fd745b524fc82c6d83e3f5ce5a892f[0m
+[90mJan 21 15:43:50.291[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:50.344[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:50.354[0m [34mDEBUG: Process time: 0.14s, Wait time: 2.00s[0m
+[90mJan 21 15:43:50.360[0m [34mDEBUG: Setting consensus timer: 1.862796 sec[0m
+[90mJan 21 15:43:50.373[0m [34mDEBUG: Handling certificate results msg with height 194:194[0m
+[90mJan 21 15:43:50.380[0m [32mINFO: Added tx 6051f95cd3d8a77008c7f611114ea08458fd745b524fc82c6d83e3f5ce5a892f to mempool for checking[0m
+[90mJan 21 15:43:50.386[0m [32mINFO: Received valid transaction 6051f95cd3d8a77008c7f611114ea08458fd745b from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:43:50.388[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:50.400[0m [34mDEBUG: Received (ID: 1 H:194, CH:194, R:0, P:COMMIT) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:50.401[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:50.417[0m [34mDEBUG: Self sending TX message[0m
+[90mJan 21 15:43:50.426[0m [34mDEBUG: Handling certificate results msg with height 193:194[0m
+[90mJan 21 15:43:50.434[0m [32mINFO: Added tx b3531a463616c1ac48659842ad42431f097b3cf4e3bbf3b03d89a0f802ceb969 to mempool for checking[0m
+[90mJan 21 15:43:50.436[0m [32mINFO: Received valid transaction b3531a463616c1ac48659842ad42431f097b3cf4 from b88a5928e54cbf0a36e0 for chain 1[0m
+[90mJan 21 15:43:52.229[0m [32mINFO: (ID: 1 H:194, CH:194, R:0, P:COMMIT_PROCESS)[0m
+[90mJan 21 15:43:52.231[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:52.232[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:43:52.233[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:43:52.234[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:43:52.235[0m [34mDEBUG: Setting consensus timer: 1.994604 sec[0m
+[90mJan 21 15:43:52.235[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:43:52.240[0m [34mDEBUG: TryCommit block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:52.241[0m [34mDEBUG: Applying block f6b051ecfed57c011b738c92770cdd23abaa30744228da42df6107b5934f6c8b for height 194[0m
+[90mJan 21 15:43:52.247[0m [34mDEBUG: Handling certificate results msg with height 193:193[0m
+[90mJan 21 15:43:52.255[0m [34mDEBUG: Handling certificate results msg with height 192:193[0m
+[90mJan 21 15:43:52.264[0m [34mDEBUG: Validating block header f6b051ecfed57c011b738c92770cdd23abaa30744228da42df6107b5934f6c8b for height 194[0m
+[90mJan 21 15:43:52.269[0m [32mINFO: Block f6b051ecfed57c011b738c92770cdd23abaa30744228da42df6107b5934f6c8b with 2 txs is valid for height 194 ✅ [0m
+[90mJan 21 15:43:52.275[0m [34mDEBUG: Indexing quorum certificate for height 194[0m
+[90mJan 21 15:43:52.275[0m [34mDEBUG: Indexing last quorum certificate for height 193[0m
+[90mJan 21 15:43:52.276[0m [34mDEBUG: Indexing block 194[0m
+[90mJan 21 15:43:52.276[0m [34mDEBUG: Tx 5f528d244d830e35c6dc6986012906ec859a6cf4bb1cf948154918e5ca660153 was included in a block so removing from mempool[0m
+[90mJan 21 15:43:52.277[0m [34mDEBUG: Tx ad00edcf59b42180c798742f577884456f2505df69ed1d1783cc938581d6b8db was included in a block so removing from mempool[0m
+[90mJan 21 15:43:52.277[0m [34mDEBUG: Checking mempool for newly invalid transactions[0m
+[90mJan 21 15:43:52.282[0m [34mDEBUG: Handling certificate results msg with height 194:194[0m
+[90mJan 21 15:43:52.290[0m [34mDEBUG: Handling certificate results msg with height 193:194[0m
+[90mJan 21 15:43:52.293[0m [34mDEBUG: Committing to store[0m
+[90mJan 21 15:43:52.294[0m [32mINFO: Committed block 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67 at H:194 🔒[0m
+[90mJan 21 15:43:52.295[0m [34mDEBUG: Setting up FSM for next height[0m
+[90mJan 21 15:43:52.295[0m [34mDEBUG: Setting up Mempool for next height[0m
+[90mJan 21 15:43:52.296[0m [34mDEBUG: Commit done[0m
+[90mJan 21 15:43:52.297[0m [34mDEBUG: Gossiping certificate: 2e1c1ad5ecf9588ffc6c99a75a25508da7e244a5c181288e443b104f943f5b67[0m
+[90mJan 21 15:43:52.297[0m [34mDEBUG: Self sending BLOCK message[0m
+[90mJan 21 15:43:52.298[0m [34mDEBUG: gossiping done[0m
+[90mJan 21 15:43:52.299[0m [32mINFO: Received new block from b88a5928e54cbf0a36e0 ✉️[0m
+[90mJan 21 15:43:52.303[0m [34mDEBUG: NewHeight: [false][0m
+[90mJan 21 15:43:52.304[0m [34mDEBUG: Starting the VDF service with 1767 iterations[0m
+[90mJan 21 15:43:52.304[0m [32mINFO: Reset BFT (NEW_HEIGHT)[0m
+[90mJan 21 15:43:52.305[0m [34mDEBUG: Process time: 0.06s, Wait time: 2.00s[0m
+[90mJan 21 15:43:52.305[0m [34mDEBUG: Setting consensus timer: 1.936784 sec[0m
+[90mJan 21 15:43:52.383[0m [32mINFO: New BaseChain Height 195 detected![0m
+[90mJan 21 15:43:52.724[0m [32mINFO: Updating must connects with 1 validators[0m
+[90mJan 21 15:43:52.725[0m [32mINFO: Updated BaseChain information[0m
+[90mJan 21 15:43:52.725[0m [34mDEBUG: NewHeight: [true][0m
+[90mJan 21 15:43:52.727[0m [32mINFO: Reset BFT (NEW_COMMITTEE)[0m
+[90mJan 21 15:43:53.351[0m [34mDEBUG: VDF service completed with 1767 iterations in 1.046497177s[0m
+[90mJan 21 15:43:53.352[0m [34mDEBUG: Adjusted iterations for next run to 2701[0m
+[90mJan 21 15:43:54.223[0m [32mINFO: (ID: 1 H:195, CH:195, R:0, P:ELECTION)[0m
+[90mJan 21 15:43:54.225[0m [32mINFO: Self is a leader candidate 🗳️[0m
+[90mJan 21 15:43:54.226[0m [34mDEBUG: Sending to 1 replicas[0m
+[90mJan 21 15:43:54.228[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:54.230[0m [34mDEBUG: Process time: 0.01s, Wait time: 2.00s[0m
+[90mJan 21 15:43:54.230[0m [34mDEBUG: Setting consensus timer: 1.993239 sec[0m
+[90mJan 21 15:43:54.231[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:54.240[0m [34mDEBUG: Received (ID: 1 H:195, CH:195, R:0, P:ELECTION) message from proposer: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:54.241[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:56.224[0m [32mINFO: (ID: 1 H:195, CH:195, R:0, P:ELECTION_VOTE)[0m
+[90mJan 21 15:43:56.227[0m [32mINFO: Voting b88a5928e54cbf0a36e0 as the proposer[0m
+[90mJan 21 15:43:56.228[0m [34mDEBUG: End signaled for VDF service[0m
+[90mJan 21 15:43:56.230[0m [34mDEBUG: Self sending CONSENSUS message[0m
+[90mJan 21 15:43:56.230[0m [34mDEBUG: Process time: 0.01s, Wait time: 3.00s[0m
+[90mJan 21 15:43:56.231[0m [34mDEBUG: Setting consensus timer: 2.993732 sec[0m
+[90mJan 21 15:43:56.231[0m [34mDEBUG: Handling inbound consensus message[0m
+[90mJan 21 15:43:56.235[0m [34mDEBUG: Received (ID: 1 H:195, CH:195, R:0, P:ELECTION_VOTE) message from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:56.236[0m [34mDEBUG: Adding vote from replica: b88a5928e54cbf0a36e0[0m
+[90mJan 21 15:43:56.236[0m [34mDEBUG: Done handling inbound consensus message[0m
+[90mJan 21 15:43:56.665[0m [32mINFO: Exit command terminated received[0m
+[90mJan 21 15:43:56.691[0m [31mERROR: GetBaseChainHeight failed with err [0m
+[31mModule:  rpc[0m
+[31mCode:    5[0m
+[31mMessage: http.Post() failed with err: Post "http://localhost:50002/v1/query/height": EOF[0m

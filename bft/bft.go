@@ -42,7 +42,7 @@ type BFT struct {
 }
 
 // New() creates a new instance of HotstuffBFT for a specific Committee
-func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, canopyHeight, height uint64, vs ValSet,
+func New(c lib.Config, valKey crypto.PrivateKeyI, canopyHeight, height uint64, vs ValSet,
 	con Controller, vdfEnabled bool, l lib.LoggerI) (*BFT, lib.ErrorI) {
 	// determine if using a Verifiable Delay Function for long-range-attack protection
 	var vdf *lib.VDFService
@@ -56,7 +56,7 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, canopyHeight, hei
 			Height:       height,
 			CanopyHeight: canopyHeight,
 			NetworkId:    c.NetworkID,
-			CommitteeId:  committeeID,
+			CommitteeId:  c.ChainId,
 		},
 		Votes:        make(VotesForHeight),
 		Proposals:    make(ProposalsForHeight),

@@ -92,7 +92,7 @@ func (s *StateMachine) AccountDeductFees(address crypto.AddressI, fee uint64) li
 	if err := s.AccountSub(address, fee); err != nil {
 		return err
 	}
-	return s.PoolAdd(lib.CanopyCommitteeId, fee)
+	return s.PoolAdd(s.Config.ChainId, fee)
 }
 
 // MintToAccount() adds newly created tokens to an Account

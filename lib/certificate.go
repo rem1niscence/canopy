@@ -393,6 +393,40 @@ func (x *Orders) CheckBasic() ErrorI {
 	return nil
 }
 
+// buyOrderJSON implements the json.Marshaller & json.Unmarshaler interfaces for BuyOrder
+type buyOrderJSON struct {
+	// order_id: is the number id that is unique to this committee to identify the order
+	OrderId uint64 `json:"order_id,omitempty"`
+	// buyer_receive_address: the Canopy address where the tokens may be received
+	BuyerReceiveAddress HexBytes `json:"buyer_receive_address,omitempty"`
+	// buyer_chain_deadline: the 'counter asset' chain height at which the buyer must send the 'counter asset' by
+	// or the 'intent to buy' will be voided
+	BuyerChainDeadline uint64 `json:"buyer_chain_deadline,omitempty"`
+}
+
+// MarshalJSON() implements the json.Marshaller interface for BuyOrder
+func (x *BuyOrder) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&buyOrderJSON{
+		OrderId:             x.OrderId,
+		BuyerReceiveAddress: x.BuyerReceiveAddress,
+		BuyerChainDeadline:  x.BuyerChainDeadline,
+	})
+}
+
+// UnmarshalJSON() implements the json.Unmarshaler interface for BuyOrder
+func (x *BuyOrder) UnmarshalJSON(b []byte) (err error) {
+	j := new(buyOrderJSON)
+	if err = json.Unmarshal(b, j); err != nil {
+		return
+	}
+	*x = BuyOrder{
+		OrderId:             j.OrderId,
+		BuyerReceiveAddress: j.BuyerReceiveAddress,
+		BuyerChainDeadline:  j.BuyerChainDeadline,
+	}
+	return
+}
+
 // CHECKPOINT CODE BELOW
 
 // CheckBasic() performs stateless validation on a Checkpoint object

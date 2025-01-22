@@ -200,17 +200,6 @@ func (s *StateMachine) GetCommitteeMembers(committeeID uint64, all ...bool) (vs 
 	return lib.NewValidatorSet(&lib.ConsensusValidators{ValidatorSet: members})
 }
 
-// GetCanopyCommitteeMembers() returns the committee members specifically for the Canopy ID
-func (s *StateMachine) GetCanopyCommitteeMembers(all ...bool) (*lib.ConsensusValidators, lib.ErrorI) {
-	// get the members for the CanopyCommitteeId
-	canopyCommittee, err := s.GetCommitteeMembers(lib.CanopyCommitteeId, all...)
-	if err != nil {
-		return nil, err
-	}
-	// only return the validator list, not the full 'Set' which includes a shared public key and other meta information
-	return canopyCommittee.ValidatorSet, nil
-}
-
 // GetCommitteePaginated() returns a 'page' of committee members ordered from highest stake to lowest
 func (s *StateMachine) GetCommitteePaginated(p lib.PageParams, committeeId uint64) (page *lib.Page, err lib.ErrorI) {
 	page, res := lib.NewPage(p, types.ValidatorsPageName), make(types.ValidatorPage, 0)

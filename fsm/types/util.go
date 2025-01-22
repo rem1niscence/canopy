@@ -244,7 +244,7 @@ type jsonSellOrder struct {
 	BuyerReceiveAddress   lib.HexBytes `json:"BuyerReceiveAddress,omitempty"`   // the buyer Canopy address to receive the CNPY
 	BuyerChainDeadline    uint64       `json:"BuyerChainDeadline,omitempty"`    // the external chain height deadline to send the 'tokens' to SellerReceiveAddress
 	OrderExpirationHeight uint64       `json:"OrderExpirationHeight,omitempty"` // the height when the order expires
-	SellersSellAddress    lib.HexBytes `json:"SellersSellAddress,omitempty"`    // the address of seller who is selling the CNPY
+	SellersSellAddress    lib.HexBytes `json:"SellersSendAddress,omitempty"`    // the address of seller who is selling the CNPY
 }
 
 // MarshalJSON() is the json.Marshaller implementation for the SellOrder object
@@ -257,7 +257,7 @@ func (x *SellOrder) MarshalJSON() ([]byte, error) {
 		SellerReceiveAddress: x.SellerReceiveAddress,
 		BuyerReceiveAddress:  x.BuyerReceiveAddress,
 		BuyerChainDeadline:   x.BuyerChainDeadline,
-		SellersSellAddress:   x.SellersSellAddress,
+		SellersSellAddress:   x.SellersSendAddress,
 	})
 }
 
@@ -275,7 +275,7 @@ func (x *SellOrder) UnmarshalJSON(bz []byte) error {
 		SellerReceiveAddress: j.SellerReceiveAddress,
 		BuyerReceiveAddress:  j.BuyerReceiveAddress,
 		BuyerChainDeadline:   j.BuyerChainDeadline,
-		SellersSellAddress:   j.SellersSellAddress,
+		SellersSendAddress:   j.SellersSellAddress,
 	}
 	return nil
 }
@@ -358,7 +358,7 @@ func (x *OrderBook) AddOrder(order *SellOrder) (id uint64) {
 }
 
 // BuyOrder() adds a recipient address and deadline height to the order to 'claim' the order and prevent others from 'claiming it'
-func (x *OrderBook) BuyOrder(orderId int, buyerAddress []byte, buyerChainDeadlineHeight uint64) lib.ErrorI {
+func (x *OrderBook) BuyOrder(orderId int, buyersReceiveAddress, buyersSendAddress []byte, buyerChainDeadlineHeight uint64) lib.ErrorI {
 	order, err := x.GetOrder(orderId)
 	if err != nil {
 		return err
@@ -366,7 +366,7 @@ func (x *OrderBook) BuyOrder(orderId int, buyerAddress []byte, buyerChainDeadlin
 	if order.BuyerReceiveAddress != nil {
 		return ErrOrderAlreadyAccepted()
 	}
-	order.BuyerReceiveAddress, order.BuyerChainDeadline = buyerAddress, buyerChainDeadlineHeight
+	order.BuyerReceiveAddress, order.BuyerSendAddress, order.BuyerChainDeadline = buyersReceiveAddress, buyersSendAddress, buyerChainDeadlineHeight
 	x.Orders[orderId] = order
 	return nil
 }

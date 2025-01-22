@@ -523,13 +523,32 @@ func (c *Client) TxDeleteOrder(from string, orderId, committeeID uint64,
 		return nil, nil, err
 	}
 	return c.transactionRequest(TxDeleteOrderRouteName, txRequest{
-		Fee:                  optFee,
-		Submit:               submit,
-		OrderId:              orderId,
-		addressRequest:       addressRequest{Address: fromHex},
-		passwordRequest:      passwordRequest{Password: pwd},
-		txChangeParamRequest: txChangeParamRequest{},
-		committeesRequest:    committeesRequest{fmt.Sprintf("%d", committeeID)},
+		Fee:               optFee,
+		Submit:            submit,
+		OrderId:           orderId,
+		addressRequest:    addressRequest{Address: fromHex},
+		passwordRequest:   passwordRequest{Password: pwd},
+		committeesRequest: committeesRequest{fmt.Sprintf("%d", committeeID)},
+	})
+}
+
+func (c *Client) TxBuyOrder(from, receiveAddress string, orderId uint64,
+	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	fromHex, err := lib.NewHexBytesFromString(from)
+	if err != nil {
+		return nil, nil, err
+	}
+	receiveHex, err := lib.NewHexBytesFromString(receiveAddress)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxBuyOrderRouteName, txRequest{
+		Fee:             optFee,
+		Submit:          submit,
+		OrderId:         orderId,
+		ReceiveAddress:  receiveHex,
+		addressRequest:  addressRequest{Address: fromHex},
+		passwordRequest: passwordRequest{Password: pwd},
 	})
 }
 

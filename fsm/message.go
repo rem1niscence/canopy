@@ -111,13 +111,13 @@ func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]by
 		if e != nil {
 			return nil, e
 		}
-		return [][]byte{order.SellersSellAddress}, nil
+		return [][]byte{order.SellersSendAddress}, nil
 	case *types.MessageDeleteOrder:
 		order, e := s.GetOrder(x.OrderId, x.CommitteeId)
 		if e != nil {
 			return nil, e
 		}
-		return [][]byte{order.SellersSellAddress}, nil
+		return [][]byte{order.SellersSendAddress}, nil
 	case *types.MessageCertificateResults:
 		pub, e := lib.PublicKeyFromBytes(x.Qc.ProposerKey)
 		if e != nil {
@@ -452,7 +452,7 @@ func (s *StateMachine) HandleMessageCreateOrder(msg *types.MessageCreateOrder) (
 		AmountForSale:        msg.AmountForSale,
 		RequestedAmount:      msg.RequestedAmount,
 		SellerReceiveAddress: msg.SellerReceiveAddress,
-		SellersSellAddress:   msg.SellersSellAddress,
+		SellersSendAddress:   msg.SellersSellAddress,
 	}, msg.CommitteeId)
 	return
 }
@@ -474,7 +474,7 @@ func (s *StateMachine) HandleMessageEditOrder(msg *types.MessageEditOrder) (err 
 	if msg.RequestedAmount < valParams.ValidatorMinimumOrderSize {
 		return types.ErrMinimumOrderSize()
 	}
-	difference, address := int(msg.AmountForSale-order.AmountForSale), crypto.NewAddress(order.SellersSellAddress)
+	difference, address := int(msg.AmountForSale-order.AmountForSale), crypto.NewAddress(order.SellersSendAddress)
 	if difference > 0 {
 		amountDifference := uint64(difference)
 		if err = s.AccountSub(address, amountDifference); err != nil {
@@ -500,7 +500,7 @@ func (s *StateMachine) HandleMessageEditOrder(msg *types.MessageEditOrder) (err 
 		AmountForSale:        msg.AmountForSale,
 		RequestedAmount:      msg.RequestedAmount,
 		SellerReceiveAddress: msg.SellerReceiveAddress,
-		SellersSellAddress:   order.SellersSellAddress,
+		SellersSendAddress:   order.SellersSendAddress,
 	}, msg.CommitteeId)
 	return
 }
@@ -518,7 +518,7 @@ func (s *StateMachine) HandleMessageDeleteOrder(msg *types.MessageDeleteOrder) (
 	if err = s.PoolSub(msg.CommitteeId+uint64(types.EscrowPoolAddend), order.AmountForSale); err != nil {
 		return
 	}
-	if err = s.AccountAdd(crypto.NewAddress(order.SellersSellAddress), order.AmountForSale); err != nil {
+	if err = s.AccountAdd(crypto.NewAddress(order.SellersSendAddress), order.AmountForSale); err != nil {
 		return
 	}
 	err = s.DeleteOrder(msg.OrderId, msg.CommitteeId)

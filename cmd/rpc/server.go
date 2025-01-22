@@ -27,6 +27,7 @@ import (
 	"net/http/pprof"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -106,6 +107,7 @@ const (
 	TxCreateOrderRouteName     = "tx-create-order"
 	TxEditOrderRouteName       = "tx-edit-order"
 	TxDeleteOrderRouteName     = "tx-delete-order"
+	TxBuyOrderRouteName        = "tx-buy-order"
 	TxStartPollRouteName       = "tx-start-poll"
 	TxVotePollRouteName        = "tx-vote-poll"
 	ResourceUsageRouteName     = "resource-usage"
@@ -192,6 +194,7 @@ var (
 		TxCreateOrderRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-create-order", HandlerFunc: TransactionCreateOrder, AdminOnly: true},
 		TxEditOrderRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-edit-order", HandlerFunc: TransactionEditOrder, AdminOnly: true},
 		TxDeleteOrderRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-delete-order", HandlerFunc: TransactionDeleteOrder, AdminOnly: true},
+		TxBuyOrderRouteName:        {Method: http.MethodPost, Path: "/v1/admin/tx-buy-order", HandlerFunc: TransactionBuyOrder, AdminOnly: true},
 		TxSubsidyRouteName:         {Method: http.MethodPost, Path: "/v1/admin/subsidy", HandlerFunc: TransactionSubsidy, AdminOnly: true},
 		TxStartPollRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-start-poll", HandlerFunc: TransactionStartPoll, AdminOnly: true},
 		TxVotePollRouteName:        {Method: http.MethodPost, Path: "/v1/admin/tx-vote-poll", HandlerFunc: TransactionVotePoll, AdminOnly: true},
@@ -219,7 +222,7 @@ const (
 
 func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	cor := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:" + c.WalletPort, "http://localhost:" + c.ExplorerPort},
+		AllowedOrigins: []string{"http://localhost:*"},
 		AllowedMethods: []string{"GET", "OPTIONS", "POST"},
 	})
 	s, timeout := a.FSM.Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
@@ -255,6 +258,7 @@ func PollBaseChainInfo() {
 	app.RemoteCallbacks = lib.RemoteCallbacks{
 		ValidatorSet:        rpcClient.ValidatorSet,
 		IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
+		Transaction:         rpcClient.Transaction,
 	}
 	// execute the loop every conf.BaseChainPollMS duration
 	ticker := time.NewTicker(time.Duration(conf.BaseChainPollMS) * time.Millisecond)
@@ -277,7 +281,7 @@ func PollBaseChainInfo() {
 		// execute the requests to get the base chain information
 		for retry := lib.NewRetry(conf.BaseChainPollMS, 25); retry.WaitAndDoRetry(); {
 			// retrieve the base-chain info
-			baseChainInfo, e := rpcClient.BaseChainInfo(baseChainHeight, app.CommitteeID)
+			baseChainInfo, e := rpcClient.BaseChainInfo(baseChainHeight, conf.ChainId)
 			if e == nil {
 				// update the controller with new base-chain info
 				app.UpdateBaseChainInfo(baseChainInfo)
@@ -861,6 +865,12 @@ func TransactionDeleteOrder(w http.ResponseWriter, r *http.Request, _ httprouter
 			committeeId = c[0]
 		}
 		return types.NewDeleteOrderTx(p, ptr.OrderId, committeeId, ptr.Fee, ptr.Memo)
+	})
+}
+
+func TransactionBuyOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		return types.NewBuyOrderTx(p, lib.BuyOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, ptr.Fee)
 	})
 }
 
@@ -1597,10 +1607,51 @@ func runStaticFileServer(fileSys fs.FS, dir, port string) {
 		return
 	}
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.FS(distFS)))
+	//mux.Handle("/", http.FileServer(http.FS(distFS)))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// serve `index.html` with dynamic config injection
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			filePath := path.Join(dir, "index.html")
+			data, err := fileSys.Open(filePath)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			defer data.Close()
+
+			htmlBytes, err := fs.ReadFile(fileSys, filePath)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+
+			// inject the config into the HTML file
+			injectedHTML := injectConfig(string(htmlBytes), conf)
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(injectedHTML))
+			return
+		}
+
+		// Serve other files as-is
+		http.FileServer(http.FS(distFS)).ServeHTTP(w, r)
+	})
 	go func() {
 		logger.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), mux).Error())
 	}()
+}
+
+// injectConfig() injects the config.json into the HTML file
+func injectConfig(html string, config lib.Config) string {
+	script := fmt.Sprintf(`<script>
+		window.__CONFIG__ = {
+			rpcURL: "%s:%s",
+			adminRPCURL: "%s:%s"
+		};
+	</script>`, config.RPCUrl, config.RPCPort, config.RPCUrl, config.AdminPort)
+
+	// inject the script just before </head>
+	return strings.Replace(html, "</head>", script+"</head>", 1)
 }
 
 func logsHandler() httprouter.Handle {

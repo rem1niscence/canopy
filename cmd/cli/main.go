@@ -74,7 +74,7 @@ func Start() {
 		l.Fatal(err.Error())
 	}
 	// create a new instance of the application
-	app, err := controller.New(lib.CanopyCommitteeId, sm, config, validatorKey, l)
+	app, err := controller.New(sm, config, validatorKey, l)
 	if err != nil {
 		l.Fatal(err.Error())
 	}
