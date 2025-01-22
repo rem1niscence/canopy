@@ -46,7 +46,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Address: newTestAddressBytes(t, 1),
 					Amount:  100,
 				}},
-				OrderBooks: new(types.OrderBooks),
+				OrderBooks: new(lib.OrderBooks),
 				Params:     types.DefaultParams(),
 				Supply:     &types.Supply{Total: 200},
 			},
@@ -72,7 +72,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
-				OrderBooks: new(types.OrderBooks),
+				OrderBooks: new(lib.OrderBooks),
 				Params:     types.DefaultParams(),
 				Supply: &types.Supply{
 					Total:  100,
@@ -102,7 +102,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Id:     lib.CanopyCommitteeId,
 					Amount: 100,
 				}},
-				OrderBooks: new(types.OrderBooks),
+				OrderBooks: new(lib.OrderBooks),
 				Params:     types.DefaultParams(),
 				Supply: &types.Supply{
 					Total: 100,
@@ -113,10 +113,10 @@ func TestNewFromGenesisFile(t *testing.T) {
 			name:   "order books",
 			detail: "the genesis file tests order books only",
 			input: types.GenesisState{
-				OrderBooks: &types.OrderBooks{
-					OrderBooks: []*types.OrderBook{{
+				OrderBooks: &lib.OrderBooks{
+					OrderBooks: []*lib.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
-						Orders: []*types.SellOrder{{
+						Orders: []*lib.SellOrder{{
 							Id:                   1,
 							Committee:            lib.CanopyCommitteeId,
 							AmountForSale:        100,
@@ -140,10 +140,10 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
 					Amount: 200,
 				}},
-				OrderBooks: &types.OrderBooks{
-					OrderBooks: []*types.OrderBook{{
+				OrderBooks: &lib.OrderBooks{
+					OrderBooks: []*lib.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
-						Orders: []*types.SellOrder{{
+						Orders: []*lib.SellOrder{{
 							Id:                   1,
 							Committee:            lib.CanopyCommitteeId,
 							AmountForSale:        100,
@@ -284,10 +284,10 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
-				OrderBooks: &types.OrderBooks{
-					OrderBooks: []*types.OrderBook{{
+				OrderBooks: &lib.OrderBooks{
+					OrderBooks: []*lib.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
-						Orders: []*types.SellOrder{{
+						Orders: []*lib.SellOrder{{
 							Id:                   1,
 							Committee:            lib.CanopyCommitteeId,
 							AmountForSale:        100,
@@ -326,10 +326,10 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
-				OrderBooks: &types.OrderBooks{
-					OrderBooks: []*types.OrderBook{{
+				OrderBooks: &lib.OrderBooks{
+					OrderBooks: []*lib.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
-						Orders: []*types.SellOrder{{
+						Orders: []*lib.SellOrder{{
 							Id:                   1,
 							Committee:            lib.CanopyCommitteeId,
 							AmountForSale:        100,
@@ -382,7 +382,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Address: newTestAddressBytes(t, 1),
 					Amount:  100,
 				}},
-				OrderBooks: new(types.OrderBooks),
+				OrderBooks: new(lib.OrderBooks),
 				Params:     types.DefaultParams(),
 				Supply:     &types.Supply{Total: 200},
 			},
@@ -408,7 +408,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Committees:   []uint64{lib.CanopyCommitteeId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
-				OrderBooks: new(types.OrderBooks),
+				OrderBooks: new(lib.OrderBooks),
 				Params:     types.DefaultParams(),
 				Supply: &types.Supply{
 					Total:  100,
@@ -438,7 +438,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Id:     lib.CanopyCommitteeId,
 					Amount: 100,
 				}},
-				OrderBooks: new(types.OrderBooks),
+				OrderBooks: new(lib.OrderBooks),
 				Params:     types.DefaultParams(),
 				Supply: &types.Supply{
 					Total: 100,
@@ -449,10 +449,10 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 			name:   "order books",
 			detail: "the genesis file tests order books only",
 			input: &types.GenesisState{
-				OrderBooks: &types.OrderBooks{
-					OrderBooks: []*types.OrderBook{{
+				OrderBooks: &lib.OrderBooks{
+					OrderBooks: []*lib.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
-						Orders: []*types.SellOrder{{
+						Orders: []*lib.SellOrder{{
 							Id:                   1,
 							Committee:            lib.CanopyCommitteeId,
 							AmountForSale:        100,
@@ -476,10 +476,10 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
 					Amount: 200,
 				}},
-				OrderBooks: &types.OrderBooks{
-					OrderBooks: []*types.OrderBook{{
+				OrderBooks: &lib.OrderBooks{
+					OrderBooks: []*lib.OrderBook{{
 						CommitteeId: lib.CanopyCommitteeId,
-						Orders: []*types.SellOrder{{
+						Orders: []*lib.SellOrder{{
 							Id:                   1,
 							Committee:            lib.CanopyCommitteeId,
 							AmountForSale:        100,
@@ -634,11 +634,11 @@ func TestValidateGenesisState(t *testing.T) {
 			name:   "duplicate committee order book",
 			detail: "the order book contains a duplicate committee entry",
 			input: &types.GenesisState{
-				OrderBooks: &types.OrderBooks{
-					OrderBooks: []*types.OrderBook{
+				OrderBooks: &lib.OrderBooks{
+					OrderBooks: []*lib.OrderBook{
 						{
 							CommitteeId: 0,
-							Orders: []*types.SellOrder{
+							Orders: []*lib.SellOrder{
 								{
 									Id:                 1,
 									Committee:          0,
@@ -649,7 +649,7 @@ func TestValidateGenesisState(t *testing.T) {
 						},
 						{
 							CommitteeId: 0,
-							Orders: []*types.SellOrder{
+							Orders: []*lib.SellOrder{
 								{
 									Id:                 2,
 									Committee:          0,
@@ -668,11 +668,11 @@ func TestValidateGenesisState(t *testing.T) {
 			name:   "duplicate sell order id",
 			detail: "the order book contains a sell order with a duplicate id within a single committee",
 			input: &types.GenesisState{
-				OrderBooks: &types.OrderBooks{
-					OrderBooks: []*types.OrderBook{
+				OrderBooks: &lib.OrderBooks{
+					OrderBooks: []*lib.OrderBook{
 						{
 							CommitteeId: 0,
-							Orders: []*types.SellOrder{
+							Orders: []*lib.SellOrder{
 								{
 									Id:                 1,
 									Committee:          0,
@@ -727,10 +727,10 @@ func newTestGenesisState(t *testing.T) *types.GenesisState {
 			Committees:   []uint64{lib.CanopyCommitteeId, 2},
 			Output:       newTestAddressBytes(t),
 		}},
-		OrderBooks: &types.OrderBooks{
-			OrderBooks: []*types.OrderBook{{
+		OrderBooks: &lib.OrderBooks{
+			OrderBooks: []*lib.OrderBook{{
 				CommitteeId: lib.CanopyCommitteeId,
-				Orders: []*types.SellOrder{{
+				Orders: []*lib.SellOrder{{
 					Id:                   1,
 					Committee:            lib.CanopyCommitteeId,
 					AmountForSale:        100,
@@ -772,10 +772,10 @@ func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 			Committees:   []uint64{lib.CanopyCommitteeId, 2},
 			Output:       newTestAddressBytes(t),
 		}},
-		OrderBooks: &types.OrderBooks{
-			OrderBooks: []*types.OrderBook{{
+		OrderBooks: &lib.OrderBooks{
+			OrderBooks: []*lib.OrderBook{{
 				CommitteeId: lib.CanopyCommitteeId,
-				Orders: []*types.SellOrder{{
+				Orders: []*lib.SellOrder{{
 					Id:                   1,
 					Committee:            lib.CanopyCommitteeId,
 					AmountForSale:        100,

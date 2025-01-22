@@ -35,7 +35,7 @@ func newTestConsensus(t *testing.T, phase Phase, numValidators int) (tc *testCon
 		sendToReplicasChan: make(chan lib.Signable),
 	}
 	// create the bft object using the mocks
-	tc.bft, err = New(lib.DefaultConfig(), tc.valKeys[0], lib.CanopyCommitteeId, 1, 1, tc.valSet, tc.cont, false, lib.NewDefaultLogger())
+	tc.bft, err = New(lib.DefaultConfig(), tc.valKeys[0], 1, 1, tc.valSet, tc.cont, false, lib.NewDefaultLogger())
 	require.NoError(t, err)
 	// set the bft phase
 	tc.bft.Phase = phase
@@ -535,12 +535,14 @@ func (t *testController) SendToProposer(msg lib.Signable) {
 	t.sendToProposerChan <- msg
 }
 
-func (t *testController) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) { return 0, nil }
-func (t *testController) IsValidDoubleSigner(_ uint64, _ []byte) bool     { return true }
-func (t *testController) Syncing() *atomic.Bool                           { return &atomic.Bool{} }
-func (t *testController) LoadCommitteeHeightInState() uint64              { return 0 }
-func (t *testController) BaseChainHeight() uint64                         { return 0 }
-func (t *testController) LoadLastProposers() *lib.Proposers               { return t.proposers }
+func (t *testController) LoadMinimumEvidenceHeight(_ uint64) (uint64, lib.ErrorI)  { return 0, nil }
+func (t *testController) IsValidDoubleSigner(_ uint64, _ []byte) bool              { return true }
+func (t *testController) Syncing() *atomic.Bool                                    { return &atomic.Bool{} }
+func (t *testController) LoadCommitteeHeightInState(_ uint64) (uint64, lib.ErrorI) { return 0, nil }
+func (t *testController) BaseChainHeight() uint64                                  { return 0 }
+func (t *testController) LoadLastProposers(_ uint64) (*lib.Proposers, lib.ErrorI) {
+	return t.proposers, nil
+}
 func (t *testController) GossipBlock(cert *lib.QuorumCertificate) {
 	t.gossipCertChan <- cert
 }

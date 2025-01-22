@@ -1,8 +1,6 @@
 syntax = "proto3";
 package types;
 
-import "certificate.proto";
-
 option go_package = "github.com/canopy-network/canopy/fsm/types";
 // *****************************************************************************************************
 // This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
@@ -61,27 +59,4 @@ message NonSigner {
   bytes address = 1;
   // counter: increments when a Validator doesn't sign a block and resets every non-sign-window
   uint64 counter = 2;
-}
-
-// CommitteesData is a list of essential information about the committee
-message CommitteesData {
-  repeated CommitteeData list = 1;
-}
-
-// CommitteeData is current status information about the current status of the Committee
-message CommitteeData {
-  // committee_id: is the unique identifier of the chain and the committee of Validators responsible for it
-  uint64 committee_id = 1;
-  // last_updated_height: is the Canopy height included in the most recently processed Certificate Results transaction
-  // This protects against historical committee attacks and ensures sequentiality among committees
-  uint64 last_canopy_height_updated = 2;
-  // last_chain_height_updated: is the 3rd party chain height included in the most recent processed Certificate Results
-  // transaction. This protects against reformatting the replay attacks
-  uint64 last_chain_height_updated = 3;
-  // payment_percents: a list of recipients and the percentage of rewards they will receive, distributed at the end of
-  // the block
-  repeated PaymentPercents  payment_percents = 4;
-  // number_of_samples: the total count of processed Certificate Result Transactions, used to dilute reward percentages
-  // accurately
-  uint64 number_of_samples = 5;
 }

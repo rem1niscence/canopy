@@ -255,10 +255,15 @@ func PollBaseChainInfo() {
 	// create a rpc client
 	rpcClient := NewClient(conf.BaseChainRPCURL, "", "")
 	// set the apps callbacks
-	app.RemoteCallbacks = lib.RemoteCallbacks{
-		ValidatorSet:        rpcClient.ValidatorSet,
-		IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
-		Transaction:         rpcClient.Transaction,
+	app.BaseChainInfo.RemoteCallbacks = lib.RemoteCallbacks{
+		ValidatorSet:          rpcClient.ValidatorSet,
+		IsValidDoubleSigner:   rpcClient.IsValidDoubleSigner,
+		Transaction:           rpcClient.Transaction,
+		LastProposers:         rpcClient.LastProposers,
+		MinimumEvidenceHeight: rpcClient.MinimumEvidenceHeight,
+		CommitteeData:         rpcClient.CommitteeData,
+		DelegateLottery:       rpcClient.DelegateLottery,
+		Orders:                rpcClient.Orders,
 	}
 	// execute the loop every conf.BaseChainPollMS duration
 	ticker := time.NewTicker(time.Duration(conf.BaseChainPollMS) * time.Millisecond)
@@ -527,6 +532,11 @@ func BaseChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		if err != nil {
 			return nil, err
 		}
+		// get the order book
+		orders, err := s.GetOrderBook(id)
+		if err != nil {
+			return nil, err
+		}
 		return &lib.BaseChainInfo{
 			Height:                  s.Height(),
 			ValidatorSet:            validatorSet,
@@ -535,6 +545,7 @@ func BaseChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 			MinimumEvidenceHeight:   minimumEvidenceHeight,
 			LastCanopyHeightUpdated: committeeData.LastCanopyHeightUpdated,
 			DelegateLotteryWinner:   delegateLotteryWinner,
+			Orders:                  orders,
 		}, nil
 	})
 }
@@ -570,7 +581,7 @@ func Orders(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		if err != nil {
 			return nil, err
 		}
-		return &types.OrderBooks{OrderBooks: []*types.OrderBook{b}}, nil
+		return &lib.OrderBooks{OrderBooks: []*lib.OrderBook{b}}, nil
 	})
 }
 
@@ -1612,15 +1623,15 @@ func runStaticFileServer(fileSys fs.FS, dir, port string) {
 		// serve `index.html` with dynamic config injection
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			filePath := path.Join(dir, "index.html")
-			data, err := fileSys.Open(filePath)
-			if err != nil {
+			data, e := fileSys.Open(filePath)
+			if e != nil {
 				http.NotFound(w, r)
 				return
 			}
 			defer data.Close()
 
-			htmlBytes, err := fs.ReadFile(fileSys, filePath)
-			if err != nil {
+			htmlBytes, e := fs.ReadFile(fileSys, filePath)
+			if e != nil {
 				http.NotFound(w, r)
 				return
 			}
@@ -1647,8 +1658,9 @@ func injectConfig(html string, config lib.Config) string {
 		window.__CONFIG__ = {
 			rpcURL: "%s:%s",
 			adminRPCURL: "%s:%s"
+			baseChainRPCURL: "%s"
 		};
-	</script>`, config.RPCUrl, config.RPCPort, config.RPCUrl, config.AdminPort)
+	</script>`, config.RPCUrl, config.RPCPort, config.RPCUrl, config.AdminPort, conf.BaseChainRPCURL)
 
 	// inject the script just before </head>
 	return strings.Replace(html, "</head>", script+"</head>", 1)

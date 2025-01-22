@@ -637,3 +637,11 @@ func ErrHashSize() ErrorI {
 func ErrMaxPort() ErrorI {
 	return NewError(CodeMaxPort, MainModule, "max port exceeded")
 }
+
+func ErrOrderAlreadyAccepted() ErrorI {
+	return NewError(CodeOrderAlreadyAccepted, StateMachineModule, "order already accepted")
+}
+
+func ErrOrderNotFound(id int) ErrorI {
+	return NewError(CodeOrderNotFound, StateMachineModule, fmt.Sprintf("order with id %d not found", id))
+}

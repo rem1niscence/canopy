@@ -65,6 +65,7 @@ func DefaultParams() *Params {
 			ValidatorStakePercentForSubsidizedCommittee: 33,
 			ValidatorMaxSlashPerCommittee:               15,
 			ValidatorDelegateRewardPercentage:           10,
+			ValidatorBuyDeadlineBlocks:                  100,
 		},
 		Fee: &FeeParams{
 			MessageSendFee:               10000,

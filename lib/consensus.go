@@ -80,8 +80,101 @@ type BaseChainInfo struct {
 	LastValidatorSet        ValidatorSet `json:"last_validator_set"`
 	LastProposers           *Proposers   `json:"last_proposers"`
 	MinimumEvidenceHeight   uint64       `json:"minimum_evidence_height"`
-	LastCanopyHeightUpdated uint64       ` json:"last_canopy_height_updated"`
+	LastCanopyHeightUpdated uint64       `json:"last_canopy_height_updated"`
 	DelegateLotteryWinner   HexBytes     `json:"delegate_lottery_winner"`
+	Orders                  *OrderBook   `json:"orders"`
+	RemoteCallbacks         RemoteCallbacks
+	Log                     LoggerI
+}
+
+// RemoteCallbacks are fallback rpc callbacks to the base-chain
+type RemoteCallbacks struct {
+	ValidatorSet          func(height, id uint64) (ValidatorSet, ErrorI)
+	IsValidDoubleSigner   func(height uint64, address string) (p *bool, err ErrorI)
+	Transaction           func(tx TransactionI) (hash *string, err ErrorI)
+	LastProposers         func(height uint64) (p *Proposers, err ErrorI)
+	MinimumEvidenceHeight func(height uint64) (p *uint64, err ErrorI)
+	CommitteeData         func(height, id uint64) (p *CommitteeData, err ErrorI)
+	DelegateLottery       func(height, id uint64) (p *HexBytes, err ErrorI)
+	Orders                func(height, committeeId uint64) (p *OrderBooks, err ErrorI)
+}
+
+// GetHeight() returns the height from the base-chain
+func (b *BaseChainInfo) GetHeight() uint64 { return b.Height }
+
+// GetValidatorSet() returns the validator set from the base-chain
+func (b *BaseChainInfo) GetValidatorSet(id, height uint64) (ValidatorSet, ErrorI) {
+	if height == b.Height {
+		return NewValidatorSet(b.ValidatorSet.ValidatorSet)
+	}
+	if height == b.Height-1 {
+		return NewValidatorSet(b.LastValidatorSet.ValidatorSet)
+	}
+	b.Log.Warnf("Executing remote GetValidatorSet call with requested height %d", height)
+	return b.RemoteCallbacks.ValidatorSet(height, id)
+}
+
+// GetLastProposers() returns the last proposers from the base-chain
+func (b *BaseChainInfo) GetLastProposers(height uint64) (*Proposers, ErrorI) {
+	if height == b.Height {
+		return b.LastProposers, nil
+	}
+	b.Log.Warnf("Executing remote GetLastProposers call with requested height %d", height)
+	return b.RemoteCallbacks.LastProposers(height)
+}
+
+// GetOrders() returns the order book from the base-chain
+func (b *BaseChainInfo) GetOrders(height, id uint64) (*OrderBook, ErrorI) {
+	if height == b.Height {
+		return b.Orders, nil
+	}
+	b.Log.Warnf("Executing remote GetOrders call with requested height %d", height)
+	books, err := b.RemoteCallbacks.Orders(height, id)
+	if err != nil {
+		return nil, err
+	}
+	return books.OrderBooks[0], nil
+}
+
+// GetMinimumEvidenceHeight() returns the minimum evidence height from the base-chain
+func (b *BaseChainInfo) GetMinimumEvidenceHeight(height uint64) (i uint64, err ErrorI) {
+	if height == b.Height {
+		return b.MinimumEvidenceHeight, nil
+	}
+	b.Log.Warnf("Executing remote GetMinimumEvidenceHeight call with requested height %d", height)
+	res, err := b.RemoteCallbacks.MinimumEvidenceHeight(height)
+	if err != nil {
+		return
+	}
+	return *res, nil
+}
+
+// IsValidDoubleSigner() returns if an address is a valid double signer
+func (b *BaseChainInfo) IsValidDoubleSigner(height uint64, address string) (*bool, ErrorI) {
+	b.Log.Warnf("Executing remote IsValidDoubleSigner call with requested height %d and address %s", height, address)
+	return b.RemoteCallbacks.IsValidDoubleSigner(height, address)
+}
+
+// GetLastCanopyHeightUpdated() returns the last canopy height the committee (meta) data was updated from the base-chain
+func (b *BaseChainInfo) GetLastCanopyHeightUpdated(height, id uint64) (uint64, ErrorI) {
+	if height == b.Height {
+		return b.LastCanopyHeightUpdated, nil
+	}
+	committeeData, err := b.RemoteCallbacks.CommitteeData(height, id)
+	if err != nil {
+		return 0, err
+	}
+	b.Log.Warnf("Executing remote GetLastCanopyHeightUpdated call with requested height %d", height)
+	return committeeData.LastCanopyHeightUpdated, nil
+}
+
+// GetDelegateLotteryWinner() returns the winner of the delegate lottery from the base-chain
+func (b *BaseChainInfo) GetDelegateLotteryWinner(height, id uint64) (*HexBytes, ErrorI) {
+	if height == b.Height {
+		return &b.DelegateLotteryWinner, nil
+	}
+	b.Log.Warnf("Executing remote DelegateLottery call with requested height %d", height)
+	return b.RemoteCallbacks.DelegateLottery(height, id)
 }
 
 // baseChainInfoJSON is the encoding structure used for json for BaseChainInfo
@@ -90,9 +183,10 @@ type baseChainInfoJSON struct {
 	Committee               *ConsensusValidators `json:"committee"`
 	LastCommittee           *ConsensusValidators `json:"lastCommittee"`
 	LastProposers           *Proposers           `json:"lastProposers"`
-	LastCanopyHeightUpdated uint64               ` json:"last_canopy_height_updated"`
+	LastCanopyHeightUpdated uint64               `json:"last_canopy_height_updated"`
 	MinimumEvidenceHeight   uint64               `json:"minimumEvidenceHeight"`
 	DelegateLotteryWinner   HexBytes             `json:"delegateLotteryWinner"`
+	Orders                  *OrderBook           `json:"orders"`
 }
 
 // MarshalJSON() implements the json.Marshaller for BaseChainInfo
@@ -105,6 +199,7 @@ func (b *BaseChainInfo) MarshalJSON() ([]byte, error) {
 		LastCanopyHeightUpdated: b.LastCanopyHeightUpdated,
 		MinimumEvidenceHeight:   b.MinimumEvidenceHeight,
 		DelegateLotteryWinner:   b.DelegateLotteryWinner,
+		Orders:                  b.Orders,
 	})
 }
 
@@ -130,15 +225,9 @@ func (b *BaseChainInfo) UnmarshalJSON(bz []byte) (err error) {
 		MinimumEvidenceHeight:   j.MinimumEvidenceHeight,
 		LastCanopyHeightUpdated: j.LastCanopyHeightUpdated,
 		DelegateLotteryWinner:   j.DelegateLotteryWinner,
+		Orders:                  j.Orders,
 	}
 	return
-}
-
-// RemoteCallbacks are rpc client callbacks to the base-chain
-type RemoteCallbacks struct {
-	ValidatorSet        func(height, id uint64) (ValidatorSet, ErrorI)
-	IsValidDoubleSigner func(height uint64, address string) (p *bool, err ErrorI)
-	Transaction         func(tx TransactionI) (hash *string, err ErrorI)
 }
 
 // CheckBasic() validates the basic structure and length of the AggregateSignature

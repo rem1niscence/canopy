@@ -409,7 +409,7 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, uint64(nonSignerPercent))
 	}
 	// update the committee data
-	return s.UpsertCommitteeData(&types.CommitteeData{
+	return s.UpsertCommitteeData(&lib.CommitteeData{
 		CommitteeId:             committeeId,
 		LastCanopyHeightUpdated: msg.Qc.Header.CanopyHeight,
 		LastChainHeightUpdated:  msg.Qc.Header.Height,
@@ -447,7 +447,7 @@ func (s *StateMachine) HandleMessageCreateOrder(msg *types.MessageCreateOrder) (
 		return
 	}
 	// save the order in state
-	_, err = s.CreateOrder(&types.SellOrder{
+	_, err = s.CreateOrder(&lib.SellOrder{
 		Committee:            msg.CommitteeId,
 		AmountForSale:        msg.AmountForSale,
 		RequestedAmount:      msg.RequestedAmount,
@@ -464,7 +464,7 @@ func (s *StateMachine) HandleMessageEditOrder(msg *types.MessageEditOrder) (err 
 		return
 	}
 	if order.BuyerReceiveAddress != nil {
-		return types.ErrOrderAlreadyAccepted()
+		return lib.ErrOrderAlreadyAccepted()
 	}
 	valParams, err := s.GetParamsVal()
 	if err != nil {
@@ -494,7 +494,7 @@ func (s *StateMachine) HandleMessageEditOrder(msg *types.MessageEditOrder) (err 
 			return
 		}
 	}
-	err = s.EditOrder(&types.SellOrder{
+	err = s.EditOrder(&lib.SellOrder{
 		Id:                   order.Id,
 		Committee:            msg.CommitteeId,
 		AmountForSale:        msg.AmountForSale,
@@ -512,7 +512,7 @@ func (s *StateMachine) HandleMessageDeleteOrder(msg *types.MessageDeleteOrder) (
 		return
 	}
 	if order.BuyerReceiveAddress != nil {
-		return types.ErrOrderAlreadyAccepted()
+		return lib.ErrOrderAlreadyAccepted()
 	}
 	// subtract from the committee escrow pool
 	if err = s.PoolSub(msg.CommitteeId+uint64(types.EscrowPoolAddend), order.AmountForSale); err != nil {

@@ -119,7 +119,7 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return
 	}
-	hash, err := c.RemoteCallbacks.Transaction(tx)
+	hash, err := c.BaseChainInfo.RemoteCallbacks.Transaction(tx)
 	if err != nil {
 		c.log.Errorf("Submitting auto-certificate-results-txn failed with err: %s", err.Error())
 		return
@@ -537,7 +537,7 @@ func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc
 	// validate the quorum certificate
 	if err = c.checkPeerQC(c.LoadMaxBlockSize(), &lib.View{
 		Height:       c.FSM.Height(),
-		CanopyHeight: c.BaseChainInfo.Height,
+		CanopyHeight: c.BaseChainInfo.GetHeight(),
 		NetworkId:    c.Config.NetworkID,
 		CommitteeId:  msg.CommitteeId,
 	}, v, qc, senderID); err != nil {

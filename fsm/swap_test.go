@@ -10,16 +10,17 @@ import (
 
 func TestHandleCommitteeSwaps(t *testing.T) {
 	tests := []struct {
-		name   string
-		detail string
-		preset []*types.SellOrder
-		orders *lib.Orders
-		error  string
+		name            string
+		detail          string
+		preset          []*lib.SellOrder
+		orders          *lib.Orders
+		alreadyAccepted bool
+		error           string
 	}{
 		{
 			name:   "buy order already accepted",
 			detail: "the buy order cannot be claimed as its already reserved",
-			preset: []*types.SellOrder{
+			preset: []*lib.SellOrder{
 				{
 					Committee:           lib.CanopyCommitteeId,
 					AmountForSale:       100,
@@ -37,12 +38,12 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 					},
 				},
 			},
-			error: "order already accepted",
+			alreadyAccepted: true,
 		},
 		{
 			name:   "reset failed, order not found",
 			detail: "can't reset an order that doesn't exist",
-			preset: []*types.SellOrder{
+			preset: []*lib.SellOrder{
 				{
 					Committee:           lib.CanopyCommitteeId,
 					AmountForSale:       100,
@@ -59,7 +60,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 		{
 			name:   "close failed, no buyer",
 			detail: "can't close an order that doesn't have a buyer",
-			preset: []*types.SellOrder{
+			preset: []*lib.SellOrder{
 				{
 					Committee:          lib.CanopyCommitteeId,
 					AmountForSale:      100,
@@ -75,7 +76,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 		{
 			name:   "buy, reset, sell",
 			detail: "test buy, reset, and sell without error",
-			preset: []*types.SellOrder{
+			preset: []*lib.SellOrder{
 				{
 					Committee:          lib.CanopyCommitteeId,
 					AmountForSale:      100,
@@ -131,14 +132,23 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				require.ErrorContains(t, err, test.error)
 				return
 			}
-			// validate the buy orders
-			for _, buyOrder := range test.orders.BuyOrders {
-				// get the order
-				order, e := sm.GetOrder(buyOrder.OrderId, lib.CanopyCommitteeId)
-				require.NoError(t, e)
-				// validate the update of the 'buy' fields
-				require.Equal(t, buyOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
-				require.Equal(t, buyOrder.BuyerChainDeadline, order.BuyerChainDeadline)
+			// if the buy order is already accepted
+			if test.alreadyAccepted {
+				for _, buyOrder := range test.orders.BuyOrders {
+					order, e := sm.GetOrder(buyOrder.OrderId, lib.CanopyCommitteeId)
+					require.NoError(t, e)
+					require.NotEqual(t, buyOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
+				}
+			} else {
+				// validate the buy orders
+				for _, buyOrder := range test.orders.BuyOrders {
+					// get the order
+					order, e := sm.GetOrder(buyOrder.OrderId, lib.CanopyCommitteeId)
+					require.NoError(t, e)
+					// validate the update of the 'buy' fields
+					require.Equal(t, buyOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
+					require.Equal(t, buyOrder.BuyerChainDeadline, order.BuyerChainDeadline)
+				}
 			}
 			// validate the reset orders
 			for _, resetOrderId := range test.orders.ResetOrders {
@@ -175,12 +185,12 @@ func TestCreateOrder(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
-		expected []*types.SellOrder
+		expected []*lib.SellOrder
 	}{
 		{
 			name:   "create sell order",
 			detail: "create sell order",
-			expected: []*types.SellOrder{
+			expected: []*lib.SellOrder{
 				{
 					Id:                   0,
 					Committee:            lib.CanopyCommitteeId,
@@ -194,7 +204,7 @@ func TestCreateOrder(t *testing.T) {
 		{
 			name:   "create sell order for two different committees",
 			detail: "create sell order for another committee",
-			expected: []*types.SellOrder{
+			expected: []*lib.SellOrder{
 				{
 					Id:                   0,
 					Committee:            lib.CanopyCommitteeId,
@@ -216,7 +226,7 @@ func TestCreateOrder(t *testing.T) {
 		{
 			name:   "id creation order",
 			detail: "test the id creation order",
-			expected: []*types.SellOrder{
+			expected: []*lib.SellOrder{
 				{
 					Id:                   0,
 					Committee:            lib.CanopyCommitteeId,
@@ -274,14 +284,14 @@ func TestEditOrder(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
-		preset   *types.SellOrder
-		expected *types.SellOrder
+		preset   *lib.SellOrder
+		expected *lib.SellOrder
 		error    string
 	}{
 		{
 			name:   "order not found",
 			detail: "order not preset so no order id is found",
-			expected: &types.SellOrder{
+			expected: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        101,
@@ -294,14 +304,14 @@ func TestEditOrder(t *testing.T) {
 		{
 			name:   "update amount",
 			detail: "update the amount for sale without error",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        100,
 				RequestedAmount:      100,
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
-			expected: &types.SellOrder{
+			expected: &lib.SellOrder{
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        101,
 				RequestedAmount:      100,
@@ -340,7 +350,7 @@ func TestBuyOrder(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		preset *types.SellOrder
+		preset *lib.SellOrder
 		order  *lib.BuyOrder
 		error  string
 	}{
@@ -358,7 +368,7 @@ func TestBuyOrder(t *testing.T) {
 		{
 			name:   "buy order already accepted",
 			detail: "the buy order cannot be claimed as its already reserved",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Committee:           lib.CanopyCommitteeId,
 				AmountForSale:       100,
 				RequestedAmount:     100,
@@ -376,7 +386,7 @@ func TestBuyOrder(t *testing.T) {
 		{
 			name:   "buy order",
 			detail: "successful buy order without error",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Committee:          lib.CanopyCommitteeId,
 				AmountForSale:      100,
 				RequestedAmount:    100,
@@ -420,7 +430,7 @@ func TestResetOrder(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		preset *types.SellOrder
+		preset *lib.SellOrder
 		order  uint64
 		error  string
 	}{
@@ -433,7 +443,7 @@ func TestResetOrder(t *testing.T) {
 		{
 			name:   "reset order",
 			detail: "successful reset order without error",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Committee:           lib.CanopyCommitteeId,
 				AmountForSale:       100,
 				RequestedAmount:     100,
@@ -474,14 +484,14 @@ func TestCloseOrder(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		preset *types.SellOrder
+		preset *lib.SellOrder
 		order  uint64
 		error  string
 	}{
 		{
 			name:   "close order not already accepted",
 			detail: "there's no existing buyer for the close order",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Committee:          lib.CanopyCommitteeId,
 				AmountForSale:      100,
 				RequestedAmount:    100,
@@ -493,7 +503,7 @@ func TestCloseOrder(t *testing.T) {
 		{
 			name:   "close order",
 			detail: "successful reset order without error",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Committee:           lib.CanopyCommitteeId,
 				AmountForSale:       100,
 				RequestedAmount:     100,
@@ -542,15 +552,15 @@ func TestDeleteOrder(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
-		preset   []*types.SellOrder
-		toDelete []*types.SellOrder
+		preset   []*lib.SellOrder
+		toDelete []*lib.SellOrder
 		error    string
 	}{
 		{
 			name:   "order not found",
 			detail: "order not found because it wasn't preset",
-			preset: []*types.SellOrder{},
-			toDelete: []*types.SellOrder{
+			preset: []*lib.SellOrder{},
+			toDelete: []*lib.SellOrder{
 				{
 					Id:        0,
 					Committee: 0,
@@ -561,7 +571,7 @@ func TestDeleteOrder(t *testing.T) {
 		{
 			name:   "delete sell order",
 			detail: "delete sell order",
-			preset: []*types.SellOrder{
+			preset: []*lib.SellOrder{
 				{
 					Id:                   0,
 					Committee:            lib.CanopyCommitteeId,
@@ -575,7 +585,7 @@ func TestDeleteOrder(t *testing.T) {
 		{
 			name:   "delete sell order for two different committees",
 			detail: "delete sell order for another committee",
-			preset: []*types.SellOrder{
+			preset: []*lib.SellOrder{
 				{
 					Id:                   0,
 					Committee:            lib.CanopyCommitteeId,
@@ -630,17 +640,17 @@ func TestGetSetOrderBooks(t *testing.T) {
 	tests := []struct {
 		name                     string
 		detail                   string
-		expected                 *types.OrderBooks
+		expected                 *lib.OrderBooks
 		expectedTotalAmount      uint64
 		expectedCommitteeAmounts map[uint64]uint64
 	}{
 		{
 			name:   "various",
 			detail: "various set to ensure get returns proper order books and supply",
-			expected: &types.OrderBooks{OrderBooks: []*types.OrderBook{
+			expected: &lib.OrderBooks{OrderBooks: []*lib.OrderBook{
 				{
 					CommitteeId: 0,
-					Orders: []*types.SellOrder{
+					Orders: []*lib.SellOrder{
 						{
 							Id:                   1,
 							Committee:            2,
@@ -661,7 +671,7 @@ func TestGetSetOrderBooks(t *testing.T) {
 				},
 				{
 					CommitteeId: 1,
-					Orders: []*types.SellOrder{
+					Orders: []*lib.SellOrder{
 						{
 							Id:                   1,
 							Committee:            2,

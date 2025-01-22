@@ -1368,14 +1368,14 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
-		upsert   []*types.CommitteeData
-		expected []*types.CommitteeData
+		upsert   []*lib.CommitteeData
+		expected []*lib.CommitteeData
 		error    map[int]lib.ErrorI // error with idx
 	}{
 		{
 			name:   "inserts only",
 			detail: "1 insert for 2 different committees i.e. no 'updates'",
-			upsert: []*types.CommitteeData{
+			upsert: []*lib.CommitteeData{
 				{
 					CommitteeId:             1,
 					LastCanopyHeightUpdated: 1,
@@ -1401,7 +1401,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 2, // can't overwrite number of samples
 				},
 			},
-			expected: []*types.CommitteeData{
+			expected: []*lib.CommitteeData{
 				{
 					CommitteeId:             1,
 					LastCanopyHeightUpdated: 1,
@@ -1431,7 +1431,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 		{
 			name:   "update",
 			detail: "2 'sets' for the same committees i.e. one 'update'",
-			upsert: []*types.CommitteeData{
+			upsert: []*lib.CommitteeData{
 				{
 					CommitteeId:             1,
 					LastCanopyHeightUpdated: 1,
@@ -1457,7 +1457,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 3, // can't overwrite number of samples
 				},
 			},
-			expected: []*types.CommitteeData{
+			expected: []*lib.CommitteeData{
 				{
 					CommitteeId:             1,
 					LastCanopyHeightUpdated: 2,
@@ -1479,7 +1479,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 		{
 			name:   "update with chain height error",
 			detail: "can't update with a LTE chain height",
-			upsert: []*types.CommitteeData{
+			upsert: []*lib.CommitteeData{
 				{
 					CommitteeId:             1,
 					LastCanopyHeightUpdated: 1,
@@ -1510,7 +1510,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 		{
 			name:   "update with committee height error",
 			detail: "can't update with a smaller committee height",
-			upsert: []*types.CommitteeData{
+			upsert: []*lib.CommitteeData{
 				{
 					CommitteeId:             1,
 					LastCanopyHeightUpdated: 1,
@@ -1574,12 +1574,12 @@ func TestGetSetCommitteesData(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		set    *types.CommitteesData
+		set    *lib.CommitteesData
 	}{
 		{
 			name:   "a single committee",
 			detail: "only one committee data inserted",
-			set: &types.CommitteesData{List: []*types.CommitteeData{
+			set: &lib.CommitteesData{List: []*lib.CommitteeData{
 				{
 					CommitteeId:             1,
 					LastCanopyHeightUpdated: 1,
@@ -1597,7 +1597,7 @@ func TestGetSetCommitteesData(t *testing.T) {
 		{
 			name:   "two committee data",
 			detail: "two different committee data inserted",
-			set: &types.CommitteesData{List: []*types.CommitteeData{
+			set: &lib.CommitteesData{List: []*lib.CommitteeData{
 				{
 					CommitteeId:             1,
 					LastCanopyHeightUpdated: 1,

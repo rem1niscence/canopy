@@ -77,7 +77,7 @@ func (c *Controller) ValidateCertificate(qc *lib.QuorumCertificate, evidence *bf
 		return lib.ErrPubKeyFromBytes(er)
 	}
 	// get the delegate and their cut from the state machine
-	delegate, delegateCut, err := c.GetDelegateToReward(proposerPub.Address().Bytes())
+	delegate, delegateCut, err := c.GetDelegateToReward(qc.Header.CanopyHeight, proposerPub.Address().Bytes())
 	if err != nil {
 		return
 	}
@@ -88,7 +88,7 @@ func (c *Controller) ValidateCertificate(qc *lib.QuorumCertificate, evidence *bf
 	}
 	// validate the reward amount for the delegate
 	delegatorPaymentPercent := qc.Results.RewardRecipients.PaymentPercents[1]
-	if !bytes.Equal(delegatorPaymentPercent.Address, delegate) || delegatorPaymentPercent.Percent != delegateCut {
+	if !bytes.Equal(delegatorPaymentPercent.Address, *delegate) || delegatorPaymentPercent.Percent != delegateCut {
 		return types.ErrInvalidDelegateReward(delegatorPaymentPercent.Address, delegatorPaymentPercent.Percent)
 	}
 	// play the block against the state machine
@@ -105,8 +105,13 @@ func (c *Controller) ValidateCertificate(qc *lib.QuorumCertificate, evidence *bf
 	if !slices.Equal(buyOrders, qc.Results.Orders.BuyOrders) {
 		return types.ErrInvalidBuyOrder()
 	}
+	// get orders from the base-chain
+	orders, err := c.BaseChainInfo.GetOrders(qc.Header.CanopyHeight, c.Config.ChainId)
+	if err != nil {
+		return err
+	}
 	// process the base-chain order book against the state
-	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(types.OrderBook{}, blockResult)
+	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(orders, blockResult)
 	// validate the close orders
 	if !slices.Equal(closeOrders, qc.Results.Orders.CloseOrders) {
 		return types.ErrInvalidBuyOrder()
@@ -182,14 +187,19 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 		return
 	}
 	// get the delegate and their cut from the state machine
-	delegate, delegateCut, err := c.GetDelegateToReward(selfAddress)
+	delegate, delegateCut, err := c.GetDelegateToReward(c.BaseChainInfo.GetHeight(), selfAddress)
 	if err != nil {
 		return
 	}
 	// parse the last block for buy orders and polling
 	buyOrders := c.FSM.ParseBuyOrders(blockResult)
+	// get orders from the base-chain
+	orders, err := c.BaseChainInfo.GetOrders(qc.Header.CanopyHeight, c.Config.ChainId)
+	if err != nil {
+		return
+	}
 	// process the base-chain order book against the state
-	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(types.OrderBook{}, blockResult)
+	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(orders, blockResult)
 	// set block reward recipients
 	results = &lib.CertificateResult{
 		RewardRecipients: &lib.RewardRecipients{
@@ -198,7 +208,7 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 				Percent: 100 - delegateCut,      // proposer gets what's left after the delegate's cut
 			},
 				{
-					Address: delegate,    // delegate is a recipient of the reward
+					Address: *delegate,   // delegate is a recipient of the reward
 					Percent: delegateCut, // delegates cut is a governance parameter
 				},
 			}},
@@ -409,7 +419,7 @@ func (c *Controller) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (s
 }
 
 // GetDelegateToReward() gets the pseudorandomly selected delegate to reward and their cut
-func (c *Controller) GetDelegateToReward(proposerAddress []byte) (address []byte, delegateCut uint64, err lib.ErrorI) {
+func (c *Controller) GetDelegateToReward(canopyHeight uint64, proposerAddress []byte) (address *lib.HexBytes, delegateCut uint64, err lib.ErrorI) {
 	// get the validator params in order to have the reward percentage for the delegate
 	valParams, err := c.FSM.GetParamsVal()
 	if err != nil {
@@ -418,9 +428,12 @@ func (c *Controller) GetDelegateToReward(proposerAddress []byte) (address []byte
 	// set the percentage the delegate receives
 	delegateCut = valParams.ValidatorDelegateRewardPercentage
 	// get the delegate pseudorandom delegate
-	address = c.BaseChainInfo.DelegateLotteryWinner
-	if bytes.Equal(address, crypto.MaxHash[:20]) {
-		address = proposerAddress
+	address, err = c.BaseChainInfo.GetDelegateLotteryWinner(canopyHeight, c.Config.ChainId)
+	if err != nil {
+		return
+	}
+	if bytes.Equal(*address, crypto.MaxHash[:20]) {
+		*address = proposerAddress
 	}
 	return
 }

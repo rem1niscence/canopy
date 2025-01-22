@@ -439,3 +439,45 @@ func (x *Checkpoint) CheckBasic() ErrorI {
 	}
 	return nil
 }
+
+// Combine() merges the Reward Recipients' Payment Percents of the current Proposal with those of another Proposal
+// such that the Payment Percentages may be equally weighted when performing reward distribution calculations
+// NOTE: percents will exceed 100% over multiple samples, but are normalized using the NumberOfSamples field
+func (x *CommitteeData) Combine(f *CommitteeData) ErrorI {
+	if f == nil {
+		return nil
+	}
+	// for each payment percent,
+	for _, ep := range f.PaymentPercents {
+		x.addPercents(ep.Address, ep.Percent)
+	}
+	// new Proposal purposefully overwrites the Block and Meta of the current Proposal
+	// this is to ensure both Proposals have the latest Block and Meta information
+	// in the case where the caller uses a pattern where there may be a stale Block/Meta
+	*x = CommitteeData{
+		PaymentPercents:         x.PaymentPercents,
+		NumberOfSamples:         x.NumberOfSamples + 1,
+		CommitteeId:             f.CommitteeId,
+		LastCanopyHeightUpdated: f.LastCanopyHeightUpdated,
+		LastChainHeightUpdated:  f.LastChainHeightUpdated,
+	}
+	return nil
+}
+
+// addPercents() is a helper function that adds reward distribution percents on behalf of an address
+func (x *CommitteeData) addPercents(address []byte, percent uint64) {
+	// check to see if the address already exists
+	for i, ep := range x.PaymentPercents {
+		// if already exists
+		if bytes.Equal(address, ep.Address) {
+			// simply add the percent to the previous
+			x.PaymentPercents[i].Percent += percent
+			return
+		}
+	}
+	// if the address doesn't already exist, append a sample to PaymentPercents
+	x.PaymentPercents = append(x.PaymentPercents, &PaymentPercents{
+		Address: address,
+		Percent: percent,
+	})
+}

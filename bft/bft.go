@@ -191,14 +191,19 @@ func (b *BFT) StartElectionPhase() {
 		b.log.Error(err.Error())
 		return
 	}
+	lastProposers, err := b.LoadLastProposers(b.CanopyHeight)
+	if err != nil {
+		b.log.Error(err.Error())
+		return
+	}
 	// initialize the sortition parameters
 	b.SortitionData = &lib.SortitionData{
-		LastProposerAddresses: b.LoadLastProposers().Addresses, // LastProposers ensures defense against Grinding Attacks
-		Height:                b.Height,                        // height ensures a unique sortition seed for each height
-		Round:                 b.Round,                         // round ensures a unique sortition seed for each round
-		TotalValidators:       b.ValidatorSet.NumValidators,    // validator count is required for CDF
-		TotalPower:            b.ValidatorSet.TotalPower,       // total power between all validators is required for CDF
-		VotingPower:           selfValidator.VotingPower,       // self voting power is required for CDF
+		LastProposerAddresses: lastProposers.Addresses,      // LastProposers ensures defense against Grinding Attacks
+		Height:                b.Height,                     // height ensures a unique sortition seed for each height
+		Round:                 b.Round,                      // round ensures a unique sortition seed for each round
+		TotalValidators:       b.ValidatorSet.NumValidators, // validator count is required for CDF
+		TotalPower:            b.ValidatorSet.TotalPower,    // total power between all validators is required for CDF
+		VotingPower:           selfValidator.VotingPower,    // self voting power is required for CDF
 	}
 	// SORTITION (CDF + VRF)
 	_, vrf, isCandidate := Sortition(&SortitionParams{
@@ -791,11 +796,11 @@ type (
 		// LoadCommittee() loads the ValidatorSet operating under CommitteeID
 		LoadCommittee(canopyHeight uint64) (lib.ValidatorSet, lib.ErrorI)
 		// LoadCommitteeHeightInState() loads the last height a committee member executed a Proposal (reward) transaction
-		LoadCommitteeHeightInState() uint64
+		LoadCommitteeHeightInState(canopyHeight uint64) (uint64, lib.ErrorI)
 		// LoadLastProposers() loads the last Canopy committee proposers for sortition data
-		LoadLastProposers() *lib.Proposers
+		LoadLastProposers(canopyHeight uint64) (*lib.Proposers, lib.ErrorI)
 		// LoadMinimumEvidenceHeight() loads the Canopy enforced minimum height for valid Byzantine Evidence
-		LoadMinimumEvidenceHeight() (uint64, lib.ErrorI)
+		LoadMinimumEvidenceHeight(canopyHeight uint64) (uint64, lib.ErrorI)
 		// IsValidDoubleSigner() checks to see if the double signer is valid for this specific height
 		IsValidDoubleSigner(height uint64, address []byte) bool
 	}

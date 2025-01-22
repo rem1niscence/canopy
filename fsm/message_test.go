@@ -288,7 +288,7 @@ func TestHandleMessage(t *testing.T) {
 				// add to the pool
 				require.NoError(t, sm.PoolAdd(lib.CanopyCommitteeId+types.EscrowPoolAddend, amount))
 				// save the order in state
-				_, err = sm.CreateOrder(&types.SellOrder{
+				_, err = sm.CreateOrder(&lib.SellOrder{
 					Committee:            lib.CanopyCommitteeId,
 					AmountForSale:        amount,
 					RequestedAmount:      1000,
@@ -326,7 +326,7 @@ func TestHandleMessage(t *testing.T) {
 				// add to the pool
 				require.NoError(t, sm.PoolAdd(lib.CanopyCommitteeId+types.EscrowPoolAddend, amount))
 				// save the order in state
-				_, err = sm.CreateOrder(&types.SellOrder{
+				_, err = sm.CreateOrder(&lib.SellOrder{
 					Committee:            lib.CanopyCommitteeId,
 					AmountForSale:        amount,
 					RequestedAmount:      1000,
@@ -591,7 +591,7 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 			// preset a committee member
 			require.NoError(t, sm.SetCommitteeMember(newTestAddress(t), lib.CanopyCommitteeId, 100))
 			// preset an order
-			_, err := sm.CreateOrder(&types.SellOrder{
+			_, err := sm.CreateOrder(&lib.SellOrder{
 				Committee:          lib.CanopyCommitteeId,
 				SellersSendAddress: newTestAddressBytes(t),
 			}, lib.CanopyCommitteeId)
@@ -2037,7 +2037,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 					buyerAddress = newTestAddressBytes(t)
 				}
 				// upsert each order in state
-				_, err := sm.CreateOrder(&types.SellOrder{
+				_, err := sm.CreateOrder(&lib.SellOrder{
 					Committee:           lib.CanopyCommitteeId,
 					BuyerReceiveAddress: buyerAddress,
 					BuyerChainDeadline:  0,
@@ -2274,7 +2274,7 @@ func TestMessageCreateOrder(t *testing.T) {
 			order, err := sm.GetOrder(0, test.msg.CommitteeId)
 			require.NoError(t, err)
 			// validate the creation of the order
-			require.EqualExportedValues(t, &types.SellOrder{
+			require.EqualExportedValues(t, &lib.SellOrder{
 				Committee:            test.msg.CommitteeId,
 				AmountForSale:        test.msg.AmountForSale,
 				RequestedAmount:      test.msg.RequestedAmount,
@@ -2291,9 +2291,9 @@ func TestHandleMessageEditOrder(t *testing.T) {
 		detail           string
 		presetAccount    uint64
 		minimumOrderSize uint64
-		preset           *types.SellOrder
+		preset           *lib.SellOrder
 		msg              *types.MessageEditOrder
-		expected         *types.SellOrder
+		expected         *lib.SellOrder
 		error            string
 	}{
 		{
@@ -2311,7 +2311,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 		{
 			name:   "order already accepted",
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
@@ -2334,7 +2334,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			name:             "minimum order size",
 			detail:           "the edited order does not satisfy the minimum order size",
 			minimumOrderSize: 2,
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        2,
@@ -2353,7 +2353,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 		}, {
 			name:   "insufficient funds",
 			detail: "the account does not have the balance to cover the edit",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
@@ -2373,7 +2373,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 		{
 			name:   "edit receive address",
 			detail: "the order simply updates the receive address but the amount stays the same",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
@@ -2388,7 +2388,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
-			expected: &types.SellOrder{
+			expected: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
@@ -2401,7 +2401,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			detail:           "the order has a increased the sell amount",
 			presetAccount:    1,
 			minimumOrderSize: 0,
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
@@ -2416,7 +2416,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
-			expected: &types.SellOrder{
+			expected: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        2,
@@ -2427,7 +2427,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 		{
 			name:   "decrease sell amount",
 			detail: "the order has a decreased the sell amount",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        2,
@@ -2442,7 +2442,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
-			expected: &types.SellOrder{
+			expected: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
@@ -2510,7 +2510,7 @@ func TestHandleMessageDelete(t *testing.T) {
 		name          string
 		detail        string
 		presetAccount uint64
-		preset        *types.SellOrder
+		preset        *lib.SellOrder
 		msg           *types.MessageDeleteOrder
 		error         string
 	}{
@@ -2526,7 +2526,7 @@ func TestHandleMessageDelete(t *testing.T) {
 		{
 			name:   "order already accepted",
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
@@ -2545,7 +2545,7 @@ func TestHandleMessageDelete(t *testing.T) {
 		{
 			name:   "successful delete",
 			detail: "the order delete was successful",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        2,

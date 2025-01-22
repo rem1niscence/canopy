@@ -163,14 +163,14 @@ func (c *Client) Committee(height uint64, id uint64, params lib.PageParams) (p *
 	return
 }
 
-func (c *Client) CommitteeData(height uint64, id uint64) (p *types.CommitteeData, err lib.ErrorI) {
-	p = new(types.CommitteeData)
+func (c *Client) CommitteeData(height uint64, id uint64) (p *lib.CommitteeData, err lib.ErrorI) {
+	p = new(lib.CommitteeData)
 	err = c.heightAndIdRequest(CommitteeDataRouteName, height, id, p)
 	return
 }
 
-func (c *Client) CommitteesData(height uint64) (p *types.CommitteesData, err lib.ErrorI) {
-	p = new(types.CommitteesData)
+func (c *Client) CommitteesData(height uint64) (p *lib.CommitteesData, err lib.ErrorI) {
+	p = new(lib.CommitteesData)
 	err = c.paginatedHeightRequest(CommitteesDataRouteName, height, lib.PageParams{}, p)
 	return
 }
@@ -187,14 +187,14 @@ func (c *Client) SubsidizedCommittees(height uint64) (p *[]uint64, err lib.Error
 	return
 }
 
-func (c *Client) Order(height, orderId, committeeId uint64) (p *types.SellOrder, err lib.ErrorI) {
-	p = new(types.SellOrder)
+func (c *Client) Order(height, orderId, committeeId uint64) (p *lib.SellOrder, err lib.ErrorI) {
+	p = new(lib.SellOrder)
 	err = c.orderRequest(OrderRouteName, height, orderId, committeeId, p)
 	return
 }
 
-func (c *Client) Orders(height, committeeId uint64) (p *types.OrderBooks, err lib.ErrorI) {
-	p = new(types.OrderBooks)
+func (c *Client) Orders(height, committeeId uint64) (p *lib.OrderBooks, err lib.ErrorI) {
+	p = new(lib.OrderBooks)
 	err = c.heightAndIdRequest(OrdersRouteName, height, committeeId, p)
 	return
 }

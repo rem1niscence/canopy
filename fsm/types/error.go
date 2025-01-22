@@ -251,20 +251,12 @@ func ErrInvalidTxTime() lib.ErrorI {
 	return lib.NewError(lib.CodeErrInvalidTxTime, lib.StateMachineModule, "invalid tx timestamp")
 }
 
-func ErrOrderNotFound(id int) lib.ErrorI {
-	return lib.NewError(lib.CodeOrderNotFound, lib.StateMachineModule, fmt.Sprintf("order with id %d not found", id))
-}
-
 func ErrUnauthorizedOrderChange() lib.ErrorI {
 	return lib.NewError(lib.CodeUnauthorizedOrderChange, lib.StateMachineModule, "unauthorized order change")
 }
 
 func ErrMinimumOrderSize() lib.ErrorI {
 	return lib.NewError(lib.CodeMinimumOrderSize, lib.StateMachineModule, "minimum order size")
-}
-
-func ErrOrderAlreadyAccepted() lib.ErrorI {
-	return lib.NewError(lib.CodeOrderAlreadyAccepted, lib.StateMachineModule, "order already accepted")
 }
 
 func ErrInvalidOrders() lib.ErrorI {
@@ -312,5 +304,5 @@ func ErrInvalidProposerRewardPercent() lib.ErrorI {
 }
 
 func ErrInvalidDelegateReward(address lib.HexBytes, cut uint64) lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidDelegatorReward, lib.StateMachineModule, fmt.Sprintf("invalid delegate reward:\naddress: %s\ncut: %d%", address, cut))
+	return lib.NewError(lib.CodeInvalidDelegatorReward, lib.StateMachineModule, fmt.Sprintf("invalid delegate reward:\naddress: %s\ncut: %d%%", address, cut))
 }
