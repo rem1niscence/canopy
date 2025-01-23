@@ -5,6 +5,18 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/fs"
+	"net/http"
+	"net/http/pprof"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/fsm"
@@ -21,17 +33,6 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
-	"io"
-	"io/fs"
-	"net/http"
-	"net/http/pprof"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -68,6 +69,7 @@ const (
 	TxsByRecRouteName              = "txs-by-rec"
 	TxByHashRouteName              = "tx-by-hash"
 	PendingRouteName               = "pending"
+	FailedTxRouteName              = "failed-txs"
 	ProposalsRouteName             = "proposals"
 	PollRouteName                  = "poll"
 	CommitteeRouteName             = "committee"
@@ -165,6 +167,7 @@ var (
 		MinimumEvidenceHeightRouteName: {Method: http.MethodPost, Path: "/v1/query/minimum-evidence-height", HandlerFunc: MinimumEvidenceHeight},
 		DelegateLotteryRouteName:       {Method: http.MethodPost, Path: "/v1/query/delegate-lottery", HandlerFunc: DelegateLottery},
 		PendingRouteName:               {Method: http.MethodPost, Path: "/v1/query/pending", HandlerFunc: Pending},
+		FailedTxRouteName:              {Method: http.MethodPost, Path: "/v1/query/failed-txs", HandlerFunc: FailedTxs},
 		ProposalsRouteName:             {Method: http.MethodGet, Path: "/v1/gov/proposals", HandlerFunc: Proposals},
 		PollRouteName:                  {Method: http.MethodGet, Path: "/v1/gov/poll", HandlerFunc: Poll},
 		BaseChainInfoRouteName:         {Method: http.MethodPost, Path: "/v1/query/base-chain-info", HandlerFunc: BaseChainInfo},
@@ -240,10 +243,10 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	}()
 	go updatePollResults()
 	go PollBaseChainInfo()
-	l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
-	runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
-	l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
-	runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
+	// l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
+	// runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
+	// l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
+	// runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
 }
 
 // PollBaseChainInfo() retrieves the information from the base-chain required for consensus
@@ -326,8 +329,14 @@ func TransactionsByHeight(w http.ResponseWriter, r *http.Request, _ httprouter.P
 }
 
 func Pending(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	addrIndexer(w, r, func(_ lib.StoreI, _ crypto.AddressI, p lib.PageParams) (any, lib.ErrorI) {
+	pageIndexer(w, r, func(_ lib.StoreI, _ crypto.AddressI, p lib.PageParams) (any, lib.ErrorI) {
 		return app.GetPendingPage(p)
+	})
+}
+
+func FailedTxs(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	pageIndexer(w, r, func(_ lib.StoreI, _ crypto.AddressI, p lib.PageParams) (any, lib.ErrorI) {
+		return app.GetFailedTxsPage(p)
 	})
 }
 
@@ -1276,6 +1285,24 @@ func addrIndexer(w http.ResponseWriter, r *http.Request, callback func(s lib.Sto
 		write(w, types.ErrAddressEmpty(), http.StatusBadRequest)
 		return
 	}
+	p, err := callback(s, crypto.NewAddressFromBytes(req.Address), req.PageParams)
+	if err != nil {
+		write(w, err, http.StatusBadRequest)
+		return
+	}
+	write(w, p, http.StatusOK)
+}
+
+func pageIndexer(w http.ResponseWriter, r *http.Request, callback func(s lib.StoreI, a crypto.AddressI, p lib.PageParams) (any, lib.ErrorI)) {
+	req := new(paginatedAddressRequest)
+	if ok := unmarshal(w, r, req); !ok {
+		return
+	}
+	s, ok := setupStore(w)
+	if !ok {
+		return
+	}
+	defer s.Discard()
 	p, err := callback(s, crypto.NewAddressFromBytes(req.Address), req.PageParams)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
