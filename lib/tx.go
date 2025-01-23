@@ -301,6 +301,7 @@ type jsonSignature struct {
 // FailedTx contains a failed transaction and its error
 type FailedTx struct {
 	Transaction *Transaction `json:"transaction,omitempty"`
+	Hash        string       `json:"tx_hash,omitempty"`
 	Error       error        `json:"error,omitempty"`
 }
 
@@ -352,6 +353,7 @@ func (f *FailedTxCache) Add(tx []byte, hash string, err error) bool {
 	f.cache[hash] = failedTx{
 		tx: &FailedTx{
 			Transaction: libTx,
+			Hash:        hash,
 			Error:       err,
 		},
 		timestamp: time.Now(),
