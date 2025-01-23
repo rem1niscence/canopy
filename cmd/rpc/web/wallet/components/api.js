@@ -29,7 +29,6 @@ const validatorPath = "/v1/query/validator";
 const txsBySender = "/v1/query/txs-by-sender";
 const txsByRec = "/v1/query/txs-by-rec";
 const failedTxs = "/v1/query/failed-txs";
-const pendingTxs = "/v1/query/pending";
 const pollPath = "/v1/gov/poll";
 const proposalsPath = "/v1/gov/proposals";
 const addVotePath = "/v1/gov/add-vote";
@@ -250,9 +249,6 @@ export async function AccountWithTxs(height, address, page) {
   result.rec_transactions = await TransactionsByRec(page, address);
   result.sent_transactions.results?.forEach(setStatus("included"));
 
-  result.pending_transactions = await PendingTransactions(page, address);
-  result.pending_transactions.results?.forEach(setStatus("pending"));
-
   result.failed_transactions = await FailedTransactions(page);
   result.failed_transactions.results?.forEach((tx) => {
     tx.status = "failure: ".concat(tx.error.Msg);
@@ -260,7 +256,6 @@ export async function AccountWithTxs(height, address, page) {
 
   result.combined = (result.rec_transactions.results || [])
     .concat(result.sent_transactions.results || [])
-    .concat(result.pending_transactions.results || [])
     .concat(result.failed_transactions.results || []);
 
   result.combined.sort(function (a, b) {
@@ -284,10 +279,6 @@ export function TransactionsByRec(page, rec) {
 
 export function FailedTransactions(page) {
   return POST(rpcURL, failedTxs, pageRequest(page));
-}
-
-export function PendingTransactions(page, rec) {
-  return POST(rpcURL, pendingTxs, pageAddrReq(page, rec));
 }
 
 export async function Validator(height, address) {
