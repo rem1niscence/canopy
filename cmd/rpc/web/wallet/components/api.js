@@ -28,6 +28,8 @@ const accountPath = "/v1/query/account";
 const validatorPath = "/v1/query/validator";
 const txsBySender = "/v1/query/txs-by-sender";
 const txsByRec = "/v1/query/txs-by-rec";
+const failedTxs = "/v1/query/failed-txs";
+const pendingTxs = "/v1/query/pending";
 const pollPath = "/v1/gov/poll";
 const proposalsPath = "/v1/gov/proposals";
 const addVotePath = "/v1/gov/add-vote";
@@ -70,6 +72,10 @@ export async function POST(url, path, request) {
     return {};
   }
   return resp.json();
+}
+
+function pageRequest(page) {
+  return JSON.stringify({ pageNumber: page, perPage: 5 });
 }
 
 function heightAndAddrRequest(height, address) {
@@ -233,21 +239,38 @@ export async function VotePoll(address, json, approve, password) {
 export async function AccountWithTxs(height, address, page) {
   let result = {};
   result.account = await Account(height, address);
+
+  const setStatus = (status) => (tx) => {
+    tx.status = status;
+  };
+
   result.sent_transactions = await TransactionsBySender(page, address);
+  result.sent_transactions.results?.forEach(setStatus("included"));
+
   result.rec_transactions = await TransactionsByRec(page, address);
-  result.combined = [];
-  if (result.sent_transactions.results != null && result.rec_transactions.results != null) {
-    result.combined = result.combined.concat(result.rec_transactions.results, result.sent_transactions.results);
-  } else if (result.sent_transactions.results != null) {
-    result.combined = result.sent_transactions.results;
-  } else if (result.rec_transactions.results != null) {
-    result.combined = result.rec_transactions.results;
-  } else {
-    return result;
-  }
-  result.combined.sort(function (a, b) {
-    return b.height === a.height ? b.index - a.index : b.height - a.height;
+  result.sent_transactions.results?.forEach(setStatus("included"));
+
+  result.pending_transactions = await PendingTransactions(page, address);
+  result.pending_transactions.results?.forEach(setStatus("pending"));
+
+  result.failed_transactions = await FailedTransactions(page);
+  result.failed_transactions.results?.forEach((tx) => {
+    tx.status = "failure: ".concat(tx.error.Msg);
   });
+
+  result.combined = (result.rec_transactions.results || [])
+    .concat(result.sent_transactions.results || [])
+    .concat(result.pending_transactions.results || [])
+    .concat(result.failed_transactions.results || []);
+
+  result.combined.sort(function (a, b) {
+    return b.transaction.time === a.transaction.time
+      ? b.height === a.height
+        ? b.index - a.index
+        : b.height - a.height
+      : b.transaction.time - a.transaction.time;
+  });
+
   return result;
 }
 
@@ -257,6 +280,14 @@ export function TransactionsBySender(page, sender) {
 
 export function TransactionsByRec(page, rec) {
   return POST(rpcURL, txsByRec, pageAddrReq(page, rec));
+}
+
+export function FailedTransactions(page) {
+  return POST(rpcURL, failedTxs, pageRequest(page));
+}
+
+export function PendingTransactions(page, rec) {
+  return POST(rpcURL, pendingTxs, pageAddrReq(page, rec));
 }
 
 export async function Validator(height, address) {
