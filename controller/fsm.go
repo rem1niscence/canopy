@@ -501,7 +501,7 @@ func (m *Mempool) HandleTransaction(tx []byte) (err lib.ErrorI) {
 	defer func() {
 		// cache failed txs for RPC display
 		if err != nil {
-			m.cachedFailedTxs.Add(tx, crypto.HashString(tx), err.Error())
+			m.cachedFailedTxs.Add(tx, crypto.HashString(tx), err)
 		}
 	}()
 
@@ -578,7 +578,7 @@ func (m *Mempool) checkMempool() {
 			m.log.Error(err.Error())
 			remove = append(remove, tx)
 			// and cache it
-			m.cachedFailedTxs.Add(tx, crypto.HashString(tx), err.Error())
+			m.cachedFailedTxs.Add(tx, crypto.HashString(tx), err)
 			continue
 		}
 		// cache the results

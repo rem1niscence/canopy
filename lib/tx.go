@@ -300,8 +300,8 @@ type jsonSignature struct {
 
 // FailedTx contains a failed transaction and its error
 type FailedTx struct {
-	Transaction *Transaction
-	Err         string
+	Transaction *Transaction `json:"transaction,omitempty"`
+	Error       error        `json:"error,omitempty"`
 }
 
 type FailedTxs []*FailedTx
@@ -322,7 +322,6 @@ type FailedTxCache struct {
 	// reject all transactions that are not of these types
 	allowdMessageTypes []string
 	m                  sync.Mutex
-	cleanupInterval    time.Duration
 }
 
 // NewFailedTxCache returns a new FailedTxCache
@@ -337,7 +336,7 @@ func NewFailedTxCache(allowedMessageTypes []string) *FailedTxCache {
 }
 
 // Add adds a failed transaction with its error to the cache
-func (f *FailedTxCache) Add(tx []byte, hash string, err string) bool {
+func (f *FailedTxCache) Add(tx []byte, hash string, err error) bool {
 	f.m.Lock()
 	defer f.m.Unlock()
 
@@ -353,7 +352,7 @@ func (f *FailedTxCache) Add(tx []byte, hash string, err string) bool {
 	f.cache[hash] = failedTx{
 		tx: &FailedTx{
 			Transaction: libTx,
-			Err:         err,
+			Error:       err,
 		},
 		timestamp: time.Now(),
 	}

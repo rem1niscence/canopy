@@ -2,6 +2,7 @@ package lib
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -340,7 +341,7 @@ func TestFailedTxCache(t *testing.T) {
 		allowedMessageTypes []string
 		txBytes             []byte
 		hash                string
-		err                 string
+		err                 error
 		expectedResult      bool
 	}{
 		{
@@ -348,7 +349,7 @@ func TestFailedTxCache(t *testing.T) {
 			allowedMessageTypes: []string{testMessageName},
 			txBytes:             txBytes,
 			hash:                "validHash",
-			err:                 "some error",
+			err:                 nil,
 			expectedResult:      true,
 		},
 		{
@@ -356,7 +357,7 @@ func TestFailedTxCache(t *testing.T) {
 			allowedMessageTypes: []string{"invalidMessageType"},
 			txBytes:             txBytes,
 			hash:                "invalidHash",
-			err:                 "some error",
+			err:                 nil,
 			expectedResult:      false,
 		},
 		{
@@ -364,7 +365,7 @@ func TestFailedTxCache(t *testing.T) {
 			allowedMessageTypes: []string{testMessageName},
 			txBytes:             []byte("invalidBytes"),
 			hash:                "unmarshalErrorHash",
-			err:                 "some error",
+			err:                 ErrUnmarshal(errors.New("unmarshal error")),
 			expectedResult:      false,
 		},
 	}
@@ -381,7 +382,7 @@ func TestFailedTxCache(t *testing.T) {
 				// validate cache
 				failedTx, ok := cache.Get(test.hash)
 				require.True(t, ok)
-				require.Equal(t, test.err, failedTx.Err)
+				require.Equal(t, test.err, failedTx.Error)
 				require.EqualExportedValues(t, tx, failedTx.Transaction)
 
 				// validate get all
