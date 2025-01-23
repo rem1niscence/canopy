@@ -322,6 +322,7 @@ type FailedTxCache struct {
 	// reject all transactions that are not of these types
 	allowdMessageTypes []string
 	m                  sync.Mutex
+	cleanupInterval    time.Duration
 }
 
 // NewFailedTxCache returns a new FailedTxCache
@@ -360,10 +361,16 @@ func (f *FailedTxCache) Add(tx []byte, hash string, err string) bool {
 }
 
 // Get returns the failed transaction associated with its hash
-func (f *FailedTxCache) Get(txHash string) *FailedTx {
+func (f *FailedTxCache) Get(txHash string) (*FailedTx, bool) {
 	f.m.Lock()
 	defer f.m.Unlock()
-	return f.cache[txHash].tx
+
+	failedTx, ok := f.cache[txHash]
+
+	if !ok {
+		return nil, ok
+	}
+	return failedTx.tx, ok
 }
 
 // GetAll returns all the failed transactions in the cache
