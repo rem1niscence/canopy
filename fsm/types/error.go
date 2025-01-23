@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+
 	"github.com/canopy-network/canopy/lib"
 )
 
@@ -308,5 +309,5 @@ func ErrInvalidProposerRewardPercent() lib.ErrorI {
 }
 
 func ErrInvalidDelegateReward(address lib.HexBytes, cut uint64) lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidDelegatorReward, lib.StateMachineModule, fmt.Sprintf("invalid delegate reward:\naddress: %s\ncut: %d%", address, cut))
+	return lib.NewError(lib.CodeInvalidDelegatorReward, lib.StateMachineModule, fmt.Sprintf("invalid delegate reward:\naddress: %s\ncut: %d", address, cut))
 }
