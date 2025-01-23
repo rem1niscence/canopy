@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"slices"
 	"strings"
-	sync "sync"
 	"time"
 
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -265,54 +264,4 @@ type peerInfoJSON struct {
 	IsMustConnect bool         `json:"is_must_connect"`
 	IsTrusted     bool         `json:"is_trusted"`
 	Reputation    int32        `json:"reputation"`
-}
-
-// FailedTxCache is a cache of failed transactions that is used to inform
-// the user of the failure
-type FailedTxCache struct {
-	// txs is a map of tx hashes to errors
-	txs map[string]error
-	m   sync.Mutex
-}
-
-// NewFailedTxCache returns a new FailedTxCache
-func NewFailedTxCache() *FailedTxCache {
-	return &FailedTxCache{
-		txs: map[string]error{},
-		m:   sync.Mutex{},
-	}
-}
-
-// Add adds a transaction hash and error to the cache
-func (f *FailedTxCache) Add(hash string, err error) bool {
-	f.m.Lock()
-	defer f.m.Unlock()
-	if _, ok := f.txs[hash]; ok {
-		return false
-	}
-
-	f.txs[hash] = err
-	return true
-}
-
-// Get returns the error associated with a transaction hash
-func (f *FailedTxCache) Get(hash string) error {
-	f.m.Lock()
-	defer f.m.Unlock()
-	return f.txs[hash]
-}
-
-func (f *FailedTxCache) GetAll() map[string]error {
-	f.m.Lock()
-	defer f.m.Unlock()
-	return f.txs
-}
-
-// Remove removes a transaction hash from the cache
-func (f *FailedTxCache) Remove(hashes ...string) {
-	f.m.Lock()
-	defer f.m.Unlock()
-	for _, hash := range hashes {
-		delete(f.txs, hash)
-	}
 }
