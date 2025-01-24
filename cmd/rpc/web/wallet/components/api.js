@@ -255,11 +255,11 @@ export async function AccountWithTxs(height, address, page) {
     .concat(result.failed_transactions.results || []);
 
   result.combined.sort(function (a, b) {
-    return b.transaction.time === a.transaction.time
-      ? b.height === a.height
-        ? b.index - a.index
-        : b.height - a.height
-      : b.transaction.time - a.transaction.time;
+    return a.transaction.time !== b.transaction.time
+      ? b.transaction.time - a.transaction.time
+      : a.height !== b.height
+        ? b.height - a.height
+        : b.index - a.index;
   });
 
   return result;

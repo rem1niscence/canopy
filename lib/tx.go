@@ -341,23 +341,27 @@ func (f *FailedTxCache) Add(tx []byte, hash string, txErr error) bool {
 	f.m.Lock()
 	defer f.m.Unlock()
 
-	libTx := new(Transaction)
-	if err := Unmarshal(tx, libTx); err != nil {
+	rawTx := new(Transaction)
+	if err := Unmarshal(tx, rawTx); err != nil {
 		return false
 	}
 
-	if slices.Contains(f.disallowedMessageTypes, libTx.MessageType) {
+	if slices.Contains(f.disallowedMessageTypes, rawTx.MessageType) {
 		return false
 	}
 
-	pubKey, err := crypto.NewPublicKeyFromBytes(libTx.Signature.PublicKey)
+	if rawTx.Signature == nil {
+		return false
+	}
+
+	pubKey, err := crypto.NewPublicKeyFromBytes(rawTx.Signature.PublicKey)
 	if err != nil {
 		return false
 	}
 
 	f.cache[hash] = failedTx{
 		tx: &FailedTx{
-			Transaction: libTx,
+			Transaction: rawTx,
 			Hash:        hash,
 			Address:     pubKey.Address().String(),
 			Error:       txErr,
