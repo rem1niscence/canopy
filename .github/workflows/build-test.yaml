@@ -24,7 +24,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Build Services
-        run: go build ./cmd/cli/...
+        run: make build
   test:
     name: Test
     runs-on: ubuntu-latest

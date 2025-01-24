@@ -8,7 +8,7 @@ DOCKER_DIR := ./.docker
 # Targets
 .PHONY: build deps test build-wallet build-explorer docker-up docker-up-fast
 
-build:
+build: build-wallet build-explorer
 	go build -o $(GO_BIN_DIR)/canopy $(CLI_DIR)
 
 deps:
