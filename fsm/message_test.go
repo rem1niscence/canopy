@@ -1891,8 +1891,8 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 		error                  string
 	}{
 		{
-			name:                   "non subsidized committee",
-			detail:                 "the committee is not subsidized",
+			name:                   "canopy committee",
+			detail:                 "the canopy committee tries to send a certificate results transaction",
 			nonSubsidizedCommittee: true,
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
@@ -1901,19 +1901,20 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 					CommitteeId:  lib.CanopyCommitteeId,
 				},
 			}},
-			error: "non subsidized committee",
+			error: "invalid certificate results",
 		},
 		{
-			name:   "older committee height",
-			detail: "a committee height that is LTE state machine height - 2",
+			name:                   "non subsidized committee",
+			detail:                 "the committee is not subsidized",
+			nonSubsidizedCommittee: true,
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
 					Height:       1,
-					CanopyHeight: 0,
-					CommitteeId:  lib.CanopyCommitteeId,
+					CanopyHeight: 3,
+					CommitteeId:  lib.CanopyCommitteeId + 1,
 				},
 			}},
-			error: "invalid certificate committee height",
+			error: "non subsidized committee",
 		},
 		{
 			name:               "no committee members exist for that id",
@@ -1923,7 +1924,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				Header: &lib.View{
 					Height:       1,
 					CanopyHeight: 3,
-					CommitteeId:  lib.CanopyCommitteeId,
+					CommitteeId:  lib.CanopyCommitteeId + 1,
 				},
 			}},
 			error: "there are no validators in the set",
@@ -1936,7 +1937,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				Header: &lib.View{
 					Height:       1,
 					CanopyHeight: 3,
-					CommitteeId:  lib.CanopyCommitteeId,
+					CommitteeId:  lib.CanopyCommitteeId + 1,
 				},
 			}},
 			error: "there are no validators in the set",
@@ -1948,7 +1949,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				Header: &lib.View{
 					Height:       1,
 					CanopyHeight: 2,
-					CommitteeId:  lib.CanopyCommitteeId,
+					CommitteeId:  lib.CanopyCommitteeId + 1,
 				},
 			}},
 			error: "empty quorum certificate",
@@ -1960,7 +1961,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				Header: &lib.View{
 					Height:       1,
 					CanopyHeight: 3,
-					CommitteeId:  lib.CanopyCommitteeId,
+					CommitteeId:  lib.CanopyCommitteeId + 1,
 				},
 				Results:     certificateResults,
 				ResultsHash: certificateResults.Hash(),
@@ -1988,16 +1989,16 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 						Address:      newTestAddressBytes(t, i),
 						PublicKey:    newTestPublicKeyBytes(t, i),
 						StakedAmount: 100,
-						Committees:   []uint64{lib.CanopyCommitteeId},
+						Committees:   []uint64{lib.CanopyCommitteeId + 1},
 					}}, supply))
 					// set the committee member
-					require.NoError(t, sm.SetCommitteeMember(newTestAddress(t, i), lib.CanopyCommitteeId, 100))
+					require.NoError(t, sm.SetCommitteeMember(newTestAddress(t, i), lib.CanopyCommitteeId+1, 100))
 				}
 				// set the supply in state
 				require.NoError(t, sm.SetSupply(supply))
 				// create an aggregate signature
 				// get the committee members
-				committee, err := sm.GetCommitteeMembers(lib.CanopyCommitteeId, true)
+				committee, err := sm.GetCommitteeMembers(lib.CanopyCommitteeId+1, true)
 				require.NoError(t, err)
 				// create a copy of the multikey
 				mk := committee.MultiKey.Copy()
@@ -2038,11 +2039,11 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				}
 				// upsert each order in state
 				_, err := sm.CreateOrder(&lib.SellOrder{
-					Committee:           lib.CanopyCommitteeId,
+					Committee:           lib.CanopyCommitteeId + 1,
 					BuyerReceiveAddress: buyerAddress,
 					BuyerChainDeadline:  0,
 					SellersSendAddress:  newTestAddressBytes(t),
-				}, lib.CanopyCommitteeId)
+				}, lib.CanopyCommitteeId+1)
 				// ensure no error
 				require.NoError(t, err)
 			}
@@ -2056,7 +2057,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			}
 			// 1) validate the 'buy order'
 			func() {
-				order, e := sm.GetOrder(0, lib.CanopyCommitteeId)
+				order, e := sm.GetOrder(0, lib.CanopyCommitteeId+1)
 				require.NoError(t, e)
 				// convenience variable for buy order
 				buyOrder := test.msg.Qc.Results.Orders.BuyOrders[0]
@@ -2067,7 +2068,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			}()
 			// 2) validate the 'reset order'
 			func() {
-				order, e := sm.GetOrder(1, lib.CanopyCommitteeId)
+				order, e := sm.GetOrder(1, lib.CanopyCommitteeId+1)
 				require.NoError(t, e)
 				// validate the receipt address was reset
 				require.Len(t, order.BuyerReceiveAddress, 0)
@@ -2077,7 +2078,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 
 			// 3) validate the 'close order'
 			func() {
-				_, err = sm.GetOrder(2, lib.CanopyCommitteeId)
+				_, err = sm.GetOrder(2, lib.CanopyCommitteeId+1)
 				require.ErrorContains(t, err, "order with id 2 not found")
 			}()
 
@@ -2086,7 +2087,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				// define convenience variable for checkpoint
 				expected := test.msg.Qc.Results.Checkpoint
 				// get the checkpoint
-				got, e := sm.store.(lib.StoreI).GetCheckpoint(lib.CanopyCommitteeId, expected.Height)
+				got, e := sm.store.(lib.StoreI).GetCheckpoint(lib.CanopyCommitteeId+1, expected.Height)
 				require.NoError(t, e)
 				// check got vs expected
 				require.Equal(t, expected.BlockHash, got)
@@ -2094,7 +2095,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 
 			// 5) validate the 'committee data'
 			func() {
-				committeeData, e := sm.GetCommitteeData(lib.CanopyCommitteeId)
+				committeeData, e := sm.GetCommitteeData(lib.CanopyCommitteeId + 1)
 				require.NoError(t, e)
 				// validate the committee height was properly set
 				require.Equal(t, test.msg.Qc.Header.CanopyHeight, committeeData.LastCanopyHeightUpdated)

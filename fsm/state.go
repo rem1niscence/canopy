@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"bytes"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -88,24 +89,29 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 	if err = s.EndBlock(b.BlockHeader.ProposerAddress); err != nil {
 		return nil, nil, err
 	}
-	// load the previous validator set
-	lastValidatorSet, err := s.LoadCommittee(s.Config.ChainId, s.Height()-1)
-	if err != nil {
-		return nil, nil, err
+	// load the last validator set
+	// NOTE: there may be no validators for sub-chains
+	lastValidatorRoot := bytes.Clone(crypto.MaxHash)
+	lastValidatorSet, _ := s.LoadCommittee(s.Config.ChainId, s.Height()-1)
+	if lastValidatorSet.NumValidators != 0 {
+		lastValidatorRoot, err = lastValidatorSet.ValidatorSet.Root()
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		s.log.Debug("No committee for LastValidatorRoot - skipping")
 	}
 	// load the next validator set
-	nextValidatorSet, err := s.LoadCommittee(s.Config.ChainId, s.Height())
-	if err != nil {
-		return nil, nil, err
-	}
-	// generate roots for block header
-	lastValidatorRoot, err := lastValidatorSet.ValidatorSet.Root()
-	if err != nil {
-		return nil, nil, err
-	}
-	nextValidatorRoot, err := nextValidatorSet.ValidatorSet.Root()
-	if err != nil {
-		return nil, nil, err
+	// NOTE: there may be no validators for sub-chains
+	nextValidatorRoot := bytes.Clone(crypto.MaxHash)
+	nextValidatorSet, _ := s.LoadCommittee(s.Config.ChainId, s.Height())
+	if nextValidatorSet.NumValidators != 0 {
+		nextValidatorRoot, err = nextValidatorSet.ValidatorSet.Root()
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		s.log.Debug("No committee for NextValidatorRoot - skipping")
 	}
 	stateRoot, err := store.Root()
 	if err != nil {

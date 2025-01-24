@@ -56,6 +56,7 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.L
 	controller := &Controller{
 		FSM:        fsm,
 		Mempool:    mempool,
+		Consensus:  nil,
 		isSyncing:  &atomic.Bool{},
 		P2P:        p2p.New(valKey, maxMembersPerCommittee, c, l),
 		Address:    valKey.PublicKey().Address().Bytes(),
@@ -65,13 +66,7 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.L
 		log:        l,
 		Mutex:      sync.Mutex{},
 	}
-	// load the committee from the Canopy state
-	valSet, e := fsm.LoadCommittee(c.ChainId, height)
-	if e != nil {
-		return nil, e // TODO is there a chicken and egg problem here with starting a new committee?
-	}
-	controller.isSyncing = &atomic.Bool{}
-	controller.Consensus, err = bft.New(c, valKey, height, height-1, valSet, controller, true, l)
+	controller.Consensus, err = bft.New(c, valKey, height, height-1, controller, true, l)
 	if err != nil {
 		return nil, err
 	}

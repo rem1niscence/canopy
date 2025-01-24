@@ -525,3 +525,18 @@ func TimeTrack(start time.Time) {
 
 	log.Println(fmt.Sprintf("%s took %s", name, elapsed))
 }
+
+func PrintStackTrace() {
+	pc := make([]uintptr, 10) // Get at most 10 stack frames
+	n := runtime.Callers(2, pc)
+	frames := runtime.CallersFrames(pc[:n])
+
+	fmt.Println("Stack trace:")
+	for {
+		frame, more := frames.Next()
+		fmt.Printf("%s\n\t%s:%d\n", frame.Function, frame.File, frame.Line)
+		if !more {
+			break
+		}
+	}
+}

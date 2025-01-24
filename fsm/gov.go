@@ -296,7 +296,8 @@ func (s *StateMachine) PollsToResults(polls *types.ActivePolls) (result types.Po
 	// get the canopy validator set
 	members, err := s.GetCommitteeMembers(s.Config.ChainId)
 	if err != nil {
-		return
+		// NOTE: sub-chains may have no validators - so not returning an error here
+		return result, nil
 	}
 	// get the supply
 	supply, err := s.GetSupply()

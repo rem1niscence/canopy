@@ -1154,7 +1154,7 @@ func updatePollResults() {
 			}
 			// convert the poll to a result
 			result, err := sm.PollsToResults(p)
-			if err != nil {
+			if err != nil || len(result) == 0 {
 				return
 			}
 			// update the rpc accessible version
@@ -1716,11 +1716,11 @@ func runStaticFileServer(fileSys fs.FS, dir, port string) {
 func injectConfig(html string, config lib.Config) string {
 	script := fmt.Sprintf(`<script>
 		window.__CONFIG__ = {
-			rpcURL: "%s:%s",
-			adminRPCURL: "%s:%s"
-			baseChainRPCURL: "%s"
-			chainId: "%d"
-		};
+            rpcURL: "%s:%s",
+            adminRPCURL: "%s:%s",
+            baseChainRPCURL: "%s",
+            chainId: %d
+        };
 	</script>`, config.RPCUrl, config.RPCPort, config.RPCUrl, config.AdminPort, conf.BaseChainRPCURL, conf.ChainId)
 
 	// inject the script just before </head>

@@ -56,7 +56,7 @@ export default function Home() {
         }, 4000);
         return () => clearInterval(interval);
     });
-    if (state.loading || !state.cardData.blocks || Object.keys(state.cardData.blocks).length === 0 || state.cardData.blocks.results.length === 0) {
+    if (state.loading || !state.cardData.blocks ) {
         getCardAndTableData(true)
         return <>
             <Spinner id="spinner"/>

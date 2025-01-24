@@ -341,7 +341,7 @@ func (c *Controller) ListenForConsensus() {
 				return
 			}
 			// load the committee associated with the committee id at the latest canopy height
-			vs, err := c.LoadCommittee(c.FSM.Height())
+			vs, err := c.LoadCommittee(c.BaseChainHeight())
 			if err != nil {
 				handleErr(err, 0)
 				return

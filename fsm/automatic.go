@@ -72,13 +72,13 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 		return nil
 	}
 	results, storeI, committeeId, nonSignerPercent := qc.Results, s.store.(lib.StoreI), qc.Header.CommitteeId, 0
-	// handle the token swaps
-	err := s.HandleCommitteeSwaps(results.Orders, committeeId)
-	if err != nil {
-		return err
-	}
 	// handle checkpoint-as-a-service functionality
 	if results.Checkpoint != nil && s.Config.ChainId == lib.CanopyCommitteeId && committee != nil {
+		// handle the token swaps
+		err := s.HandleCommitteeSwaps(results.Orders, committeeId)
+		if err != nil {
+			return err
+		}
 		// retrieve the last saved checkpoint for this chain
 		mostRecentCheckpoint, e := storeI.GetMostRecentCheckpoint(committeeId)
 		if e != nil {

@@ -5,6 +5,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"math"
+	"slices"
 )
 
 // COMMITTEES BELOW
@@ -20,6 +21,11 @@ func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
 	subsidizedCommitteeIds, err := s.GetSubsidizedCommittees()
 	if err != nil {
 		return err
+	}
+	// ensure self chain is always a 'paid' chain even if there are no validators
+	if !slices.Contains(subsidizedCommitteeIds, s.Config.ChainId) {
+		// this ensures sub-chains always receive Native Token payment to their pool
+		subsidizedCommitteeIds = append(subsidizedCommitteeIds, s.Config.ChainId)
 	}
 	// calculate the number of halvenings
 	halvenings := s.height / uint64(types.BlocksPerHalvening)

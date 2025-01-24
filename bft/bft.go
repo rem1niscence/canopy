@@ -42,7 +42,7 @@ type BFT struct {
 }
 
 // New() creates a new instance of HotstuffBFT for a specific Committee
-func New(c lib.Config, valKey crypto.PrivateKeyI, canopyHeight, height uint64, vs ValSet,
+func New(c lib.Config, valKey crypto.PrivateKeyI, canopyHeight, height uint64,
 	con Controller, vdfEnabled bool, l lib.LoggerI) (*BFT, lib.ErrorI) {
 	// determine if using a Verifiable Delay Function for long-range-attack protection
 	var vdf *lib.VDFService
@@ -58,9 +58,8 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, canopyHeight, height uint64, v
 			NetworkId:    c.NetworkID,
 			CommitteeId:  c.ChainId,
 		},
-		Votes:        make(VotesForHeight),
-		Proposals:    make(ProposalsForHeight),
-		ValidatorSet: vs,
+		Votes:     make(VotesForHeight),
+		Proposals: make(ProposalsForHeight),
 		ByzantineEvidence: &ByzantineEvidence{
 			DSE: DoubleSignEvidences{},
 		},
@@ -88,6 +87,12 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, canopyHeight, height uint64, v
 //   - (a) Canopy committeeID <committeeSet changed, reset but keep locks to prevent conflicting validator sets between peers during a view change>
 //   - (b) Target committeeID <mission accomplished, move to next height>
 func (b *BFT) Start() {
+	var err lib.ErrorI
+	// load the committee from the base chain
+	b.ValidatorSet, err = b.Controller.LoadCommittee(b.Controller.BaseChainHeight())
+	if err != nil {
+		b.log.Fatal(err.Error())
+	}
 	for {
 		select {
 		// PHASE TIMEOUT
