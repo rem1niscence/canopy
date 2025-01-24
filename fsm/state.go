@@ -30,11 +30,12 @@ type StateMachine struct {
 // New() creates a new instance of a StateMachine
 func New(c lib.Config, store lib.StoreI, log lib.LoggerI) (*StateMachine, lib.ErrorI) {
 	sm := &StateMachine{
-		Config:            c,
+		store:             nil,
 		ProtocolVersion:   ProtocolVersion,
 		NetworkID:         uint32(c.P2PConfig.NetworkID),
 		slashTracker:      types.NewSlashTracker(),
 		proposeVoteConfig: types.AcceptAllProposals,
+		Config:            c,
 		log:               log,
 	}
 	return sm, sm.Initialize(store)
@@ -62,14 +63,20 @@ func (s *StateMachine) Initialize(db lib.StoreI) (err lib.ErrorI) {
 // - applies all transactions within the block, generating transaction results nad a root hash
 // - executes `EndBlock`
 // - constructs and returns the block header, and the transaction results
-func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResult, lib.ErrorI) {
-	defer s.catchPanic()
+func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResults []*lib.TxResult, err lib.ErrorI) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.log.Errorf(string(debug.Stack()))
+			// Handle the panic and set the error
+			err = lib.ErrPanic()
+		}
+	}()
 	store, ok := s.Store().(lib.StoreI)
 	if !ok {
 		return nil, nil, types.ErrWrongStoreType()
 	}
 	// automated execution at the 'beginning of a block'
-	if err := s.BeginBlock(); err != nil {
+	if err = s.BeginBlock(); err != nil {
 		return nil, nil, err
 	}
 	// apply all Transactions in the block
@@ -110,7 +117,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 		return nil, nil, err
 	}
 	// generate the block header
-	header := lib.BlockHeader{
+	header = &lib.BlockHeader{
 		Height:                s.Height(),
 		Hash:                  nil,
 		NetworkId:             s.NetworkID,
@@ -131,7 +138,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (*lib.BlockHeader, []*lib.TxResu
 	if _, err = header.SetHash(); err != nil {
 		return nil, nil, err
 	}
-	return &header, txResults, nil
+	return
 }
 
 // ApplyTransactions processes all transactions in the provided block and updates the state accordingly
@@ -244,7 +251,7 @@ func (s *StateMachine) LoadCertificateHashesOnly(height uint64) (*lib.QuorumCert
 	if err != nil {
 		return nil, err
 	}
-	qc.Block, qc.Results = nil, nil
+	qc.Block = nil
 	return qc, nil
 }
 
@@ -260,6 +267,23 @@ func (s *StateMachine) LoadBlock(height uint64) (*lib.BlockResult, lib.ErrorI) {
 	return store.GetBlockByHeight(height)
 }
 
+// LoadBlock() loads an indexed block at a specific height
+func (s *StateMachine) LoadBlockAndCertificate(height uint64) (cert *lib.QuorumCertificate, block *lib.BlockResult, err lib.ErrorI) {
+	if height <= 1 {
+		height = 1
+	}
+	store, ok := s.store.(lib.ReadOnlyStoreI)
+	if !ok {
+		return nil, nil, types.ErrWrongStoreType()
+	}
+	block, err = store.GetBlockByHeight(height)
+	if err != nil {
+		return nil, nil, err
+	}
+	cert, err = s.LoadCertificateHashesOnly(height)
+	return
+}
+
 // Copy() makes a clone of the state machine
 // this feature is used in mempool operation to be able to maintain a parallel ephemeral state without affecting the underlying state machine
 func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
@@ -272,12 +296,12 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 		return nil, err
 	}
 	return &StateMachine{
-		Config:            s.Config,
+		store:             storeCopy,
 		ProtocolVersion:   s.ProtocolVersion,
 		NetworkID:         s.NetworkID,
 		height:            s.height,
 		proposeVoteConfig: s.proposeVoteConfig,
-		store:             storeCopy,
+		Config:            s.Config,
 		log:               s.log,
 	}, nil
 }
@@ -381,6 +405,7 @@ func (s *StateMachine) Store() lib.RWStoreI         { return s.store }
 func (s *StateMachine) SetStore(store lib.RWStoreI) { s.store = store }
 func (s *StateMachine) Height() uint64              { return s.height }
 func (s *StateMachine) TotalVDFIterations() uint64  { return s.vdfIterations }
+func (s *StateMachine) Discard()                    { s.store.(lib.StoreI).Discard() }
 func (s *StateMachine) Reset() {
 	s.slashTracker = types.NewSlashTracker()
 	s.store.(lib.StoreI).Reset()

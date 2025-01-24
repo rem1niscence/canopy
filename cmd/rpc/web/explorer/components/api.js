@@ -1,8 +1,11 @@
-// default values for the RPC URLs
-let rpcURL = "http://127.0.0.1:50002"
+let rpcURL = "http://127.0.0.1:50002" // default value for the RPC URL
+let baseChainRPCURL = rpcURL // default BaseChain RPC URL
+let chainId = 1; // default chain id
 
 if (typeof window !== 'undefined' && window.__CONFIG__) {
     rpcURL = window.__CONFIG__.rpcURL
+    baseChainRPCURL = window.__CONFIG__.baseChainRPCURL
+    chainId = Number(window.__CONFIG__.chainId)
 } else {
     console.log("config undefined")
 }

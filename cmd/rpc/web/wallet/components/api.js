@@ -1,15 +1,15 @@
-let rpcURL = "http://127.0.0.1:50002"; // Default RPC URL
-let adminRPCURL = "http://127.0.0.1:50003"; // Default Admin RPC URL
+let rpcURL = "http://127.0.0.1:50002"; // default RPC URL
+let adminRPCURL = "http://127.0.0.1:50003"; // default Admin RPC URL
+let baseChainRPCURL = rpcURL; // default BaseChain RPC URL
+let chainId = 1; // default chain id
 
 if (typeof window !== 'undefined' && window.__CONFIG__) {
     rpcURL = window.__CONFIG__.rpcURL
     adminRPCURL = window.__CONFIG__.adminRPCURL
+    baseChainRPCURL = window.__CONFIG__.baseChainRPCURL
+    chainId = Number(window.__CONFIG__.chainId)
 } else {
     console.log("config undefined")
-}
-
-export function getRpcURL() {
-    return rpcURL;
 }
 
 export function getAdminRPCURL() {
@@ -32,6 +32,7 @@ const txUnpausePath = "/v1/admin/tx-unpause"
 const txChangeParamPath = "/v1/admin/tx-change-param"
 const txDaoTransfer = "/v1/admin/tx-dao-transfer"
 const txCreateOrder = "/v1/admin/tx-create-order"
+const txBuyOrder = "/v1/admin/tx-buy-order"
 const txEditOrder = "/v1/admin/tx-edit-order"
 const txDeleteOrder = "/v1/admin/tx-delete-order"
 const txStartPoll = "/v1/admin/tx-start-poll"
@@ -49,6 +50,7 @@ const proposalsPath = "/v1/gov/proposals"
 const addVotePath = "/v1/gov/add-vote"
 const delVotePath = "/v1/gov/del-vote"
 const paramsPath = "/v1/query/params"
+const orderPath = "/v1/query/order"
 const txPath = "/v1/tx"
 
 export async function GET(url, path) {
@@ -104,7 +106,7 @@ function voteRequest(json, approve) {
 }
 
 function pollRequest(address, json, password, approve) {
-    return JSON.stringify({address:address, pollJSON: json, pollApprove: approve, password: password, submit: true, })
+    return JSON.stringify({address: address, pollJSON: json, pollApprove: approve, password: password, submit: true,})
 }
 
 function addressAndPwdRequest(address, password) {
@@ -133,7 +135,7 @@ function newTxRequest(address, pubKey, committees, netAddress, amount, delegate,
     });
 }
 
-function newSwapTxRequest(address, committeeId, orderId, sellAmount, receiveAmount, receiveAddress, memo, fee, submit, password) {
+function newSellOrderTxRequest(address, committeeId, orderId, sellAmount, receiveAmount, receiveAddress, memo, fee, submit, password) {
     return JSON.stringify({
         address: address,
         committees: committeeId.toString(),
@@ -146,6 +148,17 @@ function newSwapTxRequest(address, committeeId, orderId, sellAmount, receiveAmou
         submit: submit,
         password: password,
     })
+}
+
+function newBuyOrderTxRequest(address, receiveAddress, orderId, fee, submit, password) {
+    return JSON.stringify({
+        address: address,
+        receiveAddress: receiveAddress,
+        orderId: orderId,
+        fee: fee,
+        submit: submit,
+        password: password,
+    });
 }
 
 function newGovTxRequest(address, amount, paramSpace, paramKey, paramValue, startBlock, endBlock, memo, fee, submit, password) {
@@ -282,15 +295,19 @@ export async function TxDAOTransfer(address, amount, startBlock, endBlock, memo,
 }
 
 export async function TxCreateOrder(address, committeeId, sellAmount, receiveAmount, receiveAddress, memo, fee, password, submit) {
-    return POST(adminRPCURL, txCreateOrder, newSwapTxRequest(address, committeeId, 0, Number(sellAmount), Number(receiveAmount), receiveAddress, memo, Number(fee), submit, password))
+    return POST(adminRPCURL, txCreateOrder, newSellOrderTxRequest(address, committeeId, 0, Number(sellAmount), Number(receiveAmount), receiveAddress, memo, Number(fee), submit, password))
+}
+
+export async function TxBuyOrder(address, receiveAddress, orderId, fee, password, submit) {
+    return POST(adminRPCURL, txBuyOrder, newBuyOrderTxRequest(address, receiveAddress, Number(orderId), Number(fee), submit, password))
 }
 
 export async function TxEditOrder(address, committeeId, orderId, sellAmount, receiveAmount, receiveAddress, memo, fee, password, submit) {
-    return POST(adminRPCURL, txEditOrder, newSwapTxRequest(address, committeeId, Number(orderId), Number(sellAmount), Number(receiveAmount), receiveAddress, memo, Number(fee), submit, password))
+    return POST(adminRPCURL, txEditOrder, newSellOrderTxRequest(address, committeeId, Number(orderId), Number(sellAmount), Number(receiveAmount), receiveAddress, memo, Number(fee), submit, password))
 }
 
 export async function TxDeleteOrder(address, committeeId, orderId, memo, fee, password, submit) {
-    return POST(adminRPCURL, txDeleteOrder, newSwapTxRequest(address, committeeId, Number(orderId), 0, 0, "", memo, Number(fee), submit, password))
+    return POST(adminRPCURL, txDeleteOrder, newSellOrderTxRequest(address, committeeId, Number(orderId), 0, 0, "", memo, Number(fee), submit, password))
 }
 
 export async function RawTx(json) {

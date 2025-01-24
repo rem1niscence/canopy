@@ -75,15 +75,15 @@ func (vs *ValidatorSet) GetValidatorAndIdx(publicKey []byte) (val *ConsensusVali
 
 // BaseChainInfo maintains base-chain data needed for consensus
 type BaseChainInfo struct {
-	Height                  uint64       `json:"height"`
-	ValidatorSet            ValidatorSet `json:"validator_set"`
-	LastValidatorSet        ValidatorSet `json:"last_validator_set"`
-	LastProposers           *Proposers   `json:"last_proposers"`
-	MinimumEvidenceHeight   uint64       `json:"minimum_evidence_height"`
-	LastCanopyHeightUpdated uint64       `json:"last_canopy_height_updated"`
-	DelegateLotteryWinner   HexBytes     `json:"delegate_lottery_winner"`
-	Orders                  *OrderBook   `json:"orders"`
-	RemoteCallbacks         RemoteCallbacks
+	Height                  uint64         `json:"height"`
+	ValidatorSet            ValidatorSet   `json:"validator_set"`
+	LastValidatorSet        ValidatorSet   `json:"last_validator_set"`
+	LastProposers           *Proposers     `json:"last_proposers"`
+	MinimumEvidenceHeight   uint64         `json:"minimum_evidence_height"`
+	LastCanopyHeightUpdated uint64         `json:"last_canopy_height_updated"`
+	LotteryWinner           *LotteryWinner `json:"lottery_winner"`
+	Orders                  *OrderBook     `json:"orders"`
+	RemoteCallbacks         *RemoteCallbacks
 	Log                     LoggerI
 }
 
@@ -95,7 +95,7 @@ type RemoteCallbacks struct {
 	LastProposers         func(height uint64) (p *Proposers, err ErrorI)
 	MinimumEvidenceHeight func(height uint64) (p *uint64, err ErrorI)
 	CommitteeData         func(height, id uint64) (p *CommitteeData, err ErrorI)
-	DelegateLottery       func(height, id uint64) (p *HexBytes, err ErrorI)
+	Lottery               func(height, id uint64) (p *LotteryWinner, err ErrorI)
 	Orders                func(height, committeeId uint64) (p *OrderBooks, err ErrorI)
 }
 
@@ -168,24 +168,24 @@ func (b *BaseChainInfo) GetLastCanopyHeightUpdated(height, id uint64) (uint64, E
 	return committeeData.LastCanopyHeightUpdated, nil
 }
 
-// GetDelegateLotteryWinner() returns the winner of the delegate lottery from the base-chain
-func (b *BaseChainInfo) GetDelegateLotteryWinner(height, id uint64) (*HexBytes, ErrorI) {
+// GetLotteryWinner() returns the winner of the delegate lottery from the base-chain
+func (b *BaseChainInfo) GetLotteryWinner(height, id uint64) (*LotteryWinner, ErrorI) {
 	if height == b.Height {
-		return &b.DelegateLotteryWinner, nil
+		return b.LotteryWinner, nil
 	}
-	b.Log.Warnf("Executing remote DelegateLottery call with requested height %d", height)
-	return b.RemoteCallbacks.DelegateLottery(height, id)
+	b.Log.Warnf("Executing remote Lottery call with requested height %d", height)
+	return b.RemoteCallbacks.Lottery(height, id)
 }
 
 // baseChainInfoJSON is the encoding structure used for json for BaseChainInfo
 type baseChainInfoJSON struct {
 	Height                  uint64               `json:"height"`
 	Committee               *ConsensusValidators `json:"committee"`
-	LastCommittee           *ConsensusValidators `json:"lastCommittee"`
-	LastProposers           *Proposers           `json:"lastProposers"`
+	LastCommittee           *ConsensusValidators `json:"last_committee"`
+	LastProposers           *Proposers           `json:"last_proposers"`
 	LastCanopyHeightUpdated uint64               `json:"last_canopy_height_updated"`
-	MinimumEvidenceHeight   uint64               `json:"minimumEvidenceHeight"`
-	DelegateLotteryWinner   HexBytes             `json:"delegateLotteryWinner"`
+	MinimumEvidenceHeight   uint64               `json:"minimum_evidence_height"`
+	LotteryWinner           *LotteryWinner       `json:"lottery_winner"`
 	Orders                  *OrderBook           `json:"orders"`
 }
 
@@ -198,7 +198,7 @@ func (b *BaseChainInfo) MarshalJSON() ([]byte, error) {
 		LastProposers:           b.LastProposers,
 		LastCanopyHeightUpdated: b.LastCanopyHeightUpdated,
 		MinimumEvidenceHeight:   b.MinimumEvidenceHeight,
-		DelegateLotteryWinner:   b.DelegateLotteryWinner,
+		LotteryWinner:           b.LotteryWinner,
 		Orders:                  b.Orders,
 	})
 }
@@ -224,10 +224,17 @@ func (b *BaseChainInfo) UnmarshalJSON(bz []byte) (err error) {
 		LastProposers:           j.LastProposers,
 		MinimumEvidenceHeight:   j.MinimumEvidenceHeight,
 		LastCanopyHeightUpdated: j.LastCanopyHeightUpdated,
-		DelegateLotteryWinner:   j.DelegateLotteryWinner,
+		LotteryWinner:           j.LotteryWinner,
 		Orders:                  j.Orders,
 	}
 	return
+}
+
+// LotteryWinner is a structure that holds the subject of a pseudorandom selection and their % cut of the reward
+// This is used for delegation + sub-delegation + sub-validator earnings
+type LotteryWinner struct {
+	Winner HexBytes `json:"winner"`
+	Cut    uint64   `json:"cut"`
 }
 
 // CheckBasic() validates the basic structure and length of the AggregateSignature

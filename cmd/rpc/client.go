@@ -226,9 +226,9 @@ func (c *Client) MinimumEvidenceHeight(height uint64) (p *uint64, err lib.ErrorI
 	return
 }
 
-func (c *Client) DelegateLottery(height, id uint64) (p *lib.HexBytes, err lib.ErrorI) {
-	p = new(lib.HexBytes)
-	err = c.heightAndIdRequest(DelegateLotteryRouteName, height, id, p)
+func (c *Client) Lottery(height, id uint64) (p *lib.LotteryWinner, err lib.ErrorI) {
+	p = new(lib.LotteryWinner)
+	err = c.heightAndIdRequest(LotteryRouteName, height, id, p)
 	return
 }
 

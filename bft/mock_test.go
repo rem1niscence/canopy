@@ -509,7 +509,7 @@ func (t *testController) ProduceProposal(_ *ByzantineEvidence, _ *crypto.VDF) (b
 	return
 }
 
-func (t *testController) ValidateCertificate(qc *lib.QuorumCertificate, _ *ByzantineEvidence) lib.ErrorI {
+func (t *testController) ValidateProposal(qc *lib.QuorumCertificate, _ *ByzantineEvidence) lib.ErrorI {
 	if len(qc.Block) == expectedCandidateLen {
 		return nil
 	}

@@ -255,7 +255,7 @@ func TestHandleMessage(t *testing.T) {
 				AmountForSale:        amount,
 				RequestedAmount:      1000,
 				SellerReceiveAddress: newTestPublicKeyBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			validate: func(sm StateMachine) {
 				// ensure the account was subtracted from
@@ -551,7 +551,7 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 		}, {
 			name:     "msg create order",
 			detail:   "retrieves the authorized signers for message create order",
-			msg:      &types.MessageCreateOrder{CommitteeId: lib.CanopyCommitteeId, SellersSellAddress: newTestAddressBytes(t)},
+			msg:      &types.MessageCreateOrder{CommitteeId: lib.CanopyCommitteeId, SellersSendAddress: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg edit order",
@@ -2206,7 +2206,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				AmountForSale:        1,
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			error: "minimum order size",
 		},
@@ -2219,7 +2219,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				AmountForSale:        1,
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			error: "insufficient funds",
 		},
@@ -2233,7 +2233,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				AmountForSale:        1,
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 		},
 	}
@@ -2242,7 +2242,7 @@ func TestMessageCreateOrder(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
 			// define an address variable for convenience
-			address := crypto.NewAddress(test.msg.SellersSellAddress)
+			address := crypto.NewAddress(test.msg.SellersSendAddress)
 			// preset the minimum order size
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
@@ -2279,7 +2279,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				AmountForSale:        test.msg.AmountForSale,
 				RequestedAmount:      test.msg.RequestedAmount,
 				SellerReceiveAddress: test.msg.SellerReceiveAddress,
-				SellersSendAddress:   test.msg.SellersSellAddress,
+				SellersSendAddress:   test.msg.SellersSendAddress,
 			}, order)
 		})
 	}

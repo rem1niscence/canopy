@@ -5,11 +5,12 @@ import {Bar} from "react-chartjs-2"
 import {Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend} from "chart.js"
 import {Accordion, Button, Carousel, Col, Container, Form, InputGroup, Modal, Spinner, Table} from "react-bootstrap"
 import {AddVote, DelVote, Params, Poll, Proposals, RawTx, StartPoll, TxChangeParameter, TxDAOTransfer, VotePoll} from "@/components/api"
-import {copy, getFormInputs, objEmpty, onFormSubmit, placeholders, renderToast, withTooltip} from "@/components/util"
+import {copy, formatNumberInput, getFormInputs, objEmpty, onFormSubmit, placeholders, renderToast, sanitizeInput, withTooltip} from "@/components/util"
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend)
 
-export default function Governance({account: accountWithTxs}) {
+export default function Governance({keygroup, account: accountWithTxs, validator}) {
+
     const [state, setState] = useState({
         txResult: {}, rawTx: {}, showPropModal: false, apiResults: {}, paramSpace: "", voteOnPollAccord: "1", voteOnProposalAccord: "1",
         propAccord: "1", txPropType: 0, toast: "", voteJSON: {}, pwd: "",
@@ -18,13 +19,26 @@ export default function Governance({account: accountWithTxs}) {
     // queryAPI() executes the page API calls
     function queryAPI() {
         Promise.all([Poll(), Proposals(), Params(0)]).then((r => {
-                setState({...state, apiResults: {poll: r[0], proposals: r[1], params: r[2]}})
+                setState(prevState => ({
+                    ...prevState,
+                    apiResults: {
+                        poll: r[0],
+                        proposals: r[1],
+                        params: r[2],
+                    },
+                }))
             }
         ))
     }
-
     // execute every 4 seconds
-    useEffect(() => () => clearInterval(setInterval(() => queryAPI(), 4000)), [])
+    useEffect(() => {
+        const interval = setInterval(() => {
+            queryAPI();
+        }, 4000);
+
+        // cleanup: clear the interval when the component unmounts
+        return () => clearInterval(interval);
+    }, [])
     // set spinner if loading
     if (objEmpty(state.apiResults)) return (queryAPI(), <Spinner id="spinner"/>)
     // set placeholders
@@ -226,7 +240,7 @@ export default function Governance({account: accountWithTxs}) {
                         <Modal.Title>{state.txPropType === 0 ? "Change Parameter" : "Treasury Subsidy"}</Modal.Title>
                     </Modal.Header>
                     <Modal.Body style={{overflowWrap: "break-word"}}>
-                        {getFormInputs(state.txPropType === 0 ? "change-param" : "dao-transfer", accountWithTxs.account).map((v, i) => {
+                        {getFormInputs(state.txPropType === 0 ? "change-param" : "dao-transfer", keygroup, accountWithTxs.account, validator).map((v, i) => {
                             let show = objEmpty(state.txResult) ? "" : "none", onChange = (e) => setState({...state, paramSpace: e.target.value})
                             if (v.type === "select") {
                                 switch (v.label) {

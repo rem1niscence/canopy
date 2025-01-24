@@ -8,7 +8,6 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"math"
-	"slices"
 	"time"
 )
 
@@ -33,25 +32,123 @@ func (c *Controller) HandleTransaction(tx []byte) lib.ErrorI {
 	return c.Mempool.HandleTransaction(tx)
 }
 
-// ValidateCertificate() fully validates the proposal and resets back to begin block state
-func (c *Controller) ValidateCertificate(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (err lib.ErrorI) {
+// ProduceProposal() uses the associated `plugin` to create a Proposal with the candidate block and the `bft` to populate the byzantine evidence
+func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF) (blk []byte, results *lib.CertificateResult, err lib.ErrorI) {
+	height, reset := c.FSM.Height(), c.ValidatorProposalConfig()
+	defer func() { reset(); c.FSM.Reset() }()
+	// extract the vdf iterations if any
+	var vdfIterations uint64
+	if vdf != nil {
+		vdfIterations = vdf.Iterations
+	}
+	// load the previous block from the store
+	qc, lastBlock, err := c.FSM.LoadBlockAndCertificate(height - 1)
+	if err != nil {
+		return
+	}
+	// get the maximum possible size of the block
+	maxBlockSize, err := c.FSM.GetMaxBlockSize()
+	if err != nil {
+		return
+	}
+	// re-validate all transactions in the mempool as a fail-safe
+	c.Mempool.checkMempool()
+	// extract transactions from the mempool
+	transactions, numTxs := c.Mempool.GetTransactions(maxBlockSize)
+	// create a block structure
+	block := &lib.Block{
+		BlockHeader: &lib.BlockHeader{
+			Height:                height + 1,                                               // increment the height
+			NetworkId:             c.FSM.NetworkID,                                          // ensure only applicable for the proper network
+			Time:                  uint64(time.Now().UnixMicro()),                           // set the time of the block
+			NumTxs:                uint64(numTxs),                                           // set the number of transactions
+			TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(numTxs),          // calculate the total transactions
+			LastBlockHash:         lastBlock.BlockHeader.LastBlockHash,                      // use the last block hash to 'chain' the blocks
+			ProposerAddress:       c.Address,                                                // set self as proposer address
+			LastQuorumCertificate: qc,                                                       // add last QC to lock-in a commit certificate
+			TotalVdfIterations:    lastBlock.BlockHeader.TotalVdfIterations + vdfIterations, // add last total iterations to current iterations
+			Vdf:                   vdf,                                                      // attach the vdf proof
+		},
+		Transactions: transactions,
+	}
+	// capture the tentative block result here
+	blockResult := new(lib.BlockResult)
+	// apply the block against the state machine to fill in the merkle `roots` for the block header
+	block.BlockHeader, blockResult.Transactions, err = c.FSM.ApplyBlock(block)
+	if err != nil {
+		return
+	}
+	// add the block header to the results
+	blockResult.BlockHeader = block.BlockHeader
+	// marshal the block into bytes
+	blk, err = lib.Marshal(block)
+	if err != nil {
+		return
+	}
+	// set block reward recipients
+	results = c.CalculateRewardRecipients(c.Address, c.BaseChainHeight())
+	// handle swaps
+	c.HandleSwaps(blockResult, results, c.BaseChainHeight())
+	// set slash recipients
+	c.CalculateSlashRecipients(results, be)
+	return
+}
+
+// ValidateProposal() fully validates the proposal and resets back to begin block state
+func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (err lib.ErrorI) {
 	// the base chain has specific logic to approve or reject proposals
 	reset := c.ValidatorProposalConfig()
 	defer func() { reset(); c.FSM.Reset() }()
+	// load the store (db) object
+	storeI := c.FSM.Store().(lib.StoreI)
+	// perform stateless validations on the block and evidence
+	blk, err := c.ValidateProposalBasic(qc, evidence)
+	if err != nil {
+		return err
+	}
+	// update the LastQuorumCertificate in the store
+	//- this is to ensure that each node has the same COMMIT QC for the last block as multiple valid versions (a few less signatures) of the same QC could exist
+	// NOTE: this should come before ApplyAndValidateBlock in order to have the proposers 'LastQc' which is used for distributing rewards
+	if blk.BlockHeader.Height != 1 {
+		c.log.Debugf("Indexing last quorum certificate for height %d", blk.BlockHeader.LastQuorumCertificate.Header.Height)
+		if err = storeI.IndexQC(blk.BlockHeader.LastQuorumCertificate); err != nil {
+			return err
+		}
+	}
+	// play the block against the state machine
+	blockResult, err := c.ApplyAndValidateBlock(blk, false)
+	if err != nil {
+		return
+	}
+	// generate a comparable
+	compareResults := c.CalculateRewardRecipients(c.Address, c.BaseChainHeight())
+	// handle swaps
+	c.HandleSwaps(blockResult, compareResults, c.BaseChainHeight())
+	// set slash recipients
+	c.CalculateSlashRecipients(compareResults, evidence)
+	// ensure generated the same results
+	if !qc.Results.Equals(compareResults) {
+		return types.ErrInvalidCertificateResults()
+	}
+	return
+}
+
+// ValidateProposalBasic() performs basic structural validates the proposal and resets back to begin block state
+func (c *Controller) ValidateProposalBasic(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (blk *lib.Block, err lib.ErrorI) {
 	// validate the byzantine evidence portion of the proposal (bft is canopy controlled)
 	if err = c.Consensus.ValidateByzantineEvidence(qc.Results.SlashRecipients, evidence); err != nil {
-		return err
+		return nil, err
 	}
 	// ensure the block is not empty
 	if qc.Block == nil {
-		return lib.ErrNilBlock()
+		return nil, lib.ErrNilBlock()
 	}
 	// ensure the results aren't empty
 	if qc.Results == nil && qc.Results.RewardRecipients != nil {
-		return lib.ErrNilCertResults()
+		return nil, lib.ErrNilCertResults()
 	}
 	// convert the block bytes into a Canopy block structure
-	blk := new(lib.Block)
+	blk = new(lib.Block)
 	if err = lib.Unmarshal(qc.Block, blk); err != nil {
 		return
 	}
@@ -62,168 +159,10 @@ func (c *Controller) ValidateCertificate(qc *lib.QuorumCertificate, evidence *bf
 	// ensure the Proposal.BlockHash corresponds to the actual hash of the block
 	blockHash, e := blk.Hash()
 	if e != nil {
-		return e
+		return nil, e
 	}
 	if bytes.Equal(qc.BlockHash, blockHash) {
-		return lib.ErrMismatchBlockHash()
-	}
-	// validate the reward recipients
-	if len(qc.Results.RewardRecipients.PaymentPercents) != 2 {
-		return types.ErrInvalidNumberOfRewardRecipients()
-	}
-	// get the proposer address
-	proposerPub, er := crypto.NewPublicKeyFromBytes(qc.ProposerKey)
-	if er != nil {
-		return lib.ErrPubKeyFromBytes(er)
-	}
-	// get the delegate and their cut from the state machine
-	delegate, delegateCut, err := c.GetDelegateToReward(qc.Header.CanopyHeight, proposerPub.Address().Bytes())
-	if err != nil {
-		return
-	}
-	// validate the reward amount for the proposer
-	proposerPaymentPercent := qc.Results.RewardRecipients.PaymentPercents[0]
-	if proposerPaymentPercent.Percent != 100-delegateCut {
-		return types.ErrInvalidProposerRewardPercent()
-	}
-	// validate the reward amount for the delegate
-	delegatorPaymentPercent := qc.Results.RewardRecipients.PaymentPercents[1]
-	if !bytes.Equal(delegatorPaymentPercent.Address, *delegate) || delegatorPaymentPercent.Percent != delegateCut {
-		return types.ErrInvalidDelegateReward(delegatorPaymentPercent.Address, delegatorPaymentPercent.Percent)
-	}
-	// play the block against the state machine
-	blockResult, err := c.ApplyAndValidateBlock(blk, false)
-	if err != nil {
-		return
-	}
-	// validate the orders
-	if qc.Results.Orders == nil {
-		return types.ErrInvalidOrders()
-	}
-	// validate the buy orders
-	buyOrders := c.FSM.ParseBuyOrders(blockResult)
-	if !slices.Equal(buyOrders, qc.Results.Orders.BuyOrders) {
-		return types.ErrInvalidBuyOrder()
-	}
-	// get orders from the base-chain
-	orders, err := c.BaseChainInfo.GetOrders(qc.Header.CanopyHeight, c.Config.ChainId)
-	if err != nil {
-		return err
-	}
-	// process the base-chain order book against the state
-	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(orders, blockResult)
-	// validate the close orders
-	if !slices.Equal(closeOrders, qc.Results.Orders.CloseOrders) {
-		return types.ErrInvalidBuyOrder()
-	}
-	// validate the reset orders
-	if !slices.Equal(resetOrders, qc.Results.Orders.ResetOrders) {
-		return types.ErrInvalidBuyOrder()
-	}
-	return
-}
-
-// ProduceProposal() uses the associated `plugin` to create a Proposal with the candidate block and the `bft` to populate the byzantine evidence
-func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF) (blk []byte, results *lib.CertificateResult, err lib.ErrorI) {
-	reset := c.ValidatorProposalConfig()
-	defer func() { reset(); c.FSM.Reset() }()
-	pubKey, _ := crypto.BytesToBLS12381Public(c.PublicKey)
-	height := c.FSM.Height()
-	// load the previous block from the store
-	lastBlock, err := c.FSM.LoadBlock(height - 1)
-	if err != nil {
-		return
-	}
-	// get the last quorum certificate
-	qc, err := c.FSM.LoadCertificateHashesOnly(height - 1)
-	if err != nil {
-		return
-	}
-	// get the maximum possible size of the block
-	maxBlockSize, err := c.FSM.GetMaxBlockSize()
-	if err != nil {
-		return
-	}
-	// extract the vdf iterations if any
-	var vdfIterations uint64
-	if vdf != nil {
-		vdfIterations = vdf.Iterations
-	}
-	// re-validate all transactions in the mempool as a fail-safe
-	c.Mempool.checkMempool()
-	transactions, numTxs := c.Mempool.GetTransactions(maxBlockSize)
-	// calculate self address
-	selfAddress := pubKey.Address().Bytes()
-	// create a block header structure
-	header := &lib.BlockHeader{
-		Height:                height + 1,                                               // increment the height
-		NetworkId:             c.FSM.NetworkID,                                          // ensure only applicable for the proper network
-		Time:                  uint64(time.Now().UnixMicro()),                           // set the time of the block
-		NumTxs:                uint64(numTxs),                                           // set the number of transactions
-		TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(numTxs),          // calculate the total transactions
-		LastBlockHash:         lastBlock.BlockHeader.LastBlockHash,                      // use the last block hash to 'chain' the blocks
-		ProposerAddress:       selfAddress,                                              // set self as proposer address
-		LastQuorumCertificate: qc,                                                       // add last QC to lock-in a commit certificate
-		TotalVdfIterations:    lastBlock.BlockHeader.TotalVdfIterations + vdfIterations, // add last total iterations to current iterations
-		Vdf:                   vdf,                                                      // attach the vdf proof
-	}
-	// create a block structure
-	block := &lib.Block{
-		BlockHeader:  header,
-		Transactions: transactions,
-	}
-	// capture the tentative block result here
-	blockResult := new(lib.BlockResult)
-	// apply the block against the state machine to fill in the merkle `roots` for the block header
-	block.BlockHeader, blockResult.Transactions, err = c.FSM.ApplyBlock(block)
-	if err != nil {
-		return
-	}
-	// update the block results
-	blockResult.BlockHeader = block.BlockHeader
-	// marshal the block into bytes
-	blk, err = lib.Marshal(block)
-	if err != nil {
-		return
-	}
-	// get the delegate and their cut from the state machine
-	delegate, delegateCut, err := c.GetDelegateToReward(c.BaseChainInfo.GetHeight(), selfAddress)
-	if err != nil {
-		return
-	}
-	// parse the last block for buy orders and polling
-	buyOrders := c.FSM.ParseBuyOrders(blockResult)
-	// get orders from the base-chain
-	orders, err := c.BaseChainInfo.GetOrders(qc.Header.CanopyHeight, c.Config.ChainId)
-	if err != nil {
-		return
-	}
-	// process the base-chain order book against the state
-	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(orders, blockResult)
-	// set block reward recipients
-	results = &lib.CertificateResult{
-		RewardRecipients: &lib.RewardRecipients{
-			PaymentPercents: []*lib.PaymentPercents{{
-				Address: header.ProposerAddress, // proposer is a recipient of the reward
-				Percent: 100 - delegateCut,      // proposer gets what's left after the delegate's cut
-			},
-				{
-					Address: *delegate,   // delegate is a recipient of the reward
-					Percent: delegateCut, // delegates cut is a governance parameter
-				},
-			}},
-		SlashRecipients: new(lib.SlashRecipients),
-		Orders: &lib.Orders{
-			BuyOrders:   buyOrders,
-			ResetOrders: resetOrders,
-			CloseOrders: closeOrders,
-		},
-		Checkpoint: nil,
-	}
-	// use the bft object to fill in the Byzantine Evidence
-	results.SlashRecipients.DoubleSigners, err = c.Consensus.ProcessDSE(be.DSE.Evidence...)
-	if err != nil {
-		c.log.Warn(err.Error()) // still produce proposal
+		return nil, lib.ErrMismatchBlockHash()
 	}
 	return
 }
@@ -241,11 +180,20 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
 	defer func() { c.FSM.Reset() }()
 	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.ResultsHash))
 	// load the store (db) object
-	store := c.FSM.Store().(lib.StoreI)
+	storeI := c.FSM.Store().(lib.StoreI)
 	// convert the proposal.block (bytes) into Block structure
 	blk := new(lib.Block)
 	if err := lib.Unmarshal(qc.Block, blk); err != nil {
 		return err
+	}
+	// update the LastQuorumCertificate in the store
+	//- this is to ensure that each node has the same COMMIT QC for the last block as multiple valid versions (a few less signatures) of the same QC could exist
+	// NOTE: this should come before ApplyAndValidateBlock in order to have the proposers 'LastQc' which is used for distributing rewards
+	if blk.BlockHeader.Height != 1 {
+		c.log.Debugf("Indexing last quorum certificate for height %d", blk.BlockHeader.LastQuorumCertificate.Header.Height)
+		if err := storeI.IndexQC(blk.BlockHeader.LastQuorumCertificate); err != nil {
+			return err
+		}
 	}
 	// apply the block against the state machine
 	blockResult, err := c.ApplyAndValidateBlock(blk, true)
@@ -254,20 +202,12 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
 	}
 	// index the quorum certificate in the store
 	c.log.Debugf("Indexing quorum certificate for height %d", qc.Header.Height)
-	if err = store.IndexQC(qc); err != nil {
+	if err = storeI.IndexQC(qc); err != nil {
 		return err
-	}
-	// update the LastQuorumCertificate in the store
-	//- this is to ensure that each node has the same COMMIT QC for the last block as multiple valid versions (a few less signatures) of the same QC could exist
-	if blk.BlockHeader.Height != 1 {
-		c.log.Debugf("Indexing last quorum certificate for height %d", blk.BlockHeader.LastQuorumCertificate.Header.Height)
-		if err = store.IndexQC(blk.BlockHeader.LastQuorumCertificate); err != nil {
-			return err
-		}
 	}
 	// index the block in the store
 	c.log.Debugf("Indexing block %d", blk.BlockHeader.Height)
-	if err = store.IndexBlock(blockResult); err != nil {
+	if err = storeI.IndexBlock(blockResult); err != nil {
 		return err
 	}
 	// delete the block transactions in the mempool
@@ -282,12 +222,12 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
 	c.FSM.ParsePollTransactions(blockResult)
 	// atomically write this to the store
 	c.log.Debug("Committing to store")
-	if _, err = store.Commit(); err != nil {
+	if _, err = storeI.Commit(); err != nil {
 		return err
 	}
 	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToString(qc.ResultsHash), blk.BlockHeader.Height)
 	c.log.Debug("Setting up FSM for next height")
-	c.FSM, err = fsm.New(c.Config, store, c.log)
+	c.FSM, err = fsm.New(c.Config, storeI, c.log)
 	if err != nil {
 		return err
 	}
@@ -328,6 +268,95 @@ func (c *Controller) ApplyAndValidateBlock(b *lib.Block, commit bool) (*lib.Bloc
 		BlockHeader:  b.BlockHeader,
 		Transactions: txResults,
 	}, nil
+}
+
+// CalculateRewardRecipients() calculates the block reward recipients of the proposal
+func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, baseChainHeight uint64) (results *lib.CertificateResult) {
+	// set block reward recipients
+	results = &lib.CertificateResult{
+		RewardRecipients: &lib.RewardRecipients{
+			PaymentPercents: []*lib.PaymentPercents{
+				{
+					Address: proposerAddress, // base-chain proposer reward
+					Percent: 100,             // proposer gets what's left after the delegate's cut
+				},
+			},
+		},
+		SlashRecipients: new(lib.SlashRecipients),
+	}
+	// get the delegate and their cut from the state machine
+	baseDelegateWinner, err := c.GetBaseChainLotteryWinner(baseChainHeight)
+	if err != nil {
+		c.log.Warnf("An error occurred choosing a base-chain delegate lottery winner: %s", err.Error())
+		// continue
+	} else {
+		c.AddLotteryWinner(results, baseDelegateWinner)
+	}
+	if c.Config.ChainId != lib.CanopyCommitteeId {
+		// sub validator
+		subValidatorWinner, e := c.FSM.LotteryWinner(c.Config.ChainId)
+		if e != nil {
+			c.log.Warnf("An error occurred choosing a sub-validator lottery winner: %s", err.Error())
+			// continue
+		} else {
+			c.AddLotteryWinner(results, subValidatorWinner)
+		}
+		// sub delegate
+		subDelegateWinner, e := c.FSM.LotteryWinner(c.Config.ChainId)
+		if e != nil {
+			c.log.Warnf("An error occurred choosing a sub-delegate lottery winner: %s", err.Error())
+			// continue
+		} else {
+			c.AddLotteryWinner(results, subDelegateWinner)
+		}
+	}
+	return
+}
+
+// HandleSwaps() handles the 'buy' side of the sell orders
+func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.CertificateResult, baseChainHeight uint64) {
+	// parse the last block for buy orders and polling
+	buyOrders := c.FSM.ParseBuyOrders(blockResult)
+	// get orders from the base-chain
+	orders, e := c.LoadBaseChainOrderBook(baseChainHeight)
+	if e != nil {
+		return
+	}
+	// process the base-chain order book against the state
+	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(orders, blockResult)
+	// add the orders to the certificate result
+	results.Orders = &lib.Orders{
+		BuyOrders:   buyOrders,
+		ResetOrders: resetOrders,
+		CloseOrders: closeOrders,
+	}
+}
+
+// CalculateSlashRecipients() calculates the addresses who receive slashes on the base-chain
+func (c *Controller) CalculateSlashRecipients(results *lib.CertificateResult, be *bft.ByzantineEvidence) {
+	var err lib.ErrorI
+	// use the bft object to fill in the Byzantine Evidence
+	results.SlashRecipients.DoubleSigners, err = c.Consensus.ProcessDSE(be.DSE.Evidence...)
+	if err != nil {
+		c.log.Warn(err.Error()) // still produce proposal
+	}
+}
+
+// AddLotteryWinner() adds a lottery winner (delegate, sub-delegate, or sub-validator) to the reward recipients
+func (c *Controller) AddLotteryWinner(results *lib.CertificateResult, lotteryWinner *lib.LotteryWinner) {
+	if len(lotteryWinner.Winner) == 0 {
+		c.log.Debug("Nil lottery winner (no delegates in set)")
+		return
+	}
+	if results.RewardRecipients.PaymentPercents[0].Percent <= lotteryWinner.Cut {
+		c.log.Warn("No cut left for block proposer, skipping lottery winner (ensure base-chain-lottery-cut + 2 x sub-chain-lottery-cut < 100%)")
+		return
+	}
+	results.RewardRecipients.PaymentPercents[0].Percent -= lotteryWinner.Cut
+	results.RewardRecipients.PaymentPercents = append(results.RewardRecipients.PaymentPercents, &lib.PaymentPercents{
+		Address: lotteryWinner.Winner,
+		Percent: lotteryWinner.Cut,
+	})
 }
 
 // CompareBlockHeaders() compares two block headers for equality and validates the last quorum certificate and block time
@@ -416,34 +445,6 @@ func (c *Controller) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (s
 	// height of this block is not local height, the node is still catching up
 	stillCatchingUp = h != blk.BlockHeader.Height
 	return
-}
-
-// GetDelegateToReward() gets the pseudorandomly selected delegate to reward and their cut
-func (c *Controller) GetDelegateToReward(canopyHeight uint64, proposerAddress []byte) (address *lib.HexBytes, delegateCut uint64, err lib.ErrorI) {
-	// get the validator params in order to have the reward percentage for the delegate
-	valParams, err := c.FSM.GetParamsVal()
-	if err != nil {
-		return
-	}
-	// set the percentage the delegate receives
-	delegateCut = valParams.ValidatorDelegateRewardPercentage
-	// get the delegate pseudorandom delegate
-	address, err = c.BaseChainInfo.GetDelegateLotteryWinner(canopyHeight, c.Config.ChainId)
-	if err != nil {
-		return
-	}
-	if bytes.Equal(*address, crypto.MaxHash[:20]) {
-		*address = proposerAddress
-	}
-	return
-}
-
-func (c *Controller) LoadMaxBlockSize() int {
-	params, _ := c.FSM.GetParamsCons()
-	if params == nil {
-		return 0
-	}
-	return int(params.BlockSize) // TODO add with max header size here... as this param is only enforced at the txn level in other places in the code
 }
 
 // validateBlockTime() validates the timestamp in the block header for safe pruning

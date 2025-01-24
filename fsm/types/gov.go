@@ -61,11 +61,12 @@ func DefaultParams() *Params {
 			ValidatorMaxCommitteeSize:                   100,
 			ValidatorEarlyWithdrawalPenalty:             20,
 			ValidatorDelegateUnstakingBlocks:            2,
-			ValidatorMinimumOrderSize:                   100000000000,
+			ValidatorMinimumOrderSize:                   1000000000,
 			ValidatorStakePercentForSubsidizedCommittee: 33,
 			ValidatorMaxSlashPerCommittee:               15,
 			ValidatorDelegateRewardPercentage:           10,
-			ValidatorBuyDeadlineBlocks:                  100,
+			ValidatorBuyDeadlineBlocks:                  15,
+			ValidatorBuyOrderFeeMultiplier:              2,
 		},
 		Fee: &FeeParams{
 			MessageSendFee:               10000,
@@ -82,7 +83,7 @@ func DefaultParams() *Params {
 			MessageEditOrderFee:          10000,
 			MessageDeleteOrderFee:        10000,
 		},
-		Governance: &GovernanceParams{DaoRewardPercentage: 10},
+		Governance: &GovernanceParams{DaoRewardPercentage: 5},
 	}
 }
 
@@ -252,6 +253,7 @@ const (
 	ParamValidatorMaxSlashPerCommittee               = "validator_max_slash_per_committee"                // the maximum validator slash per committee per block
 	ParamValidatorDelegateRewardPercentage           = "validator_delegate_reward_percentage"             // the percentage of the block reward that is awarded to the delegates
 	ParamValidatorBuyDeadlineBlocks                  = "validator_buy_deadline_blocks"                    // the amount of blocks a 'buyer' has to complete an order they reserved
+	ParamValidatorBuyOrderFeeMultiplier              = "validator_buy_order_fee_multiplier"               // the fee multiplier of the 'send' fee that is required to execute a buy order
 )
 
 // Check() validates the Validator params
@@ -298,6 +300,9 @@ func (x *ValidatorParams) Check() lib.ErrorI {
 	if x.ValidatorBuyDeadlineBlocks == 0 {
 		return ErrInvalidParam(ParamValidatorBuyDeadlineBlocks)
 	}
+	if x.ValidatorBuyOrderFeeMultiplier == 0 {
+		return ErrInvalidParam(ParamValidatorBuyOrderFeeMultiplier)
+	}
 	return nil
 }
 
@@ -334,6 +339,8 @@ func (x *ValidatorParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.ValidatorDelegateRewardPercentage = value
 	case ParamValidatorBuyDeadlineBlocks:
 		x.ValidatorBuyDeadlineBlocks = value
+	case ParamValidatorBuyOrderFeeMultiplier:
+		x.ValidatorBuyOrderFeeMultiplier = value
 	default:
 		return ErrUnknownParam()
 	}
@@ -521,24 +528,18 @@ type ActivePolls struct {
 }
 
 // CheckForPollTransaction() populates the poll.json file from embeds if the embed exists in the memo field
-func (p *ActivePolls) CheckForPollTransaction(sender crypto.AddressI, memo string, height uint64, path string) lib.ErrorI {
+func (p *ActivePolls) CheckForPollTransaction(sender crypto.AddressI, memo string, height uint64) lib.ErrorI {
 	if len(memo) < minPollEmbedSize {
 		return nil
 	}
 	// check for start poll embed
 	if startPoll, err := checkMemoForStartPoll(height, memo); err == nil {
 		p.NewPoll(startPoll)
-		if e := p.SaveToFile(path); e != nil {
-			return e
-		}
 		return nil
 	}
 	// check for vote poll embed
 	if votePoll, err := checkMemoForVotePoll(memo); err == nil {
 		p.VotePoll(sender, votePoll, height)
-		if e := p.SaveToFile(path); e != nil {
-			return e
-		}
 		return nil
 	}
 	// no embed
@@ -725,7 +726,7 @@ type GovProposals map[string]GovProposalWithVote
 // NewProposalFromBytes() creates a GovProposal object from json bytes
 func NewProposalFromBytes(b []byte) (GovProposal, lib.ErrorI) {
 	cp, dt := new(MessageChangeParameter), new(MessageDAOTransfer)
-	if err := lib.UnmarshalJSON(b, cp); err != nil {
+	if err := lib.UnmarshalJSON(b, cp); err != nil || len(cp.Signer) == 0 {
 		if err = lib.UnmarshalJSON(b, dt); err != nil {
 			return nil, err
 		}

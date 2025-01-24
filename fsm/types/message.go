@@ -564,7 +564,7 @@ func (x *MessageCreateOrder) MarshalJSON() ([]byte, error) {
 		AmountForSale:        x.AmountForSale,
 		RequestedAmount:      x.RequestedAmount,
 		SellerReceiveAddress: x.SellerReceiveAddress,
-		SellersSellAddress:   x.SellersSellAddress,
+		SellersSellAddress:   x.SellersSendAddress,
 	})
 }
 
@@ -579,7 +579,7 @@ func (x *MessageCreateOrder) UnmarshalJSON(b []byte) (err error) {
 		AmountForSale:        j.AmountForSale,
 		RequestedAmount:      j.RequestedAmount,
 		SellerReceiveAddress: j.SellerReceiveAddress,
-		SellersSellAddress:   j.SellersSellAddress,
+		SellersSendAddress:   j.SellersSellAddress,
 	}
 	return
 }
@@ -772,7 +772,7 @@ func checkCommitteeId(i uint64) lib.ErrorI {
 // checkStartEndHeight() validates the start/end height of the message
 func checkStartEndHeight(proposal GovProposal) lib.ErrorI {
 	blockRange := proposal.GetEndHeight() - proposal.GetStartHeight()
-	if 100 > blockRange || blockRange <= 0 {
+	if blockRange > 10000 || blockRange <= 0 {
 		return ErrInvalidBlockRange()
 	}
 	return nil

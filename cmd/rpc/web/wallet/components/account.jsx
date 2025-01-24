@@ -1,8 +1,8 @@
 import {useState} from "react"
 import JsonView from "@uiw/react-json-view"
 import Truncate from 'react-truncate-inside'
-import {Button, Card, Col, Form, InputGroup, Modal, Row, Table, ToastContainer, Toast, Spinner} from "react-bootstrap"
-import {KeystoreGet, KeystoreImport, KeystoreNew, TxCreateOrder, TxDeleteOrder, TxEditOrder, TxEditStake, TxPause, TxSend, TxStake, TxUnpause, TxUnstake} from "@/components/api"
+import {Button, Card, Col, Form, InputGroup, Modal, Row, Table, Spinner} from "react-bootstrap"
+import {KeystoreGet, KeystoreImport, KeystoreNew, TxBuyOrder, TxCreateOrder, TxDeleteOrder, TxEditOrder, TxEditStake, TxPause, TxSend, TxStake, TxUnpause, TxUnstake} from "@/components/api"
 import {copy, sanitizeInput, numberFromCommas, numberWithCommas, formatNumberInput, formatNumber, getFormInputs, objEmpty, onFormSubmit, renderToast, withTooltip} from "@/components/util"
 
 // transactionButtons defines the icons for the transactions
@@ -14,6 +14,7 @@ const transactionButtons = [
     {title: "PAUSE", name: "pause", src: "pause"},
     {title: "PLAY", name: "unpause", src: "unpause"},
     {title: "SWAP", name: "create_order", src: "swap"},
+    {title: "LOCK", name: "buy_order", src: "buy"},
     {title: "REPRICE", name: "edit_order", src: "edit_order"},
     {title: "VOID", name: "delete_order", src: "delete_order"}
 ]
@@ -92,6 +93,7 @@ export default function Accounts({keygroup, account, validator}) {
                 "pause": () => TxPause(r.sender, r.signer, r.memo, r.fee, r.password, submit),
                 "unpause": () => TxUnpause(r.sender, r.signer, r.memo, r.fee, r.password, submit),
                 "create_order": () => TxCreateOrder(r.sender, r.committeeId, numberFromCommas(r.amount), numberFromCommas(r.receiveAmount), r.receiveAddress, r.memo, r.fee, r.password, submit),
+                "buy_order": () => TxBuyOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), r.fee, r.password, submit),
                 "edit_order": () => TxEditOrder(r.sender, r.committeeId, numberFromCommas(r.orderId), numberFromCommas(r.amount), numberFromCommas(r.receiveAmount), r.receiveAddress, r.memo, r.fee, r.password, submit),
                 "delete_order": () => TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, r.fee, r.password, submit)
             }

@@ -1,6 +1,8 @@
 package lib
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // AddOrder() adds a sell order to the OrderBook
 func (x *OrderBook) AddOrder(order *SellOrder) (id uint64) {
@@ -40,7 +42,7 @@ func (x *OrderBook) ResetOrder(orderId int) ErrorI {
 	if err != nil {
 		return err
 	}
-	order.BuyerReceiveAddress, order.BuyerChainDeadline = nil, 0
+	order.BuyerReceiveAddress, order.BuyerSendAddress, order.BuyerChainDeadline = nil, nil, 0
 	x.Orders[orderId] = order
 	return nil
 }
@@ -81,25 +83,26 @@ func (x *OrderBook) GetOrder(orderId int) (order *SellOrder, err ErrorI) {
 
 // jsonSellOrder is the json.Marshaller and json.Unmarshaler implementation for the SellOrder object
 type jsonSellOrder struct {
-	Id                    uint64   `json:"Id,omitempty"`                    // the unique identifier of the order
-	Committee             uint64   `json:"Committee,omitempty"`             // the id of the committee that is in-charge of escrow for the swap
-	AmountForSale         uint64   `json:"AmountForSale,omitempty"`         // amount of CNPY for sale
-	RequestedAmount       uint64   `json:"RequestedAmount,omitempty"`       // amount of 'token' to receive
-	SellerReceiveAddress  HexBytes `json:"SellerReceiveAddress,omitempty"`  // the external chain address to receive the 'token'
-	BuyerReceiveAddress   HexBytes `json:"BuyerReceiveAddress,omitempty"`   // the buyer Canopy address to receive the CNPY
-	BuyerChainDeadline    uint64   `json:"BuyerChainDeadline,omitempty"`    // the external chain height deadline to send the 'tokens' to SellerReceiveAddress
-	OrderExpirationHeight uint64   `json:"OrderExpirationHeight,omitempty"` // the height when the order expires
-	SellersSellAddress    HexBytes `json:"SellersSendAddress,omitempty"`    // the address of seller who is selling the CNPY
+	Id                   uint64   `json:"Id,omitempty"`                   // the unique identifier of the order
+	Committee            uint64   `json:"Committee,omitempty"`            // the id of the committee that is in-charge of escrow for the swap
+	AmountForSale        uint64   `json:"AmountForSale,omitempty"`        // amount of CNPY for sale
+	RequestedAmount      uint64   `json:"RequestedAmount,omitempty"`      // amount of 'token' to receive
+	SellerReceiveAddress HexBytes `json:"SellerReceiveAddress,omitempty"` // the external chain address to receive the 'token'
+	BuyerSendAddress     HexBytes `json:"BuyerSendAddress,omitempty"`     // the send address from the buyer
+	BuyerReceiveAddress  HexBytes `json:"BuyerReceiveAddress,omitempty"`  // the buyer Canopy address to receive the CNPY
+	BuyerChainDeadline   uint64   `json:"BuyerChainDeadline,omitempty"`   // the external chain height deadline to send the 'tokens' to SellerReceiveAddress
+	SellersSellAddress   HexBytes `json:"SellersSendAddress,omitempty"`   // the address of seller who is selling the CNPY
 }
 
 // MarshalJSON() is the json.Marshaller implementation for the SellOrder object
-func (x *SellOrder) MarshalJSON() ([]byte, error) {
+func (x SellOrder) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonSellOrder{
 		Id:                   x.Id,
 		Committee:            x.Committee,
 		AmountForSale:        x.AmountForSale,
 		RequestedAmount:      x.RequestedAmount,
 		SellerReceiveAddress: x.SellerReceiveAddress,
+		BuyerSendAddress:     x.BuyerSendAddress,
 		BuyerReceiveAddress:  x.BuyerReceiveAddress,
 		BuyerChainDeadline:   x.BuyerChainDeadline,
 		SellersSellAddress:   x.SellersSendAddress,
@@ -118,6 +121,7 @@ func (x *SellOrder) UnmarshalJSON(bz []byte) error {
 		AmountForSale:        j.AmountForSale,
 		RequestedAmount:      j.RequestedAmount,
 		SellerReceiveAddress: j.SellerReceiveAddress,
+		BuyerSendAddress:     j.BuyerSendAddress,
 		BuyerReceiveAddress:  j.BuyerReceiveAddress,
 		BuyerChainDeadline:   j.BuyerChainDeadline,
 		SellersSendAddress:   j.SellersSellAddress,
@@ -126,7 +130,7 @@ func (x *SellOrder) UnmarshalJSON(bz []byte) error {
 }
 
 // MarshalJSON() is the json.Marshaller implementation for the OrderBooks object
-func (x *OrderBooks) MarshalJSON() ([]byte, error) {
+func (x OrderBooks) MarshalJSON() ([]byte, error) {
 	return json.Marshal(x.OrderBooks)
 }
 

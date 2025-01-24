@@ -27,6 +27,7 @@ type Controller struct {
 	Consensus     *bft.BFT           // the async consensus process between the committee members for the chain
 	isSyncing     *atomic.Bool       // is the chain currently being downloaded from peers
 	P2P           *p2p.P2P           // the P2P module the node uses to connect to the network
+	Address       []byte             // self address
 	PublicKey     []byte             // self public key
 	PrivateKey    crypto.PrivateKeyI // self private key
 	Config        lib.Config         // node configuration
@@ -57,6 +58,7 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.L
 		Mempool:    mempool,
 		isSyncing:  &atomic.Bool{},
 		P2P:        p2p.New(valKey, maxMembersPerCommittee, c, l),
+		Address:    valKey.PublicKey().Address().Bytes(),
 		PublicKey:  valKey.PublicKey().Bytes(),
 		PrivateKey: valKey,
 		Config:     c,
@@ -117,6 +119,7 @@ func (c *Controller) UpdateBaseChainInfo(info *lib.BaseChainInfo) {
 	c.Lock()
 	defer c.Unlock()
 	info.RemoteCallbacks = c.BaseChainInfo.RemoteCallbacks
+	info.Log = c.log
 	// update the base-chain info
 	c.BaseChainInfo = *info
 	// signal to reset consensus
@@ -145,6 +148,11 @@ func (c *Controller) LoadMinimumEvidenceHeight(height uint64) (uint64, lib.Error
 	return c.BaseChainInfo.GetMinimumEvidenceHeight(height)
 }
 
+// GetBaseChainLotteryWinner() gets the pseudorandomly selected delegate to reward and their cut
+func (c *Controller) GetBaseChainLotteryWinner(canopyHeight uint64) (winner *lib.LotteryWinner, err lib.ErrorI) {
+	return c.BaseChainInfo.GetLotteryWinner(canopyHeight, c.Config.ChainId)
+}
+
 // IsValidDoubleSigner() Canopy checks if the double signer is valid at a certain height
 func (c *Controller) IsValidDoubleSigner(height uint64, address []byte) bool {
 	isValidDoubleSigner, err := c.BaseChainInfo.IsValidDoubleSigner(height, lib.BytesToString(address))
@@ -153,6 +161,15 @@ func (c *Controller) IsValidDoubleSigner(height uint64, address []byte) bool {
 		return false
 	}
 	return *isValidDoubleSigner
+}
+
+// LoadMaxBlockSize() gets the max block size from the state
+func (c *Controller) LoadMaxBlockSize() int {
+	params, _ := c.FSM.GetParamsCons()
+	if params == nil {
+		return 0
+	}
+	return int(params.BlockSize) // TODO add with max header size here... as this param is only enforced at the txn level in other places in the code
 }
 
 // LoadLastCommitTime() gets a timestamp from the most recent Quorum Block

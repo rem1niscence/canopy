@@ -351,7 +351,7 @@ var (
 		Short: "query the winner of the delegate lottery",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeToConsole(client.DelegateLottery(uint64(argToInt(args[0])), height))
+			writeToConsole(client.Lottery(uint64(argToInt(args[0])), height))
 		},
 	}
 

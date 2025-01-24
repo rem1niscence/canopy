@@ -143,6 +143,7 @@ const (
 	CodeHashSize                        ErrorCode = 46
 	CodeInvalidLastQC                   ErrorCode = 47
 	CodeMaxPort                         ErrorCode = 48
+	CodePanic                           ErrorCode = 49
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -644,4 +645,8 @@ func ErrOrderAlreadyAccepted() ErrorI {
 
 func ErrOrderNotFound(id int) ErrorI {
 	return NewError(CodeOrderNotFound, StateMachineModule, fmt.Sprintf("order with id %d not found", id))
+}
+
+func ErrPanic() ErrorI {
+	return NewError(CodePanic, StateMachineModule, "panic")
 }

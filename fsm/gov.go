@@ -262,7 +262,7 @@ func (s *StateMachine) getParams(space string, ptr any, emptyErr func() lib.Erro
 
 // ParsePollTransactions() parses the last valid block for memo commands to execute specialized 'straw polling' functionality
 func (s *StateMachine) ParsePollTransactions(b *lib.BlockResult) {
-	var ap *types.ActivePolls
+	ap := new(types.ActivePolls)
 	// load the active polls from the json file
 	if err := ap.NewFromFile(s.Config.DataDirPath); err != nil {
 		return
@@ -275,7 +275,7 @@ func (s *StateMachine) ParsePollTransactions(b *lib.BlockResult) {
 			return
 		}
 		// check for a poll transaction
-		if err := ap.CheckForPollTransaction(pub.Address(), tx.Transaction.Memo, s.Height(), s.Config.DataDirPath); err != nil {
+		if err := ap.CheckForPollTransaction(pub.Address(), tx.Transaction.Memo, s.Height()); err != nil {
 			s.log.Error(err.Error())
 			return
 		}

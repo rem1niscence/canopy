@@ -119,7 +119,7 @@ func NewCreateOrderTx(from crypto.PrivateKeyI, sellAmount, requestAmount, commit
 		AmountForSale:        sellAmount,
 		RequestedAmount:      requestAmount,
 		SellerReceiveAddress: receiveAddress,
-		SellersSellAddress:   from.PublicKey().Address().Bytes(),
+		SellersSendAddress:   from.PublicKey().Address().Bytes(),
 	}, fee, memo)
 }
 

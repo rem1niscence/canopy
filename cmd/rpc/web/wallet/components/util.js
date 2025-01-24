@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { OverlayTrigger, Toast, ToastContainer, Tooltip, Form } from "react-bootstrap";
+import {useState} from "react";
+import {OverlayTrigger, Toast, ToastContainer, Tooltip, Form} from "react-bootstrap";
 
 // getFormInputs() returns the form input based on the type
 // account and validator is passed to assist with auto fill
@@ -32,9 +32,9 @@ export function getFormInputs(type, keyGroup, account, validator) {
             "maxLength": 128,
         },
         address: {
-            "placeholder": "short public key of the node",
+            "placeholder": "the unique id of the account",
             "defaultValue": address,
-            "tooltip": "the short public key id of the transaction",
+            "tooltip": "the short public key id of the account",
             "label": "sender",
             "inputText": "address",
             "feedback": "please choose an address to send the transaction from",
@@ -172,6 +172,17 @@ export function getFormInputs(type, keyGroup, account, validator) {
             "minLength": 40,
             "maxLength": 40,
         },
+        buyersReceiveAddress: {
+            "placeholder": "the canopy address where CNPY will be received",
+            "tooltip": "the sender of the transaction",
+            "label": "receiveAddress",
+            "inputText": "rec-addr",
+            "feedback": "please choose an address to receive the CNPY",
+            "required": true,
+            "type": "text",
+            "minLength": 40,
+            "maxLength": 40,
+        },
         output: {
             "placeholder": "output of the node",
             "defaultValue": output,
@@ -298,6 +309,8 @@ export function getFormInputs(type, keyGroup, account, validator) {
             return [a.address, a.pubKey, a.committees, a.netAddr, a.amount, a.delegate, a.earlyWithdrawal, a.output, a.signer, a.memo, a.fee, a.password]
         case "create_order":
             return [a.address, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password]
+        case "buy_order":
+            return [a.address, a.buyersReceiveAddress, a.orderId, a.fee, a.password]
         case "edit_order":
             return [a.address, a.committeeId, a.orderId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password]
         case "delete_order":
@@ -403,19 +416,19 @@ export function formatNumber(nString, div = true, cutoff = 1000000000000000) {
     if (Number(nString) < cutoff) {
         return numberWithCommas(nString)
     }
-    return Intl.NumberFormat("en", { notation: "compact", maximumSignificantDigits: 8 }).format(nString)
+    return Intl.NumberFormat("en", {notation: "compact", maximumSignificantDigits: 8}).format(nString)
 }
 
 // copy() copies text to clipboard and triggers a toast notification
 export function copy(state, setState, detail, toastText = "Copied!") {
     navigator.clipboard.writeText(detail)
-    setState({ ...state, toast: toastText })
+    setState({...state, toast: toastText})
 }
 
 // renderToast() displays a toast notification with a customizable message
 export function renderToast(state, setState) {
     return <ToastContainer id="toast" position={"bottom-end"}>
-        <Toast bg={"dark"} onClose={() => setState({ ...state, toast: "" })} show={state.toast != ""} delay={2000} autohide>
+        <Toast bg={"dark"} onClose={() => setState({...state, toast: ""})} show={state.toast != ""} delay={2000} autohide>
             <Toast.Body>{state.toast}</Toast.Body>
         </Toast>
     </ToastContainer>
@@ -436,8 +449,8 @@ export function onFormSubmit(state, e, callback) {
 
 // withTooltip() wraps an element with a tooltip component
 export function withTooltip(obj, text, key, dir = "right") {
-    return <OverlayTrigger key={key} placement={dir} delay={{ show: 250, hide: 400 }}
-        overlay={<Tooltip id="button-tooltip">{text}</Tooltip>}
+    return <OverlayTrigger key={key} placement={dir} delay={{show: 250, hide: 400}}
+                           overlay={<Tooltip id="button-tooltip">{text}</Tooltip>}
     >{obj}</OverlayTrigger>
 }
 

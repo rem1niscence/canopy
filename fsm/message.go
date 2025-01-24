@@ -79,6 +79,44 @@ func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee uint64, err lib.E
 	}
 }
 
+// GetFeeForMessageName() returns the associated cost for processing a specific type of message based on the name
+func (s *StateMachine) GetFeeForMessageName(name string) (fee uint64, err lib.ErrorI) {
+	feeParams, err := s.GetParamsFee()
+	if err != nil {
+		return 0, err
+	}
+	switch name {
+	case types.MessageSendName:
+		return feeParams.MessageSendFee, nil
+	case types.MessageStakeName:
+		return feeParams.MessageStakeFee, nil
+	case types.MessageEditStakeName:
+		return feeParams.MessageEditStakeFee, nil
+	case types.MessageUnstakeName:
+		return feeParams.MessageUnstakeFee, nil
+	case types.MessagePauseName:
+		return feeParams.MessagePauseFee, nil
+	case types.MessageUnpauseName:
+		return feeParams.MessageUnpauseFee, nil
+	case types.MessageChangeParameterName:
+		return feeParams.MessageChangeParameterFee, nil
+	case types.MessageDAOTransferName:
+		return feeParams.MessageDaoTransferFee, nil
+	case types.MessageCertificateResultsName:
+		return feeParams.MessageCertificateResultsFee, nil
+	case types.MessageSubsidyName:
+		return feeParams.MessageSubsidyFee, nil
+	case types.MessageCreateOrderName:
+		return feeParams.MessageCreateOrderFee, nil
+	case types.MessageEditOrderName:
+		return feeParams.MessageEditOrderFee, nil
+	case types.MessageDeleteOrderName:
+		return feeParams.MessageDeleteOrderFee, nil
+	default:
+		return 0, lib.ErrUnknownMessageName(name)
+	}
+}
+
 // GetAuthorizedSignersFor() returns the addresses that are authorized to sign for this message
 func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]byte, err lib.ErrorI) {
 	switch x := msg.(type) {
@@ -105,7 +143,7 @@ func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]by
 	case *types.MessageSubsidy:
 		return [][]byte{x.Address}, nil
 	case *types.MessageCreateOrder:
-		return [][]byte{x.SellersSellAddress}, nil
+		return [][]byte{x.SellersSendAddress}, nil
 	case *types.MessageEditOrder:
 		order, e := s.GetOrder(x.OrderId, x.CommitteeId)
 		if e != nil {
@@ -342,9 +380,13 @@ func (s *StateMachine) HandleMessageDAOTransfer(msg *types.MessageDAOTransfer) l
 
 // HandleMessageCertificateResults() is the proper handler for a `CertificateResults` message
 func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertificateResults) lib.ErrorI {
+	// base-chain only message
+	if s.Config.ChainId != lib.CanopyCommitteeId || msg.Qc.Header.CommitteeId == lib.CanopyCommitteeId {
+		return types.ErrInvalidCertificateResults()
+	}
 	s.log.Debugf("Handling certificate results msg with height %d:%d", msg.Qc.Header.Height, msg.Qc.Header.CanopyHeight)
 	// define convenience variables
-	results, committeeId, store := msg.Qc.Results, msg.Qc.Header.CommitteeId, s.store.(lib.StoreI)
+	committeeId := msg.Qc.Header.CommitteeId
 	// get the validator params from state
 	validatorParams, err := s.GetParamsVal()
 	if err != nil {
@@ -361,7 +403,13 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 	}
 	// validate the height of the CertificateResults Transaction
 	height := msg.Qc.Header.CanopyHeight
-	if height != s.Height() && height != s.Height()-1 {
+	// get the last data for the committee
+	data, err := s.GetCommitteeData(committeeId)
+	if err != nil {
+		return err
+	}
+	// ensure the canopy height isn't too old
+	if height < data.LastCanopyHeightUpdated && msg.Qc.Header.Height >= data.LastChainHeightUpdated {
 		return lib.ErrInvalidQCCommitteeHeight()
 	}
 	// get committee for the QC
@@ -379,42 +427,8 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 	if isPartialQC {
 		return lib.ErrNoMaj23()
 	}
-	// handle the token swaps
-	if err = s.HandleCommitteeSwaps(results.Orders, committeeId); err != nil {
-		return err
-	}
-	// handle checkpoint-as-a-service functionality
-	if results.Checkpoint != nil {
-		// retrieve the last saved checkpoint for this chain
-		mostRecentCheckpoint, e := store.GetMostRecentCheckpoint(committeeId)
-		if e != nil {
-			return e
-		}
-		// ensure checkpoint isn't older than the most recent
-		if results.Checkpoint.Height <= mostRecentCheckpoint.Height {
-			return types.ErrInvalidCheckpoint()
-		}
-		// index the checkpoint
-		if err = store.IndexCheckpoint(committeeId, results.Checkpoint); err != nil {
-			return err
-		}
-	}
-	// calculate the missing (non-signers) percentage of voting power on this QC
-	nonSignerPercent, err := s.HandleByzantine(msg.Qc, committee.ValidatorSet, validatorParams)
-	if err != nil {
-		return err
-	}
-	// reduce all payment percents proportional to the non-signer percent
-	for i, p := range results.RewardRecipients.PaymentPercents {
-		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, uint64(nonSignerPercent))
-	}
-	// update the committee data
-	return s.UpsertCommitteeData(&lib.CommitteeData{
-		CommitteeId:             committeeId,
-		LastCanopyHeightUpdated: msg.Qc.Header.CanopyHeight,
-		LastChainHeightUpdated:  msg.Qc.Header.Height,
-		PaymentPercents:         results.RewardRecipients.PaymentPercents,
-	})
+	// handle the certificate results
+	return s.HandleCertificateResults(msg.Qc, &committee, validatorParams)
 }
 
 // HandleMessageSubsidy() is the proper handler for a `Subsidy` message
@@ -438,7 +452,7 @@ func (s *StateMachine) HandleMessageCreateOrder(msg *types.MessageCreateOrder) (
 		return types.ErrMinimumOrderSize()
 	}
 	// subtract from account balance
-	address := crypto.NewAddress(msg.SellersSellAddress)
+	address := crypto.NewAddress(msg.SellersSendAddress)
 	if err = s.AccountSub(address, msg.AmountForSale); err != nil {
 		return
 	}
@@ -452,7 +466,7 @@ func (s *StateMachine) HandleMessageCreateOrder(msg *types.MessageCreateOrder) (
 		AmountForSale:        msg.AmountForSale,
 		RequestedAmount:      msg.RequestedAmount,
 		SellerReceiveAddress: msg.SellerReceiveAddress,
-		SellersSendAddress:   msg.SellersSellAddress,
+		SellersSendAddress:   msg.SellersSendAddress,
 	}, msg.CommitteeId)
 	return
 }

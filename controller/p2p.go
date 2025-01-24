@@ -108,6 +108,9 @@ func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
 
 // SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
 func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
+	if c.Config.ChainId == lib.CanopyCommitteeId {
+		return // base-chain doesn't send this
+	}
 	c.log.Debugf("Sending certificate results txn for: %s", lib.BytesToString(qc.ResultsHash))
 	// save the block to set it back to the object after this function completes
 	blk := qc.Block
@@ -119,6 +122,7 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return
 	}
+	// handle the transaction on the base-chain
 	hash, err := c.BaseChainInfo.RemoteCallbacks.Transaction(tx)
 	if err != nil {
 		c.log.Errorf("Submitting auto-certificate-results-txn failed with err: %s", err.Error())
@@ -129,11 +133,6 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 
 // GossipBlockMsg() gossips a QuorumCertificate (with block) through the P2P network for a specific committeeID
 func (c *Controller) GossipBlock(qc *lib.QuorumCertificate) {
-	// save the results to add back after this function completes
-	results := qc.Results
-	defer func() { qc.Results = results }()
-	// when sending a certificate message, it's good practice to omit the 'results' field as it is only important for the Canopy Blockchain
-	qc.Results = nil
 	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(qc.ResultsHash))
 	// create the block message
 	blockMessage := &lib.BlockMessage{
@@ -571,11 +570,6 @@ func (c *Controller) checkPeerQC(maxBlockSize int, view *lib.View, v lib.Validat
 	if isPartialQC {
 		c.P2P.ChangeReputation(senderID, p2p.InvalidJustifyRep)
 		return lib.ErrNoMaj23()
-	}
-	// if the results structure was not pruned from the certificate
-	if qc.Results != nil {
-		c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
-		return lib.ErrNonNilCertResults()
 	}
 	// if this certificate isn't finalized
 	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {

@@ -96,16 +96,22 @@ func (s *StateMachine) ProcessBaseChainOrderBook(book *lib.OrderBook, b *lib.Blo
 
 // ParseBuyOrders() parses the proposal block for memo commands to execute specialized 'buy order' functionality
 func (s *StateMachine) ParseBuyOrders(b *lib.BlockResult) (buyOrders []*lib.BuyOrder) {
-	valParams, err := s.GetParamsVal()
+	params, err := s.GetParams()
 	if err != nil {
 		s.log.Error(err.Error())
 		return
 	}
+	// calculate the minimum buy order fee
+	minFee := params.Fee.MessageSendFee * params.Validator.ValidatorBuyOrderFeeMultiplier
 	// for each transaction in the block
 	for _, tx := range b.Transactions {
 		deDupeBuyOrders := make(map[uint64]struct{})
+		// skip over any that doesn't have the minimum fee or isn't the correct type
+		if tx.MessageType != types.MessageSendName && tx.Transaction.Fee < minFee {
+			continue
+		}
 		// parse the transaction for embedded 'buy orders'
-		if buyOrder, ok := s.ParseBuyOrder(tx.Transaction, valParams.ValidatorBuyDeadlineBlocks); ok {
+		if buyOrder, ok := s.ParseBuyOrder(tx.Transaction, params.Validator.ValidatorBuyDeadlineBlocks); ok {
 			if _, found := deDupeBuyOrders[buyOrder.OrderId]; !found {
 				buyOrders = append(buyOrders, buyOrder)
 				deDupeBuyOrders[buyOrder.OrderId] = struct{}{}

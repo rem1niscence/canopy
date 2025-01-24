@@ -323,7 +323,7 @@ func (b *BFT) StartProposeVotePhase() {
 		DSE: NewDSE(msg.LastDoubleSignEvidence),
 	}
 	// check candidate block against plugin
-	if err := b.ValidateCertificate(msg.Qc, byzantineEvidence); err != nil {
+	if err := b.ValidateProposal(msg.Qc, byzantineEvidence); err != nil {
 		b.log.Error(err.Error())
 		b.RoundInterrupt()
 		return
@@ -778,7 +778,7 @@ type (
 		// ProduceProposal() is a plugin call to produce a Proposal object as a Leader
 		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
 		// ValidateCertificate() is a plugin call to validate a Certificate object as a Replica
-		ValidateCertificate(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
+		ValidateProposal(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
 		// LoadCertificate() gets the Quorum Certificate from the committeeID-> plugin at a certain height
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
 		// GossipBlock() is a P2P call to gossip a completed Quorum Certificate with a Proposal
