@@ -9,8 +9,8 @@ services:
       args:
         BUILD_PATH: cmd/cli
     ports:
-      - 50000:50000 # Wallet
-      - 50001:50001 # Explorer
+      # - 50000:50000 # Wallet
+      # - 50001:50001 # Explorer
       - 50002:50002 # RPC
       - 50003:50003 # Admin RPC
     networks:

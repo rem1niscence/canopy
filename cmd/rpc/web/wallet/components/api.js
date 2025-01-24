@@ -1,5 +1,5 @@
-export const rpcURL = "http://127.0.0.1:50002";
-export const adminRPCURL = "http://127.0.0.1:50003";
+export const rpcURL = "http://localhost:50002";
+export const adminRPCURL = "http://localhost:50003";
 
 const keystorePath = "/v1/admin/keystore";
 const keystoreGetPath = "/v1/admin/keystore-get";

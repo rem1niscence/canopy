@@ -1,4 +1,4 @@
-const rpcURL = "http://127.0.0.1:50002";
+const rpcURL = "http://localhost:50002";
 
 // RPC PATHS BELOW
 

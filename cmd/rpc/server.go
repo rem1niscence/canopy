@@ -5,6 +5,18 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/fs"
+	"net/http"
+	"net/http/pprof"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/fsm"
@@ -21,17 +33,6 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
-	"io"
-	"io/fs"
-	"net/http"
-	"net/http/pprof"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 const (
@@ -240,10 +241,10 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	}()
 	go updatePollResults()
 	go PollBaseChainInfo()
-	l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
-	runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
-	l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
-	runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
+	// l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
+	// runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
+	// l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
+	// runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
 }
 
 // PollBaseChainInfo() retrieves the information from the base-chain required for consensus
@@ -668,7 +669,10 @@ func KeystoreNewKey(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 		if err != nil {
 			return nil, err
 		}
-		address, err := k.ImportRaw(pk.Bytes(), ptr.Password)
+		address, err := k.ImportRawWithOpts(pk.Bytes(), crypto.ImportRawOpts{
+			Password: ptr.Password,
+			Nickname: ptr.Nickname,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -687,7 +691,10 @@ func KeystoreImport(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func KeystoreImportRaw(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		address, err := k.ImportRaw(ptr.PrivateKey, ptr.Password)
+		address, err := k.ImportRawWithOpts(ptr.PrivateKey, crypto.ImportRawOpts{
+			Password: ptr.Password,
+			Nickname: ptr.Nickname,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -1336,6 +1343,9 @@ type idRequest struct {
 type passwordRequest struct {
 	Password string `json:"password"`
 }
+type nicknameRequest struct {
+	Nickname string `json:"nickname"`
+}
 type voteRequest struct {
 	Approve  bool            `json:"approve"`
 	Proposal json.RawMessage `json:"proposal"`
@@ -1365,6 +1375,7 @@ type heightAndIdRequest struct {
 type keystoreRequest struct {
 	addressRequest
 	passwordRequest
+	// nicknameRequest
 	PrivateKey lib.HexBytes `json:"privateKey"`
 	crypto.EncryptedPrivateKey
 }
