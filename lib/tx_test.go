@@ -2,11 +2,13 @@ package lib
 
 import (
 	"encoding/json"
-	"github.com/canopy-network/canopy/lib/crypto"
-	"github.com/stretchr/testify/require"
+	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTransactionCheckBasic(t *testing.T) {
@@ -310,3 +312,102 @@ func (x *Signature) New() MessageI     { return &Signature{} }
 func (x *Signature) Name() string      { return testMessageName }
 func (x *Signature) Check() ErrorI     { return nil }
 func (x *Signature) Recipient() []byte { return nil }
+
+func TestFailedTxCache(t *testing.T) {
+	rawPubKey := newTestPublicKeyBytes(t)
+	pubKey, err := crypto.NewPublicKeyFromBytes(rawPubKey)
+	require.NoError(t, err)
+
+	// pre-define a test message
+	sig := &Signature{
+		PublicKey: newTestPublicKeyBytes(t),
+		Signature: rawPubKey,
+	}
+	// pre-define an any for testing
+	a, e := NewAny(sig)
+	require.NoError(t, e)
+	// pre-define a transaction
+	tx := &Transaction{
+		MessageType: testMessageName,
+		Msg:         a,
+		Signature:   sig,
+		Time:        uint64(time.Now().UnixMicro()),
+		Fee:         1,
+		Memo:        "memo",
+	}
+	// marshal transaction to bytes
+	txBytes, err := Marshal(tx)
+	require.NoError(t, err)
+
+	// define test cases
+	tests := []struct {
+		name                    string
+		dissallowedMessageTypes []string
+		txBytes                 []byte
+		hash                    string
+		err                     error
+		expectedResult          bool
+		address                 string
+	}{
+		{
+			name:                    "valid transaction",
+			dissallowedMessageTypes: []string{},
+			txBytes:                 txBytes,
+			hash:                    "validHash",
+			err:                     nil,
+			expectedResult:          true,
+			address:                 pubKey.Address().String(),
+		},
+		{
+			name:                    "invalid message type",
+			dissallowedMessageTypes: []string{testMessageName},
+			txBytes:                 txBytes,
+			hash:                    "invalidHash",
+			err:                     nil,
+			expectedResult:          false,
+			address:                 pubKey.Address().String(),
+		},
+		{
+			name:                    "unmarshal error",
+			dissallowedMessageTypes: []string{},
+			txBytes:                 []byte("invalidBytes"),
+			hash:                    "unmarshalErrorHash",
+			err:                     ErrUnmarshal(errors.New("unmarshal error")),
+			expectedResult:          false,
+			address:                 pubKey.Address().String(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a new failed tx cache
+			cache := NewFailedTxCache(test.dissallowedMessageTypes...)
+			// add transaction to cache
+			result := cache.Add(test.txBytes, test.hash, test.err)
+			// validate result
+			require.Equal(t, test.expectedResult, result)
+			if test.expectedResult {
+				// validate cache
+				failedTx, ok := cache.Get(test.hash)
+				require.True(t, ok)
+				require.Equal(t, test.err, failedTx.Error)
+				require.EqualExportedValues(t, tx, failedTx.Transaction)
+
+				// validate get all
+				failedTxs := cache.GetAddr(test.address)
+				require.Len(t, failedTxs, 1)
+				require.Equal(t, failedTx, failedTxs[0])
+
+				// validate removal
+				cache.Remove(test.hash)
+				_, ok = cache.Get(test.hash)
+				require.False(t, ok)
+			} else {
+				// validate cache
+				tx, ok := cache.Get(test.hash)
+				require.False(t, ok)
+				require.Nil(t, tx)
+			}
+		})
+	}
+}

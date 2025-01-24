@@ -4,7 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
+	sync "sync"
+	"time"
+
 	"github.com/canopy-network/canopy/lib/crypto"
+
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -19,6 +24,7 @@ var (
 const (
 	TxResultsPageName      = "tx-results-page"      // the name of a page of transactions
 	PendingResultsPageName = "pending-results-page" //  the name of a page of mempool pending transactions
+	FailedTxsPageName      = "failed-txs-page"      // the name of a page of failed transactions
 )
 
 // Messages must be pre-registered for Transaction JSON unmarshalling
@@ -28,6 +34,7 @@ func init() {
 	RegisteredMessages = make(map[string]MessageI)
 	RegisteredPageables[TxResultsPageName] = new(TxResults)      // preregister the page type for unmarshalling
 	RegisteredPageables[PendingResultsPageName] = new(TxResults) // preregister the page type for unmarshalling
+	RegisteredPageables[FailedTxsPageName] = new(FailedTxs)      // preregister the page type for unmarshalling
 }
 
 // TRANSACTION INTERFACES BELOW
@@ -286,4 +293,131 @@ func (x *Signature) UnmarshalJSON(b []byte) (err error) {
 type jsonSignature struct {
 	PublicKey HexBytes `json:"public_key,omitempty"`
 	Signature HexBytes `json:"signature,omitempty"`
+}
+
+// FAILED TX CACHE CODE BELOW
+
+// FailedTx contains a failed transaction and its error
+type FailedTx struct {
+	Transaction *Transaction `json:"transaction,omitempty"`
+	Hash        string       `json:"tx_hash,omitempty"`
+	Address     string       `json:"address,omitempty"`
+	Error       error        `json:"error,omitempty"`
+}
+
+type FailedTxs []*FailedTx
+
+func (t *FailedTxs) Len() int      { return len(*t) }
+func (t *FailedTxs) New() Pageable { return &FailedTxs{} }
+
+type failedTx struct {
+	tx        *FailedTx
+	timestamp time.Time
+}
+
+// FailedTxCache is a cache of failed transactions that is used to inform
+// the user of the failure
+type FailedTxCache struct {
+	// map tx hashes to errors
+	cache map[string]failedTx
+	// reject all transactions that are of these types
+	disallowedMessageTypes []string
+	m                      sync.Mutex
+}
+
+// NewFailedTxCache returns a new FailedTxCache
+func NewFailedTxCache(disallowedMessageTypes ...string) *FailedTxCache {
+	cache := &FailedTxCache{
+		cache:                  map[string]failedTx{},
+		m:                      sync.Mutex{},
+		disallowedMessageTypes: disallowedMessageTypes,
+	}
+	go cache.clean()
+	return cache
+}
+
+// Add adds a failed transaction with its error to the cache
+func (f *FailedTxCache) Add(tx []byte, hash string, txErr error) bool {
+	f.m.Lock()
+	defer f.m.Unlock()
+
+	rawTx := new(Transaction)
+	if err := Unmarshal(tx, rawTx); err != nil {
+		return false
+	}
+
+	if slices.Contains(f.disallowedMessageTypes, rawTx.MessageType) {
+		return false
+	}
+
+	if rawTx.Signature == nil {
+		return false
+	}
+
+	pubKey, err := crypto.NewPublicKeyFromBytes(rawTx.Signature.PublicKey)
+	if err != nil {
+		return false
+	}
+
+	f.cache[hash] = failedTx{
+		tx: &FailedTx{
+			Transaction: rawTx,
+			Hash:        hash,
+			Address:     pubKey.Address().String(),
+			Error:       txErr,
+		},
+		timestamp: time.Now(),
+	}
+	return true
+}
+
+// Get returns the failed transaction associated with its hash
+func (f *FailedTxCache) Get(txHash string) (*FailedTx, bool) {
+	f.m.Lock()
+	defer f.m.Unlock()
+
+	failedTx, ok := f.cache[txHash]
+
+	if !ok {
+		return nil, ok
+	}
+	return failedTx.tx, ok
+}
+
+// GetAddr returns all the failed transactions in the cache for a given address
+func (f *FailedTxCache) GetAddr(address string) []*FailedTx {
+	f.m.Lock()
+	defer f.m.Unlock()
+
+	failedTxs := make([]*FailedTx, 0)
+	for _, failedTx := range f.cache {
+		if failedTx.tx.Address == address {
+			failedTxs = append(failedTxs, failedTx.tx)
+		}
+	}
+
+	return failedTxs
+}
+
+// Remove removes a transaction hash from the cache
+func (f *FailedTxCache) Remove(txHashes ...string) {
+	f.m.Lock()
+	defer f.m.Unlock()
+	for _, hash := range txHashes {
+		delete(f.cache, hash)
+	}
+}
+
+// clean periodically removes transactions from the cache that are older than 5 minutes
+func (f *FailedTxCache) clean() {
+	ticker := time.NewTicker(2 * time.Minute)
+	for range ticker.C {
+		f.m.Lock()
+		for hash, tx := range f.cache {
+			if time.Since(tx.timestamp) >= 5*time.Minute {
+				delete(f.cache, hash)
+			}
+		}
+		f.m.Unlock()
+	}
 }

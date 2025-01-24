@@ -525,12 +525,14 @@ export const sanitizeInput = (event) => {
 // formatNumberInput is a function that formats a number input with commas as thousand separators.
 // It is meant to be used as an onChange event handler.
 export const formatNumberInput = (e) => {
-  const rawValue = e.target.value.replace(/,/g, "");
+  // Removes all non-digit characters and leading zeros from the input value.
+  let input = e.target.value.replace(/[^\d]/g, "").replace(/^0/, "");
   // Check if the input is a number and is greater than 0, a regex is used as isNaN
   // may allow for unexpected input like empty strings or null values.
-  if (/^\d*$/.test(rawValue) && rawValue[0] !== "0") {
-    e.target.value = numberWithCommas(rawValue);
+  if (/^\d+$/.test(input)) {
+    input = numberWithCommas(input);
   }
+  e.target.value = input;
 };
 
 // numberFromCommas is a function that converts a string of numbers formatted with commas
