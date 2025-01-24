@@ -1705,7 +1705,6 @@ func runStaticFileServer(fileSys fs.FS, dir, port string) {
 		return
 	}
 	mux := http.NewServeMux()
-	//mux.Handle("/", http.FileServer(http.FS(distFS)))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// serve `index.html` with dynamic config injection
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
