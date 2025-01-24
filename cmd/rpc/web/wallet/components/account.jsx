@@ -412,7 +412,7 @@ export default function Accounts({ keygroup, account, validator }) {
               <tr key={i}>
                 <td>{v.height || "N/A"}</td>
                 <td>{v.transaction.msg.amount ?? v.transaction.msg.AmountForSale ?? "N/A"}</td>
-                {renderAccSumTabCol(v.recipient ?? v.sender ?? v.transaction.msg.from_address, i)}
+                {renderAccSumTabCol(v.recipient ?? v.sender ?? v.address, i)}
                 <td>{v.message_type || v.transaction.type}</td>
                 {renderAccSumTabCol(v.tx_hash, i + 1)}
                 <td>{v.status ?? ""}</td>

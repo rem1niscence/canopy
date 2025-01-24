@@ -335,8 +335,8 @@ func Pending(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func FailedTxs(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	pageIndexer(w, r, func(_ lib.StoreI, _ crypto.AddressI, p lib.PageParams) (any, lib.ErrorI) {
-		return app.GetFailedTxsPage(p)
+	addrIndexer(w, r, func(_ lib.StoreI, address crypto.AddressI, p lib.PageParams) (any, lib.ErrorI) {
+		return app.GetFailedTxsPage(address.String(), p)
 	})
 }
 

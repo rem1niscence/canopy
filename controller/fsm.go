@@ -445,12 +445,12 @@ func (c *Controller) GetPendingPage(p lib.PageParams) (page *lib.Page, err lib.E
 }
 
 // GetFailedTxsPage() returns a list of failed mempool transactions
-func (c *Controller) GetFailedTxsPage(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+func (c *Controller) GetFailedTxsPage(address string, p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 	// lock the controller for thread safety
 	c.Lock()
 	defer c.Unlock()
 	page, failedTxs := lib.NewPage(p, lib.FailedTxsPageName), make(lib.FailedTxs, 0)
-	err = page.LoadArray(c.Mempool.cachedFailedTxs.GetAll(), &failedTxs, func(i any) lib.ErrorI {
+	err = page.LoadArray(c.Mempool.cachedFailedTxs.GetAddr(address), &failedTxs, func(i any) lib.ErrorI {
 		v, ok := i.(*lib.FailedTx)
 		if !ok {
 			return lib.ErrInvalidArgument()
@@ -485,7 +485,7 @@ func NewMempool(fsm *fsm.StateMachine, config lib.MempoolConfig, log lib.LoggerI
 	m = &Mempool{
 		log:             log,
 		Mempool:         lib.NewMempool(config),
-		cachedFailedTxs: lib.NewFailedTxCache([]string{types.MessageSendName}),
+		cachedFailedTxs: lib.NewFailedTxCache(),
 	}
 	// make an 'mempool (ephemeral copy) state' so the mempool can maintain only 'valid' transactions
 	// despite dependencies and conflicts

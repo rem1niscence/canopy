@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"sync"
-	"time"
-
 	"slices"
+	sync "sync"
+	"time"
 
 	"github.com/canopy-network/canopy/lib/crypto"
 
@@ -302,6 +301,7 @@ type jsonSignature struct {
 type FailedTx struct {
 	Transaction *Transaction `json:"transaction,omitempty"`
 	Hash        string       `json:"tx_hash,omitempty"`
+	Address     string       `json:"address,omitempty"`
 	Error       error        `json:"error,omitempty"`
 }
 
@@ -320,24 +320,24 @@ type failedTx struct {
 type FailedTxCache struct {
 	// map tx hashes to errors
 	cache map[string]failedTx
-	// reject all transactions that are not of these types
-	allowdMessageTypes []string
-	m                  sync.Mutex
+	// reject all transactions that are of these types
+	disallowedMessageTypes []string
+	m                      sync.Mutex
 }
 
 // NewFailedTxCache returns a new FailedTxCache
-func NewFailedTxCache(allowedMessageTypes []string) *FailedTxCache {
+func NewFailedTxCache(disallowedMessageTypes ...string) *FailedTxCache {
 	cache := &FailedTxCache{
-		cache:              map[string]failedTx{},
-		m:                  sync.Mutex{},
-		allowdMessageTypes: allowedMessageTypes,
+		cache:                  map[string]failedTx{},
+		m:                      sync.Mutex{},
+		disallowedMessageTypes: disallowedMessageTypes,
 	}
 	go cache.clean()
 	return cache
 }
 
 // Add adds a failed transaction with its error to the cache
-func (f *FailedTxCache) Add(tx []byte, hash string, err error) bool {
+func (f *FailedTxCache) Add(tx []byte, hash string, txErr error) bool {
 	f.m.Lock()
 	defer f.m.Unlock()
 
@@ -346,7 +346,12 @@ func (f *FailedTxCache) Add(tx []byte, hash string, err error) bool {
 		return false
 	}
 
-	if !slices.Contains(f.allowdMessageTypes, libTx.MessageType) {
+	if slices.Contains(f.disallowedMessageTypes, libTx.MessageType) {
+		return false
+	}
+
+	pubKey, err := crypto.NewPublicKeyFromBytes(libTx.Signature.PublicKey)
+	if err != nil {
 		return false
 	}
 
@@ -354,7 +359,8 @@ func (f *FailedTxCache) Add(tx []byte, hash string, err error) bool {
 		tx: &FailedTx{
 			Transaction: libTx,
 			Hash:        hash,
-			Error:       err,
+			Address:     pubKey.Address().String(),
+			Error:       txErr,
 		},
 		timestamp: time.Now(),
 	}
@@ -374,14 +380,16 @@ func (f *FailedTxCache) Get(txHash string) (*FailedTx, bool) {
 	return failedTx.tx, ok
 }
 
-// GetAll returns all the failed transactions in the cache
-func (f *FailedTxCache) GetAll() []*FailedTx {
+// GetAddr returns all the failed transactions in the cache for a given address
+func (f *FailedTxCache) GetAddr(address string) []*FailedTx {
 	f.m.Lock()
 	defer f.m.Unlock()
 
-	failedTxs := make([]*FailedTx, 0, len(f.cache))
+	failedTxs := make([]*FailedTx, 0)
 	for _, failedTx := range f.cache {
-		failedTxs = append(failedTxs, failedTx.tx)
+		if failedTx.tx.Address == address {
+			failedTxs = append(failedTxs, failedTx.tx)
+		}
 	}
 
 	return failedTxs

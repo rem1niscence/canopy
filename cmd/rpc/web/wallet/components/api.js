@@ -73,10 +73,6 @@ export async function POST(url, path, request) {
   return resp.json();
 }
 
-function pageRequest(page) {
-  return JSON.stringify({ pageNumber: page, perPage: 5 });
-}
-
 function heightAndAddrRequest(height, address) {
   return JSON.stringify({ height: height, address: address });
 }
@@ -249,7 +245,7 @@ export async function AccountWithTxs(height, address, page) {
   result.rec_transactions = await TransactionsByRec(page, address);
   result.sent_transactions.results?.forEach(setStatus("included"));
 
-  result.failed_transactions = await FailedTransactions(page);
+  result.failed_transactions = await FailedTransactions(page, address);
   result.failed_transactions.results?.forEach((tx) => {
     tx.status = "failure: ".concat(tx.error.Msg);
   });
@@ -266,6 +262,8 @@ export async function AccountWithTxs(height, address, page) {
       : b.transaction.time - a.transaction.time;
   });
 
+  console.log(result.combined);
+
   return result;
 }
 
@@ -277,8 +275,8 @@ export function TransactionsByRec(page, rec) {
   return POST(rpcURL, txsByRec, pageAddrReq(page, rec));
 }
 
-export function FailedTransactions(page) {
-  return POST(rpcURL, failedTxs, pageRequest(page));
+export function FailedTransactions(page, sender) {
+  return POST(rpcURL, failedTxs, pageAddrReq(page, sender));
 }
 
 export async function Validator(height, address) {
