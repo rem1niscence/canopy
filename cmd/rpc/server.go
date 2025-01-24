@@ -243,10 +243,10 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	}()
 	go updatePollResults()
 	go PollBaseChainInfo()
-	// l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
-	// runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
-	// l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
-	// runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
+	l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
+	runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
+	l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
+	runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
 }
 
 // PollBaseChainInfo() retrieves the information from the base-chain required for consensus
