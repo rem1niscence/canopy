@@ -59,7 +59,7 @@ type GenesisState struct {
 	// this field is not importable
 	DoubleSigners []*lib.DoubleSigner `protobuf:"bytes,6,rep,name=double_signers,json=doubleSigners,proto3" json:"double_signers,omitempty"`
 	// order_books: is a list of active sell orders
-	OrderBooks *OrderBooks `protobuf:"bytes,7,opt,name=order_books,json=orderBooks,proto3" json:"order_books,omitempty"`
+	OrderBooks *lib.OrderBooks `protobuf:"bytes,7,opt,name=order_books,json=orderBooks,proto3" json:"order_books,omitempty"`
 	// params: is a list of governance parameters and their respective values
 	Params *Params `protobuf:"bytes,8,opt,name=params,proto3" json:"params,omitempty"`
 	// supply: keeps track of the total amount of tokens or funds available across the entire blockchain
@@ -141,7 +141,7 @@ func (x *GenesisState) GetDoubleSigners() []*lib.DoubleSigner {
 	return nil
 }
 
-func (x *GenesisState) GetOrderBooks() *OrderBooks {
+func (x *GenesisState) GetOrderBooks() *lib.OrderBooks {
 	if x != nil {
 		return x.OrderBooks
 	}
@@ -222,7 +222,7 @@ var file_genesis_proto_goTypes = []interface{}{
 	(*Validator)(nil),        // 3: types.Validator
 	(*NonSigner)(nil),        // 4: types.NonSigner
 	(*lib.DoubleSigner)(nil), // 5: types.DoubleSigner
-	(*OrderBooks)(nil),       // 6: types.OrderBooks
+	(*lib.OrderBooks)(nil),   // 6: types.OrderBooks
 	(*Params)(nil),           // 7: types.Params
 	(*Supply)(nil),           // 8: types.Supply
 }
@@ -250,7 +250,6 @@ func file_genesis_proto_init() {
 	file_account_proto_init()
 	file_validator_proto_init()
 	file_gov_proto_init()
-	file_swap_proto_init()
 	if !protoimpl.UnsafeEnabled {
 		file_genesis_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*GenesisState); i {

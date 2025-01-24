@@ -22,7 +22,7 @@ import (
 // 5) Do this until reach the max-peer-height
 // 6) Stay on top by listening to incoming cert messages
 func (c *Controller) Sync() {
-	c.log.Infof("Sync started 🔄 for committee %d", c.CommitteeID)
+	c.log.Infof("Sync started 🔄 for committee %d", c.Config.ChainId)
 	// set isSyncing
 	c.isSyncing.Store(true)
 	// initialize tracking variables
@@ -79,7 +79,7 @@ func (c *Controller) Sync() {
 			// the new max height
 			if blkResponseMsg.MaxHeight > maxHeight && blkResponseMsg.TotalVdfIterations >= minVDFIterations {
 				maxHeight, minVDFIterations = blkResponseMsg.MaxHeight, blkResponseMsg.TotalVdfIterations
-				c.log.Debugf("Updated chain %d with max height: %d and iterations %d\n%s", c.CommitteeID, maxHeight, minVDFIterations)
+				c.log.Debugf("Updated chain %d with max height: %d and iterations %d\n%s", c.Config.ChainId, maxHeight, minVDFIterations)
 			}
 			c.P2P.ChangeReputation(responder, p2p.GoodBlockRep)
 		case <-time.After(p2p.SyncTimeoutS * time.Second): // timeout
@@ -97,7 +97,7 @@ func (c *Controller) Sync() {
 // SendTxMsg() gossips a Transaction through the P2P network for a specific committeeID
 func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
 	// create a transaction message object using the tx bytes and the committee id
-	msg := &lib.TxMessage{CommitteeId: c.CommitteeID, Tx: tx}
+	msg := &lib.TxMessage{CommitteeId: c.Config.ChainId, Tx: tx}
 	// send it to self for de-duplication and awareness of self originated transactions
 	if err := c.P2P.SelfSend(c.PublicKey, Tx, msg); err != nil {
 		return err
@@ -108,6 +108,9 @@ func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
 
 // SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
 func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
+	if c.Config.ChainId == lib.CanopyCommitteeId {
+		return // base-chain doesn't send this
+	}
 	c.log.Debugf("Sending certificate results txn for: %s", lib.BytesToString(qc.ResultsHash))
 	// save the block to set it back to the object after this function completes
 	blk := qc.Block
@@ -119,31 +122,21 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return
 	}
-	// convert the transaction into bytes
-	bz, err := lib.Marshal(tx)
+	// handle the transaction on the base-chain
+	hash, err := c.BaseChainInfo.RemoteCallbacks.Transaction(tx)
 	if err != nil {
-		c.log.Errorf("Marshalling auto-certificate-results-txn failed with err: %s", err.Error())
+		c.log.Errorf("Submitting auto-certificate-results-txn failed with err: %s", err.Error())
 		return
 	}
-	// send the proposal transaction
-	if err = c.SendTxMsg(bz); err != nil {
-		c.log.Errorf("Gossiping auto-certificate-results-txn failed with err: %s", err.Error())
-		return
-	}
-	c.log.Infof("Gossipped the certificate-results-txn")
+	c.log.Infof("Successfully submitted the certificate-results-txn with hash %s", *hash)
 }
 
 // GossipBlockMsg() gossips a QuorumCertificate (with block) through the P2P network for a specific committeeID
 func (c *Controller) GossipBlock(qc *lib.QuorumCertificate) {
-	// save the results to add back after this function completes
-	results := qc.Results
-	defer func() { qc.Results = results }()
-	// when sending a certificate message, it's good practice to omit the 'results' field as it is only important for the Canopy Blockchain
-	qc.Results = nil
 	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(qc.ResultsHash))
 	// create the block message
 	blockMessage := &lib.BlockMessage{
-		CommitteeId:         c.CommitteeID,
+		CommitteeId:         c.Config.ChainId,
 		MaxHeight:           c.FSM.Height(),
 		TotalVdfIterations:  c.FSM.TotalVDFIterations(),
 		BlockAndCertificate: qc,
@@ -168,10 +161,10 @@ func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
 	if len(recipients) != 0 {
 		// for each 'recipient'
 		for _, pk := range recipients {
-			c.log.Debugf("Requesting block %d for chain %d from %s", height, c.CommitteeID, lib.BytesToTruncatedString(pk))
+			c.log.Debugf("Requesting block %d for chain %d from %s", height, c.Config.ChainId, lib.BytesToTruncatedString(pk))
 			// send it to exactly who was specified in the function call
 			if err := c.P2P.SendTo(pk, BlockRequest, &lib.BlockRequestMessage{
-				CommitteeId: c.CommitteeID,
+				CommitteeId: c.Config.ChainId,
 				Height:      height,
 				HeightOnly:  heightOnly,
 			}); err != nil {
@@ -179,10 +172,10 @@ func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
 			}
 		}
 	} else {
-		c.log.Debugf("Requesting block %d for chain %d from all", height, c.CommitteeID)
+		c.log.Debugf("Requesting block %d for chain %d from all", height, c.Config.ChainId)
 		// send it to the peers
 		if err := c.P2P.SendToPeers(BlockRequest, &lib.BlockRequestMessage{
-			CommitteeId: c.CommitteeID,
+			CommitteeId: c.Config.ChainId,
 			Height:      height,
 			HeightOnly:  heightOnly,
 		}, true); err != nil {
@@ -195,7 +188,7 @@ func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
 func (c *Controller) SendBlock(maxHeight, vdfIterations uint64, blockAndCert *lib.QuorumCertificate, recipient []byte) {
 	// send the block to the recipient public key specified
 	if err := c.P2P.SendTo(recipient, Block, &lib.BlockMessage{
-		CommitteeId:         c.CommitteeID,
+		CommitteeId:         c.Config.ChainId,
 		MaxHeight:           maxHeight,
 		TotalVdfIterations:  vdfIterations,
 		BlockAndCertificate: blockAndCert,
@@ -348,7 +341,7 @@ func (c *Controller) ListenForConsensus() {
 				return
 			}
 			// load the committee associated with the committee id at the latest canopy height
-			vs, err := c.LoadCommittee(c.FSM.Height())
+			vs, err := c.LoadCommittee(c.BaseChainHeight())
 			if err != nil {
 				handleErr(err, 0)
 				return
@@ -489,7 +482,7 @@ func (c *Controller) ListenForBlockRequests() {
 func (c *Controller) UpdateP2PMustConnect() {
 	// define a list
 	noDuplicates := make(map[string]*lib.PeerAddress)
-	port, err := lib.ResolvePort(c.CommitteeID)
+	port, err := lib.ResolvePort(c.Config.ChainId)
 	if err != nil {
 		if err != nil {
 			c.log.Error(err.Error())
@@ -513,7 +506,7 @@ func (c *Controller) UpdateP2PMustConnect() {
 			p = &lib.PeerAddress{
 				PublicKey:  member.PublicKey,
 				NetAddress: strings.ReplaceAll(member.NetAddress, "tcp://", "") + port,
-				PeerMeta:   &lib.PeerMeta{ChainId: c.CommitteeID},
+				PeerMeta:   &lib.PeerMeta{ChainId: c.Config.ChainId},
 			}
 		}
 		// add to the de-duplication map to ensure we don't doubly create peer objects
@@ -543,7 +536,7 @@ func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc
 	// validate the quorum certificate
 	if err = c.checkPeerQC(c.LoadMaxBlockSize(), &lib.View{
 		Height:       c.FSM.Height(),
-		CanopyHeight: c.BaseChainInfo.Height,
+		CanopyHeight: c.BaseChainInfo.GetHeight(),
 		NetworkId:    c.Config.NetworkID,
 		CommitteeId:  msg.CommitteeId,
 	}, v, qc, senderID); err != nil {
@@ -577,11 +570,6 @@ func (c *Controller) checkPeerQC(maxBlockSize int, view *lib.View, v lib.Validat
 	if isPartialQC {
 		c.P2P.ChangeReputation(senderID, p2p.InvalidJustifyRep)
 		return lib.ErrNoMaj23()
-	}
-	// if the results structure was not pruned from the certificate
-	if qc.Results != nil {
-		c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
-		return lib.ErrNonNilCertResults()
 	}
 	// if this certificate isn't finalized
 	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
@@ -700,7 +688,7 @@ func (c *Controller) signableToConsensusMessage(msg lib.Signable) (*lib.Consensu
 	}
 	// wrap the message in consensus
 	return &lib.ConsensusMessage{
-		CommitteeId: c.CommitteeID,
+		CommitteeId: c.Config.ChainId,
 		Message:     messageBytes,
 	}, nil
 }

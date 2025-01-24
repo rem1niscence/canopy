@@ -46,7 +46,7 @@ type P2P struct {
 }
 
 // New() creates an initialized pointer instance of a P2P object
-func New(p crypto.PrivateKeyI, maxMembersPerCommittee, committeeId uint64, c lib.Config, l lib.LoggerI) *P2P {
+func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l lib.LoggerI) *P2P {
 	// Initialize the peer book
 	peerBook := NewPeerBook(p.PublicKey().Bytes(), c, l)
 	// Make inbound multiplexed channels
@@ -63,7 +63,7 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee, committeeId uint64, c lib
 		}
 		bannedIPs = append(bannedIPs, *i)
 	}
-	meta := &lib.PeerMeta{ChainId: committeeId}
+	meta := &lib.PeerMeta{ChainId: c.ChainId}
 	return &P2P{
 		privateKey:             p,
 		channels:               channels,

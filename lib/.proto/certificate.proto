@@ -94,9 +94,11 @@ message BuyOrder {
   uint64 order_id = 1;
   // buyer_receive_address: the Canopy address where the tokens may be received
   bytes buyer_receive_address = 2;
+  // buyer_send_address: the 'counter asset' address where the tokens will be sent from
+  bytes buyer_send_address = 3;
   // buyer_chain_deadline: the 'counter asset' chain height at which the buyer must send the 'counter asset' by
   // or the 'intent to buy' will be voided
-  uint64 buyer_chain_deadline = 3;
+  uint64 buyer_chain_deadline = 4;
 }
 
 // Checkpoint is 3rd party chain information that allows Canopy to provide Checkpointing-as-a-Service for the 3rd party
@@ -126,4 +128,27 @@ message DoubleSigner {
   bytes pubKey = 1;
   // heights: the list of heights when the infractions occurred
   repeated uint64 heights = 2;
+}
+
+// CommitteesData is a list of essential information about the committee
+message CommitteesData {
+  repeated CommitteeData list = 1;
+}
+
+// CommitteeData is current status information about the current status of the Committee
+message CommitteeData {
+  // committee_id: is the unique identifier of the chain and the committee of Validators responsible for it
+  uint64 committee_id = 1;
+  // last_updated_height: is the Canopy height included in the most recently processed Certificate Results transaction
+  // This protects against historical committee attacks and ensures sequentiality among committees
+  uint64 last_canopy_height_updated = 2;
+  // last_chain_height_updated: is the 3rd party chain height included in the most recent processed Certificate Results
+  // transaction. This protects against reformatting the replay attacks
+  uint64 last_chain_height_updated = 3;
+  // payment_percents: a list of recipients and the percentage of rewards they will receive, distributed at the end of
+  // the block
+  repeated PaymentPercents  payment_percents = 4;
+  // number_of_samples: the total count of processed Certificate Result Transactions, used to dilute reward percentages
+  // accurately
+  uint64 number_of_samples = 5;
 }

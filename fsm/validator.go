@@ -337,13 +337,25 @@ func (s *StateMachine) GetAuthorizedSignersForValidator(address []byte) (signers
 	return [][]byte{validator.Address, validator.Output}, nil
 }
 
-// PseudorandomSelectDelegate() selects a delegate randomly weighted based on their stake within a committee
+// LotteryWinner() selects a validator/delegate randomly weighted based on their stake within a committee
 // if there's no committee, then fallback to the proposer's address
-func (s *StateMachine) PseudorandomSelectDelegate(id uint64, proposerAddress []byte) (address lib.HexBytes, err lib.ErrorI) {
-	// get the delegates
-	p, _ := s.GetAllDelegates(id)
+func (s *StateMachine) LotteryWinner(id uint64, validators ...bool) (lottery *lib.LotteryWinner, err lib.ErrorI) {
+	var p lib.ValidatorSet
+	// if validators
+	if len(validators) == 1 && validators[0] == true {
+		p, _ = s.GetCommitteeMembers(s.Config.ChainId)
+	} else {
+		// else get the delegates
+		p, _ = s.GetAllDelegates(id)
+	}
+	// get the validator params from state
+	valParams, err := s.GetParamsVal()
+	if err != nil {
+		return nil, err
+	}
+	// if there are no validators in the set - return
 	if p.NumValidators == 0 {
-		return proposerAddress, nil
+		return &lib.LotteryWinner{Winner: nil, Cut: valParams.ValidatorDelegateRewardPercentage}, nil
 	}
 	// get the last proposers
 	lastProposers, err := s.GetLastProposers()
@@ -351,15 +363,16 @@ func (s *StateMachine) PseudorandomSelectDelegate(id uint64, proposerAddress []b
 		return nil, err
 	}
 	// use un-grindable weighted pseudorandom
-	return lib.WeightedPseudorandom(&lib.PseudorandomParams{
-		SortitionData: &lib.SortitionData{
-			LastProposerAddresses: lastProposers.Addresses,
-			Height:                s.Height(),
-			TotalValidators:       p.NumValidators,
-			TotalPower:            p.TotalPower,
-		},
-		ValidatorSet: p.ValidatorSet,
-	}).Address().Bytes(), nil
+	return &lib.LotteryWinner{
+		Winner: lib.WeightedPseudorandom(&lib.PseudorandomParams{
+			SortitionData: &lib.SortitionData{
+				LastProposerAddresses: lastProposers.Addresses,
+				Height:                s.Height(),
+				TotalValidators:       p.NumValidators,
+				TotalPower:            p.TotalPower,
+			}, ValidatorSet: p.ValidatorSet,
+		}).Address().Bytes(), Cut: valParams.ValidatorDelegateRewardPercentage,
+	}, nil
 }
 
 // validatorPubToAddr() is a convenience function that converts a BLS validator key to an address

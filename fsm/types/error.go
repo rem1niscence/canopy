@@ -252,10 +252,6 @@ func ErrInvalidTxTime() lib.ErrorI {
 	return lib.NewError(lib.CodeErrInvalidTxTime, lib.StateMachineModule, "invalid tx timestamp")
 }
 
-func ErrOrderNotFound(id int) lib.ErrorI {
-	return lib.NewError(lib.CodeOrderNotFound, lib.StateMachineModule, fmt.Sprintf("order with id %d not found", id))
-}
-
 func ErrUnauthorizedOrderChange() lib.ErrorI {
 	return lib.NewError(lib.CodeUnauthorizedOrderChange, lib.StateMachineModule, "unauthorized order change")
 }
@@ -264,8 +260,8 @@ func ErrMinimumOrderSize() lib.ErrorI {
 	return lib.NewError(lib.CodeMinimumOrderSize, lib.StateMachineModule, "minimum order size")
 }
 
-func ErrOrderAlreadyAccepted() lib.ErrorI {
-	return lib.NewError(lib.CodeOrderAlreadyAccepted, lib.StateMachineModule, "order already accepted")
+func ErrInvalidOrders() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidOrders, lib.StateMachineModule, "orders are invalid")
 }
 
 func ErrInvalidBuyOrder() lib.ErrorI {
@@ -298,16 +294,4 @@ func ErrInvalidCheckpoint() lib.ErrorI {
 
 func ErrInvalidStartPollHeight() lib.ErrorI {
 	return lib.NewError(lib.CodeStartPollHeight, lib.StateMachineModule, "start poll height is invalid")
-}
-
-func ErrInvalidNumberOfRewardRecipients() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidNumberOfRewardRecipients, lib.StateMachineModule, "invalid number of reward recipients")
-}
-
-func ErrInvalidProposerRewardPercent() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidProposerRewardPercent, lib.StateMachineModule, "invalid proposer reward percent")
-}
-
-func ErrInvalidDelegateReward(address lib.HexBytes, cut uint64) lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidDelegatorReward, lib.StateMachineModule, fmt.Sprintf("invalid delegate reward:\naddress: %s\ncut: %d", address, cut))
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"slices"
 )
 
 const (
@@ -215,6 +216,23 @@ func (x *CertificateResult) CheckBasic() ErrorI {
 	return x.Checkpoint.CheckBasic()
 }
 
+// Equals() compares two certificate results to ensure equality
+func (x *CertificateResult) Equals(y *CertificateResult) bool {
+	if x == nil || y == nil {
+		return false
+	}
+	if !x.RewardRecipients.Equals(y.RewardRecipients) {
+		return false
+	}
+	if !x.SlashRecipients.Equals(y.SlashRecipients) {
+		return false
+	}
+	if !x.Orders.Equals(y.Orders) {
+		return false
+	}
+	return x.Checkpoint.Equals(y.Checkpoint)
+}
+
 // Hash() returns the cryptographic hash of the canonical Sign Bytes of the CertificateResult
 func (x *CertificateResult) Hash() []byte {
 	bz, _ := Marshal(x)
@@ -285,6 +303,28 @@ func (x *RewardRecipients) CheckBasic() (err ErrorI) {
 	return
 }
 
+// Equals() compares two RewardRecipients for equality
+func (x *RewardRecipients) Equals(y *RewardRecipients) bool {
+	if x == nil && y == nil {
+		return true
+	}
+	if x == nil || y == nil {
+		return false
+	}
+	if len(x.PaymentPercents) != len(y.PaymentPercents) {
+		return false
+	}
+	for i, pp := range x.PaymentPercents {
+		if !bytes.Equal(pp.Address, y.PaymentPercents[i].Address) {
+			return false
+		}
+		if pp.Percent != y.PaymentPercents[i].Percent {
+			return false
+		}
+	}
+	return x.NumberOfSamples == y.NumberOfSamples
+}
+
 // jsonRewardRecipients is the RewardRecipients implementation of json.Marshaller and json.Unmarshaler
 type jsonRewardRecipients struct {
 	PaymentPercents []*PaymentPercents `json:"payment_percents,omitempty"` // recipients of the block reward by percentage
@@ -352,6 +392,28 @@ func (x *SlashRecipients) CheckBasic() ErrorI {
 	return nil
 }
 
+// Equals() compares two SlashRecipients for equality
+func (x *SlashRecipients) Equals(y *SlashRecipients) bool {
+	if x == nil && y == nil {
+		return true
+	}
+	if x == nil || y == nil {
+		return false
+	}
+	if len(x.DoubleSigners) != len(y.DoubleSigners) {
+		return false
+	}
+	for i, ds := range x.DoubleSigners {
+		if !bytes.Equal(ds.PubKey, y.DoubleSigners[i].PubKey) {
+			return false
+		}
+		if !slices.Equal(ds.Heights, y.DoubleSigners[i].Heights) {
+			return false
+		}
+	}
+	return true
+}
+
 // jsonSlashRecipients is the SlashRecipients implementation of json.Marshaller and json.Unmarshaler
 type jsonSlashRecipients struct {
 	DoubleSigners []*DoubleSigner `json:"double_signers,omitempty"` // who did the bft decide was a double signer
@@ -393,6 +455,89 @@ func (x *Orders) CheckBasic() ErrorI {
 	return nil
 }
 
+// Equals() compares two Orders for equality
+func (x *Orders) Equals(y *Orders) bool {
+	if x == nil && y == nil {
+		return true
+	}
+	if x == nil || y == nil {
+		return false
+	}
+	if !slices.Equal(x.CloseOrders, y.CloseOrders) {
+		return false
+	}
+	if !slices.Equal(x.ResetOrders, y.ResetOrders) {
+		return false
+	}
+	if len(x.BuyOrders) != len(y.BuyOrders) {
+		return false
+	}
+	for i, o := range x.BuyOrders {
+		if !o.Equals(y.BuyOrders[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// Equals() compares two BuyOrders for equality
+func (x *BuyOrder) Equals(y *BuyOrder) bool {
+	if x == nil && y == nil {
+		return true
+	}
+	if x == nil || y == nil {
+		return false
+	}
+	if !bytes.Equal(x.BuyerReceiveAddress, y.BuyerReceiveAddress) {
+		return false
+	}
+	if !bytes.Equal(x.BuyerSendAddress, y.BuyerSendAddress) {
+		return false
+	}
+	if x.OrderId != y.OrderId {
+		return false
+	}
+	return x.BuyerChainDeadline == y.BuyerChainDeadline
+}
+
+// buyOrderJSON implements the json.Marshaller & json.Unmarshaler interfaces for BuyOrder
+type buyOrderJSON struct {
+	// order_id: is the number id that is unique to this committee to identify the order
+	OrderId uint64 `json:"order_id,omitempty"`
+	// buyers_send_address: the Canopy address where the tokens may be received
+	BuyersSendAddress HexBytes `json:"buyers_send_address,omitempty"`
+	// buyer_receive_address: the Canopy address where the tokens may be received
+	BuyerReceiveAddress HexBytes `json:"buyer_receive_address,omitempty"`
+	// buyer_chain_deadline: the 'counter asset' chain height at which the buyer must send the 'counter asset' by
+	// or the 'intent to buy' will be voided
+	BuyerChainDeadline uint64 `json:"buyer_chain_deadline,omitempty"`
+}
+
+// MarshalJSON() implements the json.Marshaller interface for BuyOrder
+func (x BuyOrder) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&buyOrderJSON{
+		OrderId:             x.OrderId,
+		BuyersSendAddress:   x.BuyerSendAddress,
+		BuyerReceiveAddress: x.BuyerReceiveAddress,
+		BuyerChainDeadline:  x.BuyerChainDeadline,
+	})
+}
+
+// UnmarshalJSON() implements the json.Unmarshaler interface for BuyOrder
+func (x *BuyOrder) UnmarshalJSON(b []byte) (err error) {
+	j := new(buyOrderJSON)
+	if err = json.Unmarshal(b, j); err != nil {
+		return
+	}
+	*x = BuyOrder{
+		OrderId:             j.OrderId,
+		BuyerReceiveAddress: j.BuyerReceiveAddress,
+		BuyerSendAddress:    j.BuyersSendAddress,
+		BuyerChainDeadline:  j.BuyerChainDeadline,
+	}
+	return
+}
+
 // CHECKPOINT CODE BELOW
 
 // CheckBasic() performs stateless validation on a Checkpoint object
@@ -404,4 +549,60 @@ func (x *Checkpoint) CheckBasic() ErrorI {
 		return ErrInvalidBlockHash()
 	}
 	return nil
+}
+
+// Equals() compares two Checkpoints for equality
+func (x *Checkpoint) Equals(y *Checkpoint) bool {
+	if x == nil && y == nil {
+		return true
+	}
+	if x == nil || y == nil {
+		return false
+	}
+	if !bytes.Equal(x.BlockHash, y.BlockHash) {
+		return false
+	}
+	return x.Height == y.Height
+}
+
+// Combine() merges the Reward Recipients' Payment Percents of the current Proposal with those of another Proposal
+// such that the Payment Percentages may be equally weighted when performing reward distribution calculations
+// NOTE: percents will exceed 100% over multiple samples, but are normalized using the NumberOfSamples field
+func (x *CommitteeData) Combine(f *CommitteeData) ErrorI {
+	if f == nil {
+		return nil
+	}
+	// for each payment percent,
+	for _, ep := range f.PaymentPercents {
+		x.addPercents(ep.Address, ep.Percent)
+	}
+	// new Proposal purposefully overwrites the Block and Meta of the current Proposal
+	// this is to ensure both Proposals have the latest Block and Meta information
+	// in the case where the caller uses a pattern where there may be a stale Block/Meta
+	*x = CommitteeData{
+		PaymentPercents:         x.PaymentPercents,
+		NumberOfSamples:         x.NumberOfSamples + 1,
+		CommitteeId:             f.CommitteeId,
+		LastCanopyHeightUpdated: f.LastCanopyHeightUpdated,
+		LastChainHeightUpdated:  f.LastChainHeightUpdated,
+	}
+	return nil
+}
+
+// addPercents() is a helper function that adds reward distribution percents on behalf of an address
+func (x *CommitteeData) addPercents(address []byte, percent uint64) {
+	// check to see if the address already exists
+	for i, ep := range x.PaymentPercents {
+		// if already exists
+		if bytes.Equal(address, ep.Address) {
+			// simply add the percent to the previous
+			x.PaymentPercents[i].Percent += percent
+			return
+		}
+	}
+	// if the address doesn't already exist, append a sample to PaymentPercents
+	x.PaymentPercents = append(x.PaymentPercents, &PaymentPercents{
+		Address: address,
+		Percent: percent,
+	})
 }

@@ -19,7 +19,12 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	if err := s.FundCommitteeRewardPools(); err != nil {
 		return err
 	}
-	return nil
+	// handle last certificate results
+	lastCertificate, err := s.LoadCertificate(s.Height() - 1)
+	if err != nil {
+		return err
+	}
+	return s.HandleCertificateResults(lastCertificate, nil, nil)
 }
 
 // EndBlock() is code that is executed at the end of `applying` the block
@@ -57,6 +62,53 @@ func (s *StateMachine) CheckProtocolVersion() lib.ErrorI {
 		return types.ErrInvalidProtocolVersion()
 	}
 	return nil
+}
+
+// HandleCertificateResults() is a handler for the results of a quorum certificate
+func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, committee *lib.ValidatorSet, validatorParams *types.ValidatorParams) lib.ErrorI {
+	// ensure the certificate results are not nil
+	if qc == nil || qc.Results == nil {
+		s.log.Errorf("Certificate.Results is nil, skipping")
+		return nil
+	}
+	results, storeI, committeeId, nonSignerPercent := qc.Results, s.store.(lib.StoreI), qc.Header.CommitteeId, 0
+	// handle checkpoint-as-a-service functionality
+	if results.Checkpoint != nil && s.Config.ChainId == lib.CanopyCommitteeId && committee != nil {
+		// handle the token swaps
+		err := s.HandleCommitteeSwaps(results.Orders, committeeId)
+		if err != nil {
+			return err
+		}
+		// retrieve the last saved checkpoint for this chain
+		mostRecentCheckpoint, e := storeI.GetMostRecentCheckpoint(committeeId)
+		if e != nil {
+			return e
+		}
+		// ensure checkpoint isn't older than the most recent
+		if results.Checkpoint.Height <= mostRecentCheckpoint.Height {
+			return types.ErrInvalidCheckpoint()
+		}
+		// index the checkpoint
+		if err = storeI.IndexCheckpoint(committeeId, results.Checkpoint); err != nil {
+			return err
+		}
+		// calculate the missing (non-signers) percentage of voting power on this QC
+		nonSignerPercent, err = s.HandleByzantine(qc, committee.ValidatorSet, validatorParams)
+		if err != nil {
+			return err
+		}
+	}
+	// reduce all payment percents proportional to the non-signer percent
+	for i, p := range results.RewardRecipients.PaymentPercents {
+		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, uint64(nonSignerPercent))
+	}
+	// update the committee data
+	return s.UpsertCommitteeData(&lib.CommitteeData{
+		CommitteeId:             committeeId,
+		LastCanopyHeightUpdated: qc.Header.CanopyHeight,
+		LastChainHeightUpdated:  qc.Header.Height,
+		PaymentPercents:         results.RewardRecipients.PaymentPercents,
+	})
 }
 
 // LAST PROPOSERS CODE BELOW

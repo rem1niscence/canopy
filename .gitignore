@@ -32,3 +32,4 @@ vendor
 .docs/TIMELOG.md
 .docs/WISHLIST.md
 cmd/web/explorer/.idea
+.DS_Store

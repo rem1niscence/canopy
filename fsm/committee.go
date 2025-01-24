@@ -5,6 +5,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"math"
+	"slices"
 )
 
 // COMMITTEES BELOW
@@ -20,6 +21,11 @@ func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
 	subsidizedCommitteeIds, err := s.GetSubsidizedCommittees()
 	if err != nil {
 		return err
+	}
+	// ensure self chain is always a 'paid' chain even if there are no validators
+	if !slices.Contains(subsidizedCommitteeIds, s.Config.ChainId) {
+		// this ensures sub-chains always receive Native Token payment to their pool
+		subsidizedCommitteeIds = append(subsidizedCommitteeIds, s.Config.ChainId)
 	}
 	// calculate the number of halvenings
 	halvenings := s.height / uint64(types.BlocksPerHalvening)
@@ -121,7 +127,7 @@ func (s *StateMachine) DistributeCommitteeRewards() lib.ErrorI {
 			return err
 		}
 		// clear the committee data, but leave the ID, (external) chain height, and committee height
-		committeesData.List[i] = &types.CommitteeData{
+		committeesData.List[i] = &lib.CommitteeData{
 			CommitteeId:             data.CommitteeId,
 			LastCanopyHeightUpdated: data.LastCanopyHeightUpdated,
 			LastChainHeightUpdated:  data.LastChainHeightUpdated,
@@ -198,17 +204,6 @@ func (s *StateMachine) GetCommitteeMembers(committeeID uint64, all ...bool) (vs 
 	}
 	// convert list to a validator set (includes shared public key)
 	return lib.NewValidatorSet(&lib.ConsensusValidators{ValidatorSet: members})
-}
-
-// GetCanopyCommitteeMembers() returns the committee members specifically for the Canopy ID
-func (s *StateMachine) GetCanopyCommitteeMembers(all ...bool) (*lib.ConsensusValidators, lib.ErrorI) {
-	// get the members for the CanopyCommitteeId
-	canopyCommittee, err := s.GetCommitteeMembers(lib.CanopyCommitteeId, all...)
-	if err != nil {
-		return nil, err
-	}
-	// only return the validator list, not the full 'Set' which includes a shared public key and other meta information
-	return canopyCommittee.ValidatorSet, nil
 }
 
 // GetCommitteePaginated() returns a 'page' of committee members ordered from highest stake to lowest
@@ -398,7 +393,7 @@ func (s *StateMachine) DeleteDelegate(address crypto.AddressI, committeeID, stak
 // This information secures and dictates the distribution of a Committee's reward pool
 
 // UpsertCommitteeData() updates or inserts a committee data to the committees data list
-func (s *StateMachine) UpsertCommitteeData(new *types.CommitteeData) lib.ErrorI {
+func (s *StateMachine) UpsertCommitteeData(new *lib.CommitteeData) lib.ErrorI {
 	// retrieve the committees' data list, the target and index in the list based on the committeeId
 	committeesData, targetData, idx, err := s.getCommitteeDataAndList(new.CommitteeId)
 	// check the new committee data is not 'out-dated'
@@ -416,7 +411,7 @@ func (s *StateMachine) UpsertCommitteeData(new *types.CommitteeData) lib.ErrorI 
 }
 
 // GetCommitteeData() is a convenience function to retrieve the committee data from the master list
-func (s *StateMachine) GetCommitteeData(targetCommitteeID uint64) (*types.CommitteeData, lib.ErrorI) {
+func (s *StateMachine) GetCommitteeData(targetCommitteeID uint64) (*lib.CommitteeData, lib.ErrorI) {
 	// pass through call
 	_, targetData, _, err := s.getCommitteeDataAndList(targetCommitteeID)
 	if err != nil {
@@ -427,7 +422,7 @@ func (s *StateMachine) GetCommitteeData(targetCommitteeID uint64) (*types.Commit
 }
 
 // getCommitteeDataAndList() returns the master list of committee data and the specified target data and its index from the target committee id
-func (s *StateMachine) getCommitteeDataAndList(targetCommitteeID uint64) (list *types.CommitteesData, d *types.CommitteeData, idx int, err lib.ErrorI) {
+func (s *StateMachine) getCommitteeDataAndList(targetCommitteeID uint64) (list *lib.CommitteesData, d *lib.CommitteeData, idx int, err lib.ErrorI) {
 	// first, get the master list of 'committee data'
 	list, err = s.GetCommitteesData()
 	if err != nil {
@@ -444,7 +439,7 @@ func (s *StateMachine) getCommitteeDataAndList(targetCommitteeID uint64) (list *
 	// the target index is the new list end
 	idx = len(list.List)
 	// set the committee data in the returned variable
-	d = &types.CommitteeData{
+	d = &lib.CommitteeData{
 		CommitteeId:             targetCommitteeID,
 		LastCanopyHeightUpdated: 0,
 		LastChainHeightUpdated:  0,
@@ -457,7 +452,7 @@ func (s *StateMachine) getCommitteeDataAndList(targetCommitteeID uint64) (list *
 }
 
 // SetCommitteesData() sets a list of List into the state
-func (s *StateMachine) SetCommitteesData(f *types.CommitteesData) lib.ErrorI {
+func (s *StateMachine) SetCommitteesData(f *lib.CommitteesData) lib.ErrorI {
 	bz, err := lib.Marshal(f)
 	if err != nil {
 		return err
@@ -466,13 +461,13 @@ func (s *StateMachine) SetCommitteesData(f *types.CommitteesData) lib.ErrorI {
 }
 
 // GetCommitteesData() gets a list of List from the state
-func (s *StateMachine) GetCommitteesData() (f *types.CommitteesData, err lib.ErrorI) {
+func (s *StateMachine) GetCommitteesData() (f *lib.CommitteesData, err lib.ErrorI) {
 	bz, err := s.Get(types.CommitteesDataPrefix())
 	if err != nil {
 		return nil, err
 	}
-	f = &types.CommitteesData{
-		List: make([]*types.CommitteeData, 0),
+	f = &lib.CommitteesData{
+		List: make([]*lib.CommitteeData, 0),
 	}
 	err = lib.Unmarshal(bz, f)
 	return

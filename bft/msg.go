@@ -108,7 +108,11 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 		if x.Header.CanopyHeight != b.CanopyHeight {
 			return false, lib.ErrWrongCanopyHeight()
 		}
-		if x.Qc.Header.Height < b.LoadCommitteeHeightInState() {
+		committeeHeightInState, e := b.LoadCommitteeHeightInState(b.CanopyHeight)
+		if e != nil {
+			return false, e
+		}
+		if x.Qc.Header.Height < committeeHeightInState {
 			return false, lib.ErrWrongCanopyHeight()
 		}
 		if x.Header.Phase == Propose {

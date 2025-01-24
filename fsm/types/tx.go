@@ -119,7 +119,7 @@ func NewCreateOrderTx(from crypto.PrivateKeyI, sellAmount, requestAmount, commit
 		AmountForSale:        sellAmount,
 		RequestedAmount:      requestAmount,
 		SellerReceiveAddress: receiveAddress,
-		SellersSellAddress:   from.PublicKey().Address().Bytes(),
+		SellersSendAddress:   from.PublicKey().Address().Bytes(),
 	}, fee, memo)
 }
 
@@ -140,6 +140,15 @@ func NewDeleteOrderTx(from crypto.PrivateKeyI, orderId, committeeId uint64, fee 
 		OrderId:     orderId,
 		CommitteeId: committeeId,
 	}, fee, memo)
+}
+
+// NewBuyOrderTx() reserves a sell order using a send-tx and the memo field
+func NewBuyOrderTx(from crypto.PrivateKeyI, order lib.BuyOrder, fee uint64) (lib.TransactionI, lib.ErrorI) {
+	jsonBytes, err := lib.MarshalJSON(order)
+	if err != nil {
+		return nil, err
+	}
+	return NewSendTransaction(from, from.PublicKey().Address(), 1, fee, string(jsonBytes))
 }
 
 // NewTransaction() creates a Transaction object from a message in the interface form of TransactionI

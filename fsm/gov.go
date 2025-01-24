@@ -260,15 +260,44 @@ func (s *StateMachine) getParams(space string, ptr any, emptyErr func() lib.Erro
 	return nil
 }
 
+// ParsePollTransactions() parses the last valid block for memo commands to execute specialized 'straw polling' functionality
+func (s *StateMachine) ParsePollTransactions(b *lib.BlockResult) {
+	ap := new(types.ActivePolls)
+	// load the active polls from the json file
+	if err := ap.NewFromFile(s.Config.DataDirPath); err != nil {
+		return
+	}
+	// for each transaction in the block
+	for _, tx := range b.Transactions {
+		// get the public key object
+		pub, e := crypto.NewPublicKeyFromBytes(tx.Transaction.Signature.PublicKey)
+		if e != nil {
+			return
+		}
+		// check for a poll transaction
+		if err := ap.CheckForPollTransaction(pub.Address(), tx.Transaction.Memo, s.Height()); err != nil {
+			s.log.Error(err.Error())
+			return
+		}
+	}
+	// save to file: NOTE: this is non-atomic and can be inconsistent with the database
+	// but this is a non-critical function that won't cause a consensus failure
+	if err := ap.SaveToFile(s.Config.DataDirPath); err != nil {
+		s.log.Error(err.Error())
+		return
+	}
+}
+
 // PollsToResults() coverts the polling objects to a compressed result based on the voting power
 func (s *StateMachine) PollsToResults(polls *types.ActivePolls) (result types.Poll, err lib.ErrorI) {
 	result = make(types.Poll)
 	// create caches to span over multiple
 	accountCache, valList := map[string]uint64{}, map[string]uint64{} // address -> power (tokens)
 	// get the canopy validator set
-	members, err := s.GetCommitteeMembers(lib.CanopyCommitteeId)
+	members, err := s.GetCommitteeMembers(s.Config.ChainId)
 	if err != nil {
-		return
+		// NOTE: sub-chains may have no validators - so not returning an error here
+		return result, nil
 	}
 	// get the supply
 	supply, err := s.GetSupply()

@@ -77,7 +77,7 @@ func TestBeginBlock(t *testing.T) {
 
 func TestEndBlock(t *testing.T) {
 	// generate committee data for testing
-	committeeData := []*types.CommitteeData{
+	committeeData := []*lib.CommitteeData{
 		{
 			CommitteeId:             lib.CanopyCommitteeId,
 			LastChainHeightUpdated:  1,
@@ -110,7 +110,7 @@ func TestEndBlock(t *testing.T) {
 		height                uint64
 		previousProposers     [][]byte
 		committeeRewardAmount uint64
-		committeeData         []*types.CommitteeData
+		committeeData         []*lib.CommitteeData
 		validators            []*types.Validator
 		error                 lib.ErrorI
 	}{

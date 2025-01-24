@@ -6,7 +6,7 @@ import Container from "react-bootstrap/Container";
 import { Button, Card, Carousel, Col, Row, Spinner } from "react-bootstrap";
 import { YAxis, Tooltip, Legend, AreaChart, Area } from "recharts";
 import {
-  adminRPCURL,
+  getAdminRPCURL,
   configPath,
   ConsensusInfo,
   consensusInfoPath,
@@ -103,9 +103,9 @@ export default function Dashboard() {
           },
         ],
         btnSlides: [
-          { url: adminRPCURL + consensusInfoPath, title: "QUORUM" },
-          { url: adminRPCURL + configPath, title: "CONFIG" },
-          { url: adminRPCURL + logsPath, title: "LOGGER" },
+          { url: getAdminRPCURL() + consensusInfoPath, title: "QUORUM" },
+          { url: getAdminRPCURL() + configPath, title: "CONFIG" },
+          { url: getAdminRPCURL() + logsPath, title: "LOGGER" },
         ],
       },
       {
@@ -121,8 +121,8 @@ export default function Dashboard() {
           },
         ],
         btnSlides: [
-          { url: adminRPCURL + peerBookPath, title: "PEER BOOK" },
-          { url: adminRPCURL + peerInfoPath, title: "PEER INFO" },
+          { url: getAdminRPCURL() + peerBookPath, title: "PEER BOOK" },
+          { url: getAdminRPCURL() + peerInfoPath, title: "PEER INFO" },
         ],
       },
     ];

@@ -122,6 +122,7 @@ func (s *Store) NewReadOnly(version uint64) (lib.StoreI, lib.ErrorI) {
 		version: version,
 		log:     s.log,
 		db:      s.db,
+		writer:  reader,
 		ss:      NewTxnWrapper(reader, s.log, stateStorePrefix),
 		sc:      NewDefaultSMT(NewTxnWrapper(reader, s.log, stateCommitmentPrefix)),
 		Indexer: &Indexer{NewTxnWrapper(reader, s.log, indexerPrefix)},

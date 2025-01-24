@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [Unreleased] - 1/24/2024
+- Modified architecture to supported forkable multi-chain 
+- Created 'buy-orders'
+- Fixed polling and proposals
+
 ## [Unrelease] - 1/23/24
 - Add Failure transactions cache
 - Add Simple paginator query with no additional params
@@ -9,6 +14,7 @@
 
 ## [Unreleased] - 1/21/2024
 - Set up prettier for both Wallet and Explorer
+>>>>>>> origin/main
 
 ## [Unreleased] - 1/20/2024
 - Wallet UI fixes

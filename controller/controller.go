@@ -21,23 +21,22 @@ var _ bft.Controller = new(Controller)
 
 // Controller acts as the 'manager' of the modules of the application
 type Controller struct {
-	FSM             *fsm.StateMachine
-	BaseChainInfo   lib.BaseChainInfo
-	RemoteCallbacks lib.RemoteCallbacks
-	Mempool         *Mempool
-	Consensus       *bft.BFT           // the async consensus process between the committee members for the chain
-	isSyncing       *atomic.Bool       // is the chain currently being downloaded from peers
-	P2P             *p2p.P2P           // the P2P module the node uses to connect to the network
-	PublicKey       []byte             // self public key
-	PrivateKey      crypto.PrivateKeyI // self private key
-	CommitteeID     uint64             // the global committee id for this chain
-	Config          lib.Config         // node configuration
-	log             lib.LoggerI        // object for logging
-	sync.Mutex                         // mutex for thread safety
+	FSM           *fsm.StateMachine
+	BaseChainInfo lib.BaseChainInfo
+	Mempool       *Mempool
+	Consensus     *bft.BFT           // the async consensus process between the committee members for the chain
+	isSyncing     *atomic.Bool       // is the chain currently being downloaded from peers
+	P2P           *p2p.P2P           // the P2P module the node uses to connect to the network
+	Address       []byte             // self address
+	PublicKey     []byte             // self public key
+	PrivateKey    crypto.PrivateKeyI // self private key
+	Config        lib.Config         // node configuration
+	log           lib.LoggerI        // object for logging
+	sync.Mutex                       // mutex for thread safety
 }
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
-func New(committeeID uint64, fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (*Controller, lib.ErrorI) {
+func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (*Controller, lib.ErrorI) {
 	// make a convenience variable for the 'height' of the state machine
 	height := fsm.Height()
 	// load maxMembersPerCommittee param to set limits on P2P
@@ -55,24 +54,19 @@ func New(committeeID uint64, fsm *fsm.StateMachine, c lib.Config, valKey crypto.
 	}
 	// create a controller structure
 	controller := &Controller{
-		FSM:         fsm,
-		Mempool:     mempool,
-		isSyncing:   &atomic.Bool{},
-		P2P:         p2p.New(valKey, maxMembersPerCommittee, committeeID, c, l),
-		PublicKey:   valKey.PublicKey().Bytes(),
-		PrivateKey:  valKey,
-		CommitteeID: committeeID,
-		Config:      c,
-		log:         l,
-		Mutex:       sync.Mutex{},
+		FSM:        fsm,
+		Mempool:    mempool,
+		Consensus:  nil,
+		isSyncing:  &atomic.Bool{},
+		P2P:        p2p.New(valKey, maxMembersPerCommittee, c, l),
+		Address:    valKey.PublicKey().Address().Bytes(),
+		PublicKey:  valKey.PublicKey().Bytes(),
+		PrivateKey: valKey,
+		Config:     c,
+		log:        l,
+		Mutex:      sync.Mutex{},
 	}
-	// load the committee from the Canopy state
-	valSet, e := fsm.LoadCommittee(controller.CommitteeID, height)
-	if e != nil {
-		return nil, e // TODO is there a chicken and egg problem here with starting a new committee?
-	}
-	controller.isSyncing = &atomic.Bool{}
-	controller.Consensus, err = bft.New(c, valKey, controller.CommitteeID, height, height-1, valSet, controller, true, l)
+	controller.Consensus, err = bft.New(c, valKey, height, height-1, controller, true, l)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +84,7 @@ func (c *Controller) Start() {
 		t := time.NewTicker(time.Second)
 		defer t.Stop()
 		for range t.C {
-			if c.BaseChainInfo.Height != 0 {
+			if c.BaseChainInfo.GetHeight() != 0 {
 				break
 			}
 		}
@@ -119,6 +113,8 @@ func (c *Controller) Stop() {
 func (c *Controller) UpdateBaseChainInfo(info *lib.BaseChainInfo) {
 	c.Lock()
 	defer c.Unlock()
+	info.RemoteCallbacks = c.BaseChainInfo.RemoteCallbacks
+	info.Log = c.log
 	// update the base-chain info
 	c.BaseChainInfo = *info
 	// signal to reset consensus
@@ -129,15 +125,12 @@ func (c *Controller) UpdateBaseChainInfo(info *lib.BaseChainInfo) {
 
 // LoadCommittee() gets the ValidatorSet that is authorized to come to Consensus agreement on the Proposal for a specific height/committeeId
 func (c *Controller) LoadCommittee(height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	// if loading from expected height
-	if height == c.BaseChainInfo.Height {
-		return lib.NewValidatorSet(c.BaseChainInfo.ValidatorSet.ValidatorSet)
-	}
-	if height == c.BaseChainInfo.Height-1 {
-		return lib.NewValidatorSet(c.BaseChainInfo.LastValidatorSet.ValidatorSet)
-	}
-	c.log.Warnf("Executing remote LoadCommittee call with requested height %d and base-chain height %d", height, c.BaseChainInfo.Height)
-	return c.RemoteCallbacks.ValidatorSet(height, c.CommitteeID)
+	return c.BaseChainInfo.GetValidatorSet(c.Config.ChainId, height)
+}
+
+// LoadBaseChainOrderBook() gets the order book from the base-chain
+func (c *Controller) LoadBaseChainOrderBook(height uint64) (*lib.OrderBook, lib.ErrorI) {
+	return c.BaseChainInfo.GetOrders(height, c.Config.ChainId)
 }
 
 // LoadCertificate() gets the Quorum Block from the committeeID-> plugin at a certain height
@@ -146,19 +139,32 @@ func (c *Controller) LoadCertificate(height uint64) (*lib.QuorumCertificate, lib
 }
 
 // LoadMinimumEvidenceHeight() gets the minimum evidence height from Canopy
-func (c *Controller) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) {
-	return c.BaseChainInfo.MinimumEvidenceHeight, nil
+func (c *Controller) LoadMinimumEvidenceHeight(height uint64) (uint64, lib.ErrorI) {
+	return c.BaseChainInfo.GetMinimumEvidenceHeight(height)
+}
+
+// GetBaseChainLotteryWinner() gets the pseudorandomly selected delegate to reward and their cut
+func (c *Controller) GetBaseChainLotteryWinner(canopyHeight uint64) (winner *lib.LotteryWinner, err lib.ErrorI) {
+	return c.BaseChainInfo.GetLotteryWinner(canopyHeight, c.Config.ChainId)
 }
 
 // IsValidDoubleSigner() Canopy checks if the double signer is valid at a certain height
 func (c *Controller) IsValidDoubleSigner(height uint64, address []byte) bool {
-	c.log.Warnf("Executing remote IsValidDoubleSigner call with requested height %d and address %s", height, lib.BytesToString(address))
-	isValidDoubleSigner, err := c.RemoteCallbacks.IsValidDoubleSigner(height, lib.BytesToString(address))
+	isValidDoubleSigner, err := c.BaseChainInfo.IsValidDoubleSigner(height, lib.BytesToString(address))
 	if err != nil {
-		c.log.Errorf("IsValidDoubleSigner remote call failed with error: %s", err.Error())
+		c.log.Errorf("IsValidDoubleSigner failed with error: %s", err.Error())
 		return false
 	}
 	return *isValidDoubleSigner
+}
+
+// LoadMaxBlockSize() gets the max block size from the state
+func (c *Controller) LoadMaxBlockSize() int {
+	params, _ := c.FSM.GetParamsCons()
+	if params == nil {
+		return 0
+	}
+	return int(params.BlockSize) // TODO add with max header size here... as this param is only enforced at the txn level in other places in the code
 }
 
 // LoadLastCommitTime() gets a timestamp from the most recent Quorum Block
@@ -180,22 +186,22 @@ func (c *Controller) LoadLastCommitTime(height uint64) time.Time {
 }
 
 // LoadProposerKeys() gets the last Base-ChainId proposer keys
-func (c *Controller) LoadLastProposers() *lib.Proposers {
+func (c *Controller) LoadLastProposers(height uint64) (*lib.Proposers, lib.ErrorI) {
 	// return the last proposers from the Base-ChainId
-	return c.BaseChainInfo.LastProposers
+	return c.BaseChainInfo.GetLastProposers(height)
 }
 
 // LoadCommitteeHeightInState() returns the last height the committee submitted a proposal for rewards
-func (c *Controller) LoadCommitteeHeightInState() uint64 {
+func (c *Controller) LoadCommitteeHeightInState(height uint64) (uint64, lib.ErrorI) {
 	// return the committee height
-	return c.BaseChainInfo.LastCanopyHeightUpdated
+	return c.BaseChainInfo.GetLastCanopyHeightUpdated(height, c.Config.ChainId)
 }
 
 // Syncing() returns if any of the supported chains are currently syncing
 func (c *Controller) Syncing() *atomic.Bool { return c.isSyncing }
 
 // BaseChainHeight() returns the height of the canopy base-chain
-func (c *Controller) BaseChainHeight() uint64 { return c.BaseChainInfo.Height }
+func (c *Controller) BaseChainHeight() uint64 { return c.BaseChainInfo.GetHeight() }
 
 // ChainHeight() returns the height of this target chain
 func (c *Controller) ChainHeight() uint64 { return c.FSM.Height() }

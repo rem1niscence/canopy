@@ -33,6 +33,7 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
+	"path"
 )
 
 const (
@@ -81,7 +82,7 @@ const (
 	LastProposersRouteName         = "last-proposers"
 	IsValidDoubleSignerRouteName   = "valid-double-signer"
 	MinimumEvidenceHeightRouteName = "minimum-evidence-height"
-	DelegateLotteryRouteName       = "delegate-lottery"
+	LotteryRouteName               = "lottery"
 	BaseChainInfoRouteName         = "base-chain-info"
 	ValidatorSetRouteName          = "validator-set"
 	// debug
@@ -108,6 +109,7 @@ const (
 	TxCreateOrderRouteName     = "tx-create-order"
 	TxEditOrderRouteName       = "tx-edit-order"
 	TxDeleteOrderRouteName     = "tx-delete-order"
+	TxBuyOrderRouteName        = "tx-buy-order"
 	TxStartPollRouteName       = "tx-start-poll"
 	TxVotePollRouteName        = "tx-vote-poll"
 	ResourceUsageRouteName     = "resource-usage"
@@ -165,7 +167,7 @@ var (
 		LastProposersRouteName:         {Method: http.MethodPost, Path: "/v1/query/last-proposers", HandlerFunc: LastProposers},
 		IsValidDoubleSignerRouteName:   {Method: http.MethodPost, Path: "/v1/query/valid-double-signer", HandlerFunc: IsValidDoubleSigner},
 		MinimumEvidenceHeightRouteName: {Method: http.MethodPost, Path: "/v1/query/minimum-evidence-height", HandlerFunc: MinimumEvidenceHeight},
-		DelegateLotteryRouteName:       {Method: http.MethodPost, Path: "/v1/query/delegate-lottery", HandlerFunc: DelegateLottery},
+		LotteryRouteName:               {Method: http.MethodPost, Path: "/v1/query/lottery", HandlerFunc: Lottery},
 		PendingRouteName:               {Method: http.MethodPost, Path: "/v1/query/pending", HandlerFunc: Pending},
 		FailedTxRouteName:              {Method: http.MethodPost, Path: "/v1/query/failed-txs", HandlerFunc: FailedTxs},
 		ProposalsRouteName:             {Method: http.MethodGet, Path: "/v1/gov/proposals", HandlerFunc: Proposals},
@@ -195,6 +197,7 @@ var (
 		TxCreateOrderRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-create-order", HandlerFunc: TransactionCreateOrder, AdminOnly: true},
 		TxEditOrderRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-edit-order", HandlerFunc: TransactionEditOrder, AdminOnly: true},
 		TxDeleteOrderRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-delete-order", HandlerFunc: TransactionDeleteOrder, AdminOnly: true},
+		TxBuyOrderRouteName:        {Method: http.MethodPost, Path: "/v1/admin/tx-buy-order", HandlerFunc: TransactionBuyOrder, AdminOnly: true},
 		TxSubsidyRouteName:         {Method: http.MethodPost, Path: "/v1/admin/subsidy", HandlerFunc: TransactionSubsidy, AdminOnly: true},
 		TxStartPollRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-start-poll", HandlerFunc: TransactionStartPoll, AdminOnly: true},
 		TxVotePollRouteName:        {Method: http.MethodPost, Path: "/v1/admin/tx-vote-poll", HandlerFunc: TransactionVotePoll, AdminOnly: true},
@@ -222,7 +225,7 @@ const (
 
 func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	cor := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:" + c.WalletPort, "http://localhost:" + c.ExplorerPort},
+		AllowedOrigins: []string{"http://localhost:*"},
 		AllowedMethods: []string{"GET", "OPTIONS", "POST"},
 	})
 	s, timeout := a.FSM.Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
@@ -255,9 +258,15 @@ func PollBaseChainInfo() {
 	// create a rpc client
 	rpcClient := NewClient(conf.BaseChainRPCURL, "", "")
 	// set the apps callbacks
-	app.RemoteCallbacks = lib.RemoteCallbacks{
-		ValidatorSet:        rpcClient.ValidatorSet,
-		IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
+	app.BaseChainInfo.RemoteCallbacks = &lib.RemoteCallbacks{
+		ValidatorSet:          rpcClient.ValidatorSet,
+		IsValidDoubleSigner:   rpcClient.IsValidDoubleSigner,
+		Transaction:           rpcClient.Transaction,
+		LastProposers:         rpcClient.LastProposers,
+		MinimumEvidenceHeight: rpcClient.MinimumEvidenceHeight,
+		CommitteeData:         rpcClient.CommitteeData,
+		Lottery:               rpcClient.Lottery,
+		Orders:                rpcClient.Orders,
 	}
 	// execute the loop every conf.BaseChainPollMS duration
 	ticker := time.NewTicker(time.Duration(conf.BaseChainPollMS) * time.Millisecond)
@@ -280,7 +289,7 @@ func PollBaseChainInfo() {
 		// execute the requests to get the base chain information
 		for retry := lib.NewRetry(conf.BaseChainPollMS, 25); retry.WaitAndDoRetry(); {
 			// retrieve the base-chain info
-			baseChainInfo, e := rpcClient.BaseChainInfo(baseChainHeight, app.CommitteeID)
+			baseChainInfo, e := rpcClient.BaseChainInfo(baseChainHeight, conf.ChainId)
 			if e == nil {
 				// update the controller with new base-chain info
 				app.UpdateBaseChainInfo(baseChainInfo)
@@ -381,7 +390,7 @@ func AddVote(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		return
 	}
 	prop, err := types.NewProposalFromBytes(j.Proposal)
-	if err != nil {
+	if err != nil || prop.GetEndHeight() == 0 {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
@@ -528,7 +537,12 @@ func BaseChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 			return nil, err
 		}
 		// get the delegate lottery winner
-		delegateLotteryWinner, err := s.PseudorandomSelectDelegate(id, crypto.MaxHash[:20])
+		lotteryWinner, err := s.LotteryWinner(id)
+		if err != nil {
+			return nil, err
+		}
+		// get the order book
+		orders, err := s.GetOrderBook(id)
 		if err != nil {
 			return nil, err
 		}
@@ -539,7 +553,8 @@ func BaseChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 			LastProposers:           lastProposers,
 			MinimumEvidenceHeight:   minimumEvidenceHeight,
 			LastCanopyHeightUpdated: committeeData.LastCanopyHeightUpdated,
-			DelegateLotteryWinner:   delegateLotteryWinner,
+			LotteryWinner:           lotteryWinner,
+			Orders:                  orders,
 		}, nil
 	})
 }
@@ -575,7 +590,7 @@ func Orders(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		if err != nil {
 			return nil, err
 		}
-		return &types.OrderBooks{OrderBooks: []*types.OrderBook{b}}, nil
+		return &lib.OrderBooks{OrderBooks: []*lib.OrderBook{b}}, nil
 	})
 }
 
@@ -591,9 +606,9 @@ func MinimumEvidenceHeight(w http.ResponseWriter, r *http.Request, _ httprouter.
 	})
 }
 
-func DelegateLottery(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func Lottery(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
-		return s.PseudorandomSelectDelegate(id, crypto.MaxHash[:20])
+		return s.LotteryWinner(id)
 	})
 }
 
@@ -754,8 +769,37 @@ func TransactionSend(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		if err != nil {
 			return nil, err
 		}
+		if err = GetFeeFromState(w, ptr, types.MessageSendName); err != nil {
+			return nil, err
+		}
 		return types.NewSendTransaction(p, toAddress, ptr.Amount, ptr.Fee, ptr.Memo)
 	})
+}
+
+func GetFeeFromState(w http.ResponseWriter, ptr *txRequest, messageName string, buyOrder ...bool) lib.ErrorI {
+	state, ok := getStateMachineWithHeight(0, w)
+	if !ok {
+		return ErrTimeMachine(fmt.Errorf("getStateMachineWithHeight failed"))
+	}
+	defer state.Discard()
+	minimumFee, err := state.GetFeeForMessageName(messageName)
+	if err != nil {
+		return err
+	}
+	if len(buyOrder) == 1 && buyOrder[0] == true {
+		params, e := state.GetParamsVal()
+		if e != nil {
+			return e
+		}
+		minimumFee *= params.ValidatorBuyOrderFeeMultiplier
+	}
+	if ptr.Fee == 0 {
+		ptr.Fee = minimumFee
+	}
+	if ptr.Fee < minimumFee {
+		return types.ErrTxFeeBelowStateLimit()
+	}
+	return nil
 }
 
 func TransactionStake(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -772,6 +816,9 @@ func TransactionStake(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		if err != nil {
 			return nil, err
 		}
+		if err = GetFeeFromState(w, ptr, types.MessageStakeName); err != nil {
+			return nil, err
+		}
 		return types.NewStakeTx(p, pk.Bytes(), outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal, ptr.Memo)
 	})
 }
@@ -786,24 +833,36 @@ func TransactionEditStake(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if err != nil {
 			return nil, err
 		}
+		if err = GetFeeFromState(w, ptr, types.MessageEditStakeName); err != nil {
+			return nil, err
+		}
 		return types.NewEditStakeTx(p, crypto.NewAddress(ptr.Address), outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.EarlyWithdrawal, ptr.Memo)
 	})
 }
 
 func TransactionUnstake(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		if err := GetFeeFromState(w, ptr, types.MessageUnstakeName); err != nil {
+			return nil, err
+		}
 		return types.NewUnstakeTx(p, crypto.NewAddress(ptr.Address), ptr.Fee, ptr.Memo)
 	})
 }
 
 func TransactionPause(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		if err := GetFeeFromState(w, ptr, types.MessagePauseName); err != nil {
+			return nil, err
+		}
 		return types.NewPauseTx(p, crypto.NewAddress(ptr.Address), ptr.Fee, ptr.Memo)
 	})
 }
 
 func TransactionUnpause(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		if err := GetFeeFromState(w, ptr, types.MessageUnpauseName); err != nil {
+			return nil, err
+		}
 		return types.NewUnpauseTx(p, crypto.NewAddress(ptr.Address), ptr.Fee, ptr.Memo)
 	})
 }
@@ -813,6 +872,9 @@ func TransactionChangeParam(w http.ResponseWriter, r *http.Request, _ httprouter
 		ptr.ParamSpace = types.FormatParamSpace(ptr.ParamSpace)
 		isString, err := types.IsStringParam(ptr.ParamSpace, ptr.ParamKey)
 		if err != nil {
+			return nil, err
+		}
+		if err = GetFeeFromState(w, ptr, types.MessageChangeParameterName); err != nil {
 			return nil, err
 		}
 		if isString {
@@ -829,6 +891,9 @@ func TransactionChangeParam(w http.ResponseWriter, r *http.Request, _ httprouter
 
 func TransactionDAOTransfer(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		if err := GetFeeFromState(w, ptr, types.MessageDAOTransferName); err != nil {
+			return nil, err
+		}
 		return types.NewDAOTransferTx(p, ptr.Amount, ptr.StartBlock, ptr.EndBlock, ptr.Fee, ptr.Memo)
 	})
 }
@@ -838,6 +903,9 @@ func TransactionSubsidy(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 		committeeId := uint64(0)
 		if c, err := StringToCommittees(ptr.Committees); err == nil {
 			committeeId = c[0]
+		}
+		if err := GetFeeFromState(w, ptr, types.MessageSubsidyName); err != nil {
+			return nil, err
 		}
 		return types.NewSubsidyTx(p, ptr.Amount, committeeId, ptr.OpCode, ptr.Fee, ptr.Memo)
 	})
@@ -849,6 +917,9 @@ func TransactionCreateOrder(w http.ResponseWriter, r *http.Request, _ httprouter
 		if c, err := StringToCommittees(ptr.Committees); err == nil {
 			committeeId = c[0]
 		}
+		if err := GetFeeFromState(w, ptr, types.MessageCreateOrderName); err != nil {
+			return nil, err
+		}
 		return types.NewCreateOrderTx(p, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee, ptr.Memo)
 	})
 }
@@ -858,6 +929,9 @@ func TransactionEditOrder(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		committeeId := uint64(0)
 		if c, err := StringToCommittees(ptr.Committees); err == nil {
 			committeeId = c[0]
+		}
+		if err := GetFeeFromState(w, ptr, types.MessageEditOrderName); err != nil {
+			return nil, err
 		}
 		return types.NewEditOrderTx(p, ptr.OrderId, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee, ptr.Memo)
 	})
@@ -869,18 +943,36 @@ func TransactionDeleteOrder(w http.ResponseWriter, r *http.Request, _ httprouter
 		if c, err := StringToCommittees(ptr.Committees); err == nil {
 			committeeId = c[0]
 		}
+		if err := GetFeeFromState(w, ptr, types.MessageDeleteOrderName); err != nil {
+			return nil, err
+		}
 		return types.NewDeleteOrderTx(p, ptr.OrderId, committeeId, ptr.Fee, ptr.Memo)
+	})
+}
+
+func TransactionBuyOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		if err := GetFeeFromState(w, ptr, types.MessageSendName, true); err != nil {
+			return nil, err
+		}
+		return types.NewBuyOrderTx(p, lib.BuyOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, ptr.Fee)
 	})
 }
 
 func TransactionStartPoll(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		if err := GetFeeFromState(w, ptr, types.MessageSendName); err != nil {
+			return nil, err
+		}
 		return types.NewStartPollTransaction(p, ptr.PollJSON, ptr.Fee)
 	})
 }
 
 func TransactionVotePoll(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		if err := GetFeeFromState(w, ptr, types.MessageSendName); err != nil {
+			return nil, err
+		}
 		return types.NewVotePollTransaction(p, ptr.PollJSON, ptr.PollApprove, ptr.Fee)
 	})
 }
@@ -1071,7 +1163,7 @@ func updatePollResults() {
 			}
 			// convert the poll to a result
 			result, err := sm.PollsToResults(p)
-			if err != nil {
+			if err != nil || len(result) == 0 {
 				return
 			}
 			// update the rpc accessible version
@@ -1082,7 +1174,7 @@ func updatePollResults() {
 		}(); err != nil {
 			logger.Error(err.Error())
 		}
-		time.Sleep(time.Minute * 5)
+		time.Sleep(time.Second * 3)
 	}
 }
 
@@ -1103,18 +1195,6 @@ func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey 
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
-	}
-	state, ok := getStateMachineWithHeight(0, w)
-	if !ok {
-		return
-	}
-	if ptr.Fee == 0 {
-		feeParams, e := state.GetParamsFee()
-		if e != nil {
-			write(w, e, http.StatusBadRequest)
-			return
-		}
-		ptr.Fee = feeParams.MessageSendFee
 	}
 	p, err := callback(privateKey, ptr)
 	if err != nil {
@@ -1537,6 +1617,7 @@ func setupStateMachine(height uint64, w http.ResponseWriter) (*fsm.StateMachine,
 	state, err := app.FSM.TimeMachine(height)
 	if err != nil {
 		write(w, ErrTimeMachine(err), http.StatusInternalServerError)
+		return nil, false
 	}
 	return state, true
 }
@@ -1624,10 +1705,52 @@ func runStaticFileServer(fileSys fs.FS, dir, port string) {
 		return
 	}
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.FS(distFS)))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// serve `index.html` with dynamic config injection
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			filePath := path.Join(dir, "index.html")
+			data, e := fileSys.Open(filePath)
+			if e != nil {
+				http.NotFound(w, r)
+				return
+			}
+			defer data.Close()
+
+			htmlBytes, e := fs.ReadFile(fileSys, filePath)
+			if e != nil {
+				http.NotFound(w, r)
+				return
+			}
+
+			// inject the config into the HTML file
+			injectedHTML := injectConfig(string(htmlBytes), conf)
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(injectedHTML))
+			return
+		}
+
+		// Serve other files as-is
+		http.FileServer(http.FS(distFS)).ServeHTTP(w, r)
+	})
 	go func() {
 		logger.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), mux).Error())
 	}()
+}
+
+// injectConfig() injects the config.json into the HTML file
+func injectConfig(html string, config lib.Config) string {
+	script := fmt.Sprintf(`<script>
+		window.__CONFIG__ = {
+            rpcURL: "%s:%s",
+            adminRPCURL: "%s:%s",
+            baseChainRPCURL: "%s",
+            chainId: %d
+        };
+	</script>`, config.RPCUrl, config.RPCPort, config.RPCUrl, config.AdminPort, conf.BaseChainRPCURL, conf.ChainId)
+
+	// inject the script just before </head>
+	return strings.Replace(html, "</head>", script+"</head>", 1)
 }
 
 func logsHandler() httprouter.Handle {

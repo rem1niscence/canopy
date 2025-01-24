@@ -143,6 +143,7 @@ const (
 	CodeHashSize                        ErrorCode = 46
 	CodeInvalidLastQC                   ErrorCode = 47
 	CodeMaxPort                         ErrorCode = 48
+	CodePanic                           ErrorCode = 49
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -220,22 +221,22 @@ const (
 	CodeInvalidSlashRecipients            ErrorCode = 70
 	CodeCanopyHeight                      ErrorCode = 71
 	CodeInvalidQCCommitteeHeight          ErrorCode = 72
-
-	CodeOrderNotFound                   ErrorCode = 74
-	CodeUnauthorizedOrderChange         ErrorCode = 75
-	CodeMinimumOrderSize                ErrorCode = 76
-	CodeOrderAlreadyAccepted            ErrorCode = 77
-	CodeInvalidBuyOrder                 ErrorCode = 78
-	CodeDuplicateBuyOrder               ErrorCode = 79
-	CodeInvalidBuyerDeadline            ErrorCode = 80
-	CodeInvalidCloseOrder               ErrorCode = 81
-	CodeInvalidResetOrder               ErrorCode = 82
-	CodeInvalidCheckpoint               ErrorCode = 83
-	CodeInvalidSellOrder                ErrorCode = 84
-	CodeStartPollHeight                 ErrorCode = 85
-	CodeInvalidDelegatorReward          ErrorCode = 86
-	CodeInvalidNumberOfRewardRecipients ErrorCode = 87
-	CodeInvalidProposerRewardPercent    ErrorCode = 88
+	CodeInvalidOrders                     ErrorCode = 73
+	CodeOrderNotFound                     ErrorCode = 74
+	CodeUnauthorizedOrderChange           ErrorCode = 75
+	CodeMinimumOrderSize                  ErrorCode = 76
+	CodeOrderAlreadyAccepted              ErrorCode = 77
+	CodeInvalidBuyOrder                   ErrorCode = 78
+	CodeDuplicateBuyOrder                 ErrorCode = 79
+	CodeInvalidBuyerDeadline              ErrorCode = 80
+	CodeInvalidCloseOrder                 ErrorCode = 81
+	CodeInvalidResetOrder                 ErrorCode = 82
+	CodeInvalidCheckpoint                 ErrorCode = 83
+	CodeInvalidSellOrder                  ErrorCode = 84
+	CodeStartPollHeight                   ErrorCode = 85
+	CodeInvalidDelegatorReward            ErrorCode = 86
+	CodeInvalidNumberOfRewardRecipients   ErrorCode = 87
+	CodeInvalidProposerRewardPercent      ErrorCode = 88
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -636,4 +637,16 @@ func ErrHashSize() ErrorI {
 
 func ErrMaxPort() ErrorI {
 	return NewError(CodeMaxPort, MainModule, "max port exceeded")
+}
+
+func ErrOrderAlreadyAccepted() ErrorI {
+	return NewError(CodeOrderAlreadyAccepted, StateMachineModule, "order already accepted")
+}
+
+func ErrOrderNotFound(id int) ErrorI {
+	return NewError(CodeOrderNotFound, StateMachineModule, fmt.Sprintf("order with id %d not found", id))
+}
+
+func ErrPanic() ErrorI {
+	return NewError(CodePanic, StateMachineModule, "panic")
 }

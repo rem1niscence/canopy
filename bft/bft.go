@@ -42,7 +42,7 @@ type BFT struct {
 }
 
 // New() creates a new instance of HotstuffBFT for a specific Committee
-func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, canopyHeight, height uint64, vs ValSet,
+func New(c lib.Config, valKey crypto.PrivateKeyI, canopyHeight, height uint64,
 	con Controller, vdfEnabled bool, l lib.LoggerI) (*BFT, lib.ErrorI) {
 	// determine if using a Verifiable Delay Function for long-range-attack protection
 	var vdf *lib.VDFService
@@ -56,11 +56,10 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, canopyHeight, hei
 			Height:       height,
 			CanopyHeight: canopyHeight,
 			NetworkId:    c.NetworkID,
-			CommitteeId:  committeeID,
+			CommitteeId:  c.ChainId,
 		},
-		Votes:        make(VotesForHeight),
-		Proposals:    make(ProposalsForHeight),
-		ValidatorSet: vs,
+		Votes:     make(VotesForHeight),
+		Proposals: make(ProposalsForHeight),
 		ByzantineEvidence: &ByzantineEvidence{
 			DSE: DoubleSignEvidences{},
 		},
@@ -88,6 +87,12 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, committeeID, canopyHeight, hei
 //   - (a) Canopy committeeID <committeeSet changed, reset but keep locks to prevent conflicting validator sets between peers during a view change>
 //   - (b) Target committeeID <mission accomplished, move to next height>
 func (b *BFT) Start() {
+	var err lib.ErrorI
+	// load the committee from the base chain
+	b.ValidatorSet, err = b.Controller.LoadCommittee(b.Controller.BaseChainHeight())
+	if err != nil {
+		b.log.Fatal(err.Error())
+	}
 	for {
 		select {
 		// PHASE TIMEOUT
@@ -191,14 +196,19 @@ func (b *BFT) StartElectionPhase() {
 		b.log.Error(err.Error())
 		return
 	}
+	lastProposers, err := b.LoadLastProposers(b.CanopyHeight)
+	if err != nil {
+		b.log.Error(err.Error())
+		return
+	}
 	// initialize the sortition parameters
 	b.SortitionData = &lib.SortitionData{
-		LastProposerAddresses: b.LoadLastProposers().Addresses, // LastProposers ensures defense against Grinding Attacks
-		Height:                b.Height,                        // height ensures a unique sortition seed for each height
-		Round:                 b.Round,                         // round ensures a unique sortition seed for each round
-		TotalValidators:       b.ValidatorSet.NumValidators,    // validator count is required for CDF
-		TotalPower:            b.ValidatorSet.TotalPower,       // total power between all validators is required for CDF
-		VotingPower:           selfValidator.VotingPower,       // self voting power is required for CDF
+		LastProposerAddresses: lastProposers.Addresses,      // LastProposers ensures defense against Grinding Attacks
+		Height:                b.Height,                     // height ensures a unique sortition seed for each height
+		Round:                 b.Round,                      // round ensures a unique sortition seed for each round
+		TotalValidators:       b.ValidatorSet.NumValidators, // validator count is required for CDF
+		TotalPower:            b.ValidatorSet.TotalPower,    // total power between all validators is required for CDF
+		VotingPower:           selfValidator.VotingPower,    // self voting power is required for CDF
 	}
 	// SORTITION (CDF + VRF)
 	_, vrf, isCandidate := Sortition(&SortitionParams{
@@ -318,7 +328,7 @@ func (b *BFT) StartProposeVotePhase() {
 		DSE: NewDSE(msg.LastDoubleSignEvidence),
 	}
 	// check candidate block against plugin
-	if err := b.ValidateCertificate(msg.Qc, byzantineEvidence); err != nil {
+	if err := b.ValidateProposal(msg.Qc, byzantineEvidence); err != nil {
 		b.log.Error(err.Error())
 		b.RoundInterrupt()
 		return
@@ -773,7 +783,7 @@ type (
 		// ProduceProposal() is a plugin call to produce a Proposal object as a Leader
 		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
 		// ValidateCertificate() is a plugin call to validate a Certificate object as a Replica
-		ValidateCertificate(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
+		ValidateProposal(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
 		// LoadCertificate() gets the Quorum Certificate from the committeeID-> plugin at a certain height
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
 		// GossipBlock() is a P2P call to gossip a completed Quorum Certificate with a Proposal
@@ -791,11 +801,11 @@ type (
 		// LoadCommittee() loads the ValidatorSet operating under CommitteeID
 		LoadCommittee(canopyHeight uint64) (lib.ValidatorSet, lib.ErrorI)
 		// LoadCommitteeHeightInState() loads the last height a committee member executed a Proposal (reward) transaction
-		LoadCommitteeHeightInState() uint64
+		LoadCommitteeHeightInState(canopyHeight uint64) (uint64, lib.ErrorI)
 		// LoadLastProposers() loads the last Canopy committee proposers for sortition data
-		LoadLastProposers() *lib.Proposers
+		LoadLastProposers(canopyHeight uint64) (*lib.Proposers, lib.ErrorI)
 		// LoadMinimumEvidenceHeight() loads the Canopy enforced minimum height for valid Byzantine Evidence
-		LoadMinimumEvidenceHeight() (uint64, lib.ErrorI)
+		LoadMinimumEvidenceHeight(canopyHeight uint64) (uint64, lib.ErrorI)
 		// IsValidDoubleSigner() checks to see if the double signer is valid for this specific height
 		IsValidDoubleSigner(height uint64, address []byte) bool
 	}

@@ -16,11 +16,21 @@ import {
   TxDAOTransfer,
   VotePoll,
 } from "@/components/api";
-import { copy, getFormInputs, objEmpty, onFormSubmit, placeholders, renderToast, withTooltip } from "@/components/util";
+import {
+  copy,
+  formatNumberInput,
+  getFormInputs,
+  objEmpty,
+  onFormSubmit,
+  placeholders,
+  renderToast,
+  sanitizeInput,
+  withTooltip,
+} from "@/components/util";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
-export default function Governance({ account: accountWithTxs }) {
+export default function Governance({ keygroup, account: accountWithTxs, validator }) {
   const [state, setState] = useState({
     txResult: {},
     rawTx: {},
@@ -39,12 +49,25 @@ export default function Governance({ account: accountWithTxs }) {
   // queryAPI() executes the page API calls
   function queryAPI() {
     Promise.all([Poll(), Proposals(), Params(0)]).then((r) => {
-      setState({ ...state, apiResults: { poll: r[0], proposals: r[1], params: r[2] } });
+      setState((prevState) => ({
+        ...prevState,
+        apiResults: {
+          poll: r[0],
+          proposals: r[1],
+          params: r[2],
+        },
+      }));
     });
   }
-
   // execute every 4 seconds
-  useEffect(() => () => clearInterval(setInterval(() => queryAPI(), 4000)), []);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      queryAPI();
+    }, 4000);
+
+    // cleanup: clear the interval when the component unmounts
+    return () => clearInterval(interval);
+  }, []);
   // set spinner if loading
   if (objEmpty(state.apiResults)) return queryAPI(), (<Spinner id="spinner" />);
   // set placeholders
@@ -336,65 +359,68 @@ export default function Governance({ account: accountWithTxs }) {
               <Modal.Title>{state.txPropType === 0 ? "Change Parameter" : "Treasury Subsidy"}</Modal.Title>
             </Modal.Header>
             <Modal.Body style={{ overflowWrap: "break-word" }}>
-              {getFormInputs(state.txPropType === 0 ? "change-param" : "dao-transfer", accountWithTxs.account).map(
-                (v, i) => {
-                  let show = objEmpty(state.txResult) ? "" : "none",
-                    onChange = (e) => setState({ ...state, paramSpace: e.target.value });
-                  if (v.type === "select") {
-                    switch (v.label) {
-                      case "param_key":
-                        let paramKeys = [],
-                          ps = state.apiResults.params[state.paramSpace];
-                        if (ps) {
-                          paramKeys = Object.keys(ps);
-                        }
-                        return (
-                          <InputGroup style={{ display: show }} key={i} className="mb-3" size="lg">
-                            <Form.Select size="lg" aria-label={v.label}>
-                              <option>param key</option>
-                              {paramKeys.map((v, i) => (
-                                <option key={i} value={v}>
-                                  {v}
-                                </option>
-                              ))}
-                            </Form.Select>
-                          </InputGroup>
-                        );
-                      case "param_space":
-                        return (
-                          <InputGroup style={{ display: show }} key={i} className="mb-3" size="lg">
-                            <Form.Select size="lg" onChange={onChange} aria-label={v.label}>
-                              <option>param space</option>
-                              <option value="Consensus">consensus</option>
-                              <option value="Validator">validator</option>
-                              <option value="Governance">governance</option>
-                              <option value="Fee">fee</option>
-                            </Form.Select>
-                          </InputGroup>
-                        );
-                    }
+              {getFormInputs(
+                state.txPropType === 0 ? "change-param" : "dao-transfer",
+                keygroup,
+                accountWithTxs.account,
+                validator,
+              ).map((v, i) => {
+                let show = objEmpty(state.txResult) ? "" : "none",
+                  onChange = (e) => setState({ ...state, paramSpace: e.target.value });
+                if (v.type === "select") {
+                  switch (v.label) {
+                    case "param_key":
+                      let paramKeys = [],
+                        ps = state.apiResults.params[state.paramSpace];
+                      if (ps) {
+                        paramKeys = Object.keys(ps);
+                      }
+                      return (
+                        <InputGroup style={{ display: show }} key={i} className="mb-3" size="lg">
+                          <Form.Select size="lg" aria-label={v.label}>
+                            <option>param key</option>
+                            {paramKeys.map((v, i) => (
+                              <option key={i} value={v}>
+                                {v}
+                              </option>
+                            ))}
+                          </Form.Select>
+                        </InputGroup>
+                      );
+                    case "param_space":
+                      return (
+                        <InputGroup style={{ display: show }} key={i} className="mb-3" size="lg">
+                          <Form.Select size="lg" onChange={onChange} aria-label={v.label}>
+                            <option>param space</option>
+                            <option value="Consensus">consensus</option>
+                            <option value="Validator">validator</option>
+                            <option value="Governance">governance</option>
+                            <option value="Fee">fee</option>
+                          </Form.Select>
+                        </InputGroup>
+                      );
                   }
-                  return (
-                    <InputGroup style={{ display: show }} key={i} className="mb-3" size="lg">
-                      {withTooltip(
-                        <InputGroup.Text className="param-input">{v.inputText}</InputGroup.Text>,
-                        v.tooltip,
-                        i,
-                      )}
-                      <Form.Control
-                        placeholder={v.placeholder}
-                        required={v.required}
-                        defaultValue={v.defaultValue}
-                        type={v.type}
-                        min={0}
-                        minLength={v.minLength}
-                        maxLength={v.maxLength}
-                        aria-label={v.label}
-                      />
-                    </InputGroup>
-                  );
-                },
-              )}
+                }
+                return (
+                  <InputGroup style={{ display: show }} key={i} className="mb-3" size="lg">
+                    {withTooltip(
+                      <InputGroup.Text className="param-input">{v.inputText}</InputGroup.Text>,
+                      v.tooltip,
+                      i,
+                    )}
+                    <Form.Control
+                      placeholder={v.placeholder}
+                      required={v.required}
+                      defaultValue={v.defaultValue}
+                      type={v.type}
+                      min={0}
+                      minLength={v.minLength}
+                      maxLength={v.maxLength}
+                      aria-label={v.label}
+                    />
+                  </InputGroup>
+                );
+              })}
               {renderJSONViewer()}
             </Modal.Body>
             <Modal.Footer>{renderButtons()}</Modal.Footer>

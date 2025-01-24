@@ -1,5 +1,20 @@
-export const rpcURL = "http://127.0.0.1:50002";
-export const adminRPCURL = "http://127.0.0.1:50003";
+let rpcURL = "http://127.0.0.1:50002"; // default RPC URL
+let adminRPCURL = "http://127.0.0.1:50003"; // default Admin RPC URL
+let baseChainRPCURL = rpcURL; // default BaseChain RPC URL
+let chainId = 1; // default chain id
+
+if (typeof window !== "undefined" && window.__CONFIG__) {
+  rpcURL = window.__CONFIG__.rpcURL;
+  adminRPCURL = window.__CONFIG__.adminRPCURL;
+  baseChainRPCURL = window.__CONFIG__.baseChainRPCURL;
+  chainId = Number(window.__CONFIG__.chainId);
+} else {
+  console.log("config undefined");
+}
+
+export function getAdminRPCURL() {
+  return adminRPCURL;
+}
 
 const keystorePath = "/v1/admin/keystore";
 const keystoreGetPath = "/v1/admin/keystore-get";
@@ -16,6 +31,7 @@ const txUnpausePath = "/v1/admin/tx-unpause";
 const txChangeParamPath = "/v1/admin/tx-change-param";
 const txDaoTransfer = "/v1/admin/tx-dao-transfer";
 const txCreateOrder = "/v1/admin/tx-create-order";
+const txBuyOrder = "/v1/admin/tx-buy-order";
 const txEditOrder = "/v1/admin/tx-edit-order";
 const txDeleteOrder = "/v1/admin/tx-delete-order";
 const txStartPoll = "/v1/admin/tx-start-poll";
@@ -34,6 +50,7 @@ const proposalsPath = "/v1/gov/proposals";
 const addVotePath = "/v1/gov/add-vote";
 const delVotePath = "/v1/gov/del-vote";
 const paramsPath = "/v1/query/params";
+const orderPath = "/v1/query/order";
 const txPath = "/v1/tx";
 
 export async function GET(url, path) {
@@ -129,7 +146,7 @@ function newTxRequest(
   });
 }
 
-function newSwapTxRequest(
+function newSellOrderTxRequest(
   address,
   committeeId,
   orderId,
@@ -149,6 +166,17 @@ function newSwapTxRequest(
     receiveAmount: receiveAmount,
     receiveAddress: receiveAddress,
     memo: memo,
+    fee: fee,
+    submit: submit,
+    password: password,
+  });
+}
+
+function newBuyOrderTxRequest(address, receiveAddress, orderId, fee, submit, password) {
+  return JSON.stringify({
+    address: address,
+    receiveAddress: receiveAddress,
+    orderId: orderId,
     fee: fee,
     submit: submit,
     password: password,
@@ -452,7 +480,7 @@ export async function TxCreateOrder(
   return POST(
     adminRPCURL,
     txCreateOrder,
-    newSwapTxRequest(
+    newSellOrderTxRequest(
       address,
       committeeId,
       0,
@@ -464,6 +492,14 @@ export async function TxCreateOrder(
       submit,
       password,
     ),
+  );
+}
+
+export async function TxBuyOrder(address, receiveAddress, orderId, fee, password, submit) {
+  return POST(
+    adminRPCURL,
+    txBuyOrder,
+    newBuyOrderTxRequest(address, receiveAddress, Number(orderId), Number(fee), submit, password),
   );
 }
 
@@ -482,7 +518,7 @@ export async function TxEditOrder(
   return POST(
     adminRPCURL,
     txEditOrder,
-    newSwapTxRequest(
+    newSellOrderTxRequest(
       address,
       committeeId,
       Number(orderId),
@@ -501,7 +537,7 @@ export async function TxDeleteOrder(address, committeeId, orderId, memo, fee, pa
   return POST(
     adminRPCURL,
     txDeleteOrder,
-    newSwapTxRequest(address, committeeId, Number(orderId), 0, 0, "", memo, Number(fee), submit, password),
+    newSellOrderTxRequest(address, committeeId, Number(orderId), 0, 0, "", memo, Number(fee), submit, password),
   );
 }
 

@@ -38,7 +38,7 @@ export default function Home() {
             if (state.navIdx === 0) {
               return <Accounts keygroup={Object.values(state.keystore)[state.keyIdx]} {...state} />;
             } else if (state.navIdx === 1) {
-              return <Governance {...state} />;
+              return <Governance keygroup={Object.values(state.keystore)[state.keyIdx]} {...state} />;
             } else {
               return <Dashboard />;
             }

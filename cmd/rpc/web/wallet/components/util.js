@@ -32,9 +32,9 @@ export function getFormInputs(type, keyGroup, account, validator) {
       maxLength: 128,
     },
     address: {
-      placeholder: "short public key of the node",
+      placeholder: "the unique id of the account",
       defaultValue: address,
-      tooltip: "the short public key id of the transaction",
+      tooltip: "the short public key id of the account",
       label: "sender",
       inputText: "address",
       feedback: "please choose an address to send the transaction from",
@@ -168,6 +168,17 @@ export function getFormInputs(type, keyGroup, account, validator) {
       label: "receiveAddress",
       inputText: "rec-addr",
       feedback: "please choose an address to receive the counter asset to",
+      required: true,
+      type: "text",
+      minLength: 40,
+      maxLength: 40,
+    },
+    buyersReceiveAddress: {
+      placeholder: "the canopy address where CNPY will be received",
+      tooltip: "the sender of the transaction",
+      label: "receiveAddress",
+      inputText: "rec-addr",
+      feedback: "please choose an address to receive the CNPY",
       required: true,
       type: "text",
       minLength: 40,
@@ -312,6 +323,8 @@ export function getFormInputs(type, keyGroup, account, validator) {
       ];
     case "create_order":
       return [a.address, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password];
+    case "buy_order":
+      return [a.address, a.buyersReceiveAddress, a.orderId, a.fee, a.password];
     case "edit_order":
       return [
         a.address,

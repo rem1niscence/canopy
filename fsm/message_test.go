@@ -255,7 +255,7 @@ func TestHandleMessage(t *testing.T) {
 				AmountForSale:        amount,
 				RequestedAmount:      1000,
 				SellerReceiveAddress: newTestPublicKeyBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			validate: func(sm StateMachine) {
 				// ensure the account was subtracted from
@@ -288,12 +288,12 @@ func TestHandleMessage(t *testing.T) {
 				// add to the pool
 				require.NoError(t, sm.PoolAdd(lib.CanopyCommitteeId+types.EscrowPoolAddend, amount))
 				// save the order in state
-				_, err = sm.CreateOrder(&types.SellOrder{
+				_, err = sm.CreateOrder(&lib.SellOrder{
 					Committee:            lib.CanopyCommitteeId,
 					AmountForSale:        amount,
 					RequestedAmount:      1000,
 					SellerReceiveAddress: newTestPublicKeyBytes(t),
-					SellersSellAddress:   newTestAddressBytes(t),
+					SellersSendAddress:   newTestAddressBytes(t),
 				}, lib.CanopyCommitteeId)
 				require.NoError(t, err)
 			},
@@ -326,12 +326,12 @@ func TestHandleMessage(t *testing.T) {
 				// add to the pool
 				require.NoError(t, sm.PoolAdd(lib.CanopyCommitteeId+types.EscrowPoolAddend, amount))
 				// save the order in state
-				_, err = sm.CreateOrder(&types.SellOrder{
+				_, err = sm.CreateOrder(&lib.SellOrder{
 					Committee:            lib.CanopyCommitteeId,
 					AmountForSale:        amount,
 					RequestedAmount:      1000,
 					SellerReceiveAddress: newTestPublicKeyBytes(t),
-					SellersSellAddress:   newTestAddressBytes(t),
+					SellersSendAddress:   newTestAddressBytes(t),
 				}, lib.CanopyCommitteeId)
 				require.NoError(t, err)
 			},
@@ -551,7 +551,7 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 		}, {
 			name:     "msg create order",
 			detail:   "retrieves the authorized signers for message create order",
-			msg:      &types.MessageCreateOrder{CommitteeId: lib.CanopyCommitteeId, SellersSellAddress: newTestAddressBytes(t)},
+			msg:      &types.MessageCreateOrder{CommitteeId: lib.CanopyCommitteeId, SellersSendAddress: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg edit order",
@@ -591,9 +591,9 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 			// preset a committee member
 			require.NoError(t, sm.SetCommitteeMember(newTestAddress(t), lib.CanopyCommitteeId, 100))
 			// preset an order
-			_, err := sm.CreateOrder(&types.SellOrder{
+			_, err := sm.CreateOrder(&lib.SellOrder{
 				Committee:          lib.CanopyCommitteeId,
-				SellersSellAddress: newTestAddressBytes(t),
+				SellersSendAddress: newTestAddressBytes(t),
 			}, lib.CanopyCommitteeId)
 			require.NoError(t, err)
 			// execute function call
@@ -1891,8 +1891,8 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 		error                  string
 	}{
 		{
-			name:                   "non subsidized committee",
-			detail:                 "the committee is not subsidized",
+			name:                   "canopy committee",
+			detail:                 "the canopy committee tries to send a certificate results transaction",
 			nonSubsidizedCommittee: true,
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
@@ -1901,19 +1901,20 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 					CommitteeId:  lib.CanopyCommitteeId,
 				},
 			}},
-			error: "non subsidized committee",
+			error: "invalid certificate results",
 		},
 		{
-			name:   "older committee height",
-			detail: "a committee height that is LTE state machine height - 2",
+			name:                   "non subsidized committee",
+			detail:                 "the committee is not subsidized",
+			nonSubsidizedCommittee: true,
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
 					Height:       1,
-					CanopyHeight: 0,
-					CommitteeId:  lib.CanopyCommitteeId,
+					CanopyHeight: 3,
+					CommitteeId:  lib.CanopyCommitteeId + 1,
 				},
 			}},
-			error: "invalid certificate committee height",
+			error: "non subsidized committee",
 		},
 		{
 			name:               "no committee members exist for that id",
@@ -1923,7 +1924,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				Header: &lib.View{
 					Height:       1,
 					CanopyHeight: 3,
-					CommitteeId:  lib.CanopyCommitteeId,
+					CommitteeId:  lib.CanopyCommitteeId + 1,
 				},
 			}},
 			error: "there are no validators in the set",
@@ -1936,7 +1937,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				Header: &lib.View{
 					Height:       1,
 					CanopyHeight: 3,
-					CommitteeId:  lib.CanopyCommitteeId,
+					CommitteeId:  lib.CanopyCommitteeId + 1,
 				},
 			}},
 			error: "there are no validators in the set",
@@ -1948,7 +1949,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				Header: &lib.View{
 					Height:       1,
 					CanopyHeight: 2,
-					CommitteeId:  lib.CanopyCommitteeId,
+					CommitteeId:  lib.CanopyCommitteeId + 1,
 				},
 			}},
 			error: "empty quorum certificate",
@@ -1960,7 +1961,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				Header: &lib.View{
 					Height:       1,
 					CanopyHeight: 3,
-					CommitteeId:  lib.CanopyCommitteeId,
+					CommitteeId:  lib.CanopyCommitteeId + 1,
 				},
 				Results:     certificateResults,
 				ResultsHash: certificateResults.Hash(),
@@ -1988,16 +1989,16 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 						Address:      newTestAddressBytes(t, i),
 						PublicKey:    newTestPublicKeyBytes(t, i),
 						StakedAmount: 100,
-						Committees:   []uint64{lib.CanopyCommitteeId},
+						Committees:   []uint64{lib.CanopyCommitteeId + 1},
 					}}, supply))
 					// set the committee member
-					require.NoError(t, sm.SetCommitteeMember(newTestAddress(t, i), lib.CanopyCommitteeId, 100))
+					require.NoError(t, sm.SetCommitteeMember(newTestAddress(t, i), lib.CanopyCommitteeId+1, 100))
 				}
 				// set the supply in state
 				require.NoError(t, sm.SetSupply(supply))
 				// create an aggregate signature
 				// get the committee members
-				committee, err := sm.GetCommitteeMembers(lib.CanopyCommitteeId, true)
+				committee, err := sm.GetCommitteeMembers(lib.CanopyCommitteeId+1, true)
 				require.NoError(t, err)
 				// create a copy of the multikey
 				mk := committee.MultiKey.Copy()
@@ -2037,12 +2038,12 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 					buyerAddress = newTestAddressBytes(t)
 				}
 				// upsert each order in state
-				_, err := sm.CreateOrder(&types.SellOrder{
-					Committee:           lib.CanopyCommitteeId,
+				_, err := sm.CreateOrder(&lib.SellOrder{
+					Committee:           lib.CanopyCommitteeId + 1,
 					BuyerReceiveAddress: buyerAddress,
 					BuyerChainDeadline:  0,
-					SellersSellAddress:  newTestAddressBytes(t),
-				}, lib.CanopyCommitteeId)
+					SellersSendAddress:  newTestAddressBytes(t),
+				}, lib.CanopyCommitteeId+1)
 				// ensure no error
 				require.NoError(t, err)
 			}
@@ -2056,7 +2057,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			}
 			// 1) validate the 'buy order'
 			func() {
-				order, e := sm.GetOrder(0, lib.CanopyCommitteeId)
+				order, e := sm.GetOrder(0, lib.CanopyCommitteeId+1)
 				require.NoError(t, e)
 				// convenience variable for buy order
 				buyOrder := test.msg.Qc.Results.Orders.BuyOrders[0]
@@ -2067,7 +2068,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			}()
 			// 2) validate the 'reset order'
 			func() {
-				order, e := sm.GetOrder(1, lib.CanopyCommitteeId)
+				order, e := sm.GetOrder(1, lib.CanopyCommitteeId+1)
 				require.NoError(t, e)
 				// validate the receipt address was reset
 				require.Len(t, order.BuyerReceiveAddress, 0)
@@ -2077,7 +2078,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 
 			// 3) validate the 'close order'
 			func() {
-				_, err = sm.GetOrder(2, lib.CanopyCommitteeId)
+				_, err = sm.GetOrder(2, lib.CanopyCommitteeId+1)
 				require.ErrorContains(t, err, "order with id 2 not found")
 			}()
 
@@ -2086,7 +2087,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				// define convenience variable for checkpoint
 				expected := test.msg.Qc.Results.Checkpoint
 				// get the checkpoint
-				got, e := sm.store.(lib.StoreI).GetCheckpoint(lib.CanopyCommitteeId, expected.Height)
+				got, e := sm.store.(lib.StoreI).GetCheckpoint(lib.CanopyCommitteeId+1, expected.Height)
 				require.NoError(t, e)
 				// check got vs expected
 				require.Equal(t, expected.BlockHash, got)
@@ -2094,7 +2095,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 
 			// 5) validate the 'committee data'
 			func() {
-				committeeData, e := sm.GetCommitteeData(lib.CanopyCommitteeId)
+				committeeData, e := sm.GetCommitteeData(lib.CanopyCommitteeId + 1)
 				require.NoError(t, e)
 				// validate the committee height was properly set
 				require.Equal(t, test.msg.Qc.Header.CanopyHeight, committeeData.LastCanopyHeightUpdated)
@@ -2206,7 +2207,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				AmountForSale:        1,
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			error: "minimum order size",
 		},
@@ -2219,7 +2220,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				AmountForSale:        1,
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			error: "insufficient funds",
 		},
@@ -2233,7 +2234,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				AmountForSale:        1,
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 		},
 	}
@@ -2242,7 +2243,7 @@ func TestMessageCreateOrder(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
 			// define an address variable for convenience
-			address := crypto.NewAddress(test.msg.SellersSellAddress)
+			address := crypto.NewAddress(test.msg.SellersSendAddress)
 			// preset the minimum order size
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
@@ -2274,12 +2275,12 @@ func TestMessageCreateOrder(t *testing.T) {
 			order, err := sm.GetOrder(0, test.msg.CommitteeId)
 			require.NoError(t, err)
 			// validate the creation of the order
-			require.EqualExportedValues(t, &types.SellOrder{
+			require.EqualExportedValues(t, &lib.SellOrder{
 				Committee:            test.msg.CommitteeId,
 				AmountForSale:        test.msg.AmountForSale,
 				RequestedAmount:      test.msg.RequestedAmount,
 				SellerReceiveAddress: test.msg.SellerReceiveAddress,
-				SellersSellAddress:   test.msg.SellersSellAddress,
+				SellersSendAddress:   test.msg.SellersSendAddress,
 			}, order)
 		})
 	}
@@ -2291,9 +2292,9 @@ func TestHandleMessageEditOrder(t *testing.T) {
 		detail           string
 		presetAccount    uint64
 		minimumOrderSize uint64
-		preset           *types.SellOrder
+		preset           *lib.SellOrder
 		msg              *types.MessageEditOrder
-		expected         *types.SellOrder
+		expected         *lib.SellOrder
 		error            string
 	}{
 		{
@@ -2311,7 +2312,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 		{
 			name:   "order already accepted",
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
@@ -2319,7 +2320,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellerReceiveAddress: newTestAddressBytes(t),
 				BuyerReceiveAddress:  newTestAddressBytes(t, 1), // signals a buyer
 				BuyerChainDeadline:   100,                       // signals a buyer
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2334,13 +2335,13 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			name:             "minimum order size",
 			detail:           "the edited order does not satisfy the minimum order size",
 			minimumOrderSize: 2,
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2353,13 +2354,13 @@ func TestHandleMessageEditOrder(t *testing.T) {
 		}, {
 			name:   "insufficient funds",
 			detail: "the account does not have the balance to cover the edit",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2373,13 +2374,13 @@ func TestHandleMessageEditOrder(t *testing.T) {
 		{
 			name:   "edit receive address",
 			detail: "the order simply updates the receive address but the amount stays the same",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2388,12 +2389,12 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
-			expected: &types.SellOrder{
+			expected: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 		},
 		{
@@ -2401,13 +2402,13 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			detail:           "the order has a increased the sell amount",
 			presetAccount:    1,
 			minimumOrderSize: 0,
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2416,24 +2417,24 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
-			expected: &types.SellOrder{
+			expected: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        2,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 		},
 		{
 			name:   "decrease sell amount",
 			detail: "the order has a decreased the sell amount",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
@@ -2442,12 +2443,12 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
-			expected: &types.SellOrder{
+			expected: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 		},
 	}
@@ -2458,7 +2459,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// define an address variable for convenience
 			if test.preset != nil {
-				address = crypto.NewAddress(test.preset.SellersSellAddress)
+				address = crypto.NewAddress(test.preset.SellersSendAddress)
 				// preset the minimum order size
 				valParams, err := sm.GetParamsVal()
 				require.NoError(t, err)
@@ -2510,7 +2511,7 @@ func TestHandleMessageDelete(t *testing.T) {
 		name          string
 		detail        string
 		presetAccount uint64
-		preset        *types.SellOrder
+		preset        *lib.SellOrder
 		msg           *types.MessageDeleteOrder
 		error         string
 	}{
@@ -2526,7 +2527,7 @@ func TestHandleMessageDelete(t *testing.T) {
 		{
 			name:   "order already accepted",
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        1,
@@ -2534,7 +2535,7 @@ func TestHandleMessageDelete(t *testing.T) {
 				SellerReceiveAddress: newTestAddressBytes(t),
 				BuyerReceiveAddress:  newTestAddressBytes(t, 1), // signals a buyer
 				BuyerChainDeadline:   100,                       // signals a buyer
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageDeleteOrder{
 				OrderId:     0,
@@ -2545,13 +2546,13 @@ func TestHandleMessageDelete(t *testing.T) {
 		{
 			name:   "successful delete",
 			detail: "the order delete was successful",
-			preset: &types.SellOrder{
+			preset: &lib.SellOrder{
 				Id:                   0,
 				Committee:            lib.CanopyCommitteeId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSellAddress:   newTestAddressBytes(t),
+				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageDeleteOrder{
 				OrderId:     0,
@@ -2566,7 +2567,7 @@ func TestHandleMessageDelete(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// define an address variable for convenience
 			if test.preset != nil {
-				address = crypto.NewAddress(test.preset.SellersSellAddress)
+				address = crypto.NewAddress(test.preset.SellersSendAddress)
 				// preset the account with tokens
 				require.NoError(t, sm.AccountAdd(address, test.presetAccount))
 				// get the proper order book

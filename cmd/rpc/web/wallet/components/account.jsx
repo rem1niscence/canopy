@@ -1,23 +1,12 @@
 import { useState } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
-import {
-  Button,
-  Card,
-  Col,
-  Form,
-  InputGroup,
-  Modal,
-  Row,
-  Table,
-  ToastContainer,
-  Toast,
-  Spinner,
-} from "react-bootstrap";
+import { Button, Card, Col, Form, InputGroup, Modal, Row, Table, Spinner } from "react-bootstrap";
 import {
   KeystoreGet,
   KeystoreImport,
   KeystoreNew,
+  TxBuyOrder,
   TxCreateOrder,
   TxDeleteOrder,
   TxEditOrder,
@@ -51,6 +40,7 @@ const transactionButtons = [
   { title: "PAUSE", name: "pause", src: "pause" },
   { title: "PLAY", name: "unpause", src: "unpause" },
   { title: "SWAP", name: "create_order", src: "swap" },
+  { title: "LOCK", name: "buy_order", src: "buy" },
   { title: "REPRICE", name: "edit_order", src: "edit_order" },
   { title: "VOID", name: "delete_order", src: "delete_order" },
 ];
@@ -190,6 +180,7 @@ export default function Accounts({ keygroup, account, validator }) {
             r.password,
             submit,
           ),
+        buy_order: () => TxBuyOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), r.fee, r.password, submit),
         edit_order: () =>
           TxEditOrder(
             r.sender,

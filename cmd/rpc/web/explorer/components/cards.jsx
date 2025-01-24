@@ -8,6 +8,9 @@ const cardTitles = ["Latest Block", "Supply", "Transactions", "Validators"];
 // getCardHeader() returns the header information for the card
 function getCardHeader(props, idx) {
   const blks = props.blocks;
+  if (blks.results.length === 0) {
+    return "Loading";
+  }
   switch (idx) {
     case 0:
       return convertNumber(blks.results[0].block_header.height);
@@ -20,6 +23,9 @@ function getCardHeader(props, idx) {
       return "+" + convertNumber(blks.results[0].block_header.num_txs);
     case 3:
       let totalStake = 0;
+      if (!props.canopyCommittee.results) {
+        return 0;
+      }
       props.canopyCommittee.results.forEach(function (validator) {
         totalStake += Number(validator.staked_amount);
       });
@@ -35,6 +41,9 @@ function getCardHeader(props, idx) {
 // getCardSubHeader() returns the sub header of the card (right below the header)
 function getCardSubHeader(props, idx) {
   const v = props.blocks;
+  if (v.results.length === 0) {
+    return "Loading";
+  }
   switch (idx) {
     case 0:
       return convertTime(v.results[0].block_header.time);
@@ -43,6 +52,9 @@ function getCardSubHeader(props, idx) {
     case 2:
       return "blk size: " + convertBytes(v.results[0].meta.size);
     case 3:
+      if (!props.canopyCommittee.results) {
+        return 0 + " unique vals";
+      }
       return props.canopyCommittee.results.length + " unique vals";
   }
 }
@@ -50,6 +62,9 @@ function getCardSubHeader(props, idx) {
 // getCardRightAligned() returns the data for the right aligned note
 function getCardRightAligned(props, idx) {
   const v = props.blocks;
+  if (v.results.length === 0) {
+    return "Loading";
+  }
   switch (idx) {
     case 0:
       return v.results[0].meta.took;
@@ -69,6 +84,9 @@ function getCardRightAligned(props, idx) {
 // getCardNote() returns the data for the small text above the footer
 function getCardNote(props, idx) {
   const v = props.blocks;
+  if (v.results.length === 0) {
+    return "Loading";
+  }
   switch (idx) {
     case 0:
       return (
@@ -81,6 +99,9 @@ function getCardNote(props, idx) {
     case 2:
       return "TOTAL " + convertNumber(v.results[0].block_header.total_txs);
     case 3:
+      if (!props.canopyCommittee.results) {
+        return "MaxStake: " + 0;
+      }
       return "MaxStake: " + convertNumber(props.canopyCommittee.results[0].staked_amount, 1000);
     default:
       return "?";
@@ -90,6 +111,9 @@ function getCardNote(props, idx) {
 // getCardFooter() returns the data for the footer of the card
 function getCardFooter(props, idx) {
   const v = props.blocks;
+  if (v.results.length === 0) {
+    return "Loading";
+  }
   switch (idx) {
     case 0:
       return "Next block: " + addDate(v.results[0].block_header.time, v.results[0].meta.took);
@@ -111,10 +135,13 @@ function getCardFooter(props, idx) {
       return "Average fee in last blk: " + convertNumber(totalFee / txs.length, 1000000);
     case 3:
       let totalStake = 0;
+      if (!props.canopyCommittee.results) {
+        return 0 + "% in validator set";
+      }
       props.canopyCommittee.results.forEach(function (validator) {
         totalStake += Number(validator.staked_amount);
       });
-      return ((totalStake / props.supply.staked) * 100).toFixed(1) + "% in canopy committee";
+      return ((totalStake / props.supply.staked) * 100).toFixed(1) + "% in validator set";
   }
 }
 
