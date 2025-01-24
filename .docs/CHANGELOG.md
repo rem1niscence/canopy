@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [Unreleased] - 1/24/2024
+- Modified architecture to supported forkable multi-chain 
+- Created 'buy-orders'
+- Fixed polling and proposals
+
 ## [Unreleased] - 1/20/2024
 - Wallet UI fixes
 - Added wallet text input sanitizaiton
