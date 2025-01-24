@@ -5,9 +5,20 @@
 - Created 'buy-orders'
 - Fixed polling and proposals
 
+## [Unrelease] - 1/23/24
+- Add Failure transactions cache
+- Add Simple paginator query with no additional params
+- Implement Failure transactions endpoint
+- Display failed user transactions in the wallet
+- Fix Wallet Bug on number input
+
+## [Unreleased] - 1/21/2024
+- Set up prettier for both Wallet and Explorer
+>>>>>>> origin/main
+
 ## [Unreleased] - 1/20/2024
 - Wallet UI fixes
-- Added wallet text input sanitizaiton
+- Added wallet text input sanitization
 - Added wallet number input formatting 
 
 ## [Unreleased] - 1/19/2024

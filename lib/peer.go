@@ -3,12 +3,13 @@ package lib
 import (
 	"container/list"
 	"encoding/json"
-	"github.com/canopy-network/canopy/lib/crypto"
-	"google.golang.org/protobuf/proto"
 	"net/url"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/canopy-network/canopy/lib/crypto"
+	"google.golang.org/protobuf/proto"
 )
 
 // MESSAGE CODE BELOW

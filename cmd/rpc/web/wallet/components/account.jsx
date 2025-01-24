@@ -393,7 +393,7 @@ export default function Accounts({ keygroup, account, validator }) {
         <Table className="table-fixed" bordered hover style={{ marginTop: "10px" }}>
           <thead>
             <tr>
-              {["Height", "Amount", "Recipient", "Type", "Hash"].map((k, i) => (
+              {["Height", "Amount", "Recipient", "Type", "Hash", "Status"].map((k, i) => (
                 <th key={i}>{k}</th>
               ))}
             </tr>
@@ -401,11 +401,12 @@ export default function Accounts({ keygroup, account, validator }) {
           <tbody>
             {account.combined.slice(0, 5).map((v, i) => (
               <tr key={i}>
-                <td>{v.height}</td>
+                <td>{v.height || "N/A"}</td>
                 <td>{v.transaction.msg.amount ?? v.transaction.msg.AmountForSale ?? "N/A"}</td>
-                {renderAccSumTabCol(v.recipient ?? v.sender, i)}
-                <td>{v.message_type}</td>
-                {renderAccSumTabCol(v.tx_hash, i)}
+                {renderAccSumTabCol(v.recipient ?? v.sender ?? v.address, i)}
+                <td>{v.message_type || v.transaction.type}</td>
+                {renderAccSumTabCol(v.tx_hash, i + 1)}
+                <td>{v.status ?? ""}</td>
               </tr>
             ))}
           </tbody>

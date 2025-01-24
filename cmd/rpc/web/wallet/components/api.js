@@ -44,6 +44,7 @@ const accountPath = "/v1/query/account";
 const validatorPath = "/v1/query/validator";
 const txsBySender = "/v1/query/txs-by-sender";
 const txsByRec = "/v1/query/txs-by-rec";
+const failedTxs = "/v1/query/failed-txs";
 const pollPath = "/v1/gov/poll";
 const proposalsPath = "/v1/gov/proposals";
 const addVotePath = "/v1/gov/add-vote";
@@ -261,21 +262,34 @@ export async function VotePoll(address, json, approve, password) {
 export async function AccountWithTxs(height, address, page) {
   let result = {};
   result.account = await Account(height, address);
+
+  const setStatus = (status) => (tx) => {
+    tx.status = status;
+  };
+
   result.sent_transactions = await TransactionsBySender(page, address);
+  result.sent_transactions.results?.forEach(setStatus("included"));
+
   result.rec_transactions = await TransactionsByRec(page, address);
-  result.combined = [];
-  if (result.sent_transactions.results != null && result.rec_transactions.results != null) {
-    result.combined = result.combined.concat(result.rec_transactions.results, result.sent_transactions.results);
-  } else if (result.sent_transactions.results != null) {
-    result.combined = result.sent_transactions.results;
-  } else if (result.rec_transactions.results != null) {
-    result.combined = result.rec_transactions.results;
-  } else {
-    return result;
-  }
-  result.combined.sort(function (a, b) {
-    return b.height === a.height ? b.index - a.index : b.height - a.height;
+  result.sent_transactions.results?.forEach(setStatus("included"));
+
+  result.failed_transactions = await FailedTransactions(page, address);
+  result.failed_transactions.results?.forEach((tx) => {
+    tx.status = "failure: ".concat(tx.error.Msg);
   });
+
+  result.combined = (result.rec_transactions.results || [])
+    .concat(result.sent_transactions.results || [])
+    .concat(result.failed_transactions.results || []);
+
+  result.combined.sort(function (a, b) {
+    return a.transaction.time !== b.transaction.time
+      ? b.transaction.time - a.transaction.time
+      : a.height !== b.height
+        ? b.height - a.height
+        : b.index - a.index;
+  });
+
   return result;
 }
 
@@ -285,6 +299,10 @@ export function TransactionsBySender(page, sender) {
 
 export function TransactionsByRec(page, rec) {
   return POST(rpcURL, txsByRec, pageAddrReq(page, rec));
+}
+
+export function FailedTransactions(page, sender) {
+  return POST(rpcURL, failedTxs, pageAddrReq(page, sender));
 }
 
 export async function Validator(height, address) {

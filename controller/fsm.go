@@ -2,13 +2,14 @@ package controller
 
 import (
 	"bytes"
+	"math"
+	"time"
+
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"math"
-	"time"
 )
 
 // HandleTransaction() accepts or rejects inbound txs based on the mempool state
@@ -492,6 +493,26 @@ func (c *Controller) GetPendingPage(p lib.PageParams) (page *lib.Page, err lib.E
 	return
 }
 
+// GetFailedTxsPage() returns a list of failed mempool transactions
+func (c *Controller) GetFailedTxsPage(address string, p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	// lock the controller for thread safety
+	c.Lock()
+	defer c.Unlock()
+	page, failedTxs := lib.NewPage(p, lib.FailedTxsPageName), make(lib.FailedTxs, 0)
+	err = page.LoadArray(c.Mempool.cachedFailedTxs.GetAddr(address), &failedTxs, func(i any) lib.ErrorI {
+		v, ok := i.(*lib.FailedTx)
+		if !ok {
+			return lib.ErrInvalidArgument()
+		}
+		failedTxs = append(failedTxs, v)
+		return nil
+	})
+	return
+}
+
+// GetFailedTxsPage() returns a list of failed transactions
+// func (c *Contoller) GetFailedTxPage(p lib.PageParams) (page *lib.Page)
+
 // Mempool accepts or rejects incoming txs based on the mempool (ephemeral copy) state
 // - recheck when
 //   - mempool dropped some percent of the lowest fee txs
@@ -500,9 +521,10 @@ func (c *Controller) GetPendingPage(p lib.PageParams) (page *lib.Page, err lib.E
 // - notes:
 //   - new tx added may also be evicted, this is expected behavior
 type Mempool struct {
-	log           lib.LoggerI
-	FSM           *fsm.StateMachine
-	cachedResults lib.TxResults
+	log             lib.LoggerI
+	FSM             *fsm.StateMachine
+	cachedResults   lib.TxResults
+	cachedFailedTxs *lib.FailedTxCache
 	lib.Mempool
 }
 
@@ -510,8 +532,9 @@ type Mempool struct {
 func NewMempool(fsm *fsm.StateMachine, config lib.MempoolConfig, log lib.LoggerI) (m *Mempool, err lib.ErrorI) {
 	// initialize the structure
 	m = &Mempool{
-		log:     log,
-		Mempool: lib.NewMempool(config),
+		log:             log,
+		Mempool:         lib.NewMempool(config),
+		cachedFailedTxs: lib.NewFailedTxCache(),
 	}
 	// make an 'mempool (ephemeral copy) state' so the mempool can maintain only 'valid' transactions
 	// despite dependencies and conflicts
@@ -523,7 +546,14 @@ func NewMempool(fsm *fsm.StateMachine, config lib.MempoolConfig, log lib.LoggerI
 }
 
 // HandleTransaction() attempts to add a transaction to the mempool by validating, adding, and evicting overfull or newly invalid txs
-func (m *Mempool) HandleTransaction(tx []byte) lib.ErrorI {
+func (m *Mempool) HandleTransaction(tx []byte) (err lib.ErrorI) {
+	defer func() {
+		// cache failed txs for RPC display
+		if err != nil {
+			m.cachedFailedTxs.Add(tx, crypto.HashString(tx), err)
+		}
+	}()
+
 	// validate the transaction against the mempool (ephemeral copy) state
 	result, err := m.applyAndWriteTx(tx)
 	if err != nil {
@@ -569,6 +599,8 @@ func (m *Mempool) checkMempool() {
 			// if invalid, add to the remove list
 			m.log.Error(err.Error())
 			remove = append(remove, tx)
+			// and cache it
+			m.cachedFailedTxs.Add(tx, crypto.HashString(tx), err)
 			continue
 		}
 		// cache the results
