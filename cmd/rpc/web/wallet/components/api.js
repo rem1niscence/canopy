@@ -262,8 +262,6 @@ export async function AccountWithTxs(height, address, page) {
       : b.transaction.time - a.transaction.time;
   });
 
-  console.log(result.combined);
-
   return result;
 }
 
