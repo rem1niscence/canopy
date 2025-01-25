@@ -124,7 +124,7 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 	c.CalculateCheckpoint(blockResult, compareResults)
 	// ensure generated the same results
 	if !qc.Results.Equals(compareResults) {
-		return types.ErrInvalidCertificateResults()
+		return types.ErrMismatchCertResults()
 	}
 	return
 }

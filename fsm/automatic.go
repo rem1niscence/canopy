@@ -83,28 +83,33 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	}
 	results, storeI, committeeId, nonSignerPercent := qc.Results, s.store.(lib.StoreI), qc.Header.CommitteeId, 0
 	// handle checkpoint-as-a-service functionality
-	if results.Checkpoint != nil && s.Config.ChainId == lib.CanopyCommitteeId && committee != nil {
+	if s.Config.ChainId == lib.CanopyCommitteeId {
 		// handle the token swaps
 		if err = s.HandleCommitteeSwaps(results.Orders, committeeId); err != nil {
 			return err
 		}
-		// retrieve the last saved checkpoint for this chain
-		mostRecentCheckpoint, e := storeI.GetMostRecentCheckpoint(committeeId)
-		if e != nil {
-			return e
-		}
-		// ensure checkpoint isn't older than the most recent
-		if results.Checkpoint.Height <= mostRecentCheckpoint.Height {
-			return types.ErrInvalidCheckpoint()
-		}
 		// index the checkpoint
-		if err = storeI.IndexCheckpoint(committeeId, results.Checkpoint); err != nil {
-			return err
+		if results.Checkpoint != nil {
+			// retrieve the last saved checkpoint for this chain
+			mostRecentCheckpoint, e := storeI.GetMostRecentCheckpoint(committeeId)
+			if e != nil {
+				return e
+			}
+			// ensure checkpoint isn't older than the most recent
+			if results.Checkpoint.Height <= mostRecentCheckpoint.Height {
+				return types.ErrInvalidCheckpoint()
+			}
+			// index the checkpoint
+			if err = storeI.IndexCheckpoint(committeeId, results.Checkpoint); err != nil {
+				return err
+			}
 		}
 		// calculate the missing (non-signers) percentage of voting power on this QC
-		nonSignerPercent, err = s.HandleByzantine(qc, committee.ValidatorSet, validatorParams)
-		if err != nil {
-			return err
+		if committee != nil {
+			nonSignerPercent, err = s.HandleByzantine(qc, committee.ValidatorSet, validatorParams)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	// reduce all payment percents proportional to the non-signer percent

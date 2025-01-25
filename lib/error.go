@@ -236,6 +236,9 @@ const (
 	CodeInvalidSellOrder                  ErrorCode = 84
 	CodeStartPollHeight                   ErrorCode = 85
 	CodeEmptyCommitteeID                  ErrorCode = 86
+	CodeMismatchCertResults               ErrorCode = 87
+	CodeInvalidQCBaseChainHeight          ErrorCode = 88
+	CodeEmptyCertificateResults           ErrorCode = 89
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -424,6 +427,10 @@ func ErrWrongCanopyHeight() ErrorI {
 
 func ErrInvalidQCCommitteeHeight() ErrorI {
 	return NewError(CodeInvalidQCCommitteeHeight, ConsensusModule, "invalid certificate committee height")
+}
+
+func ErrInvalidQCBaseChainHeight() ErrorI {
+	return NewError(CodeInvalidQCBaseChainHeight, ConsensusModule, "invalid certificate base-chain height")
 }
 
 func ErrWrongMaxHeight() ErrorI {
