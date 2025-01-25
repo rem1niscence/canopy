@@ -772,7 +772,7 @@ func TransactionSend(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		if err = GetFeeFromState(w, ptr, types.MessageSendName); err != nil {
 			return nil, err
 		}
-		return types.NewSendTransaction(p, toAddress, ptr.Amount, ptr.Fee, ptr.Memo)
+		return types.NewSendTransaction(p, toAddress, ptr.Amount, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -819,7 +819,7 @@ func TransactionStake(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		if err = GetFeeFromState(w, ptr, types.MessageStakeName); err != nil {
 			return nil, err
 		}
-		return types.NewStakeTx(p, pk.Bytes(), outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal, ptr.Memo)
+		return types.NewStakeTx(p, pk.Bytes(), outputAddress, ptr.NetAddress, committees, ptr.Amount, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Delegate, ptr.EarlyWithdrawal, ptr.Memo)
 	})
 }
 
@@ -836,7 +836,7 @@ func TransactionEditStake(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if err = GetFeeFromState(w, ptr, types.MessageEditStakeName); err != nil {
 			return nil, err
 		}
-		return types.NewEditStakeTx(p, crypto.NewAddress(ptr.Address), outputAddress, ptr.NetAddress, committees, ptr.Amount, ptr.Fee, ptr.EarlyWithdrawal, ptr.Memo)
+		return types.NewEditStakeTx(p, crypto.NewAddress(ptr.Address), outputAddress, ptr.NetAddress, committees, ptr.Amount, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.EarlyWithdrawal, ptr.Memo)
 	})
 }
 
@@ -845,7 +845,7 @@ func TransactionUnstake(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 		if err := GetFeeFromState(w, ptr, types.MessageUnstakeName); err != nil {
 			return nil, err
 		}
-		return types.NewUnstakeTx(p, crypto.NewAddress(ptr.Address), ptr.Fee, ptr.Memo)
+		return types.NewUnstakeTx(p, crypto.NewAddress(ptr.Address), conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -854,7 +854,7 @@ func TransactionPause(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		if err := GetFeeFromState(w, ptr, types.MessagePauseName); err != nil {
 			return nil, err
 		}
-		return types.NewPauseTx(p, crypto.NewAddress(ptr.Address), ptr.Fee, ptr.Memo)
+		return types.NewPauseTx(p, crypto.NewAddress(ptr.Address), conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -863,7 +863,7 @@ func TransactionUnpause(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 		if err := GetFeeFromState(w, ptr, types.MessageUnpauseName); err != nil {
 			return nil, err
 		}
-		return types.NewUnpauseTx(p, crypto.NewAddress(ptr.Address), ptr.Fee, ptr.Memo)
+		return types.NewUnpauseTx(p, crypto.NewAddress(ptr.Address), conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -878,13 +878,13 @@ func TransactionChangeParam(w http.ResponseWriter, r *http.Request, _ httprouter
 			return nil, err
 		}
 		if isString {
-			return types.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, ptr.Fee, ptr.Memo)
+			return types.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 		} else {
 			paramValue, err := strconv.ParseUint(ptr.ParamValue, 10, 64)
 			if err != nil {
 				return nil, err
 			}
-			return types.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, ptr.Fee, ptr.Memo)
+			return types.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 		}
 	})
 }
@@ -894,7 +894,7 @@ func TransactionDAOTransfer(w http.ResponseWriter, r *http.Request, _ httprouter
 		if err := GetFeeFromState(w, ptr, types.MessageDAOTransferName); err != nil {
 			return nil, err
 		}
-		return types.NewDAOTransferTx(p, ptr.Amount, ptr.StartBlock, ptr.EndBlock, ptr.Fee, ptr.Memo)
+		return types.NewDAOTransferTx(p, ptr.Amount, ptr.StartBlock, ptr.EndBlock, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -907,7 +907,7 @@ func TransactionSubsidy(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 		if err := GetFeeFromState(w, ptr, types.MessageSubsidyName); err != nil {
 			return nil, err
 		}
-		return types.NewSubsidyTx(p, ptr.Amount, committeeId, ptr.OpCode, ptr.Fee, ptr.Memo)
+		return types.NewSubsidyTx(p, ptr.Amount, committeeId, ptr.OpCode, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -920,7 +920,7 @@ func TransactionCreateOrder(w http.ResponseWriter, r *http.Request, _ httprouter
 		if err := GetFeeFromState(w, ptr, types.MessageCreateOrderName); err != nil {
 			return nil, err
 		}
-		return types.NewCreateOrderTx(p, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee, ptr.Memo)
+		return types.NewCreateOrderTx(p, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -933,7 +933,7 @@ func TransactionEditOrder(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if err := GetFeeFromState(w, ptr, types.MessageEditOrderName); err != nil {
 			return nil, err
 		}
-		return types.NewEditOrderTx(p, ptr.OrderId, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, ptr.Fee, ptr.Memo)
+		return types.NewEditOrderTx(p, ptr.OrderId, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -946,7 +946,7 @@ func TransactionDeleteOrder(w http.ResponseWriter, r *http.Request, _ httprouter
 		if err := GetFeeFromState(w, ptr, types.MessageDeleteOrderName); err != nil {
 			return nil, err
 		}
-		return types.NewDeleteOrderTx(p, ptr.OrderId, committeeId, ptr.Fee, ptr.Memo)
+		return types.NewDeleteOrderTx(p, ptr.OrderId, committeeId, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -955,7 +955,7 @@ func TransactionBuyOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 		if err := GetFeeFromState(w, ptr, types.MessageSendName, true); err != nil {
 			return nil, err
 		}
-		return types.NewBuyOrderTx(p, lib.BuyOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, ptr.Fee)
+		return types.NewBuyOrderTx(p, lib.BuyOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, conf.NetworkID, conf.ChainId, ptr.Fee)
 	})
 }
 
@@ -964,7 +964,7 @@ func TransactionStartPoll(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if err := GetFeeFromState(w, ptr, types.MessageSendName); err != nil {
 			return nil, err
 		}
-		return types.NewStartPollTransaction(p, ptr.PollJSON, ptr.Fee)
+		return types.NewStartPollTransaction(p, ptr.PollJSON, conf.NetworkID, conf.ChainId, ptr.Fee)
 	})
 }
 
@@ -973,7 +973,7 @@ func TransactionVotePoll(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 		if err := GetFeeFromState(w, ptr, types.MessageSendName); err != nil {
 			return nil, err
 		}
-		return types.NewVotePollTransaction(p, ptr.PollJSON, ptr.PollApprove, ptr.Fee)
+		return types.NewVotePollTransaction(p, ptr.PollJSON, ptr.PollApprove, conf.NetworkID, conf.ChainId, ptr.Fee)
 	})
 }
 

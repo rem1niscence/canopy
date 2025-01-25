@@ -235,9 +235,7 @@ const (
 	CodeInvalidCheckpoint                 ErrorCode = 83
 	CodeInvalidSellOrder                  ErrorCode = 84
 	CodeStartPollHeight                   ErrorCode = 85
-	CodeInvalidDelegatorReward            ErrorCode = 86
-	CodeInvalidNumberOfRewardRecipients   ErrorCode = 87
-	CodeInvalidProposerRewardPercent      ErrorCode = 88
+	CodeEmptyCommitteeID                  ErrorCode = 86
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -598,6 +596,10 @@ func ErrPaymentRecipientsCount() ErrorI {
 
 func ErrWrongNetworkID() ErrorI {
 	return NewError(CodeWrongNetworkID, StateMachineModule, "wrong network id")
+}
+
+func ErrEmptyCommitteeId() ErrorI {
+	return NewError(CodeEmptyCommitteeID, StateMachineModule, "empty committee id")
 }
 
 func ErrWrongCommitteeID() ErrorI {

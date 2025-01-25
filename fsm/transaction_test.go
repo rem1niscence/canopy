@@ -15,7 +15,7 @@ func TestApplyTransaction(t *testing.T) {
 	// predefine a keygroup for signing the transaction
 	kg := newTestKeyGroup(t)
 	// predefine a send-transaction to insert into the block
-	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, "")
+	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, 1, 1, "")
 	require.NoError(t, e)
 	tests := []struct {
 		name          string
@@ -103,7 +103,7 @@ func TestCheckTx(t *testing.T) {
 	// predefine a keygroup for signing the transaction
 	kg := newTestKeyGroup(t)
 	// predefine a send-transaction to insert into the block
-	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, "")
+	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, 1, 1, "")
 	require.NoError(t, e)
 	// convert the object to bytes
 	tx, e := lib.Marshal(sendTx)
@@ -347,14 +347,38 @@ func TestCheckReplay(t *testing.T) {
 		error         string
 	}{
 		{
+			name:   "bad network id",
+			detail: "the network id is incorrect",
+			tx: &lib.Transaction{
+				NetworkId: 2,
+				ChainId:   1,
+			},
+			error: "wrong network id",
+		},
+		{
+			name:   "bad chain id",
+			detail: "the chain id is incorrect",
+			tx: &lib.Transaction{
+				NetworkId: 1,
+				ChainId:   2,
+			},
+			error: "wrong committee id",
+		},
+		{
 			name:   "before height 2",
 			detail: "before height 2 so timestamps are ignored",
+			tx: &lib.Transaction{
+				NetworkId: 1,
+				ChainId:   1,
+			},
 		},
 		{
 			name:   "above maximum time",
 			detail: "above maximum timestamp should fail",
 			tx: &lib.Transaction{
-				Time: uint64(start.Add(time.Hour*6 + 1000).UnixMicro()),
+				Time:      uint64(start.Add(time.Hour*6 + 1000).UnixMicro()),
+				NetworkId: 1,
+				ChainId:   1,
 			},
 			height:        2,
 			lastBlockTime: start,
@@ -364,7 +388,9 @@ func TestCheckReplay(t *testing.T) {
 			name:   "below minimum time",
 			detail: "below minimum timestamp should fail",
 			tx: &lib.Transaction{
-				Time: uint64(start.UnixMicro()),
+				Time:      uint64(start.UnixMicro()),
+				NetworkId: 1,
+				ChainId:   1,
 			},
 			height:        2,
 			lastBlockTime: start.Add(-time.Hour*6 - 1000),
@@ -374,7 +400,9 @@ func TestCheckReplay(t *testing.T) {
 			name:   "maximum time",
 			detail: "maximum timestamp should succeed",
 			tx: &lib.Transaction{
-				Time: uint64(start.UnixMicro()),
+				Time:      uint64(start.UnixMicro()),
+				NetworkId: 1,
+				ChainId:   1,
 			},
 			height:        2,
 			lastBlockTime: start.Add(time.Hour * 6),
@@ -383,7 +411,9 @@ func TestCheckReplay(t *testing.T) {
 			name:   "minimum time",
 			detail: "minimum timestamp should succeed",
 			tx: &lib.Transaction{
-				Time: uint64(start.UnixMicro()),
+				Time:      uint64(start.UnixMicro()),
+				NetworkId: 1,
+				ChainId:   1,
 			},
 			height:        2,
 			lastBlockTime: start.Add(-time.Hour * 6),

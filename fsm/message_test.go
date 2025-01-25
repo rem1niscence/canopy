@@ -1960,6 +1960,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
 					Height:       1,
+					NetworkId:    1,
 					CanopyHeight: 3,
 					CommitteeId:  lib.CanopyCommitteeId + 1,
 				},
@@ -2038,7 +2039,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 					buyerAddress = newTestAddressBytes(t)
 				}
 				// upsert each order in state
-				_, err := sm.CreateOrder(&lib.SellOrder{
+				_, err = sm.CreateOrder(&lib.SellOrder{
 					Committee:           lib.CanopyCommitteeId + 1,
 					BuyerReceiveAddress: buyerAddress,
 					BuyerChainDeadline:  0,

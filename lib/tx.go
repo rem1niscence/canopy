@@ -103,6 +103,12 @@ func (x *Transaction) CheckBasic() ErrorI {
 	if len(x.Memo) > 200 {
 		return ErrInvalidMemo()
 	}
+	if x.NetworkId == 0 {
+		return ErrNilNetworkID()
+	}
+	if x.ChainId == 0 {
+		return ErrEmptyCommitteeId()
+	}
 	return nil
 }
 
@@ -127,6 +133,8 @@ func (x *Transaction) GetSignBytes() ([]byte, ErrorI) {
 		Time:        x.Time,
 		Fee:         x.Fee,
 		Memo:        x.Memo,
+		NetworkId:   x.NetworkId,
+		ChainId:     x.ChainId,
 	})
 }
 
@@ -150,6 +158,8 @@ type jsonTx struct {
 	Time      uint64          `json:"time,omitempty"`
 	Fee       uint64          `json:"fee,omitempty"`
 	Memo      string          `json:"memo,omitempty"`
+	NetworkId uint64          `json:"networkId,omitempty"`
+	ChainId   uint64          `json:"chainId,omitempty"`
 }
 
 // nolint:all
@@ -173,6 +183,8 @@ func (x Transaction) MarshalJSON() ([]byte, error) {
 		Time:      x.Time,
 		Fee:       x.Fee,
 		Memo:      x.Memo,
+		NetworkId: x.NetworkId,
+		ChainId:   x.ChainId,
 	})
 }
 
@@ -201,6 +213,8 @@ func (x *Transaction) UnmarshalJSON(b []byte) error {
 		Time:        j.Time,
 		Fee:         j.Fee,
 		Memo:        j.Memo,
+		NetworkId:   j.NetworkId,
+		ChainId:     j.ChainId,
 	}
 	return nil
 }
