@@ -532,13 +532,23 @@ func (c *Controller) UpdateP2PMustConnect() {
 func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc *lib.QuorumCertificate, stillSyncing bool, err lib.ErrorI) {
 	// define a convenience variable for certificate
 	qc = msg.BlockAndCertificate
-	v := c.Consensus.ValidatorSet
+	// do a basic validation on the QC before loading the committee
+	if err = qc.CheckBasic(); err != nil {
+		return
+	}
+	// load the committee using the canopy height from the base-chain
+	// upon independence, this check for the validator set will be ignored
+	// and checkpoints will be used instead
+	v, err := c.Consensus.LoadCommittee(qc.Header.CanopyHeight)
+	if err != nil {
+		return
+	}
 	// validate the quorum certificate
 	if err = c.checkPeerQC(c.LoadMaxBlockSize(), &lib.View{
 		Height:       c.FSM.Height(),
-		CanopyHeight: c.BaseChainInfo.GetHeight(),
+		CanopyHeight: qc.Header.CanopyHeight,
 		NetworkId:    c.Config.NetworkID,
-		CommitteeId:  msg.CommitteeId,
+		CommitteeId:  c.Config.ChainId,
 	}, v, qc, senderID); err != nil {
 		return
 	}

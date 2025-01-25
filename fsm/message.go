@@ -401,19 +401,8 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 	if poolBalance == 0 {
 		return types.ErrNonSubsidizedCommittee()
 	}
-	// validate the height of the CertificateResults Transaction
-	height := msg.Qc.Header.CanopyHeight
-	// get the last data for the committee
-	data, err := s.GetCommitteeData(committeeId)
-	if err != nil {
-		return err
-	}
-	// ensure the canopy height isn't too old
-	if height < data.LastCanopyHeightUpdated && msg.Qc.Header.Height >= data.LastChainHeightUpdated {
-		return lib.ErrInvalidQCCommitteeHeight()
-	}
 	// get committee for the QC
-	committee, err := s.LoadCommittee(committeeId, height)
+	committee, err := s.LoadCommittee(committeeId, msg.Qc.Header.CanopyHeight)
 	if err != nil {
 		return err
 	}

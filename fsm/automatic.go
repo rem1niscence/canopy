@@ -68,15 +68,24 @@ func (s *StateMachine) CheckProtocolVersion() lib.ErrorI {
 func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, committee *lib.ValidatorSet, validatorParams *types.ValidatorParams) lib.ErrorI {
 	// ensure the certificate results are not nil
 	if qc == nil || qc.Results == nil {
-		s.log.Errorf("Certificate.Results is nil, skipping")
-		return nil
+		return lib.ErrNilCertResults()
+	}
+	// validate the height of the CertificateResults Transaction
+	height := qc.Header.CanopyHeight
+	// get the last data for the committee
+	data, err := s.GetCommitteeData(qc.Header.CommitteeId)
+	if err != nil {
+		return err
+	}
+	// ensure the canopy height isn't too old
+	if height < data.LastCanopyHeightUpdated && qc.Header.Height >= data.LastChainHeightUpdated {
+		return lib.ErrInvalidQCCommitteeHeight()
 	}
 	results, storeI, committeeId, nonSignerPercent := qc.Results, s.store.(lib.StoreI), qc.Header.CommitteeId, 0
 	// handle checkpoint-as-a-service functionality
 	if results.Checkpoint != nil && s.Config.ChainId == lib.CanopyCommitteeId && committee != nil {
 		// handle the token swaps
-		err := s.HandleCommitteeSwaps(results.Orders, committeeId)
-		if err != nil {
+		if err = s.HandleCommitteeSwaps(results.Orders, committeeId); err != nil {
 			return err
 		}
 		// retrieve the last saved checkpoint for this chain

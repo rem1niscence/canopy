@@ -11,11 +11,12 @@ import (
 
 func TestBeginBlock(t *testing.T) {
 	tests := []struct {
-		name            string
-		detail          string
-		isGenesis       bool
-		protocolVersion int
-		error           lib.ErrorI
+		name               string
+		detail             string
+		isGenesis          bool
+		protocolVersion    int
+		setLastCertResults bool
+		error              lib.ErrorI
 	}{
 		{
 			name:            "begin_block at genesis",
@@ -30,9 +31,16 @@ func TestBeginBlock(t *testing.T) {
 			isGenesis:       true,
 		},
 		{
-			name:            "begin_block after genesis",
-			detail:          "after genesis with a valid protocol version",
+			name:            "begin_block empty certificate results",
+			detail:          "the certificate results are empty",
 			protocolVersion: 1,
+			error:           lib.ErrNilCertResults(),
+		},
+		{
+			name:               "begin_block after genesis",
+			detail:             "after genesis with a valid protocol version",
+			protocolVersion:    1,
+			setLastCertResults: true,
 		},
 		{
 			name:            "begin_block after genesis with invalid protocol version",
@@ -48,6 +56,18 @@ func TestBeginBlock(t *testing.T) {
 			)
 			// create a state machine instance with default parameters
 			sm := newSingleAccountStateMachine(t)
+			// set the last certificate results in the indexer
+			if test.setLastCertResults {
+				require.NoError(t, sm.store.(lib.StoreI).IndexQC(&lib.QuorumCertificate{
+					Header: &lib.View{Height: sm.height - 1},
+					Results: &lib.CertificateResult{RewardRecipients: &lib.RewardRecipients{
+						PaymentPercents: []*lib.PaymentPercents{{
+							Address: newTestAddressBytes(t),
+							Percent: 100,
+						}},
+					}},
+				}))
+			}
 			// set protocol version
 			sm.ProtocolVersion = test.protocolVersion
 			// if at genesis, set height to 1
