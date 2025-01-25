@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +35,7 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
 	"path"
+	pprof2 "runtime/pprof"
 )
 
 const (
@@ -246,6 +248,21 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	}()
 	go updatePollResults()
 	go PollBaseChainInfo()
+	go func() { // TODO remove DEBUG ONLY
+		fileName := "heap1.out"
+		for range time.Tick(time.Second * 10) {
+			f, err := os.Create(filepath.Join(c.DataDirPath, fileName))
+			if err != nil {
+				l.Fatalf("could not create memory profile: ", err)
+			}
+			runtime.GC() // get up-to-date statistics
+			if err = pprof2.WriteHeapProfile(f); err != nil {
+				l.Fatalf("could not write memory profile: ", err)
+			}
+			f.Close()
+			fileName = "heap2.out"
+		}
+	}()
 	l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
 	runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
 	l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
@@ -547,14 +564,14 @@ func BaseChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 			return nil, err
 		}
 		return &lib.BaseChainInfo{
-			Height:                  s.Height(),
-			ValidatorSet:            validatorSet,
-			LastValidatorSet:        lastValidatorSet,
-			LastProposers:           lastProposers,
-			MinimumEvidenceHeight:   minimumEvidenceHeight,
-			LastCanopyHeightUpdated: committeeData.LastCanopyHeightUpdated,
-			LotteryWinner:           lotteryWinner,
-			Orders:                  orders,
+			Height:                 s.Height(),
+			ValidatorSet:           validatorSet,
+			LastValidatorSet:       lastValidatorSet,
+			LastProposers:          lastProposers,
+			MinimumEvidenceHeight:  minimumEvidenceHeight,
+			LastChainHeightUpdated: committeeData.LastChainHeightUpdated,
+			LotteryWinner:          lotteryWinner,
+			Orders:                 orders,
 		}, nil
 	})
 }

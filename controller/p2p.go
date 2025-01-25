@@ -530,6 +530,7 @@ func (c *Controller) UpdateP2PMustConnect() {
 
 // handlePeerBlock() validates and handles inbound Quorum Certificates from remote peers
 func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc *lib.QuorumCertificate, stillSyncing bool, err lib.ErrorI) {
+	c.log.Info("Handling peer block")
 	// define a convenience variable for certificate
 	qc = msg.BlockAndCertificate
 	// do a basic validation on the QC before loading the committee

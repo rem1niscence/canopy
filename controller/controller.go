@@ -194,7 +194,7 @@ func (c *Controller) LoadLastProposers(height uint64) (*lib.Proposers, lib.Error
 // LoadCommitteeHeightInState() returns the last height the committee submitted a proposal for rewards
 func (c *Controller) LoadCommitteeHeightInState(height uint64) (uint64, lib.ErrorI) {
 	// return the committee height
-	return c.BaseChainInfo.GetLastCanopyHeightUpdated(height, c.Config.ChainId)
+	return c.BaseChainInfo.GetLastChainHeightUpdated(height, c.Config.ChainId)
 }
 
 // Syncing() returns if any of the supported chains are currently syncing
