@@ -83,6 +83,8 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 	c.HandleSwaps(blockResult, results, c.BaseChainHeight())
 	// set slash recipients
 	c.CalculateSlashRecipients(results, be)
+	// set checkpoint
+	c.CalculateCheckpoint(blockResult, results)
 	return
 }
 
@@ -118,6 +120,8 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 	c.HandleSwaps(blockResult, compareResults, c.BaseChainHeight())
 	// set slash recipients
 	c.CalculateSlashRecipients(compareResults, evidence)
+	// set checkpoint
+	c.CalculateCheckpoint(blockResult, compareResults)
 	// ensure generated the same results
 	if !qc.Results.Equals(compareResults) {
 		return types.ErrInvalidCertificateResults()
@@ -331,6 +335,17 @@ func (c *Controller) CalculateSlashRecipients(results *lib.CertificateResult, be
 	results.SlashRecipients.DoubleSigners, err = c.Consensus.ProcessDSE(be.DSE.Evidence...)
 	if err != nil {
 		c.log.Warn(err.Error()) // still produce proposal
+	}
+}
+
+// CalculateCheckpoint() calculates the checkpoint for the checkpoint as a service functionality
+func (c *Controller) CalculateCheckpoint(blockResult *lib.BlockResult, results *lib.CertificateResult) {
+	// checkpoint every 100 heights
+	if blockResult.BlockHeader.Height%100 == 0 {
+		results.Checkpoint = &lib.Checkpoint{
+			Height:    blockResult.BlockHeader.Height,
+			BlockHash: blockResult.BlockHeader.Hash,
+		}
 	}
 }
 
