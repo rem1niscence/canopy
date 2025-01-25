@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"bytes"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -68,7 +67,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 	defer func() {
 		if r := recover(); r != nil {
 			s.log.Errorf(string(debug.Stack()))
-			// Handle the panic and set the error
+			// handle the panic and set the error
 			err = lib.ErrPanic()
 		}
 	}()
@@ -91,7 +90,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 	}
 	// load the last validator set
 	// NOTE: there may be no validators for sub-chains
-	lastValidatorRoot := bytes.Clone(crypto.MaxHash)
+	var lastValidatorRoot []byte
 	lastValidatorSet, _ := s.LoadCommittee(s.Config.ChainId, s.Height()-1)
 	if lastValidatorSet.NumValidators != 0 {
 		lastValidatorRoot, err = lastValidatorSet.ValidatorSet.Root()
@@ -103,7 +102,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 	}
 	// load the next validator set
 	// NOTE: there may be no validators for sub-chains
-	nextValidatorRoot := bytes.Clone(crypto.MaxHash)
+	var nextValidatorRoot []byte
 	nextValidatorSet, _ := s.LoadCommittee(s.Config.ChainId, s.Height())
 	if nextValidatorSet.NumValidators != 0 {
 		nextValidatorRoot, err = nextValidatorSet.ValidatorSet.Root()
@@ -124,21 +123,21 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 	}
 	// generate the block header
 	header = &lib.BlockHeader{
-		Height:                s.Height(),
-		Hash:                  nil,
-		NetworkId:             s.NetworkID,
-		Time:                  b.BlockHeader.Time,
-		NumTxs:                uint64(numTxs),
-		TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(numTxs),
-		TotalVdfIterations:    b.BlockHeader.TotalVdfIterations,
-		LastBlockHash:         nonEmptyHash(lastBlock.BlockHeader.Hash),
-		StateRoot:             stateRoot,
-		TransactionRoot:       nonEmptyHash(txRoot),
-		ValidatorRoot:         lastValidatorRoot,
-		NextValidatorRoot:     nextValidatorRoot,
-		ProposerAddress:       b.BlockHeader.ProposerAddress,
-		Vdf:                   b.BlockHeader.Vdf,
-		LastQuorumCertificate: b.BlockHeader.LastQuorumCertificate,
+		Height:                s.Height(),                                                                   // increment the height
+		Hash:                  nil,                                                                          // set hash after
+		NetworkId:             s.NetworkID,                                                                  // ensure only applicable for the proper network
+		Time:                  b.BlockHeader.Time,                                                           // use the pre-set block time
+		NumTxs:                uint64(numTxs),                                                               // set the number of transactions
+		TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(numTxs),                              // set the total count of transactions
+		TotalVdfIterations:    lastBlock.BlockHeader.TotalVdfIterations + b.BlockHeader.Vdf.GetIterations(), // add last total iterations to current iterations
+		StateRoot:             stateRoot,                                                                    // set the state root generated from the resulting state of the VDF
+		LastBlockHash:         nonEmptyHash(lastBlock.BlockHeader.Hash),                                     // set the last block hash to chain the blocks together
+		TransactionRoot:       nonEmptyHash(txRoot),                                                         // set the transaction root to easily merkle the transactions in a block
+		ValidatorRoot:         nonEmptyHash(lastValidatorRoot),                                              // set the last validator root to easily prove the validators who voted on this block
+		NextValidatorRoot:     nonEmptyHash(nextValidatorRoot),                                              // set the next validator root to have continuity between validator sets
+		ProposerAddress:       b.BlockHeader.ProposerAddress,                                                // set the proposer address
+		Vdf:                   b.BlockHeader.Vdf,                                                            // attach the preset vdf proof
+		LastQuorumCertificate: b.BlockHeader.LastQuorumCertificate,                                          // attach last quorum certificate (which is validated in the 'compare block headers' func
 	}
 	// create and set the block hash in the header
 	if _, err = header.SetHash(); err != nil {

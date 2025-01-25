@@ -144,6 +144,7 @@ const (
 	CodeInvalidLastQC                   ErrorCode = 47
 	CodeMaxPort                         ErrorCode = 48
 	CodePanic                           ErrorCode = 49
+	CodeInvalidVDF                      ErrorCode = 50
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -469,6 +470,10 @@ func ErrInvalidAggrSignature() ErrorI {
 
 func ErrNoMaj23() ErrorI {
 	return NewError(CodeNoMaj23, ConsensusModule, "quorum not reached")
+}
+
+func ErrInvalidVDF() ErrorI {
+	return NewError(CodeInvalidVDF, ConsensusModule, "invalid verifiable delay proof")
 }
 
 func ErrValidatorNotInSet(publicKey []byte) ErrorI {

@@ -37,13 +37,8 @@ func (c *Controller) HandleTransaction(tx []byte) lib.ErrorI {
 func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF) (blk []byte, results *lib.CertificateResult, err lib.ErrorI) {
 	height, reset := c.FSM.Height(), c.ValidatorProposalConfig()
 	defer func() { reset(); c.FSM.Reset() }()
-	// extract the vdf iterations if any
-	var vdfIterations uint64
-	if vdf != nil {
-		vdfIterations = vdf.Iterations
-	}
 	// load the previous block from the store
-	qc, lastBlock, err := c.FSM.LoadBlockAndCertificate(height - 1)
+	qc, _, err := c.FSM.LoadBlockAndCertificate(height - 1)
 	if err != nil {
 		return
 	}
@@ -55,21 +50,17 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 	// re-validate all transactions in the mempool as a fail-safe
 	c.Mempool.checkMempool()
 	// extract transactions from the mempool
-	transactions, numTxs := c.Mempool.GetTransactions(maxBlockSize)
+	transactions, _ := c.Mempool.GetTransactions(maxBlockSize)
+	// validate VDF
+	if vdf != nil {
+		if !crypto.VerifyVDF(qc.BlockHash, vdf.Output, vdf.Proof, int(vdf.Iterations)) {
+			c.log.Error(lib.ErrInvalidVDF().Error())
+			vdf = nil
+		}
+	}
 	// create a block structure
 	block := &lib.Block{
-		BlockHeader: &lib.BlockHeader{
-			Height:                height + 1,                                               // increment the height
-			NetworkId:             c.FSM.NetworkID,                                          // ensure only applicable for the proper network
-			Time:                  uint64(time.Now().UnixMicro()),                           // set the time of the block
-			NumTxs:                uint64(numTxs),                                           // set the number of transactions
-			TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(numTxs),          // calculate the total transactions
-			LastBlockHash:         lastBlock.BlockHeader.LastBlockHash,                      // use the last block hash to 'chain' the blocks
-			ProposerAddress:       c.Address,                                                // set self as proposer address
-			LastQuorumCertificate: qc,                                                       // add last QC to lock-in a commit certificate
-			TotalVdfIterations:    lastBlock.BlockHeader.TotalVdfIterations + vdfIterations, // add last total iterations to current iterations
-			Vdf:                   vdf,                                                      // attach the vdf proof
-		},
+		BlockHeader:  &lib.BlockHeader{Time: uint64(time.Now().UnixMicro()), ProposerAddress: c.Address, LastQuorumCertificate: qc, Vdf: vdf},
 		Transactions: transactions,
 	}
 	// capture the tentative block result here
@@ -403,6 +394,12 @@ func (c *Controller) CompareBlockHeaders(candidate *lib.BlockHeader, compare *li
 		// ensure is a full +2/3rd maj QC
 		if isPartialQC {
 			return lib.ErrNoMaj23()
+		}
+	}
+	// validate VDF
+	if candidate.Vdf != nil {
+		if !crypto.VerifyVDF(candidate.LastQuorumCertificate.BlockHash, candidate.Vdf.Output, candidate.Vdf.Proof, int(candidate.Vdf.Iterations)) {
+			return lib.ErrInvalidVDF()
 		}
 	}
 	// check the timestamp if actively in BFT - else it's been validated by the validator set
