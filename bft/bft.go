@@ -728,6 +728,9 @@ func (b *BFT) SelfIsValidator() bool {
 
 // RunVDF() runs the verifiable delay service
 func (b *BFT) RunVDF() lib.ErrorI {
+	if b.Config.ChainId != lib.CanopyCommitteeId {
+		return nil
+	}
 	// generate the VDF seed
 	seed, err := b.VDFSeed()
 	if err != nil {
