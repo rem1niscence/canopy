@@ -387,11 +387,6 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 	s.log.Debugf("Handling certificate results msg with height %d:%d", msg.Qc.Header.Height, msg.Qc.Header.CanopyHeight)
 	// define convenience variables
 	committeeId := msg.Qc.Header.CommitteeId
-	// get the validator params from state
-	validatorParams, err := s.GetParamsVal()
-	if err != nil {
-		return err
-	}
 	// get the proper reward Pool
 	poolBalance, err := s.GetPoolBalance(committeeId)
 	if err != nil {
@@ -417,7 +412,7 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 		return lib.ErrNoMaj23()
 	}
 	// handle the certificate results
-	return s.HandleCertificateResults(msg.Qc, &committee, validatorParams)
+	return s.HandleCertificateResults(msg.Qc, &committee)
 }
 
 // HandleMessageSubsidy() is the proper handler for a `Subsidy` message

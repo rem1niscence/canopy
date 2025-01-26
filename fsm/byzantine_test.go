@@ -120,7 +120,7 @@ func TestHandleByzantine(t *testing.T) {
 			// STEP 1) execute function call
 			func() {
 				// run the function call
-				nonSignerPercent, e := sm.HandleByzantine(test.qc, committee.ValidatorSet, valParams)
+				nonSignerPercent, e := sm.HandleByzantine(test.qc, &committee)
 				// ensure expected error
 				require.Equal(t, test.error, e)
 				// ensure expected percent of non signers

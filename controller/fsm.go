@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"math"
+	"math/rand"
 	"time"
 
 	"github.com/canopy-network/canopy/bft"
@@ -413,8 +414,12 @@ func (c *Controller) CompareBlockHeaders(candidate *lib.BlockHeader, compare *li
 	}
 	// validate VDF
 	if candidate.Vdf != nil {
-		if !crypto.VerifyVDF(candidate.LastQuorumCertificate.BlockHash, candidate.Vdf.Output, candidate.Vdf.Proof, int(candidate.Vdf.Iterations)) {
-			return lib.ErrInvalidVDF()
+		// if syncing or committing - only verify the vdf randomly since this randomness is pseudo-non-deterministic (among nodes) this holds
+		// similar security guarantees but lowers the computational requirements at a per-node basis
+		if !commit || rand.Intn(100) == 0 {
+			if !crypto.VerifyVDF(candidate.LastQuorumCertificate.BlockHash, candidate.Vdf.Output, candidate.Vdf.Proof, int(candidate.Vdf.Iterations)) {
+				return lib.ErrInvalidVDF()
+			}
 		}
 	}
 	// check the timestamp if actively in BFT - else it's been validated by the validator set
