@@ -557,21 +557,6 @@ func TestStartCommitPhase(t *testing.T) {
 				c.bft.Block, c.bft.Results, _ = c.cont.ProduceProposal(nil, nil)
 			}
 			go c.bft.StartCommitPhase()
-			// receive the cert results txn
-			select {
-			case <-time.After(testTimeout):
-				if test.has23MajPropVote {
-					t.Fatal("timeout")
-				}
-			case qc := <-c.cont.gossipCertChan:
-				require.NotNil(t, qc)
-				require.Equal(t, qc.Header.Phase, expectedQCView.Phase)
-				require.Equal(t, blockHash, qc.BlockHash)
-				require.Equal(t, resultsHash, qc.ResultsHash)
-				expectedAggSig, err := multiKey.AggregateSignatures()
-				require.NoError(t, err)
-				require.Equal(t, expectedAggSig, qc.Signature.Signature)
-			}
 			// receive the commit message
 			select {
 			case <-time.After(testTimeout):

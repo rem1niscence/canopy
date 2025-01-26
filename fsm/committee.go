@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -398,6 +399,7 @@ func (s *StateMachine) UpsertCommitteeData(new *lib.CommitteeData) lib.ErrorI {
 	committeesData, targetData, idx, err := s.getCommitteeDataAndList(new.CommitteeId)
 	// check the new committee data is not 'out-dated'
 	if new.LastChainHeightUpdated <= targetData.LastChainHeightUpdated {
+		fmt.Println("H2 ", new.LastChainHeightUpdated, targetData.LastChainHeightUpdated)
 		return lib.ErrInvalidQCCommitteeHeight()
 	}
 	if new.LastCanopyHeightUpdated < targetData.LastCanopyHeightUpdated {

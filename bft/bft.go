@@ -430,15 +430,6 @@ func (b *BFT) StartCommitPhase() {
 		b.RoundInterrupt()
 		return
 	}
-	// send the proposal (reward) transaction
-	b.SendCertificateResultsTx(&QC{
-		Header:      vote.Qc.Header,       // vote view
-		BlockHash:   crypto.Hash(b.Block), // vote block payload
-		ResultsHash: b.Results.Hash(),     // vote certificate results payload
-		Results:     b.Results,
-		ProposerKey: b.ProposerKey,
-		Signature:   as,
-	})
 	// SEND MSG TO REPLICAS
 	b.SendToReplicas(b.ValidatorSet, &Message{
 		Header: b.Copy(), // header

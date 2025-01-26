@@ -566,6 +566,12 @@ func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc
 		c.log.Warnf("CommitCertificate from %s: %s", lib.BytesToTruncatedString(senderID), err.Error())
 		return
 	}
+	// if self was he proposer
+	if bytes.Equal(qc.ProposerKey, c.PublicKey) && !c.isSyncing.Load() {
+		// send the proposal (reward) transaction
+		qc.Block = nil
+		c.SendCertificateResultsTx(qc)
+	}
 	return
 }
 

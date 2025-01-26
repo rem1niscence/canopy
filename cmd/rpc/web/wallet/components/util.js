@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { OverlayTrigger, Toast, ToastContainer, Tooltip, Form } from "react-bootstrap";
+import { OverlayTrigger, Toast, ToastContainer, Tooltip } from "react-bootstrap";
 
 // getFormInputs() returns the form input based on the type
 // account and validator is passed to assist with auto fill
@@ -29,7 +28,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: false,
       type: "password",
       minLength: 64,
-      maxLength: 128,
+      maxLength: 128
     },
     address: {
       placeholder: "the unique id of the account",
@@ -41,7 +40,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 40,
-      maxLength: 40,
+      maxLength: 40
     },
     pubKey: {
       placeholder: "public key of the node",
@@ -53,7 +52,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 96,
-      maxLength: 96,
+      maxLength: 96
     },
     committees: {
       placeholder: "1, 22, 50",
@@ -65,7 +64,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 1,
-      maxLength: 200,
+      maxLength: 200
     },
     netAddr: {
       placeholder: "url of the node",
@@ -77,7 +76,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 5,
-      maxLength: 50,
+      maxLength: 50
     },
     earlyWithdrawal: {
       placeholder: "early withdrawal rewards for 20% penalty",
@@ -89,7 +88,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 4,
-      maxLength: 5,
+      maxLength: 5
     },
     delegate: {
       placeholder: "validator delegation status",
@@ -102,7 +101,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 4,
-      maxLength: 5,
+      maxLength: 5
     },
     rec: {
       placeholder: "recipient of the tx",
@@ -114,7 +113,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 40,
-      maxLength: 40,
+      maxLength: 40
     },
     amount: {
       placeholder: "amount value for the tx",
@@ -126,7 +125,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "number",
       minLength: 1,
-      maxLength: 100,
+      maxLength: 100
     },
     receiveAmount: {
       placeholder: "amount of counter asset to receive",
@@ -138,7 +137,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "number",
       minLength: 1,
-      maxLength: 100,
+      maxLength: 100
     },
     orderId: {
       placeholder: "the id of the existing order",
@@ -149,7 +148,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "number",
       minLength: 1,
-      maxLength: 100,
+      maxLength: 100
     },
     committeeId: {
       placeholder: "the id of the committee / counter asset",
@@ -160,7 +159,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "number",
       minLength: 1,
-      maxLength: 100,
+      maxLength: 100
     },
     receiveAddress: {
       placeholder: "the address where the counter asset will be sent",
@@ -171,7 +170,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 40,
-      maxLength: 40,
+      maxLength: 40
     },
     buyersReceiveAddress: {
       placeholder: "the canopy address where CNPY will be received",
@@ -182,7 +181,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 40,
-      maxLength: 40,
+      maxLength: 40
     },
     output: {
       placeholder: "output of the node",
@@ -194,7 +193,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 40,
-      maxLength: 40,
+      maxLength: 40
     },
     signer: {
       placeholder: "signer of the transaction",
@@ -206,7 +205,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 40,
-      maxLength: 40,
+      maxLength: 40
     },
     paramSpace: {
       placeholder: "",
@@ -218,7 +217,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "select",
       minLength: 1,
-      maxLength: 100,
+      maxLength: 100
     },
     paramKey: {
       placeholder: "",
@@ -230,7 +229,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "select",
       minLength: 1,
-      maxLength: 100,
+      maxLength: 100
     },
     paramValue: {
       placeholder: "",
@@ -242,7 +241,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "text",
       minLength: 1,
-      maxLength: 100,
+      maxLength: 100
     },
     startBlock: {
       placeholder: "1",
@@ -254,7 +253,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "number",
       minLength: 0,
-      maxLength: 40,
+      maxLength: 40
     },
     endBlock: {
       placeholder: "100",
@@ -266,7 +265,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "number",
       minLength: 0,
-      maxLength: 40,
+      maxLength: 40
     },
     memo: {
       placeholder: "opt: note attached with the transaction",
@@ -276,7 +275,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       inputText: "memo",
       required: false,
       minLength: 0,
-      maxLength: 200,
+      maxLength: 200
     },
     fee: {
       placeholder: "opt: transaction fee",
@@ -288,7 +287,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: false,
       type: "number",
       minLength: 0,
-      maxLength: 40,
+      maxLength: 40
     },
     password: {
       placeholder: "key password",
@@ -300,8 +299,8 @@ export function getFormInputs(type, keyGroup, account, validator) {
       required: true,
       type: "password",
       minLength: 0,
-      maxLength: 40,
-    },
+      maxLength: 40
+    }
   };
   switch (type) {
     case "send":
@@ -319,7 +318,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
         a.signer,
         a.memo,
         a.fee,
-        a.password,
+        a.password
       ];
     case "create_order":
       return [a.address, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password];
@@ -335,7 +334,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
         a.receiveAddress,
         a.memo,
         a.fee,
-        a.password,
+        a.password
       ];
     case "delete_order":
       return [a.address, a.committeeId, a.orderId, a.memo, a.fee, a.password];
@@ -350,7 +349,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
         a.signer,
         a.memo,
         a.fee,
-        a.password,
+        a.password
       ];
     case "change-param":
       return [a.address, a.paramSpace, a.paramKey, a.paramValue, a.startBlock, a.endBlock, a.memo, a.fee, a.password];
@@ -380,19 +379,19 @@ export const placeholders = {
       accounts: {
         approvedPercent: 38,
         rejectPercent: 62,
-        votedPercent: 35,
+        votedPercent: 35
       },
       validators: {
         approvedPercent: 76,
         rejectPercent: 24,
-        votedPercent: 77,
-      },
-    },
+        votedPercent: 77
+      }
+    }
   },
   pollJSON: {
     proposal: "canopy network is the best",
     endBlock: 100,
-    URL: "https://discord.com/link-to-thread",
+    URL: "https://discord.com/link-to-thread"
   },
   proposals: {
     "2cbb73b8abdacf233f4c9b081991f1692145624a95004f496a95d3cce4d492a4": {
@@ -402,10 +401,10 @@ export const placeholders = {
         parameter_value: "example",
         start_height: 1,
         end_height: 1000000,
-        signer: "4646464646464646464646464646464646464646464646464646464646464646",
+        signer: "4646464646464646464646464646464646464646464646464646464646464646"
       },
-      approve: false,
-    },
+      approve: false
+    }
   },
   params: {
     parameter_space: "consensus",
@@ -413,7 +412,7 @@ export const placeholders = {
     parameter_value: "1/150",
     start_height: 1,
     end_height: 100,
-    signer: "303739303732333263...",
+    signer: "303739303732333263..."
   },
   rawTx: {
     type: "change_parameter",
@@ -423,15 +422,15 @@ export const placeholders = {
       parameter_value: 1000,
       start_height: 1,
       end_height: 100,
-      signer: "1fe1e32edc41d688...",
+      signer: "1fe1e32edc41d688..."
     },
     signature: {
       public_key: "a88b9c0c7b77e7f8ac...",
-      signature: "8f6d016d04e350...",
+      signature: "8f6d016d04e350..."
     },
     memo: "",
-    fee: 10000,
-  },
+    fee: 10000
+  }
 };
 
 // numberWithCommas() formats a number with commas as thousand separators
@@ -521,27 +520,24 @@ export function objEmpty(o) {
 }
 
 // disallowedCharacters is a string of characters that are not allowed in form inputs.
-export const disallowedCharacters = ["\t", '"'];
+export const disallowedCharacters = ["\t", "\""];
 
 // sanitizeInput removes disallowed characters from the given event target value.
-// It is meant to be used as an onChange event handler.
+// It is meant to be used as an onChange event handler
 export const sanitizeInput = (event) => {
   let value = event.target.value;
-
   disallowedCharacters.forEach((char) => {
     value = value.split(char).join("");
   });
-
   event.target.value = value;
 };
 
 // formatNumberInput is a function that formats a number input with commas as thousand separators.
-// It is meant to be used as an onChange event handler.
+// It is meant to be used as an onChange event handler
 export const formatNumberInput = (e) => {
-  // Removes all non-digit characters and leading zeros from the input value.
-  let input = e.target.value.replace(/[^\d]/g, "").replace(/^0/, "");
-  // Check if the input is a number and is greater than 0, a regex is used as isNaN
-  // may allow for unexpected input like empty strings or null values.
+  // remove all non-digit characters but keep leading zeros
+  let input = e.target.value.replace(/[^\d]/g, "");
+  // check if the input is a valid number (digits only)
   if (/^\d+$/.test(input)) {
     input = numberWithCommas(input);
   }

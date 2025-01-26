@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 )
@@ -70,15 +71,17 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	if qc == nil || qc.Results == nil {
 		return lib.ErrNilCertResults()
 	}
-	// validate the height of the CertificateResults Transaction
-	height := qc.Header.CanopyHeight
 	// get the last data for the committee
 	data, err := s.GetCommitteeData(qc.Header.CommitteeId)
 	if err != nil {
 		return err
 	}
 	// ensure the canopy height isn't too old
-	if height < data.LastCanopyHeightUpdated && qc.Header.Height >= data.LastChainHeightUpdated {
+	if qc.Header.CanopyHeight < data.LastCanopyHeightUpdated {
+		return lib.ErrInvalidQCBaseChainHeight()
+	} // ensure the committee height isn't too old
+	if qc.Header.Height <= data.LastChainHeightUpdated {
+		fmt.Println("H1 ", qc.Header.Height, data.LastChainHeightUpdated)
 		return lib.ErrInvalidQCCommitteeHeight()
 	}
 	results, storeI, committeeId, nonSignerPercent := qc.Results, s.store.(lib.StoreI), qc.Header.CommitteeId, 0
