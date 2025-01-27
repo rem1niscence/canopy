@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+
 	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/p2p"
-	"io"
-	"net/http"
 )
 
 type Client struct {
@@ -318,28 +319,30 @@ func (c *Client) Keystore() (keystore *crypto.Keystore, err lib.ErrorI) {
 	err = c.get(KeystoreRouteName, keystore, true)
 	return
 }
-func (c *Client) KeystoreNewKey(password string) (address crypto.AddressI, err lib.ErrorI) {
+func (c *Client) KeystoreNewKey(password, nickname string) (address crypto.AddressI, err lib.ErrorI) {
 	address = new(crypto.Address)
 	err = c.keystoreRequest(KeystoreNewKeyRouteName, keystoreRequest{
 		passwordRequest: passwordRequest{password},
+		nicknameRequest: nicknameRequest{nickname},
 	}, address)
 	return
 }
 
-func (c *Client) KeystoreImport(address string, epk crypto.EncryptedPrivateKey) (returned crypto.AddressI, err lib.ErrorI) {
+func (c *Client) KeystoreImport(address, nickname string, epk crypto.EncryptedPrivateKey) (returned crypto.AddressI, err lib.ErrorI) {
 	bz, err := lib.NewHexBytesFromString(address)
 	if err != nil {
 		return nil, err
 	}
 	returned = new(crypto.Address)
 	err = c.keystoreRequest(KeystoreImportRouteName, keystoreRequest{
-		addressRequest:      addressRequest{Address: bz},
+		addressRequest:      addressRequest{bz},
+		nicknameRequest:     nicknameRequest{nickname},
 		EncryptedPrivateKey: epk,
 	}, returned)
 	return
 }
 
-func (c *Client) KeystoreImportRaw(privateKey, password string) (returned crypto.AddressI, err lib.ErrorI) {
+func (c *Client) KeystoreImportRaw(privateKey, password, nickname string) (returned crypto.AddressI, err lib.ErrorI) {
 	bz, err := lib.NewHexBytesFromString(privateKey)
 	if err != nil {
 		return nil, err
@@ -347,33 +350,66 @@ func (c *Client) KeystoreImportRaw(privateKey, password string) (returned crypto
 	returned = new(crypto.Address)
 	err = c.keystoreRequest(KeystoreImportRawRouteName, keystoreRequest{
 		PrivateKey:      bz,
-		passwordRequest: passwordRequest{Password: password},
-	}, returned)
-	return
-}
-
-func (c *Client) KeystoreDelete(address string) (returned crypto.AddressI, err lib.ErrorI) {
-	bz, err := lib.NewHexBytesFromString(address)
-	if err != nil {
-		return nil, err
-	}
-	returned = new(crypto.Address)
-	err = c.keystoreRequest(KeystoreDeleteRouteName, keystoreRequest{
-		addressRequest: addressRequest{bz},
-	}, returned)
-	return
-}
-
-func (c *Client) KeystoreGet(address, password string) (returned *crypto.KeyGroup, err lib.ErrorI) {
-	bz, err := lib.NewHexBytesFromString(address)
-	if err != nil {
-		return nil, err
-	}
-	returned = new(crypto.KeyGroup)
-	err = c.keystoreRequest(KeystoreGetRouteName, keystoreRequest{
-		addressRequest:  addressRequest{bz},
 		passwordRequest: passwordRequest{password},
+		nicknameRequest: nicknameRequest{nickname},
 	}, returned)
+	return
+}
+
+type AddrOrNickname struct {
+	Address  string
+	Nickname string
+}
+
+func (c *Client) KeystoreDelete(addrOrNickname AddrOrNickname) (returned crypto.AddressI, err lib.ErrorI) {
+	returned = new(crypto.Address)
+
+	if addrOrNickname.Address != "" {
+		var bz lib.HexBytes
+		bz, err = lib.NewHexBytesFromString(addrOrNickname.Address)
+		if err != nil {
+			return
+		}
+		err = c.keystoreRequest(KeystoreDeleteRouteName, keystoreRequest{
+			addressRequest: addressRequest{bz},
+		}, returned)
+		return
+	}
+
+	if addrOrNickname.Nickname != "" {
+		err = c.keystoreRequest(KeystoreDeleteRouteName, keystoreRequest{
+			nicknameRequest: nicknameRequest{addrOrNickname.Nickname},
+		}, returned)
+		return
+	}
+
+	return
+}
+
+func (c *Client) KeystoreGet(addrOrNickname AddrOrNickname, password string) (returned *crypto.KeyGroup, err lib.ErrorI) {
+	returned = new(crypto.KeyGroup)
+
+	if addrOrNickname.Address != "" {
+		var bz lib.HexBytes
+		bz, err = lib.NewHexBytesFromString(addrOrNickname.Address)
+		if err != nil {
+			return
+		}
+		err = c.keystoreRequest(KeystoreGetRouteName, keystoreRequest{
+			addressRequest:  addressRequest{bz},
+			passwordRequest: passwordRequest{password},
+		}, returned)
+		return
+	}
+
+	if addrOrNickname.Nickname != "" {
+		err = c.keystoreRequest(KeystoreGetRouteName, keystoreRequest{
+			nicknameRequest: nicknameRequest{addrOrNickname.Nickname},
+			passwordRequest: passwordRequest{password},
+		}, returned)
+		return
+	}
+
 	return
 }
 

@@ -706,7 +706,10 @@ func KeystoreNewKey(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func KeystoreImport(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		if err := k.Import(ptr.Address, &ptr.EncryptedPrivateKey); err != nil {
+		if err := k.ImportWithOpts(&ptr.EncryptedPrivateKey, crypto.ImportOpts{
+			Address:  ptr.Address,
+			Nickname: ptr.Nickname,
+		}); err != nil {
 			return nil, err
 		}
 		return ptr.Address, k.SaveToFile(conf.DataDirPath)
@@ -728,14 +731,20 @@ func KeystoreImportRaw(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 
 func KeystoreDelete(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		k.DeleteKey(ptr.Address)
+		k.DeleteKeyWithOpts(crypto.DeleteOpts{
+			Address:  ptr.Address,
+			Nickname: ptr.Nickname,
+		})
 		return ptr.Address, k.SaveToFile(conf.DataDirPath)
 	})
 }
 
 func KeystoreGetKeyGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		return k.GetKeyGroup(ptr.Address, ptr.Password)
+		return k.GetKeyGroupWithOpts(ptr.Password, crypto.GetKeyGroupOpts{
+			Address:  ptr.Address,
+			Nickname: ptr.Nickname,
+		})
 	})
 }
 
@@ -1482,7 +1491,7 @@ type heightAndIdRequest struct {
 type keystoreRequest struct {
 	addressRequest
 	passwordRequest
-	// nicknameRequest
+	nicknameRequest
 	PrivateKey lib.HexBytes `json:"privateKey"`
 	crypto.EncryptedPrivateKey
 }

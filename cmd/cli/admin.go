@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+
 	"github.com/canopy-network/canopy/cmd/rpc"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"os"
 )
 
 var adminCmd = &cobra.Command{
@@ -78,7 +79,7 @@ var (
 		Use:   "ks-new-key",
 		Short: "add a new key to the keystore of the node",
 		Run: func(cmd *cobra.Command, args []string) {
-			writeToConsole(client.KeystoreNewKey(getPassword()))
+			writeToConsole(client.KeystoreNewKey(getPassword(), getNickname()))
 		},
 	}
 
@@ -91,7 +92,7 @@ var (
 			if err := lib.UnmarshalJSON([]byte(args[1]), ptr); err != nil {
 				l.Fatal(err.Error())
 			}
-			writeToConsole(client.KeystoreImport(argGetAddr(args[0]), *ptr))
+			writeToConsole(client.KeystoreImport(argGetAddr(args[0]), getNickname(), *ptr))
 		},
 	}
 
@@ -100,25 +101,25 @@ var (
 		Short: "add a new key to the keystore of the node using the raw private key",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeToConsole(client.KeystoreImportRaw(args[0], getPassword()))
+			writeToConsole(client.KeystoreImportRaw(args[0], getPassword(), getNickname()))
 		},
 	}
 
 	ksDeleteCmd = &cobra.Command{
-		Use:   "ks-delete <address>",
-		Short: "delete the key associated with the address from the keystore",
+		Use:   "ks-delete <address or nickname>",
+		Short: "delete the key associated with the address or nickname from the keystore",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeToConsole(client.KeystoreDelete(argGetAddr(args[0])))
+			writeToConsole(client.KeystoreDelete(argGetAddrOrNickname(args[0])))
 		},
 	}
 
 	ksGetCmd = &cobra.Command{
-		Use:   "ks-get <address>",
-		Short: "query the key group associated with the address",
+		Use:   "ks-get <address or nickname>",
+		Short: "query the key group associated with the address or nickname",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeToConsole(client.KeystoreGet(argGetAddr(args[0]), getPassword()))
+			writeToConsole(client.KeystoreGet(argGetAddrOrNickname(args[0]), getPassword()))
 		},
 	}
 
@@ -369,11 +370,39 @@ func argGetAddr(arg string) string {
 	return arg
 }
 
+func argGetAddrOrNickname(arg string) rpc.AddrOrNickname {
+	bz, err := lib.StringToBytes(arg)
+	if err != nil {
+		return rpc.AddrOrNickname{
+			Nickname: arg,
+		}
+	}
+	if len(bz) != crypto.AddressSize {
+		return rpc.AddrOrNickname{
+			Nickname: arg,
+		}
+	}
+	return rpc.AddrOrNickname{
+		Address: arg,
+	}
+}
+
 func argToCommittees(arg string) string {
 	if _, err := rpc.StringToCommittees(arg); err != nil {
 		l.Fatal(err.Error())
 	}
 	return arg
+}
+
+func getNickname() string {
+	var nickname string
+	fmt.Println("Enter nickname:")
+	_, err := fmt.Scanln(&nickname)
+	if err != nil {
+		fmt.Println("Error reading input:", err)
+		return ""
+	}
+	return nickname
 }
 
 func getPassword() string {

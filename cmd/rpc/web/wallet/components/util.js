@@ -302,6 +302,18 @@ export function getFormInputs(type, keyGroup, account, validator) {
       minLength: 0,
       maxLength: 40,
     },
+    nickname: {
+      placeholder: "key nickname",
+      defaultValue: "",
+      tooltip: "nickname assigned to key for easier identification",
+      label: "nickname",
+      inputText: "nickname",
+      feedback: "nickname too long",
+      required: false,
+      type: "nickname",
+      minLength: 0,
+      maxLength: 40,
+    },
   };
   switch (type) {
     case "send":
@@ -366,6 +378,12 @@ export function getFormInputs(type, keyGroup, account, validator) {
       return [a.privateKey, a.password];
     case "pass-only":
       return [a.password];
+    case "pass-nickname-and-addr":
+      return [a.address, a.password, a.nickname];
+    case "pass-nickname-and-pk":
+      return [a.privateKey, a.password, a.nickname];
+    case "pass-and-nickname":
+      return [a.password, a.nickname];
     default:
       return [a.address, a.memo, a.fee, a.password];
   }

@@ -5,6 +5,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/canopy-network/canopy/cmd/rpc"
 	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/fsm"
@@ -16,13 +24,6 @@ import (
 	"golang.org/x/term"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
-	"log"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"strings"
-	"syscall"
-	"time"
 )
 
 var rootCmd = &cobra.Command{
@@ -128,13 +129,23 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 		if e != nil {
 			log.Fatal(e.Error())
 		}
+		// get nickname from the user
+		log.Infof("Enter nickname for your new private key:")
+		var nickname string
+		_, e = fmt.Scanln(&nickname)
+		if e != nil {
+			log.Fatal(e.Error())
+		}
 		// load the keystore from file
 		k, e := crypto.NewKeystoreFromFile(dataDirPath)
 		if e != nil {
 			log.Fatal(e.Error())
 		}
 		// import the validator key
-		address, e := k.ImportRaw(blsPrivateKey.Bytes(), string(password))
+		address, e := k.ImportRawWithOpts(blsPrivateKey.Bytes(), crypto.ImportRawOpts{
+			Password: string(password),
+			Nickname: string(nickname),
+		})
 		if e != nil {
 			log.Fatal(e.Error())
 		}

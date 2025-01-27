@@ -106,12 +106,12 @@ function pollRequest(address, json, password, approve) {
   return JSON.stringify({ address: address, pollJSON: json, pollApprove: approve, password: password, submit: true });
 }
 
-function addressAndPwdRequest(address, password) {
-  return JSON.stringify({ address: address, password: password, submit: true });
+function addressNicknameAndPwdRequest(address, password, nickname) {
+  return JSON.stringify({ address: address, password: password, nickname: nickname, submit: true });
 }
 
-function pkAndPwdRequest(pk, password) {
-  return JSON.stringify({ privateKey: pk, password: password });
+function pkNicknameAndPwdRequest(pk, password, nickname) {
+  return JSON.stringify({ privateKey: pk, password: password, nickname: nickname });
 }
 
 function newTxRequest(
@@ -215,16 +215,16 @@ export async function Keystore() {
   return GET(adminRPCURL, keystorePath);
 }
 
-export async function KeystoreGet(address, password) {
-  return POST(adminRPCURL, keystoreGetPath, addressAndPwdRequest(address, password));
+export async function KeystoreGet(address, password, nickname) {
+  return POST(adminRPCURL, keystoreGetPath, addressNicknameAndPwdRequest(address, password, nickname));
 }
 
-export async function KeystoreNew(password) {
-  return POST(adminRPCURL, keystoreNewPath, addressAndPwdRequest("", password));
+export async function KeystoreNew(password, nickname) {
+  return POST(adminRPCURL, keystoreNewPath, addressNicknameAndPwdRequest("", password, nickname));
 }
 
-export async function KeystoreImport(pk, password) {
-  return POST(adminRPCURL, keystoreImportPath, pkAndPwdRequest(pk, password));
+export async function KeystoreImport(pk, password, nickname) {
+  return POST(adminRPCURL, keystoreImportPath, pkNicknameAndPwdRequest(pk, password, nickname));
 }
 
 export async function Logs() {

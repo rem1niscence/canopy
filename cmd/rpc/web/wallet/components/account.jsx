@@ -102,7 +102,7 @@ export default function Accounts({ keygroup, account, validator }) {
   // onPKFormSubmit() handles the submission of the private key form and updates the state with the retrieved key
   function onPKFormSubmit(e) {
     onFormSubmit(state, e, (r) =>
-      KeystoreGet(r.sender, r.password).then((r) => {
+      KeystoreGet(r.sender, r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
       }),
     );
@@ -111,7 +111,7 @@ export default function Accounts({ keygroup, account, validator }) {
   // onNewPKFormSubmit() handles the submission of the new private key form and updates the state with the generated key
   function onNewPKFormSubmit(e) {
     onFormSubmit(state, e, (r) =>
-      KeystoreNew(r.password).then((r) => {
+      KeystoreNew(r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
       }),
     );
@@ -121,9 +121,9 @@ export default function Accounts({ keygroup, account, validator }) {
   function onImportOrGenerateSubmit(e) {
     onFormSubmit(state, e, (r) => {
       if (r.private_key) {
-        void KeystoreImport(r.private_key, r.password).then((_) => setState({ ...state, showSpinner: false }));
+        void KeystoreImport(r.private_key, r.password, r.nickname).then((_) => setState({ ...state, showSpinner: false }));
       } else {
-        void KeystoreNew(r.password).then((_) => setState({ ...state, showSpinner: false }));
+        void KeystoreNew(r.password, r.nickname).then((_) => setState({ ...state, showSpinner: false }));
       }
     });
   }
@@ -420,7 +420,7 @@ export default function Accounts({ keygroup, account, validator }) {
     return renderModal(
       true,
       "UPLOAD PRIVATE OR CREATE KEY",
-      "pass-and-pk",
+      "pass-nickname-and-pk",
       onImportOrGenerateSubmit,
       null,
       null,
@@ -450,8 +450,9 @@ export default function Accounts({ keygroup, account, validator }) {
         <br />
         <br />
         {[
-          { title: "Address", info: acc.address },
+          { title: "Address", info: keygroup.keyAddress },
           { title: "Public Key", info: keygroup.publicKey },
+          { title: "Nickname", info: keygroup.keyNickname },
         ].map(renderKeyDetail)}
         <br />
         {renderTransactions()}
@@ -470,11 +471,8 @@ export default function Accounts({ keygroup, account, validator }) {
         {renderModal(
           state.showPKImportModal,
           "Private Key",
-          "pass-and-pk",
-          () => {
-            onImportOrGenerateSubmit();
-            resetState();
-          },
+          "pass-nickname-and-pk",
+          onImportOrGenerateSubmit,
           keygroup,
           acc,
           null,
@@ -484,7 +482,7 @@ export default function Accounts({ keygroup, account, validator }) {
         {renderModal(
           state.showNewModal,
           "Private Key",
-          "pass-only",
+          "pass-and-nickname",
           onNewPKFormSubmit,
           null,
           null,

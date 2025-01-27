@@ -37,15 +37,15 @@ type KeyGroup struct {
 
 // Keystore() represents a lightweight database of private keys that are encrypted
 type Keystore struct {
-	ByAddress  map[string]*EncryptedPrivateKey
-	ByNickname map[string]*EncryptedPrivateKey
+	AddressMap  map[string]*EncryptedPrivateKey `json:"addressMap"`
+	NicknameMap map[string]*EncryptedPrivateKey `json:"nicknameMap,omitempty"`
 }
 
 // NewKeystoreInMemory() creates a new in memory keystore
 func NewKeystoreInMemory() *Keystore {
 	return &Keystore{
-		ByAddress:  make(map[string]*EncryptedPrivateKey),
-		ByNickname: make(map[string]*EncryptedPrivateKey),
+		AddressMap:  make(map[string]*EncryptedPrivateKey),
+		NicknameMap: make(map[string]*EncryptedPrivateKey),
 	}
 }
 
@@ -60,12 +60,19 @@ func NewKeystoreFromFile(dataDirPath string) (*Keystore, error) {
 		return nil, err
 	}
 	ks := new(Keystore)
-	return ks, json.Unmarshal(ksBz, ks)
+	err = json.Unmarshal(ksBz, ks)
+	if err != nil {
+		return nil, err
+	}
+	if ks.NicknameMap == nil {
+		ks.NicknameMap = make(map[string]*EncryptedPrivateKey)
+	}
+	return ks, nil
 }
 
 // Import() imports an encrypted private key to the store
 func (ks *Keystore) Import(address []byte, encrypted *EncryptedPrivateKey) error {
-	ks.ByAddress[hex.EncodeToString(address)] = encrypted
+	ks.AddressMap[hex.EncodeToString(address)] = encrypted
 	return nil
 }
 
@@ -76,13 +83,20 @@ type ImportOpts struct {
 
 // ImportWithOpts() imports an encrypted private key to the store
 func (ks *Keystore) ImportWithOpts(encrypted *EncryptedPrivateKey, opts ImportOpts) error {
-	if opts.Address != nil {
-		ks.ByAddress[hex.EncodeToString(opts.Address)] = encrypted
-	}
+	// TODO: better naming
+	encrypted.KeyAddress = hex.EncodeToString(opts.Address)
+	encrypted.KeyNickname = opts.Nickname
 
 	if opts.Nickname != "" {
-		// TODO: ask if it is needed to get address mapping too
-		ks.ByNickname[opts.Nickname] = encrypted
+		_, ok := ks.NicknameMap[opts.Nickname]
+		if ok {
+			return errors.New("nickname already used")
+		}
+		ks.NicknameMap[opts.Nickname] = encrypted
+	}
+
+	if opts.Address != nil {
+		ks.AddressMap[encrypted.KeyAddress] = encrypted
 	}
 
 	return nil
@@ -95,12 +109,12 @@ func (ks *Keystore) ImportRaw(privateKeyBytes []byte, password string) (address 
 		return
 	}
 	publicKey := privateKey.PublicKey()
-	encrypted, err := EncryptPrivateKey(publicKey.Bytes(), privateKeyBytes, []byte(password))
+	address = publicKey.Address().String()
+	encrypted, err := EncryptPrivateKey(publicKey.Bytes(), privateKeyBytes, []byte(password), address)
 	if err != nil {
 		return
 	}
-	address = publicKey.Address().String()
-	ks.ByAddress[address] = encrypted
+	ks.AddressMap[address] = encrypted
 	return
 }
 
@@ -117,11 +131,17 @@ func (ks *Keystore) ImportRawWithOpts(privateKeyBytes []byte, opts ImportRawOpts
 	}
 
 	if opts.Nickname != "" {
-		pKey := ks.ByAddress[address]
-		pKey.Nickname = opts.Nickname
+		_, ok := ks.NicknameMap[opts.Nickname]
+		if ok {
+			delete(ks.AddressMap, address)
+			return "", errors.New("nickname already used")
+		}
 
-		ks.ByAddress[address] = pKey
-		ks.ByNickname[opts.Nickname] = pKey
+		pKey := ks.AddressMap[address]
+		pKey.KeyNickname = opts.Nickname
+
+		ks.AddressMap[address] = pKey
+		ks.NicknameMap[opts.Nickname] = pKey
 	}
 
 	return
@@ -129,7 +149,7 @@ func (ks *Keystore) ImportRawWithOpts(privateKeyBytes []byte, opts ImportRawOpts
 
 // GetKey() returns the PrivateKeyI interface for an address and decrypts it using the password
 func (ks *Keystore) GetKey(address []byte, password string) (PrivateKeyI, error) {
-	v, ok := ks.ByAddress[hex.EncodeToString(address)]
+	v, ok := ks.AddressMap[hex.EncodeToString(address)]
 	if !ok {
 		return nil, fmt.Errorf("key not found")
 	}
@@ -138,7 +158,7 @@ func (ks *Keystore) GetKey(address []byte, password string) (PrivateKeyI, error)
 
 // GetKeyGroup() returns the full keygroup for an address and decrypts the private key using the password
 func (ks *Keystore) GetKeyGroup(address []byte, password string) (*KeyGroup, error) {
-	v, ok := ks.ByAddress[hex.EncodeToString(address)]
+	v, ok := ks.AddressMap[hex.EncodeToString(address)]
 	if !ok {
 		return nil, fmt.Errorf("key not found")
 	}
@@ -161,10 +181,16 @@ type GetKeyGroupOpts struct {
 func (ks *Keystore) GetKeyGroupWithOpts(password string, opts GetKeyGroupOpts) (*KeyGroup, error) {
 	var v *EncryptedPrivateKey
 	if opts.Address != nil {
-		v = ks.ByAddress[hex.EncodeToString(opts.Address)]
-	} else if opts.Nickname != "" {
-		v = ks.ByNickname[opts.Nickname]
+		stringAddress := hex.EncodeToString(opts.Address)
+		if stringAddress != "" {
+			v = ks.AddressMap[stringAddress]
+		}
 	}
+
+	if opts.Nickname != "" {
+		v = ks.NicknameMap[opts.Nickname]
+	}
+
 	if v == nil {
 		return nil, fmt.Errorf("key not found")
 	}
@@ -180,7 +206,7 @@ func (ks *Keystore) GetKeyGroupWithOpts(password string, opts GetKeyGroupOpts) (
 
 // DeleteKey() removes a private key from the store given an address
 func (ks *Keystore) DeleteKey(address []byte) {
-	delete(ks.ByAddress, hex.EncodeToString(address))
+	delete(ks.AddressMap, hex.EncodeToString(address))
 }
 
 type DeleteOpts struct {
@@ -191,14 +217,21 @@ type DeleteOpts struct {
 // DeleteKeyWithOpts() removes a private key from the store given an address and/or nickname
 func (ks *Keystore) DeleteKeyWithOpts(opts DeleteOpts) {
 	if opts.Address != nil {
-		pKey := ks.ByAddress[hex.EncodeToString(opts.Address)]
-		if pKey.Nickname != "" {
-			delete(ks.ByNickname, opts.Nickname)
+		addressString := hex.EncodeToString(opts.Address)
+		if addressString != "" {
+			pKey := ks.AddressMap[hex.EncodeToString(opts.Address)]
+			if pKey.KeyNickname != "" {
+				delete(ks.NicknameMap, pKey.KeyNickname)
+			}
+			delete(ks.AddressMap, hex.EncodeToString(opts.Address))
+			return
 		}
-		delete(ks.ByAddress, hex.EncodeToString(opts.Address))
-	} else if opts.Nickname != "" {
-		// TODO: also delete in address map
-		delete(ks.ByNickname, opts.Nickname)
+	}
+
+	if opts.Nickname != "" {
+		pKey := ks.NicknameMap[opts.Nickname]
+		delete(ks.AddressMap, pKey.KeyAddress)
+		delete(ks.NicknameMap, opts.Nickname)
 	}
 }
 
@@ -214,15 +247,16 @@ func (ks *Keystore) SaveToFile(dataDirPath string) error {
 // EncryptedPrivateKey represents an encrypted form of a private key, including the public key,
 // salt used in key derivation, and the encrypted private key itself
 type EncryptedPrivateKey struct {
-	PublicKey string `json:"publicKey"`
-	Salt      string `json:"salt"`
-	Encrypted string `json:"encrypted"`
-	Nickname  string `json:"nickname"`
+	PublicKey   string `json:"publicKey"`
+	Salt        string `json:"salt"`
+	Encrypted   string `json:"encrypted"`
+	KeyAddress  string `json:"keyAddress"`            // TODO: better naming
+	KeyNickname string `json:"keyNickname,omitempty"` // TODO: better naming
 }
 
 // EncryptPrivateKey creates an encrypted private key by generating a random salt
 // and deriving an encryption key with the KDF, and finally encrypting key using AES-GCM
-func EncryptPrivateKey(publicKey, privateKey, password []byte) (*EncryptedPrivateKey, error) {
+func EncryptPrivateKey(publicKey, privateKey, password []byte, address string) (*EncryptedPrivateKey, error) {
 	// generate random 16 bytes salt
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
@@ -235,28 +269,11 @@ func EncryptPrivateKey(publicKey, privateKey, password []byte) (*EncryptedPrivat
 	}
 	// encrypt the private key with AES-GCM using the derived key and nonce
 	return &EncryptedPrivateKey{
-		PublicKey: hex.EncodeToString(publicKey),
-		Salt:      hex.EncodeToString(salt),
-		Encrypted: hex.EncodeToString(gcm.Seal(nil, nonce, privateKey, nil)),
+		PublicKey:  hex.EncodeToString(publicKey),
+		Salt:       hex.EncodeToString(salt),
+		Encrypted:  hex.EncodeToString(gcm.Seal(nil, nonce, privateKey, nil)),
+		KeyAddress: address,
 	}, nil
-}
-
-type EncryptPrivateKeyOpts struct {
-	Nickname string
-	Password []byte
-}
-
-// EncryptPrivateKey creates an encrypted private key by generating a random salt
-// and deriving an encryption key with the KDF, and finally encrypting key using AES-GCM
-func EncryptPrivateKeyWithOpts(publicKey, privateKey []byte, opts EncryptPrivateKeyOpts) (*EncryptedPrivateKey, error) {
-	key, err := EncryptPrivateKey(publicKey, privateKey, opts.Password)
-	if err != nil {
-		return nil, err
-	}
-
-	key.Nickname = opts.Nickname
-
-	return key, nil
 }
 
 // DecryptPrivateKey takes an EncryptedPrivateKey and decrypts it to a PrivateKeyI interface using the password
