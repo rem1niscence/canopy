@@ -116,7 +116,7 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 		return
 	}
 	// generate a comparable
-	compareResults := c.CalculateRewardRecipients(c.Address, c.BaseChainHeight())
+	compareResults := c.CalculateRewardRecipients(blk.BlockHeader.ProposerAddress, c.BaseChainHeight())
 	// handle swaps
 	c.HandleSwaps(blockResult, compareResults, c.BaseChainHeight())
 	// set slash recipients
@@ -291,7 +291,7 @@ func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, baseChain
 	}
 	if c.Config.ChainId != lib.CanopyCommitteeId {
 		// sub validator
-		subValidatorWinner, e := c.FSM.LotteryWinner(c.Config.ChainId)
+		subValidatorWinner, e := c.FSM.LotteryWinner(c.Config.ChainId, true)
 		if e != nil {
 			c.log.Warnf("An error occurred choosing a sub-validator lottery winner: %s", err.Error())
 			// continue
