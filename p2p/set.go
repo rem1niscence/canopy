@@ -47,8 +47,6 @@ type Peer struct {
 
 // Add() introduces a peer to the set
 func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
-	ps.Lock()
-	defer ps.Unlock()
 	// check if peer is already added
 	pubKey := lib.BytesToString(p.Address.PublicKey)
 	if _, found := ps.m[pubKey]; found {
