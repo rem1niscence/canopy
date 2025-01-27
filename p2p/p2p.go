@@ -271,6 +271,7 @@ func (p *P2P) DialWithBackoff(peerInfo *lib.PeerAddress) {
 		return
 	}
 	opts := backoff.NewExponentialBackOff()
+	opts.InitialInterval = 5 * time.Second
 	opts.MaxElapsedTime = time.Minute
 	_ = backoff.Retry(dialAndLog, opts)
 }

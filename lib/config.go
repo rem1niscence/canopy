@@ -50,10 +50,13 @@ func DefaultConfig() Config {
 type MainConfig struct {
 	LogLevel string `json:"logLevel"`
 	ChainId  uint64 `json:"chainId"`
+	Headless bool   `json:"headless"`
 }
 
 // DefaultMainConfig() sets log level to 'info'
-func DefaultMainConfig() MainConfig { return MainConfig{LogLevel: "info", ChainId: CanopyCommitteeId} }
+func DefaultMainConfig() MainConfig {
+	return MainConfig{LogLevel: "info", ChainId: CanopyCommitteeId, Headless: false}
+}
 
 // GetLogLevel() parses the log string in the config file into a LogLevel Enum
 func (m *MainConfig) GetLogLevel() int32 {
