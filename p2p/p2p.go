@@ -270,7 +270,9 @@ func (p *P2P) DialWithBackoff(peerInfo *lib.PeerAddress) {
 		}
 		return
 	}
-	_ = backoff.Retry(dialAndLog, backoff.NewExponentialBackOff())
+	opts := backoff.NewExponentialBackOff()
+	opts.MaxElapsedTime = time.Minute
+	_ = backoff.Retry(dialAndLog, opts)
 }
 
 // DialAndDisconnect() dials the peer but disconnects once a fully authenticated connection is established
