@@ -158,6 +158,13 @@ func (ps *PeerSet) GetPeerInfo(publicKey []byte) (*lib.PeerInfo, lib.ErrorI) {
 	return peer.PeerInfo.Copy(), nil
 }
 
+// PeerCount() returns the total number of peers
+func (ps *PeerSet) PeerCount() int {
+	ps.RLock()
+	defer ps.RUnlock()
+	return len(ps.m)
+}
+
 // GetAllInfos() returns the information on connected peers and the total inbound / outbound counts
 func (ps *PeerSet) GetAllInfos() (res []*lib.PeerInfo, numInbound, numOutbound int) {
 	ps.RLock()

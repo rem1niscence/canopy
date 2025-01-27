@@ -146,7 +146,7 @@ func (c *Controller) GossipBlock(qc *lib.QuorumCertificate) {
 		c.log.Errorf("unable to gossip block with err: %s", err.Error())
 	}
 	// if a single node network - send to self
-	if c.singleNodeNetwork() {
+	if c.singleNodeNetwork() || c.P2P.PeerCount() == 0 {
 		if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
 			c.log.Errorf("unable to self send block with err: %s", err.Error())
 		}
@@ -557,7 +557,7 @@ func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc
 	stillSyncing, err = c.CheckPeerQC(msg.MaxHeight, qc)
 	if err != nil {
 		c.P2P.ChangeReputation(senderID, p2p.InvalidBlockRep)
-		c.log.Warnf("Plugin.CheckPeerQC from %s failed with error: %s", lib.BytesToTruncatedString(senderID), err.Error())
+		c.log.Warnf("CheckPeerQC from %s failed with error: %s", lib.BytesToTruncatedString(senderID), err.Error())
 		return
 	}
 	// attempts to commit the QC to persistence of chain by playing it against the state machine
@@ -569,7 +569,6 @@ func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc
 	// if self was he proposer
 	if bytes.Equal(qc.ProposerKey, c.PublicKey) && !c.isSyncing.Load() {
 		// send the proposal (reward) transaction
-		qc.Block = nil
 		c.SendCertificateResultsTx(qc)
 	}
 	return
