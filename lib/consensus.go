@@ -75,16 +75,16 @@ func (vs *ValidatorSet) GetValidatorAndIdx(publicKey []byte) (val *ConsensusVali
 
 // BaseChainInfo maintains base-chain data needed for consensus
 type BaseChainInfo struct {
-	Height                  uint64         `json:"height"`
-	ValidatorSet            ValidatorSet   `json:"validator_set"`
-	LastValidatorSet        ValidatorSet   `json:"last_validator_set"`
-	LastProposers           *Proposers     `json:"last_proposers"`
-	MinimumEvidenceHeight   uint64         `json:"minimum_evidence_height"`
-	LastCanopyHeightUpdated uint64         `json:"last_canopy_height_updated"`
-	LotteryWinner           *LotteryWinner `json:"lottery_winner"`
-	Orders                  *OrderBook     `json:"orders"`
-	RemoteCallbacks         *RemoteCallbacks
-	Log                     LoggerI
+	Height                 uint64         `json:"height"`
+	ValidatorSet           ValidatorSet   `json:"validator_set"`
+	LastValidatorSet       ValidatorSet   `json:"last_validator_set"`
+	LastProposers          *Proposers     `json:"last_proposers"`
+	MinimumEvidenceHeight  uint64         `json:"minimum_evidence_height"`
+	LastChainHeightUpdated uint64         `json:"last_canopy_height_updated"`
+	LotteryWinner          *LotteryWinner `json:"lottery_winner"`
+	Orders                 *OrderBook     `json:"orders"`
+	RemoteCallbacks        *RemoteCallbacks
+	Log                    LoggerI
 }
 
 // RemoteCallbacks are fallback rpc callbacks to the base-chain
@@ -155,17 +155,17 @@ func (b *BaseChainInfo) IsValidDoubleSigner(height uint64, address string) (*boo
 	return b.RemoteCallbacks.IsValidDoubleSigner(height, address)
 }
 
-// GetLastCanopyHeightUpdated() returns the last canopy height the committee (meta) data was updated from the base-chain
-func (b *BaseChainInfo) GetLastCanopyHeightUpdated(height, id uint64) (uint64, ErrorI) {
+// GetLastChainHeightUpdated() returns the last chain (target) height the committee (meta) data was updated from the base-chain
+func (b *BaseChainInfo) GetLastChainHeightUpdated(height, id uint64) (uint64, ErrorI) {
 	if height == b.Height {
-		return b.LastCanopyHeightUpdated, nil
+		return b.LastChainHeightUpdated, nil
 	}
 	committeeData, err := b.RemoteCallbacks.CommitteeData(height, id)
 	if err != nil {
 		return 0, err
 	}
-	b.Log.Warnf("Executing remote GetLastCanopyHeightUpdated call with requested height %d", height)
-	return committeeData.LastCanopyHeightUpdated, nil
+	b.Log.Warnf("Executing remote GetLastChainHeightUpdated call with requested height %d", height)
+	return committeeData.LastChainHeightUpdated, nil
 }
 
 // GetLotteryWinner() returns the winner of the delegate lottery from the base-chain
@@ -196,7 +196,7 @@ func (b *BaseChainInfo) MarshalJSON() ([]byte, error) {
 		Committee:               b.ValidatorSet.ValidatorSet,
 		LastCommittee:           b.LastValidatorSet.ValidatorSet,
 		LastProposers:           b.LastProposers,
-		LastCanopyHeightUpdated: b.LastCanopyHeightUpdated,
+		LastCanopyHeightUpdated: b.LastChainHeightUpdated,
 		MinimumEvidenceHeight:   b.MinimumEvidenceHeight,
 		LotteryWinner:           b.LotteryWinner,
 		Orders:                  b.Orders,
@@ -218,14 +218,14 @@ func (b *BaseChainInfo) UnmarshalJSON(bz []byte) (err error) {
 		return
 	}
 	*b = BaseChainInfo{
-		Height:                  j.Height,
-		ValidatorSet:            validatorSet,
-		LastValidatorSet:        lastValidatorSet,
-		LastProposers:           j.LastProposers,
-		MinimumEvidenceHeight:   j.MinimumEvidenceHeight,
-		LastCanopyHeightUpdated: j.LastCanopyHeightUpdated,
-		LotteryWinner:           j.LotteryWinner,
-		Orders:                  j.Orders,
+		Height:                 j.Height,
+		ValidatorSet:           validatorSet,
+		LastValidatorSet:       lastValidatorSet,
+		LastProposers:          j.LastProposers,
+		MinimumEvidenceHeight:  j.MinimumEvidenceHeight,
+		LastChainHeightUpdated: j.LastCanopyHeightUpdated,
+		LotteryWinner:          j.LotteryWinner,
+		Orders:                 j.Orders,
 	}
 	return
 }

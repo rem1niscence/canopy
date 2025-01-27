@@ -432,14 +432,14 @@ var _ lib.MessageI = &MessageCertificateResults{} // interface enforcement
 // Check() validates the Message structure
 func (x *MessageCertificateResults) Check() lib.ErrorI {
 	if x == nil {
-		return ErrInvalidCertificateResults()
+		return ErrEmptyCertificateResults()
 	}
 	if err := x.Qc.CheckBasic(); err != nil {
 		return err
 	}
 	results := x.Qc.Results
 	if results == nil {
-		return ErrInvalidCertificateResults()
+		return ErrEmptyCertificateResults()
 	}
 	if x.Qc.Block != nil {
 		return lib.ErrNilBlock()

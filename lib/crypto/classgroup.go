@@ -3,6 +3,8 @@ package crypto
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 	"math/big"
 	"sync"
 )
@@ -353,9 +355,14 @@ func (group *ClassGroup) Discard() { bip.Recycle(group.a, group.b, group.c) }
 //
 //	This design would ultimately save GC pressure because Class Groups could be explicitly reused instead of always creating a new instance
 
+var DiscriminantCache = map[string]*big.Int{}
+
 // NewDiscriminant generates a 2048-bit discriminant using a seed
 // The discriminant % 8 == 7 and is a negated random prime p between 13 - 2^4096
 func NewDiscriminant(seed []byte) *big.Int {
+	if d, ok := DiscriminantCache[hex.EncodeToString(seed)]; ok {
+		return bip.New().Set(d)
+	}
 	// define big ints
 	n, negN, temp := bip.New(), bip.New(), bip.New()
 	defer bip.Recycle(negN, temp)
@@ -375,36 +382,55 @@ func NewDiscriminant(seed []byte) *big.Int {
 	n.Add(n, temp.SetInt64(int64(residue)))
 	// save the negative value of n
 	negN.Neg(n)
-
 	// find the smallest prime >= n of the form n + m*x
+	// initialize a sieve to mark non-prime candidates within the range
+	sieveLen := 65536
+	sieve := make([]bool, sieveLen)
 	for {
-		// initialize a sieve to mark non-prime candidates within the range
-		sieve := make([]bool, 65536)
-		// use modular arithmetic to mark multiples of primes as non-prime
+		// reset the slice
+		sieve = sieve[:]
+		var wg sync.WaitGroup
+		// parallelize the marking of multiples
 		for _, v := range SieveInfo {
-			// `v.p` is a prime divisor, and `v.q` is the modular inverse of m mod v.p
-			// `i` calculates the starting index for marking multiples of v.p
-			// it represents the smallest integer such that:
-			//     m * i ≡ -n (mod v.p)
-			// simplified as:
-			//     i = ((-n % v.p) * v.q) % v.p
-			i := (temp.Mod(negN, temp.SetInt64(v.p)).Int64() * v.q) % v.p
+			wg.Add(1)
+			go func(v Pair) {
+				tmp := bip.New().Set(temp)
+				defer wg.Done()
+				defer bip.Recycle(tmp)
+				// `v.p` is a prime divisor, and `v.q` is the modular inverse of m mod v.p
+				// `i` calculates the starting index for marking multiples of v.p
+				// it represents the smallest integer such that:
+				//     m * i ≡ -n (mod v.p)
+				// simplified as:
+				//     i = ((-n % v.p) * v.q) % v.p
+				i := (tmp.Mod(negN, tmp.SetInt64(v.p)).Int64() * v.q) % v.p
 
-			// adjust `i` to ensure it's within the bounds of the sieve
-			for i < int64(len(sieve)) {
-				// mark the sieve index as non-prime
-				sieve[i] = true
-				// move to the next multiple of v.p within the sieve range
-				i += v.p
-			}
+				// adjust `i` to ensure it's within the bounds of the sieve
+				for i < int64(sieveLen) {
+					// mark the sieve index as non-prime
+					sieve[i] = true
+					// move to the next multiple of v.p within the sieve range
+					i += v.p
+				}
+			}(v)
 		}
+		// wait for all marking goroutines to finish
+		wg.Wait()
 		// check each number in the sieve range for primality.
 		for i, marked := range sieve {
+			// skip if pre-marked as non prime
+			if marked {
+				continue
+			}
 			// calculate the candidate number t = n + m * i
 			t := temp.Add(n, temp.SetInt64(m*int64(i)))
-
 			// if the number is not marked in the sieve and is a probable prime:
-			if !marked && t.ProbablyPrime(1) {
+			if t.ProbablyPrime(1) {
+				if len(DiscriminantCache) >= 100 {
+					DiscriminantCache = make(map[string]*big.Int)
+				}
+				// set to cache
+				DiscriminantCache[hex.EncodeToString(seed)] = bip.New().Set(n.Neg(t))
 				// return the negation of the prime number (as per the discriminant's requirements)
 				return n.Neg(t)
 			}
@@ -468,6 +494,11 @@ func floorDivision(x, y *big.Int) *big.Int {
 // - solvable: A boolean indicating if a solution exists
 func solveMod(a, b, m *big.Int) (solution, step *big.Int, solvable bool) {
 	solution = bip.New()
+	// ensure m is not 0
+	if m.Cmp(bigZero) == 0 {
+		fmt.Println("M == 0, should not happen")
+		return nil, nil, false // No solution exists
+	}
 	// find GCD of a and m, and the coefficients d and e
 	gcd, x, _ := safeGCD(a, m)
 	// check if b is divisible by gcd

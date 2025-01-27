@@ -24,7 +24,20 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	return s.HandleCertificateResults(lastCertificate, nil, nil)
+	// if not base-chain: the committee won't match the certificate result
+	// so just set the committee to nil to ignore the byzantine evidence
+	// the byzantine evidence is handled at `Transaction Level` via
+	// HandleMessageCertificateResults
+	if s.Config.ChainId != lib.CanopyCommitteeId {
+		return s.HandleCertificateResults(lastCertificate, nil)
+	}
+	// if is base-chain: load the committee from state as the certificate result
+	// will match the evidence and there's no Transaction to HandleMessageCertificateResults
+	committee, err := s.LoadCommittee(s.Config.ChainId, s.Height()-1)
+	if err != nil {
+		return err
+	}
+	return s.HandleCertificateResults(lastCertificate, &committee)
 }
 
 // EndBlock() is code that is executed at the end of `applying` the block
@@ -65,20 +78,56 @@ func (s *StateMachine) CheckProtocolVersion() lib.ErrorI {
 }
 
 // HandleCertificateResults() is a handler for the results of a quorum certificate
-func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, committee *lib.ValidatorSet, validatorParams *types.ValidatorParams) lib.ErrorI {
+func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, committee *lib.ValidatorSet) lib.ErrorI {
 	// ensure the certificate results are not nil
 	if qc == nil || qc.Results == nil {
-		s.log.Errorf("Certificate.Results is nil, skipping")
-		return nil
+		return lib.ErrNilCertResults()
 	}
-	results, storeI, committeeId, nonSignerPercent := qc.Results, s.store.(lib.StoreI), qc.Header.CommitteeId, 0
-	// handle checkpoint-as-a-service functionality
-	if results.Checkpoint != nil && s.Config.ChainId == lib.CanopyCommitteeId && committee != nil {
-		// handle the token swaps
-		err := s.HandleCommitteeSwaps(results.Orders, committeeId)
-		if err != nil {
-			return err
-		}
+	// get the last data for the committee
+	data, err := s.GetCommitteeData(qc.Header.CommitteeId)
+	if err != nil {
+		return err
+	}
+	// ensure the canopy height isn't too old
+	if qc.Header.CanopyHeight < data.LastCanopyHeightUpdated {
+		return lib.ErrInvalidQCBaseChainHeight()
+	} // ensure the committee height isn't too old
+	if qc.Header.Height <= data.LastChainHeightUpdated {
+		return lib.ErrInvalidQCCommitteeHeight()
+	}
+	results, committeeId := qc.Results, qc.Header.CommitteeId
+	// handle the token swaps
+	if err = s.HandleCommitteeSwaps(results.Orders, committeeId); err != nil {
+		return err
+	}
+	// index the checkpoint
+	if err = s.HandleCheckpoint(committeeId, results); err != nil {
+		return err
+	}
+	// handle byzantine evidence
+	nonSignerPercent, err := s.HandleByzantine(qc, committee)
+	if err != nil {
+		return err
+	}
+	// reduce all payment percents proportional to the non-signer percent
+	for i, p := range results.RewardRecipients.PaymentPercents {
+		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, uint64(nonSignerPercent))
+	}
+	// update the committee data
+	return s.UpsertCommitteeData(&lib.CommitteeData{
+		CommitteeId:             committeeId,
+		LastCanopyHeightUpdated: qc.Header.CanopyHeight,
+		LastChainHeightUpdated:  qc.Header.Height,
+		PaymentPercents:         results.RewardRecipients.PaymentPercents,
+	})
+}
+
+// HandleCheckpoint() handles the `checkpoint-as-a-service` base-chain functionality
+// NOTE: this will index self checkpoints - but allows for sub-chain checkpointing too
+func (s *StateMachine) HandleCheckpoint(committeeId uint64, results *lib.CertificateResult) (err lib.ErrorI) {
+	storeI := s.store.(lib.StoreI)
+	// index the checkpoint
+	if results.Checkpoint != nil {
 		// retrieve the last saved checkpoint for this chain
 		mostRecentCheckpoint, e := storeI.GetMostRecentCheckpoint(committeeId)
 		if e != nil {
@@ -92,23 +141,8 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 		if err = storeI.IndexCheckpoint(committeeId, results.Checkpoint); err != nil {
 			return err
 		}
-		// calculate the missing (non-signers) percentage of voting power on this QC
-		nonSignerPercent, err = s.HandleByzantine(qc, committee.ValidatorSet, validatorParams)
-		if err != nil {
-			return err
-		}
 	}
-	// reduce all payment percents proportional to the non-signer percent
-	for i, p := range results.RewardRecipients.PaymentPercents {
-		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, uint64(nonSignerPercent))
-	}
-	// update the committee data
-	return s.UpsertCommitteeData(&lib.CommitteeData{
-		CommitteeId:             committeeId,
-		LastCanopyHeightUpdated: qc.Header.CanopyHeight,
-		LastChainHeightUpdated:  qc.Header.Height,
-		PaymentPercents:         results.RewardRecipients.PaymentPercents,
-	})
+	return
 }
 
 // LAST PROPOSERS CODE BELOW

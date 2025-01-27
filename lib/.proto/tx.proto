@@ -34,6 +34,10 @@ message Transaction {
   uint64 fee = 5;
   // memo: An optional message or note attached to the transaction
   string memo = 6;
+  // network_id: The identity of the network the transaction is intended for
+  uint64 network_id = 7;
+  // chain_id: The identity of the committee the transaction is intended for
+  uint64 chain_id = 8;
 }
 
 // TxResult represents the result of a processed transaction, including information about the sender, recipient,

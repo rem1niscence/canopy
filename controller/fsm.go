@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"math"
+	"math/rand"
 	"time"
 
 	"github.com/canopy-network/canopy/bft"
@@ -37,13 +38,8 @@ func (c *Controller) HandleTransaction(tx []byte) lib.ErrorI {
 func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF) (blk []byte, results *lib.CertificateResult, err lib.ErrorI) {
 	height, reset := c.FSM.Height(), c.ValidatorProposalConfig()
 	defer func() { reset(); c.FSM.Reset() }()
-	// extract the vdf iterations if any
-	var vdfIterations uint64
-	if vdf != nil {
-		vdfIterations = vdf.Iterations
-	}
 	// load the previous block from the store
-	qc, lastBlock, err := c.FSM.LoadBlockAndCertificate(height - 1)
+	qc, _, err := c.FSM.LoadBlockAndCertificate(height - 1)
 	if err != nil {
 		return
 	}
@@ -55,21 +51,17 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 	// re-validate all transactions in the mempool as a fail-safe
 	c.Mempool.checkMempool()
 	// extract transactions from the mempool
-	transactions, numTxs := c.Mempool.GetTransactions(maxBlockSize)
+	transactions, _ := c.Mempool.GetTransactions(maxBlockSize)
+	// validate VDF
+	if vdf != nil {
+		if !crypto.VerifyVDF(qc.BlockHash, vdf.Output, vdf.Proof, int(vdf.Iterations)) {
+			c.log.Error(lib.ErrInvalidVDF().Error())
+			vdf = nil
+		}
+	}
 	// create a block structure
 	block := &lib.Block{
-		BlockHeader: &lib.BlockHeader{
-			Height:                height + 1,                                               // increment the height
-			NetworkId:             c.FSM.NetworkID,                                          // ensure only applicable for the proper network
-			Time:                  uint64(time.Now().UnixMicro()),                           // set the time of the block
-			NumTxs:                uint64(numTxs),                                           // set the number of transactions
-			TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(numTxs),          // calculate the total transactions
-			LastBlockHash:         lastBlock.BlockHeader.LastBlockHash,                      // use the last block hash to 'chain' the blocks
-			ProposerAddress:       c.Address,                                                // set self as proposer address
-			LastQuorumCertificate: qc,                                                       // add last QC to lock-in a commit certificate
-			TotalVdfIterations:    lastBlock.BlockHeader.TotalVdfIterations + vdfIterations, // add last total iterations to current iterations
-			Vdf:                   vdf,                                                      // attach the vdf proof
-		},
+		BlockHeader:  &lib.BlockHeader{Time: uint64(time.Now().UnixMicro()), ProposerAddress: c.Address, LastQuorumCertificate: qc, Vdf: vdf},
 		Transactions: transactions,
 	}
 	// capture the tentative block result here
@@ -92,6 +84,8 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 	c.HandleSwaps(blockResult, results, c.BaseChainHeight())
 	// set slash recipients
 	c.CalculateSlashRecipients(results, be)
+	// set checkpoint
+	c.CalculateCheckpoint(blockResult, results)
 	return
 }
 
@@ -127,9 +121,11 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 	c.HandleSwaps(blockResult, compareResults, c.BaseChainHeight())
 	// set slash recipients
 	c.CalculateSlashRecipients(compareResults, evidence)
+	// set checkpoint
+	c.CalculateCheckpoint(blockResult, compareResults)
 	// ensure generated the same results
 	if !qc.Results.Equals(compareResults) {
-		return types.ErrInvalidCertificateResults()
+		return types.ErrMismatchCertResults()
 	}
 	return
 }
@@ -343,6 +339,17 @@ func (c *Controller) CalculateSlashRecipients(results *lib.CertificateResult, be
 	}
 }
 
+// CalculateCheckpoint() calculates the checkpoint for the checkpoint as a service functionality
+func (c *Controller) CalculateCheckpoint(blockResult *lib.BlockResult, results *lib.CertificateResult) {
+	// checkpoint every 100 heights
+	if blockResult.BlockHeader.Height%100 == 0 {
+		results.Checkpoint = &lib.Checkpoint{
+			Height:    blockResult.BlockHeader.Height,
+			BlockHash: blockResult.BlockHeader.Hash,
+		}
+	}
+}
+
 // AddLotteryWinner() adds a lottery winner (delegate, sub-delegate, or sub-validator) to the reward recipients
 func (c *Controller) AddLotteryWinner(results *lib.CertificateResult, lotteryWinner *lib.LotteryWinner) {
 	if len(lotteryWinner.Winner) == 0 {
@@ -403,6 +410,16 @@ func (c *Controller) CompareBlockHeaders(candidate *lib.BlockHeader, compare *li
 		// ensure is a full +2/3rd maj QC
 		if isPartialQC {
 			return lib.ErrNoMaj23()
+		}
+	}
+	// validate VDF
+	if candidate.Vdf != nil {
+		// if syncing or committing - only verify the vdf randomly since this randomness is pseudo-non-deterministic (among nodes) this holds
+		// similar security guarantees but lowers the computational requirements at a per-node basis
+		if !commit || rand.Intn(100) == 0 {
+			if !crypto.VerifyVDF(candidate.LastQuorumCertificate.BlockHash, candidate.Vdf.Output, candidate.Vdf.Proof, int(candidate.Vdf.Iterations)) {
+				return lib.ErrInvalidVDF()
+			}
 		}
 	}
 	// check the timestamp if actively in BFT - else it's been validated by the validator set

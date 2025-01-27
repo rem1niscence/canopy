@@ -86,6 +86,19 @@ func TestTransactionCheckBasic(t *testing.T) {
 			error: "invalid memo",
 		},
 		{
+			name:   "bad network id",
+			detail: "the network id is invalid",
+			transaction: &Transaction{
+				MessageType: testMessageName,
+				Msg:         a,
+				Signature:   sig,
+				Time:        uint64(time.Now().UnixMicro()),
+				Fee:         0,
+				Memo:        "",
+			},
+			error: "nil network id",
+		},
+		{
 			name:   "no error",
 			detail: "the transaction is valid",
 			transaction: &Transaction{
@@ -95,6 +108,22 @@ func TestTransactionCheckBasic(t *testing.T) {
 				Time:        uint64(time.Now().UnixMicro()),
 				Fee:         0,
 				Memo:        "",
+				NetworkId:   1,
+			},
+			error: "empty committee id",
+		},
+		{
+			name:   "no error",
+			detail: "the transaction is valid",
+			transaction: &Transaction{
+				MessageType: testMessageName,
+				Msg:         a,
+				Signature:   sig,
+				Time:        uint64(time.Now().UnixMicro()),
+				Fee:         0,
+				Memo:        "",
+				NetworkId:   1,
+				ChainId:     1,
 			},
 		},
 	}

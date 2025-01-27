@@ -123,6 +123,15 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (cr
 //     into the hash of the transaction, ensuring no transactions will 'accidentally collide'
 //   - The timestamp acceptance policy for transactions maintains an acceptable bound of time to support database pruning
 func (s *StateMachine) CheckReplay(tx *lib.Transaction, txHash string) lib.ErrorI {
+	// ensure the right network
+	if uint64(s.NetworkID) != tx.NetworkId {
+		return lib.ErrWrongNetworkID()
+	}
+	// ensure the right chain
+	if s.Config.ChainId != tx.ChainId {
+		return lib.ErrWrongCommitteeID()
+	}
+	// if below height 2, skip this check as GetBlockByHeight will load a block that has a lastQC that doesn't exist
 	height := s.Height()
 	if height < 2 {
 		return nil

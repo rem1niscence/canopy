@@ -8,9 +8,14 @@ import (
 )
 
 // HandleByzantine() handles the byzantine (faulty/malicious) participants from a QuorumCertificate
-func (s *StateMachine) HandleByzantine(qc *lib.QuorumCertificate, vs *lib.ConsensusValidators, params *types.ValidatorParams) (nonSignerPercent int, err lib.ErrorI) {
-	if s.height <= 2 {
+func (s *StateMachine) HandleByzantine(qc *lib.QuorumCertificate, vs *lib.ValidatorSet) (nonSignerPercent int, err lib.ErrorI) {
+	if s.height <= 2 || vs == nil {
 		return // height 2 would use height 1 as begin_block which uses genesis as lastQC
+	}
+	// get the validator params
+	params, err := s.GetParamsVal()
+	if err != nil {
+		return 0, err
 	}
 	slashRecipients := qc.Results.SlashRecipients
 	// if the non-signers window has completed, reset the window and slash non-signers
@@ -27,7 +32,7 @@ func (s *StateMachine) HandleByzantine(qc *lib.QuorumCertificate, vs *lib.Consen
 		}
 	}
 	// get those who did not sign this particular QC but should have
-	nonSigners, nonSignerPercent, err := qc.GetNonSigners(vs)
+	nonSigners, nonSignerPercent, err := qc.GetNonSigners(vs.ValidatorSet)
 	if err != nil {
 		return 0, err
 	}

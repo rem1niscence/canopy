@@ -397,8 +397,11 @@ func (s *StateMachine) UpsertCommitteeData(new *lib.CommitteeData) lib.ErrorI {
 	// retrieve the committees' data list, the target and index in the list based on the committeeId
 	committeesData, targetData, idx, err := s.getCommitteeDataAndList(new.CommitteeId)
 	// check the new committee data is not 'out-dated'
-	if new.LastCanopyHeightUpdated < targetData.LastCanopyHeightUpdated || new.LastChainHeightUpdated <= targetData.LastChainHeightUpdated {
-		return types.ErrInvalidCertificateResults()
+	if new.LastChainHeightUpdated <= targetData.LastChainHeightUpdated {
+		return lib.ErrInvalidQCCommitteeHeight()
+	}
+	if new.LastCanopyHeightUpdated < targetData.LastCanopyHeightUpdated {
+		return lib.ErrInvalidQCBaseChainHeight()
 	}
 	// combine the new data with the target
 	if err = targetData.Combine(new); err != nil {

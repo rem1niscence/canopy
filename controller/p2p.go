@@ -117,7 +117,7 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 	defer func() { qc.Block = blk }()
 	// it's good practice to omit the block when sending the transaction as it's not relevant to canopy
 	qc.Block = nil
-	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, 0, "")
+	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, c.Config.NetworkID, 0, "")
 	if err != nil {
 		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return
@@ -530,15 +530,26 @@ func (c *Controller) UpdateP2PMustConnect() {
 
 // handlePeerBlock() validates and handles inbound Quorum Certificates from remote peers
 func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc *lib.QuorumCertificate, stillSyncing bool, err lib.ErrorI) {
+	c.log.Info("Handling peer block")
 	// define a convenience variable for certificate
 	qc = msg.BlockAndCertificate
-	v := c.Consensus.ValidatorSet
+	// do a basic validation on the QC before loading the committee
+	if err = qc.CheckBasic(); err != nil {
+		return
+	}
+	// load the committee using the canopy height from the base-chain
+	// upon independence, this check for the validator set will be ignored
+	// and checkpoints will be used instead
+	v, err := c.Consensus.LoadCommittee(qc.Header.CanopyHeight)
+	if err != nil {
+		return
+	}
 	// validate the quorum certificate
 	if err = c.checkPeerQC(c.LoadMaxBlockSize(), &lib.View{
 		Height:       c.FSM.Height(),
-		CanopyHeight: c.BaseChainInfo.GetHeight(),
+		CanopyHeight: qc.Header.CanopyHeight,
 		NetworkId:    c.Config.NetworkID,
-		CommitteeId:  msg.CommitteeId,
+		CommitteeId:  c.Config.ChainId,
 	}, v, qc, senderID); err != nil {
 		return
 	}
@@ -554,6 +565,12 @@ func (c *Controller) handlePeerBlock(senderID []byte, msg *lib.BlockMessage) (qc
 		c.P2P.ChangeReputation(senderID, p2p.InvalidBlockRep)
 		c.log.Warnf("CommitCertificate from %s: %s", lib.BytesToTruncatedString(senderID), err.Error())
 		return
+	}
+	// if self was he proposer
+	if bytes.Equal(qc.ProposerKey, c.PublicKey) && !c.isSyncing.Load() {
+		// send the proposal (reward) transaction
+		qc.Block = nil
+		c.SendCertificateResultsTx(qc)
 	}
 	return
 }

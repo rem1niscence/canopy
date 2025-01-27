@@ -430,15 +430,6 @@ func (b *BFT) StartCommitPhase() {
 		b.RoundInterrupt()
 		return
 	}
-	// send the proposal (reward) transaction
-	b.SendCertificateResultsTx(&QC{
-		Header:      vote.Qc.Header,       // vote view
-		BlockHash:   crypto.Hash(b.Block), // vote block payload
-		ResultsHash: b.Results.Hash(),     // vote certificate results payload
-		Results:     b.Results,
-		ProposerKey: b.ProposerKey,
-		Signature:   as,
-	})
 	// SEND MSG TO REPLICAS
 	b.SendToReplicas(b.ValidatorSet, &Message{
 		Header: b.Copy(), // header
@@ -590,19 +581,6 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.PacemakerMessages = make(PacemakerMessages)
 	// reset PartialQCs
 	b.PartialQCs = make(PartialQCs)
-	// if resetting due to new Canopy Block and Validator Set then KeepLocks
-	// - protecting any who may have committed against attacks like malicious proposers from withholding
-	// COMMIT_MSG and sending it after the next block is produces
-	if keepLocks == nil || !keepLocks[0] {
-		b.HighQC = nil
-		if b.SelfIsValidator() {
-			// begin the verifiable delay function for the next height
-			if err = b.RunVDF(); err != nil {
-				b.log.Errorf("RunVDF() failed with error, %s", err.Error())
-			}
-		}
-		b.Height++
-	}
 	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
 	b.Block, b.Results = nil, nil
@@ -619,6 +597,18 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.ValidatorSet, err = b.Controller.LoadCommittee(b.CanopyHeight)
 	if err != nil {
 		b.log.Errorf("LoadCommittee() failed with err: %s", err.Error())
+	}
+	// if resetting due to new Canopy Block and Validator Set then KeepLocks
+	// - protecting any who may have committed against attacks like malicious proposers from withholding
+	// COMMIT_MSG and sending it after the next block is produces
+	if keepLocks == nil || !keepLocks[0] {
+		b.HighQC = nil
+		if b.SelfIsValidator() {
+			// begin the verifiable delay function for the next height
+			if err = b.RunVDF(); err != nil {
+				b.log.Errorf("RunVDF() failed with error, %s", err.Error())
+			}
+		}
 	}
 }
 
@@ -729,8 +719,11 @@ func (b *BFT) SelfIsValidator() bool {
 
 // RunVDF() runs the verifiable delay service
 func (b *BFT) RunVDF() lib.ErrorI {
+	if b.Config.ChainId != lib.CanopyCommitteeId {
+		return nil
+	}
 	// generate the VDF seed
-	seed, err := b.VDFSeed(b.PublicKey)
+	seed, err := b.VDFSeed()
 	if err != nil {
 		return err
 	}
@@ -740,7 +733,7 @@ func (b *BFT) RunVDF() lib.ErrorI {
 }
 
 // VDFSeed() generates the seed for the verifiable delay service
-func (b *BFT) VDFSeed(publicKey []byte) ([]byte, lib.ErrorI) {
+func (b *BFT) VDFSeed() ([]byte, lib.ErrorI) {
 	lastQuorumCertificate, err := b.LoadCertificate(b.Height - 1)
 	if err != nil {
 		return nil, err
@@ -748,12 +741,12 @@ func (b *BFT) VDFSeed(publicKey []byte) ([]byte, lib.ErrorI) {
 	if lastQuorumCertificate == nil {
 		return nil, lib.ErrEmptyQuorumCertificate()
 	}
-	return append(lastQuorumCertificate.BlockHash, publicKey...), nil
+	return lastQuorumCertificate.BlockHash, nil
 }
 
 // VerifyVDF() validates the VDF from a Replica
 func (b *BFT) VerifyVDF(vote *Message) (bool, lib.ErrorI) {
-	seed, err := b.VDFSeed(vote.Signature.PublicKey)
+	seed, err := b.VDFSeed()
 	if err != nil {
 		return false, err
 	}

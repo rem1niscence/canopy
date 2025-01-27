@@ -144,6 +144,7 @@ const (
 	CodeInvalidLastQC                   ErrorCode = 47
 	CodeMaxPort                         ErrorCode = 48
 	CodePanic                           ErrorCode = 49
+	CodeInvalidVDF                      ErrorCode = 50
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -234,9 +235,10 @@ const (
 	CodeInvalidCheckpoint                 ErrorCode = 83
 	CodeInvalidSellOrder                  ErrorCode = 84
 	CodeStartPollHeight                   ErrorCode = 85
-	CodeInvalidDelegatorReward            ErrorCode = 86
-	CodeInvalidNumberOfRewardRecipients   ErrorCode = 87
-	CodeInvalidProposerRewardPercent      ErrorCode = 88
+	CodeEmptyCommitteeID                  ErrorCode = 86
+	CodeMismatchCertResults               ErrorCode = 87
+	CodeInvalidQCBaseChainHeight          ErrorCode = 88
+	CodeEmptyCertificateResults           ErrorCode = 89
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -427,6 +429,10 @@ func ErrInvalidQCCommitteeHeight() ErrorI {
 	return NewError(CodeInvalidQCCommitteeHeight, ConsensusModule, "invalid certificate committee height")
 }
 
+func ErrInvalidQCBaseChainHeight() ErrorI {
+	return NewError(CodeInvalidQCBaseChainHeight, ConsensusModule, "invalid certificate base-chain height")
+}
+
 func ErrWrongMaxHeight() ErrorI {
 	return NewError(CodeWrongMaxHeight, ConsensusModule, "wrong max height")
 }
@@ -469,6 +475,10 @@ func ErrInvalidAggrSignature() ErrorI {
 
 func ErrNoMaj23() ErrorI {
 	return NewError(CodeNoMaj23, ConsensusModule, "quorum not reached")
+}
+
+func ErrInvalidVDF() ErrorI {
+	return NewError(CodeInvalidVDF, ConsensusModule, "invalid verifiable delay proof")
 }
 
 func ErrValidatorNotInSet(publicKey []byte) ErrorI {
@@ -593,6 +603,10 @@ func ErrPaymentRecipientsCount() ErrorI {
 
 func ErrWrongNetworkID() ErrorI {
 	return NewError(CodeWrongNetworkID, StateMachineModule, "wrong network id")
+}
+
+func ErrEmptyCommitteeId() ErrorI {
+	return NewError(CodeEmptyCommitteeID, StateMachineModule, "empty committee id")
 }
 
 func ErrWrongCommitteeID() ErrorI {

@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -10,12 +11,14 @@ import (
 )
 
 func TestBeginBlock(t *testing.T) {
+	const stakeAmount = uint64(100)
 	tests := []struct {
-		name            string
-		detail          string
-		isGenesis       bool
-		protocolVersion int
-		error           lib.ErrorI
+		name               string
+		detail             string
+		isGenesis          bool
+		protocolVersion    int
+		setLastCertResults bool
+		error              lib.ErrorI
 	}{
 		{
 			name:            "begin_block at genesis",
@@ -30,9 +33,16 @@ func TestBeginBlock(t *testing.T) {
 			isGenesis:       true,
 		},
 		{
-			name:            "begin_block after genesis",
-			detail:          "after genesis with a valid protocol version",
+			name:            "begin_block empty certificate results",
+			detail:          "the certificate results are empty",
 			protocolVersion: 1,
+			error:           lib.ErrNilCertResults(),
+		},
+		{
+			name:               "begin_block after genesis",
+			detail:             "after genesis with a valid protocol version",
+			protocolVersion:    1,
+			setLastCertResults: true,
 		},
 		{
 			name:            "begin_block after genesis with invalid protocol version",
@@ -48,6 +58,65 @@ func TestBeginBlock(t *testing.T) {
 			)
 			// create a state machine instance with default parameters
 			sm := newSingleAccountStateMachine(t)
+			// set the last certificate results in the indexer
+			if test.setLastCertResults {
+				qc := &lib.QuorumCertificate{
+					Header: &lib.View{Height: sm.height},
+					Results: &lib.CertificateResult{RewardRecipients: &lib.RewardRecipients{
+						PaymentPercents: []*lib.PaymentPercents{{
+							Address: newTestAddressBytes(t),
+							Percent: 100,
+						}},
+					}},
+				}
+				// track the supply
+				supply := &types.Supply{}
+				// for 4 validators
+				for i := 0; i < 4; i++ {
+					// set the validator
+					require.NoError(t, sm.SetValidators([]*types.Validator{{
+						Address:      newTestAddressBytes(t, i),
+						PublicKey:    newTestPublicKeyBytes(t, i),
+						StakedAmount: 100,
+						Committees:   []uint64{lib.CanopyCommitteeId},
+					}}, supply))
+					// set the committee member
+					require.NoError(t, sm.SetCommitteeMember(newTestAddress(t, i), lib.CanopyCommitteeId, 100))
+				}
+				// set the supply in state
+				require.NoError(t, sm.SetSupply(supply))
+				// create an aggregate signature
+				// get the committee members
+				committee, err := sm.GetCommitteeMembers(lib.CanopyCommitteeId, true)
+				require.NoError(t, err)
+				// create a copy of the multikey
+				mk := committee.MultiKey.Copy()
+				// only sign with 3/4 to test the non-signer reduction
+				for i := 0; i < 3; i++ {
+					privateKey := newTestKeyGroup(t, i).PrivateKey
+					// search for the proper index for the signer
+					for j, pubKey := range mk.PublicKeys() {
+						// if found, add the signer
+						if privateKey.PublicKey().Equals(pubKey) {
+							// sign the qc
+							require.NoError(t, mk.AddSigner(privateKey.Sign(qc.SignBytes()), j))
+						}
+					}
+				}
+				// aggregate the signature
+				aggSig, e := mk.AggregateSignatures()
+				require.NoError(t, e)
+				// attach the signature to the message
+				qc.Signature = &lib.AggregateSignature{
+					Signature: aggSig,
+					Bitmap:    mk.Bitmap(),
+				}
+				require.NoError(t, sm.store.(lib.StoreI).IndexQC(qc))
+			}
+			// commit the store
+			_, err := sm.store.(lib.StoreI).Commit()
+			require.NoError(t, err)
+			sm.height += 1
 			// set protocol version
 			sm.ProtocolVersion = test.protocolVersion
 			// if at genesis, set height to 1
@@ -66,7 +135,7 @@ func TestBeginBlock(t *testing.T) {
 			// check canopy reward pool for proper mint
 			canopyRewardPool, err := sm.GetPool(lib.CanopyCommitteeId)
 			require.NoError(t, err)
-			require.Equal(t, expectedCommitteeMint, canopyRewardPool.Amount)
+			require.Equal(t, expectedCommitteeMint, canopyRewardPool.Amount, fmt.Sprintf("%d, %d", expectedCommitteeMint, canopyRewardPool.Amount))
 			// check DAO reward pool for proper mint
 			daoRewardPool, err := sm.GetPool(lib.DAOPoolID)
 			require.NoError(t, err)

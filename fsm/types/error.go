@@ -232,6 +232,14 @@ func ErrInvalidCertificateResults() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidCertificateResults, lib.StateMachineModule, "invalid certificate results")
 }
 
+func ErrEmptyCertificateResults() lib.ErrorI {
+	return lib.NewError(lib.CodeEmptyCertificateResults, lib.StateMachineModule, "empty certificate results")
+}
+
+func ErrMismatchCertResults() lib.ErrorI {
+	return lib.NewError(lib.CodeMismatchCertResults, lib.StateMachineModule, "the certificate results generated does not match the compare")
+}
+
 func ErrInvalidSubisdy() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidSubsidy, lib.StateMachineModule, "invalid subsidy")
 }

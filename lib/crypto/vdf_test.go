@@ -146,7 +146,7 @@ func TestVDFJSON(t *testing.T) {
 	require.EqualExportedValues(t, expected, got)
 }
 
-const precomputedTestCasesCSV = `seed,out,proof,verify
+const precomputedTestCasesCSV = `seed,out,proof,iterations
 2c2dabd803f7ded3e9874074c09d13adbcc217e8279c115cf22f6790e358728d,0a02000212020001,0a02000112020001,0
 f13d0686cc8189fca9f154e75613d088ce5a4a4f8e9cb0f1ff963145a5254e45,0a02000412020103,0a02000112020001,1
 47ad70cd98b8366b536debbc64d750af1dd15d188bdf14be2e60ee396e3adb99,0a02001012020107,0a02000112020001,2
