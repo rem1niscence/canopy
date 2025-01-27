@@ -153,7 +153,7 @@ var (
 		GovParamRouteName:              {Method: http.MethodPost, Path: "/v1/query/gov-params", HandlerFunc: GovParams},
 		ConParamsRouteName:             {Method: http.MethodPost, Path: "/v1/query/con-params", HandlerFunc: ConParams},
 		ValParamRouteName:              {Method: http.MethodPost, Path: "/v1/query/val-params", HandlerFunc: ValParams},
-		StateRouteName:                 {Method: http.MethodPost, Path: "/v1/query/state", HandlerFunc: State},
+		StateRouteName:                 {Method: http.MethodGet, Path: "/v1/query/state", HandlerFunc: State},
 		StateDiffRouteName:             {Method: http.MethodPost, Path: "/v1/query/state-diff", HandlerFunc: StateDiff},
 		StateDiffGetRouteName:          {Method: http.MethodGet, Path: "/v1/query/state-diff", HandlerFunc: StateDiff},
 		CertByHeightRouteName:          {Method: http.MethodPost, Path: "/v1/query/cert-by-height", HandlerFunc: CertByHeight},
@@ -658,7 +658,23 @@ func GovParams(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func State(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	heightParams(w, r, func(s *fsm.StateMachine) (any, lib.ErrorI) { return s.ExportState() })
+	request := new(heightsRequest)
+	if err := r.ParseForm(); err != nil {
+		write(w, err, http.StatusBadRequest)
+		return
+	}
+	request.Height = parseUint64FromString(r.Form.Get("height"))
+	sm, ok := getStateMachineWithHeight(request.Height, w)
+	if !ok {
+		return
+	}
+	defer sm.Discard()
+	state, err := sm.ExportState()
+	if err != nil {
+		write(w, err, http.StatusBadRequest)
+		return
+	}
+	write(w, state, http.StatusOK)
 }
 
 func StateDiff(w http.ResponseWriter, r *http.Request, p httprouter.Params) {

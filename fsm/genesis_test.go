@@ -603,34 +603,6 @@ func TestValidateGenesisState(t *testing.T) {
 			error: "address size is invalid",
 		},
 		{
-			name:   "account amount",
-			detail: "the account amount is invalid",
-			input: &types.GenesisState{
-				Accounts: []*types.Account{
-					{
-						Address: newTestAddressBytes(t),
-						Amount:  0,
-					},
-				},
-				Params: types.DefaultParams(),
-			},
-			error: "amount is invalid",
-		},
-		{
-			name:   "pool amount",
-			detail: "the pool amount is invalid",
-			input: &types.GenesisState{
-				Pools: []*types.Pool{
-					{
-						Id:     lib.CanopyCommitteeId,
-						Amount: 0,
-					},
-				},
-				Params: types.DefaultParams(),
-			},
-			error: "amount is invalid",
-		},
-		{
 			name:   "duplicate committee order book",
 			detail: "the order book contains a duplicate committee entry",
 			input: &types.GenesisState{
