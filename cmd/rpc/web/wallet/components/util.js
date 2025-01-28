@@ -76,7 +76,8 @@ export function getFormInputs(type, keyGroup, account, validator) {
             required: true,
             type: "text",
             minLength: 5,
-            maxLength: 50
+            maxLength: 50,
+            shouldNotRender : (keygroup, account, validator) => validator?.delegate === true
         },
         earlyWithdrawal: {
             placeholder: "early withdrawal rewards for 20% penalty",

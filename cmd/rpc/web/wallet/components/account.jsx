@@ -320,6 +320,8 @@ export default function Accounts({ keygroup, account, validator }) {
     };
 
     const doRenderForm = (v, i) => {
+      if (v.shouldNotRender && v.shouldNotRender(keygroup, account, validator)) return null;
+
       return (
         <Form.Group key={i} className="mb-3">
           <InputGroup size="lg">
