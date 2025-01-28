@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	GlobalMaxBlockSize = int(32 * units.MB)
+	GlobalMaxBlockSize         = int(32 * units.MB)
+	ExpectedMaxBlockHeaderSize = 1640 // ensures developers are aware of a change to the header size (which is a consensus breaking change)
 )
 
 var MaxBlockHeaderSize uint64
@@ -58,7 +59,9 @@ func init() {
 		panic(err)
 	}
 	MaxBlockHeaderSize = uint64(len(maxBlockHeader))
-	fmt.Println(MaxBlockHeaderSize)
+	if MaxBlockHeaderSize != ExpectedMaxBlockHeaderSize {
+		panic(fmt.Sprintf("Max_Header_Size changed from %d to %d; This is a consensus breaking change", ExpectedMaxBlockHeaderSize, MaxBlockHeaderSize))
+	}
 }
 
 // QUORUM CERTIFICATE CODE BELOW

@@ -164,7 +164,7 @@ func (c *Controller) LoadMaxBlockSize() int {
 	if params == nil {
 		return 0
 	}
-	return int(params.BlockSize) // TODO add with max header size here... as this param is only enforced at the txn level in other places in the code
+	return int(params.BlockSize)
 }
 
 // LoadLastCommitTime() gets a timestamp from the most recent Quorum Block
