@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [Unreleased] - 1/28/2024
+- Remove net addr in wallet when not delegating
+
+## [Unreleased] - 1/28/2024
+- Add max amount form button
+
+## [Unreleased] - 1/28/2024
+- Fix UI transactions table Issue
+
 ## [Unreleased] - 1/24/2024
 - Modified architecture to supported forkable multi-chain 
 - Created 'buy-orders'

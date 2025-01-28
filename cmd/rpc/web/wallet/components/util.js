@@ -76,7 +76,8 @@ export function getFormInputs(type, keyGroup, account, validator) {
             required: true,
             type: "text",
             minLength: 5,
-            maxLength: 50
+            maxLength: 50,
+            shouldNotRender : (keygroup, account, validator) => validator?.delegate === true
         },
         earlyWithdrawal: {
             placeholder: "early withdrawal rewards for 20% penalty",
@@ -524,24 +525,23 @@ export const disallowedCharacters = ["\t", "\""];
 
 // sanitizeInput removes disallowed characters from the given event target value.
 // It is meant to be used as an onChange event handler
-export const sanitizeInput = (event) => {
-    let value = event.target.value;
+export const sanitizeInput = (value) => {
     disallowedCharacters.forEach((char) => {
         value = value.split(char).join("");
     });
-    event.target.value = value;
+    return value;
 };
 
 // formatNumberInput is a function that formats a number input with commas as thousand separators.
-// It is meant to be used as an onChange event handler
-export const formatNumberInput = (e) => {
-    // remove all non-digit characters but keep leading zeros
-    let input = e.target.value.replace(/[^\d]/g, "");
-    // check if the input is a valid number (digits only)
+export const formatNumberInput = (value) => {
+    // Removes all non-digit characters and leading zeros from the input value.
+    let input = value.replace(/[^\d]/g, "").replace(/^0/, "");
+    // Check if the input is a number and is greater than 0, a regex is used as isNaN
+    // may allow for unexpected input like empty strings or null values.
     if (/^\d+$/.test(input)) {
-        input = numberWithCommas(input);
+        return numberWithCommas(input);
     }
-    e.target.value = input;
+    return input;
 };
 
 // numberFromCommas is a function that converts a string of numbers formatted with commas
