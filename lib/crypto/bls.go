@@ -343,3 +343,7 @@ func (b *BLS12381MultiPublicKey) SignerEnabledAt(i int) (bool, error) {
 func (b *BLS12381MultiPublicKey) SetBitmap(bm []byte) error { return b.mask.SetMask(bm) }
 func newBLSScheme() *bdn.Scheme                             { return bdn.NewSchemeOnG2(newBLSSuite()) }
 func newBLSSuite() pairing.Suite                            { return bls12381.NewBLS12381Suite() }
+
+func MaxBitmapSize(numValidators uint64) int {
+	return int((numValidators + 7) / 8)
+}

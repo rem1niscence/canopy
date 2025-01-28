@@ -51,7 +51,7 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 	// re-validate all transactions in the mempool as a fail-safe
 	c.Mempool.checkMempool()
 	// extract transactions from the mempool
-	transactions, _ := c.Mempool.GetTransactions(maxBlockSize)
+	transactions, _ := c.Mempool.GetTransactions(maxBlockSize - lib.MaxBlockHeaderSize)
 	// validate VDF
 	if vdf != nil {
 		if !crypto.VerifyVDF(qc.BlockHash, vdf.Output, vdf.Proof, int(vdf.Iterations)) {
@@ -322,8 +322,9 @@ func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.Cert
 	// process the base-chain order book against the state
 	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(orders, blockResult)
 	// add the orders to the certificate result
+	// truncate for defensive spam protection
 	results.Orders = &lib.Orders{
-		BuyOrders:   buyOrders,
+		BuyOrders:   lib.TruncateSlice(buyOrders, 100),
 		ResetOrders: resetOrders,
 		CloseOrders: closeOrders,
 	}

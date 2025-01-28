@@ -3,14 +3,63 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"math"
 	"slices"
 )
 
 const (
 	GlobalMaxBlockSize = int(32 * units.MB)
 )
+
+var MaxBlockHeaderSize uint64
+
+func init() {
+	maxBlockHeader, err := Marshal(&BlockHeader{
+		Height:             math.MaxUint64,
+		Hash:               crypto.MaxHash,
+		NetworkId:          math.MaxInt8,
+		Time:               math.MaxUint32,
+		NumTxs:             math.MaxUint64,
+		TotalTxs:           math.MaxUint64,
+		TotalVdfIterations: math.MaxUint64,
+		LastBlockHash:      crypto.MaxHash,
+		StateRoot:          crypto.MaxHash[:20],
+		TransactionRoot:    crypto.MaxHash,
+		ValidatorRoot:      crypto.MaxHash,
+		NextValidatorRoot:  crypto.MaxHash,
+		ProposerAddress:    crypto.MaxHash,
+		Vdf: &crypto.VDF{
+			Proof:      bytes.Repeat([]byte("F"), 528),
+			Output:     bytes.Repeat([]byte("F"), 528),
+			Iterations: math.MaxUint64,
+		},
+		LastQuorumCertificate: &QuorumCertificate{
+			Header: &View{
+				NetworkId:    math.MaxInt8,
+				CommitteeId:  math.MaxUint64,
+				Height:       math.MaxUint64,
+				CanopyHeight: math.MaxUint64,
+				Round:        math.MaxUint64,
+				Phase:        math.MaxInt8,
+			},
+			ResultsHash: crypto.MaxHash,
+			BlockHash:   crypto.MaxHash,
+			ProposerKey: bytes.Repeat([]byte("F"), crypto.BLS12381PubKeySize),
+			Signature: &AggregateSignature{
+				Signature: bytes.Repeat([]byte("F"), crypto.BLS12381SignatureSize),
+				Bitmap:    bytes.Repeat([]byte("F"), crypto.MaxBitmapSize(100)),
+			},
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	MaxBlockHeaderSize = uint64(len(maxBlockHeader))
+	fmt.Println(MaxBlockHeaderSize)
+}
 
 // QUORUM CERTIFICATE CODE BELOW
 
@@ -103,9 +152,8 @@ func (x *QuorumCertificate) Check(vs ValidatorSet, maxBlockSize int, view *View,
 		return false, err
 	}
 	if x.Block != nil {
-		blockSize := len(x.Block)
-		// global max block size enforcement
-		if blockSize > maxBlockSize {
+		// max block size enforcement
+		if len(x.Block) > maxBlockSize {
 			return false, ErrExpectedMaxBlockSize()
 		}
 	}
