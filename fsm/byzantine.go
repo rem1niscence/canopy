@@ -145,13 +145,13 @@ func (s *StateMachine) HandleDoubleSigners(committeeId uint64, params *types.Val
 	var badList [][]byte
 	for _, doubleSigner := range doubleSigners {
 		// sanity check
-		if doubleSigner == nil || doubleSigner.PubKey == nil {
+		if doubleSigner == nil || doubleSigner.Id == nil {
 			return lib.ErrInvalidEvidence()
 		}
 		if len(doubleSigner.Heights) < 1 {
 			return lib.ErrInvalidDoubleSignHeights()
 		}
-		pubKey, e := crypto.NewPublicKeyFromBytes(doubleSigner.PubKey)
+		pubKey, e := crypto.NewPublicKeyFromBytes(doubleSigner.Id)
 		if e != nil {
 			return lib.ErrPubKeyFromBytes(e)
 		}

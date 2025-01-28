@@ -315,7 +315,7 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 func (s *StateMachine) ResetToBeginBlock() {
 	s.Reset()
 	if err := s.BeginBlock(); err != nil {
-		panic(err)
+		s.log.Errorf("BEGIN_BLOCK FAILURE: %s", err.Error())
 	}
 }
 

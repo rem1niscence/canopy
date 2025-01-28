@@ -263,15 +263,13 @@ func (t *Indexer) GetDoubleSigners() (ds []*lib.DoubleSigner, err lib.ErrorI) {
 			return nil, ErrInvalidKey()
 		}
 		// key split should be dsPrefix / height / address
-		height, address := t.decodeBigEndian(split[1]), split[2]
+		address, height := split[1], t.decodeBigEndian(split[2])
 		// add to results
-		heights := results[lib.BytesToString(address)]
-		heights = append(heights, height)
-		results[string(address)] = heights
+		results[string(address)] = append(results[string(address)], height)
 	}
 	for address, heights := range results {
 		ds = append(ds, &lib.DoubleSigner{
-			PubKey:  []byte(address),
+			Id:      []byte(address),
 			Heights: heights,
 		})
 	}
@@ -531,7 +529,7 @@ func (t *Indexer) checkpointKey(committee, height uint64) []byte {
 }
 
 func (t *Indexer) doubleSignerHeightKey(address []byte, height uint64) []byte {
-	return t.key(doubleSignerPrefix, t.encodeBigEndian(height), address)
+	return t.key(doubleSignerPrefix, address, t.encodeBigEndian(height))
 }
 
 func (t *Indexer) key(prefix []byte, param1, param2 []byte) []byte {

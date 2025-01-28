@@ -68,7 +68,7 @@ func TestHandleByzantine(t *testing.T) {
 					SlashRecipients: &lib.SlashRecipients{
 						DoubleSigners: []*lib.DoubleSigner{
 							{
-								PubKey:  keyGroups[0].PublicKey.Bytes(),
+								Id:      keyGroups[0].PublicKey.Bytes(),
 								Heights: []uint64{0},
 							},
 						},
@@ -164,7 +164,7 @@ func TestHandleByzantine(t *testing.T) {
 					require.Len(t, doubleSigners, 1)
 					// get the validator associated with the double signer
 					// NOTE: GetDoubleSigners populates with the address NOT the public key...
-					validator, e := sm.GetValidator(crypto.NewAddress(doubleSigners[0].PubKey))
+					validator, e := sm.GetValidator(crypto.NewAddress(doubleSigners[0].Id))
 					require.NoError(t, e)
 					// validate the slash of the double signer
 					require.Less(t, validator.StakedAmount, stakeAmount)
@@ -403,7 +403,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 			name:   "bad heights",
 			detail: "there is 1 invalid double signer, bad heights",
 			doubleSigners: []*lib.DoubleSigner{{
-				PubKey:  newTestPublicKeyBytes(t),
+				Id:      newTestPublicKeyBytes(t),
 				Heights: []uint64{},
 			}},
 			error: lib.ErrInvalidDoubleSignHeights(),
@@ -412,11 +412,11 @@ func TestHandleDoubleSigners(t *testing.T) {
 			name:   "already indexed",
 			detail: "there is 1 invalid double signer, already indexed",
 			preset: []*lib.DoubleSigner{{
-				PubKey:  newTestPublicKeyBytes(t),
+				Id:      newTestPublicKeyBytes(t),
 				Heights: []uint64{1},
 			}},
 			doubleSigners: []*lib.DoubleSigner{{
-				PubKey:  newTestPublicKeyBytes(t),
+				Id:      newTestPublicKeyBytes(t),
 				Heights: []uint64{1},
 			}},
 			error: lib.ErrInvalidDoubleSigner(),
@@ -425,7 +425,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 			name:   "1 double signer for 1 height",
 			detail: "there is 1 valid double signer for a single height",
 			doubleSigners: []*lib.DoubleSigner{{
-				PubKey:  newTestPublicKeyBytes(t),
+				Id:      newTestPublicKeyBytes(t),
 				Heights: []uint64{1},
 			}},
 		},
@@ -433,7 +433,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 			name:   "1 double signer for 2 heights",
 			detail: "there is 1 valid double signer for two heights",
 			doubleSigners: []*lib.DoubleSigner{{
-				PubKey:  newTestPublicKeyBytes(t),
+				Id:      newTestPublicKeyBytes(t),
 				Heights: []uint64{1, 2},
 			}},
 		},
@@ -441,10 +441,10 @@ func TestHandleDoubleSigners(t *testing.T) {
 			name:   "2 double signer for various heights",
 			detail: "there is 2 valid double signer for various heights",
 			doubleSigners: []*lib.DoubleSigner{{
-				PubKey:  newTestPublicKeyBytes(t),
+				Id:      newTestPublicKeyBytes(t),
 				Heights: []uint64{1, 2},
 			}, {
-				PubKey:  newTestPublicKeyBytes(t, 1),
+				Id:      newTestPublicKeyBytes(t, 1),
 				Heights: []uint64{3, 4, 5},
 			}},
 		},
@@ -461,7 +461,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 			for _, doubleSigner := range test.preset {
 				s := sm.Store().(lib.StoreI)
 				// get the address of the double signer
-				pub, err := crypto.NewPublicKeyFromBytes(doubleSigner.PubKey)
+				pub, err := crypto.NewPublicKeyFromBytes(doubleSigner.Id)
 				require.NoError(t, err)
 				// pre-index the double signer
 				for _, h := range doubleSigner.Heights {
@@ -486,7 +486,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 				// add the validator stake to supply
 				require.NoError(t, sm.AddToStakedSupply(stakeAmount))
 				// get the address of the double signer
-				pub, err := crypto.NewPublicKeyFromBytes(doubleSigner.PubKey)
+				pub, err := crypto.NewPublicKeyFromBytes(doubleSigner.Id)
 				require.NoError(t, err)
 				// save the public key for later use in the test
 				pubs = append(pubs, pub)

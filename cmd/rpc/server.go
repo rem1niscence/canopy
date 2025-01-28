@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -83,6 +84,7 @@ const (
 	OrdersRouteName                = "orders"
 	LastProposersRouteName         = "last-proposers"
 	IsValidDoubleSignerRouteName   = "valid-double-signer"
+	DoubleSignersRouteName         = "double-signers"
 	MinimumEvidenceHeightRouteName = "minimum-evidence-height"
 	LotteryRouteName               = "lottery"
 	BaseChainInfoRouteName         = "base-chain-info"
@@ -168,6 +170,7 @@ var (
 		OrdersRouteName:                {Method: http.MethodPost, Path: "/v1/query/orders", HandlerFunc: Orders},
 		LastProposersRouteName:         {Method: http.MethodPost, Path: "/v1/query/last-proposers", HandlerFunc: LastProposers},
 		IsValidDoubleSignerRouteName:   {Method: http.MethodPost, Path: "/v1/query/valid-double-signer", HandlerFunc: IsValidDoubleSigner},
+		DoubleSignersRouteName:         {Method: http.MethodPost, Path: "/v1/query/double-signers", HandlerFunc: DoubleSigners},
 		MinimumEvidenceHeightRouteName: {Method: http.MethodPost, Path: "/v1/query/minimum-evidence-height", HandlerFunc: MinimumEvidenceHeight},
 		LotteryRouteName:               {Method: http.MethodPost, Path: "/v1/query/lottery", HandlerFunc: Lottery},
 		PendingRouteName:               {Method: http.MethodPost, Path: "/v1/query/pending", HandlerFunc: Pending},
@@ -632,8 +635,33 @@ func Lottery(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func IsValidDoubleSigner(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	heightAndAddressParams(w, r, func(s *fsm.StateMachine, a lib.HexBytes) (interface{}, lib.ErrorI) {
-		return s.IsValidDoubleSigner(s.Height(), a), nil
+	heightAndAddrIndexer(w, r, func(s lib.StoreI, h uint64, a lib.HexBytes) (interface{}, lib.ErrorI) {
+		// ensure the last quorum certificate doesn't expose any valid double signers that aren't yet indexed
+		qc, err := s.GetQCByHeight(s.Version() - 1)
+		if err != nil {
+			return nil, err
+		}
+		if qc.Results != nil && qc.Results.SlashRecipients != nil {
+			for _, ds := range qc.Results.SlashRecipients.DoubleSigners {
+				// get the public key from the address
+				pk, e := crypto.NewPublicKeyFromBytes(ds.Id)
+				if e != nil {
+					continue
+				}
+				// if contains height, return not valid signer
+				if bytes.Equal(pk.Address().Bytes(), a) && slices.Contains(ds.Heights, h) {
+					return false, nil
+				}
+			}
+		}
+		// check the indexer
+		return s.IsValidDoubleSigner(a, h)
+	})
+}
+
+func DoubleSigners(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightIndexer(w, r, func(s lib.StoreI, _ uint64, _ lib.PageParams) (interface{}, lib.ErrorI) {
+		return s.GetDoubleSigners()
 	})
 }
 
@@ -1356,6 +1384,27 @@ func heightIndexer(w http.ResponseWriter, r *http.Request, callback func(s lib.S
 		req.Height = s.Version() - 1
 	}
 	p, err := callback(s, req.Height, req.PageParams)
+	if err != nil {
+		write(w, err, http.StatusBadRequest)
+		return
+	}
+	write(w, p, http.StatusOK)
+}
+
+func heightAndAddrIndexer(w http.ResponseWriter, r *http.Request, callback func(s lib.StoreI, h uint64, address lib.HexBytes) (any, lib.ErrorI)) {
+	req := new(heightAndAddressRequest)
+	if ok := unmarshal(w, r, req); !ok {
+		return
+	}
+	s, ok := setupStore(w)
+	if !ok {
+		return
+	}
+	defer s.Discard()
+	if req.Height == 0 {
+		req.Height = s.Version() - 1
+	}
+	p, err := callback(s, req.Height, req.Address)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return

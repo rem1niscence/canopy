@@ -3,6 +3,7 @@ package bft
 import (
 	"bytes"
 	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"slices"
 )
 
@@ -30,7 +31,7 @@ func (b *BFT) ValidateByzantineEvidence(slashRecipients *lib.SlashRecipients, be
 			}
 			// check if the Double Signer in the Proposal is within our locally generated Double Signers list
 			if !slices.ContainsFunc(doubleSigners, func(signer *lib.DoubleSigner) bool {
-				if signer == nil || !bytes.Equal(ds.PubKey, signer.PubKey) {
+				if signer == nil || !bytes.Equal(ds.Id, signer.Id) {
 					return false
 				}
 				// validate each height slash per double signer is also justified
@@ -100,10 +101,15 @@ func (b *BFT) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.DoubleSigne
 		// if so, ignore those double signers but still process the rest of the bad actors
 	out:
 		for _, pubKey := range doubleSigners {
-			if b.IsValidDoubleSigner(committeeHeight, pubKey) {
+			pk, er := crypto.NewPublicKeyFromBytes(pubKey)
+			if er != nil {
+				return nil, lib.ErrPubKeyFromBytes(er)
+			}
+			if b.IsValidDoubleSigner(committeeHeight, pk.Address().Bytes()) {
+				b.log.Infof("DoubleSigner %s is valid", lib.BytesToTruncatedString(pubKey))
 				// check to see if double signer included in the results already
 				for i, doubleSigner := range results {
-					if bytes.Equal(doubleSigner.PubKey, pubKey) {
+					if bytes.Equal(doubleSigner.Id, pubKey) {
 						// simply update the height
 						results[i].AddHeight(committeeHeight)
 						continue out
@@ -111,9 +117,11 @@ func (b *BFT) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.DoubleSigne
 				}
 				// add to the results
 				results = append(results, &lib.DoubleSigner{
-					PubKey:  pubKey,
+					Id:      pubKey,
 					Heights: []uint64{committeeHeight},
 				})
+			} else {
+				b.log.Warnf("DoubleSigner %s is not valid", lib.BytesToTruncatedString(pubKey))
 			}
 		}
 	}
@@ -150,6 +158,7 @@ func (b *BFT) AddDSE(e *DoubleSignEvidences, ev *DoubleSignEvidence) (err lib.Er
 	if _, isDuplicate := e.DeDuplicator[key1]; isDuplicate {
 		return
 	}
+	b.log.Infof("Adding byzantine evidence: %s", lib.BytesToTruncatedString(bz))
 	e.Evidence = append(e.Evidence, ev)
 	e.DeDuplicator[key1] = true
 	return
@@ -165,6 +174,10 @@ func (b *BFT) GetLocalDSE() DoubleSignEvidences {
 	// that also voted for the 'true Leader' the candidate now holds equivocating signatures by Replicas
 	// for the same View
 	b.addDSEByCandidate(&dse)
+	// log if DSE is found
+	if dseLen := len(dse.Evidence); dseLen != 0 {
+		b.log.Infof("GetLocalDSE yielded %d pieces of evidence", dseLen)
+	}
 	return dse
 }
 
@@ -262,6 +275,7 @@ func (b *BFT) addDSEByPartialQC(dse *DoubleSignEvidences) {
 			}); err != nil {
 				b.log.Error(err.Error())
 			}
+			b.log.Infof("Added byzantine evidence by partial QC for phase %s", phaseToString(pQC.Header.Phase))
 		} else { // this partial QC is historical
 			// historically can only process precommit vote as the other non Commit QCs are pruned
 			if pQC.Header.Phase != PrecommitVote {
@@ -279,6 +293,7 @@ func (b *BFT) addDSEByPartialQC(dse *DoubleSignEvidences) {
 			}); err != nil {
 				b.log.Error(err.Error())
 			}
+			b.log.Infof("Added byzantine evidence by historical partial QC at height %d ", evidenceHeight)
 		}
 	}
 }

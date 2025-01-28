@@ -1167,7 +1167,7 @@ func TestAddHeight(t *testing.T) {
 	expected := []uint64{0, 1, 2, 3, 4, 5}
 	// pre-define a double signer
 	doubleSigner := &DoubleSigner{
-		PubKey:  newTestPublicKeyBytes(t),
+		Id:      newTestPublicKeyBytes(t),
 		Heights: []uint64{1, 2},
 	}
 	for i := 0; i < len(expected); i++ {
@@ -1208,11 +1208,11 @@ func TestDoubleSignerEquals(t *testing.T) {
 			name:   "public keys",
 			detail: "the public keys are different",
 			ds1: &DoubleSigner{
-				PubKey:  newTestPublicKeyBytes(t),
+				Id:      newTestPublicKeyBytes(t),
 				Heights: nil,
 			},
 			ds2: &DoubleSigner{
-				PubKey:  newTestPublicKeyBytes(t, 1),
+				Id:      newTestPublicKeyBytes(t, 1),
 				Heights: nil,
 			},
 			equals: false,
@@ -1221,11 +1221,11 @@ func TestDoubleSignerEquals(t *testing.T) {
 			name:   "heights",
 			detail: "the heights are different",
 			ds1: &DoubleSigner{
-				PubKey:  newTestPublicKeyBytes(t),
+				Id:      newTestPublicKeyBytes(t),
 				Heights: []uint64{0},
 			},
 			ds2: &DoubleSigner{
-				PubKey:  newTestPublicKeyBytes(t),
+				Id:      newTestPublicKeyBytes(t),
 				Heights: []uint64{1},
 			},
 			equals: false,
@@ -1234,11 +1234,11 @@ func TestDoubleSignerEquals(t *testing.T) {
 			name:   "same",
 			detail: "both double signer objects are the same",
 			ds1: &DoubleSigner{
-				PubKey:  newTestPublicKeyBytes(t),
+				Id:      newTestPublicKeyBytes(t),
 				Heights: []uint64{0},
 			},
 			ds2: &DoubleSigner{
-				PubKey:  newTestPublicKeyBytes(t),
+				Id:      newTestPublicKeyBytes(t),
 				Heights: []uint64{0},
 			},
 			equals: true,

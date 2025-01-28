@@ -455,7 +455,7 @@ func (x *SlashRecipients) Equals(y *SlashRecipients) bool {
 		return false
 	}
 	for i, ds := range x.DoubleSigners {
-		if !bytes.Equal(ds.PubKey, y.DoubleSigners[i].PubKey) {
+		if !bytes.Equal(ds.Id, y.DoubleSigners[i].Id) {
 			return false
 		}
 		if !slices.Equal(ds.Heights, y.DoubleSigners[i].Heights) {
@@ -656,4 +656,27 @@ func (x *CommitteeData) addPercents(address []byte, percent uint64) {
 		Address: address,
 		Percent: percent,
 	})
+}
+
+// jsonDoubleSigner implements the json.Marshaller and json.Unmarshaler interfaces for double signers
+type jsonDoubleSigner struct {
+	// id: the cryptographic identifier of the malicious actor
+	Id HexBytes `json:"id,omitempty"`
+	// heights: the list of heights when the infractions occurred
+	Heights []uint64 `json:"heights,omitempty"`
+}
+
+// MarshalJSON() implements the json.Marshaller interface for double signers
+func (x DoubleSigner) MarshalJSON() ([]byte, error) {
+	return MarshalJSON(jsonDoubleSigner{Id: x.Id, Heights: x.Heights})
+}
+
+// MarshalJSON() implements the json.Unmarshaler interface for double signers
+func (x *DoubleSigner) UnmarshalJSON(bz []byte) (err error) {
+	j := new(jsonDoubleSigner)
+	if err = json.Unmarshal(bz, j); err != nil {
+		return
+	}
+	*x = DoubleSigner{Id: j.Id, Heights: j.Heights}
+	return
 }

@@ -87,9 +87,6 @@ func (vdf *VDFService) Run(seed []byte) {
 // - already running signals a stop in the running thread and returns
 // - not running returns
 func (vdf *VDFService) Finish() (results *crypto.VDF) {
-	if vdf == nil {
-		return
-	}
 	vdf.log.Debugf("End signaled for VDF service")
 	if vdf == nil {
 		return

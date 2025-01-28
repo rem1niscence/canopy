@@ -636,7 +636,7 @@ func (x *DoubleSigner) Equals(d *DoubleSigner) bool {
 	if x == nil || d == nil {
 		return false
 	}
-	if !bytes.Equal(x.PubKey, d.PubKey) {
+	if !bytes.Equal(x.Id, d.Id) {
 		return false
 	}
 	return slices.Equal(x.Heights, d.Heights)

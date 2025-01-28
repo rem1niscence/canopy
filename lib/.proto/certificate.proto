@@ -124,8 +124,8 @@ message PaymentPercents {
 // DoubleSigner identifies a validator who has been caught double signing and should be slashed
 // The structure includes the validator's public key and a list of block heights where the double signing occurred
 message DoubleSigner {
-  // pubkey: the cryptographic identifier of the malicious actor
-  bytes pubKey = 1;
+  // id: the cryptographic identifier of the malicious actor
+  bytes id = 1;
   // heights: the list of heights when the infractions occurred
   repeated uint64 heights = 2;
 }

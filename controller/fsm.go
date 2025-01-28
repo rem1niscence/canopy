@@ -338,6 +338,9 @@ func (c *Controller) CalculateSlashRecipients(results *lib.CertificateResult, be
 	if err != nil {
 		c.log.Warn(err.Error()) // still produce proposal
 	}
+	if srLen := len(results.SlashRecipients.DoubleSigners); srLen != 0 {
+		c.log.Infof("Added %d slash recipients due to byzantine evidence", srLen)
+	}
 }
 
 // CalculateCheckpoint() calculates the checkpoint for the checkpoint as a service functionality

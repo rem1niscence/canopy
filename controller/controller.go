@@ -13,10 +13,6 @@ import (
 	"time"
 )
 
-// TODO
-// - Change state to not accept ports just IP or host in service URL
-// - Change P2P to extrapolate port from the url + chain-id
-
 var _ bft.Controller = new(Controller)
 
 // Controller acts as the 'manager' of the modules of the application
