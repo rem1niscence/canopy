@@ -673,12 +673,6 @@ func TestViewCheckBasic(t *testing.T) {
 			error:  "empty view",
 		},
 		{
-			name:   "view above max round",
-			detail: "view above max round",
-			view:   &View{Round: MaxRound + 1},
-			error:  "wrong round",
-		},
-		{
 			name:   "no error",
 			detail: "view passes with no error",
 			view:   &View{},

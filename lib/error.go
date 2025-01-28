@@ -90,6 +90,7 @@ const (
 	CodeNilRewardRecipients         ErrorCode = 28
 	CodeNoValidators                ErrorCode = 29
 	CodeInvalidResultsHash          ErrorCode = 30
+	CodeNonNilBlock                 ErrorCode = 31
 
 	// Consensus Module
 	ConsensusModule ErrorModule = "consensus"
@@ -343,6 +344,10 @@ func ErrStringToBytes(err error) ErrorI {
 
 func ErrNilBlock() ErrorI {
 	return NewError(CodeNilBlock, MainModule, "block is nil")
+}
+
+func ErrNonNilBlock() ErrorI {
+	return NewError(CodeNonNilBlock, MainModule, "block is not nil")
 }
 
 func ErrNilRewardRecipients() ErrorI {
