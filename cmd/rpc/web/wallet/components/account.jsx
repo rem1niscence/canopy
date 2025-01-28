@@ -302,23 +302,69 @@ export default function Accounts({ keygroup, account, validator }) {
   }
 
   // renderForm() returns a form input group for the transaction execution
-  function renderForm(v, i) {
+  function renderForm(fields) {
+    // Manage all form input values in a single state object to allow for dynamic form generation
+    // and state management
+    const [formValues, setFormValues] = useState(
+      fields.reduce((form, field) => {
+        form[field.label] = field.defaultValue || "";
+        return form;
+      }, {}),
+    );
+
+    const handleInputChange = (key, value, type) => {
+      setFormValues((prev) => ({
+        ...prev,
+        [key]: type === "number" ? formatNumberInput(value) : sanitizeInput(value),
+      }));
+    };
+
+    const doRenderForm = (v, i) => {
+      if (v.shouldNotRender && v.shouldNotRender(keygroup, account, validator)) return null;
+
+      return (
+        <Form.Group key={i} className="mb-3">
+          <InputGroup size="lg">
+            {withTooltip(<InputGroup.Text className="input-text">{v.inputText}</InputGroup.Text>, v.tooltip, i, "auto")}
+            <Form.Control
+              className="input-text-field"
+              onChange={(e) => handleInputChange(v.label, e.target.value, v.type)}
+              type={v.type == "number" ? "text" : v.type}
+              value={formValues[v.label]}
+              placeholder={v.placeholder}
+              required={v.required}
+              min={0}
+              minLength={v.minLength}
+              maxLength={v.maxLength}
+              aria-label={v.label}
+              aria-describedby="emailHelp"
+            />
+          </InputGroup>
+          {v.label === "amount" ? renderAmountInput(handleInputChange, v) : null}
+        </Form.Group>
+      );
+    };
+
+    return fields.map(doRenderForm);
+  }
+
+  // renderAmountInput() renders the amount input with the option to set the amount to max
+  function renderAmountInput(onchange, v) {
+    const amount = formatNumber(account.account.amount);
     return (
-      <InputGroup key={i} className="mb-3" size="lg">
-        {withTooltip(<InputGroup.Text className="input-text">{v.inputText}</InputGroup.Text>, v.tooltip, i, "auto")}
-        <Form.Control
-          className="input-text-field"
-          onChange={v.type === "number" ? formatNumberInput : sanitizeInput}
-          type={v.type == "number" ? "text" : v.type}
-          defaultValue={v.type === "number" ? numberWithCommas(v.defaultValue || "") : v.defaultValue}
-          placeholder={v.placeholder}
-          required={v.required}
-          min={0}
-          minLength={v.minLength}
-          maxLength={v.maxLength}
-          aria-label={v.label}
-        />
-      </InputGroup>
+      <div className="text-end">
+        <Form.Text>
+          Available: <span className="fw-bold">{amount} </span>
+          <Button
+            aria-label="max-button"
+            onClick={() => onchange(v.label, Math.ceil(numberFromCommas(amount)).toString(), v.type)}
+            variant="link"
+            bsPrefix="max-amount-btn"
+          >
+            MAX
+          </Button>
+        </Form.Text>
+      </div>
     );
   }
 
@@ -331,7 +377,7 @@ export default function Accounts({ keygroup, account, validator }) {
             <Modal.Title>{title}</Modal.Title>
           </Modal.Header>
           <Modal.Body className="modal-body">
-            {getFormInputs(txType, keyGroup, acc, val).map((v, i) => renderForm(v, i))}
+            {renderForm(getFormInputs(txType, keyGroup, acc, val))}
             {renderJSONViewer()}
             <Spinner style={{ display: state.showSpinner ? "block" : "none", margin: "0 auto" }} />
           </Modal.Body>
