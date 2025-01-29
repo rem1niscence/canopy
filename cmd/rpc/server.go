@@ -309,7 +309,7 @@ func PollBaseChainInfo() {
 		// if a new height received
 		logger.Infof("New BaseChain Height %d detected!", baseChainHeight)
 		// execute the requests to get the base chain information
-		for retry := lib.NewRetry(conf.BaseChainPollMS, 25); retry.WaitAndDoRetry(); {
+		for retry := lib.NewRetry(conf.BaseChainPollMS, 3); retry.WaitAndDoRetry(); {
 			// retrieve the base-chain info
 			baseChainInfo, e := rpcClient.BaseChainInfo(baseChainHeight, conf.ChainId)
 			if e == nil {
