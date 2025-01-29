@@ -1,5 +1,5 @@
 import Navigation from "@/components/navbar";
-import { AccountWithTxs, Keystore, Validator } from "@/components/api";
+import { AccountWithTxs, Height, Keystore, Validator } from "@/components/api";
 import { useEffect, useState } from "react";
 import Accounts from "@/components/account";
 import Dashboard from "@/components/dashboard";
@@ -7,13 +7,13 @@ import Governance from "@/components/governance";
 import { Spinner } from "react-bootstrap";
 
 export default function Home() {
-  const [state, setState] = useState({ navIdx: 0, keystore: null, keyIdx: 0, account: {}, validator: {} });
+  const [state, setState] = useState({ navIdx: 0, keystore: null, keyIdx: 0, account: {}, validator: {}, height: 0 });
   const setNavIdx = (i) => setState({ ...state, navIdx: i });
 
   function queryAPI(i = state.keyIdx) {
     Keystore().then((ks) => {
-      Promise.all([AccountWithTxs(0, Object.keys(ks)[i], 0), Validator(0, Object.keys(ks)[i])]).then((r) => {
-        setState({ ...state, keyIdx: i, keystore: ks, account: r[0], validator: r[1] });
+      Promise.all([AccountWithTxs(0, Object.keys(ks)[i], 0), Validator(0, Object.keys(ks)[i]), Height()]).then((r) => {
+        setState({ ...state, keyIdx: i, keystore: ks, account: r[0], validator: r[1], height: r[2] });
       });
     });
   }
