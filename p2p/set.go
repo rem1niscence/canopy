@@ -47,8 +47,6 @@ type Peer struct {
 
 // Add() introduces a peer to the set
 func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
-	ps.Lock()
-	defer ps.Unlock()
 	// check if peer is already added
 	pubKey := lib.BytesToString(p.Address.PublicKey)
 	if _, found := ps.m[pubKey]; found {
@@ -156,6 +154,13 @@ func (ps *PeerSet) GetPeerInfo(publicKey []byte) (*lib.PeerInfo, lib.ErrorI) {
 		return nil, err
 	}
 	return peer.PeerInfo.Copy(), nil
+}
+
+// PeerCount() returns the total number of peers
+func (ps *PeerSet) PeerCount() int {
+	ps.RLock()
+	defer ps.RUnlock()
+	return len(ps.m)
 }
 
 // GetAllInfos() returns the information on connected peers and the total inbound / outbound counts

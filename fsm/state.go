@@ -181,7 +181,7 @@ func (s *StateMachine) ApplyTransactions(block *lib.Block) (results []*lib.TxRes
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	if blockSize > maxBlockSize {
+	if blockSize+lib.MaxBlockHeaderSize > maxBlockSize {
 		return nil, nil, 0, types.ErrMaxBlockSize()
 	}
 	// create a transaction root for the block header
@@ -226,7 +226,7 @@ func (s *StateMachine) GetMaxValidators() (uint64, lib.ErrorI) {
 	return valParams.ValidatorMaxCommitteeSize, nil
 }
 
-// GetMaxBlockSize() returns the maximum size of a block (excluding the header)
+// GetMaxBlockSize() returns the maximum size of a block
 func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
 	consParams, err := s.GetParamsCons()
 	if err != nil {
@@ -315,7 +315,7 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 func (s *StateMachine) ResetToBeginBlock() {
 	s.Reset()
 	if err := s.BeginBlock(); err != nil {
-		panic(err)
+		s.log.Errorf("BEGIN_BLOCK FAILURE: %s", err.Error())
 	}
 }
 

@@ -526,6 +526,17 @@ func TimeTrack(start time.Time) {
 	log.Println(fmt.Sprintf("%s took %s", name, elapsed))
 }
 
+// TruncateSlice() safely ensures that a slice doesn't exceed the max size
+func TruncateSlice[T any](slice []T, max int) []T {
+	if slice == nil {
+		return nil
+	}
+	if len(slice) > max {
+		return slice[:max]
+	}
+	return slice
+}
+
 func PrintStackTrace() {
 	pc := make([]uintptr, 10) // Get at most 10 stack frames
 	n := runtime.Callers(2, pc)

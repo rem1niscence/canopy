@@ -452,8 +452,6 @@ const (
 
 // VIEW CODE BELOW
 
-const MaxRound = 10000 // max round is arbitrarily chosen and may be modified safely
-
 func (x *View) CheckBasic() ErrorI {
 	if x == nil {
 		return ErrEmptyView()
@@ -461,9 +459,6 @@ func (x *View) CheckBasic() ErrorI {
 	// round and phase are not further checked,
 	// because peers may be sending valid messages
 	// asynchronously from different views
-	if x.Round >= MaxRound {
-		return ErrWrongRound()
-	}
 	return nil
 }
 
@@ -641,7 +636,7 @@ func (x *DoubleSigner) Equals(d *DoubleSigner) bool {
 	if x == nil || d == nil {
 		return false
 	}
-	if !bytes.Equal(x.PubKey, d.PubKey) {
+	if !bytes.Equal(x.Id, d.Id) {
 		return false
 	}
 	return slices.Equal(x.Heights, d.Heights)

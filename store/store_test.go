@@ -1,39 +1,64 @@
 package store
 
 import (
+	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
+	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/require"
+	math2 "math"
 	math "math/rand"
+	"os"
+	"runtime/debug"
 	"testing"
+	"time"
 )
 
-//func TestGC(t *testing.T) {
-//	db, err := badger.OpenManaged(badger.DefaultOptions("test_temp.db").WithMemTableSize(15 * int64(units.MB)).
-//		WithNumVersionsToKeep(math2.MaxInt).WithLoggingLevel(badger.ERROR))
-//	require.NoError(t, err)
-//	defer func() { db.Close(); os.RemoveAll("test_temp.db") }()
-//	for i := uint64(1); i < 1000; i++ {
-//		tx := db.NewTransactionAt(1, true)
-//		key, val := []byte("key"), append([]byte(fmt.Sprintf("%d/", i)), make([]byte, units.MB)...)
-//		require.NoError(t, tx.Set(key, val))
-//		require.NoError(t, tx.CommitAt(i, nil))
-//	}
-//	require.NoError(t, db.Flatten(1))
-//	db.RunValueLogGC(.01)
-//	for i := uint64(1); i < 1000; i++ {
-//		tx := db.NewTransactionAt(i, false)
-//		v, e := tx.Get([]byte("key"))
-//		require.NoError(t, e)
-//		require.NoError(t, v.Value(func(val []byte) error {
-//			require.Equal(t, strings.Split(string(val), "/")[0], fmt.Sprintf("%d", i))
-//			return nil
-//		}))
-//		tx.Discard()
-//	}
-//}
+func TestMaxTransaction(t *testing.T) {
+	t.Skip()
+	db, err := badger.OpenManaged(badger.DefaultOptions("test_temp.db").WithMemTableSize(2 * int64(units.GB)).
+		WithNumVersionsToKeep(math2.MaxInt).WithLoggingLevel(badger.ERROR))
+	require.NoError(t, err)
+	defer func() { db.Close(); os.RemoveAll("test_temp.db") }()
+	tx := db.NewTransactionAt(1, true)
+	i := 0
+	totalBytes := 0
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println(string(debug.Stack()))
+			fmt.Println(i)
+			fmt.Println(totalBytes)
+		}
+	}()
+	for ; i < 10000000; i++ {
+		k := numberToBytes(i)
+		v := bytes.Repeat([]byte("b"), 60)
+		totalBytes += len(k) + len(v)
+		if err = tx.Set(k, v); err != nil {
+			fmt.Println(err.Error())
+			fmt.Println(i)
+			fmt.Println(totalBytes)
+			tx.Discard()
+			return
+		}
+	}
+	fmt.Println(totalBytes)
+	start := time.Now()
+	require.NoError(t, tx.CommitAt(1, nil))
+	fmt.Println(time.Since(start))
+}
+
+func numberToBytes(n int) []byte {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.BigEndian, uint32(n))
+	if err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
 
 func TestStoreSetGetDelete(t *testing.T) {
 	store, _, cleanup := testStore(t)

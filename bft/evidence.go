@@ -3,6 +3,7 @@ package bft
 import (
 	"bytes"
 	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"slices"
 )
 
@@ -23,17 +24,14 @@ func (b *BFT) ValidateByzantineEvidence(slashRecipients *lib.SlashRecipients, be
 		if err != nil {
 			return err
 		}
-		// this validation ensures that the Meta.DoubleSigners is justified, but there may be additional evidence included without any error
+		// this validation ensures that the DoubleSigners is justified, but there may be additional evidence included without any error
 		for _, ds := range slashRecipients.DoubleSigners {
 			if ds == nil {
 				return lib.ErrInvalidEvidence()
 			}
 			// check if the Double Signer in the Proposal is within our locally generated Double Signers list
 			if !slices.ContainsFunc(doubleSigners, func(signer *lib.DoubleSigner) bool {
-				if signer == nil {
-					return false
-				}
-				if !bytes.Equal(ds.PubKey, signer.PubKey) {
+				if signer == nil || !bytes.Equal(ds.Id, signer.Id) {
 					return false
 				}
 				// validate each height slash per double signer is also justified
@@ -94,6 +92,7 @@ func (b *BFT) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.DoubleSigne
 		}
 		// take the signatures from the two
 		sig1, sig2 := x.VoteA.Signature, x.VoteB.Signature
+		// extract the double signers between the two
 		doubleSigners, err := sig1.GetDoubleSigners(sig2, vs)
 		if err != nil {
 			return nil, err
@@ -102,17 +101,27 @@ func (b *BFT) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.DoubleSigne
 		// if so, ignore those double signers but still process the rest of the bad actors
 	out:
 		for _, pubKey := range doubleSigners {
-			if b.IsValidDoubleSigner(committeeHeight, pubKey) {
+			pk, er := crypto.NewPublicKeyFromBytes(pubKey)
+			if er != nil {
+				return nil, lib.ErrPubKeyFromBytes(er)
+			}
+			if b.IsValidDoubleSigner(committeeHeight, pk.Address().Bytes()) {
+				b.log.Infof("DoubleSigner %s is valid", lib.BytesToTruncatedString(pubKey))
+				// check to see if double signer included in the results already
 				for i, doubleSigner := range results {
-					if bytes.Equal(doubleSigner.PubKey, pubKey) {
+					if bytes.Equal(doubleSigner.Id, pubKey) {
+						// simply update the height
 						results[i].AddHeight(committeeHeight)
 						continue out
 					}
 				}
+				// add to the results
 				results = append(results, &lib.DoubleSigner{
-					PubKey:  pubKey,
+					Id:      pubKey,
 					Heights: []uint64{committeeHeight},
 				})
+			} else {
+				b.log.Warnf("DoubleSigner %s is not valid", lib.BytesToTruncatedString(pubKey))
 			}
 		}
 	}
@@ -142,13 +151,14 @@ func (b *BFT) AddDSE(e *DoubleSignEvidences, ev *DoubleSignEvidence) (err lib.Er
 		e.DeDuplicator = make(map[string]bool)
 	}
 	// NOTE: this de-duplication is only good for 'accidental' duplication
-	// evidence could be replayed - but it would always only result in
-	// 1 slash per signer per Canopy height
+	// evidence could be replayed - but it wouldn't result in additional slashes
+	// as each DS is indexed by canopy height
 	bz, _ := lib.Marshal(ev)
 	key1 := lib.BytesToString(bz)
 	if _, isDuplicate := e.DeDuplicator[key1]; isDuplicate {
 		return
 	}
+	b.log.Infof("Adding byzantine evidence: %s", lib.BytesToTruncatedString(bz))
 	e.Evidence = append(e.Evidence, ev)
 	e.DeDuplicator[key1] = true
 	return
@@ -164,6 +174,10 @@ func (b *BFT) GetLocalDSE() DoubleSignEvidences {
 	// that also voted for the 'true Leader' the candidate now holds equivocating signatures by Replicas
 	// for the same View
 	b.addDSEByCandidate(&dse)
+	// log if DSE is found
+	if dseLen := len(dse.Evidence); dseLen != 0 {
+		b.log.Infof("GetLocalDSE yielded %d pieces of evidence", dseLen)
+	}
 	return dse
 }
 
@@ -180,9 +194,6 @@ func (x *DoubleSignEvidence) CheckBasic() lib.ErrorI {
 	if !x.VoteA.Header.Equals(x.VoteB.Header) {
 		return lib.ErrMismatchEvidenceAndHeader()
 	}
-	if x.VoteA.Header.Round >= lib.MaxRound {
-		return lib.ErrWrongRound()
-	}
 	return nil
 }
 
@@ -194,7 +205,7 @@ func (x *DoubleSignEvidence) Check(vs lib.ValidatorSet, view *lib.View, minimumE
 	}
 	// ensure large payloads are empty as they are unnecessary for this message
 	if x.VoteA.Block != nil || x.VoteB.Block != nil {
-		return lib.ErrNilBlock()
+		return lib.ErrNonNilBlock()
 	}
 	if x.VoteA.Results != nil || x.VoteB.Results != nil {
 		return lib.ErrNonNilCertResults()
@@ -217,9 +228,16 @@ func (x *DoubleSignEvidence) Check(vs lib.ValidatorSet, view *lib.View, minimumE
 	return nil
 }
 
-// PartialQCs are saved < +2/3 majority Quorum Certificates received by a malicious or faulty proposer
-// PartialQCs are not Double Sign evidence until coupled with a full QC of the same View
-// Correct replicas save partial QCs to check for double sign evidence to send to the next proposer during the ElectionVote phase
+/*
+DoubleSignEvidence: By PartialQC
+
+With < 1/3 Byzantine actors, two conflicting Quorum Certs with +2/3 majority cannot exist for the same view
+
+Double signs can be detected when a leader sends a PartialQC (< +2/3 majority) to a replica, and that replica already
+holds a +2/3 majority QC for the same view (from another leader or an earlier message)
+
+Correct replicas save PartialQCs to check for double-sign evidence, which they share with the next proposer during the ElectionVote phase
+*/
 type PartialQCs map[string]*QC // [ PayloadHash ] -> Partial QC
 
 // AddPartialQC() saves a non-majority Quorum Certificate which is a big hint of faulty behavior
@@ -237,6 +255,7 @@ func (b *BFT) addDSEByPartialQC(dse *DoubleSignEvidences) {
 	// REPLICA with two proposer messages for same (H,R,P) - the partial is the malicious one
 	for _, pQC := range b.PartialQCs {
 		evidenceHeight := pQC.Header.Height
+		// check if evidence height is current (non-historical)
 		if evidenceHeight == b.Height {
 			// get the round of the partial QC to try to find a conflicting majority QC
 			roundProposal := b.Proposals[pQC.Header.Round]
@@ -244,7 +263,7 @@ func (b *BFT) addDSEByPartialQC(dse *DoubleSignEvidences) {
 				continue
 			}
 			// try to find a conflicting QC
-			// NOTE: proposals with conflicting QC is 1 phase above as it's used by the leader as Justification
+			// NOTE: proposals with conflicting QC is 1 phase above as it's used by the leader as justification
 			proposal, found := roundProposal[phaseToString(pQC.Header.Phase+1)]
 			if !found {
 				continue
@@ -256,6 +275,7 @@ func (b *BFT) addDSEByPartialQC(dse *DoubleSignEvidences) {
 			}); err != nil {
 				b.log.Error(err.Error())
 			}
+			b.log.Infof("Added byzantine evidence by partial QC for phase %s", phaseToString(pQC.Header.Phase))
 		} else { // this partial QC is historical
 			// historically can only process precommit vote as the other non Commit QCs are pruned
 			if pQC.Header.Phase != PrecommitVote {
@@ -273,9 +293,20 @@ func (b *BFT) addDSEByPartialQC(dse *DoubleSignEvidences) {
 			}); err != nil {
 				b.log.Error(err.Error())
 			}
+			b.log.Infof("Added byzantine evidence by historical partial QC at height %d ", evidenceHeight)
 		}
 	}
 }
+
+/*
+DoubleSignEvidence: By LeaderCandidate
+
+If a Leader Candidate receives ELECTION votes from Replicas that also voted for the true Leader, when the true Leader proves
+their legitimacy with an ELECTION_VOTE_QC, the candidate ends up holding equivocating signatures (evidence) that some Replicas
+voted for both Leaders in the same View
+
+This allows the Leader Candidate to `out` the validators who `double signed` for themselves and the true leader for the same View.
+*/
 
 // addDSEByCandidate() node looks through any ELECTION-VOTES they received to see if any signers conflict with signers of the true Leader
 func (b *BFT) addDSEByCandidate(dse *DoubleSignEvidences) {
@@ -290,8 +321,9 @@ func (b *BFT) addDSEByCandidate(dse *DoubleSignEvidences) {
 			}
 			// get votes for Election Vote phase
 			ps := phaseToString(ElectionVote)
-			ev := rvs[ps]
-			if ev == nil {
+			electionVotes := rvs[ps]
+			// if didn't receive any election votes
+			if electionVotes == nil {
 				continue
 			}
 			// get the true Leaders' messages for this same round
@@ -301,15 +333,15 @@ func (b *BFT) addDSEByCandidate(dse *DoubleSignEvidences) {
 			}
 			// specifically the Propose message which contains the ElectionVote justification signatures
 			proposal, found := roundProposal[phaseToString(Propose)]
-			if !found {
+			if !found || len(proposal) == 0 {
 				continue
 			}
 			// for each election vote payload received (likely only 1 payload)
-			for _, voteSet := range ev {
+			for _, voteSet := range electionVotes {
 				// if the vote exists and the QC is not empty
 				if voteSet.Vote != nil && voteSet.Vote.Qc != nil {
 					// aggregate the signers of this vote
-					as, e := voteSet.multiKey.AggregateSignatures()
+					signature, e := voteSet.multiKey.AggregateSignatures()
 					if e != nil {
 						continue
 					}
@@ -318,7 +350,7 @@ func (b *BFT) addDSEByCandidate(dse *DoubleSignEvidences) {
 						Header:      voteSet.Vote.Qc.Header,
 						ProposerKey: voteSet.Vote.Qc.ProposerKey,
 						Signature: &lib.AggregateSignature{
-							Signature: as,
+							Signature: signature,
 							Bitmap:    voteSet.multiKey.Bitmap(),
 						},
 					}

@@ -137,6 +137,7 @@ func (p *P2P) ListenForInboundPeers(listenAddress *lib.PeerAddress) {
 			}
 			// tries to create a full peer from the ephemeral connection and just the net address
 			if err = p.AddPeer(c, &lib.PeerInfo{Address: &lib.PeerAddress{NetAddress: netAddress}}, false); err != nil {
+				p.log.Error(err.Error())
 				_ = c.Close()
 				return
 			}
@@ -206,6 +207,8 @@ func (p *P2P) Dial(address *lib.PeerAddress, disconnect bool) lib.ErrorI {
 // create a E2E encrypted channel with a fully authenticated peer and save it to
 // the peer set and the peer book
 func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err lib.ErrorI) {
+	p.Lock()
+	defer p.Unlock()
 	// create the e2e encrypted connection while establishing a full peer info object
 	connection, err := p.NewConnection(conn)
 	if err != nil {
@@ -230,14 +233,12 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err l
 		return nil
 	}
 	// check if is must connect
-	p.RLock()
 	for _, item := range p.mustConnect {
 		if bytes.Equal(item.PublicKey, info.Address.PublicKey) {
 			info.IsMustConnect = true
 			break
 		}
 	}
-	p.RUnlock()
 	// check if is trusted
 	for _, item := range p.config.TrustedPeerIDs {
 		if item == lib.BytesToString(info.Address.PublicKey) {
@@ -255,11 +256,14 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err l
 	// add peer to peer set and peer book
 	p.log.Infof("Adding peer: %s@%s", lib.BytesToString(info.Address.PublicKey), info.Address.NetAddress)
 	p.book.Add(&BookPeer{Address: info.Address})
-	return p.PeerSet.Add(&Peer{
+	if err = p.PeerSet.Add(&Peer{
 		conn:     connection,
 		PeerInfo: info,
 		stop:     sync.Once{},
-	})
+	}); err != nil {
+		connection.Stop()
+	}
+	return
 }
 
 // DialWithBackoff() dials the peer with exponential backoff retry
@@ -270,7 +274,10 @@ func (p *P2P) DialWithBackoff(peerInfo *lib.PeerAddress) {
 		}
 		return
 	}
-	_ = backoff.Retry(dialAndLog, backoff.NewExponentialBackOff())
+	opts := backoff.NewExponentialBackOff()
+	opts.InitialInterval = 5 * time.Second
+	opts.MaxElapsedTime = time.Minute
+	_ = backoff.Retry(dialAndLog, opts)
 }
 
 // DialAndDisconnect() dials the peer but disconnects once a fully authenticated connection is established

@@ -55,8 +55,8 @@ func DefaultParams() *Params {
 			ValidatorMaxPauseBlocks:                     4380,
 			ValidatorDoubleSignSlashPercentage:          10,
 			ValidatorNonSignSlashPercentage:             1,
-			ValidatorMaxNonSign:                         4,
-			ValidatorNonSignWindow:                      10,
+			ValidatorMaxNonSign:                         3,
+			ValidatorNonSignWindow:                      5,
 			ValidatorMaxCommittees:                      15,
 			ValidatorMaxCommitteeSize:                   100,
 			ValidatorEarlyWithdrawalPenalty:             20,
@@ -112,7 +112,7 @@ var _ ParamSpace = &ConsensusParams{}
 
 // Check() validates the consensus params
 func (x *ConsensusParams) Check() lib.ErrorI {
-	if x.BlockSize == 0 {
+	if x.BlockSize < lib.MaxBlockHeaderSize {
 		return ErrInvalidParam(ParamBlockSize)
 	}
 	if _, err := x.ParseProtocolVersion(); err != nil {

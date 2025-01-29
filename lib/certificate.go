@@ -3,14 +3,66 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"math"
 	"slices"
 )
 
 const (
-	GlobalMaxBlockSize = int(32 * units.MB)
+	GlobalMaxBlockSize         = int(32 * units.MB)
+	ExpectedMaxBlockHeaderSize = 1640 // ensures developers are aware of a change to the header size (which is a consensus breaking change)
 )
+
+var MaxBlockHeaderSize uint64
+
+func init() {
+	maxBlockHeader, err := Marshal(&BlockHeader{
+		Height:             math.MaxUint64,
+		Hash:               crypto.MaxHash,
+		NetworkId:          math.MaxInt8,
+		Time:               math.MaxUint32,
+		NumTxs:             math.MaxUint64,
+		TotalTxs:           math.MaxUint64,
+		TotalVdfIterations: math.MaxUint64,
+		LastBlockHash:      crypto.MaxHash,
+		StateRoot:          crypto.MaxHash[:20],
+		TransactionRoot:    crypto.MaxHash,
+		ValidatorRoot:      crypto.MaxHash,
+		NextValidatorRoot:  crypto.MaxHash,
+		ProposerAddress:    crypto.MaxHash,
+		Vdf: &crypto.VDF{
+			Proof:      bytes.Repeat([]byte("F"), 528),
+			Output:     bytes.Repeat([]byte("F"), 528),
+			Iterations: math.MaxUint64,
+		},
+		LastQuorumCertificate: &QuorumCertificate{
+			Header: &View{
+				NetworkId:    math.MaxInt8,
+				CommitteeId:  math.MaxUint64,
+				Height:       math.MaxUint64,
+				CanopyHeight: math.MaxUint64,
+				Round:        math.MaxUint64,
+				Phase:        math.MaxInt8,
+			},
+			ResultsHash: crypto.MaxHash,
+			BlockHash:   crypto.MaxHash,
+			ProposerKey: bytes.Repeat([]byte("F"), crypto.BLS12381PubKeySize),
+			Signature: &AggregateSignature{
+				Signature: bytes.Repeat([]byte("F"), crypto.BLS12381SignatureSize),
+				Bitmap:    bytes.Repeat([]byte("F"), crypto.MaxBitmapSize(100)),
+			},
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	MaxBlockHeaderSize = uint64(len(maxBlockHeader))
+	if MaxBlockHeaderSize != ExpectedMaxBlockHeaderSize {
+		panic(fmt.Sprintf("Max_Header_Size changed from %d to %d; This is a consensus breaking change", ExpectedMaxBlockHeaderSize, MaxBlockHeaderSize))
+	}
+}
 
 // QUORUM CERTIFICATE CODE BELOW
 
@@ -103,9 +155,8 @@ func (x *QuorumCertificate) Check(vs ValidatorSet, maxBlockSize int, view *View,
 		return false, err
 	}
 	if x.Block != nil {
-		blockSize := len(x.Block)
-		// global max block size enforcement
-		if blockSize > maxBlockSize {
+		// max block size enforcement
+		if len(x.Block) > maxBlockSize {
 			return false, ErrExpectedMaxBlockSize()
 		}
 	}
@@ -404,7 +455,7 @@ func (x *SlashRecipients) Equals(y *SlashRecipients) bool {
 		return false
 	}
 	for i, ds := range x.DoubleSigners {
-		if !bytes.Equal(ds.PubKey, y.DoubleSigners[i].PubKey) {
+		if !bytes.Equal(ds.Id, y.DoubleSigners[i].Id) {
 			return false
 		}
 		if !slices.Equal(ds.Heights, y.DoubleSigners[i].Heights) {
@@ -605,4 +656,27 @@ func (x *CommitteeData) addPercents(address []byte, percent uint64) {
 		Address: address,
 		Percent: percent,
 	})
+}
+
+// jsonDoubleSigner implements the json.Marshaller and json.Unmarshaler interfaces for double signers
+type jsonDoubleSigner struct {
+	// id: the cryptographic identifier of the malicious actor
+	Id HexBytes `json:"id,omitempty"`
+	// heights: the list of heights when the infractions occurred
+	Heights []uint64 `json:"heights,omitempty"`
+}
+
+// MarshalJSON() implements the json.Marshaller interface for double signers
+func (x DoubleSigner) MarshalJSON() ([]byte, error) {
+	return MarshalJSON(jsonDoubleSigner{Id: x.Id, Heights: x.Heights})
+}
+
+// MarshalJSON() implements the json.Unmarshaler interface for double signers
+func (x *DoubleSigner) UnmarshalJSON(bz []byte) (err error) {
+	j := new(jsonDoubleSigner)
+	if err = json.Unmarshal(bz, j); err != nil {
+		return
+	}
+	*x = DoubleSigner{Id: j.Id, Heights: j.Heights}
+	return
 }

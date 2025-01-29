@@ -91,9 +91,6 @@ func (vdf *VDFService) Finish() (results *crypto.VDF) {
 		return
 	}
 	vdf.log.Debugf("End signaled for VDF service")
-	if vdf == nil {
-		return
-	}
 	// if service has not yet completed, signal to stop
 	if vdf.running.Load() {
 		vdf.log.Warn("Prematurely stopping VDF service")

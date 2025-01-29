@@ -146,6 +146,7 @@ func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 			}
 			// save the highQC if it's higher than any the Leader currently is aware of
 			if b.HighQC == nil || b.HighQC.Header.Less(vote.HighQc.Header) {
+				b.log.Infof("Replica %s submitted a highQC", lib.BytesToTruncatedString(vote.Signature.PublicKey))
 				b.HighQC = vote.HighQc
 				b.Block, b.Results = vote.Qc.Block, vote.Qc.Results
 			}
@@ -158,14 +159,16 @@ func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 					return err
 				}
 				if ok {
+					b.log.Infof("Replica %s submitted a highVDF", lib.BytesToTruncatedString(vote.Signature.PublicKey))
 					b.HighVDF = vote.Vdf
 				}
 			}
 		}
 		// combine double sign evidence
 		for _, evidence := range vote.LastDoubleSignEvidence {
+			b.log.Infof("Replica %s submitted double sign evidence", lib.BytesToTruncatedString(vote.Signature.PublicKey))
 			if err := b.AddDSE(&b.ByzantineEvidence.DSE, evidence); err != nil {
-				return err
+				b.log.Warnf("Replica %s evidence invalid", lib.BytesToTruncatedString(vote.Signature.PublicKey))
 			}
 		}
 	}

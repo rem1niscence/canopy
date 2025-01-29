@@ -271,7 +271,7 @@ export async function AccountWithTxs(height, address, page) {
   result.sent_transactions.results?.forEach(setStatus("included"));
 
   result.rec_transactions = await TransactionsByRec(page, address);
-  result.sent_transactions.results?.forEach(setStatus("included"));
+  result.rec_transactions.results?.forEach(setStatus("included"));
 
   result.failed_transactions = await FailedTransactions(page, address);
   result.failed_transactions.results?.forEach((tx) => {

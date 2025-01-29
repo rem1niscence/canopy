@@ -83,12 +83,12 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.Err
 			return types.ErrAddressSize()
 		}
 		if account.Amount == 0 {
-			return types.ErrInvalidAmount()
+			continue
 		}
 	}
 	for _, pool := range genesis.Pools {
 		if pool.Amount == 0 {
-			return types.ErrInvalidAmount()
+			continue
 		}
 	}
 	if genesis.OrderBooks != nil {

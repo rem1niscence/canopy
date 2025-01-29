@@ -145,13 +145,13 @@ func (s *StateMachine) HandleDoubleSigners(committeeId uint64, params *types.Val
 	var badList [][]byte
 	for _, doubleSigner := range doubleSigners {
 		// sanity check
-		if doubleSigner == nil || doubleSigner.PubKey == nil {
+		if doubleSigner == nil || doubleSigner.Id == nil {
 			return lib.ErrInvalidEvidence()
 		}
 		if len(doubleSigner.Heights) < 1 {
 			return lib.ErrInvalidDoubleSignHeights()
 		}
-		pubKey, e := crypto.NewPublicKeyFromBytes(doubleSigner.PubKey)
+		pubKey, e := crypto.NewPublicKeyFromBytes(doubleSigner.Id)
 		if e != nil {
 			return lib.ErrPubKeyFromBytes(e)
 		}
@@ -242,6 +242,7 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, committeeId, p
 	if !slices.Contains(validator.Committees, committeeId) {
 		return types.ErrInvalidCommitteeID()
 	}
+	newCommittees := slices.Clone(validator.Committees)
 	// if a 'slash tracker' is used to limit the max slash per committee per block
 	if s.slashTracker != nil {
 		// get the slashed percent so far in this block by this committee
@@ -255,13 +256,13 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, committeeId, p
 			// only slash up to the maximum
 			percent = p.ValidatorMaxSlashPerCommittee - slashTotal
 			// get the number of committees for this validator
-			numCommittees := len(validator.Committees)
+			numCommittees := len(newCommittees)
 			// defensive coding, this function basically requires 1 committee
 			if numCommittees != 0 {
-				for i, id := range validator.Committees {
+				for i, id := range newCommittees {
 					if id == committeeId {
 						// remove the committee from the validator
-						validator.Committees = append(validator.Committees[:i], validator.Committees[i+1:]...)
+						newCommittees = append(newCommittees[:i], newCommittees[i+1:]...)
 						break
 					}
 				}
@@ -284,9 +285,11 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, committeeId, p
 		return err
 	}
 	// update the committees based on the new stake amount
-	if err = s.UpdateCommittees(addr, validator, stakeAfterSlash, validator.Committees); err != nil {
+	if err = s.UpdateCommittees(addr, validator, stakeAfterSlash, newCommittees); err != nil {
 		return err
 	}
+	// set the committees in the validator structure
+	validator.Committees = newCommittees
 	// update the stake amount and set the validator
 	validator.StakedAmount = stakeAfterSlash
 	// update the validator

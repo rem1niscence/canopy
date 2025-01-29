@@ -1868,7 +1868,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 		},
 		SlashRecipients: &lib.SlashRecipients{
 			DoubleSigners: []*lib.DoubleSigner{
-				{PubKey: newTestPublicKeyBytes(t), Heights: []uint64{1}},
+				{Id: newTestPublicKeyBytes(t), Heights: []uint64{1}},
 			},
 		},
 		Orders: &lib.Orders{

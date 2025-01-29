@@ -212,6 +212,12 @@ func (c *Client) IsValidDoubleSigner(height uint64, address string) (p *bool, er
 	return
 }
 
+func (c *Client) DoubleSigners(height uint64) (p *[]*lib.DoubleSigner, err lib.ErrorI) {
+	p = new([]*lib.DoubleSigner)
+	err = c.heightRequest(DoubleSignersRouteName, height, p)
+	return
+}
+
 func (c *Client) ValidatorSet(height uint64, id uint64) (v lib.ValidatorSet, err lib.ErrorI) {
 	p := new(lib.ConsensusValidators)
 	err = c.heightAndIdRequest(ValidatorSetRouteName, height, id, p)

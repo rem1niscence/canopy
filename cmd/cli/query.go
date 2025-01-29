@@ -58,6 +58,7 @@ func init() {
 	queryCmd.AddCommand(lastProposersCmd)
 	queryCmd.AddCommand(minimumEvidenceHeightCmd)
 	queryCmd.AddCommand(isValidDoubleSignerCmd)
+	queryCmd.AddCommand(doubleSignersCmd)
 	queryCmd.AddCommand(delegateLotteryCmd)
 	queryCmd.AddCommand(baseChainInfoCmd)
 	queryCmd.AddCommand(validatorSetCmd)
@@ -343,6 +344,14 @@ var (
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			writeToConsole(client.IsValidDoubleSigner(height, args[0]))
+		},
+	}
+
+	doubleSignersCmd = &cobra.Command{
+		Use:   "double-signers --height=1",
+		Short: "query all indexed double signers at some height",
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.DoubleSigners(height))
 		},
 	}
 

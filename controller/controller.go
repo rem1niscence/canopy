@@ -13,10 +13,6 @@ import (
 	"time"
 )
 
-// TODO
-// - Change state to not accept ports just IP or host in service URL
-// - Change P2P to extrapolate port from the url + chain-id
-
 var _ bft.Controller = new(Controller)
 
 // Controller acts as the 'manager' of the modules of the application
@@ -164,7 +160,7 @@ func (c *Controller) LoadMaxBlockSize() int {
 	if params == nil {
 		return 0
 	}
-	return int(params.BlockSize) // TODO add with max header size here... as this param is only enforced at the txn level in other places in the code
+	return int(params.BlockSize)
 }
 
 // LoadLastCommitTime() gets a timestamp from the most recent Quorum Block

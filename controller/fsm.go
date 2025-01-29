@@ -51,7 +51,7 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 	// re-validate all transactions in the mempool as a fail-safe
 	c.Mempool.checkMempool()
 	// extract transactions from the mempool
-	transactions, _ := c.Mempool.GetTransactions(maxBlockSize)
+	transactions, _ := c.Mempool.GetTransactions(maxBlockSize - lib.MaxBlockHeaderSize)
 	// validate VDF
 	if vdf != nil {
 		if !crypto.VerifyVDF(qc.BlockHash, vdf.Output, vdf.Proof, int(vdf.Iterations)) {
@@ -116,7 +116,7 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 		return
 	}
 	// generate a comparable
-	compareResults := c.CalculateRewardRecipients(c.Address, c.BaseChainHeight())
+	compareResults := c.CalculateRewardRecipients(blk.BlockHeader.ProposerAddress, c.BaseChainHeight())
 	// handle swaps
 	c.HandleSwaps(blockResult, compareResults, c.BaseChainHeight())
 	// set slash recipients
@@ -291,7 +291,7 @@ func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, baseChain
 	}
 	if c.Config.ChainId != lib.CanopyCommitteeId {
 		// sub validator
-		subValidatorWinner, e := c.FSM.LotteryWinner(c.Config.ChainId)
+		subValidatorWinner, e := c.FSM.LotteryWinner(c.Config.ChainId, true)
 		if e != nil {
 			c.log.Warnf("An error occurred choosing a sub-validator lottery winner: %s", err.Error())
 			// continue
@@ -322,8 +322,9 @@ func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.Cert
 	// process the base-chain order book against the state
 	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(orders, blockResult)
 	// add the orders to the certificate result
+	// truncate for defensive spam protection
 	results.Orders = &lib.Orders{
-		BuyOrders:   buyOrders,
+		BuyOrders:   lib.TruncateSlice(buyOrders, 100),
 		ResetOrders: resetOrders,
 		CloseOrders: closeOrders,
 	}
@@ -336,6 +337,9 @@ func (c *Controller) CalculateSlashRecipients(results *lib.CertificateResult, be
 	results.SlashRecipients.DoubleSigners, err = c.Consensus.ProcessDSE(be.DSE.Evidence...)
 	if err != nil {
 		c.log.Warn(err.Error()) // still produce proposal
+	}
+	if srLen := len(results.SlashRecipients.DoubleSigners); srLen != 0 {
+		c.log.Infof("Added %d slash recipients due to byzantine evidence", srLen)
 	}
 }
 
