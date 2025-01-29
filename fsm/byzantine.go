@@ -280,6 +280,10 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, committeeId, p
 	if err = s.SubFromTotalSupply(slashAmount); err != nil {
 		return err
 	}
+	// if stake after slash is 0, remove the validator
+	if stakeAfterSlash == 0 {
+		return s.DeleteValidator(validator)
+	}
 	// subtract from staked supply
 	if err = s.SubFromStakedSupply(slashAmount); err != nil {
 		return err
