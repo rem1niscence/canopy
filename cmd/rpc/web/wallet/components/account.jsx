@@ -94,9 +94,18 @@ export default function Accounts({ keygroup, account, validator }) {
 
   // getStakedStatus() returns the staking status of the validator
   function getStakedStatus() {
-    if (!validator.address) return "UNSTAKED";
-    else if (validator.unstaking_time) return "UNSTAKING";
-    else return "STAKED";
+    switch (true) {
+      case !validator.address:
+        return "UNSTAKED";
+      case validator.max_paused_height != 0:
+        return "PAUSED";
+      case validator.delegate:
+        return "DELEGATING";
+      case validator.unstaking_time:
+        return "UNSTAKING";
+      default:
+        return "STAKED";
+    }
   }
 
   // onPKFormSubmit() handles the submission of the private key form and updates the state with the retrieved key
@@ -134,7 +143,16 @@ export default function Accounts({ keygroup, account, validator }) {
       const submit = Object.keys(state.txResult).length !== 0;
       // Mapping transaction types to their respective functions
       const txMap = {
-        send: () => TxSend(r.sender, r.recipient, numberFromCommas(r.amount), r.memo, numberFromCommas(r.fee), r.password, submit),
+        send: () =>
+          TxSend(
+            r.sender,
+            r.recipient,
+            numberFromCommas(r.amount),
+            r.memo,
+            numberFromCommas(r.fee),
+            r.password,
+            submit,
+          ),
         stake: () =>
           TxStake(
             r.sender,
@@ -180,7 +198,15 @@ export default function Accounts({ keygroup, account, validator }) {
             r.password,
             submit,
           ),
-        buy_order: () => TxBuyOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), numberFromCommas(r.fee), r.password, submit),
+        buy_order: () =>
+          TxBuyOrder(
+            r.sender,
+            r.receiveAddress,
+            numberFromCommas(r.orderId),
+            numberFromCommas(r.fee),
+            r.password,
+            submit,
+          ),
         edit_order: () =>
           TxEditOrder(
             r.sender,
@@ -194,7 +220,8 @@ export default function Accounts({ keygroup, account, validator }) {
             r.password,
             submit,
           ),
-        delete_order: () => TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, numberFromCommas(r.fee), r.password, submit),
+        delete_order: () =>
+          TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, numberFromCommas(r.fee), r.password, submit),
       };
 
       const txFunction = txMap[state.txType];
