@@ -14,12 +14,12 @@ const socials = [
   { url: "https://x.com/CNPYNetwork", icon: "./twitter.png" },
 ];
 
-export default function Navigation({ keystore, setActiveKey, keyIdx, setNavIdx }) {
+export default function Navigation({ keystore, setActiveKey, keyIdx, setNavIdx, height }) {
   return (
     <Navbar sticky="top" data-bs-theme="light" id="nav-bar">
       <Container id="nav-bar-container">
         <Navbar.Brand id="nav-bar-brand">
-          my <span id="nav-bar-brand-highlight">canopy </span>wallet
+          my <span className="nav-bar-brand-highlight">canopy </span>wallet
         </Navbar.Brand>
         <div id="nav-dropdown-container">
           <NavDropdown
@@ -64,6 +64,9 @@ export default function Navigation({ keystore, setActiveKey, keyIdx, setNavIdx }
         <a href={socials[1].url}>
           <div style={{ backgroundImage: "url(" + socials[1].icon + ")" }} className="nav-social-icon" />
         </a>
+        <Navbar.Text className="ms-4">
+          Latest height: <strong className="nav-bar-brand-highlight">{Math.max(height - 1, 1)}</strong>
+        </Navbar.Text>
       </Container>
     </Navbar>
   );
