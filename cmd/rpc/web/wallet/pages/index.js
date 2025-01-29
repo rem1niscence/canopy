@@ -12,13 +12,17 @@ export default function Home() {
 
   function queryAPI(i = state.keyIdx) {
     Keystore().then((ks) => {
-      let mergedKS = {...ks.addressMap, ...ks.nicknameMap}
-
-      if (Object.keys(mergedKS).length === 0) {
+      if (Object.keys(ks.addressMap).length === 0) {
         console.warn("mergedKS is empty. No data to query.");
         setState({ ...state, keystore: {}, account: {}, validator: {} }); // Handle empty case
         return
       }
+
+      const mergedKS = Object.entries(ks.addressMap).reduce((acc, [address, details]) => {
+        const key = details.keyNickname || address;
+        acc[key] = details;
+        return acc;
+      }, {});
 
       Promise.all([AccountWithTxs(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, 0), Validator(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress)]).then((r) => {
         setState({ ...state, keyIdx: i, keystore: mergedKS, account: r[0], validator: r[1] });

@@ -450,9 +450,9 @@ export default function Accounts({ keygroup, account, validator }) {
         <br />
         <br />
         {[
+          { title: "Nickname", info: keygroup.keyNickname },
           { title: "Address", info: keygroup.keyAddress },
           { title: "Public Key", info: keygroup.publicKey },
-          { title: "Nickname", info: keygroup.keyNickname },
         ].map(renderKeyDetail)}
         <br />
         {renderTransactions()}

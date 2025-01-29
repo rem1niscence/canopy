@@ -711,7 +711,7 @@ func KeystoreNewKey(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 		if err != nil {
 			return nil, err
 		}
-		address, err := k.ImportRawWithOpts(pk.Bytes(), crypto.ImportRawOpts{
+		address, err := k.ImportRaw(pk.Bytes(), crypto.ImportRawOpts{
 			Password: ptr.Password,
 			Nickname: ptr.Nickname,
 		})
@@ -724,7 +724,7 @@ func KeystoreNewKey(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func KeystoreImport(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		if err := k.ImportWithOpts(&ptr.EncryptedPrivateKey, crypto.ImportOpts{
+		if err := k.Import(&ptr.EncryptedPrivateKey, crypto.ImportOpts{
 			Address:  ptr.Address,
 			Nickname: ptr.Nickname,
 		}); err != nil {
@@ -736,7 +736,7 @@ func KeystoreImport(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func KeystoreImportRaw(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		address, err := k.ImportRawWithOpts(ptr.PrivateKey, crypto.ImportRawOpts{
+		address, err := k.ImportRaw(ptr.PrivateKey, crypto.ImportRawOpts{
 			Password: ptr.Password,
 			Nickname: ptr.Nickname,
 		})
@@ -749,7 +749,7 @@ func KeystoreImportRaw(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 
 func KeystoreDelete(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		k.DeleteKeyWithOpts(crypto.DeleteOpts{
+		k.DeleteKey(crypto.DeleteOpts{
 			Address:  ptr.Address,
 			Nickname: ptr.Nickname,
 		})
@@ -759,7 +759,7 @@ func KeystoreDelete(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func KeystoreGetKeyGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		return k.GetKeyGroupWithOpts(ptr.Password, crypto.GetKeyGroupOpts{
+		return k.GetKeyGroup(ptr.Password, crypto.GetKeyGroupOpts{
 			Address:  ptr.Address,
 			Nickname: ptr.Nickname,
 		})

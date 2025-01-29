@@ -142,7 +142,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			log.Fatal(e.Error())
 		}
 		// import the validator key
-		address, e := k.ImportRawWithOpts(blsPrivateKey.Bytes(), crypto.ImportRawOpts{
+		address, e := k.ImportRaw(blsPrivateKey.Bytes(), crypto.ImportRawOpts{
 			Password: string(password),
 			Nickname: string(nickname),
 		})
