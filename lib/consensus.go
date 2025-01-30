@@ -642,6 +642,32 @@ func (x *DoubleSigner) Equals(d *DoubleSigner) bool {
 	return slices.Equal(x.Heights, d.Heights)
 }
 
+// proposersJSON implements the json.Marshaller and json.Unmarshaler interfaces for Proposer
+type proposersJSON struct {
+	Addresses []HexBytes `json:"addresses,omitempty"`
+}
+
+// MarshalJSON() implements the json.Marshaller interface for Proposers
+func (x Proposers) MarshalJSON() ([]byte, error) {
+	j := proposersJSON{}
+	for _, address := range x.Addresses {
+		j.Addresses = append(j.Addresses, address)
+	}
+	return json.Marshal(j)
+}
+
+// UnmarshalJSON() implements the json.Unmarshaler interface for Proposers
+func (x *Proposers) UnmarshalJSON(bz []byte) (err error) {
+	j := new(proposersJSON)
+	if err = json.Unmarshal(bz, j); err != nil {
+		return
+	}
+	for _, address := range j.Addresses {
+		x.Addresses = append(x.Addresses, address)
+	}
+	return
+}
+
 // SortitionData is the seed data for the IsCandidate and VRF functions
 type SortitionData struct {
 	LastProposerAddresses [][]byte // the last N proposers addresses prevents any grinding attacks

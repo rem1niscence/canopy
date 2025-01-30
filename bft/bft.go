@@ -19,6 +19,7 @@ type BFT struct {
 	ValidatorSet  ValSet                 // the current set of Validators
 	HighQC        *QC                    // the highest PRECOMMIT quorum certificate the node is aware of for this Height
 	Block         []byte                 // the current Block being voted on (the foundational unit of the blockchain)
+	BlockHash     []byte                 // the current hash of the block being voted on
 	Results       *lib.CertificateResult // the current Result being voted on (reward and slash recipients)
 	SortitionData *lib.SortitionData     // the current data being used for VRF+CDF Leader Election
 	VDFService    *lib.VDFService        // the verifiable delay service, run once per block as a deterrent against long-range-attacks
@@ -290,7 +291,7 @@ func (b *BFT) StartProposePhase() {
 			Results:     b.Results,      // the proposed `certificate results`
 			ResultsHash: b.Results.Hash(),
 			Block:       b.Block,
-			BlockHash:   crypto.Hash(b.Block),
+			BlockHash:   b.GetBlockHash(),
 			ProposerKey: vote.Qc.ProposerKey, // self-public-key, Replicas use this to validate the Aggregate (multi) Signature
 			Signature:   as,                  // justifies them as the leader
 		},
@@ -341,7 +342,7 @@ func (b *BFT) StartProposeVotePhase() {
 	b.SendToProposer(&Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
 			Header:      b.View.Copy(),
-			BlockHash:   crypto.Hash(b.Block),
+			BlockHash:   b.GetBlockHash(),
 			ResultsHash: b.Results.Hash(),
 			ProposerKey: b.ProposerKey,
 		},
@@ -370,9 +371,9 @@ func (b *BFT) StartPrecommitPhase() {
 	b.SendToReplicas(b.ValidatorSet, &Message{
 		Header: b.Copy(),
 		Qc: &QC{
-			Header:      vote.Qc.Header,       // vote view
-			BlockHash:   crypto.Hash(b.Block), // vote block payload
-			ResultsHash: b.Results.Hash(),     // vote certificate results payload
+			Header:      vote.Qc.Header,   // vote view
+			BlockHash:   b.GetBlockHash(), // vote block payload
+			ResultsHash: b.Results.Hash(), // vote certificate results payload
 			ProposerKey: b.ProposerKey,
 			Signature:   as,
 		},
@@ -405,7 +406,7 @@ func (b *BFT) StartPrecommitVotePhase() {
 	b.SendToProposer(&Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
 			Header:      b.View.Copy(),
-			BlockHash:   crypto.Hash(b.Block),
+			BlockHash:   b.GetBlockHash(),
 			ResultsHash: b.Results.Hash(),
 			ProposerKey: b.ProposerKey,
 		},
@@ -434,9 +435,9 @@ func (b *BFT) StartCommitPhase() {
 	b.SendToReplicas(b.ValidatorSet, &Message{
 		Header: b.Copy(), // header
 		Qc: &QC{
-			Header:      vote.Qc.Header,       // vote view
-			BlockHash:   crypto.Hash(b.Block), // vote block payload
-			ResultsHash: b.Results.Hash(),     // vote certificate results payload
+			Header:      vote.Qc.Header,   // vote view
+			BlockHash:   b.GetBlockHash(), // vote block payload
+			ResultsHash: b.Results.Hash(), // vote certificate results payload
 			ProposerKey: b.ProposerKey,
 			Signature:   as,
 		},
@@ -550,7 +551,7 @@ func (b *BFT) CheckProposerAndProposal(msg *Message) (interrupt bool) {
 	}
 
 	// confirm is expected proposal
-	if !bytes.Equal(crypto.Hash(b.Block), msg.Qc.BlockHash) || !bytes.Equal(b.Results.Hash(), msg.Qc.ResultsHash) {
+	if !bytes.Equal(b.GetBlockHash(), msg.Qc.BlockHash) || !bytes.Equal(b.Results.Hash(), msg.Qc.ResultsHash) {
 		b.log.Error(ErrMismatchedProposals().Error())
 		return true
 	}
@@ -583,7 +584,7 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.PartialQCs = make(PartialQCs)
 	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
-	b.Block, b.Results = nil, nil
+	b.Block, b.BlockHash, b.Results = nil, nil, nil
 	b.SortitionData = nil
 	// initialize Round 0
 	b.NewRound(true)
@@ -622,7 +623,7 @@ func (b *BFT) SafeNode(msg *Message) lib.ErrorI {
 		return ErrEmptyMessage()
 	}
 	// ensure the messages' HighQC justifies its proposal (should have the same hashes)
-	if !bytes.Equal(crypto.Hash(msg.Qc.Block), msg.HighQc.BlockHash) && !bytes.Equal(msg.Qc.Results.Hash(), msg.HighQc.ResultsHash) {
+	if !bytes.Equal(b.GetBlockHash(), msg.HighQc.BlockHash) && !bytes.Equal(msg.Qc.Results.Hash(), msg.HighQc.ResultsHash) {
 		return ErrMismatchedProposals()
 	}
 	// if the hashes of the Locked proposal is the same as the Leader's message
@@ -751,6 +752,24 @@ func (b *BFT) VerifyVDF(vote *Message) (bool, lib.ErrorI) {
 		return false, err
 	}
 	return b.VDFService.VerifyVDF(seed, vote.Vdf), nil
+}
+
+// GetBlockHash() retrieves the hash from the block
+func (b *BFT) GetBlockHash() (hash []byte) {
+	if b.BlockHash == nil {
+		b.BlockHash = b.BlockToHash(b.Block)
+	}
+	return b.BlockHash
+}
+
+// BlockToHash() converts block bytes into a hash
+func (b *BFT) BlockToHash(blk []byte) (hash []byte) {
+	block := new(lib.Block)
+	hash, err := block.BytesToBlock(blk)
+	if err != nil {
+		b.log.Errorf("bft.BlockToHash failed: %s", err.Error())
+	}
+	return
 }
 
 // phaseToString() converts the phase object to a human-readable string

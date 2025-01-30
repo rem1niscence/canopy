@@ -25,7 +25,7 @@ var (
 )
 
 func init() {
-	adminCmd.PersistentFlags().StringVar(&pwd, "password", "", "input a private key password (not recommended)")
+	rootCmd.PersistentFlags().StringVar(&pwd, "password", "", "input a private key password (not recommended)")
 	adminCmd.PersistentFlags().BoolVar(&sim, "simulate", false, "simulate won't submit a transaction, rather it will print the json of the transaction that would've been submitted")
 	adminCmd.PersistentFlags().Uint64Var(&fee, "fee", 0, "custom fee, by default will use the minimum fee")
 	txStakeCmd.PersistentFlags().BoolVar(&delegate, "delegate", false, "delegate tokens to committee(s) only without actual validator operation")

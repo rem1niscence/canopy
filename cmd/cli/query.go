@@ -227,13 +227,10 @@ var (
 	}
 
 	blkByHeightCmd = &cobra.Command{
-		Use:   "block <height> ",
+		Use:   "block --height=1",
 		Short: "query a block at a height",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) == 0 {
-				args = append(args, "0")
-			}
-			writeToConsole(client.BlockByHeight(uint64(argToInt(args[0]))))
+			writeToConsole(client.BlockByHeight(height))
 		},
 	}
 
@@ -370,7 +367,7 @@ var (
 		Long:  "query the base chain information needed to complete consensus: this is a local call so will only work if self is the base-chain",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeToConsole(client.BaseChainInfo(uint64(argToInt(args[0])), height))
+			writeToConsole(client.BaseChainInfo(height, uint64(argToInt(args[0]))))
 		},
 	}
 

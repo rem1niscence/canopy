@@ -308,6 +308,7 @@ func TestStartProposeVotePhase(t *testing.T) {
 			name:          "replica is locked and highQC doesn't pass safety or liveness",
 			detail:        `a locked replica received a valid proposal with an invalid highQC justification, lock is not bypassed`,
 			invalidHighQC: true,
+			validProposal: true,
 		},
 	}
 	for _, test := range tests {
@@ -321,7 +322,7 @@ func TestStartProposeVotePhase(t *testing.T) {
 			if test.hasBE {
 				be.DSE.Evidence = c.newTestDoubleSignEvidence(t)
 			}
-			block, results := c.simProposePhase(t, 0, test.validProposal, be, highQC, 0)
+			_, results := c.simProposePhase(t, 0, test.validProposal, be, highQC, 0)
 			expectedView := lib.View{
 				Height:       1,
 				Round:        0,
@@ -334,7 +335,7 @@ func TestStartProposeVotePhase(t *testing.T) {
 			go c.bft.StartProposeVotePhase()
 			select {
 			case <-time.After(testTimeout):
-				if test.validProposal {
+				if test.validProposal && !test.invalidHighQC {
 					t.Fatal("timeout")
 				}
 			case m := <-c.cont.sendToProposerChan:
@@ -345,7 +346,7 @@ func TestStartProposeVotePhase(t *testing.T) {
 				require.True(t, ok)
 				require.NotNil(t, msg.Qc)
 				require.Equal(t, *msg.Qc.Header, expectedView)
-				require.Equal(t, crypto.Hash(block), msg.Qc.BlockHash)
+				require.Equal(t, c.cont.NewTestBlockHash(), msg.Qc.BlockHash)
 				require.Equal(t, results.Hash(), msg.Qc.ResultsHash)
 				if test.hasBE {
 					require.NotNil(t, be.DSE)
@@ -469,7 +470,8 @@ func TestStartPrecommitVotePhase(t *testing.T) {
 				block, results = c.simPrecommitPhase(t, 0)
 			}
 			if !test.validProposal {
-				c.bft.Block = []byte("some other block") // mismatched proposals
+				c.bft.Block = c.cont.NewTestBlock2() // mismatched proposals
+				c.bft.BlockHash = c.cont.NewTestBlockHash2()
 			}
 			if !test.isProposer {
 				c.bft.ProposerKey = []byte("some other proposer")
@@ -496,7 +498,7 @@ func TestStartPrecommitVotePhase(t *testing.T) {
 				require.True(t, ok)
 				require.NotNil(t, msg.Qc)
 				require.Equal(t, *msg.Qc.Header, expectedView)
-				require.Equal(t, crypto.Hash(block), msg.Qc.BlockHash)
+				require.Equal(t, c.cont.NewTestBlockHash(), msg.Qc.BlockHash)
 				require.Equal(t, results.Hash(), msg.Qc.ResultsHash)
 				require.Equal(t, c.bft.HighQC.BlockHash, msg.Qc.BlockHash)
 				require.Equal(t, c.bft.HighQC.Block, block)
@@ -671,7 +673,7 @@ func TestStartCommitProcessPhase(t *testing.T) {
 			case qc := <-c.cont.gossipCertChan:
 				require.Equal(t, qc.Header.Phase, expectedQCView.Phase)
 				require.Equal(t, qc.Block, block)
-				require.Equal(t, crypto.Hash(block), qc.BlockHash)
+				require.Equal(t, c.cont.NewTestBlockHash(), qc.BlockHash)
 				require.Equal(t, results.Hash(), qc.ResultsHash)
 				require.NotNil(t, qc.Signature)
 				expectedAggSig, err := multiKey.AggregateSignatures()
@@ -797,7 +799,7 @@ func TestCheckProposerAndBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			c := newTestConsensus(t, Precommit, 1)
-			c.bft.Block, c.bft.ProposerKey, c.bft.Results = []byte("some proposal"), bytes.Repeat([]byte("F"), crypto.BLS12381PubKeySize), &lib.CertificateResult{
+			c.bft.Block, c.bft.ProposerKey, c.bft.Results = c.cont.NewTestBlock(), bytes.Repeat([]byte("F"), crypto.BLS12381PubKeySize), &lib.CertificateResult{
 				RewardRecipients: &lib.RewardRecipients{
 					PaymentPercents: []*lib.PaymentPercents{{
 						Address: crypto.Hash([]byte("some address"))[:20],
@@ -805,16 +807,16 @@ func TestCheckProposerAndBlock(t *testing.T) {
 					}},
 				},
 			}
-			messageProposal, messageProposer := []byte("some other proposal"), []byte("some other proposer")
+			messageHash, messageProposer := c.cont.NewTestBlockHash2(), []byte("some other proposer")
 			if test.validProposal {
-				messageProposal = c.bft.Block
+				messageHash = c.cont.NewTestBlockHash()
 			}
 			if test.validProposer {
 				messageProposer = c.bft.ProposerKey
 			}
 			msg := &Message{
 				Qc: &lib.QuorumCertificate{
-					BlockHash:   crypto.Hash(messageProposal),
+					BlockHash:   messageHash,
 					ResultsHash: c.bft.Results.Hash(),
 				},
 				Signature: &lib.Signature{
@@ -1030,9 +1032,9 @@ func TestSafeNode(t *testing.T) {
 					HighQc: c2.bft.HighQC,
 				})
 			default:
-				msgProposal, highQCProposal := []byte("some proposal"), []byte("some other proposal")
+				msgProposal, hash := c.cont.NewTestBlock(), c.cont.NewTestBlock2()
 				if test.samePropInMsg {
-					highQCProposal = msgProposal
+					hash = c.cont.NewTestBlockHash()
 				}
 				err = c.bft.SafeNode(&Message{
 					Qc: &QC{
@@ -1041,7 +1043,7 @@ func TestSafeNode(t *testing.T) {
 					},
 					HighQc: &QC{
 						Header:    c.bft.HighQC.Header,
-						BlockHash: crypto.Hash(highQCProposal),
+						BlockHash: hash,
 					},
 				})
 			}
