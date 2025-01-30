@@ -354,7 +354,11 @@ func writeTxResultToConsole(hash *string, tx json.RawMessage, e lib.ErrorI) {
 	if sim {
 		writeToConsole(tx, e)
 	} else {
-		writeToConsole(hash, e)
+		var hashString string
+		if hash != nil {
+			hashString = *hash
+		}
+		writeToConsole(hashString, e)
 	}
 }
 
