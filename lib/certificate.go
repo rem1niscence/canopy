@@ -120,8 +120,14 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 		}
 		// block may be omitted in certain cases like the 'reward transaction'
 		if x.Block != nil {
+			blk := new(Block)
+			// convert the block bytes into a block
+			hash, err := blk.BytesToBlock(x.Block)
+			if err != nil {
+				return err
+			}
 			// check the block hash
-			if !bytes.Equal(x.BlockHash, crypto.Hash(x.Block)) {
+			if !bytes.Equal(x.BlockHash, hash) {
 				return ErrMismatchBlockHash()
 			}
 			blockSize := len(x.Block)

@@ -142,7 +142,7 @@ func (tc *testConsensus) simProposePhase(t *testing.T, propIdx int, validProp bo
 		m.HighQc, m.LastDoubleSignEvidence, m.Qc.ProposerKey = hQC, be.DSE.Evidence, tc.valKeys[propIdx].PublicKey().Bytes()
 		// if proposal not valid, generate an invalid proposal and hash pair
 		if !validProp {
-			m.Qc.Block, m.Qc.BlockHash = []byte(""), crypto.Hash([]byte(""))
+			m.Qc.Block, m.Qc.BlockHash = tc.cont.NewTestBlock2(), tc.cont.NewTestBlockHash2()
 		}
 	}, propIdx)
 	return
@@ -476,7 +476,7 @@ func (tc *testConsensus) view(phase Phase, round ...uint64) *lib.View {
 func (tc *testConsensus) proposal(t *testing.T) (blk, blkHash []byte, results *lib.CertificateResult, resultsHash []byte) {
 	blk, results, err := tc.cont.ProduceProposal(nil, nil)
 	require.NoError(t, err)
-	blkHash, resultsHash = crypto.Hash(blk), results.Hash()
+	blkHash, resultsHash = tc.cont.NewTestBlockHash(), results.Hash()
 	return
 }
 
@@ -498,7 +498,7 @@ func (t *testController) ChainHeight() uint64 {
 }
 
 func (t *testController) ProduceProposal(_ *ByzantineEvidence, _ *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI) {
-	block = crypto.Hash([]byte("mock"))
+	block = t.NewTestBlock()
 	results = &lib.CertificateResult{
 		RewardRecipients: &lib.RewardRecipients{
 			PaymentPercents: []*lib.PaymentPercents{{
@@ -548,4 +548,40 @@ func (t *testController) GossipBlock(cert *lib.QuorumCertificate) {
 	t.gossipCertChan <- cert
 }
 
-const expectedCandidateLen = crypto.HashSize
+func (t *testController) NewTestBlock() []byte {
+	blockBytes, err := lib.Marshal(t.newTestBlock())
+	if err != nil {
+		panic(err)
+	}
+	return blockBytes
+}
+
+func (t *testController) NewTestBlock2() []byte {
+	blockBytes, err := lib.Marshal(t.newTestBlock2())
+	if err != nil {
+		panic(err)
+	}
+	return blockBytes
+}
+
+func (t *testController) NewTestBlockHash() []byte {
+	blk := t.newTestBlock()
+	hash, _ := blk.BlockHeader.SetHash()
+	return hash
+}
+
+func (t *testController) NewTestBlockHash2() []byte {
+	blk := t.newTestBlock2()
+	hash, _ := blk.BlockHeader.SetHash()
+	return hash
+}
+
+func (t *testController) newTestBlock() *lib.Block {
+	return &lib.Block{BlockHeader: &lib.BlockHeader{Height: 1}}
+}
+
+func (t *testController) newTestBlock2() *lib.Block {
+	return &lib.Block{BlockHeader: &lib.BlockHeader{Height: 1, TransactionRoot: crypto.Hash([]byte("entropy"))}}
+}
+
+const expectedCandidateLen = 4

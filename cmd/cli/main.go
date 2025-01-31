@@ -123,16 +123,20 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 		if err = crypto.PrivateKeyToFile(blsPrivateKey, privateValKeyPath); err != nil {
 			log.Fatal(err.Error())
 		}
-		// get the password from the user
-		log.Infof("Enter password for your new private key:")
-		password, e := term.ReadPassword(int(os.Stdin.Fd()))
-		if e != nil {
-			log.Fatal(e.Error())
+		// allow flag config to skip initial password
+		if pwd == "" {
+			// get the password from the user
+			log.Infof("Enter password for your new private key:")
+			password, e := term.ReadPassword(int(os.Stdin.Fd()))
+			if e != nil {
+				log.Fatal(e.Error())
+			}
+			pwd = string(password)
 		}
 		// get nickname from the user
 		log.Infof("Enter nickname for your new private key:")
 		var nickname string
-		_, e = fmt.Scanln(&nickname)
+		_, e := fmt.Scanln(&nickname)
 		if e != nil {
 			log.Fatal(e.Error())
 		}
@@ -143,7 +147,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 		}
 		// import the validator key
 		address, e := k.ImportRaw(blsPrivateKey.Bytes(), crypto.ImportRawOpts{
-			Password: string(password),
+			Password: string(pwd),
 			Nickname: string(nickname),
 		})
 		if e != nil {

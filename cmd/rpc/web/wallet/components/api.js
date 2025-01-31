@@ -52,6 +52,7 @@ const delVotePath = "/v1/gov/del-vote";
 const paramsPath = "/v1/query/params";
 const orderPath = "/v1/query/order";
 const txPath = "/v1/tx";
+const height = "/v1/query/height";
 
 export async function GET(url, path) {
   let resp = await fetch(url + path, {
@@ -291,6 +292,10 @@ export async function AccountWithTxs(height, address, page) {
   });
 
   return result;
+}
+
+export function Height() {
+  return POST(rpcURL, height);
 }
 
 export function TransactionsBySender(page, sender) {

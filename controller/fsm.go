@@ -158,7 +158,7 @@ func (c *Controller) ValidateProposalBasic(qc *lib.QuorumCertificate, evidence *
 	if e != nil {
 		return nil, e
 	}
-	if bytes.Equal(qc.BlockHash, blockHash) {
+	if !bytes.Equal(qc.BlockHash, blockHash) {
 		return nil, lib.ErrMismatchBlockHash()
 	}
 	return
@@ -447,8 +447,13 @@ func (c *Controller) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (s
 	if blk == nil || blk.BlockHeader == nil {
 		return false, lib.ErrNilBlock()
 	}
+	// get the hash from the block
+	hash, err := blk.Hash()
+	if err != nil {
+		return false, err
+	}
 	// ensure the Proposal.BlockHash corresponds to the actual hash of the block
-	if !bytes.Equal(qc.BlockHash, crypto.Hash(qc.Block)) {
+	if !bytes.Equal(qc.BlockHash, hash) {
 		err = lib.ErrMismatchBlockHash()
 		return
 	}

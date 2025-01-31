@@ -9,7 +9,6 @@ import (
 /*
 	This file contains the Canopy implementation of a 'Block' which is used as 'Block bytes' in Committee for Canopy
 	NOTE: other Committees will use other 'Block' implementations dictated by the respective plugins
-	// TODO since block is only specific to Canopy, consider moving this file out of library
 */
 
 // BLOCK HEADER CODE BELOW
@@ -184,6 +183,27 @@ func (x *Block) Check(networkID, committeeID uint64) ErrorI {
 
 // Hash() computes, sets, and returns the BlockHash
 func (x *Block) Hash() ([]byte, ErrorI) { return x.BlockHeader.SetHash() }
+
+// BytesToBlock() converts block bytes into a block hash
+func (x *Block) BytesToBlock(blk []byte) (hash []byte, err ErrorI) {
+	// ensure the block isn't empty
+	if blk == nil {
+		return
+	}
+	// unmarshal the block
+	if err = Unmarshal(blk, x); err != nil {
+		return
+	}
+	// ensure header isn't nil
+	if x.BlockHeader == nil {
+		return nil, ErrNilBlockHeader()
+	}
+	hash, err = x.BlockHeader.SetHash()
+	if err != nil {
+		return
+	}
+	return
+}
 
 // jsonBlock is the Block implementation of json.Marshaller and json.Unmarshaler
 type jsonBlock struct {

@@ -134,7 +134,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 				return false, lib.ErrEmptyMessage()
 			}
 			// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
-			if !bytes.Equal(x.Qc.BlockHash, crypto.Hash(b.Block)) {
+			if !bytes.Equal(x.Qc.BlockHash, b.GetBlockHash()) {
 				return false, lib.ErrMismatchBlockHash()
 			}
 			if !bytes.Equal(x.Qc.ResultsHash, b.Results.Hash()) {
@@ -174,8 +174,14 @@ func (b *BFT) CheckReplicaMessage(x *Message) lib.ErrorI {
 		}
 	} else {
 		// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
-		if !bytes.Equal(x.Qc.BlockHash, crypto.Hash(b.Block)) {
-			return lib.ErrMismatchBlockHash()
+		if b.Block == nil {
+			if !bytes.Equal(x.Qc.BlockHash, b.BlockToHash(x.Qc.Block)) {
+				return lib.ErrMismatchBlockHash()
+			}
+		} else {
+			if !bytes.Equal(x.Qc.BlockHash, b.GetBlockHash()) {
+				return lib.ErrMismatchBlockHash()
+			}
 		}
 		if !bytes.Equal(x.Qc.ResultsHash, b.Results.Hash()) {
 			return lib.ErrMismatchResultsHash()

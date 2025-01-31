@@ -147,7 +147,7 @@ export default function Accounts({ keygroup, account, validator }) {
         r.signer = ks[r.sender].keyAddress
       }
       const txMap = {
-        send: () => TxSend(r.sender, r.recipient, numberFromCommas(r.amount), r.memo, r.fee, r.password, submit),
+        send: () => TxSend(r.sender, r.recipient, numberFromCommas(r.amount), r.memo, numberFromCommas(r.fee), r.password, submit),
         stake: () =>
           TxStake(
             r.sender,
@@ -160,7 +160,7 @@ export default function Accounts({ keygroup, account, validator }) {
             r.output,
             r.signer,
             r.memo,
-            r.fee,
+            numberFromCommas(r.fee),
             r.password,
             submit,
           ),
@@ -174,13 +174,13 @@ export default function Accounts({ keygroup, account, validator }) {
             r.output,
             r.signer,
             r.memo,
-            r.fee,
+            numberFromCommas(r.fee),
             r.password,
             submit,
           ),
-        unstake: () => TxUnstake(r.sender, r.signer, r.memo, r.fee, r.password, submit),
-        pause: () => TxPause(r.sender, r.signer, r.memo, r.fee, r.password, submit),
-        unpause: () => TxUnpause(r.sender, r.signer, r.memo, r.fee, r.password, submit),
+        unstake: () => TxUnstake(r.sender, r.signer, r.memo, numberFromCommas(r.fee), r.password, submit),
+        pause: () => TxPause(r.sender, r.signer, r.memo, numberFromCommas(r.fee), r.password, submit),
+        unpause: () => TxUnpause(r.sender, r.signer, r.memo, numberFromCommas(r.fee), r.password, submit),
         create_order: () =>
           TxCreateOrder(
             r.sender,
@@ -189,11 +189,11 @@ export default function Accounts({ keygroup, account, validator }) {
             numberFromCommas(r.receiveAmount),
             r.receiveAddress,
             r.memo,
-            r.fee,
+            numberFromCommas(r.fee),
             r.password,
             submit,
           ),
-        buy_order: () => TxBuyOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), r.fee, r.password, submit),
+        buy_order: () => TxBuyOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), numberFromCommas(r.fee), r.password, submit),
         edit_order: () =>
           TxEditOrder(
             r.sender,
@@ -203,11 +203,11 @@ export default function Accounts({ keygroup, account, validator }) {
             numberFromCommas(r.receiveAmount),
             r.receiveAddress,
             r.memo,
-            r.fee,
+            numberFromCommas(r.fee),
             r.password,
             submit,
           ),
-        delete_order: () => TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, r.fee, r.password, submit),
+        delete_order: () => TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, numberFromCommas(r.fee), r.password, submit),
       };
 
       const txFunction = txMap[state.txType];
@@ -388,7 +388,7 @@ export default function Accounts({ keygroup, account, validator }) {
           Available: <span className="fw-bold">{amount} </span>
           <Button
             aria-label="max-button"
-            onClick={() => onchange(v.label, Math.ceil(numberFromCommas(amount)).toString(), v.type)}
+            onClick={() => onchange(v.label, Math.ceil(account.account.amount).toString(), v.type)}
             variant="link"
             bsPrefix="max-amount-btn"
           >

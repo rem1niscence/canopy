@@ -9,7 +9,7 @@ import { Spinner } from "react-bootstrap";
 export const KeystoreContext = createContext()
 
 export default function Home() {
-  const [state, setState] = useState({ navIdx: 0, keystore: null, keyIdx: 0, account: {}, validator: {} });
+  const [state, setState] = useState({ navIdx: 0, keystore: null, keyIdx: 0, account: {}, validator: {}, height: 0 });
   const setNavIdx = (i) => setState({ ...state, navIdx: i });
 
   function queryAPI(i = state.keyIdx) {
@@ -27,7 +27,7 @@ export default function Home() {
       }, {});
 
       Promise.all([AccountWithTxs(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, 0), Validator(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress)]).then((r) => {
-        setState({ ...state, keyIdx: i, keystore: mergedKS, account: r[0], validator: r[1] });
+        setState({ ...state, keyIdx: i, keystore: mergedKS, account: r[0], validator: r[1], height: r[2] });
       });
     });
   }
@@ -64,5 +64,3 @@ export default function Home() {
     </KeystoreContext.Provider>
   );
 }
-
-// export { KeystoreContext };

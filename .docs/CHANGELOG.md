@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [Unreleased] - 1/29/2024
+- Display latest height in wallet
+
 ## [Unreleased] - 1/28/2024
 - Remove net addr in wallet when not delegating
 

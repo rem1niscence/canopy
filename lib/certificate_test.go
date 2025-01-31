@@ -9,6 +9,10 @@ import (
 )
 
 func TestCertificateCheckBasic(t *testing.T) {
+	block := &Block{BlockHeader: &BlockHeader{Height: 1}}
+	_, err := block.BlockHeader.SetHash()
+	require.NoError(t, err)
+	blkBytes, _ := Marshal(block)
 	// predefine qc results
 	results := &CertificateResult{
 		RewardRecipients: &RewardRecipients{
@@ -79,8 +83,8 @@ func TestCertificateCheckBasic(t *testing.T) {
 			detail: "the block hash does not match the block",
 			qc: &QuorumCertificate{
 				Header:      &View{},
-				Block:       []byte("b"),
-				BlockHash:   crypto.Hash([]byte("h")),
+				Block:       blkBytes,
+				BlockHash:   crypto.Hash([]byte("b")),
 				ResultsHash: results.Hash(),
 				Results:     results,
 				ProposerKey: newTestPublicKeyBytes(t),
@@ -92,8 +96,8 @@ func TestCertificateCheckBasic(t *testing.T) {
 			detail: "the aggregate signature is empty",
 			qc: &QuorumCertificate{
 				Header:      &View{},
-				Block:       []byte("b"),
-				BlockHash:   crypto.Hash([]byte("b")),
+				Block:       blkBytes,
+				BlockHash:   block.BlockHeader.Hash,
 				ResultsHash: results.Hash(),
 				Results:     results,
 				ProposerKey: newTestPublicKeyBytes(t),
@@ -105,8 +109,8 @@ func TestCertificateCheckBasic(t *testing.T) {
 			detail: "the happy path",
 			qc: &QuorumCertificate{
 				Header:      &View{},
-				Block:       []byte("b"),
-				BlockHash:   crypto.Hash([]byte("b")),
+				Block:       blkBytes,
+				BlockHash:   block.BlockHeader.Hash,
 				ResultsHash: results.Hash(),
 				Results:     results,
 				ProposerKey: newTestPublicKeyBytes(t),
