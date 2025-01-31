@@ -2,12 +2,13 @@ package fsm
 
 import (
 	"bytes"
+	"sort"
+	"testing"
+
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
-	"sort"
-	"testing"
 )
 
 func TestSetGetAccount(t *testing.T) {
@@ -531,6 +532,9 @@ func TestGetSetPools(t *testing.T) {
 			}, {
 				Id:     lib.CanopyCommitteeId + 1,
 				Amount: 100,
+			}, {
+				Id:     lib.CanopyCommitteeId + 2,
+				Amount: 0,
 			}},
 		},
 	}
@@ -553,6 +557,14 @@ func TestGetSetPools(t *testing.T) {
 			// ensure no error on function call
 			got, err := sm.GetPools()
 			require.NoError(t, err)
+			// ensure 0 amount pools are not returned
+			var noZeroAccounts int
+			for _, pool := range test.pools {
+				if pool.Amount != 0 {
+					noZeroAccounts++
+				}
+			}
+			require.Equal(t, len(got), noZeroAccounts)
 			// ensure results equal expected
 			for i, pool := range got {
 				require.EqualExportedValues(t, pool, test.pools[i])

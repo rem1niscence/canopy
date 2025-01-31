@@ -176,6 +176,9 @@ func (s *StateMachine) GetPools() ([]*types.Pool, lib.ErrorI) {
 		if err != nil {
 			return nil, err
 		}
+		if acc.Amount == 0 {
+			continue
+		}
 		result = append(result, acc)
 	}
 	return result, nil
