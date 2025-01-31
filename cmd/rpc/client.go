@@ -27,7 +27,7 @@ func NewClient(rpcURL, rpcPort, adminPort string) *Client {
 
 func (c *Client) Version() (version *string, err lib.ErrorI) {
 	version = new(string)
-	err = c.get(VersionRouteName, version)
+	err = c.get(VersionRouteName, "", version)
 	return
 }
 
@@ -63,13 +63,13 @@ func (c *Client) Pending(params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 
 func (c *Client) Proposals() (p *types.GovProposals, err lib.ErrorI) {
 	p = new(types.GovProposals)
-	err = c.get(ProposalsRouteName, p)
+	err = c.get(ProposalsRouteName, "", p)
 	return
 }
 
 func (c *Client) Poll() (p *types.Poll, err lib.ErrorI) {
 	p = new(types.Poll)
-	err = c.get(PollRouteName, p)
+	err = c.get(PollRouteName, "", p)
 	return
 }
 
@@ -282,8 +282,12 @@ func (c *Client) ValParams(height uint64) (p *types.ValidatorParams, err lib.Err
 }
 
 func (c *Client) State(height uint64) (p *types.GenesisState, err lib.ErrorI) {
+	var param string
+	if height != 0 {
+		param = fmt.Sprintf("?height=%d", height)
+	}
 	p = new(types.GenesisState)
-	err = c.heightRequest(StateRouteName, height, p)
+	err = c.get(StateRouteName, param, p)
 	return
 }
 
@@ -292,7 +296,7 @@ func (c *Client) StateDiff(height, startHeight uint64) (diff string, err lib.Err
 	if err != nil {
 		return
 	}
-	resp, e := c.client.Post(c.url(StateDiffRouteName, false), ApplicationJSON, bytes.NewBuffer(bz))
+	resp, e := c.client.Post(c.url(StateDiffRouteName, "", false), ApplicationJSON, bytes.NewBuffer(bz))
 	if e != nil {
 		return "", ErrPostRequest(e)
 	}
@@ -322,7 +326,7 @@ func (c *Client) Transaction(tx lib.TransactionI) (hash *string, err lib.ErrorI)
 
 func (c *Client) Keystore() (keystore *crypto.Keystore, err lib.ErrorI) {
 	keystore = new(crypto.Keystore)
-	err = c.get(KeystoreRouteName, keystore, true)
+	err = c.get(KeystoreRouteName, "", keystore, true)
 	return
 }
 func (c *Client) KeystoreNewKey(password, nickname string) (address crypto.AddressI, err lib.ErrorI) {
@@ -668,36 +672,36 @@ func (c *Client) TxVotePoll(from AddrOrNickname, pollJSON json.RawMessage, pollA
 
 func (c *Client) ResourceUsage() (returned *resourceUsageResponse, err lib.ErrorI) {
 	returned = new(resourceUsageResponse)
-	err = c.get(ResourceUsageRouteName, returned, true)
+	err = c.get(ResourceUsageRouteName, "", returned, true)
 	return
 }
 
 func (c *Client) PeerInfo() (returned *peerInfoResponse, err lib.ErrorI) {
 	returned = new(peerInfoResponse)
-	err = c.get(PeerInfoRouteName, returned, true)
+	err = c.get(PeerInfoRouteName, "", returned, true)
 	return
 }
 
 func (c *Client) ConsensusInfo() (returned *controller.ConsensusSummary, err lib.ErrorI) {
 	returned = new(controller.ConsensusSummary)
-	err = c.get(ConsensusInfoRouteName, returned, true)
+	err = c.get(ConsensusInfoRouteName, "", returned, true)
 	return
 }
 
 func (c *Client) PeerBook() (returned *[]*p2p.BookPeer, err lib.ErrorI) {
 	returned = new([]*p2p.BookPeer)
-	err = c.get(PeerBookRouteName, returned, true)
+	err = c.get(PeerBookRouteName, "", returned, true)
 	return
 }
 
 func (c *Client) Config() (returned *lib.Config, err lib.ErrorI) {
 	returned = new(lib.Config)
-	err = c.get(ConfigRouteName, returned, true)
+	err = c.get(ConfigRouteName, "", returned, true)
 	return
 }
 
 func (c *Client) Logs() (logs string, err lib.ErrorI) {
-	resp, e := c.client.Get(c.url(LogsRouteName, true))
+	resp, e := c.client.Get(c.url(LogsRouteName, "", true))
 	if e != nil {
 		return "", ErrGetRequest(err)
 	}
@@ -877,28 +881,28 @@ func (c *Client) heightAndIdRequest(routeName string, height, id uint64, ptr any
 	return
 }
 
-func (c *Client) url(routeName string, admin ...bool) string {
+func (c *Client) url(routeName, param string, admin ...bool) string {
 	// if rpc port and admin ports are defined then it's a local RPC deployment
 	if c.rpcPort != "" && c.adminPort != "" {
 		if admin != nil && admin[0] {
-			return "http://" + localhost + colon + c.adminPort + router[routeName].Path
+			return "http://" + localhost + colon + c.adminPort + router[routeName].Path + param
 		}
-		return c.rpcURL + colon + c.rpcPort + router[routeName].Path
+		return c.rpcURL + colon + c.rpcPort + router[routeName].Path + param
 	}
 	// if rpc port is not defined then it's consider a remote RPC deployment
-	return c.rpcURL + router[routeName].Path
+	return c.rpcURL + router[routeName].Path + param
 }
 
 func (c *Client) post(routeName string, json []byte, ptr any, admin ...bool) lib.ErrorI {
-	resp, err := c.client.Post(c.url(routeName, admin...), ApplicationJSON, bytes.NewBuffer(json))
+	resp, err := c.client.Post(c.url(routeName, "", admin...), ApplicationJSON, bytes.NewBuffer(json))
 	if err != nil {
 		return ErrPostRequest(err)
 	}
 	return c.unmarshal(resp, ptr)
 }
 
-func (c *Client) get(routeName string, ptr any, admin ...bool) lib.ErrorI {
-	resp, err := c.client.Get(c.url(routeName, admin...))
+func (c *Client) get(routeName, param string, ptr any, admin ...bool) lib.ErrorI {
+	resp, err := c.client.Get(c.url(routeName, param, admin...))
 	if err != nil {
 		return ErrGetRequest(err)
 	}

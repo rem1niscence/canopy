@@ -71,7 +71,7 @@ func (s *StateMachine) SlashAndResetNonSigners(committeeId uint64, params *types
 		return err
 	}
 	// pause all on the bad list
-	s.SetValidatorsPaused(badList)
+	s.SetValidatorsPaused(committeeId, badList)
 	// slash all on the bad list
 	if err := s.SlashNonSigners(committeeId, params, badList); err != nil {
 		return err
@@ -240,7 +240,9 @@ func (s *StateMachine) SlashValidators(addresses [][]byte, committeeId, percent 
 func (s *StateMachine) SlashValidator(validator *types.Validator, committeeId, percent uint64, p *types.ValidatorParams) (err lib.ErrorI) {
 	// ensure no unauthorized slashes may occur
 	if !slices.Contains(validator.Committees, committeeId) {
-		return types.ErrInvalidCommitteeID()
+		// NOTE: expected - this can happen during a race between edit-stake and slash
+		s.log.Warn(types.ErrInvalidCommitteeID().Error())
+		return nil
 	}
 	newCommittees := slices.Clone(validator.Committees)
 	// if a 'slash tracker' is used to limit the max slash per committee per block

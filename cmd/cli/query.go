@@ -13,7 +13,7 @@ var queryCmd = &cobra.Command{
 }
 
 var (
-	height, startHeight, pageNumber, perPage, committee, order, unstaking, delegated, paused = uint64(0), uint64(0), 0, 0, uint64(0), uint64(0), "", "", ""
+	height, startHeight, pageNumber, perPage, committee, unstaking, delegated, paused = uint64(0), uint64(0), 0, 0, uint64(0), "", "", ""
 )
 
 func init() {
@@ -22,7 +22,6 @@ func init() {
 	queryCmd.PersistentFlags().IntVar(&pageNumber, "page-number", 0, "page number on a paginated call")
 	queryCmd.PersistentFlags().IntVar(&perPage, "per-page", 0, "number of items per page on a paginated call")
 	queryCmd.PersistentFlags().Uint64Var(&committee, "committee", 0, "filter validators by committee id")
-	queryCmd.PersistentFlags().Uint64Var(&order, "order", 0, "the unique identifier of the sell order")
 	queryCmd.PersistentFlags().StringVar(&unstaking, "unstaking", "", "yes = only unstaking validators, no = only non-unstaking validators")
 	queryCmd.PersistentFlags().StringVar(&paused, "paused", "", "yes = only paused validators, no = only unpaused validators")
 	queryCmd.PersistentFlags().StringVar(&delegated, "delegated", "", "yes = only delegated validators, no = only non-delegated validators")
@@ -160,10 +159,11 @@ var (
 	}
 
 	orderCmd = &cobra.Command{
-		Use:   "order --height=1 --order=1 --committee=1",
+		Use:   "order <order_id> --height=1 --committee=1",
 		Short: "query a specific sell order",
+		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeToConsole(client.Order(height, order, committee))
+			writeToConsole(client.Order(height, uint64(argToInt(args[0])), committee))
 		},
 	}
 
@@ -216,13 +216,10 @@ var (
 	}
 
 	certCmd = &cobra.Command{
-		Use:   "certificate <height>",
+		Use:   "certificate --height=1",
 		Short: "query a quorum certificate for a height",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) == 0 {
-				args = append(args, "0")
-			}
-			writeToConsole(client.CertByHeight(uint64(argToInt(args[0]))))
+			writeToConsole(client.CertByHeight(height))
 		},
 	}
 
@@ -253,13 +250,9 @@ var (
 	}
 
 	txsByHeightCmd = &cobra.Command{
-		Use:   "transactions <height> --per-page=10 --page-number=1",
+		Use:   "txs --height=1 --per-page=10 --page-number=1",
 		Short: "query txs at a certain height",
 		Run: func(cmd *cobra.Command, args []string) {
-			height = uint64(0)
-			if len(args) != 0 {
-				height = uint64(argToInt(args[0]))
-			}
 			writeToConsole(client.TransactionsByHeight(getPaginatedArgs()))
 		},
 	}
@@ -285,7 +278,7 @@ var (
 	}
 
 	txByHashCmd = &cobra.Command{
-		Use:   "tx-by-hash <hash>",
+		Use:   "tx <hash>",
 		Short: "query a transaction by its hash",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -321,7 +314,6 @@ var (
 	lastProposersCmd = &cobra.Command{
 		Use:   "last-proposers --height=1",
 		Short: "query the last proposers used in leader election",
-		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			writeToConsole(client.LastProposers(height))
 		},
@@ -377,7 +369,7 @@ var (
 		Long:  "query the validator set for a committee at a certain height",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeToConsole(client.ValidatorSet(uint64(argToInt(args[0])), height))
+			writeToConsole(client.ValidatorSet(height, uint64(argToInt(args[0]))))
 		},
 	}
 )
