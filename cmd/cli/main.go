@@ -137,12 +137,14 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			}
 			pwd = string(password)
 		}
-		// get nickname from the user
-		log.Infof("Enter nickname for your new private key:")
-		var nickname string
-		_, e := fmt.Scanln(&nickname)
-		if e != nil {
-			log.Fatal(e.Error())
+		// allow flag config to skip initial nickname
+		if nick == "" {
+			// get nickname from the user
+			log.Infof("Enter nickname for your new private key:")
+			_, e := fmt.Scanln(&nick)
+			if e != nil {
+				log.Fatal(e.Error())
+			}
 		}
 		// load the keystore from file
 		k, e := crypto.NewKeystoreFromFile(dataDirPath)
@@ -151,8 +153,8 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 		}
 		// import the validator key
 		address, e := k.ImportRaw(blsPrivateKey.Bytes(), crypto.ImportRawOpts{
-			Password: string(pwd),
-			Nickname: string(nickname),
+			Password: pwd,
+			Nickname: nick,
 		})
 		if e != nil {
 			log.Fatal(e.Error())

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import Truncate from "react-truncate-inside";
 import JsonView from "@uiw/react-json-view";
 import { Bar } from "react-chartjs-2";
@@ -27,10 +27,17 @@ import {
   sanitizeInput,
   withTooltip,
 } from "@/components/util";
+import { KeystoreContext } from "@/pages";
+
+function Keystore() {
+  const keystore = useContext(KeystoreContext);
+  return keystore
+}
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 export default function Governance({ keygroup, account: accountWithTxs, validator }) {
+  const ks = Keystore()
   const [state, setState] = useState({
     txResult: {},
     rawTx: {},
@@ -134,7 +141,7 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
 
   // onPropSubmit() handles the proposal submit form callback
   function onPropSubmit(e) {
-    onFormSubmit(state, e, (r) => {
+    onFormSubmit(state, e, ks, (r) => {
       if (state.txPropType === 0) {
         createParamChangeTx(
           r.sender,
@@ -408,6 +415,22 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                       v.tooltip,
                       i,
                     )}
+                    {v.type === "dropdown" ? (
+                      <Form.Select
+                        className="input-text-field"
+                        aria-label={v.label}
+                      >
+                        {v.options && v.options.length > 0 ? (
+                          v.options.map((key) => (
+                            <option key={key} value={key}>
+                              {key}
+                            </option>
+                          ))
+                        ) : (
+                          <option disabled>No options available</option>
+                        )}
+                      </Form.Select>
+                    ) : (
                     <Form.Control
                       placeholder={v.placeholder}
                       required={v.required}
@@ -417,7 +440,7 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                       minLength={v.minLength}
                       maxLength={v.maxLength}
                       aria-label={v.label}
-                    />
+                    />)}
                   </InputGroup>
                 );
               })}

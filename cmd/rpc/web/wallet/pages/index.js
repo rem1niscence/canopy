@@ -1,5 +1,5 @@
 import Navigation from "@/components/navbar";
-import { AccountWithTxs, Keystore, Validator } from "@/components/api";
+import { AccountWithTxs, Height, Keystore, Validator } from "@/components/api";
 import { createContext, useEffect, useState } from "react";
 import Accounts from "@/components/account";
 import Dashboard from "@/components/dashboard";
@@ -26,7 +26,7 @@ export default function Home() {
         return acc;
       }, {});
 
-      Promise.all([AccountWithTxs(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, 0), Validator(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress)]).then((r) => {
+      Promise.all([AccountWithTxs(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, 0), Validator(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress), Height()]).then((r) => {
         setState({ ...state, keyIdx: i, keystore: mergedKS, account: r[0], validator: r[1], height: r[2] });
       });
     });

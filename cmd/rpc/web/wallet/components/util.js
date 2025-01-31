@@ -480,7 +480,7 @@ export function renderToast(state, setState) {
 }
 
 // onFormSubmit() handles form submission and passes form data to a callback
-export function onFormSubmit(state, e, callback) {
+export function onFormSubmit(state, e, ks, callback) {
     e.preventDefault();
     let r = {};
     for (let i = 0; ; i++) {
@@ -488,6 +488,12 @@ export function onFormSubmit(state, e, callback) {
             break;
         }
         r[e.target[i].ariaLabel] = e.target[i].value;
+    }
+    if (r.sender) {
+        r.sender = ks[r.sender].keyAddress
+    }
+    if (r.signer) {
+        r.signer = ks[r.sender].keyAddress
     }
     callback(r);
 }

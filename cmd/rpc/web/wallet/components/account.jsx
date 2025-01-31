@@ -108,7 +108,7 @@ export default function Accounts({ keygroup, account, validator }) {
 
   // onPKFormSubmit() handles the submission of the private key form and updates the state with the retrieved key
   function onPKFormSubmit(e) {
-    onFormSubmit(state, e, (r) =>
+    onFormSubmit(state, e, ks, (r) =>
       KeystoreGet(r.sender, r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
       }),
@@ -117,7 +117,7 @@ export default function Accounts({ keygroup, account, validator }) {
 
   // onNewPKFormSubmit() handles the submission of the new private key form and updates the state with the generated key
   function onNewPKFormSubmit(e) {
-    onFormSubmit(state, e, (r) =>
+    onFormSubmit(state, e, ks, (r) =>
       KeystoreNew(r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
       }),
@@ -126,7 +126,7 @@ export default function Accounts({ keygroup, account, validator }) {
 
   // onImportOrGenerateSubmit() handles the submission of either the import or generate form and updates the state accordingly
   function onImportOrGenerateSubmit(e) {
-    onFormSubmit(state, e, (r) => {
+    onFormSubmit(state, e, ks, (r) => {
       if (r.private_key) {
         void KeystoreImport(r.private_key, r.password, r.nickname).then((_) => setState({ ...state, showSpinner: false }));
       } else {
@@ -137,15 +137,9 @@ export default function Accounts({ keygroup, account, validator }) {
 
   // onTxFormSubmit() handles transaction form submissions based on transaction type
   function onTxFormSubmit(e) {
-    onFormSubmit(state, e, (r) => {
+    onFormSubmit(state, e, ks, (r) => {
       const submit = Object.keys(state.txResult).length !== 0;
       // Mapping transaction types to their respective functions
-      if (r.sender) {
-        r.sender = ks[r.sender].keyAddress
-      }
-      if (r.signer) {
-        r.signer = ks[r.sender].keyAddress
-      }
       const txMap = {
         send: () => TxSend(r.sender, r.recipient, numberFromCommas(r.amount), r.memo, numberFromCommas(r.fee), r.password, submit),
         stake: () =>
