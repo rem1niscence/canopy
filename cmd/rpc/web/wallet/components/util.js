@@ -9,7 +9,6 @@ export function getFormInputs(type, keyGroup, account, validator) {
     let compound = validator && validator.address ? validator.compound : false;
     let output = validator && validator.address ? validator.output : "";
     let address = account != null ? account.address : "";
-    let pubKey = keyGroup != null ? keyGroup.publicKey : "";
     let signer = account != null ? account.address : "";
     let committeeList = validator && validator.address && validator.committees && (validator.committees.length !== 0) ? validator.committees.join(",") : "";
     address = type !== "send" && validator && validator.address ? validator.address : address;
@@ -41,18 +40,6 @@ export function getFormInputs(type, keyGroup, account, validator) {
             type: "text",
             minLength: 40,
             maxLength: 40
-        },
-        pubKey: {
-            placeholder: "public key of the node",
-            defaultValue: pubKey,
-            tooltip: "the public key of the validator",
-            label: "pubKey",
-            inputText: "pubKey",
-            feedback: "please choose a pubKey to send the transaction from",
-            required: true,
-            type: "text",
-            minLength: 96,
-            maxLength: 96
         },
         committees: {
             placeholder: "1, 22, 50",
@@ -309,7 +296,6 @@ export function getFormInputs(type, keyGroup, account, validator) {
         case "stake":
             return [
                 a.address,
-                a.pubKey,
                 a.committees,
                 a.netAddr,
                 a.amount,

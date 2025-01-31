@@ -165,7 +165,7 @@ var (
 	}
 
 	txPauseCmd = &cobra.Command{
-		Use:     "tx-pause <address>  --fee=10000 --simulate=true",
+		Use:     "tx-pause <address> <signer> --fee=10000 --simulate=true",
 		Short:   "pause an active validator",
 		Example: "tx-pause dfd3c8dff19da7682f7fe5fde062c813b55c9eee dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
 		Args:    cobra.MinimumNArgs(2),

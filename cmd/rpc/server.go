@@ -1259,6 +1259,7 @@ func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey 
 		write(w, err, http.StatusBadRequest)
 		return
 	}
+	ptr.PubKey = privateKey.PublicKey().String()
 	p, err := callback(privateKey, ptr)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
