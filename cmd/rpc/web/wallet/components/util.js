@@ -1,8 +1,16 @@
 import {OverlayTrigger, Toast, ToastContainer, Tooltip} from "react-bootstrap";
+import { useContext } from "react";
+import { KeystoreContext } from "@/pages";
+
+function Keystore() {
+    const keystore = useContext(KeystoreContext);
+    return keystore
+}
 
 // getFormInputs() returns the form input based on the type
 // account and validator is passed to assist with auto fill
 export function getFormInputs(type, keyGroup, account, validator) {
+    const ks = Keystore()
     let amount = null;
     let netAddr = validator && validator.address ? validator.net_address : "";
     let delegate = validator && validator.address ? validator.delegate : false;
@@ -30,17 +38,12 @@ export function getFormInputs(type, keyGroup, account, validator) {
             minLength: 64,
             maxLength: 128
         },
-        address: {
-            placeholder: "the unique id of the account",
-            defaultValue: address,
-            tooltip: "the short public key id of the account",
+        account: {
+            tooltip: "the short public key id or nickname of the account",
             label: "sender",
-            inputText: "address",
-            feedback: "please choose an address to send the transaction from",
-            required: true,
-            type: "text",
-            minLength: 40,
-            maxLength: 40
+            inputText: "account",
+            type: "dropdown",
+            options: ks ? Object.keys(ks) : []
         },
         pubKey: {
             placeholder: "public key of the node",
@@ -197,16 +200,11 @@ export function getFormInputs(type, keyGroup, account, validator) {
             maxLength: 40
         },
         signer: {
-            placeholder: "signer of the transaction",
-            defaultValue: signer,
             tooltip: "the signing address that authorizes the transaction",
             label: "signer",
             inputText: "signer",
-            feedback: "please choose a signer address",
-            required: true,
-            type: "text",
-            minLength: 40,
-            maxLength: 40
+            type: "dropdown",
+            options: ks ? Object.keys(ks) : []
         },
         paramSpace: {
             placeholder: "",
@@ -317,10 +315,10 @@ export function getFormInputs(type, keyGroup, account, validator) {
     };
     switch (type) {
         case "send":
-            return [a.address, a.rec, a.amount, a.memo, a.fee, a.password];
+            return [a.account, a.rec, a.amount, a.memo, a.fee, a.password];
         case "stake":
             return [
-                a.address,
+                a.account,
                 a.pubKey,
                 a.committees,
                 a.netAddr,
@@ -334,12 +332,12 @@ export function getFormInputs(type, keyGroup, account, validator) {
                 a.password
             ];
         case "create_order":
-            return [a.address, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password];
+            return [a.account, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password];
         case "buy_order":
-            return [a.address, a.buyersReceiveAddress, a.orderId, a.fee, a.password];
+            return [a.account, a.buyersReceiveAddress, a.orderId, a.fee, a.password];
         case "edit_order":
             return [
-                a.address,
+                a.account,
                 a.committeeId,
                 a.orderId,
                 a.amount,
@@ -350,10 +348,10 @@ export function getFormInputs(type, keyGroup, account, validator) {
                 a.password
             ];
         case "delete_order":
-            return [a.address, a.committeeId, a.orderId, a.memo, a.fee, a.password];
+            return [a.account, a.committeeId, a.orderId, a.memo, a.fee, a.password];
         case "edit-stake":
             return [
-                a.address,
+                a.account,
                 a.committees,
                 a.netAddr,
                 a.amount,
@@ -365,27 +363,27 @@ export function getFormInputs(type, keyGroup, account, validator) {
                 a.password
             ];
         case "change-param":
-            return [a.address, a.paramSpace, a.paramKey, a.paramValue, a.startBlock, a.endBlock, a.memo, a.fee, a.password];
+            return [a.account, a.paramSpace, a.paramKey, a.paramValue, a.startBlock, a.endBlock, a.memo, a.fee, a.password];
         case "dao-transfer":
-            return [a.address, a.amount, a.startBlock, a.endBlock, a.memo, a.fee, a.password];
+            return [a.account, a.amount, a.startBlock, a.endBlock, a.memo, a.fee, a.password];
         case "pause":
         case "unpause":
         case "unstake":
-            return [a.address, a.signer, a.memo, a.fee, a.password];
+            return [a.account, a.signer, a.memo, a.fee, a.password];
         case "pass-and-addr":
-            return [a.address, a.password];
+            return [a.account, a.password];
         case "pass-and-pk":
             return [a.privateKey, a.password];
         case "pass-only":
             return [a.password];
         case "pass-nickname-and-addr":
-          return [a.address, a.password, a.nickname];
+          return [a.account, a.password, a.nickname];
         case "pass-nickname-and-pk":
           return [a.privateKey, a.password, a.nickname];
         case "pass-and-nickname":
           return [a.password, a.nickname];
         default:
-            return [a.address, a.memo, a.fee, a.password];
+            return [a.account, a.memo, a.fee, a.password];
     }
 }
 

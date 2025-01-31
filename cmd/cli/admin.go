@@ -124,154 +124,154 @@ var (
 	}
 
 	txSendCmd = &cobra.Command{
-		Use:     "tx-send <address> <to-address> <amount> --fee=10000 --simulate=true",
+		Use:     "tx-send <address or nickname> <to-address> <amount> --fee=10000 --simulate=true",
 		Short:   "send an amount to another address",
 		Example: "tx-send dfd3c8dff19da7682f7fe5fde062c813b55c9eee eed6c9dff19da7682f7fe5fde062c813b42c7abc 10000",
 		Args:    cobra.MinimumNArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxSend(argGetAddr(args[0]), argGetAddr(args[1]), uint64(argToInt(args[2])), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxSend(argGetAddrOrNickname(args[0]), argGetAddr(args[1]), uint64(argToInt(args[2])), getPassword(), !sim, fee))
 		},
 	}
 
 	txStakeCmd = &cobra.Command{
-		Use:     "tx-stake <address> <net-address> <amount> <committees> <output> <signer> --delegated --early-withdrawal --fee=10000 --simulate=true",
+		Use:     "tx-stake <address or nickname> <net-address> <amount> <committees> <output> <signer address or nickname> --delegated --early-withdrawal --fee=10000 --simulate=true",
 		Short:   "stake a validator",
 		Long:    "tx-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of committeeIds> <address for rewards> <signer address>--delegated --early-withdrawal  --fee=10000 --simulate=true",
 		Example: "tx-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9000 100000000 0,21,22 abc3c8dff19da7682f7fe5fde062c813b55c9abc dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
 		Args:    cobra.MinimumNArgs(6),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxStake(argGetAddr(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), argGetAddr(args[5]), delegate, earlyWithdrawal, getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxStake(argGetAddrOrNickname(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), argGetAddrOrNickname(args[5]), delegate, earlyWithdrawal, getPassword(), !sim, fee))
 		},
 	}
 
 	txEditStakeCmd = &cobra.Command{
-		Use:     "tx-edit-stake <address> <net-address> <amount> <committees> <output> <signer> --delegated --early-withdrawal --fee=10000 --simulate=true",
+		Use:     "tx-edit-stake <address or nickname> <net-address> <amount> <committees> <output> <signer address or nickname> --delegated --early-withdrawal --fee=10000 --simulate=true",
 		Short:   "edit-stake an active validator. Use the existing value to not edit a field",
 		Long:    "tx-edit-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of committeeIds> <address for rewards> <address for rewards> <signer address> --delegated --early-withdrawal  --fee=10000 --simulate=true",
 		Example: "tx-edit-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9001 100000001 0,21,22 abc3c8dff19da7682f7fe5fde062c813b55c9abc dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
 		Args:    cobra.MinimumNArgs(6),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxEditStake(argGetAddr(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), argGetAddr(args[5]), delegate, earlyWithdrawal, getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxEditStake(argGetAddrOrNickname(args[0]), args[1], uint64(argToInt(args[2])), argToCommittees(args[3]), argGetAddr(args[4]), argGetAddrOrNickname(args[5]), delegate, earlyWithdrawal, getPassword(), !sim, fee))
 		},
 	}
 
 	txUnstakeCmd = &cobra.Command{
-		Use:     "tx-unstake <address>  --fee=10000 --simulate=true",
+		Use:     "tx-unstake <address or nickname> <signer address or nickname>  --fee=10000 --simulate=true",
 		Short:   "begin unstaking an active validator; may take some time to fully unstake",
 		Example: "tx-unstake dfd3c8dff19da7682f7fe5fde062c813b55c9eee dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
 		Args:    cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxUnstake(argGetAddr(args[0]), argGetAddr(args[1]), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxUnstake(argGetAddrOrNickname(args[0]), argGetAddrOrNickname(args[1]), getPassword(), !sim, fee))
 		},
 	}
 
 	txPauseCmd = &cobra.Command{
-		Use:     "tx-pause <address>  --fee=10000 --simulate=true",
+		Use:     "tx-pause <address or nickname> <signer address or nickname>  --fee=10000 --simulate=true",
 		Short:   "pause an active validator",
 		Example: "tx-pause dfd3c8dff19da7682f7fe5fde062c813b55c9eee dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
 		Args:    cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxPause(argGetAddr(args[0]), argGetAddr(args[1]), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxPause(argGetAddrOrNickname(args[0]), argGetAddrOrNickname(args[1]), getPassword(), !sim, fee))
 		},
 	}
 
 	txUnpauseCmd = &cobra.Command{
-		Use:     "tx-unpause <address> <signer> --fee=10000 --simulate=true",
+		Use:     "tx-unpause <address or nickname> <signer address or nickname> --fee=10000 --simulate=true",
 		Short:   "unpause a paused validator",
 		Example: "tx-unpause dfd3c8dff19da7682f7fe5fde062c813b55c9eee dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
 		Args:    cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxUnpause(argGetAddr(args[0]), argGetAddr(args[1]), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxUnpause(argGetAddrOrNickname(args[0]), argGetAddrOrNickname(args[1]), getPassword(), !sim, fee))
 		},
 	}
 
 	txChangeParamCmd = &cobra.Command{
-		Use:   "tx-change-param <address> <param-space> <param-key> <param-value> <proposal-start-block> <proposal-end-block> --fee=10000 --simulate=true",
+		Use:   "tx-change-param <address or nickname> <param-space> <param-key> <param-value> <proposal-start-block> <proposal-end-block> --fee=10000 --simulate=true",
 		Short: "propose a governance parameter change - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(6),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxChangeParam(argGetAddr(args[0]), args[1], args[2], args[3], uint64(argToInt(args[4])), uint64(argToInt(args[5])), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxChangeParam(argGetAddrOrNickname(args[0]), args[1], args[2], args[3], uint64(argToInt(args[4])), uint64(argToInt(args[5])), getPassword(), !sim, fee))
 		},
 	}
 
 	txDAOTransferCmd = &cobra.Command{
-		Use:   "tx-dao-transfer <address> <amount> <proposal-start-block> <proposal-end-block> --fee=10000 --simulate=true",
+		Use:   "tx-dao-transfer <address or nickname> <amount> <proposal-start-block> <proposal-end-block> --fee=10000 --simulate=true",
 		Short: "propose a treasury subsidy - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(4),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxDaoTransfer(argGetAddr(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), uint64(argToInt(args[3])), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxDaoTransfer(argGetAddrOrNickname(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), uint64(argToInt(args[3])), getPassword(), !sim, fee))
 		},
 	}
 
 	txSubsidyCmd = &cobra.Command{
-		Use:   "tx-subsidy <address> <amount> <committee-id> <opcode> --fee=10000 --simulate=true",
+		Use:   "tx-subsidy <address or nickname> <amount> <committee-id> <opcode> --fee=10000 --simulate=true",
 		Short: "subsidize the reward pool of a committee - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(4),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxSubsidy(argGetAddr(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), args[3], getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxSubsidy(argGetAddrOrNickname(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), args[3], getPassword(), !sim, fee))
 		},
 	}
 
 	txCreateOrderCmd = &cobra.Command{
-		Use:   "tx-create-order <address> <sell-amount> <receive-amount> <committee-id> <receive-address> --fee=10000 --simulate=true",
+		Use:   "tx-create-order <address or nickname> <sell-amount> <receive-amount> <committee-id> <receive-address> --fee=10000 --simulate=true",
 		Short: "create a sell order - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(5),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxCreateOrder(argGetAddr(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), uint64(argToInt(args[3])), args[4], getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxCreateOrder(argGetAddrOrNickname(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), uint64(argToInt(args[3])), args[4], getPassword(), !sim, fee))
 		},
 	}
 
 	txEditOrderCmd = &cobra.Command{
-		Use:   "tx-edit-order <address> <sell-amount> <receive-amount> <order-id> <committee-id> <receive-address> --fee=10000 --simulate=true",
+		Use:   "tx-edit-order <address or nickname> <sell-amount> <receive-amount> <order-id> <committee-id> <receive-address> --fee=10000 --simulate=true",
 		Short: "edit an existing sell order - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(6),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxEditOrder(argGetAddr(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), uint64(argToInt(args[3])), uint64(argToInt(args[4])), args[5], getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxEditOrder(argGetAddrOrNickname(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), uint64(argToInt(args[3])), uint64(argToInt(args[4])), args[5], getPassword(), !sim, fee))
 		},
 	}
 
 	txDeleteOrderCmd = &cobra.Command{
-		Use:   "tx-delete-order <address> <order-id> <committee-id>--fee=10000 --simulate=true",
+		Use:   "tx-delete-order <address or nickname> <order-id> <committee-id>--fee=10000 --simulate=true",
 		Short: "delete an existing sell order - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxDeleteOrder(argGetAddr(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxDeleteOrder(argGetAddrOrNickname(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), getPassword(), !sim, fee))
 		},
 	}
 
 	txBuyOrderCmd = &cobra.Command{
-		Use:   "tx-buy-order <address> <canopy-receive-address> <order-id> --fee=10000 --simulate=true",
+		Use:   "tx-buy-order <address or nickname> <canopy-receive-address> <order-id> --fee=10000 --simulate=true",
 		Short: "buy an existing sell order - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxBuyOrder(argGetAddr(args[0]), argGetAddr(args[1]), uint64(argToInt(args[2])), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxBuyOrder(argGetAddrOrNickname(args[0]), argGetAddr(args[1]), uint64(argToInt(args[2])), getPassword(), !sim, fee))
 		},
 	}
 
 	txStartPollCmd = &cobra.Command{
-		Use:   "tx-start-poll <address> <poll-json> --fee=50000 --simulate=true",
+		Use:   "tx-start-poll <address or nickname> <poll-json> --fee=50000 --simulate=true",
 		Short: "start a straw poll on canopy - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxStartPoll(argGetAddr(args[0]), []byte(args[1]), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxStartPoll(argGetAddrOrNickname(args[0]), []byte(args[1]), getPassword(), !sim, fee))
 		},
 	}
 
 	approveTxVotePoll = &cobra.Command{
-		Use:   "approve-tx-vote-poll <address> <poll-json> --fee=10000 --simulate=true",
+		Use:   "approve-tx-vote-poll <address or nickname> <poll-json> --fee=10000 --simulate=true",
 		Short: "approve vote on a straw poll for canopy - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxVotePoll(argGetAddr(args[0]), []byte(args[1]), true, getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxVotePoll(argGetAddrOrNickname(args[0]), []byte(args[1]), true, getPassword(), !sim, fee))
 		},
 	}
 
 	rejectTxVotePoll = &cobra.Command{
-		Use:   "approve-tx-vote-poll <address> <poll-json> --fee=10000 --simulate=true",
+		Use:   "approve-tx-vote-poll <address or nickname> <poll-json> --fee=10000 --simulate=true",
 		Short: "reject vote on a straw poll for canopy - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxVotePoll(argGetAddr(args[0]), []byte(args[1]), false, getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxVotePoll(argGetAddrOrNickname(args[0]), []byte(args[1]), false, getPassword(), !sim, fee))
 		},
 	}
 

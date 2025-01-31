@@ -1,10 +1,12 @@
 import Navigation from "@/components/navbar";
 import { AccountWithTxs, Keystore, Validator } from "@/components/api";
-import { useEffect, useState } from "react";
+import { createContext, useEffect, useState } from "react";
 import Accounts from "@/components/account";
 import Dashboard from "@/components/dashboard";
 import Governance from "@/components/governance";
 import { Spinner } from "react-bootstrap";
+
+export const KeystoreContext = createContext()
 
 export default function Home() {
   const [state, setState] = useState({ navIdx: 0, keystore: null, keyIdx: 0, account: {}, validator: {} });
@@ -42,21 +44,25 @@ export default function Home() {
     return <Spinner id="spinner" />;
   }
   return (
-    <>
-      <div id="container">
-        <Navigation {...state} setActiveKey={queryAPI} setNavIdx={setNavIdx} />
-        <div id="pageContent">
-          {(() => {
-            if (state.navIdx === 0) {
-              return <Accounts keygroup={Object.values(state.keystore)[state.keyIdx]} {...state} />;
-            } else if (state.navIdx === 1) {
-              return <Governance keygroup={Object.values(state.keystore)[state.keyIdx]} {...state} />;
-            } else {
-              return <Dashboard />;
-            }
-          })()}
+    <KeystoreContext.Provider value={state.keystore}>
+      <>
+        <div id="container">
+          <Navigation {...state} setActiveKey={queryAPI} setNavIdx={setNavIdx} />
+          <div id="pageContent">
+            {(() => {
+              if (state.navIdx === 0) {
+                return <Accounts keygroup={Object.values(state.keystore)[state.keyIdx]} {...state} />;
+              } else if (state.navIdx === 1) {
+                return <Governance keygroup={Object.values(state.keystore)[state.keyIdx]} {...state} />;
+              } else {
+                return <Dashboard />;
+              }
+            })()}
+          </div>
         </div>
-      </div>
-    </>
+      </>
+    </KeystoreContext.Provider>
   );
 }
+
+// export { KeystoreContext };

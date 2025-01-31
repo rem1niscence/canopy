@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
 import { Button, Card, Col, Form, InputGroup, Modal, Row, Table, Spinner } from "react-bootstrap";
@@ -30,6 +30,12 @@ import {
   renderToast,
   withTooltip,
 } from "@/components/util";
+import { KeystoreContext } from "@/pages";
+
+function Keystore() {
+  const keystore = useContext(KeystoreContext);
+  return keystore
+}
 
 // transactionButtons defines the icons for the transactions
 const transactionButtons = [
@@ -47,6 +53,7 @@ const transactionButtons = [
 
 // Accounts() returns the main component of this file
 export default function Accounts({ keygroup, account, validator }) {
+  const ks = Keystore()
   const [state, setState] = useState({
       showModal: false,
       txType: "send",
@@ -133,6 +140,12 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, (r) => {
       const submit = Object.keys(state.txResult).length !== 0;
       // Mapping transaction types to their respective functions
+      if (r.sender) {
+        r.sender = ks[r.sender].keyAddress
+      }
+      if (r.signer) {
+        r.signer = ks[r.sender].keyAddress
+      }
       const txMap = {
         send: () => TxSend(r.sender, r.recipient, numberFromCommas(r.amount), r.memo, r.fee, r.password, submit),
         stake: () =>
@@ -326,6 +339,24 @@ export default function Accounts({ keygroup, account, validator }) {
         <Form.Group key={i} className="mb-3">
           <InputGroup size="lg">
             {withTooltip(<InputGroup.Text className="input-text">{v.inputText}</InputGroup.Text>, v.tooltip, i, "auto")}
+            {v.type === "dropdown" ? (
+              <Form.Select
+                className="input-text-field"
+                onChange={(e) => handleInputChange(v.label, e.target.value, v.type)}
+                value={formValues[v.label]}
+                aria-label={v.label}
+              >
+                {v.options && v.options.length > 0 ? (
+                  v.options.map((key) => (
+                    <option key={key} value={key}>
+                      {key}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>No options available</option>
+                )}
+              </Form.Select>
+            ) : (
             <Form.Control
               className="input-text-field"
               onChange={(e) => handleInputChange(v.label, e.target.value, v.type)}
@@ -338,7 +369,7 @@ export default function Accounts({ keygroup, account, validator }) {
               maxLength={v.maxLength}
               aria-label={v.label}
               aria-describedby="emailHelp"
-            />
+            />)}
           </InputGroup>
           {v.label === "amount" ? renderAmountInput(handleInputChange, v) : null}
         </Form.Group>

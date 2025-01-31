@@ -3,6 +3,7 @@ package rpc
 import (
 	"bytes"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -829,7 +830,9 @@ type txRequest struct {
 	PollJSON        json.RawMessage `json:"pollJSON"`
 	PollApprove     bool            `json:"pollApprove"`
 	Signer          lib.HexBytes    `json:"signer"`
+	SignerNickname  string          `json:"signerNickname"`
 	addressRequest
+	nicknameRequest
 	passwordRequest
 	txChangeParamRequest
 	committeesRequest
@@ -1258,6 +1261,20 @@ func updatePollResults() {
 	}
 }
 
+func getAddressFromNickname(ptr *txRequest, keystore *crypto.Keystore) {
+	if len(ptr.Signer) == 0 && ptr.SignerNickname != "" {
+		addressString := keystore.NicknameMap[ptr.SignerNickname]
+		addressBytes, _ := hex.DecodeString(addressString)
+		ptr.Signer = addressBytes
+	}
+
+	if len(ptr.Address) == 0 && ptr.Nickname != "" {
+		addressString := keystore.NicknameMap[ptr.Nickname]
+		addressBytes, _ := hex.DecodeString(addressString)
+		ptr.Address = addressBytes
+	}
+}
+
 func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error)) {
 	ptr := new(txRequest)
 	if ok := unmarshal(w, r, ptr); !ok {
@@ -1267,6 +1284,8 @@ func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey 
 	if !ok {
 		return
 	}
+	getAddressFromNickname(ptr, keystore)
+
 	signer := ptr.Signer
 	if len(signer) == 0 {
 		signer = ptr.Address
