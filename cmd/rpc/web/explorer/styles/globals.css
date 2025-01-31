@@ -26,6 +26,7 @@
   --callout-border-rgb: 172, 175, 176;
   --card-rgb: 180, 185, 188;
   --card-border-rgb: 131, 134, 135;
+  --primary-color: #06AC56
 }
 
 @media (prefers-color-scheme: dark) {
@@ -134,16 +135,16 @@ input::placeholder {
 
 .page-item .page-link {
   z-index: 3;
-  color: #32908f !important;
-  border-color: #32908f !important;
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
   background-color: #fff !important;
 }
 
 .page-item.active .page-link {
   z-index: 3;
   color: #fff !important;
-  border-color: #32908f !important;
-  background-color: #32908f !important;
+  border-color: var(--primary-color) !important;
+  background-color: var(--primary-color) !important;
 }
 
 body {
@@ -151,11 +152,11 @@ body {
 }
 
 a:link {
-  color: #32908f;
+  color: var(--primary-color);
 }
 
 a:visited {
-  color: #32908f;
+  color: var(--primary-color);
 }
 
 a:hover {
@@ -163,7 +164,7 @@ a:hover {
 }
 
 a:active {
-  color: #32908f;
+  color: var(--primary-color);
 }
 
 @media (min-width: 992px) {
@@ -424,7 +425,7 @@ a:active {
 }
 
 .nav-bar-brand-highlight {
-  color: #32908f;
+  color: var(--primary-color);
 }
 
 .nav-bar-center {
@@ -439,16 +440,16 @@ a:active {
 }
 
 .nav-link.active {
-  color: #32908f !important;
+  color: var(--primary-color) !important;
   background-color: white !important;
   font-weight: bold;
   opacity: 100%;
   border: 0 !important;
-  border-bottom: 2px solid #32908f !important;
+  border-bottom: 2px solid var(--primary-color) !important;
 }
 
 .nav-link {
-  color: #32908f !important;
+  color: var(--primary-color) !important;
   background-color: white !important;
   opacity: 50%;
   border: 0 !important;

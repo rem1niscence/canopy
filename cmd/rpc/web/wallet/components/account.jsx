@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
 import { Button, Card, Col, Form, InputGroup, Modal, Row, Table, Spinner } from "react-bootstrap";
@@ -58,8 +58,24 @@ export default function Accounts({ keygroup, account, validator }) {
       pk: {},
       toast: "",
       showSpinner: false,
+      primaryColor: "",
+      greyColor: "",
     }),
     acc = account.account;
+
+  useEffect(() => {
+    // Ensure document is available
+    const rootStyles = getComputedStyle(document.documentElement);
+    const primaryColor = rootStyles.getPropertyValue("--primary-color").trim();
+    const greyColor = rootStyles.getPropertyValue("--grey-color").trim();
+
+    // Update state with colors
+    setState((prevState) => ({
+      ...prevState,
+      primaryColor,
+      greyColor,
+    }));
+  }, []);
 
   // resetState() resets the state back to its initial
   function resetState() {
@@ -406,7 +422,7 @@ export default function Accounts({ keygroup, account, validator }) {
           <Card.Body style={{ padding: "10px" }}>
             <Card.Title style={{ fontWeight: "bold", fontSize: "14px" }}>
               {v.info}
-              <span style={{ fontSize: "10px", color: "#32908f" }}>{v.after}</span>
+              <span style={{ fontSize: "10px", color: state.primaryColor }}>{v.after}</span>
             </Card.Title>
           </Card.Body>
         </Card>
@@ -433,7 +449,7 @@ export default function Accounts({ keygroup, account, validator }) {
   function renderTransactions() {
     return account.combined.length === 0 ? null : (
       <div className="recent-transactions-table">
-        <span style={{ textAlign: "center", fontWeight: "100", fontSize: "14px", color: "grey" }}>
+        <span style={{ textAlign: "center", fontWeight: "100", fontSize: "14px", color: state.greyColor }}>
           RECENT TRANSACTIONS
         </span>
         <Table className="table-fixed" bordered hover style={{ marginTop: "10px" }}>
@@ -480,7 +496,7 @@ export default function Accounts({ keygroup, account, validator }) {
     <>
       <div className="content-container">
         <span id="balance">{formatNumber(acc.amount)}</span>
-        <span style={{ fontWeight: "bold", color: "#32908f" }}>{" CNPY"}</span>
+        <span style={{ fontWeight: "bold", color: state.primaryColor }}>{" CNPY"}</span>
         <br />
         <hr style={{ border: "1px dashed black", borderRadius: "5px", width: "60%", margin: "0 auto" }} />
         <br />

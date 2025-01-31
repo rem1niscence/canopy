@@ -19,6 +19,9 @@ import (
 	"sync"
 	"time"
 
+	"path"
+	pprof2 "runtime/pprof"
+
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/fsm"
@@ -35,8 +38,6 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
-	"path"
-	pprof2 "runtime/pprof"
 )
 
 const (
@@ -267,10 +268,10 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 		}
 	}()
 	if !conf.Headless {
-		l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
-		runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
-		l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
-		runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
+		// l.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", c.WalletPort)
+		// runStaticFileServer(walletFS, walletStaticDir, c.WalletPort)
+		// l.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", c.ExplorerPort)
+		// runStaticFileServer(explorerFS, explorerStaticDir, c.ExplorerPort)
 	}
 }
 

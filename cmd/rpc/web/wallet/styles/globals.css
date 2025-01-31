@@ -1,3 +1,9 @@
+:root {
+  --primary-color: #0058DB;
+  --secondary-color: #5447ac;
+  --grey-color: gray;
+}
+
 #container {
   z-index: 0;
   width: 100%;
@@ -42,7 +48,7 @@
 }
 
 .nav-bar-brand-highlight {
-  color: #32908f;
+  color: var(--primary-color);
 }
 
 #nav-bar-select {
@@ -72,13 +78,13 @@
 }
 
 .nav-link.active {
-  color: #32908f !important;
+  color: var(--primary-color) !important;
   background-color: white !important;
   opacity: 100%;
   text-decoration: none;
   font-weight: bold;
   border: 0 !important;
-  border-bottom: 1px solid #32908f !important;
+  border-bottom: 1px solid var(--primary-color) !important;
   width: 100px !important;
   margin: 0 auto;
 }
@@ -265,14 +271,14 @@
 }
 
 #pk-button {
-  color: #32908f;
-  border-color: #32908f;
+  color: var(--primary-color);
+  border-color: var(--primary-color);
   margin: 20px;
 }
 
 #pk-button:hover {
   color: white;
-  background-color: #32908f;
+  background-color: var(--primary-color);
 }
 
 #export-pk-button {
@@ -280,13 +286,13 @@
 }
 
 #reveal-pk-button {
-  color: purple;
-  border-color: purple;
+  color: var(--secondary-color);
+  border-color: var(--secondary-color);
   margin: 10px;
 }
 
 #reveal-pk-button:hover {
-  background-color: purple;
+  background-color: var(--secondary-color);
   color: white;
 }
 
@@ -295,13 +301,13 @@
 }
 
 #import-pk-button {
-  color: grey;
-  border-color: grey;
+  color: var(--grey-color);
+  border-color: var(--grey-color);
   margin: 10px;
 }
 
 #import-pk-button:hover {
-  background-color: grey;
+  background-color: var(--grey-color);
   color: white;
 }
 
@@ -447,7 +453,7 @@
 #propose-subtitle {
   font-weight: bold;
   font-size: 18px;
-  color: #32908f;
+  color: var(--primary-color);
 }
 
 .governance-header-image {
