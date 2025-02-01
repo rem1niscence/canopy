@@ -16,7 +16,7 @@ const (
 	ProposalsFilePath      = "proposals.json"
 	PollsFilePath          = "polls.json"
 	UnknownCommitteeId     = uint64(0)
-	CanopyCommitteeId      = uint64(1)
+	CanopyCommitteeId      = uint64(1) // NOTE: to not break sub-chain recursion, this should not be used except for 'default config/genesis' developer setups
 	DAOPoolID              = math.MaxUint32 + 1
 	CanopyMainnetNetworkId = 1
 )
@@ -48,14 +48,15 @@ func DefaultConfig() Config {
 // MAIN CONFIG BELOW
 
 type MainConfig struct {
-	LogLevel string `json:"logLevel"`
-	ChainId  uint64 `json:"chainId"`
-	Headless bool   `json:"headless"`
+	LogLevel    string `json:"logLevel"`
+	ChainId     uint64 `json:"chainId"`
+	BaseChainId uint64 `json:"baseChainId"`
+	Headless    bool   `json:"headless"`
 }
 
 // DefaultMainConfig() sets log level to 'info'
 func DefaultMainConfig() MainConfig {
-	return MainConfig{LogLevel: "info", ChainId: CanopyCommitteeId, Headless: false}
+	return MainConfig{LogLevel: "info", BaseChainId: CanopyCommitteeId, ChainId: CanopyCommitteeId, Headless: false}
 }
 
 // GetLogLevel() parses the log string in the config file into a LogLevel Enum
@@ -100,6 +101,9 @@ func DefaultRPCConfig() RPCConfig {
 		TimeoutS:        3,
 	}
 }
+
+// IsBaseChain() returns whether the self chain is base
+func (c Config) IsBaseChain() bool { return c.BaseChainId == c.ChainId }
 
 // STATE MACHINE CONFIG BELOW
 
@@ -206,7 +210,7 @@ type MempoolConfig struct {
 // DefaultMempoolConfig() returns the developer created Mempool options
 func DefaultMempoolConfig() MempoolConfig {
 	return MempoolConfig{
-		MaxTotalBytes:       uint64(units.MB),
+		MaxTotalBytes:       uint64(10 * units.MB),
 		IndividualMaxTxSize: uint32(4 * units.Kilobyte),
 		MaxTransactionCount: 5000,
 		DropPercentage:      35,

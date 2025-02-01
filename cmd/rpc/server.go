@@ -78,8 +78,9 @@ const (
 	PollRouteName                  = "poll"
 	CommitteeRouteName             = "committee"
 	CommitteeDataRouteName         = "committee-data"
-	CommitteesDataRouteName        = "Committees-data"
-	SubsidizedCommitteesRouteName  = "subsidized-Committees"
+	CommitteesDataRouteName        = "committees-data"
+	SubsidizedCommitteesRouteName  = "subsidized-committees"
+	RetiredCommitteesRouteName     = "retired-committees"
 	OrderRouteName                 = "order"
 	OrdersRouteName                = "orders"
 	LastProposersRouteName         = "last-proposers"
@@ -146,8 +147,9 @@ var (
 		ValidatorsRouteName:            {Method: http.MethodPost, Path: "/v1/query/validators", HandlerFunc: Validators},
 		CommitteeRouteName:             {Method: http.MethodPost, Path: "/v1/query/committee", HandlerFunc: Committee},
 		CommitteeDataRouteName:         {Method: http.MethodPost, Path: "/v1/query/committee-data", HandlerFunc: CommitteeData},
-		CommitteesDataRouteName:        {Method: http.MethodPost, Path: "/v1/query/Committees-data", HandlerFunc: CommitteesData},
-		SubsidizedCommitteesRouteName:  {Method: http.MethodPost, Path: "/v1/query/subsidized-Committees", HandlerFunc: SubsidizedCommittees},
+		CommitteesDataRouteName:        {Method: http.MethodPost, Path: "/v1/query/committees-data", HandlerFunc: CommitteesData},
+		SubsidizedCommitteesRouteName:  {Method: http.MethodPost, Path: "/v1/query/subsidized-committees", HandlerFunc: SubsidizedCommittees},
+		RetiredCommitteesRouteName:     {Method: http.MethodPost, Path: "/v1/query/retired-committees", HandlerFunc: RetiredCommittees},
 		NonSignersRouteName:            {Method: http.MethodPost, Path: "/v1/query/non-signers", HandlerFunc: NonSigners},
 		ParamRouteName:                 {Method: http.MethodPost, Path: "/v1/query/params", HandlerFunc: Params},
 		SupplyRouteName:                {Method: http.MethodPost, Path: "/v1/query/supply", HandlerFunc: Supply},
@@ -595,6 +597,10 @@ func CommitteesData(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func SubsidizedCommittees(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	heightParams(w, r, func(s *fsm.StateMachine) (interface{}, lib.ErrorI) { return s.GetSubsidizedCommittees() })
+}
+
+func RetiredCommittees(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightParams(w, r, func(s *fsm.StateMachine) (interface{}, lib.ErrorI) { return s.GetRetiredCommittees() })
 }
 
 func Order(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {

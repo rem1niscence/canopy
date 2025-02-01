@@ -86,6 +86,8 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 	c.CalculateSlashRecipients(results, be)
 	// set checkpoint
 	c.CalculateCheckpoint(blockResult, results)
+	// handle retired status
+	c.HandleRetired(results)
 	return
 }
 
@@ -123,6 +125,8 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 	c.CalculateSlashRecipients(compareResults, evidence)
 	// set checkpoint
 	c.CalculateCheckpoint(blockResult, compareResults)
+	// handle retired status
+	c.HandleRetired(compareResults)
 	// ensure generated the same results
 	if !qc.Results.Equals(compareResults) {
 		return types.ErrMismatchCertResults()
@@ -289,7 +293,8 @@ func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, baseChain
 	} else {
 		c.AddLotteryWinner(results, baseDelegateWinner)
 	}
-	if c.Config.ChainId != lib.CanopyCommitteeId {
+	// is isn't base chain
+	if !c.Config.IsBaseChain() {
 		// sub validator
 		subValidatorWinner, e := c.FSM.LotteryWinner(c.Config.ChainId, true)
 		if e != nil {
@@ -352,6 +357,16 @@ func (c *Controller) CalculateCheckpoint(blockResult *lib.BlockResult, results *
 			BlockHash: blockResult.BlockHeader.Hash,
 		}
 	}
+}
+
+// HandleRetired() checks if the committee is retiring and sets in the results accordingly
+func (c *Controller) HandleRetired(results *lib.CertificateResult) {
+	cons, err := c.FSM.GetParamsCons()
+	if err != nil {
+		c.log.Error(err.Error())
+		return
+	}
+	results.Retired = cons.Retired != 0
 }
 
 // AddLotteryWinner() adds a lottery winner (delegate, sub-delegate, or sub-validator) to the reward recipients

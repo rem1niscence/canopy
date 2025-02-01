@@ -36,6 +36,7 @@ func init() {
 	queryCmd.AddCommand(committeeDataCmd)
 	queryCmd.AddCommand(committeesDataCmd)
 	queryCmd.AddCommand(subsidizedCommitteeCmd)
+	queryCmd.AddCommand(retiredCommitteeCmd)
 	queryCmd.AddCommand(orderCmd)
 	queryCmd.AddCommand(ordersCmd)
 	queryCmd.AddCommand(nonSignersCmd)
@@ -155,6 +156,14 @@ var (
 		Short: "query a list of committees that are subsidized",
 		Run: func(cmd *cobra.Command, args []string) {
 			writeToConsole(client.SubsidizedCommittees(height))
+		},
+	}
+
+	retiredCommitteeCmd = &cobra.Command{
+		Use:   "retired-committees --height=1",
+		Short: "query a list of retired committees",
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.RetiredCommittees(height))
 		},
 	}
 
