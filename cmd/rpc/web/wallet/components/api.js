@@ -260,9 +260,10 @@ export async function VotePoll(address, json, approve, password) {
   return POST(adminRPCURL, txVotePoll, pollRequest(address, JSON.parse(json), password, approve));
 }
 
-export async function AccountWithTxs(height, address, page) {
+export async function AccountWithTxs(height, address, nickname, page) {
   let result = {};
   result.account = await Account(height, address);
+  result.account.nickname = nickname
 
   const setStatus = (status) => (tx) => {
     tx.status = status;
@@ -310,8 +311,10 @@ export function FailedTransactions(page, sender) {
   return POST(rpcURL, failedTxs, pageAddrReq(page, sender));
 }
 
-export async function Validator(height, address) {
-  return POST(rpcURL, validatorPath, heightAndAddrRequest(height, address));
+export async function Validator(height, address, nickname) {
+  let vl = POST(rpcURL, validatorPath, heightAndAddrRequest(height, address))
+  vl.nickname = nickname
+  return vl;
 }
 
 export async function Resource() {

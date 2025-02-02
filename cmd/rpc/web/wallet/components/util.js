@@ -16,11 +16,11 @@ export function getFormInputs(type, keyGroup, account, validator) {
     let delegate = validator && validator.address ? validator.delegate : false;
     let compound = validator && validator.address ? validator.compound : false;
     let output = validator && validator.address ? validator.output : "";
-    let address = account != null ? account.address : "";
-    let signer = account != null ? account.address : "";
+    let defaultNick = account != null ? account.nickname : "";
+    let defaultNickSigner = account != null ? account.nickname : "";
     let committeeList = validator && validator.address && validator.committees && (validator.committees.length !== 0) ? validator.committees.join(",") : "";
-    address = type !== "send" && validator && validator.address ? validator.address : address;
-    address = type === "stake" && validator && validator.address ? "WARNING: validator already staked" : address;
+    defaultNick = type !== "send" && validator && validator.nickname ? validator.nickname : defaultNick;
+    defaultNick = type === "stake" && validator && validator.nickname ? "WARNING: validator already staked" : defaultNick;
     if (type === "edit-stake" || type === "stake") {
         amount = validator && validator.address ? validator.staked_amount : null;
     }
@@ -40,6 +40,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
         account: {
             tooltip: "the short public key id or nickname of the account",
             label: "sender",
+            defaultValue: defaultNick,
             inputText: "account",
             type: "dropdown",
             options: ks ? Object.keys(ks) : []
@@ -190,6 +191,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
             tooltip: "the signing address that authorizes the transaction",
             label: "signer",
             inputText: "signer",
+            defaultValue: defaultNickSigner,
             type: "dropdown",
             options: ks ? Object.keys(ks) : []
         },
@@ -306,7 +308,6 @@ export function getFormInputs(type, keyGroup, account, validator) {
         case "stake":
             return [
                 a.account,
-                a.pubKey,
                 a.committees,
                 a.netAddr,
                 a.amount,
@@ -493,7 +494,7 @@ export function onFormSubmit(state, e, ks, callback) {
         r.sender = ks[r.sender].keyAddress
     }
     if (r.signer) {
-        r.signer = ks[r.sender].keyAddress
+        r.signer = ks[r.signer].keyAddress
     }
     callback(r);
 }

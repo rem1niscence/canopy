@@ -26,7 +26,7 @@ export default function Home() {
         return acc;
       }, {});
 
-      Promise.all([AccountWithTxs(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, 0), Validator(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress), Height()]).then((r) => {
+      Promise.all([AccountWithTxs(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, Object.keys(mergedKS)[i], 0), Validator(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, Object.keys(mergedKS)[i]), Height()]).then((r) => {
         setState({ ...state, keyIdx: i, keystore: mergedKS, account: r[0], validator: r[1], height: r[2] });
       });
     });
