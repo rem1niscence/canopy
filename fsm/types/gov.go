@@ -7,6 +7,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -208,7 +209,7 @@ func FormatParamSpace(paramSpace string) string {
 
 // IsStringParam() validates if the param is a string by space and key
 func IsStringParam(paramSpace, paramKey string) (bool, lib.ErrorI) {
-	testValueStr, testValue := NewProtocolVersion(1, 1), uint64(2)
+	testValueStr, testValue := NewProtocolVersion(math.MaxInt, math.MaxInt), uint64(2)
 	params := DefaultParams()
 	switch paramSpace {
 	case ParamSpaceVal:
