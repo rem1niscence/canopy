@@ -115,9 +115,6 @@ var _ ParamSpace = &ConsensusParams{}
 
 // Check() validates the consensus params
 func (x *ConsensusParams) Check() lib.ErrorI {
-	if x.BlockSize < lib.MaxBlockHeaderSize {
-		return ErrInvalidParam(ParamBlockSize)
-	}
 	if _, err := x.ParseProtocolVersion(); err != nil {
 		return err
 	}
