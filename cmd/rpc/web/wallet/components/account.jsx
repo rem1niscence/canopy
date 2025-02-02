@@ -96,12 +96,12 @@ export default function Accounts({ keygroup, account, validator }) {
     switch (true) {
       case !validator.address:
         return "UNSTAKED";
+      case validator.unstaking_height !== 0:
+        return "UNSTAKING";
       case validator.max_paused_height !== 0:
         return "PAUSED";
       case validator.delegate:
         return "DELEGATING";
-      case validator.unstaking_height !== 0:
-        return "UNSTAKING";
       default:
         return "STAKED";
     }
