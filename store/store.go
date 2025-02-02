@@ -73,8 +73,8 @@ func New(config lib.Config, l lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 // NewStore() creates a new instance of a disk DB
 func NewStore(path string, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	// use badger DB in managed mode to allow easy versioning
-	// memTableSize is set to 2GB (max) to allow 300MB (15%) of writes in a
-	// single batch. It is seemingly unknown why the 15% limit is set
+	// memTableSize is set to 1.28GB (max) to allow 128MB (10%) of writes in a
+	// single batch. It is seemingly unknown why the 10% limit is set
 	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt).
 		WithLoggingLevel(badger.ERROR).WithMemTableSize(int64(1*units.GB + 280*units.MB)))
@@ -305,34 +305,52 @@ func (s *Store) Close() lib.ErrorI {
 // crisis situations
 func (s *Store) UnsafeRollback(rollbackToHeight uint64) {
 	for i := s.Version(); i > rollbackToHeight; i-- {
-		// read only tx to collect the keys
-		tx := s.db.NewTransactionAt(i, false)
-		// only get the keys (no values)
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = false
-		// iterate through all the keys
-		it := tx.NewIterator(opts)
-		// save the keys to delete
-		keysToDelete := make([][]byte, 0)
-		for it.Rewind(); it.Valid(); it.Next() {
-			keysToDelete = append(keysToDelete, it.Item().KeyCopy(nil))
-		}
-		it.Close()
-		// discard the read only tx
-		tx.Discard()
-		// delete in a new transaction
-		tx = s.db.NewTransactionAt(i, true) // New write txn
-		for _, k := range keysToDelete {
-			// delete each key
-			if err := tx.Delete(k); err != nil {
-				panic(err)
-			}
-		}
-		// commit at the specific version
-		if err := tx.CommitAt(i, nil); err != nil {
-			panic(err)
-		}
+		s.deleteAllKeysAtVersion(i)
 	}
 	s.version = rollbackToHeight
 	s.resetWriter()
+}
+
+// Prune() removes older heights of the blockchain database for a 'lighter weight node'
+// NOTE: this is not recommended and at-least breaks peer syncing from genesis and could
+// be dangerous for sub-chains syncing from the base-chain
+func (s *Store) Prune(highestPruneHeight uint64) {
+	// TODO incomplete, pruning breaks the initializeTree design which attempts to write
+	//   on a read only store. Need to ensure that if pruned - don't accept historical
+	//   queries beyond the prune height. Also consider not starting at (0) but start at
+	//   first non-pruned height
+	for i := uint64(0); i <= highestPruneHeight; i++ {
+		s.deleteAllKeysAtVersion(i)
+	}
+	s.resetWriter()
+}
+
+// deleteAllKeysAtVersion() deletes all items at a certain height of the blockchain
+func (s *Store) deleteAllKeysAtVersion(version uint64) {
+	tx := s.db.NewTransactionAt(version, false)
+	// only get the keys (no values)
+	opts := badger.DefaultIteratorOptions
+	opts.PrefetchValues = false
+	// iterate through all the keys
+	it := tx.NewIterator(opts)
+	// save the keys to delete
+	keysToDelete := make([][]byte, 0)
+	for it.Rewind(); it.Valid(); it.Next() {
+		keysToDelete = append(keysToDelete, it.Item().KeyCopy(nil))
+	}
+	it.Close()
+	// discard the read only tx
+	tx.Discard()
+	// delete in a new transaction
+	tx = s.db.NewTransactionAt(version, true)
+	for _, k := range keysToDelete {
+		// delete each key
+		if err := tx.Delete(k); err != nil {
+			panic(err)
+		}
+	}
+	// commit at the specific version
+	if err := tx.CommitAt(version, nil); err != nil {
+		panic(err)
+	}
 }
