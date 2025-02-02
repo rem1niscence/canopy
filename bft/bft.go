@@ -92,7 +92,7 @@ func (b *BFT) Start() {
 	// load the committee from the base chain
 	b.ValidatorSet, err = b.Controller.LoadCommittee(b.Controller.BaseChainHeight())
 	if err != nil {
-		b.log.Fatal(err.Error())
+		b.log.Warn(err.Error())
 	}
 	for {
 		select {
@@ -690,7 +690,7 @@ func (b *BFT) waitTime(sleepTimeMS int, round uint64) time.Duration {
 func (b *BFT) SetWaitTimers(phaseWaitTime, optimisticWaitTIme, processTime time.Duration) {
 	b.log.Debugf("Process time: %.2fs, Wait time: %.2fs", processTime.Seconds(), phaseWaitTime.Seconds())
 	subtract := func(wt, pt time.Duration) (t time.Duration) {
-		if pt > 700*time.Hour {
+		if pt > 24*time.Hour {
 			return wt
 		}
 		if wt <= pt {

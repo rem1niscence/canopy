@@ -321,6 +321,15 @@ func PollBaseChainInfo() {
 				break
 			}
 			logger.Errorf("GetBaseChainInfo failed with err %s", e.Error())
+			// update with empty base-chain info to stop consensus
+			app.UpdateBaseChainInfo(&lib.BaseChainInfo{
+				Height:           baseChainHeight,
+				ValidatorSet:     lib.ValidatorSet{},
+				LastValidatorSet: lib.ValidatorSet{},
+				LastProposers:    &lib.Proposers{},
+				LotteryWinner:    &lib.LotteryWinner{},
+				Orders:           &lib.OrderBook{},
+			})
 		}
 	}
 }
@@ -541,10 +550,8 @@ func BaseChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 			return nil, err
 		}
 		// get the previous committee
-		lastValidatorSet, err := lastSM.GetCommitteeMembers(id, false)
-		if err != nil {
-			return nil, err
-		}
+		// allow an error here to have size 0 validator sets
+		lastValidatorSet, _ := lastSM.GetCommitteeMembers(id, false)
 		// get the last proposers
 		lastProposers, err := s.GetLastProposers()
 		if err != nil {

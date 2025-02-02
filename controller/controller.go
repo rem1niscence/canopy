@@ -113,8 +113,13 @@ func (c *Controller) UpdateBaseChainInfo(info *lib.BaseChainInfo) {
 	info.Log = c.log
 	// update the base-chain info
 	c.BaseChainInfo = *info
-	// signal to reset consensus
-	c.Consensus.ResetBFT <- bft.ResetBFT{IsBaseChainUpdate: true}
+	if info.LastValidatorSet.NumValidators == 0 {
+		// signal to reset consensus and start a new height
+		c.Consensus.ResetBFT <- bft.ResetBFT{IsBaseChainUpdate: false}
+	} else {
+		// signal to reset consensus
+		c.Consensus.ResetBFT <- bft.ResetBFT{IsBaseChainUpdate: true}
+	}
 	// update the peer 'must connect'
 	c.UpdateP2PMustConnect()
 }

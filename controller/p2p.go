@@ -491,6 +491,10 @@ func (c *Controller) UpdateP2PMustConnect() {
 	}
 	// ensure self is a validator
 	var selfIsValidator bool
+	// handle empty validator set
+	if c.BaseChainInfo.ValidatorSet.ValidatorSet == nil {
+		return
+	}
 	// for each member of the committee
 	for _, member := range c.BaseChainInfo.ValidatorSet.ValidatorSet.ValidatorSet {
 		if bytes.Equal(member.PublicKey, c.PublicKey) {
@@ -653,7 +657,7 @@ func (c *Controller) pollMaxHeight(backoff int) (max, minVDFIterations uint64, s
 // singleNodeNetwork() returns true if there are no other participants in the committee besides self
 func (c *Controller) singleNodeNetwork() bool {
 	// if self is the only validator, return true
-	return c.BaseChainInfo.ValidatorSet.NumValidators == 1 &&
+	return c.BaseChainInfo.ValidatorSet.NumValidators == 0 || c.BaseChainInfo.ValidatorSet.NumValidators == 1 &&
 		bytes.Equal(c.BaseChainInfo.ValidatorSet.ValidatorSet.ValidatorSet[0].PublicKey, c.PublicKey)
 }
 

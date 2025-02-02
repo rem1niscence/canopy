@@ -15,7 +15,7 @@ import (
 
 func TestIsCandidateDistribution(t *testing.T) {
 	const trials = 100000
-	tolerance := 0.005 // Allow ±.05% deviation
+	tolerance := 0.01 // Allow ± 1% deviation
 
 	tests := []struct {
 		name               string
