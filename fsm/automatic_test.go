@@ -16,7 +16,7 @@ func TestBeginBlock(t *testing.T) {
 		name               string
 		detail             string
 		isGenesis          bool
-		protocolVersion    int
+		protocolVersion    uint64
 		setLastCertResults bool
 		error              lib.ErrorI
 	}{
@@ -343,7 +343,7 @@ func TestCheckProtocolVersion(t *testing.T) {
 	tests := []struct {
 		name                  string
 		detail                string
-		localProtocolVersion  int
+		localProtocolVersion  uint64
 		localHeight           uint64
 		protocolVersion       uint64
 		protocolVersionHeight uint64

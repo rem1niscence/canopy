@@ -140,8 +140,19 @@ func (x *ConsensusParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 func (x *ConsensusParams) SetString(paramName string, value string) lib.ErrorI {
 	switch paramName {
 	case ParamProtocolVersion:
-		if _, err := checkProtocolVersion(value); err != nil {
+		// get new protocol version
+		newVersion, err := checkProtocolVersion(value)
+		if err != nil {
 			return err
+		}
+		// get old protocol version
+		oldVersion, err := checkProtocolVersion(x.ProtocolVersion)
+		if err != nil {
+			return err
+		}
+		// ensure new version isn't less than old version
+		if newVersion.Version <= oldVersion.Version || newVersion.Height <= oldVersion.Height {
+			return ErrInvalidProtocolVersion()
 		}
 		x.ProtocolVersion = value
 	default:

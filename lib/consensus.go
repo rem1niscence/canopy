@@ -23,6 +23,10 @@ type ValidatorSet struct {
 // NewValidatorSet() initializes a ValidatorSet from a given set of consensus validators
 func NewValidatorSet(validators *ConsensusValidators) (vs ValidatorSet, err ErrorI) {
 	totalPower, count, points := uint64(0), uint64(0), make([]kyber.Point, 0)
+	// handle empty set
+	if validators == nil {
+		return ValidatorSet{}, ErrNoValidators()
+	}
 	// iterate through the ValidatorSet to get the count, total power, and convert
 	// the public keys to 'points' on an elliptic curve for the BLS multikey
 	for _, v := range validators.ValidatorSet {
@@ -213,10 +217,7 @@ func (b *BaseChainInfo) UnmarshalJSON(bz []byte) (err error) {
 	if err != nil {
 		return
 	}
-	lastValidatorSet, err := NewValidatorSet(j.LastCommittee)
-	if err != nil {
-		return
-	}
+	lastValidatorSet, _ := NewValidatorSet(j.LastCommittee)
 	*b = BaseChainInfo{
 		Height:                 j.Height,
 		ValidatorSet:           validatorSet,

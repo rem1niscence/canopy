@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
-import { Button, Card, Col, Form, InputGroup, Modal, Row, Table, Spinner } from "react-bootstrap";
+import { Button, Card, Col, Form, InputGroup, Modal, Row, Spinner, Table } from "react-bootstrap";
 import {
   KeystoreGet,
   KeystoreImport,
@@ -15,20 +15,19 @@ import {
   TxSend,
   TxStake,
   TxUnpause,
-  TxUnstake,
+  TxUnstake
 } from "@/components/api";
 import {
   copy,
-  sanitizeInput,
-  numberFromCommas,
-  numberWithCommas,
-  formatNumberInput,
   formatNumber,
+  formatNumberInput,
   getFormInputs,
+  numberFromCommas,
   objEmpty,
   onFormSubmit,
   renderToast,
-  withTooltip,
+  sanitizeInput,
+  withTooltip
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 
@@ -48,7 +47,7 @@ const transactionButtons = [
   { title: "SWAP", name: "create_order", src: "swap" },
   { title: "LOCK", name: "buy_order", src: "buy" },
   { title: "REPRICE", name: "edit_order", src: "edit_order" },
-  { title: "VOID", name: "delete_order", src: "delete_order" },
+  { title: "VOID", name: "delete_order", src: "delete_order" }
 ];
 
 // Accounts() returns the main component of this file
@@ -64,7 +63,7 @@ export default function Accounts({ keygroup, account, validator }) {
       showNewModal: false,
       pk: {},
       toast: "",
-      showSpinner: false,
+      showSpinner: false
     }),
     acc = account.account;
 
@@ -78,7 +77,7 @@ export default function Accounts({ keygroup, account, validator }) {
       showModal: false,
       showPKModal: false,
       showNewModal: false,
-      showPKImportModal: false,
+      showPKImportModal: false
     });
   }
 
@@ -101,9 +100,18 @@ export default function Accounts({ keygroup, account, validator }) {
 
   // getStakedStatus() returns the staking status of the validator
   function getStakedStatus() {
-    if (!validator.address) return "UNSTAKED";
-    else if (validator.unstaking_time) return "UNSTAKING";
-    else return "STAKED";
+    switch (true) {
+      case !validator.address:
+        return "UNSTAKED";
+      case validator.unstaking_height !== 0:
+        return "UNSTAKING";
+      case validator.max_paused_height !== 0:
+        return "PAUSED";
+      case validator.delegate:
+        return "DELEGATING";
+      default:
+        return "STAKED";
+    }
   }
 
   // onPKFormSubmit() handles the submission of the private key form and updates the state with the retrieved key
@@ -111,7 +119,7 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, ks, (r) =>
       KeystoreGet(r.sender, r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
-      }),
+      })
     );
   }
 
@@ -120,7 +128,7 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, ks, (r) =>
       KeystoreNew(r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
-      }),
+      })
     );
   }
 
@@ -149,7 +157,7 @@ export default function Accounts({ keygroup, account, validator }) {
             r.memo,
             numberFromCommas(r.fee),
             r.password,
-            submit,
+            submit
           ),
         stake: () =>
           TxStake(
@@ -165,7 +173,7 @@ export default function Accounts({ keygroup, account, validator }) {
             r.memo,
             numberFromCommas(r.fee),
             r.password,
-            submit,
+            submit
           ),
         "edit-stake": () =>
           TxEditStake(
@@ -179,7 +187,7 @@ export default function Accounts({ keygroup, account, validator }) {
             r.memo,
             numberFromCommas(r.fee),
             r.password,
-            submit,
+            submit
           ),
         unstake: () => TxUnstake(r.sender, r.signer, r.memo, numberFromCommas(r.fee), r.password, submit),
         pause: () => TxPause(r.sender, r.signer, r.memo, numberFromCommas(r.fee), r.password, submit),
@@ -194,7 +202,7 @@ export default function Accounts({ keygroup, account, validator }) {
             r.memo,
             numberFromCommas(r.fee),
             r.password,
-            submit,
+            submit
           ),
         buy_order: () =>
           TxBuyOrder(
@@ -203,7 +211,7 @@ export default function Accounts({ keygroup, account, validator }) {
             numberFromCommas(r.orderId),
             numberFromCommas(r.fee),
             r.password,
-            submit,
+            submit
           ),
         edit_order: () =>
           TxEditOrder(
@@ -216,10 +224,10 @@ export default function Accounts({ keygroup, account, validator }) {
             r.memo,
             numberFromCommas(r.fee),
             r.password,
-            submit,
+            submit
           ),
         delete_order: () =>
-          TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, numberFromCommas(r.fee), r.password, submit),
+          TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, numberFromCommas(r.fee), r.password, submit)
       };
 
       const txFunction = txMap[state.txType];
@@ -322,7 +330,7 @@ export default function Accounts({ keygroup, account, validator }) {
       </td>,
       detail,
       i,
-      "top",
+      "top"
     );
   }
 
@@ -346,7 +354,7 @@ export default function Accounts({ keygroup, account, validator }) {
     const handleInputChange = (key, value, type) => {
       setFormValues((prev) => ({
         ...prev,
-        [key]: type === "number" ? formatNumberInput(value) : sanitizeInput(value),
+        [key]: type === "number" ? formatNumberInput(value) : sanitizeInput(value)
       }));
     };
 
@@ -487,23 +495,23 @@ export default function Accounts({ keygroup, account, validator }) {
         </span>
         <Table className="table-fixed" bordered hover style={{ marginTop: "10px" }}>
           <thead>
-            <tr>
-              {["Height", "Amount", "Recipient", "Type", "Hash", "Status"].map((k, i) => (
-                <th key={i}>{k}</th>
-              ))}
-            </tr>
+          <tr>
+            {["Height", "Amount", "Recipient", "Type", "Hash", "Status"].map((k, i) => (
+              <th key={i}>{k}</th>
+            ))}
+          </tr>
           </thead>
           <tbody>
-            {account.combined.slice(0, 5).map((v, i) => (
-              <tr key={i}>
-                <td>{v.height || "N/A"}</td>
-                <td>{v.transaction.msg.amount ?? v.transaction.msg.AmountForSale ?? "N/A"}</td>
-                {renderAccSumTabCol(v.recipient ?? v.sender ?? v.address, i)}
-                <td>{v.message_type || v.transaction.type}</td>
-                {renderAccSumTabCol(v.tx_hash, i + 1)}
-                <td>{v.status ?? ""}</td>
-              </tr>
-            ))}
+          {account.combined.slice(0, 5).map((v, i) => (
+            <tr key={i}>
+              <td>{v.height || "N/A"}</td>
+              <td>{v.transaction.msg.amount ?? v.transaction.msg.AmountForSale ?? "N/A"}</td>
+              {renderAccSumTabCol(v.recipient ?? v.sender ?? v.address, i)}
+              <td>{v.message_type || v.transaction.type}</td>
+              {renderAccSumTabCol(v.tx_hash, i + 1)}
+              <td>{v.status ?? ""}</td>
+            </tr>
+          ))}
           </tbody>
         </Table>
       </div>
@@ -521,7 +529,7 @@ export default function Accounts({ keygroup, account, validator }) {
       null,
       null,
       null,
-      "import-or-generate",
+      "import-or-generate"
     );
   }
   // return the main component
@@ -539,7 +547,7 @@ export default function Accounts({ keygroup, account, validator }) {
           {[
             { title: "Account Type", info: getAccountType() },
             { title: "Stake Amount", info: getValidatorAmount(), after: " cnpy" },
-            { title: "Staked Status", info: getStakedStatus() },
+            { title: "Staked Status", info: getStakedStatus() }
           ].map(renderAccountInfo)}
         </Row>
         <br />
@@ -561,7 +569,7 @@ export default function Accounts({ keygroup, account, validator }) {
           acc,
           null,
           resetState,
-          "reveal-pk",
+          "reveal-pk"
         )}
         {renderModal(
           state.showPKImportModal,
@@ -572,7 +580,7 @@ export default function Accounts({ keygroup, account, validator }) {
           acc,
           null,
           resetState,
-          "import-pk",
+          "import-pk"
         )}
         {renderModal(
           state.showNewModal,
@@ -583,7 +591,7 @@ export default function Accounts({ keygroup, account, validator }) {
           null,
           null,
           resetState,
-          "new-pk",
+          "new-pk"
         )}
         <Button id="pk-button" variant="outline-secondary" onClick={() => setState({ ...state, showNewModal: true })}>
           New Private Key

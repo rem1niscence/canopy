@@ -1,6 +1,9 @@
 # CHANGELOG
 
 ## [Unreleased] - 1/29/2024
+- Add more validator status to wallet
+
+## [Unreleased] - 1/29/2024
 - Display latest height in wallet
 
 ## [Unreleased] - 1/28/2024
