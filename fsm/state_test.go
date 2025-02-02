@@ -308,7 +308,7 @@ func newTestStateMachine(t *testing.T) StateMachine {
 		slashTracker:      types.NewSlashTracker(),
 		proposeVoteConfig: types.AcceptAllProposals,
 		Config: lib.Config{
-			MainConfig: lib.MainConfig{ChainId: lib.CanopyCommitteeId},
+			MainConfig: lib.DefaultMainConfig(),
 		},
 		log: log,
 	}

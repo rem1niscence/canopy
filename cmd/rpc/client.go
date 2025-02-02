@@ -188,6 +188,12 @@ func (c *Client) SubsidizedCommittees(height uint64) (p *[]uint64, err lib.Error
 	return
 }
 
+func (c *Client) RetiredCommittees(height uint64) (p *[]uint64, err lib.ErrorI) {
+	p = new([]uint64)
+	err = c.heightRequest(RetiredCommitteesRouteName, height, p)
+	return
+}
+
 func (c *Client) Order(height, orderId, committeeId uint64) (p *lib.SellOrder, err lib.ErrorI) {
 	p = new(lib.SellOrder)
 	err = c.orderRequest(OrderRouteName, height, orderId, committeeId, p)

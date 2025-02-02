@@ -98,8 +98,8 @@ func NewDAOTransferTx(from crypto.PrivateKeyI, amount, start, end, networkId, ch
 }
 
 // NewCertificateResultsTx() creates a CertificateResultsTransaction object in the interface form of TransactionI
-func NewCertificateResultsTx(from crypto.PrivateKeyI, qc *lib.QuorumCertificate, networkId, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
-	return NewTransaction(from, &MessageCertificateResults{Qc: qc}, networkId, lib.CanopyCommitteeId, fee, memo)
+func NewCertificateResultsTx(from crypto.PrivateKeyI, qc *lib.QuorumCertificate, baseChainId, networkId, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+	return NewTransaction(from, &MessageCertificateResults{Qc: qc}, networkId, baseChainId, fee, memo)
 }
 
 // NewSubsidyTx() creates a SubsidyTransaction object in the interface form of TransactionI
