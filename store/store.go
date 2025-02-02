@@ -77,7 +77,7 @@ func NewStore(path string, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	// single batch. It is seemingly unknown why the 15% limit is set
 	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt).
-		WithLoggingLevel(badger.ERROR).WithMemTableSize(int64(2 * units.GB)))
+		WithLoggingLevel(badger.ERROR).WithMemTableSize(int64(1*units.GB + 280*units.MB)))
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
@@ -298,4 +298,41 @@ func (s *Store) Close() lib.ErrorI {
 		return ErrCloseDB(s.db.Close())
 	}
 	return nil
+}
+
+// UnsafeRollback() allows a rollback of the database to a previous height
+// Since blockchains are immutable, this should only be used in testing or
+// crisis situations
+func (s *Store) UnsafeRollback(rollbackToHeight uint64) {
+	for i := s.Version(); i > rollbackToHeight; i-- {
+		// read only tx to collect the keys
+		tx := s.db.NewTransactionAt(i, false)
+		// only get the keys (no values)
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false
+		// iterate through all the keys
+		it := tx.NewIterator(opts)
+		// save the keys to delete
+		keysToDelete := make([][]byte, 0)
+		for it.Rewind(); it.Valid(); it.Next() {
+			keysToDelete = append(keysToDelete, it.Item().KeyCopy(nil))
+		}
+		it.Close()
+		// discard the read only tx
+		tx.Discard()
+		// delete in a new transaction
+		tx = s.db.NewTransactionAt(i, true) // New write txn
+		for _, k := range keysToDelete {
+			// delete each key
+			if err := tx.Delete(k); err != nil {
+				panic(err)
+			}
+		}
+		// commit at the specific version
+		if err := tx.CommitAt(i, nil); err != nil {
+			panic(err)
+		}
+	}
+	s.version = rollbackToHeight
+	s.resetWriter()
 }
