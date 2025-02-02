@@ -17,7 +17,7 @@ const (
 type StateMachine struct {
 	store lib.RWStoreI
 
-	ProtocolVersion   int
+	ProtocolVersion   uint64
 	NetworkID         uint32
 	height            uint64
 	vdfIterations     uint64

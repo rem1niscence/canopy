@@ -507,3 +507,67 @@ func TestApproveProposal(t *testing.T) {
 		})
 	}
 }
+
+func TestOnOrAfterVersion(t *testing.T) {
+	tests := []struct {
+		name            string
+		detail          string
+		height          uint64
+		protocolVersion string
+		version         uint64
+		expected        bool
+	}{
+		{
+			name:            "before version",
+			detail:          "before the version, on the height",
+			height:          2,
+			protocolVersion: "2/2",
+			version:         3,
+			expected:        false,
+		},
+		{
+			name:            "before height",
+			detail:          "before the height, on the version",
+			height:          1,
+			protocolVersion: "2/2",
+			version:         2,
+			expected:        false,
+		},
+		{
+			name:            "on version / height",
+			detail:          "exactly on the version and height",
+			height:          2,
+			protocolVersion: "2/2",
+			version:         2,
+			expected:        true,
+		},
+		{
+			name:            "after height",
+			detail:          "after the height",
+			height:          3,
+			protocolVersion: "2/2",
+			version:         2,
+			expected:        true,
+		},
+		{
+			name:            "after version",
+			detail:          "after the height",
+			height:          3,
+			protocolVersion: "2/2",
+			version:         2,
+			expected:        true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// set height
+			sm.height = test.height
+			// update the protocol version
+			require.NoError(t, sm.UpdateParam(types.ParamSpaceCons, types.ParamProtocolVersion, &lib.StringWrapper{Value: test.protocolVersion}))
+			// execute the function
+			require.Equal(t, test.expected, sm.OnOrAfterVersion(test.version))
+		})
+	}
+}

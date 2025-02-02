@@ -1625,7 +1625,7 @@ func TestMessageUnpause(t *testing.T) {
 
 func TestHandleMessageChangeParameter(t *testing.T) {
 	uint64Any, _ := lib.NewAny(&lib.UInt64Wrapper{Value: 100})
-	stringAny, _ := lib.NewAny(&lib.StringWrapper{Value: "1/2"})
+	stringAny, _ := lib.NewAny(&lib.StringWrapper{Value: "2/2"})
 	tests := []struct {
 		name           string
 		detail         string

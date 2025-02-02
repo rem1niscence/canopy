@@ -71,7 +71,7 @@ func (s *StateMachine) CheckProtocolVersion() lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	if s.Height() >= version.Height && uint64(s.ProtocolVersion) < version.Version {
+	if s.Height() >= version.Height && s.ProtocolVersion < version.Version {
 		return types.ErrInvalidProtocolVersion()
 	}
 	return nil
