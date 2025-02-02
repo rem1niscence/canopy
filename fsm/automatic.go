@@ -114,7 +114,7 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, uint64(nonSignerPercent))
 	}
 	// handle retired status
-	if qc.Results.Retired {
+	if qc.Results.Retired && qc.Header.CommitteeId != s.Config.ChainId {
 		if err = s.RetireCommittee(qc.Header.CommitteeId); err != nil {
 			return err
 		}
