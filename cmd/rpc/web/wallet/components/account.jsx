@@ -94,9 +94,18 @@ export default function Accounts({ keygroup, account, validator }) {
 
   // getStakedStatus() returns the staking status of the validator
   function getStakedStatus() {
-    if (!validator.address) return "UNSTAKED";
-    else if (validator.unstaking_time) return "UNSTAKING";
-    else return "STAKED";
+    switch (true) {
+      case !validator.address:
+        return "UNSTAKED";
+      case validator.max_paused_height != 0:
+        return "PAUSED";
+      case validator.delegate:
+        return "DELEGATING";
+      case validator.unstaking_time:
+        return "UNSTAKING";
+      default:
+        return "STAKED";
+    }
   }
 
   // onPKFormSubmit() handles the submission of the private key form and updates the state with the retrieved key
