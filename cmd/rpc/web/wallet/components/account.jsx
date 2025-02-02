@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
 import { Button, Card, Col, Form, InputGroup, Modal, Row, Table, Spinner } from "react-bootstrap";
@@ -134,7 +134,16 @@ export default function Accounts({ keygroup, account, validator }) {
       const submit = Object.keys(state.txResult).length !== 0;
       // Mapping transaction types to their respective functions
       const txMap = {
-        send: () => TxSend(r.sender, r.recipient, numberFromCommas(r.amount), r.memo, numberFromCommas(r.fee), r.password, submit),
+        send: () =>
+          TxSend(
+            r.sender,
+            r.recipient,
+            numberFromCommas(r.amount),
+            r.memo,
+            numberFromCommas(r.fee),
+            r.password,
+            submit,
+          ),
         stake: () =>
           TxStake(
             r.sender,
@@ -180,7 +189,15 @@ export default function Accounts({ keygroup, account, validator }) {
             r.password,
             submit,
           ),
-        buy_order: () => TxBuyOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), numberFromCommas(r.fee), r.password, submit),
+        buy_order: () =>
+          TxBuyOrder(
+            r.sender,
+            r.receiveAddress,
+            numberFromCommas(r.orderId),
+            numberFromCommas(r.fee),
+            r.password,
+            submit,
+          ),
         edit_order: () =>
           TxEditOrder(
             r.sender,
@@ -194,7 +211,8 @@ export default function Accounts({ keygroup, account, validator }) {
             r.password,
             submit,
           ),
-        delete_order: () => TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, numberFromCommas(r.fee), r.password, submit),
+        delete_order: () =>
+          TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, numberFromCommas(r.fee), r.password, submit),
       };
 
       const txFunction = txMap[state.txType];
@@ -302,15 +320,21 @@ export default function Accounts({ keygroup, account, validator }) {
   }
 
   // renderForm() returns a form input group for the transaction execution
-  function renderForm(fields) {
+  function renderForm(fields, show) {
     // Manage all form input values in a single state object to allow for dynamic form generation
     // and state management
-    const [formValues, setFormValues] = useState(
-      fields.reduce((form, field) => {
-        form[field.label] = field.defaultValue || "";
+    const [formValues, setFormValues] = useState({});
+
+    // sets the default form values based on the fields every time the modal is opened
+    useEffect(() => {
+      const initialValues = fields.reduce((form, field) => {
+        const value = field.defaultValue || "";
+        form[field.label] = field.type === "number" ? formatNumberInput(value.toString()) : value;
         return form;
-      }, {}),
-    );
+      }, {});
+
+      setFormValues(initialValues);
+    }, [show]);
 
     const handleInputChange = (key, value, type) => {
       setFormValues((prev) => ({
@@ -377,7 +401,7 @@ export default function Accounts({ keygroup, account, validator }) {
             <Modal.Title>{title}</Modal.Title>
           </Modal.Header>
           <Modal.Body className="modal-body">
-            {renderForm(getFormInputs(txType, keyGroup, acc, val))}
+            {renderForm(getFormInputs(txType, keyGroup, acc, val), show)}
             {renderJSONViewer()}
             <Spinner style={{ display: state.showSpinner ? "block" : "none", margin: "0 auto" }} />
           </Modal.Body>
