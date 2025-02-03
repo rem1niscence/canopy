@@ -15,19 +15,22 @@ import {
   TxSend,
   TxStake,
   TxUnpause,
-  TxUnstake
+  TxUnstake,
 } from "@/components/api";
 import {
   copy,
   formatNumber,
-  formatNumberInput,
+  sanitizeNumberInput,
   getFormInputs,
   numberFromCommas,
   objEmpty,
   onFormSubmit,
   renderToast,
   sanitizeInput,
-  withTooltip
+  withTooltip,
+  toUCNPY,
+  toCNPY,
+  formatLocaleNumber,
 } from "@/components/util";
 
 // transactionButtons defines the icons for the transactions
@@ -41,7 +44,7 @@ const transactionButtons = [
   { title: "SWAP", name: "create_order", src: "swap" },
   { title: "LOCK", name: "buy_order", src: "buy" },
   { title: "REPRICE", name: "edit_order", src: "edit_order" },
-  { title: "VOID", name: "delete_order", src: "delete_order" }
+  { title: "VOID", name: "delete_order", src: "delete_order" },
 ];
 
 // Accounts() returns the main component of this file
@@ -56,7 +59,7 @@ export default function Accounts({ keygroup, account, validator }) {
       showNewModal: false,
       pk: {},
       toast: "",
-      showSpinner: false
+      showSpinner: false,
     }),
     acc = account.account;
 
@@ -70,7 +73,7 @@ export default function Accounts({ keygroup, account, validator }) {
       showModal: false,
       showPKModal: false,
       showNewModal: false,
-      showPKImportModal: false
+      showPKImportModal: false,
     });
   }
 
@@ -112,7 +115,7 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, (r) =>
       KeystoreGet(r.sender, r.password).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
-      })
+      }),
     );
   }
 
@@ -121,7 +124,7 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, (r) =>
       KeystoreNew(r.password).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
-      })
+      }),
     );
   }
 
@@ -141,86 +144,72 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, (r) => {
       const submit = Object.keys(state.txResult).length !== 0;
       // Mapping transaction types to their respective functions
+
+      const amount = toUCNPY(numberFromCommas(r.amount));
+      const fee = toUCNPY(numberFromCommas(r.fee));
+
       const txMap = {
-        send: () =>
-          TxSend(
-            r.sender,
-            r.recipient,
-            numberFromCommas(r.amount),
-            r.memo,
-            numberFromCommas(r.fee),
-            r.password,
-            submit
-          ),
+        send: () => TxSend(r.sender, r.recipient, amount, r.memo, fee, r.password, submit),
         stake: () =>
           TxStake(
             r.sender,
             r.pubKey,
             r.committees,
             r.net_address,
-            numberFromCommas(r.amount),
+            amount,
             r.delegate,
             r.earlyWithdrawal,
             r.output,
             r.signer,
             r.memo,
-            numberFromCommas(r.fee),
+            fee,
             r.password,
-            submit
+            submit,
           ),
         "edit-stake": () =>
           TxEditStake(
             r.sender,
             r.committees,
             r.net_address,
-            numberFromCommas(r.amount),
+            amount,
             r.earlyWithdrawal,
             r.output,
             r.signer,
             r.memo,
-            numberFromCommas(r.fee),
+            amount,
             r.password,
-            submit
+            submit,
           ),
-        unstake: () => TxUnstake(r.sender, r.signer, r.memo, numberFromCommas(r.fee), r.password, submit),
-        pause: () => TxPause(r.sender, r.signer, r.memo, numberFromCommas(r.fee), r.password, submit),
-        unpause: () => TxUnpause(r.sender, r.signer, r.memo, numberFromCommas(r.fee), r.password, submit),
+        unstake: () => TxUnstake(r.sender, r.signer, r.memo, fee, r.password, submit),
+        pause: () => TxPause(r.sender, r.signer, r.memo, fee, r.password, submit),
+        unpause: () => TxUnpause(r.sender, r.signer, r.memo, fee, r.password, submit),
         create_order: () =>
           TxCreateOrder(
             r.sender,
             r.committeeId,
-            numberFromCommas(r.amount),
+            amount,
             numberFromCommas(r.receiveAmount),
             r.receiveAddress,
             r.memo,
-            numberFromCommas(r.fee),
+            fee,
             r.password,
-            submit
+            submit,
           ),
-        buy_order: () =>
-          TxBuyOrder(
-            r.sender,
-            r.receiveAddress,
-            numberFromCommas(r.orderId),
-            numberFromCommas(r.fee),
-            r.password,
-            submit
-          ),
+        buy_order: () => TxBuyOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), fee, r.password, submit),
         edit_order: () =>
           TxEditOrder(
             r.sender,
             r.committeeId,
             numberFromCommas(r.orderId),
-            numberFromCommas(r.amount),
+            amount,
             numberFromCommas(r.receiveAmount),
             r.receiveAddress,
             r.memo,
-            numberFromCommas(r.fee),
+            fee,
             r.password,
-            submit
+            submit,
           ),
-        delete_order: () =>
-          TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, numberFromCommas(r.fee), r.password, submit)
+        delete_order: () => TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, fee, r.password, submit),
       };
 
       const txFunction = txMap[state.txType];
@@ -323,7 +312,7 @@ export default function Accounts({ keygroup, account, validator }) {
       </td>,
       detail,
       i,
-      "top"
+      "top",
     );
   }
 
@@ -337,7 +326,9 @@ export default function Accounts({ keygroup, account, validator }) {
     useEffect(() => {
       const initialValues = fields.reduce((form, field) => {
         const value = field.defaultValue || "";
-        form[field.label] = field.type === "number" ? formatNumberInput(value.toString()) : value;
+
+        form[field.label] =
+          field.type === "number" || field.type === "currency" ? sanitizeNumberInput(value.toString()) : value;
         return form;
       }, {});
 
@@ -345,10 +336,19 @@ export default function Accounts({ keygroup, account, validator }) {
     }, [show]);
 
     const handleInputChange = (key, value, type) => {
-      setFormValues((prev) => ({
-        ...prev,
-        [key]: type === "number" ? formatNumberInput(value) : sanitizeInput(value)
-      }));
+      setFormValues((prev) => {
+        let val = "";
+        let isCurrency = type === "currency";
+        if (type === "number" || isCurrency) {
+          val = sanitizeNumberInput(value, isCurrency);
+        } else {
+          val = sanitizeInput(value);
+        }
+        return {
+          ...prev,
+          [key]: val,
+        };
+      });
     };
 
     const doRenderForm = (v, i) => {
@@ -361,8 +361,8 @@ export default function Accounts({ keygroup, account, validator }) {
             <Form.Control
               className="input-text-field"
               onChange={(e) => handleInputChange(v.label, e.target.value, v.type)}
-              type={v.type == "number" ? "text" : v.type}
-              value={formValues[v.label]}
+              type={v.type == "number" || v.type == "currency" ? "text" : v.type}
+              value={v.type === "currency" ? formValues[v.label] : formValues[v.label]}
               placeholder={v.placeholder}
               required={v.required}
               min={0}
@@ -372,7 +372,7 @@ export default function Accounts({ keygroup, account, validator }) {
               aria-describedby="emailHelp"
             />
           </InputGroup>
-          {v.label === "amount" ? renderAmountInput(handleInputChange, v) : null}
+          {v.type === "currency" ? renderAmountInput(handleInputChange, v, formValues[v.label]) : null}
         </Form.Group>
       );
     };
@@ -381,12 +381,15 @@ export default function Accounts({ keygroup, account, validator }) {
   }
 
   // renderAmountInput() renders the amount input with the option to set the amount to max
-  function renderAmountInput(onchange, v) {
+  function renderAmountInput(onchange, v, inputValue) {
     const amount = formatNumber(account.account.amount);
     return (
-      <div className="text-end">
-        <Form.Text>
-          Available: <span className="fw-bold">{amount} </span>
+      <div className="d-flex justify-content-between">
+        <Form.Text className="text-start fw-bold">
+          uCNPY: {formatLocaleNumber(toUCNPY(numberFromCommas(inputValue)))}
+        </Form.Text>
+        <Form.Text className="text-end">
+          Available: <span className="fw-bold">{amount} CNPY </span>
           <Button
             aria-label="max-button"
             onClick={() => onchange(v.label, Math.ceil(account.account.amount).toString(), v.type)}
@@ -470,23 +473,23 @@ export default function Accounts({ keygroup, account, validator }) {
         </span>
         <Table className="table-fixed" bordered hover style={{ marginTop: "10px" }}>
           <thead>
-          <tr>
-            {["Height", "Amount", "Recipient", "Type", "Hash", "Status"].map((k, i) => (
-              <th key={i}>{k}</th>
-            ))}
-          </tr>
+            <tr>
+              {["Height", "Amount", "Recipient", "Type", "Hash", "Status"].map((k, i) => (
+                <th key={i}>{k}</th>
+              ))}
+            </tr>
           </thead>
           <tbody>
-          {account.combined.slice(0, 5).map((v, i) => (
-            <tr key={i}>
-              <td>{v.height || "N/A"}</td>
-              <td>{v.transaction.msg.amount ?? v.transaction.msg.AmountForSale ?? "N/A"}</td>
-              {renderAccSumTabCol(v.recipient ?? v.sender ?? v.address, i)}
-              <td>{v.message_type || v.transaction.type}</td>
-              {renderAccSumTabCol(v.tx_hash, i + 1)}
-              <td>{v.status ?? ""}</td>
-            </tr>
-          ))}
+            {account.combined.slice(0, 5).map((v, i) => (
+              <tr key={i}>
+                <td>{v.height || "N/A"}</td>
+                <td>{toCNPY(v.transaction.msg.amount) || toUCNPY(v.transaction.msg.AmountForSale) || "N/A"}</td>
+                {renderAccSumTabCol(v.recipient ?? v.sender ?? v.address, i)}
+                <td>{v.message_type || v.transaction.type}</td>
+                {renderAccSumTabCol(v.tx_hash, i + 1)}
+                <td>{v.status ?? ""}</td>
+              </tr>
+            ))}
           </tbody>
         </Table>
       </div>
@@ -504,7 +507,7 @@ export default function Accounts({ keygroup, account, validator }) {
       null,
       null,
       null,
-      "import-or-generate"
+      "import-or-generate",
     );
   }
   // return the main component
@@ -522,14 +525,14 @@ export default function Accounts({ keygroup, account, validator }) {
           {[
             { title: "Account Type", info: getAccountType() },
             { title: "Stake Amount", info: getValidatorAmount(), after: " cnpy" },
-            { title: "Staked Status", info: getStakedStatus() }
+            { title: "Staked Status", info: getStakedStatus() },
           ].map(renderAccountInfo)}
         </Row>
         <br />
         <br />
         {[
           { title: "Address", info: acc.address },
-          { title: "Public Key", info: keygroup.publicKey }
+          { title: "Public Key", info: keygroup.publicKey },
         ].map(renderKeyDetail)}
         <br />
         {renderTransactions()}
@@ -543,7 +546,7 @@ export default function Accounts({ keygroup, account, validator }) {
           acc,
           null,
           resetState,
-          "reveal-pk"
+          "reveal-pk",
         )}
         {renderModal(
           state.showPKImportModal,
@@ -557,7 +560,7 @@ export default function Accounts({ keygroup, account, validator }) {
           acc,
           null,
           resetState,
-          "import-pk"
+          "import-pk",
         )}
         {renderModal(
           state.showNewModal,
@@ -568,7 +571,7 @@ export default function Accounts({ keygroup, account, validator }) {
           null,
           null,
           resetState,
-          "new-pk"
+          "new-pk",
         )}
         <Button id="pk-button" variant="outline-secondary" onClick={() => setState({ ...state, showNewModal: true })}>
           New Private Key
