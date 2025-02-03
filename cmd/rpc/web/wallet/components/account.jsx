@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect, useContext } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
 import { Button, Card, Col, Form, InputGroup, Modal, Row, Spinner, Table } from "react-bootstrap";
@@ -29,6 +29,12 @@ import {
   sanitizeInput,
   withTooltip
 } from "@/components/util";
+import { KeystoreContext } from "@/pages";
+
+function Keystore() {
+  const keystore = useContext(KeystoreContext);
+  return keystore
+}
 
 // transactionButtons defines the icons for the transactions
 const transactionButtons = [
@@ -46,6 +52,7 @@ const transactionButtons = [
 
 // Accounts() returns the main component of this file
 export default function Accounts({ keygroup, account, validator }) {
+  const ks = Keystore()
   const [state, setState] = useState({
       showModal: false,
       txType: "send",
@@ -109,8 +116,8 @@ export default function Accounts({ keygroup, account, validator }) {
 
   // onPKFormSubmit() handles the submission of the private key form and updates the state with the retrieved key
   function onPKFormSubmit(e) {
-    onFormSubmit(state, e, (r) =>
-      KeystoreGet(r.sender, r.password).then((r) => {
+    onFormSubmit(state, e, ks, (r) =>
+      KeystoreGet(r.sender, r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
       })
     );
@@ -118,8 +125,8 @@ export default function Accounts({ keygroup, account, validator }) {
 
   // onNewPKFormSubmit() handles the submission of the new private key form and updates the state with the generated key
   function onNewPKFormSubmit(e) {
-    onFormSubmit(state, e, (r) =>
-      KeystoreNew(r.password).then((r) => {
+    onFormSubmit(state, e, ks, (r) =>
+      KeystoreNew(r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
       })
     );
@@ -127,18 +134,18 @@ export default function Accounts({ keygroup, account, validator }) {
 
   // onImportOrGenerateSubmit() handles the submission of either the import or generate form and updates the state accordingly
   function onImportOrGenerateSubmit(e) {
-    onFormSubmit(state, e, (r) => {
+    onFormSubmit(state, e, ks, (r) => {
       if (r.private_key) {
-        void KeystoreImport(r.private_key, r.password).then((_) => setState({ ...state, showSpinner: false }));
+        void KeystoreImport(r.private_key, r.password, r.nickname).then((_) => setState({ ...state, showSpinner: false }));
       } else {
-        void KeystoreNew(r.password).then((_) => setState({ ...state, showSpinner: false }));
+        void KeystoreNew(r.password, r.nickname).then((_) => setState({ ...state, showSpinner: false }));
       }
     });
   }
 
   // onTxFormSubmit() handles transaction form submissions based on transaction type
   function onTxFormSubmit(e) {
-    onFormSubmit(state, e, (r) => {
+    onFormSubmit(state, e, ks, (r) => {
       const submit = Object.keys(state.txResult).length !== 0;
       // Mapping transaction types to their respective functions
       const txMap = {
@@ -358,6 +365,24 @@ export default function Accounts({ keygroup, account, validator }) {
         <Form.Group key={i} className="mb-3">
           <InputGroup size="lg">
             {withTooltip(<InputGroup.Text className="input-text">{v.inputText}</InputGroup.Text>, v.tooltip, i, "auto")}
+            {v.type === "dropdown" ? (
+              <Form.Select
+                className="input-text-field"
+                onChange={(e) => handleInputChange(v.label, e.target.value, v.type)}
+                value={formValues[v.label]}
+                aria-label={v.label}
+              >
+                {v.options && v.options.length > 0 ? (
+                  v.options.map((key) => (
+                    <option key={key} value={key}>
+                      {key}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>No options available</option>
+                )}
+              </Form.Select>
+            ) : (
             <Form.Control
               className="input-text-field"
               onChange={(e) => handleInputChange(v.label, e.target.value, v.type)}
@@ -370,7 +395,7 @@ export default function Accounts({ keygroup, account, validator }) {
               maxLength={v.maxLength}
               aria-label={v.label}
               aria-describedby="emailHelp"
-            />
+            />)}
           </InputGroup>
           {v.label === "amount" ? renderAmountInput(handleInputChange, v) : null}
         </Form.Group>
@@ -498,7 +523,7 @@ export default function Accounts({ keygroup, account, validator }) {
     return renderModal(
       true,
       "UPLOAD PRIVATE OR CREATE KEY",
-      "pass-and-pk",
+      "pass-nickname-and-pk",
       onImportOrGenerateSubmit,
       null,
       null,
@@ -528,8 +553,9 @@ export default function Accounts({ keygroup, account, validator }) {
         <br />
         <br />
         {[
-          { title: "Address", info: acc.address },
-          { title: "Public Key", info: keygroup.publicKey }
+          { title: "Nickname", info: keygroup.keyNickname },
+          { title: "Address", info: keygroup.keyAddress },
+          { title: "Public Key", info: keygroup.publicKey },
         ].map(renderKeyDetail)}
         <br />
         {renderTransactions()}
@@ -548,11 +574,8 @@ export default function Accounts({ keygroup, account, validator }) {
         {renderModal(
           state.showPKImportModal,
           "Private Key",
-          "pass-and-pk",
-          () => {
-            onImportOrGenerateSubmit();
-            resetState();
-          },
+          "pass-nickname-and-pk",
+          onImportOrGenerateSubmit,
           keygroup,
           acc,
           null,
@@ -562,7 +585,7 @@ export default function Accounts({ keygroup, account, validator }) {
         {renderModal(
           state.showNewModal,
           "Private Key",
-          "pass-only",
+          "pass-and-nickname",
           onNewPKFormSubmit,
           null,
           null,

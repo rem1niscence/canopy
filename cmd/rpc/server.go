@@ -3,6 +3,7 @@ package rpc
 import (
 	"bytes"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +19,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"path"
+
+	pprof2 "runtime/pprof"
 
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/controller"
@@ -35,8 +40,6 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
 	"github.com/shirou/gopsutil/v3/process"
-	"path"
-	pprof2 "runtime/pprof"
 )
 
 const (
@@ -768,7 +771,10 @@ func KeystoreNewKey(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 		if err != nil {
 			return nil, err
 		}
-		address, err := k.ImportRaw(pk.Bytes(), ptr.Password)
+		address, err := k.ImportRaw(pk.Bytes(), crypto.ImportRawOpts{
+			Password: ptr.Password,
+			Nickname: ptr.Nickname,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -778,7 +784,10 @@ func KeystoreNewKey(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func KeystoreImport(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		if err := k.Import(ptr.Address, &ptr.EncryptedPrivateKey); err != nil {
+		if err := k.Import(&ptr.EncryptedPrivateKey, crypto.ImportOpts{
+			Address:  ptr.Address,
+			Nickname: ptr.Nickname,
+		}); err != nil {
 			return nil, err
 		}
 		return ptr.Address, k.SaveToFile(conf.DataDirPath)
@@ -787,7 +796,10 @@ func KeystoreImport(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func KeystoreImportRaw(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		address, err := k.ImportRaw(ptr.PrivateKey, ptr.Password)
+		address, err := k.ImportRaw(ptr.PrivateKey, crypto.ImportRawOpts{
+			Password: ptr.Password,
+			Nickname: ptr.Nickname,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -797,14 +809,20 @@ func KeystoreImportRaw(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 
 func KeystoreDelete(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		k.DeleteKey(ptr.Address)
+		k.DeleteKey(crypto.DeleteOpts{
+			Address:  ptr.Address,
+			Nickname: ptr.Nickname,
+		})
 		return ptr.Address, k.SaveToFile(conf.DataDirPath)
 	})
 }
 
 func KeystoreGetKeyGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		return k.GetKeyGroup(ptr.Address, ptr.Password)
+		return k.GetKeyGroup(ptr.Password, crypto.GetKeyGroupOpts{
+			Address:  ptr.Address,
+			Nickname: ptr.Nickname,
+		})
 	})
 }
 
@@ -825,7 +843,9 @@ type txRequest struct {
 	PollJSON        json.RawMessage `json:"pollJSON"`
 	PollApprove     bool            `json:"pollApprove"`
 	Signer          lib.HexBytes    `json:"signer"`
+	SignerNickname  string          `json:"signerNickname"`
 	addressRequest
+	nicknameRequest
 	passwordRequest
 	txChangeParamRequest
 	committeesRequest
@@ -1254,6 +1274,20 @@ func updatePollResults() {
 	}
 }
 
+func getAddressFromNickname(ptr *txRequest, keystore *crypto.Keystore) {
+	if len(ptr.Signer) == 0 && ptr.SignerNickname != "" {
+		addressString := keystore.NicknameMap[ptr.SignerNickname]
+		addressBytes, _ := hex.DecodeString(addressString)
+		ptr.Signer = addressBytes
+	}
+
+	if len(ptr.Address) == 0 && ptr.Nickname != "" {
+		addressString := keystore.NicknameMap[ptr.Nickname]
+		addressBytes, _ := hex.DecodeString(addressString)
+		ptr.Address = addressBytes
+	}
+}
+
 func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error)) {
 	ptr := new(txRequest)
 	if ok := unmarshal(w, r, ptr); !ok {
@@ -1263,6 +1297,8 @@ func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey 
 	if !ok {
 		return
 	}
+	getAddressFromNickname(ptr, keystore)
+
 	signer := ptr.Signer
 	if len(signer) == 0 {
 		signer = ptr.Address
@@ -1541,6 +1577,9 @@ type idRequest struct {
 type passwordRequest struct {
 	Password string `json:"password"`
 }
+type nicknameRequest struct {
+	Nickname string `json:"nickname"`
+}
 type voteRequest struct {
 	Approve  bool            `json:"approve"`
 	Proposal json.RawMessage `json:"proposal"`
@@ -1570,6 +1609,7 @@ type heightAndIdRequest struct {
 type keystoreRequest struct {
 	addressRequest
 	passwordRequest
+	nicknameRequest
 	PrivateKey lib.HexBytes `json:"privateKey"`
 	crypto.EncryptedPrivateKey
 }
