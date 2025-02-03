@@ -400,7 +400,7 @@ export default function Accounts({ keygroup, account, validator }) {
               />
             )}
           </InputGroup>
-          {v.type === "currency" ? renderAmountInput(handleInputChange, v, formValues[v.label]) : null}
+          {v.type === "currency" ? renderAmountInput(handleInputChange, v, formValues[v.label], v.hideConverter) : null}
         </Form.Group>
       );
     };
@@ -409,13 +409,15 @@ export default function Accounts({ keygroup, account, validator }) {
   }
 
   // renderAmountInput() renders the amount input with the option to set the amount to max
-  function renderAmountInput(onchange, v, inputValue) {
+  function renderAmountInput(onchange, v, inputValue, hideConverter) {
     const amount = formatNumber(account.account.amount);
     return (
-      <div className="d-flex justify-content-between">
-        <Form.Text className="text-start fw-bold">
-          uCNPY: {formatLocaleNumber(toUCNPY(numberFromCommas(inputValue)))}
-        </Form.Text>
+      <div className={`${!hideConverter ? "d-flex justify-content-between" : "text-end"}`}>
+        {!hideConverter && (
+          <Form.Text className="text-start fw-bold">
+            uCNPY: {formatLocaleNumber(toUCNPY(numberFromCommas(inputValue)))}
+          </Form.Text>
+        )}
         <Form.Text className="text-end">
           Available: <span className="fw-bold">{amount} CNPY </span>
           <Button

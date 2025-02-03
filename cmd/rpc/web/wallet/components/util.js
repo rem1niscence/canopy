@@ -130,9 +130,10 @@ export function getFormInputs(type, keyGroup, account, validator) {
       inputText: "rec-amount",
       feedback: "please choose a receive amount for the tx",
       required: true,
-      type: "number",
+      type: "currency",
       minLength: 1,
       maxLength: 100,
+      hideConverter: true,
     },
     orderId: {
       placeholder: "the id of the existing order",
