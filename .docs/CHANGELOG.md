@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [Unreleased] - 2/03/2024
+- Display UI amounts in CNPY in Wallet/Explorer
+
 ## [Unreleased] - 1/29/2024
 - Add more validator status to wallet
 
