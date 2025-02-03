@@ -164,13 +164,14 @@ func (p *P2P) DialForOutboundPeers() {
 	}
 	// Continuous service until program exit, dial timeout loop frequency for resource break
 	for {
-		time.Sleep(dialTimeout)
+		time.Sleep(5 * dialTimeout)
 		// for each supported plugin, try to max out peer config by dialing
 		func() {
 			// exit if maxed out config or none left to dial
 			if (p.PeerSet.outbound+dialing >= p.config.MaxOutbound) || p.book.GetBookSize() == 0 {
 				return
 			}
+			p.log.Debugf("Executing P2P Dial for more outbound peers")
 			// get random peer for chain
 			rand := p.book.GetRandom()
 			if rand == nil || p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) {
@@ -181,7 +182,7 @@ func (p *P2P) DialForOutboundPeers() {
 			dialing++
 			defer func() { dialing-- }()
 			if err := p.Dial(rand.Address, false); err != nil {
-				p.log.Warn(err.Error())
+				p.log.Debug(err.Error())
 				return
 			}
 		}()
@@ -295,7 +296,6 @@ func (p *P2P) OnPeerError(err error, publicKey []byte, remoteAddr string) {
 			go p.DialWithBackoff(peer.Address)
 		}
 	}
-	p.book.Remove(publicKey)
 }
 
 // NewStreams() creates map of streams for the multiplexing architecture
