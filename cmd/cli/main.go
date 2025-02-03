@@ -105,6 +105,25 @@ func waitForKill() {
 	l.Infof("Exit command %s received", s)
 }
 
+func getFirstPassword(log lib.LoggerI) string {
+	// allow flag config to skip initial password
+	if pwd == "" {
+		// get the password from the user
+		log.Infof("Enter password for your new private key:")
+		password, e := term.ReadPassword(int(os.Stdin.Fd()))
+		if e != nil {
+			log.Fatal(e.Error())
+		}
+		if password == nil {
+			log.Infof("Password cannot be empty")
+			return getFirstPassword(log)
+		}
+		return string(password)
+	}
+
+	return pwd
+}
+
 // InitializeDataDirectory() populates the data directory with configuration and data files if missing
 func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config, privateValKey crypto.PrivateKeyI) {
 	// make the data dir if missing
@@ -127,16 +146,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 		if err = crypto.PrivateKeyToFile(blsPrivateKey, privateValKeyPath); err != nil {
 			log.Fatal(err.Error())
 		}
-		// allow flag config to skip initial password
-		if pwd == "" {
-			// get the password from the user
-			log.Infof("Enter password for your new private key:")
-			password, e := term.ReadPassword(int(os.Stdin.Fd()))
-			if e != nil {
-				log.Fatal(e.Error())
-			}
-			pwd = string(password)
-		}
+		pwd = getFirstPassword(log)
 		// allow flag config to skip initial nickname
 		if nick == "" {
 			// get nickname from the user
@@ -152,8 +162,7 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 			log.Fatal(e.Error())
 		}
 		// import the validator key
-		address, e := k.ImportRaw(blsPrivateKey.Bytes(), crypto.ImportRawOpts{
-			Password: pwd,
+		address, e := k.ImportRaw(blsPrivateKey.Bytes(), pwd, crypto.ImportRawOpts{
 			Nickname: nick,
 		})
 		if e != nil {

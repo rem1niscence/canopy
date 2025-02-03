@@ -419,6 +419,10 @@ func getPassword() string {
 		if err != nil {
 			l.Fatal(err.Error())
 		}
+		if password == nil {
+			fmt.Println("Password cannot be empty")
+			return getPassword()
+		}
 		return string(password)
 	}
 	return pwd

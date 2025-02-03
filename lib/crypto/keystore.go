@@ -106,18 +106,21 @@ func (ks *Keystore) Import(encrypted *EncryptedPrivateKey, opts ImportOpts) erro
 
 type ImportRawOpts struct {
 	Nickname string
-	Password string
 }
 
 // ImportRaw() imports a non-encrypted private key to the store, but encrypts it given a password
-func (ks *Keystore) ImportRaw(privateKeyBytes []byte, opts ImportRawOpts) (address string, err error) {
+func (ks *Keystore) ImportRaw(privateKeyBytes []byte, password string, opts ImportRawOpts) (address string, err error) {
+	if password == "" {
+		return "", fmt.Errorf("invalid password")
+	}
+
 	privateKey, err := NewPrivateKeyFromBytes(privateKeyBytes)
 	if err != nil {
 		return
 	}
 	publicKey := privateKey.PublicKey()
 
-	encrypted, err := EncryptPrivateKey(publicKey.Bytes(), privateKeyBytes, []byte(opts.Password), address)
+	encrypted, err := EncryptPrivateKey(publicKey.Bytes(), privateKeyBytes, []byte(password), address)
 	if err != nil {
 		return
 	}
