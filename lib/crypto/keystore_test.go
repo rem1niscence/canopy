@@ -48,9 +48,7 @@ func TestKeystoreImportRawWithOpts(t *testing.T) {
 	// create a new in-memory keystore
 	ks := NewKeystoreInMemory()
 	// execute the function call
-	gotAddress, err := ks.ImportRaw(private.Bytes(), ImportRawOpts{
-		Password: password,
-	})
+	gotAddress, err := ks.ImportRaw(private.Bytes(), password, ImportRawOpts{})
 	require.NoError(t, err)
 	// validate got address vs expected
 	require.Equal(t, hex.EncodeToString(address), gotAddress)
@@ -75,8 +73,7 @@ func TestKeystoreDeleteKeyWithOpts(t *testing.T) {
 	// create a new in-memory keystore
 	ks := NewKeystoreInMemory()
 	// execute the function call
-	gotAddress, err := ks.ImportRaw(private.Bytes(), ImportRawOpts{
-		Password: password,
+	gotAddress, err := ks.ImportRaw(private.Bytes(), password, ImportRawOpts{
 		Nickname: "pablito",
 	})
 	require.NoError(t, err)
@@ -96,8 +93,7 @@ func TestKeystoreDeleteKeyWithOpts(t *testing.T) {
 	require.ErrorContains(t, err, "key not found")
 
 	// execute the function call
-	gotAddress, err = ks.ImportRaw(private.Bytes(), ImportRawOpts{
-		Password: password,
+	gotAddress, err = ks.ImportRaw(private.Bytes(), password, ImportRawOpts{
 		Nickname: "pablito",
 	})
 	require.NoError(t, err)

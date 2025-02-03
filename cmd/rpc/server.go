@@ -771,8 +771,7 @@ func KeystoreNewKey(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 		if err != nil {
 			return nil, err
 		}
-		address, err := k.ImportRaw(pk.Bytes(), crypto.ImportRawOpts{
-			Password: ptr.Password,
+		address, err := k.ImportRaw(pk.Bytes(), ptr.Password, crypto.ImportRawOpts{
 			Nickname: ptr.Nickname,
 		})
 		if err != nil {
@@ -796,8 +795,7 @@ func KeystoreImport(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func KeystoreImportRaw(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		address, err := k.ImportRaw(ptr.PrivateKey, crypto.ImportRawOpts{
-			Password: ptr.Password,
+		address, err := k.ImportRaw(ptr.PrivateKey, ptr.Password, crypto.ImportRawOpts{
 			Nickname: ptr.Nickname,
 		})
 		if err != nil {
