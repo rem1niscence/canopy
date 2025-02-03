@@ -15,7 +15,7 @@ function getCardHeader(props, idx) {
     case 0:
       return convertNumber(blks.results[0].block_header.height);
     case 1:
-      return convertNumber(props.supply.total);
+      return convertNumber(props.supply.total, 1000, true);
     case 2:
       if (blks.results[0].block_header.num_txs == null) {
         return "+0";
@@ -31,7 +31,7 @@ function getCardHeader(props, idx) {
       });
       return (
         <>
-          {convertNumber(totalStake)}
+          {convertNumber(totalStake, 1000, true)}
           <span style={{ fontSize: "14px" }}>{" stake"}</span>
         </>
       );
@@ -48,7 +48,7 @@ function getCardSubHeader(props, idx) {
     case 0:
       return convertTime(v.results[0].block_header.time);
     case 1:
-      return convertNumber(Number(props.supply.total) - Number(props.supply.staked), 1000) + " liquid";
+      return convertNumber(Number(props.supply.total) - Number(props.supply.staked), 1000, true) + " liquid";
     case 2:
       return "blk size: " + convertBytes(v.results[0].meta.size);
     case 3:
@@ -69,7 +69,7 @@ function getCardRightAligned(props, idx) {
     case 0:
       return v.results[0].meta.took;
     case 1:
-      return convertNumber(props.supply.staked, 1000) + " staked";
+      return convertNumber(props.supply.staked, 1000, true) + " staked";
     case 2:
       return "block #" + v.results[0].block_header.height;
     case 3:
@@ -102,7 +102,7 @@ function getCardNote(props, idx) {
       if (!props.canopyCommittee.results) {
         return "MaxStake: " + 0;
       }
-      return "MaxStake: " + convertNumber(props.canopyCommittee.results[0].staked_amount, 1000);
+      return "MaxStake: " + convertNumber(props.canopyCommittee.results[0].staked_amount, 1000, true);
     default:
       return "?";
   }
@@ -120,7 +120,7 @@ function getCardFooter(props, idx) {
     case 1:
       let s = "DAO pool supply: ";
       if (props.pool != null) {
-        return s + convertNumber(props.pool.amount, 1000);
+        return s + convertNumber(props.pool.amount, 1000, true);
       }
       return s;
     case 2:
