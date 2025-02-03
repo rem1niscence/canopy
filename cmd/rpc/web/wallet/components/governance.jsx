@@ -3,7 +3,7 @@ import Truncate from "react-truncate-inside";
 import JsonView from "@uiw/react-json-view";
 import { Bar } from "react-chartjs-2";
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
-import { Accordion, Button, Carousel, Col, Container, Form, InputGroup, Modal, Spinner, Table } from "react-bootstrap";
+import { Accordion, Button, Carousel, Container, Form, InputGroup, Modal, Spinner, Table } from "react-bootstrap";
 import {
   AddVote,
   DelVote,
@@ -16,17 +16,7 @@ import {
   TxDAOTransfer,
   VotePoll,
 } from "@/components/api";
-import {
-  copy,
-  formatNumberInput,
-  getFormInputs,
-  objEmpty,
-  onFormSubmit,
-  placeholders,
-  renderToast,
-  sanitizeInput,
-  withTooltip,
-} from "@/components/util";
+import { copy, getFormInputs, objEmpty, onFormSubmit, placeholders, renderToast, withTooltip } from "@/components/util";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
