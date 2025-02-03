@@ -19,7 +19,8 @@
   "params": {
     "Consensus": {
       "block_size": 1000000,
-      "protocol_version": "1/0"
+      "protocol_version": "1/0",
+      "retired": 0
     },
     "Validator": {
       "validator_unstaking_blocks": 2,

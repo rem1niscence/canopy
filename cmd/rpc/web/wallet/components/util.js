@@ -1,21 +1,29 @@
 import { OverlayTrigger, Toast, ToastContainer, Tooltip } from "react-bootstrap";
+import { useContext } from "react";
+import { KeystoreContext } from "@/pages";
+
+function Keystore() {
+  const keystore = useContext(KeystoreContext);
+  return keystore;
+}
 
 // getFormInputs() returns the form input based on the type
 // account and validator is passed to assist with auto fill
 export function getFormInputs(type, keyGroup, account, validator) {
+  const ks = Keystore();
   let amount = null;
   let netAddr = validator && validator.address ? validator.net_address : "";
   let delegate = validator && validator.address ? validator.delegate : false;
   let compound = validator && validator.address ? validator.compound : false;
   let output = validator && validator.address ? validator.output : "";
-  let address = account != null ? account.address : "";
-  let signer = account != null ? account.address : "";
+  let defaultNick = account != null ? account.nickname : "";
+  let defaultNickSigner = account != null ? account.nickname : "";
   let committeeList =
     validator && validator.address && validator.committees && validator.committees.length !== 0
       ? validator.committees.join(",")
       : "";
-  address = type !== "send" && validator && validator.address ? validator.address : address;
-  address = type === "stake" && validator && validator.address ? "WARNING: validator already staked" : address;
+  defaultNick = type !== "send" && validator && validator.nickname ? validator.nickname : defaultNick;
+  defaultNick = type === "stake" && validator && validator.nickname ? "WARNING: validator already staked" : defaultNick;
   if (type === "edit-stake" || type === "stake") {
     amount = validator && validator.address ? validator.staked_amount : null;
   }
@@ -32,17 +40,13 @@ export function getFormInputs(type, keyGroup, account, validator) {
       minLength: 64,
       maxLength: 128,
     },
-    address: {
-      placeholder: "the unique id of the account",
-      defaultValue: address,
-      tooltip: "the short public key id of the account",
+    account: {
+      tooltip: "the short public key id or nickname of the account",
       label: "sender",
-      inputText: "address",
-      feedback: "please choose an address to send the transaction from",
-      required: true,
-      type: "text",
-      minLength: 40,
-      maxLength: 40,
+      defaultValue: defaultNick,
+      inputText: "account",
+      type: "dropdown",
+      options: ks ? Object.keys(ks) : [],
     },
     committees: {
       placeholder: "1, 22, 50",
@@ -187,16 +191,12 @@ export function getFormInputs(type, keyGroup, account, validator) {
       maxLength: 40,
     },
     signer: {
-      placeholder: "signer of the transaction",
-      defaultValue: signer,
       tooltip: "the signing address that authorizes the transaction",
       label: "signer",
       inputText: "signer",
-      feedback: "please choose a signer address",
-      required: true,
-      type: "text",
-      minLength: 40,
-      maxLength: 40,
+      defaultValue: defaultNickSigner,
+      type: "dropdown",
+      options: ks ? Object.keys(ks) : [],
     },
     paramSpace: {
       placeholder: "",
@@ -292,13 +292,25 @@ export function getFormInputs(type, keyGroup, account, validator) {
       minLength: 0,
       maxLength: 40,
     },
+    nickname: {
+      placeholder: "key nickname",
+      defaultValue: "",
+      tooltip: "nickname assigned to key for easier identification",
+      label: "nickname",
+      inputText: "nickname",
+      feedback: "nickname too long",
+      required: false,
+      type: "nickname",
+      minLength: 0,
+      maxLength: 40,
+    },
   };
   switch (type) {
     case "send":
-      return [a.address, a.rec, a.amount, a.memo, a.fee, a.password];
+      return [a.account, a.rec, a.amount, a.memo, a.fee, a.password];
     case "stake":
       return [
-        a.address,
+        a.account,
         a.committees,
         a.netAddr,
         a.amount,
@@ -311,12 +323,12 @@ export function getFormInputs(type, keyGroup, account, validator) {
         a.password,
       ];
     case "create_order":
-      return [a.address, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password];
+      return [a.account, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password];
     case "buy_order":
-      return [a.address, a.buyersReceiveAddress, a.orderId, a.fee, a.password];
+      return [a.account, a.buyersReceiveAddress, a.orderId, a.fee, a.password];
     case "edit_order":
       return [
-        a.address,
+        a.account,
         a.committeeId,
         a.orderId,
         a.amount,
@@ -327,10 +339,10 @@ export function getFormInputs(type, keyGroup, account, validator) {
         a.password,
       ];
     case "delete_order":
-      return [a.address, a.committeeId, a.orderId, a.memo, a.fee, a.password];
+      return [a.account, a.committeeId, a.orderId, a.memo, a.fee, a.password];
     case "edit-stake":
       return [
-        a.address,
+        a.account,
         a.committees,
         a.netAddr,
         a.amount,
@@ -342,21 +354,27 @@ export function getFormInputs(type, keyGroup, account, validator) {
         a.password,
       ];
     case "change-param":
-      return [a.address, a.paramSpace, a.paramKey, a.paramValue, a.startBlock, a.endBlock, a.memo, a.fee, a.password];
+      return [a.account, a.paramSpace, a.paramKey, a.paramValue, a.startBlock, a.endBlock, a.memo, a.fee, a.password];
     case "dao-transfer":
-      return [a.address, a.amount, a.startBlock, a.endBlock, a.memo, a.fee, a.password];
+      return [a.account, a.amount, a.startBlock, a.endBlock, a.memo, a.fee, a.password];
     case "pause":
     case "unpause":
     case "unstake":
-      return [a.address, a.signer, a.memo, a.fee, a.password];
+      return [a.account, a.signer, a.memo, a.fee, a.password];
     case "pass-and-addr":
-      return [a.address, a.password];
+      return [a.account, a.password];
     case "pass-and-pk":
       return [a.privateKey, a.password];
     case "pass-only":
       return [a.password];
+    case "pass-nickname-and-addr":
+      return [a.account, a.password, a.nickname];
+    case "pass-nickname-and-pk":
+      return [a.privateKey, a.password, a.nickname];
+    case "pass-and-nickname":
+      return [a.password, a.nickname];
     default:
-      return [a.address, a.memo, a.fee, a.password];
+      return [a.account, a.memo, a.fee, a.password];
   }
 }
 
@@ -466,7 +484,7 @@ export function renderToast(state, setState) {
 }
 
 // onFormSubmit() handles form submission and passes form data to a callback
-export function onFormSubmit(state, e, callback) {
+export function onFormSubmit(state, e, ks, callback) {
   e.preventDefault();
   let r = {};
   for (let i = 0; ; i++) {
@@ -474,6 +492,12 @@ export function onFormSubmit(state, e, callback) {
       break;
     }
     r[e.target[i].ariaLabel] = e.target[i].value;
+  }
+  if (r.sender) {
+    r.sender = ks[r.sender].keyAddress;
+  }
+  if (r.signer) {
+    r.signer = ks[r.signer].keyAddress;
   }
   callback(r);
 }
