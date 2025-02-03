@@ -419,6 +419,7 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                       <Form.Select
                         className="input-text-field"
                         aria-label={v.label}
+                        defaultValue={v.defaultValue}
                       >
                         {v.options && v.options.length > 0 ? (
                           v.options.map((key) => (
