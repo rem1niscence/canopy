@@ -26,7 +26,7 @@ import {
   objEmpty,
   onFormSubmit,
   renderToast,
-  sanitizeInput,
+  sanitizeTextInput,
   withTooltip,
   toUCNPY,
   toCNPY,
@@ -352,7 +352,7 @@ export default function Accounts({ keygroup, account, validator }) {
         if (type === "number" || isCurrency) {
           val = sanitizeNumberInput(value, isCurrency);
         } else {
-          val = sanitizeInput(value);
+          val = sanitizeTextInput(value);
         }
         return {
           ...prev,

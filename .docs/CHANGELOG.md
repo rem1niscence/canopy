@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [Unreleased] - 2/04/2024
+- Add same style and sanitization to Wallet governance forms
+
 ## [Unreleased] - 2/03/2024
 - Display UI amounts in CNPY in Wallet/Explorer
 
