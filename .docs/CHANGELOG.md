@@ -35,7 +35,6 @@
 
 ## [Unreleased] - 1/21/2024
 - Set up prettier for both Wallet and Explorer
->>>>>>> origin/main
 
 ## [Unreleased] - 1/20/2024
 - Wallet UI fixes
