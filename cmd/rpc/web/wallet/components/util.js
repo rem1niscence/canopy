@@ -121,6 +121,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       type: "currency",
       minLength: 1,
       maxLength: 100,
+      displayBalance: true,
     },
     receiveAmount: {
       placeholder: "amount of counter asset to receive",
@@ -133,7 +134,6 @@ export function getFormInputs(type, keyGroup, account, validator) {
       type: "currency",
       minLength: 1,
       maxLength: 100,
-      hideConverter: true,
     },
     orderId: {
       placeholder: "the id of the existing order",

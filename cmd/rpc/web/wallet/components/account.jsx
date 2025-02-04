@@ -156,6 +156,7 @@ export default function Accounts({ keygroup, account, validator }) {
 
       const amount = toUCNPY(numberFromCommas(r.amount));
       const fee = toUCNPY(numberFromCommas(r.fee));
+      const receiveAmount = toUCNPY(numberFromCommas(r.receiveAmount));
 
       const txMap = {
         send: () => TxSend(r.sender, r.recipient, amount, r.memo, fee, r.password, submit),
@@ -197,7 +198,7 @@ export default function Accounts({ keygroup, account, validator }) {
             r.sender,
             r.committeeId,
             amount,
-            numberFromCommas(r.receiveAmount),
+            receiveAmount,
             r.receiveAddress,
             r.memo,
             fee,
@@ -211,7 +212,7 @@ export default function Accounts({ keygroup, account, validator }) {
             r.committeeId,
             numberFromCommas(r.orderId),
             amount,
-            numberFromCommas(r.receiveAmount),
+            receiveAmount,
             r.receiveAddress,
             r.memo,
             fee,
@@ -400,7 +401,9 @@ export default function Accounts({ keygroup, account, validator }) {
               />
             )}
           </InputGroup>
-          {v.type === "currency" ? renderAmountInput(handleInputChange, v, formValues[v.label], v.hideConverter) : null}
+          {v.type === "currency" && v.displayBalance
+            ? renderAmountInput(handleInputChange, v, formValues[v.label], v.hideConverter)
+            : null}
         </Form.Group>
       );
     };
@@ -409,15 +412,13 @@ export default function Accounts({ keygroup, account, validator }) {
   }
 
   // renderAmountInput() renders the amount input with the option to set the amount to max
-  function renderAmountInput(onchange, v, inputValue, hideConverter) {
+  function renderAmountInput(onchange, v, inputValue) {
     const amount = formatNumber(account.account.amount);
     return (
-      <div className={`${!hideConverter ? "d-flex justify-content-between" : "text-end"}`}>
-        {!hideConverter && (
-          <Form.Text className="text-start fw-bold">
-            uCNPY: {formatLocaleNumber(toUCNPY(numberFromCommas(inputValue)))}
-          </Form.Text>
-        )}
+      <div className="d-flex justify-content-between">
+        <Form.Text className="text-start fw-bold">
+          uCNPY: {formatLocaleNumber(toUCNPY(numberFromCommas(inputValue)))}
+        </Form.Text>
         <Form.Text className="text-end">
           Available: <span className="fw-bold">{amount} CNPY </span>
           <Button
@@ -513,7 +514,7 @@ export default function Accounts({ keygroup, account, validator }) {
             {account.combined.slice(0, 5).map((v, i) => (
               <tr key={i}>
                 <td>{v.height || "N/A"}</td>
-                <td>{toCNPY(v.transaction.msg.amount) || toUCNPY(v.transaction.msg.AmountForSale) || "N/A"}</td>
+                <td>{toCNPY(v.transaction.msg.amount) || toCNPY(v.transaction.msg.AmountForSale) || "N/A"}</td>
                 {renderAccSumTabCol(v.recipient ?? v.sender ?? v.address, i)}
                 <td>{v.message_type || v.transaction.type}</td>
                 {renderAccSumTabCol(v.tx_hash, i + 1)}
