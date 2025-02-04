@@ -45,7 +45,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       label: "sender",
       defaultValue: defaultNick,
       inputText: "account",
-      type: "dropdown",
+      type: "select",
       options: ks ? Object.keys(ks) : [],
     },
     committees: {
@@ -196,7 +196,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       label: "signer",
       inputText: "signer",
       defaultValue: defaultNickSigner,
-      type: "dropdown",
+      type: "select",
       options: ks ? Object.keys(ks) : [],
     },
     paramSpace: {
