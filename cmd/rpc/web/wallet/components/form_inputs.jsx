@@ -11,8 +11,6 @@ import {
 } from "@/components/util";
 
 export default function RenderFormInputs({ keygroup, account, validator, fields, show, onFieldChange }) {
-  console.log("fields", fields);
-
   // Manage all form input values in a single state object to allow for dynamic form generation
   // and state management
   const [formValues, setFormValues] = useState({});
@@ -168,23 +166,3 @@ const RenderAmountInput = ({ amount, onchange, input, inputValue }) => {
     </div>
   );
 };
-
-// <RenderFormInputs
-//   fields={getFormInputs(
-//     state.txPropType === 0 ? "change-param" : "dao-transfer",
-//     keygroup,
-//     accountWithTxs.account,
-//     validator,
-//   ).map((input) => {
-//     let inputCopy = Object.assign({}, input);
-//     switch (input.label) {
-//       case "param_space":
-//         inputCopy.options = ["consensus", "validator", "governance", "fee"];
-//     }
-//     return inputCopy;
-//   })}
-//   keygroup={keygroup}
-//   account={accountWithTxs}
-//   show={state.showPropModal}
-//   validator={validator}
-// />
