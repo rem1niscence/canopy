@@ -1,7 +1,7 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useContext } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
-import { Button, Card, Col, Form, InputGroup, Modal, Row, Spinner, Table } from "react-bootstrap";
+import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
 import {
   KeystoreGet,
   KeystoreImport,
@@ -21,17 +21,14 @@ import RenderFormInputs from "@/components/form_inputs";
 import {
   copy,
   formatNumber,
-  sanitizeNumberInput,
   getFormInputs,
   numberFromCommas,
   objEmpty,
   onFormSubmit,
   renderToast,
-  sanitizeTextInput,
   withTooltip,
   toUCNPY,
   toCNPY,
-  formatLocaleNumber,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 
@@ -155,9 +152,8 @@ export default function Accounts({ keygroup, account, validator }) {
       const submit = Object.keys(state.txResult).length !== 0;
       // Mapping transaction types to their respective functions
 
-      console.log("feeeee", r.fee);
       const amount = toUCNPY(numberFromCommas(r.amount));
-      const fee = toUCNPY(numberFromCommas(r.fee));
+      const fee = r.fee ? toUCNPY(numberFromCommas(r.fee)) : 0;
       const receiveAmount = toUCNPY(numberFromCommas(r.receiveAmount));
 
       const txMap = {
@@ -344,7 +340,6 @@ export default function Accounts({ keygroup, account, validator }) {
               show={show}
               validator={val}
             />
-            {/* {renderForm(getFormInputs(txType, keyGroup, acc, val), show)} */}
             {renderJSONViewer()}
             <Spinner style={{ display: state.showSpinner ? "block" : "none", margin: "0 auto" }} />
           </Modal.Body>
