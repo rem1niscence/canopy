@@ -10,6 +10,7 @@ import {
   pagination,
   upperCaseAndRepUnderscore,
   convertTx,
+  toCNPY,
 } from "@/components/util";
 
 // convertValue() converts the value based on its key and handles different types
@@ -74,14 +75,44 @@ function convertBlock(v) {
   return JSON.parse(JSON.stringify(value, ["height", "hash", "time", "num_txs", "total_txs", "proposer_address"], 4));
 }
 
+// convertValidator() processes validator details, converting uCNPY values to CNPY
+function convertValidator(v) {
+  let value = Object.assign({}, v);
+  value.staked_amount = toCNPY(value.staked_amount);
+  return value;
+}
+
+// converAccount() processes account details, converting uCNPY values to CNPY
+function convertAccount(v) {
+  let value = Object.assign({}, v);
+  value.amount = toCNPY(value.amount);
+  return value;
+}
+
 // convertParams() processes different consensus parameters for table structure
 function convertParams(v) {
   if (!v.Consensus) return ["0"];
   let value = cpyObj(v);
+  let toCNPYParams = [
+    "message_send_fee",
+    "message_stake_fee",
+    "message_edit_stake_fee",
+    "message_unstake_fee",
+    "message_pause_fee",
+    "message_unpause_fee",
+    "message_change_parameter_fee",
+    "message_dao_transfer_fee",
+    "message_subsidy_fee",
+    "message_create_order_fee",
+    "message_edit_order_fee",
+    "message_delete_order_fee",
+    "validator_minimum_order_size",
+  ];
+
   return ["Consensus", "Validator", "Fee", "Governance"].flatMap((space) =>
     Object.entries(value[space] || {}).map(([k, v]) => ({
       ParamName: k,
-      ParamValue: v,
+      ParamValue: toCNPYParams.includes(k) ? toCNPY(v) : v,
       ParamSpace: space,
     })),
   );
@@ -93,9 +124,9 @@ function convertOrder(v) {
   return {
     Id: v.Id ?? 0,
     Chain: v.Committee,
-    AmountForSale: v.AmountForSale,
+    AmountForSale: toCNPY(v.AmountForSale),
     Rate: exchangeRate.toFixed(2),
-    RequestedAmount: v.RequestedAmount,
+    RequestedAmount: toCNPY(v.RequestedAmount),
     SellerReceiveAddress: v.SellerReceiveAddress,
     SellersSendAddress: v.SellersSendAddress,
     BuyerSendAddress: v.BuyerSendAddress,
@@ -111,7 +142,7 @@ function convertCommitteeSupply(v, total) {
   return {
     Chain: 1,
     stake_cut: `${percent}%`,
-    total_restake: v.amount,
+    total_restake: toCNPY(v.amount),
   };
 }
 
@@ -138,8 +169,9 @@ function getTableBody(v) {
     "tx-results-page": convertTransaction,
     "pending-results-page": convertTransaction,
     "block-results-page": convertBlock,
-    accounts: (item) => item,
-    validators: (item) => item,
+    accounts: convertAccount,
+    // validators: (item) => item,
+    validators: convertValidator,
   };
   let results = v.results.map(converters[v.type] || (() => []));
   return results.length === 0 ? empty : results;

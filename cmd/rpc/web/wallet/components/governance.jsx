@@ -3,7 +3,7 @@ import Truncate from "react-truncate-inside";
 import JsonView from "@uiw/react-json-view";
 import { Bar } from "react-chartjs-2";
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
-import { Accordion, Button, Carousel, Col, Container, Form, InputGroup, Modal, Spinner, Table } from "react-bootstrap";
+import { Accordion, Button, Carousel, Container, Form, InputGroup, Modal, Spinner, Table } from "react-bootstrap";
 import {
   AddVote,
   DelVote,
@@ -31,13 +31,13 @@ import { KeystoreContext } from "@/pages";
 
 function Keystore() {
   const keystore = useContext(KeystoreContext);
-  return keystore
+  return keystore;
 }
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 export default function Governance({ keygroup, account: accountWithTxs, validator }) {
-  const ks = Keystore()
+  const ks = Keystore();
   const [state, setState] = useState({
     txResult: {},
     rawTx: {},
@@ -155,7 +155,15 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
           r.password,
         );
       } else {
-        createDAOTransferTx(r.sender, r.amount, r.start_block, r.end_block, r.memo, r.fee, r.password);
+        createDAOTransferTx(
+          r.sender,
+          toUCNPY(numberFromCommas(r.amount)),
+          r.start_block,
+          r.end_block,
+          r.memo,
+          r.fee,
+          r.password,
+        );
       }
     });
   }
@@ -416,11 +424,7 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                       i,
                     )}
                     {v.type === "dropdown" ? (
-                      <Form.Select
-                        className="input-text-field"
-                        aria-label={v.label}
-                        defaultValue={v.defaultValue}
-                      >
+                      <Form.Select className="input-text-field" aria-label={v.label} defaultValue={v.defaultValue}>
                         {v.options && v.options.length > 0 ? (
                           v.options.map((key) => (
                             <option key={key} value={key}>
@@ -432,16 +436,17 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                         )}
                       </Form.Select>
                     ) : (
-                    <Form.Control
-                      placeholder={v.placeholder}
-                      required={v.required}
-                      defaultValue={v.defaultValue}
-                      type={v.type}
-                      min={0}
-                      minLength={v.minLength}
-                      maxLength={v.maxLength}
-                      aria-label={v.label}
-                    />)}
+                      <Form.Control
+                        placeholder={v.placeholder}
+                        required={v.required}
+                        defaultValue={v.defaultValue}
+                        type={v.type}
+                        min={0}
+                        minLength={v.minLength}
+                        maxLength={v.maxLength}
+                        aria-label={v.label}
+                      />
+                    )}
                   </InputGroup>
                 );
               })}
