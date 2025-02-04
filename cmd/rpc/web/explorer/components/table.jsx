@@ -106,6 +106,7 @@ function convertParams(v) {
     "message_create_order_fee",
     "message_edit_order_fee",
     "message_delete_order_fee",
+    "validator_minimum_order_size",
   ];
 
   return ["Consensus", "Validator", "Fee", "Governance"].flatMap((space) =>
