@@ -149,7 +149,7 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
           r.sender,
           r.param_space,
           r.param_key,
-          numberFromCommas(r.param_value).toString(),
+          r.param_value,
           r.start_block,
           r.end_block,
           r.memo,

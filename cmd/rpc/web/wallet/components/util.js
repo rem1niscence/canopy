@@ -231,7 +231,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       inputText: "param val",
       feedback: "please choose a value for the parameter change",
       required: true,
-      type: "number",
+      type: "text",
       minLength: 1,
       maxLength: 100,
     },
