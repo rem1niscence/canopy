@@ -18,14 +18,16 @@ import {
 } from "@/components/api";
 import {
   copy,
-  formatNumberInput,
   getFormInputs,
   objEmpty,
   onFormSubmit,
   placeholders,
   renderToast,
-  sanitizeInput,
   withTooltip,
+  sanitizeTextInput,
+  sanitizeNumberInput,
+  toUCNPY,
+  numberFromCommas,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 
@@ -147,11 +149,11 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
           r.sender,
           r.param_space,
           r.param_key,
-          r.param_value,
+          numberFromCommas(r.param_value).toString(),
           r.start_block,
           r.end_block,
           r.memo,
-          r.fee,
+          toUCNPY(numberFromCommas(r.fee)),
           r.password,
         );
       } else {
@@ -408,6 +410,17 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                       );
                   }
                 }
+
+                const handleInputChange = (e, type) => {
+                  let sanitized = "";
+                  if (type === "number" || type === "currency") {
+                    sanitized = sanitizeNumberInput(e.target.value, type === "currency");
+                  } else {
+                    sanitized = sanitizeTextInput(e.target.value);
+                  }
+                  e.target.value = sanitized;
+                };
+
                 return (
                   <InputGroup style={{ display: show }} key={i} className="mb-3" size="lg">
                     {withTooltip(
@@ -429,10 +442,12 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                       </Form.Select>
                     ) : (
                       <Form.Control
+                        onChange={(e) => handleInputChange(e, v.type)}
+                        type={v.type == "number" || v.type == "currency" ? "text" : v.type}
+                        className="input-text-field"
                         placeholder={v.placeholder}
                         required={v.required}
                         defaultValue={v.defaultValue}
-                        type={v.type}
                         min={0}
                         minLength={v.minLength}
                         maxLength={v.maxLength}
