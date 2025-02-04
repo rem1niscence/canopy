@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Truncate from "react-truncate-inside";
-import { getRatio } from "@/components/util";
+import { getRatio, formatNumber } from "@/components/util";
 import Container from "react-bootstrap/Container";
 import { Button, Card, Carousel, Col, Row, Spinner } from "react-bootstrap";
 import { YAxis, Tooltip, Legend, AreaChart, Area } from "recharts";
@@ -89,7 +89,7 @@ export default function Dashboard() {
         slides: [
           {
             title: state.consensusInfo.syncing ? "SYNCING" : "SYNCED",
-            dT: "H: " + formatNumbers(v.height, false) + ", R: " + v.round + ", P: " + v.phase,
+            dT: "H: " + formatNumber(v.height, false) + ", R: " + v.round + ", P: " + v.phase,
             d1: "PROP: " + (state.consensusInfo.proposer === "" ? "UNDECIDED" : state.consensusInfo.proposer),
             d2: "BLK: " + (state.consensusInfo.blockHash === "" ? "WAITING" : state.consensusInfo.blockHash),
             d3: state.consensusInfo.status,
