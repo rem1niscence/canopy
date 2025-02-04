@@ -155,7 +155,15 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
           r.password,
         );
       } else {
-        createDAOTransferTx(r.sender, r.amount, r.start_block, r.end_block, r.memo, r.fee, r.password);
+        createDAOTransferTx(
+          r.sender,
+          toUCNPY(numberFromCommas(r.amount)),
+          r.start_block,
+          r.end_block,
+          r.memo,
+          r.fee,
+          r.password,
+        );
       }
     });
   }
