@@ -65,6 +65,8 @@ message ConsensusParams {
   uint64 block_size = 1;
   // protocol_version: is the minimum protocol standard that nodes must run to participate in the network
   string protocol_version = 2;
+  // retired: have the validators agreed to stop this chain and mark it as 'forever un-subsidized' in the base chain
+  uint64 retired = 3;
 }
 
 // ValidatorParams is the parameter space that defines the rules and criteria for validators in the blockchain

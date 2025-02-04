@@ -366,3 +366,24 @@ func (s *StateMachine) PollsToResults(polls *types.ActivePolls) (result types.Po
 	}
 	return
 }
+
+// OnOrAfterVersion() checks if a protocol version is enabled or not
+// based on the current UPGRADE param in state
+func (s *StateMachine) OnOrAfterVersion(version uint64) (isEnabled bool) {
+	params, err := s.GetParamsCons()
+	if err != nil {
+		s.log.Error(err.Error())
+		return false
+	}
+	v, err := params.ParseProtocolVersion()
+	if err != nil {
+		s.log.Error(err.Error())
+		return false
+	}
+	// anytime on a higher protocol version, enable the feature
+	if v.Version > version {
+		return true
+	}
+	// if on the version + on or greater than the upgrade height
+	return s.Height() >= v.Height && version == v.Version
+}

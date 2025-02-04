@@ -28,7 +28,7 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	// so just set the committee to nil to ignore the byzantine evidence
 	// the byzantine evidence is handled at `Transaction Level` via
 	// HandleMessageCertificateResults
-	if s.Config.ChainId != lib.CanopyCommitteeId {
+	if !s.Config.IsBaseChain() {
 		return s.HandleCertificateResults(lastCertificate, nil)
 	}
 	// if is base-chain: load the committee from state as the certificate result
@@ -71,7 +71,7 @@ func (s *StateMachine) CheckProtocolVersion() lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	if s.Height() >= version.Height && uint64(s.ProtocolVersion) < version.Version {
+	if s.Height() >= version.Height && s.ProtocolVersion < version.Version {
 		return types.ErrInvalidProtocolVersion()
 	}
 	return nil
@@ -112,6 +112,12 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	// reduce all payment percents proportional to the non-signer percent
 	for i, p := range results.RewardRecipients.PaymentPercents {
 		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, uint64(nonSignerPercent))
+	}
+	// handle retired status
+	if qc.Results.Retired && qc.Header.CommitteeId != s.Config.ChainId {
+		if err = s.RetireCommittee(qc.Header.CommitteeId); err != nil {
+			return err
+		}
 	}
 	// update the committee data
 	return s.UpsertCommitteeData(&lib.CommitteeData{

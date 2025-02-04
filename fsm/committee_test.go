@@ -1688,3 +1688,39 @@ func TestHalvening(t *testing.T) {
 		})
 	}
 }
+
+func TestRetireCommittee(t *testing.T) {
+	tests := []struct {
+		name                      string
+		detail                    string
+		expectedRetiredCommittees []uint64
+	}{
+		{
+			name:                      "one",
+			detail:                    "one retired committees",
+			expectedRetiredCommittees: []uint64{1},
+		},
+		{
+			name:                      "multi",
+			detail:                    "multiple retired committees",
+			expectedRetiredCommittees: []uint64{1, 2, 3},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// retire the committee
+			require.NoError(t, sm.SetRetiredCommittees(test.expectedRetiredCommittees))
+			// ensure they're retired
+			for _, id := range test.expectedRetiredCommittees {
+				isRetired, err := sm.CommitteeIsRetired(id)
+				require.NoError(t, err)
+				require.True(t, isRetired)
+			}
+			gotCommittees, err := sm.GetRetiredCommittees()
+			require.NoError(t, err)
+			require.Equal(t, test.expectedRetiredCommittees, gotCommittees)
+		})
+	}
+}

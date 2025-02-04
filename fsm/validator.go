@@ -5,6 +5,7 @@ import (
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"slices"
 )
 
 // TODO investigate 0 validator committee situations
@@ -268,9 +269,22 @@ func (s *StateMachine) DeleteFinishedUnstaking() lib.ErrorI {
 // PAUSED VALIDATORS BELOW
 
 // SetValidatorsPaused() automatically updates all validators as if they'd submitted a MessagePause
-func (s *StateMachine) SetValidatorsPaused(addresses [][]byte) {
+func (s *StateMachine) SetValidatorsPaused(committeeId uint64, addresses [][]byte) {
 	for _, addr := range addresses {
-		if err := s.HandleMessagePause(&types.MessagePause{Address: addr}); err != nil {
+		// get the validator
+		val, err := s.GetValidator(crypto.NewAddress(addr))
+		if err != nil {
+			s.log.Debugf("can't pause validator %s not found", lib.BytesToString(addr))
+			continue
+		}
+		// ensure no unauthorized auto-pauses
+		if !slices.Contains(val.Committees, committeeId) {
+			// NOTE: expected - this can happen during a race between edit-stake and pause
+			s.log.Warn(types.ErrInvalidCommitteeID().Error())
+			return
+		}
+		// handle pausing
+		if err = s.HandleMessagePause(&types.MessagePause{Address: addr}); err != nil {
 			s.log.Debugf("can't pause validator %s with err %s", lib.BytesToString(addr), err.Error())
 			continue
 		}

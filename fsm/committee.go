@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"bytes"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -77,6 +78,16 @@ func (s *StateMachine) GetSubsidizedCommittees() (paidIDs []uint64, err lib.Erro
 		committedStakePercent := lib.Uint64PercentageDiv(committee.Amount, supply.Staked)
 		// if the committee percentage is over the threshold
 		if committedStakePercent >= valParams.ValidatorStakePercentForSubsidizedCommittee {
+			// get retired status of the committee
+			retired, e := s.CommitteeIsRetired(committee.Id)
+			if e != nil {
+				return nil, e
+			}
+			// ensure the committee isn't retired
+			if retired {
+				s.log.Warnf("Not subsidizing retired committee: %d", committee.Id)
+				continue
+			}
 			// add it to the paid list
 			paidIDs = append(paidIDs, committee.Id)
 		}
@@ -473,5 +484,43 @@ func (s *StateMachine) GetCommitteesData() (f *lib.CommitteesData, err lib.Error
 		List: make([]*lib.CommitteeData, 0),
 	}
 	err = lib.Unmarshal(bz, f)
+	return
+}
+
+// RetireCommittee marks a committee as non-subsidized for eternity
+// This is a useful mechanism to gracefully 'stop' a committee
+func (s *StateMachine) RetireCommittee(id uint64) lib.ErrorI {
+	return s.Set(types.KeyForRetiredCommittee(id), types.RetiredCommitteesPrefix())
+}
+
+// CommitteeIsRetired checks if a committee is marked as 'retired' which prevents it from being subsidized for eternity
+func (s *StateMachine) CommitteeIsRetired(id uint64) (bool, lib.ErrorI) {
+	bz, err := s.Get(types.KeyForRetiredCommittee(id))
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(types.RetiredCommitteesPrefix(), bz), nil
+}
+
+// GetRetiredCommittees() returns a list of the retired committeeIds
+func (s *StateMachine) GetRetiredCommittees() (result []uint64, err lib.ErrorI) {
+	err = s.IterateAndExecute(types.RetiredCommitteesPrefix(), func(key, _ []byte) (e lib.ErrorI) {
+		id, e := types.IdFromKey(key)
+		if e != nil {
+			return
+		}
+		result = append(result, id)
+		return
+	})
+	return
+}
+
+// SetRetiredCommittees() sets a list of committeeIds as retired
+func (s *StateMachine) SetRetiredCommittees(ids []uint64) (err lib.ErrorI) {
+	for _, id := range ids {
+		if err = s.RetireCommittee(id); err != nil {
+			return
+		}
+	}
 	return
 }

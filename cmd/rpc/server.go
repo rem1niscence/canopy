@@ -3,6 +3,7 @@ package rpc
 import (
 	"bytes"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -79,8 +80,9 @@ const (
 	PollRouteName                  = "poll"
 	CommitteeRouteName             = "committee"
 	CommitteeDataRouteName         = "committee-data"
-	CommitteesDataRouteName        = "Committees-data"
-	SubsidizedCommitteesRouteName  = "subsidized-Committees"
+	CommitteesDataRouteName        = "committees-data"
+	SubsidizedCommitteesRouteName  = "subsidized-committees"
+	RetiredCommitteesRouteName     = "retired-committees"
 	OrderRouteName                 = "order"
 	OrdersRouteName                = "orders"
 	LastProposersRouteName         = "last-proposers"
@@ -147,8 +149,9 @@ var (
 		ValidatorsRouteName:            {Method: http.MethodPost, Path: "/v1/query/validators", HandlerFunc: Validators},
 		CommitteeRouteName:             {Method: http.MethodPost, Path: "/v1/query/committee", HandlerFunc: Committee},
 		CommitteeDataRouteName:         {Method: http.MethodPost, Path: "/v1/query/committee-data", HandlerFunc: CommitteeData},
-		CommitteesDataRouteName:        {Method: http.MethodPost, Path: "/v1/query/Committees-data", HandlerFunc: CommitteesData},
-		SubsidizedCommitteesRouteName:  {Method: http.MethodPost, Path: "/v1/query/subsidized-Committees", HandlerFunc: SubsidizedCommittees},
+		CommitteesDataRouteName:        {Method: http.MethodPost, Path: "/v1/query/committees-data", HandlerFunc: CommitteesData},
+		SubsidizedCommitteesRouteName:  {Method: http.MethodPost, Path: "/v1/query/subsidized-committees", HandlerFunc: SubsidizedCommittees},
+		RetiredCommitteesRouteName:     {Method: http.MethodPost, Path: "/v1/query/retired-committees", HandlerFunc: RetiredCommittees},
 		NonSignersRouteName:            {Method: http.MethodPost, Path: "/v1/query/non-signers", HandlerFunc: NonSigners},
 		ParamRouteName:                 {Method: http.MethodPost, Path: "/v1/query/params", HandlerFunc: Params},
 		SupplyRouteName:                {Method: http.MethodPost, Path: "/v1/query/supply", HandlerFunc: Supply},
@@ -320,6 +323,15 @@ func PollBaseChainInfo() {
 				break
 			}
 			logger.Errorf("GetBaseChainInfo failed with err %s", e.Error())
+			// update with empty base-chain info to stop consensus
+			app.UpdateBaseChainInfo(&lib.BaseChainInfo{
+				Height:           baseChainHeight,
+				ValidatorSet:     lib.ValidatorSet{},
+				LastValidatorSet: lib.ValidatorSet{},
+				LastProposers:    &lib.Proposers{},
+				LotteryWinner:    &lib.LotteryWinner{},
+				Orders:           &lib.OrderBook{},
+			})
 		}
 	}
 }
@@ -540,10 +552,8 @@ func BaseChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 			return nil, err
 		}
 		// get the previous committee
-		lastValidatorSet, err := lastSM.GetCommitteeMembers(id, false)
-		if err != nil {
-			return nil, err
-		}
+		// allow an error here to have size 0 validator sets
+		lastValidatorSet, _ := lastSM.GetCommitteeMembers(id, false)
 		// get the last proposers
 		lastProposers, err := s.GetLastProposers()
 		if err != nil {
@@ -596,6 +606,10 @@ func CommitteesData(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func SubsidizedCommittees(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	heightParams(w, r, func(s *fsm.StateMachine) (interface{}, lib.ErrorI) { return s.GetSubsidizedCommittees() })
+}
+
+func RetiredCommittees(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightParams(w, r, func(s *fsm.StateMachine) (interface{}, lib.ErrorI) { return s.GetRetiredCommittees() })
 }
 
 func Order(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -756,7 +770,9 @@ func KeystoreNewKey(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 		if err != nil {
 			return nil, err
 		}
-		address, err := k.ImportRaw(pk.Bytes(), ptr.Password)
+		address, err := k.ImportRaw(pk.Bytes(), ptr.Password, crypto.ImportRawOpts{
+			Nickname: ptr.Nickname,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -766,7 +782,10 @@ func KeystoreNewKey(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func KeystoreImport(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		if err := k.Import(ptr.Address, &ptr.EncryptedPrivateKey); err != nil {
+		if err := k.Import(&ptr.EncryptedPrivateKey, crypto.ImportOpts{
+			Address:  ptr.Address,
+			Nickname: ptr.Nickname,
+		}); err != nil {
 			return nil, err
 		}
 		return ptr.Address, k.SaveToFile(conf.DataDirPath)
@@ -775,7 +794,9 @@ func KeystoreImport(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 
 func KeystoreImportRaw(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		address, err := k.ImportRaw(ptr.PrivateKey, ptr.Password)
+		address, err := k.ImportRaw(ptr.PrivateKey, ptr.Password, crypto.ImportRawOpts{
+			Nickname: ptr.Nickname,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -785,14 +806,20 @@ func KeystoreImportRaw(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 
 func KeystoreDelete(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		k.DeleteKey(ptr.Address)
+		k.DeleteKey(crypto.DeleteOpts{
+			Address:  ptr.Address,
+			Nickname: ptr.Nickname,
+		})
 		return ptr.Address, k.SaveToFile(conf.DataDirPath)
 	})
 }
 
 func KeystoreGetKeyGroup(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	keystoreHandler(w, r, func(k *crypto.Keystore, ptr *keystoreRequest) (any, error) {
-		return k.GetKeyGroup(ptr.Address, ptr.Password)
+		return k.GetKeyGroup(ptr.Password, crypto.GetKeyGroupOpts{
+			Address:  ptr.Address,
+			Nickname: ptr.Nickname,
+		})
 	})
 }
 
@@ -813,7 +840,9 @@ type txRequest struct {
 	PollJSON        json.RawMessage `json:"pollJSON"`
 	PollApprove     bool            `json:"pollApprove"`
 	Signer          lib.HexBytes    `json:"signer"`
+	SignerNickname  string          `json:"signerNickname"`
 	addressRequest
+	nicknameRequest
 	passwordRequest
 	txChangeParamRequest
 	committeesRequest
@@ -1242,6 +1271,20 @@ func updatePollResults() {
 	}
 }
 
+func getAddressFromNickname(ptr *txRequest, keystore *crypto.Keystore) {
+	if len(ptr.Signer) == 0 && ptr.SignerNickname != "" {
+		addressString := keystore.NicknameMap[ptr.SignerNickname]
+		addressBytes, _ := hex.DecodeString(addressString)
+		ptr.Signer = addressBytes
+	}
+
+	if len(ptr.Address) == 0 && ptr.Nickname != "" {
+		addressString := keystore.NicknameMap[ptr.Nickname]
+		addressBytes, _ := hex.DecodeString(addressString)
+		ptr.Address = addressBytes
+	}
+}
+
 func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error)) {
 	ptr := new(txRequest)
 	if ok := unmarshal(w, r, ptr); !ok {
@@ -1251,6 +1294,8 @@ func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey 
 	if !ok {
 		return
 	}
+	getAddressFromNickname(ptr, keystore)
+
 	signer := ptr.Signer
 	if len(signer) == 0 {
 		signer = ptr.Address
@@ -1260,6 +1305,7 @@ func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey 
 		write(w, err, http.StatusBadRequest)
 		return
 	}
+	ptr.PubKey = privateKey.PublicKey().String()
 	p, err := callback(privateKey, ptr)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
@@ -1528,6 +1574,9 @@ type idRequest struct {
 type passwordRequest struct {
 	Password string `json:"password"`
 }
+type nicknameRequest struct {
+	Nickname string `json:"nickname"`
+}
 type voteRequest struct {
 	Approve  bool            `json:"approve"`
 	Proposal json.RawMessage `json:"proposal"`
@@ -1557,6 +1606,7 @@ type heightAndIdRequest struct {
 type keystoreRequest struct {
 	addressRequest
 	passwordRequest
+	nicknameRequest
 	PrivateKey lib.HexBytes `json:"privateKey"`
 	crypto.EncryptedPrivateKey
 }

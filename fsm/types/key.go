@@ -16,19 +16,20 @@ var ReservedIDs = []uint64{
 const EscrowPoolAddend = math.MaxUint16
 
 var (
-	accountPrefix        = []byte{1}  // store key prefix for accounts
-	poolPrefix           = []byte{2}  // store key prefix for pools
-	validatorPrefix      = []byte{3}  // store key prefix for validators
-	committeePrefix      = []byte{4}  // store key prefix for validators in committees
-	unstakePrefix        = []byte{5}  // store key prefix for validators currently unstaking
-	pausedPrefix         = []byte{6}  // store key prefix for validators currently paused
-	paramsPrefix         = []byte{7}  // store key prefix for governance parameters
-	nonSignerPrefix      = []byte{8}  // store key prefix for validators who have missed signing QCs
-	lastProposersPrefix  = []byte{9}  // store key prefix for the last proposers
-	supplyPrefix         = []byte{10} // store key prefix for the supply count
-	delegatePrefix       = []byte{11} // store key prefix for the validators who are delegating for committees
-	committeesDataPrefix = []byte{12} // store key prefix for Quorum Certificate proposals before they are paid
-	orderBookPrefix      = []byte{13} // store key prefix for 'sell orders' before they are bid on
+	accountPrefix          = []byte{1}  // store key prefix for accounts
+	poolPrefix             = []byte{2}  // store key prefix for pools
+	validatorPrefix        = []byte{3}  // store key prefix for validators
+	committeePrefix        = []byte{4}  // store key prefix for validators in committees
+	unstakePrefix          = []byte{5}  // store key prefix for validators currently unstaking
+	pausedPrefix           = []byte{6}  // store key prefix for validators currently paused
+	paramsPrefix           = []byte{7}  // store key prefix for governance parameters
+	nonSignerPrefix        = []byte{8}  // store key prefix for validators who have missed signing QCs
+	lastProposersPrefix    = []byte{9}  // store key prefix for the last proposers
+	supplyPrefix           = []byte{10} // store key prefix for the supply count
+	delegatePrefix         = []byte{11} // store key prefix for the validators who are delegating for committees
+	committeesDataPrefix   = []byte{12} // store key prefix for Quorum Certificate proposals before they are paid
+	orderBookPrefix        = []byte{13} // store key prefix for 'sell orders' before they are bid on
+	retiredCommitteePrefix = []byte{14} // store key prefix for 'retired' (dead) committees
 )
 
 func KeyForUnstaking(height uint64, address crypto.AddressI) []byte {
@@ -42,6 +43,9 @@ func KeyForCommittee(committeeID uint64, addr crypto.AddressI, stake uint64) []b
 }
 func KeyForDelegate(committeeID uint64, addr crypto.AddressI, stake uint64) []byte {
 	return append(DelegatePrefix(committeeID), lib.Delimit(formatUint64(stake), addr.Bytes())...)
+}
+func KeyForRetiredCommittee(committeeID uint64) []byte {
+	return lib.Delimit(retiredCommitteePrefix, formatUint64(committeeID))
 }
 func KeyForAccount(addr crypto.AddressI) []byte   { return lib.Delimit(accountPrefix, addr.Bytes()) }
 func KeyForPool(n uint64) []byte                  { return lib.Delimit(poolPrefix, formatUint64(n)) }
@@ -61,6 +65,7 @@ func CommitteePrefix(id uint64) []byte            { return lib.Delimit(committee
 func DelegatePrefix(id uint64) []byte             { return lib.Delimit(delegatePrefix, formatUint64(id)) }
 func OrderBookPrefix() []byte                     { return lib.Delimit(orderBookPrefix) }
 func CommitteesDataPrefix() []byte                { return lib.Delimit(committeesDataPrefix) }
+func RetiredCommitteesPrefix() []byte             { return lib.Delimit(retiredCommitteePrefix) }
 func AddressFromKey(k []byte) (crypto.AddressI, lib.ErrorI) {
 	n := len(k)
 	delimLen := len(lib.Delimiter)

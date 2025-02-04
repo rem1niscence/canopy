@@ -128,6 +128,40 @@ func TestIteratorCommitAndPrefixed(t *testing.T) {
 	it4.Close()
 }
 
+func TestUnsafeRollback(t *testing.T) {
+	store, _, cleanup := testStore(t)
+	defer cleanup()
+	for i := 0; i < 100; i++ {
+		require.NoError(t, store.Set([]byte("key"), []byte(fmt.Sprintf("%d", i+1))))
+		_, err := store.Commit()
+		require.NoError(t, err)
+	}
+	require.Equal(t, uint64(100), store.Version())
+	store.UnsafeRollback(1)
+	k, err := store.Get([]byte("key"))
+	require.NoError(t, err)
+	require.Equal(t, "1", string(k))
+}
+
+func TestPrune(t *testing.T) {
+	t.Skip()
+	store, _, cleanup := testStore(t)
+	defer cleanup()
+	for i := 1000000; i < 1000100; i++ {
+		store.version = uint64(i)
+		require.NoError(t, store.Set([]byte("key"), []byte(fmt.Sprintf("%d", i+1))))
+		_, err := store.Commit()
+		require.NoError(t, err)
+	}
+	require.Equal(t, uint64(1000100), store.Version())
+	store.Prune(1000099)
+	readOnly, err := store.NewReadOnly(10000100)
+	require.NoError(t, err)
+	got, err := readOnly.Get([]byte("key"))
+	require.NoError(t, err)
+	fmt.Println(string(got))
+}
+
 //func TestProof(t *testing.T) {
 //	store, _, cleanup := testStore(t)
 //	defer cleanup()

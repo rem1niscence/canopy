@@ -539,7 +539,7 @@ func ErrInvalidNetAddressPubKey(s string) ErrorI {
 }
 
 func ErrInvalidStateNetAddress(s string) ErrorI {
-	return NewError(CodeInvalidStateNetAddress, P2PModule, fmt.Sprintf("invalid state net address - optional tcp:// + ip or hostname but no ports or subpaths allowed: %s", s))
+	return NewError(CodeInvalidStateNetAddress, P2PModule, fmt.Sprintf("invalid net address no ports or subpaths allowed: %s", s))
 }
 
 func ErrInvalidNetAddress(s string) ErrorI {
