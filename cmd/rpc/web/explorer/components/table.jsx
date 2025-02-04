@@ -123,9 +123,9 @@ function convertOrder(v) {
   return {
     Id: v.Id ?? 0,
     Chain: v.Committee,
-    AmountForSale: v.AmountForSale,
+    AmountForSale: toCNPY(v.AmountForSale),
     Rate: exchangeRate.toFixed(2),
-    RequestedAmount: v.RequestedAmount,
+    RequestedAmount: toCNPY(v.RequestedAmount),
     SellerReceiveAddress: v.SellerReceiveAddress,
     SellersSendAddress: v.SellersSendAddress,
     BuyerSendAddress: v.BuyerSendAddress,
@@ -141,7 +141,7 @@ function convertCommitteeSupply(v, total) {
   return {
     Chain: 1,
     stake_cut: `${percent}%`,
-    total_restake: v.amount,
+    total_restake: toCNPY(v.amount),
   };
 }
 
