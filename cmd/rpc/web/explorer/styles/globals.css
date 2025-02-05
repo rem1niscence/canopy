@@ -26,7 +26,7 @@
   --callout-border-rgb: 172, 175, 176;
   --card-rgb: 180, 185, 188;
   --card-border-rgb: 131, 134, 135;
-  --primary-color: #06AC56
+  --primary-color: #2C9B5A
 }
 
 @media (prefers-color-scheme: dark) {
@@ -531,4 +531,10 @@ a:active {
   html {
     color-scheme: dark;
   }
+}
+
+.nav-bar-logo {
+  height: 20px; /* Adjust size as needed */
+  margin-right: 8px; /* Adds spacing between the logo and 'explorer' */
+  vertical-align: middle;
 }
