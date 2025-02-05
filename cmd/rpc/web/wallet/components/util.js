@@ -45,7 +45,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       label: "sender",
       defaultValue: defaultNick,
       inputText: "account",
-      type: "dropdown",
+      type: "select",
       options: ks ? Object.keys(ks) : [],
     },
     committees: {
@@ -196,7 +196,7 @@ export function getFormInputs(type, keyGroup, account, validator) {
       label: "signer",
       inputText: "signer",
       defaultValue: defaultNickSigner,
-      type: "dropdown",
+      type: "select",
       options: ks ? Object.keys(ks) : [],
     },
     paramSpace: {
@@ -537,9 +537,9 @@ export function objEmpty(o) {
 // disallowedCharacters is a string of characters that are not allowed in form inputs.
 export const disallowedCharacters = ["\t", '"'];
 
-// sanitizeInput removes disallowed characters from the given event target value.
+// sanitizeTextInput removes disallowed characters from the given event target value.
 // It is meant to be used as an onChange event handler
-export const sanitizeInput = (value) => {
+export const sanitizeTextInput = (value) => {
   disallowedCharacters.forEach((char) => {
     value = value.split(char).join("");
   });

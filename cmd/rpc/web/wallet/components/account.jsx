@@ -1,7 +1,7 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useContext } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
-import { Button, Card, Col, Form, InputGroup, Modal, Row, Spinner, Table } from "react-bootstrap";
+import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
 import {
   KeystoreGet,
   KeystoreImport,
@@ -17,20 +17,18 @@ import {
   TxUnpause,
   TxUnstake,
 } from "@/components/api";
+import FormInputs from "@/components/form_inputs";
 import {
   copy,
   formatNumber,
-  sanitizeNumberInput,
   getFormInputs,
   numberFromCommas,
   objEmpty,
   onFormSubmit,
   renderToast,
-  sanitizeInput,
   withTooltip,
   toUCNPY,
   toCNPY,
-  formatLocaleNumber,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 
@@ -155,7 +153,7 @@ export default function Accounts({ keygroup, account, validator }) {
       // Mapping transaction types to their respective functions
 
       const amount = toUCNPY(numberFromCommas(r.amount));
-      const fee = toUCNPY(numberFromCommas(r.fee));
+      const fee = r.fee ? toUCNPY(numberFromCommas(r.fee)) : 0;
       const receiveAmount = toUCNPY(numberFromCommas(r.receiveAmount));
 
       const txMap = {
@@ -186,7 +184,7 @@ export default function Accounts({ keygroup, account, validator }) {
             r.output,
             r.signer,
             r.memo,
-            amount,
+            fee,
             r.password,
             submit,
           ),
@@ -326,114 +324,6 @@ export default function Accounts({ keygroup, account, validator }) {
     );
   }
 
-  // renderForm() returns a form input group for the transaction execution
-  function renderForm(fields, show) {
-    // Manage all form input values in a single state object to allow for dynamic form generation
-    // and state management
-    const [formValues, setFormValues] = useState({});
-
-    // sets the default form values based on the fields every time the modal is opened
-    useEffect(() => {
-      const initialValues = fields.reduce((form, field) => {
-        const value = field.defaultValue || "";
-
-        form[field.label] =
-          field.type === "number" || field.type === "currency" ? sanitizeNumberInput(value.toString()) : value;
-        return form;
-      }, {});
-
-      setFormValues(initialValues);
-    }, [show]);
-
-    const handleInputChange = (key, value, type) => {
-      setFormValues((prev) => {
-        let val = "";
-        let isCurrency = type === "currency";
-        if (type === "number" || isCurrency) {
-          val = sanitizeNumberInput(value, isCurrency);
-        } else {
-          val = sanitizeInput(value);
-        }
-        return {
-          ...prev,
-          [key]: val,
-        };
-      });
-    };
-
-    const doRenderForm = (v, i) => {
-      if (v.shouldNotRender && v.shouldNotRender(keygroup, account, validator)) return null;
-
-      return (
-        <Form.Group key={i} className="mb-3">
-          <InputGroup size="lg">
-            {withTooltip(<InputGroup.Text className="input-text">{v.inputText}</InputGroup.Text>, v.tooltip, i, "auto")}
-            {v.type === "dropdown" ? (
-              <Form.Select
-                className="input-text-field"
-                onChange={(e) => handleInputChange(v.label, e.target.value, v.type)}
-                value={formValues[v.label]}
-                aria-label={v.label}
-              >
-                {v.options && v.options.length > 0 ? (
-                  v.options.map((key) => (
-                    <option key={key} value={key}>
-                      {key}
-                    </option>
-                  ))
-                ) : (
-                  <option disabled>No options available</option>
-                )}
-              </Form.Select>
-            ) : (
-              <Form.Control
-                className="input-text-field"
-                onChange={(e) => handleInputChange(v.label, e.target.value, v.type)}
-                type={v.type == "number" || v.type == "currency" ? "text" : v.type}
-                value={v.type === "currency" ? formValues[v.label] : formValues[v.label]}
-                placeholder={v.placeholder}
-                required={v.required}
-                min={0}
-                minLength={v.minLength}
-                maxLength={v.maxLength}
-                aria-label={v.label}
-                aria-describedby="emailHelp"
-              />
-            )}
-          </InputGroup>
-          {v.type === "currency" && v.displayBalance
-            ? renderAmountInput(handleInputChange, v, formValues[v.label], v.hideConverter)
-            : null}
-        </Form.Group>
-      );
-    };
-
-    return fields.map(doRenderForm);
-  }
-
-  // renderAmountInput() renders the amount input with the option to set the amount to max
-  function renderAmountInput(onchange, v, inputValue) {
-    const amount = formatNumber(account.account.amount);
-    return (
-      <div className="d-flex justify-content-between">
-        <Form.Text className="text-start fw-bold">
-          uCNPY: {formatLocaleNumber(toUCNPY(numberFromCommas(inputValue)))}
-        </Form.Text>
-        <Form.Text className="text-end">
-          Available: <span className="fw-bold">{amount} CNPY </span>
-          <Button
-            aria-label="max-button"
-            onClick={() => onchange(v.label, Math.ceil(account.account.amount).toString(), v.type)}
-            variant="link"
-            bsPrefix="max-amount-btn"
-          >
-            MAX
-          </Button>
-        </Form.Text>
-      </div>
-    );
-  }
-
   // renderModal() returns the transaction modal
   function renderModal(show, title, txType, onFormSub, keyGroup, acc, val, onHide, btnType) {
     return (
@@ -443,7 +333,13 @@ export default function Accounts({ keygroup, account, validator }) {
             <Modal.Title>{title}</Modal.Title>
           </Modal.Header>
           <Modal.Body className="modal-body">
-            {renderForm(getFormInputs(txType, keyGroup, acc, val), show)}
+            <FormInputs
+              keygroup={keyGroup}
+              fields={getFormInputs(txType, keyGroup, acc, val)}
+              account={account}
+              show={show}
+              validator={val}
+            />
             {renderJSONViewer()}
             <Spinner style={{ display: state.showSpinner ? "block" : "none", margin: "0 auto" }} />
           </Modal.Body>

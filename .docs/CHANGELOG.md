@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## [Unreleased] - 2/04/2024
+- Refactor wallet forms and consolidate all of them as one 
+
 ## [Unreleased] - 2/03/2024
 - Display UI amounts in CNPY in Wallet/Explorer
 
@@ -32,7 +35,6 @@
 
 ## [Unreleased] - 1/21/2024
 - Set up prettier for both Wallet and Explorer
->>>>>>> origin/main
 
 ## [Unreleased] - 1/20/2024
 - Wallet UI fixes
