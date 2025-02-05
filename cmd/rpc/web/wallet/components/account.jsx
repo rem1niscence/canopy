@@ -184,7 +184,7 @@ export default function Accounts({ keygroup, account, validator }) {
             r.output,
             r.signer,
             r.memo,
-            amount,
+            fee,
             r.password,
             submit,
           ),

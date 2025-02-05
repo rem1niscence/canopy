@@ -1,7 +1,6 @@
 package types
 
 import (
-	"bytes"
 	"encoding/binary"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -33,53 +32,66 @@ var (
 )
 
 func KeyForUnstaking(height uint64, address crypto.AddressI) []byte {
-	return append(UnstakingPrefix(height), lib.Delimit(address.Bytes())...)
+	return append(UnstakingPrefix(height), lib.AppendAndLenPrefix(address.Bytes())...)
 }
 func KeyForPaused(maxPausedHeight uint64, address crypto.AddressI) []byte {
-	return append(PausedPrefix(maxPausedHeight), lib.Delimit(address.Bytes())...)
+	return append(PausedPrefix(maxPausedHeight), lib.AppendAndLenPrefix(address.Bytes())...)
 }
 func KeyForCommittee(committeeID uint64, addr crypto.AddressI, stake uint64) []byte {
-	return append(CommitteePrefix(committeeID), lib.Delimit(formatUint64(stake), addr.Bytes())...)
+	return append(CommitteePrefix(committeeID), lib.AppendAndLenPrefix(formatUint64(stake), addr.Bytes())...)
 }
 func KeyForDelegate(committeeID uint64, addr crypto.AddressI, stake uint64) []byte {
-	return append(DelegatePrefix(committeeID), lib.Delimit(formatUint64(stake), addr.Bytes())...)
+	return append(DelegatePrefix(committeeID), lib.AppendAndLenPrefix(formatUint64(stake), addr.Bytes())...)
 }
 func KeyForRetiredCommittee(committeeID uint64) []byte {
-	return lib.Delimit(retiredCommitteePrefix, formatUint64(committeeID))
+	return lib.AppendAndLenPrefix(retiredCommitteePrefix, formatUint64(committeeID))
 }
-func KeyForAccount(addr crypto.AddressI) []byte   { return lib.Delimit(accountPrefix, addr.Bytes()) }
-func KeyForPool(n uint64) []byte                  { return lib.Delimit(poolPrefix, formatUint64(n)) }
-func KeyForValidator(addr crypto.AddressI) []byte { return lib.Delimit(validatorPrefix, addr.Bytes()) }
-func KeyForParams(s string) []byte                { return lib.Delimit(paramsPrefix, []byte(prefixForParamSpace(s))) }
-func KeyForNonSigner(a []byte) []byte             { return lib.Delimit(nonSignerPrefix, a) }
-func KeyForOrderBook(id uint64) []byte            { return lib.Delimit(orderBookPrefix, formatUint64(id)) }
-func AccountPrefix() []byte                       { return lib.Delimit(accountPrefix) }
-func PoolPrefix() []byte                          { return lib.Delimit(poolPrefix) }
-func SupplyPrefix() []byte                        { return lib.Delimit(supplyPrefix) }
-func ValidatorPrefix() []byte                     { return lib.Delimit(validatorPrefix) }
-func NonSignerPrefix() []byte                     { return lib.Delimit(nonSignerPrefix) }
-func UnstakingPrefix(height uint64) []byte        { return lib.Delimit(unstakePrefix, formatUint64(height)) }
-func PausedPrefix(height uint64) []byte           { return lib.Delimit(pausedPrefix, formatUint64(height)) }
-func LastProposersPrefix() []byte                 { return lib.Delimit(lastProposersPrefix) }
-func CommitteePrefix(id uint64) []byte            { return lib.Delimit(committeePrefix, formatUint64(id)) }
-func DelegatePrefix(id uint64) []byte             { return lib.Delimit(delegatePrefix, formatUint64(id)) }
-func OrderBookPrefix() []byte                     { return lib.Delimit(orderBookPrefix) }
-func CommitteesDataPrefix() []byte                { return lib.Delimit(committeesDataPrefix) }
-func RetiredCommitteesPrefix() []byte             { return lib.Delimit(retiredCommitteePrefix) }
+func KeyForAccount(addr crypto.AddressI) []byte {
+	return lib.AppendAndLenPrefix(accountPrefix, addr.Bytes())
+}
+func KeyForPool(n uint64) []byte { return lib.AppendAndLenPrefix(poolPrefix, formatUint64(n)) }
+func KeyForValidator(addr crypto.AddressI) []byte {
+	return lib.AppendAndLenPrefix(validatorPrefix, addr.Bytes())
+}
+func KeyForParams(s string) []byte {
+	return lib.AppendAndLenPrefix(paramsPrefix, []byte(prefixForParamSpace(s)))
+}
+func KeyForNonSigner(a []byte) []byte { return lib.AppendAndLenPrefix(nonSignerPrefix, a) }
+func KeyForOrderBook(id uint64) []byte {
+	return lib.AppendAndLenPrefix(orderBookPrefix, formatUint64(id))
+}
+func AccountPrefix() []byte   { return lib.AppendAndLenPrefix(accountPrefix) }
+func PoolPrefix() []byte      { return lib.AppendAndLenPrefix(poolPrefix) }
+func SupplyPrefix() []byte    { return lib.AppendAndLenPrefix(supplyPrefix) }
+func ValidatorPrefix() []byte { return lib.AppendAndLenPrefix(validatorPrefix) }
+func NonSignerPrefix() []byte { return lib.AppendAndLenPrefix(nonSignerPrefix) }
+func UnstakingPrefix(height uint64) []byte {
+	return lib.AppendAndLenPrefix(unstakePrefix, formatUint64(height))
+}
+func PausedPrefix(height uint64) []byte {
+	return lib.AppendAndLenPrefix(pausedPrefix, formatUint64(height))
+}
+func LastProposersPrefix() []byte { return lib.AppendAndLenPrefix(lastProposersPrefix) }
+func CommitteePrefix(id uint64) []byte {
+	return lib.AppendAndLenPrefix(committeePrefix, formatUint64(id))
+}
+func DelegatePrefix(id uint64) []byte {
+	return lib.AppendAndLenPrefix(delegatePrefix, formatUint64(id))
+}
+func OrderBookPrefix() []byte         { return lib.AppendAndLenPrefix(orderBookPrefix) }
+func CommitteesDataPrefix() []byte    { return lib.AppendAndLenPrefix(committeesDataPrefix) }
+func RetiredCommitteesPrefix() []byte { return lib.AppendAndLenPrefix(retiredCommitteePrefix) }
 func AddressFromKey(k []byte) (crypto.AddressI, lib.ErrorI) {
-	n := len(k)
-	delimLen := len(lib.Delimiter)
-	if n <= crypto.AddressSize+delimLen {
-		return nil, ErrInvalidKey(k)
-	}
-	return crypto.NewAddressFromBytes(k[n-crypto.AddressSize-delimLen : n-delimLen]), nil
+	segments := lib.DecodeLengthPrefixed(k)
+	return crypto.NewAddressFromBytes(segments[len(segments)-1]), nil
 }
 
 func IdFromKey(k []byte) (uint64, lib.ErrorI) {
-	if bytes.Count(k, []byte("/")) != 2 {
+	segments := lib.DecodeLengthPrefixed(k)
+	if len(segments) != 2 {
 		return 0, ErrInvalidKey(k)
 	}
-	return binary.BigEndian.Uint64(bytes.Split(k, []byte("/"))[1]), nil
+	return binary.BigEndian.Uint64(segments[1]), nil
 }
 
 func formatUint64(u uint64) []byte {
