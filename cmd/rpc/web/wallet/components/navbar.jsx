@@ -19,8 +19,12 @@ export default function Navigation({ keystore, setActiveKey, keyIdx, setNavIdx, 
     <Navbar sticky="top" data-bs-theme="light" id="nav-bar">
       <Container id="nav-bar-container">
         <Navbar.Brand id="nav-bar-brand">
-          my <span className="nav-bar-brand-highlight">canopy </span>wallet
-        </Navbar.Brand>
+          <img 
+                src="/wallet_logo.png" 
+                alt="Wallet Logo" 
+                className="nav-bar-logo"
+              />
+          </Navbar.Brand>
         <div id="nav-dropdown-container">
           <NavDropdown
             id="nav-dropdown"

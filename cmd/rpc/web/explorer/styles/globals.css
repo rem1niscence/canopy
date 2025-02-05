@@ -534,7 +534,7 @@ a:active {
 }
 
 .nav-bar-logo {
-  height: 20px; /* Adjust size as needed */
-  margin-right: 8px; /* Adds spacing between the logo and 'explorer' */
+  height: 20px;
+  margin-right: 8px; 
   vertical-align: middle;
 }

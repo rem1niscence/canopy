@@ -1,5 +1,5 @@
-let rpcURL = "http://localhost:50002"; // default RPC URL
-let adminRPCURL = "http://localhost:50003"; // default Admin RPC URL
+let rpcURL = "http://127.0.0.1:50002"; // default RPC URL
+let adminRPCURL = "http://127.0.0.1:50003"; // default Admin RPC URL
 let baseChainRPCURL = rpcURL; // default BaseChain RPC URL
 let chainId = 1; // default chain id
 

@@ -1,6 +1,6 @@
 :root {
   --primary-color: #2C9B5A;
-  --secondary-color: #5447ac;
+  --secondary-color: #7749c0;
   --grey-color: gray;
 }
 
@@ -90,7 +90,7 @@
 }
 
 .nav-link.active img {
-  filter: invert(45%) sepia(93%) saturate(278%) hue-rotate(130deg) brightness(90%) contrast(92%);
+  filter: brightness(0) saturate(100%) invert(55%) sepia(15%) saturate(1502%) hue-rotate(92deg) brightness(87%) contrast(106%);
 }
 
 .nav-link {
@@ -592,4 +592,10 @@
 .accordion-button:not(.collapsed) {
   color: black !important;
   background-color: white !important;
+}
+
+.nav-bar-logo {
+  height: 20px;
+  margin-right: 8px; 
+  vertical-align: middle;
 }
