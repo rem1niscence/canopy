@@ -1,12 +1,12 @@
 import Navigation from "@/components/navbar";
 import { AccountWithTxs, Height, Keystore, Validator } from "@/components/api";
-import { createContext, useEffect, useState } from "react";
+import { createContext, use, useEffect, useState } from "react";
 import Accounts from "@/components/account";
 import Dashboard from "@/components/dashboard";
 import Governance from "@/components/governance";
 import { Spinner } from "react-bootstrap";
 
-export const KeystoreContext = createContext()
+export const KeystoreContext = createContext();
 
 export default function Home() {
   const [state, setState] = useState({ navIdx: 0, keystore: null, keyIdx: 0, account: {}, validator: {}, height: 0 });
@@ -14,10 +14,10 @@ export default function Home() {
 
   function queryAPI(i = state.keyIdx) {
     Keystore().then((ks) => {
-      if (Object.keys(ks.addressMap).length === 0) {
+      if (!ks.addressMap || Object.keys(ks.addressMap).length === 0) {
         console.warn("mergedKS is empty. No data to query.");
         setState({ ...state, keystore: {}, account: {}, validator: {} }); // Handle empty case
-        return
+        return;
       }
 
       const mergedKS = Object.entries(ks.addressMap).reduce((acc, [address, details]) => {
@@ -26,11 +26,20 @@ export default function Home() {
         return acc;
       }, {});
 
-      Promise.all([AccountWithTxs(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, Object.keys(mergedKS)[i], 0), Validator(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, Object.keys(mergedKS)[i]), Height()]).then((r) => {
+      Promise.all([
+        AccountWithTxs(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, Object.keys(mergedKS)[i], 0),
+        Validator(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, Object.keys(mergedKS)[i]),
+        Height(),
+      ]).then((r) => {
         setState({ ...state, keyIdx: i, keystore: mergedKS, account: r[0], validator: r[1], height: r[2] });
       });
     });
   }
+
+  // Initial API call on component mount
+  useEffect(() => {
+    queryAPI();
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   useEffect(() => {
     const i = setInterval(() => {
@@ -40,27 +49,18 @@ export default function Home() {
   });
 
   if (state.keystore === null) {
-    queryAPI();
     return <Spinner id="spinner" />;
   }
   return (
     <KeystoreContext.Provider value={state.keystore}>
-      <>
-        <div id="container">
-          <Navigation {...state} setActiveKey={queryAPI} setNavIdx={setNavIdx} />
-          <div id="pageContent">
-            {(() => {
-              if (state.navIdx === 0) {
-                return <Accounts keygroup={Object.values(state.keystore)[state.keyIdx]} {...state} />;
-              } else if (state.navIdx === 1) {
-                return <Governance keygroup={Object.values(state.keystore)[state.keyIdx]} {...state} />;
-              } else {
-                return <Dashboard />;
-              }
-            })()}
-          </div>
+      <div id="container">
+        <Navigation {...state} setActiveKey={queryAPI} setNavIdx={setNavIdx} />
+        <div id="pageContent">
+          {state.navIdx == 0 && <Accounts keygroup={Object.values(state.keystore)[state.keyIdx]} {...state} />}
+          {state.navIdx == 1 && <Governance keygroup={Object.values(state.keystore)[state.keyIdx]} {...state} />}
+          {state.navIdx == 2 && <Dashboard />}
         </div>
-      </>
+      </div>
     </KeystoreContext.Provider>
   );
 }
