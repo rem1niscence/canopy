@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [Unreleased] - 2/05/2024
+- Fix hooks order error on Wallet
+- Refactor components to prevent unnecesary re-renders
+
 ## [Unreleased] - 2/04/2024
 - Refactor wallet forms and consolidate all of them as one 
 
