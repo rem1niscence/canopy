@@ -103,19 +103,12 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
     });
   }
 
-  // Initial API call on component mount
   useEffect(() => {
     queryAPI();
-  }, []); // Empty dependency array ensures this runs only once on mount
-  // execute every 4 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      queryAPI();
-    }, 4000);
-
-    // cleanup: clear the interval when the component unmounts
+    const interval = setInterval(queryAPI, 4000);
     return () => clearInterval(interval);
   }, []);
+
   // set spinner if loading
   if (objEmpty(state.apiResults)) {
     return <Spinner id="spinner" />;
