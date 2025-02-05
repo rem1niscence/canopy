@@ -30,7 +30,7 @@ import {
   numberFromCommas,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
-import RenderFormInputs from "@/components/form_inputs";
+import FormInputs from "@/components/form_inputs";
 
 function useKeystore() {
   const keystore = useContext(KeystoreContext);
@@ -383,7 +383,7 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
               <Modal.Title>{state.txPropType === 0 ? "Change Parameter" : "Treasury Subsidy"}</Modal.Title>
             </Modal.Header>
             <Modal.Body style={{ overflowWrap: "break-word" }}>
-              <RenderFormInputs
+              <FormInputs
                 fields={getFormInputs(
                   state.txPropType === 0 ? "change-param" : "dao-transfer",
                   keygroup,

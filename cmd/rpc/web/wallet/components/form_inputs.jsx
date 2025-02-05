@@ -10,7 +10,7 @@ import {
   formatLocaleNumber,
 } from "@/components/util";
 
-export default function RenderFormInputs({ keygroup, account, validator, fields, show, onFieldChange }) {
+export default function FormInputs({ keygroup, account, validator, fields, show, onFieldChange }) {
   // Manage all form input values in a single state object to allow for dynamic form generation
   // and state management
   const [formValues, setFormValues] = useState({});

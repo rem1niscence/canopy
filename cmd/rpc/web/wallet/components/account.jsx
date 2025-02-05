@@ -17,7 +17,7 @@ import {
   TxUnpause,
   TxUnstake,
 } from "@/components/api";
-import RenderFormInputs from "@/components/form_inputs";
+import FormInputs from "@/components/form_inputs";
 import {
   copy,
   formatNumber,
@@ -333,7 +333,7 @@ export default function Accounts({ keygroup, account, validator }) {
             <Modal.Title>{title}</Modal.Title>
           </Modal.Header>
           <Modal.Body className="modal-body">
-            <RenderFormInputs
+            <FormInputs
               keygroup={keyGroup}
               fields={getFormInputs(txType, keyGroup, acc, val)}
               account={account}
