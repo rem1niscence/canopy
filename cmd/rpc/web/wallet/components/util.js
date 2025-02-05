@@ -1,16 +1,8 @@
 import { OverlayTrigger, Toast, ToastContainer, Tooltip } from "react-bootstrap";
-import { useContext } from "react";
-import { KeystoreContext } from "@/pages";
-
-function Keystore() {
-  const keystore = useContext(KeystoreContext);
-  return keystore;
-}
 
 // getFormInputs() returns the form input based on the type
 // account and validator is passed to assist with auto fill
-export function getFormInputs(type, keyGroup, account, validator) {
-  const ks = Keystore();
+export function getFormInputs(type, keyGroup, account, validator, keyStore) {
   let amount = null;
   let netAddr = validator && validator.address ? validator.net_address : "";
   let delegate = validator && validator.address ? validator.delegate : false;
@@ -45,8 +37,8 @@ export function getFormInputs(type, keyGroup, account, validator) {
       label: "sender",
       defaultValue: defaultNick,
       inputText: "account",
-      type: "select",
-      options: ks ? Object.keys(ks) : [],
+      type: "dropdown",
+      options: keyStore ? Object.keys(keyStore) : [],
     },
     committees: {
       placeholder: "1, 22, 50",
@@ -196,8 +188,8 @@ export function getFormInputs(type, keyGroup, account, validator) {
       label: "signer",
       inputText: "signer",
       defaultValue: defaultNickSigner,
-      type: "select",
-      options: ks ? Object.keys(ks) : [],
+      type: "dropdown",
+      options: keyStore ? Object.keys(keyStore) : [],
     },
     paramSpace: {
       placeholder: "",
