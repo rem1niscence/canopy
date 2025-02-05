@@ -37,7 +37,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
       label: "sender",
       defaultValue: defaultNick,
       inputText: "account",
-      type: "dropdown",
+      type: "select",
       options: keyStore ? Object.keys(keyStore) : [],
     },
     committees: {
@@ -188,7 +188,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
       label: "signer",
       inputText: "signer",
       defaultValue: defaultNickSigner,
-      type: "dropdown",
+      type: "select",
       options: keyStore ? Object.keys(keyStore) : [],
     },
     paramSpace: {
