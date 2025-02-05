@@ -122,7 +122,7 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	// update the committee data
 	return s.UpsertCommitteeData(&lib.CommitteeData{
 		CommitteeId:             committeeId,
-		LastCanopyHeightUpdated: qc.Header.CanopyHeight,
+		LastCanopyHeightUpdated: qc.Header.CanopyHeight, // TODO this may cause an issue when going independent if new root-chain height < old-root-chain height
 		LastChainHeightUpdated:  qc.Header.Height,
 		PaymentPercents:         results.RewardRecipients.PaymentPercents,
 	})
@@ -133,7 +133,7 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 func (s *StateMachine) HandleCheckpoint(committeeId uint64, results *lib.CertificateResult) (err lib.ErrorI) {
 	storeI := s.store.(lib.StoreI)
 	// index the checkpoint
-	if results.Checkpoint != nil {
+	if results.Checkpoint != nil && len(results.Checkpoint.BlockHash) != 0 {
 		// retrieve the last saved checkpoint for this chain
 		mostRecentCheckpoint, e := storeI.GetMostRecentCheckpoint(committeeId)
 		if e != nil {

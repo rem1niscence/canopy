@@ -600,12 +600,20 @@ func (c *Controller) checkPeerQC(maxBlockSize int, view *lib.View, v lib.Validat
 	if qc.Header.Height != view.Height {
 		return lib.ErrWrongHeight()
 	}
-	// enforce the last saved committee height as valid
-	// NOTE: historical committees are accepted up to the last saved height in the state
-	// else there's a potential for a long-range attack
-	if qc.Header.CanopyHeight < view.CanopyHeight {
-		c.P2P.ChangeReputation(senderID, p2p.InvalidJustifyRep)
-		return lib.ErrWrongCanopyHeight()
+	// use checkpoints to protect against long-range attacks
+	if qc.Header.Height%c.GetCheckpointFrequency() == 0 {
+		// get the checkpoint from the base chain (or file if independent)
+		checkpoint, e := c.BaseChainInfo.GetCheckpoint(qc.Header.Height, c.Config.ChainId)
+		if e != nil {
+			c.log.Warnf(e.Error())
+			return nil
+		}
+		// if checkpoint fails
+		if len(checkpoint) != 0 && !bytes.Equal(qc.BlockHash, checkpoint) {
+			c.log.Fatalf("Invalid checkpoint %s vs %s at height %d from sender %s",
+				lib.BytesToString(qc.BlockHash), checkpoint, qc.Header.Height, lib.BytesToString(senderID),
+			)
+		}
 	}
 	return nil
 }

@@ -58,6 +58,7 @@ func init() {
 	queryCmd.AddCommand(lastProposersCmd)
 	queryCmd.AddCommand(minimumEvidenceHeightCmd)
 	queryCmd.AddCommand(isValidDoubleSignerCmd)
+	queryCmd.AddCommand(checkpointCmd)
 	queryCmd.AddCommand(doubleSignersCmd)
 	queryCmd.AddCommand(delegateLotteryCmd)
 	queryCmd.AddCommand(baseChainInfoCmd)
@@ -342,6 +343,15 @@ var (
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			writeToConsole(client.IsValidDoubleSigner(height, args[0]))
+		},
+	}
+
+	checkpointCmd = &cobra.Command{
+		Use:   "checkpoint <id> --height=1",
+		Short: "query a checkpoint",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeToConsole(client.Checkpoint(height, uint64(argToInt(args[0]))))
 		},
 	}
 

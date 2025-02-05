@@ -95,7 +95,7 @@ func (t *Indexer) GetBlockByHeight(height uint64) (*lib.BlockResult, lib.ErrorI)
 // GetBlocks() returns a page of blocks based on the page parameters
 func (t *Indexer) GetBlocks(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 	results, count, page := make(lib.BlockResults, 0), 0, lib.NewPage(p, lib.BlockResultsPageName)
-	err = page.Load(blockHeightPrefix, true, &results, t.db, func(_, b []byte) lib.ErrorI {
+	err = page.Load(lib.AppendAndLenPrefix(blockHeightPrefix), true, &results, t.db, func(_, b []byte) lib.ErrorI {
 		// get the block from the iterator value
 		block, e := t.getBlock(b)
 		if e != nil {
@@ -249,21 +249,21 @@ func (t *Indexer) IndexDoubleSigner(address []byte, height uint64) lib.ErrorI {
 // GetDoubleSigners() gets all double signers saved in the indexer
 // IMPORTANT NOTE: this returns double signers in the form of <address> -> <heights> NOT <public_key> -> <heights>
 func (t *Indexer) GetDoubleSigners() (ds []*lib.DoubleSigner, err lib.ErrorI) {
-	it, err := t.db.Iterator(doubleSignerPrefix)
+	it, err := t.db.Iterator(lib.AppendAndLenPrefix(doubleSignerPrefix))
 	if err != nil {
 		return nil, err
 	}
 	defer it.Close()
 	results := make(map[string][]uint64)
 	for ; it.Valid(); it.Next() {
-		// split the key by Delimiter
-		split := bytes.Split(it.Key(), lib.Delimiter)
+		// get the segments of the key
+		segments := lib.DecodeLengthPrefixed(it.Key())
 		// sanity check the key
-		if len(split) < 3 {
+		if len(segments) < 3 {
 			return nil, ErrInvalidKey()
 		}
 		// key split should be dsPrefix / height / address
-		address, height := split[1], t.decodeBigEndian(split[2])
+		address, height := segments[1], t.decodeBigEndian(segments[2])
 		// add to results
 		results[string(address)] = append(results[string(address)], height)
 	}
@@ -295,7 +295,7 @@ func (t *Indexer) IndexCheckpoint(committeeId uint64, checkpoint *lib.Checkpoint
 
 // GetCheckpoint() retrieves a 'checkpoint block hash' for a committee chain at a certain height
 // this is for the 'checkpointing as a service' long-range-attack prevention
-func (t *Indexer) GetCheckpoint(committeeId, height uint64) (blockHash []byte, err lib.ErrorI) {
+func (t *Indexer) GetCheckpoint(committeeId, height uint64) (blockHash lib.HexBytes, err lib.ErrorI) {
 	return t.db.Get(t.checkpointKey(committeeId, height))
 }
 
@@ -335,11 +335,11 @@ func (t *Indexer) GetAllCheckpoints(committeeId uint64) (checkpoints []*lib.Chec
 }
 
 func (t *Indexer) checkpointFromKeyValue(key, value []byte) (*lib.Checkpoint, lib.ErrorI) {
-	if bytes.Count(key, lib.Delimiter) < 2 {
+	segments := lib.DecodeLengthPrefixed(key)
+	if len(segments) != 3 {
 		return nil, ErrInvalidKey()
 	}
-	bigEndianHeight := bytes.Split(key, lib.Delimiter)[2]
-	height := binary.BigEndian.Uint64(bigEndianHeight)
+	height := binary.BigEndian.Uint64(segments[2])
 	return &lib.Checkpoint{
 		Height:    height,
 		BlockHash: value,
@@ -443,8 +443,8 @@ func (t *Indexer) deleteAll(prefix []byte) lib.ErrorI {
 	for ; it.Valid(); it.Next() {
 		keysToDelete = append(keysToDelete, it.Key())
 	}
-	for _, key := range keysToDelete {
-		if err = t.db.Delete(key); err != nil {
+	for _, k := range keysToDelete {
+		if err = t.db.Delete(k); err != nil {
 			return err
 		}
 	}
@@ -452,8 +452,8 @@ func (t *Indexer) deleteAll(prefix []byte) lib.ErrorI {
 }
 
 func (t *Indexer) indexTxByHash(hash, bz []byte) (hashKey []byte, err lib.ErrorI) {
-	key := t.txHashKey(hash)
-	return key, t.db.Set(key, bz)
+	k := t.txHashKey(hash)
+	return k, t.db.Set(k, bz)
 }
 
 func (t *Indexer) indexTxByHeightAndIndex(heightAndIndexKey []byte, bz []byte) lib.ErrorI {
@@ -476,8 +476,8 @@ func (t *Indexer) indexQCByHeight(height uint64, bz []byte) lib.ErrorI {
 }
 
 func (t *Indexer) indexBlockByHash(hash, bz []byte) (hashKey []byte, err lib.ErrorI) {
-	key := t.blockHashKey(hash)
-	return key, t.db.Set(key, bz)
+	k := t.blockHashKey(hash)
+	return k, t.db.Set(k, bz)
 }
 
 func (t *Indexer) indexBlockByHeight(height uint64, bz []byte) lib.ErrorI {
@@ -493,7 +493,7 @@ func (t *Indexer) txHashKey(hash []byte) []byte {
 }
 
 func (t *Indexer) heightAndIndexKey(height, index uint64) []byte {
-	return lib.Delimit(t.txHeightKey(height), t.encodeBigEndian(index))
+	return t.key(txHeightPrefix, t.encodeBigEndian(height), t.encodeBigEndian(index))
 }
 
 func (t *Indexer) txHeightKey(height uint64) []byte {
@@ -532,8 +532,8 @@ func (t *Indexer) doubleSignerHeightKey(address []byte, height uint64) []byte {
 	return t.key(doubleSignerPrefix, address, t.encodeBigEndian(height))
 }
 
-func (t *Indexer) key(prefix []byte, param1, param2 []byte) []byte {
-	return lib.Delimit(prefix, param1, param2)
+func (t *Indexer) key(prefix, param1, param2 []byte) []byte {
+	return lib.AppendAndLenPrefix(prefix, param1, param2)
 }
 
 // encodeBigEndian() encodes a number such that default DB order

@@ -93,6 +93,7 @@ type BaseChainInfo struct {
 
 // RemoteCallbacks are fallback rpc callbacks to the base-chain
 type RemoteCallbacks struct {
+	Checkpoint            func(height, id uint64) (blockHash HexBytes, i ErrorI)
 	ValidatorSet          func(height, id uint64) (ValidatorSet, ErrorI)
 	IsValidDoubleSigner   func(height uint64, address string) (p *bool, err ErrorI)
 	Transaction           func(tx TransactionI) (hash *string, err ErrorI)
@@ -157,6 +158,12 @@ func (b *BaseChainInfo) GetMinimumEvidenceHeight(height uint64) (i uint64, err E
 func (b *BaseChainInfo) IsValidDoubleSigner(height uint64, address string) (*bool, ErrorI) {
 	b.Log.Warnf("Executing remote IsValidDoubleSigner call with requested height %d and address %s", height, address)
 	return b.RemoteCallbacks.IsValidDoubleSigner(height, address)
+}
+
+// GetCheckpoint() returns the checkpoint if any for a specific chain height
+func (b *BaseChainInfo) GetCheckpoint(height, chainId uint64) (blockHash HexBytes, err ErrorI) {
+	// TODO should be able to get these from the file or the base-chain upon independence
+	return b.RemoteCallbacks.Checkpoint(height, chainId)
 }
 
 // GetLastChainHeightUpdated() returns the last chain (target) height the committee (meta) data was updated from the base-chain

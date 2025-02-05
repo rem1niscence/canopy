@@ -2091,7 +2091,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				got, e := sm.store.(lib.StoreI).GetCheckpoint(lib.CanopyCommitteeId+1, expected.Height)
 				require.NoError(t, e)
 				// check got vs expected
-				require.Equal(t, expected.BlockHash, got)
+				require.Equal(t, lib.HexBytes(expected.BlockHash), got)
 			}()
 
 			// 5) validate the 'committee data'
