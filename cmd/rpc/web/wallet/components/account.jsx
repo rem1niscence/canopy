@@ -1,7 +1,7 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useContext } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
-import { Button, Card, Col, Form, InputGroup, Modal, Row, Spinner, Table } from "react-bootstrap";
+import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
 import {
   KeystoreGet,
   KeystoreImport,
@@ -15,25 +15,26 @@ import {
   TxSend,
   TxStake,
   TxUnpause,
-  TxUnstake
+  TxUnstake,
 } from "@/components/api";
+import FormInputs from "@/components/form_inputs";
 import {
   copy,
   formatNumber,
-  formatNumberInput,
   getFormInputs,
   numberFromCommas,
   objEmpty,
   onFormSubmit,
   renderToast,
-  sanitizeInput,
-  withTooltip
+  withTooltip,
+  toUCNPY,
+  toCNPY,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 
 function Keystore() {
   const keystore = useContext(KeystoreContext);
-  return keystore
+  return keystore;
 }
 
 // transactionButtons defines the icons for the transactions
@@ -47,12 +48,12 @@ const transactionButtons = [
   { title: "SWAP", name: "create_order", src: "swap" },
   { title: "LOCK", name: "buy_order", src: "buy" },
   { title: "REPRICE", name: "edit_order", src: "edit_order" },
-  { title: "VOID", name: "delete_order", src: "delete_order" }
+  { title: "VOID", name: "delete_order", src: "delete_order" },
 ];
 
 // Accounts() returns the main component of this file
 export default function Accounts({ keygroup, account, validator }) {
-  const ks = Keystore()
+  const ks = Keystore();
   const [state, setState] = useState({
       showModal: false,
       txType: "send",
@@ -93,7 +94,7 @@ export default function Accounts({ keygroup, account, validator }) {
       showModal: false,
       showPKModal: false,
       showNewModal: false,
-      showPKImportModal: false
+      showPKImportModal: false,
     });
   }
 
@@ -135,7 +136,7 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, ks, (r) =>
       KeystoreGet(r.sender, r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
-      })
+      }),
     );
   }
 
@@ -144,7 +145,7 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, ks, (r) =>
       KeystoreNew(r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
-      })
+      }),
     );
   }
 
@@ -152,7 +153,9 @@ export default function Accounts({ keygroup, account, validator }) {
   function onImportOrGenerateSubmit(e) {
     onFormSubmit(state, e, ks, (r) => {
       if (r.private_key) {
-        void KeystoreImport(r.private_key, r.password, r.nickname).then((_) => setState({ ...state, showSpinner: false }));
+        void KeystoreImport(r.private_key, r.password, r.nickname).then((_) =>
+          setState({ ...state, showSpinner: false }),
+        );
       } else {
         void KeystoreNew(r.password, r.nickname).then((_) => setState({ ...state, showSpinner: false }));
       }
@@ -164,86 +167,73 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, ks, (r) => {
       const submit = Object.keys(state.txResult).length !== 0;
       // Mapping transaction types to their respective functions
+
+      const amount = toUCNPY(numberFromCommas(r.amount));
+      const fee = r.fee ? toUCNPY(numberFromCommas(r.fee)) : 0;
+      const receiveAmount = toUCNPY(numberFromCommas(r.receiveAmount));
+
       const txMap = {
-        send: () =>
-          TxSend(
-            r.sender,
-            r.recipient,
-            numberFromCommas(r.amount),
-            r.memo,
-            numberFromCommas(r.fee),
-            r.password,
-            submit
-          ),
+        send: () => TxSend(r.sender, r.recipient, amount, r.memo, fee, r.password, submit),
         stake: () =>
           TxStake(
             r.sender,
             r.pubKey,
             r.committees,
             r.net_address,
-            numberFromCommas(r.amount),
+            amount,
             r.delegate,
             r.earlyWithdrawal,
             r.output,
             r.signer,
             r.memo,
-            numberFromCommas(r.fee),
+            fee,
             r.password,
-            submit
+            submit,
           ),
         "edit-stake": () =>
           TxEditStake(
             r.sender,
             r.committees,
             r.net_address,
-            numberFromCommas(r.amount),
+            amount,
             r.earlyWithdrawal,
             r.output,
             r.signer,
             r.memo,
-            numberFromCommas(r.fee),
+            fee,
             r.password,
-            submit
+            submit,
           ),
-        unstake: () => TxUnstake(r.sender, r.signer, r.memo, numberFromCommas(r.fee), r.password, submit),
-        pause: () => TxPause(r.sender, r.signer, r.memo, numberFromCommas(r.fee), r.password, submit),
-        unpause: () => TxUnpause(r.sender, r.signer, r.memo, numberFromCommas(r.fee), r.password, submit),
+        unstake: () => TxUnstake(r.sender, r.signer, r.memo, fee, r.password, submit),
+        pause: () => TxPause(r.sender, r.signer, r.memo, fee, r.password, submit),
+        unpause: () => TxUnpause(r.sender, r.signer, r.memo, fee, r.password, submit),
         create_order: () =>
           TxCreateOrder(
             r.sender,
             r.committeeId,
-            numberFromCommas(r.amount),
-            numberFromCommas(r.receiveAmount),
+            amount,
+            receiveAmount,
             r.receiveAddress,
             r.memo,
-            numberFromCommas(r.fee),
+            fee,
             r.password,
-            submit
+            submit,
           ),
-        buy_order: () =>
-          TxBuyOrder(
-            r.sender,
-            r.receiveAddress,
-            numberFromCommas(r.orderId),
-            numberFromCommas(r.fee),
-            r.password,
-            submit
-          ),
+        buy_order: () => TxBuyOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), fee, r.password, submit),
         edit_order: () =>
           TxEditOrder(
             r.sender,
             r.committeeId,
             numberFromCommas(r.orderId),
-            numberFromCommas(r.amount),
-            numberFromCommas(r.receiveAmount),
+            amount,
+            receiveAmount,
             r.receiveAddress,
             r.memo,
-            numberFromCommas(r.fee),
+            fee,
             r.password,
-            submit
+            submit,
           ),
-        delete_order: () =>
-          TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, numberFromCommas(r.fee), r.password, submit)
+        delete_order: () => TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, fee, r.password, submit),
       };
 
       const txFunction = txMap[state.txType];
@@ -346,98 +336,7 @@ export default function Accounts({ keygroup, account, validator }) {
       </td>,
       detail,
       i,
-      "top"
-    );
-  }
-
-  // renderForm() returns a form input group for the transaction execution
-  function renderForm(fields, show) {
-    // Manage all form input values in a single state object to allow for dynamic form generation
-    // and state management
-    const [formValues, setFormValues] = useState({});
-
-    // sets the default form values based on the fields every time the modal is opened
-    useEffect(() => {
-      const initialValues = fields.reduce((form, field) => {
-        const value = field.defaultValue || "";
-        form[field.label] = field.type === "number" ? formatNumberInput(value.toString()) : value;
-        return form;
-      }, {});
-
-      setFormValues(initialValues);
-    }, [show]);
-
-    const handleInputChange = (key, value, type) => {
-      setFormValues((prev) => ({
-        ...prev,
-        [key]: type === "number" ? formatNumberInput(value) : sanitizeInput(value)
-      }));
-    };
-
-    const doRenderForm = (v, i) => {
-      if (v.shouldNotRender && v.shouldNotRender(keygroup, account, validator)) return null;
-
-      return (
-        <Form.Group key={i} className="mb-3">
-          <InputGroup size="lg">
-            {withTooltip(<InputGroup.Text className="input-text">{v.inputText}</InputGroup.Text>, v.tooltip, i, "auto")}
-            {v.type === "dropdown" ? (
-              <Form.Select
-                className="input-text-field"
-                onChange={(e) => handleInputChange(v.label, e.target.value, v.type)}
-                value={formValues[v.label]}
-                aria-label={v.label}
-              >
-                {v.options && v.options.length > 0 ? (
-                  v.options.map((key) => (
-                    <option key={key} value={key}>
-                      {key}
-                    </option>
-                  ))
-                ) : (
-                  <option disabled>No options available</option>
-                )}
-              </Form.Select>
-            ) : (
-            <Form.Control
-              className="input-text-field"
-              onChange={(e) => handleInputChange(v.label, e.target.value, v.type)}
-              type={v.type == "number" ? "text" : v.type}
-              value={formValues[v.label]}
-              placeholder={v.placeholder}
-              required={v.required}
-              min={0}
-              minLength={v.minLength}
-              maxLength={v.maxLength}
-              aria-label={v.label}
-              aria-describedby="emailHelp"
-            />)}
-          </InputGroup>
-          {v.label === "amount" ? renderAmountInput(handleInputChange, v) : null}
-        </Form.Group>
-      );
-    };
-
-    return fields.map(doRenderForm);
-  }
-
-  // renderAmountInput() renders the amount input with the option to set the amount to max
-  function renderAmountInput(onchange, v) {
-    const amount = formatNumber(account.account.amount);
-    return (
-      <div className="text-end">
-        <Form.Text>
-          Available: <span className="fw-bold">{amount} </span>
-          <Button
-            aria-label="max-button"
-            onClick={() => onchange(v.label, Math.ceil(account.account.amount).toString(), v.type)}
-            variant="link"
-            bsPrefix="max-amount-btn"
-          >
-            MAX
-          </Button>
-        </Form.Text>
-      </div>
+      "top",
     );
   }
 
@@ -450,7 +349,13 @@ export default function Accounts({ keygroup, account, validator }) {
             <Modal.Title>{title}</Modal.Title>
           </Modal.Header>
           <Modal.Body className="modal-body">
-            {renderForm(getFormInputs(txType, keyGroup, acc, val), show)}
+            <FormInputs
+              keygroup={keyGroup}
+              fields={getFormInputs(txType, keyGroup, acc, val)}
+              account={account}
+              show={show}
+              validator={val}
+            />
             {renderJSONViewer()}
             <Spinner style={{ display: state.showSpinner ? "block" : "none", margin: "0 auto" }} />
           </Modal.Body>
@@ -511,23 +416,23 @@ export default function Accounts({ keygroup, account, validator }) {
         </span>
         <Table className="table-fixed" bordered hover style={{ marginTop: "10px" }}>
           <thead>
-          <tr>
-            {["Height", "Amount", "Recipient", "Type", "Hash", "Status"].map((k, i) => (
-              <th key={i}>{k}</th>
-            ))}
-          </tr>
+            <tr>
+              {["Height", "Amount", "Recipient", "Type", "Hash", "Status"].map((k, i) => (
+                <th key={i}>{k}</th>
+              ))}
+            </tr>
           </thead>
           <tbody>
-          {account.combined.slice(0, 5).map((v, i) => (
-            <tr key={i}>
-              <td>{v.height || "N/A"}</td>
-              <td>{v.transaction.msg.amount ?? v.transaction.msg.AmountForSale ?? "N/A"}</td>
-              {renderAccSumTabCol(v.recipient ?? v.sender ?? v.address, i)}
-              <td>{v.message_type || v.transaction.type}</td>
-              {renderAccSumTabCol(v.tx_hash, i + 1)}
-              <td>{v.status ?? ""}</td>
-            </tr>
-          ))}
+            {account.combined.slice(0, 5).map((v, i) => (
+              <tr key={i}>
+                <td>{v.height || "N/A"}</td>
+                <td>{toCNPY(v.transaction.msg.amount) || toCNPY(v.transaction.msg.AmountForSale) || "N/A"}</td>
+                {renderAccSumTabCol(v.recipient ?? v.sender ?? v.address, i)}
+                <td>{v.message_type || v.transaction.type}</td>
+                {renderAccSumTabCol(v.tx_hash, i + 1)}
+                <td>{v.status ?? ""}</td>
+              </tr>
+            ))}
           </tbody>
         </Table>
       </div>
@@ -545,7 +450,7 @@ export default function Accounts({ keygroup, account, validator }) {
       null,
       null,
       null,
-      "import-or-generate"
+      "import-or-generate",
     );
   }
   // return the main component
@@ -563,7 +468,7 @@ export default function Accounts({ keygroup, account, validator }) {
           {[
             { title: "Account Type", info: getAccountType() },
             { title: "Stake Amount", info: getValidatorAmount(), after: " cnpy" },
-            { title: "Staked Status", info: getStakedStatus() }
+            { title: "Staked Status", info: getStakedStatus() },
           ].map(renderAccountInfo)}
         </Row>
         <br />
@@ -585,7 +490,7 @@ export default function Accounts({ keygroup, account, validator }) {
           acc,
           null,
           resetState,
-          "reveal-pk"
+          "reveal-pk",
         )}
         {renderModal(
           state.showPKImportModal,
@@ -596,7 +501,7 @@ export default function Accounts({ keygroup, account, validator }) {
           acc,
           null,
           resetState,
-          "import-pk"
+          "import-pk",
         )}
         {renderModal(
           state.showNewModal,
@@ -607,7 +512,7 @@ export default function Accounts({ keygroup, account, validator }) {
           null,
           null,
           resetState,
-          "new-pk"
+          "new-pk",
         )}
         <Button id="pk-button" variant="outline-secondary" onClick={() => setState({ ...state, showNewModal: true })}>
           New Private Key

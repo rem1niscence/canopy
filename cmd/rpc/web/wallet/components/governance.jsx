@@ -3,7 +3,7 @@ import Truncate from "react-truncate-inside";
 import JsonView from "@uiw/react-json-view";
 import { Bar } from "react-chartjs-2";
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
-import { Accordion, Button, Carousel, Col, Container, Form, InputGroup, Modal, Spinner, Table } from "react-bootstrap";
+import { Accordion, Button, Carousel, Container, Form, InputGroup, Modal, Spinner, Table } from "react-bootstrap";
 import {
   AddVote,
   DelVote,
@@ -18,26 +18,29 @@ import {
 } from "@/components/api";
 import {
   copy,
-  formatNumberInput,
   getFormInputs,
   objEmpty,
   onFormSubmit,
   placeholders,
   renderToast,
-  sanitizeInput,
   withTooltip,
+  sanitizeTextInput,
+  sanitizeNumberInput,
+  toUCNPY,
+  numberFromCommas,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
+import FormInputs from "@/components/form_inputs";
 
-function Keystore() {
+function useKeystore() {
   const keystore = useContext(KeystoreContext);
-  return keystore
+  return keystore;
 }
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 export default function Governance({ keygroup, account: accountWithTxs, validator }) {
-  const ks = Keystore()
+  const ks = useKeystore();
   const [state, setState] = useState({
     txResult: {},
     rawTx: {},
@@ -52,6 +55,12 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
     voteJSON: {},
     pwd: "",
   });
+
+  function OnFormChange(key, value, newValue) {
+    if (key === "param_space") {
+      setState({ ...state, paramSpace: newValue });
+    }
+  }
 
   // queryAPI() executes the page API calls
   function queryAPI() {
@@ -151,11 +160,19 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
           r.start_block,
           r.end_block,
           r.memo,
-          r.fee,
+          toUCNPY(numberFromCommas(r.fee)),
           r.password,
         );
       } else {
-        createDAOTransferTx(r.sender, r.amount, r.start_block, r.end_block, r.memo, r.fee, r.password);
+        createDAOTransferTx(
+          r.sender,
+          toUCNPY(numberFromCommas(r.amount)),
+          r.start_block,
+          r.end_block,
+          r.memo,
+          r.fee,
+          r.password,
+        );
       }
     });
   }
@@ -366,85 +383,33 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
               <Modal.Title>{state.txPropType === 0 ? "Change Parameter" : "Treasury Subsidy"}</Modal.Title>
             </Modal.Header>
             <Modal.Body style={{ overflowWrap: "break-word" }}>
-              {getFormInputs(
-                state.txPropType === 0 ? "change-param" : "dao-transfer",
-                keygroup,
-                accountWithTxs.account,
-                validator,
-              ).map((v, i) => {
-                let show = objEmpty(state.txResult) ? "" : "none",
-                  onChange = (e) => setState({ ...state, paramSpace: e.target.value });
-                if (v.type === "select") {
-                  switch (v.label) {
-                    case "param_key":
-                      let paramKeys = [],
-                        ps = state.apiResults.params[state.paramSpace];
-                      if (ps) {
-                        paramKeys = Object.keys(ps);
-                      }
-                      return (
-                        <InputGroup style={{ display: show }} key={i} className="mb-3" size="lg">
-                          <Form.Select size="lg" aria-label={v.label}>
-                            <option>param key</option>
-                            {paramKeys.map((v, i) => (
-                              <option key={i} value={v}>
-                                {v}
-                              </option>
-                            ))}
-                          </Form.Select>
-                        </InputGroup>
-                      );
+              <FormInputs
+                fields={getFormInputs(
+                  state.txPropType === 0 ? "change-param" : "dao-transfer",
+                  keygroup,
+                  accountWithTxs.account,
+                  validator,
+                ).map((input) => {
+                  let formInput = Object.assign({}, input);
+                  switch (input.label) {
                     case "param_space":
-                      return (
-                        <InputGroup style={{ display: show }} key={i} className="mb-3" size="lg">
-                          <Form.Select size="lg" onChange={onChange} aria-label={v.label}>
-                            <option>param space</option>
-                            <option value="Consensus">consensus</option>
-                            <option value="Validator">validator</option>
-                            <option value="Governance">governance</option>
-                            <option value="Fee">fee</option>
-                          </Form.Select>
-                        </InputGroup>
-                      );
+                      formInput.options = Object.keys(state.apiResults.params);
+                      break;
+                    case "param_key":
+                      // Add the first api result as the default param space
+                      const paramSpace = state.paramSpace || Object.keys(state.apiResults.params)[0];
+                      const params = state.apiResults.params[paramSpace];
+                      formInput.options = params ? Object.keys(params) : [];
+                      break;
                   }
-                }
-                return (
-                  <InputGroup style={{ display: show }} key={i} className="mb-3" size="lg">
-                    {withTooltip(
-                      <InputGroup.Text className="param-input">{v.inputText}</InputGroup.Text>,
-                      v.tooltip,
-                      i,
-                    )}
-                    {v.type === "dropdown" ? (
-                      <Form.Select
-                        className="input-text-field"
-                        aria-label={v.label}
-                        defaultValue={v.defaultValue}
-                      >
-                        {v.options && v.options.length > 0 ? (
-                          v.options.map((key) => (
-                            <option key={key} value={key}>
-                              {key}
-                            </option>
-                          ))
-                        ) : (
-                          <option disabled>No options available</option>
-                        )}
-                      </Form.Select>
-                    ) : (
-                    <Form.Control
-                      placeholder={v.placeholder}
-                      required={v.required}
-                      defaultValue={v.defaultValue}
-                      type={v.type}
-                      min={0}
-                      minLength={v.minLength}
-                      maxLength={v.maxLength}
-                      aria-label={v.label}
-                    />)}
-                  </InputGroup>
-                );
-              })}
+                  return formInput;
+                })}
+                keygroup={keygroup}
+                account={accountWithTxs}
+                show={state.showPropModal}
+                validator={validator}
+                onFieldChange={OnFormChange}
+              />
               {renderJSONViewer()}
             </Modal.Body>
             <Modal.Footer>{renderButtons()}</Modal.Footer>

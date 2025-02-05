@@ -92,6 +92,7 @@ const (
 	LotteryRouteName               = "lottery"
 	BaseChainInfoRouteName         = "base-chain-info"
 	ValidatorSetRouteName          = "validator-set"
+	CheckpointRouteName            = "checkpoint"
 	// debug
 	DebugBlockedRouteName = "blocked"
 	DebugHeapRouteName    = "heap"
@@ -183,6 +184,7 @@ var (
 		PollRouteName:                  {Method: http.MethodGet, Path: "/v1/gov/poll", HandlerFunc: Poll},
 		BaseChainInfoRouteName:         {Method: http.MethodPost, Path: "/v1/query/base-chain-info", HandlerFunc: BaseChainInfo},
 		ValidatorSetRouteName:          {Method: http.MethodPost, Path: "/v1/query/validator-set", HandlerFunc: ValidatorSet},
+		CheckpointRouteName:            {Method: http.MethodPost, Path: "/v1/query/checkpoint", HandlerFunc: Checkpoint},
 		// debug
 		DebugBlockedRouteName: {Method: http.MethodPost, Path: "/debug/blocked", HandlerFunc: debugHandler(DebugBlockedRouteName)},
 		DebugHeapRouteName:    {Method: http.MethodPost, Path: "/debug/heap", HandlerFunc: debugHandler(DebugHeapRouteName)},
@@ -285,6 +287,7 @@ func PollBaseChainInfo() {
 	rpcClient := NewClient(conf.BaseChainRPCURL, "", "")
 	// set the apps callbacks
 	app.BaseChainInfo.RemoteCallbacks = &lib.RemoteCallbacks{
+		Checkpoint:            rpcClient.Checkpoint,
 		ValidatorSet:          rpcClient.ValidatorSet,
 		IsValidDoubleSigner:   rpcClient.IsValidDoubleSigner,
 		Transaction:           rpcClient.Transaction,
@@ -536,6 +539,12 @@ func ValidatorSet(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 			return nil, err
 		}
 		return members.ValidatorSet, nil
+	})
+}
+
+func Checkpoint(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	heightAndIdIndexer(w, r, func(s lib.StoreI, height, id uint64) (interface{}, lib.ErrorI) {
+		return s.GetCheckpoint(id, height)
 	})
 }
 
@@ -1452,6 +1461,27 @@ func heightAndAddrIndexer(w http.ResponseWriter, r *http.Request, callback func(
 		req.Height = s.Version() - 1
 	}
 	p, err := callback(s, req.Height, req.Address)
+	if err != nil {
+		write(w, err, http.StatusBadRequest)
+		return
+	}
+	write(w, p, http.StatusOK)
+}
+
+func heightAndIdIndexer(w http.ResponseWriter, r *http.Request, callback func(s lib.StoreI, h, id uint64) (any, lib.ErrorI)) {
+	req := new(heightAndIdRequest)
+	if ok := unmarshal(w, r, req); !ok {
+		return
+	}
+	s, ok := setupStore(w)
+	if !ok {
+		return
+	}
+	defer s.Discard()
+	if req.Height == 0 {
+		req.Height = s.Version() - 1
+	}
+	p, err := callback(s, req.Height, req.ID)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return

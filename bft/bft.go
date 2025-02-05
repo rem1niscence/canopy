@@ -631,7 +631,7 @@ func (b *BFT) SafeNode(msg *Message) lib.ErrorI {
 		return nil // SAFETY (SAME PROPOSAL AS LOCKED)
 	}
 	// if the view of the Locked proposal is older than the Leader's message
-	if msg.HighQc.Header.CanopyHeight > b.HighQC.Header.CanopyHeight || msg.HighQc.Header.Round > b.HighQC.Header.Round {
+	if msg.HighQc.Header.Round > b.HighQC.Header.Round {
 		return nil // LIVENESS (HIGHER ROUND v COMMITTEE THAN LOCKED)
 	}
 	return ErrFailedSafeNodePredicate()

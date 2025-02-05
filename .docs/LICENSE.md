@@ -1,7 +1,7 @@
-Copyright 2024, canopy Consulting LLC
+Copyright 2024, Canopy Network Labs Inc.
 
 SOFTWARE LICENSE TERMS
-This Software License Agreement ("Terms") is made and entered into as of 2024-04-12 ("Effective Date") by and between canopy Consulting LLC, any user ("Licensee").
+This Software License Agreement ("Terms") is made and entered into as of 2024-04-12 ("Effective Date") by and between Canopy Network Labs Inc., any user ("Licensee").
 
 WHEREAS, Licensor owns this software;
 
@@ -38,4 +38,4 @@ NOW, THEREFORE, in consideration of the mutual promises contained herein and for
 
 IN WITNESS WHEREOF, the parties have executed this Software License Agreement as of the Effective Date.
 
-Licensor: Canopy Network Labs
+Licensor: Canopy Network Labs Inc.

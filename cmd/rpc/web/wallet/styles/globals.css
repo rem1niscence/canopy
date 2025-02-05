@@ -176,7 +176,7 @@
 }
 
 .input-text {
-  width: 125px;
+  min-width: 125px;
 }
 
 .input-group .input-text-field::placeholder {

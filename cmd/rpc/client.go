@@ -218,6 +218,12 @@ func (c *Client) IsValidDoubleSigner(height uint64, address string) (p *bool, er
 	return
 }
 
+func (c *Client) Checkpoint(height, id uint64) (p lib.HexBytes, err lib.ErrorI) {
+	p = make(lib.HexBytes, 0)
+	err = c.heightAndIdRequest(CheckpointRouteName, height, id, &p)
+	return
+}
+
 func (c *Client) DoubleSigners(height uint64) (p *[]*lib.DoubleSigner, err lib.ErrorI) {
 	p = new([]*lib.DoubleSigner)
 	err = c.heightRequest(DoubleSignersRouteName, height, p)

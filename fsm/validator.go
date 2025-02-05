@@ -56,16 +56,11 @@ func (s *StateMachine) GetValidators() ([]*types.Validator, lib.ErrorI) {
 
 // GetValidatorsPaginated() returns a page of filtered validators
 func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorFilters) (page *lib.Page, err lib.ErrorI) {
-	return s.getValidatorsPaginated(p, f, types.ValidatorPrefix())
-}
-
-// getValidatorsPaginated() a helper function that returns a filtered page of Validators under a specific prefix key
-func (s *StateMachine) getValidatorsPaginated(p lib.PageParams, f lib.ValidatorFilters, prefix []byte) (page *lib.Page, err lib.ErrorI) {
 	// initialize a page and the results slice
 	page, res := lib.NewPage(p, types.ValidatorsPageName), make(types.ValidatorPage, 0)
 	if f.On() { // if request has filters
 		// create a new iterator for the prefix key
-		it, e := s.Iterator(prefix)
+		it, e := s.Iterator(types.ValidatorPrefix())
 		if e != nil {
 			return nil, e
 		}
@@ -92,7 +87,7 @@ func (s *StateMachine) getValidatorsPaginated(p lib.PageParams, f lib.ValidatorF
 			return
 		})
 	} else { // if no filters
-		err = page.Load(prefix, false, &res, s.store, func(_, b []byte) (err lib.ErrorI) {
+		err = page.Load(types.ValidatorPrefix(), false, &res, s.store, func(_, b []byte) (err lib.ErrorI) {
 			val, err := s.unmarshalValidator(b)
 			if err == nil {
 				res = append(res, val)

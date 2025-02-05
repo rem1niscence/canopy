@@ -1,13 +1,30 @@
 import React from "react";
 import { Tooltip, OverlayTrigger, Pagination } from "react-bootstrap";
 
+// cnpyConversionRate sets the conversion rate between CNPY and uCNPY
+export const cnpyConversionRate = 1_000_000;
+
+// toCNPY converts a uCNPY amount to CNPY
+export function toCNPY(uCNPY) {
+  return uCNPY / cnpyConversionRate;
+}
+
+// toUCNPY converts a CNPY amount to uCNPY
+export function toUCNPY(cnpy) {
+  return cnpy * cnpyConversionRate;
+}
+
 // convertNumberWCommas() formats a number with commas
 export function convertNumberWCommas(x) {
   return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 // convertNumber() formats a number with commas or in compact notation
-export function convertNumber(nString, cutoff = 1000000) {
+export function convertNumber(nString, cutoff = 1000000, convertToCNPY = false) {
+  if (convertToCNPY) {
+    nString = toCNPY(nString).toString();
+  }
+
   if (Number(nString) < cutoff) {
     return convertNumberWCommas(nString);
   }

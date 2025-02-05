@@ -12,6 +12,7 @@ import {
   upperCaseAndRepUnderscore,
   withTooltip,
   convertTx,
+  toCNPY,
 } from "@/components/util";
 
 // convertCardData() converts the data from state into a display object for rendering
@@ -98,7 +99,9 @@ function convertTabData(state, v, tab) {
   } else if ("account" in v) {
     switch (tab) {
       case 0:
-        return cpyObj(v.account);
+        let account = cpyObj(v.account);
+        account.amount = toCNPY(account.amount);
+        return account;
       case 1:
         return convertTransactions(v.sent_transactions.results);
       default:
@@ -251,6 +254,8 @@ export default function DetailModal({ state, setState }) {
     );
   }
 
+  let toCNPYFields = ["amount", "staked_amount"];
+
   // return the Modal
   return (
     <Modal size="xl" show={state.modalState.show} onHide={resetState}>
@@ -263,13 +268,13 @@ export default function DetailModal({ state, setState }) {
         </h3>
         {/* CARDS */}
         <CardGroup className="modal-card-group">
-          {Object.keys(cards).map((k, i) =>
-            withTooltip(
+          {Object.keys(cards).map((k, i) => {
+            return withTooltip(
               <Card onClick={() => clipboard(state, setState, cards[k])} key={i} className="modal-cards">
                 <Card.Body className="modal-card">
                   <h5 className="modal-card-title">{k}</h5>
                   <div className="modal-card-detail">
-                    <Truncate text={String(cards[k])} />
+                    <Truncate text={String(toCNPYFields.includes(k) ? toCNPY(cards[k]) : cards[k])} />
                   </div>
                   <img className="copy-img" src="./copy.png" alt="copy" />
                 </Card.Body>
@@ -277,8 +282,8 @@ export default function DetailModal({ state, setState }) {
               cards[k],
               i,
               "top",
-            ),
-          )}
+            );
+          })}
         </CardGroup>
         {/* TABS */}
         <Tabs defaultActiveKey="0" id="fill-tab-example" className="mb-3" fill>

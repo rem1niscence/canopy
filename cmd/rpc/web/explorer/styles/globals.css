@@ -111,6 +111,12 @@ input::placeholder {
   background-position: right center;
   background-size: 25px;
   background-origin: content-box;
+  background-color: rgba(0, 0, 0, 0.02);
+  color: black;
+}
+
+.search-table:focus {
+  outline: 2px solid rgba(0, 123, 255, 0.5); 
 }
 
 .chain-table {
