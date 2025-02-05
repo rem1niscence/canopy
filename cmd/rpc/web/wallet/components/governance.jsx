@@ -396,6 +396,7 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                       formInput.options = Object.keys(state.apiResults.params);
                       break;
                     case "param_key":
+                      // Add the first api result as the default param space
                       const paramSpace = state.paramSpace || Object.keys(state.apiResults.params)[0];
                       const params = state.apiResults.params[paramSpace];
                       formInput.options = params ? Object.keys(params) : [];
