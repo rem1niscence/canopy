@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
 import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
