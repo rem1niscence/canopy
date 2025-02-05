@@ -10,6 +10,7 @@ import {
   formatLocaleNumber,
 } from "@/components/util";
 
+// FormInputs() is a component that renders form inputs based on the fields passed to it
 export default function FormInputs({ keygroup, account, validator, fields, show, onFieldChange }) {
   // Manage all form input values in a single state object to allow for dynamic form generation
   // and state management
@@ -121,9 +122,9 @@ const FormControl = ({ input, formValues, onChange, account }) => {
         input.type === "currency" &&
         input.displayBalance &&
         RenderAmountInput({
-          amount: account.account.amount,
+          amount: account.amount,
           input,
-          onchange,
+          onClick: onChange,
           inputValue: formValues[input.label],
         })
       }
@@ -146,7 +147,7 @@ const FormControl = ({ input, formValues, onChange, account }) => {
 };
 
 // RenderAmountInput() renders the amount input with the option to set the amount to max
-const RenderAmountInput = ({ amount, onchange, input, inputValue }) => {
+const RenderAmountInput = ({ amount, onClick, input, inputValue }) => {
   return (
     <div className="d-flex justify-content-between">
       <Form.Text className="text-start fw-bold">
@@ -156,7 +157,7 @@ const RenderAmountInput = ({ amount, onchange, input, inputValue }) => {
         Available: <span className="fw-bold">{formatNumber(amount)} CNPY </span>
         <Button
           aria-label="max-button"
-          onClick={() => onchange(input.label, Math.ceil(amount).toString(), input.type)}
+          onClick={() => onClick(input.label, Math.ceil(amount).toString(), input.type)}
           variant="link"
           bsPrefix="max-amount-btn"
         >
