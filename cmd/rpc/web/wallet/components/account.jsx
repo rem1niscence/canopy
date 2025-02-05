@@ -268,7 +268,7 @@ export default function Accounts({ keygroup, account, validator }) {
   return (
     <div className="content-container">
       <span id="balance">{formatNumber(acc.amount)}</span>
-      <span style={{ fontWeight: "bold", color: "#32908f" }}>{" CNPY"}</span>
+      <span style={{ fontWeight: "bold", color: state.primaryColor }}>{" CNPY"}</span>
       <br />
       <hr style={{ border: "1px dashed black", borderRadius: "5px", width: "60%", margin: "0 auto" }} />
       <br />
@@ -294,7 +294,7 @@ export default function Accounts({ keygroup, account, validator }) {
           { title: "Stake Amount", info: getValidatorAmount(), after: " cnpy" },
           { title: "Staked Status", info: getStakedStatus() },
         ].map((v, i) => (
-          <RenderAccountInfo v={v} i={i} />
+          <RenderAccountInfo v={v} i={i} color={state.primaryColor} />
         ))}
       </Row>
       <br />
@@ -528,7 +528,7 @@ function ActionButton({ v, i, showModal }) {
 }
 
 // RenderAccountInfo() generates a card displaying account summary details
-function RenderAccountInfo({ v, i }) {
+function RenderAccountInfo({ v, i }, color) {
   return (
     <Col key={i}>
       <Card className="account-summary-container-card">
@@ -536,7 +536,7 @@ function RenderAccountInfo({ v, i }) {
         <Card.Body style={{ padding: "10px" }}>
           <Card.Title style={{ fontWeight: "bold", fontSize: "14px" }}>
             {v.info}
-            <span style={{ fontSize: "10px", color: "#32908f" }}>{v.after}</span>
+            <span style={{ fontSize: "10px", color: color }}>{v.after}</span>
           </Card.Title>
         </Card.Body>
       </Card>
@@ -548,7 +548,7 @@ function RenderAccountInfo({ v, i }) {
 function RenderTransactions({ account, state, setState }) {
   return account.combined.length === 0 ? null : (
     <div className="recent-transactions-table">
-      <span style={{ textAlign: "center", fontWeight: "100", fontSize: "14px", color: "grey" }}>
+      <span style={{ textAlign: "center", fontWeight: "100", fontSize: "14px", color: state.greyColor }}>
         RECENT TRANSACTIONS
       </span>
       <Table className="table-fixed" bordered hover style={{ marginTop: "10px" }}>
