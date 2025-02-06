@@ -55,40 +55,52 @@ const txPath = "/v1/tx";
 const height = "/v1/query/height";
 
 export async function GET(url, path) {
-  let resp = await fetch(url + path, {
+  return fetch(url + path, {
     method: "GET",
-  }).catch((rejected) => {
-    console.log(rejected);
-  });
-  if (resp == null) {
-    return {};
-  }
-  return resp.json();
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        return Promise.reject(response);
+      }
+      return response.json();
+    })
+    .catch((rejected) => {
+      console.log(rejected);
+      return Promise.reject(rejected);
+    });
 }
 
 export async function GETText(url, path) {
-  let resp = await fetch(url + path, {
+  return fetch(url + path, {
     method: "GET",
-  }).catch((rejected) => {
-    console.log(rejected);
-  });
-  if (resp == null) {
-    return {};
-  }
-  return resp.text();
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        return Promise.reject(response);
+      }
+      return response.text();
+    })
+    .catch((rejected) => {
+      console.log(rejected);
+      return Promise.reject(rejected);
+    });
 }
 
 export async function POST(url, path, request) {
-  let resp = await fetch(url + path, {
+  return fetch(url + path, {
     method: "POST",
     body: request,
-  }).catch((rejected) => {
-    console.log(rejected);
-  });
-  if (resp == null) {
-    return {};
-  }
-  return resp.json();
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        return Promise.reject(response);
+      }
+      return response.json();
+    })
+    .catch((rejected) => {
+      console.log(rejected);
+      return Promise.reject(rejected);
+    });
 }
 
 function heightAndAddrRequest(height, address) {
@@ -263,7 +275,7 @@ export async function VotePoll(address, json, approve, password) {
 export async function AccountWithTxs(height, address, nickname, page) {
   let result = {};
   result.account = await Account(height, address);
-  result.account.nickname = nickname
+  result.account.nickname = nickname;
 
   const setStatus = (status) => (tx) => {
     tx.status = status;
@@ -312,8 +324,8 @@ export function FailedTransactions(page, sender) {
 }
 
 export async function Validator(height, address, nickname) {
-  let vl = POST(rpcURL, validatorPath, heightAndAddrRequest(height, address))
-  vl.nickname = nickname
+  let vl = POST(rpcURL, validatorPath, heightAndAddrRequest(height, address));
+  vl.nickname = nickname;
   return vl;
 }
 
