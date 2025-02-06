@@ -278,7 +278,7 @@ export default function Accounts({ keygroup, account, validator }) {
           { title: "Stake Amount", info: getValidatorAmount(), after: " cnpy" },
           { title: "Staked Status", info: getStakedStatus() },
         ].map((v, i) => (
-          <RenderAccountInfo v={v} i={i} />
+          <RenderAccountInfo key={i} v={v} i={i} />
         ))}
       </Row>
       <br />
