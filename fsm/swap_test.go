@@ -15,7 +15,8 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 		preset          []*lib.SellOrder
 		orders          *lib.Orders
 		alreadyAccepted bool
-		error           string
+		noBuyer         bool
+		notFound        bool
 	}{
 		{
 			name:   "buy order already accepted",
@@ -55,7 +56,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			orders: &lib.Orders{
 				ResetOrders: []uint64{1},
 			},
-			error: "not found",
+			notFound: true,
 		},
 		{
 			name:   "close failed, no buyer",
@@ -71,7 +72,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			orders: &lib.Orders{
 				CloseOrders: []uint64{0},
 			},
-			error: "buy order invalid",
+			noBuyer: true,
 		},
 		{
 			name:   "buy, reset, sell",
@@ -125,26 +126,16 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				require.NoError(t, sm.PoolAdd(lib.CanopyCommitteeId+types.EscrowPoolAddend, preset.AmountForSale))
 			}
 			// execute the function call
-			err := sm.HandleCommitteeSwaps(test.orders, lib.CanopyCommitteeId)
-			// validate the expected error
-			require.Equal(t, test.error != "", err != nil, err)
-			if err != nil {
-				require.ErrorContains(t, err, test.error)
-				return
-			}
-			// if the buy order is already accepted
-			if test.alreadyAccepted {
-				for _, buyOrder := range test.orders.BuyOrders {
-					order, e := sm.GetOrder(buyOrder.OrderId, lib.CanopyCommitteeId)
-					require.NoError(t, e)
+			sm.HandleCommitteeSwaps(test.orders, lib.CanopyCommitteeId)
+			// validate the buy orders
+			for _, buyOrder := range test.orders.BuyOrders {
+				// get the order
+				order, e := sm.GetOrder(buyOrder.OrderId, lib.CanopyCommitteeId)
+				require.NoError(t, e)
+				// if the buy order is already accepted
+				if test.alreadyAccepted {
 					require.NotEqual(t, buyOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
-				}
-			} else {
-				// validate the buy orders
-				for _, buyOrder := range test.orders.BuyOrders {
-					// get the order
-					order, e := sm.GetOrder(buyOrder.OrderId, lib.CanopyCommitteeId)
-					require.NoError(t, e)
+				} else {
 					// validate the update of the 'buy' fields
 					require.Equal(t, buyOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
 					require.Equal(t, buyOrder.BuyerChainDeadline, order.BuyerChainDeadline)
@@ -154,10 +145,15 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			for _, resetOrderId := range test.orders.ResetOrders {
 				// get the order
 				order, e := sm.GetOrder(resetOrderId, lib.CanopyCommitteeId)
-				require.NoError(t, e)
-				// validate the update of the 'buy' fields
-				require.Empty(t, order.BuyerReceiveAddress)
-				require.Zero(t, order.BuyerChainDeadline)
+				// if order not found to be reset
+				if test.notFound {
+					require.ErrorContains(t, e, "not found")
+				} else {
+					require.NoError(t, e)
+					// validate the update of the 'buy' fields
+					require.Empty(t, order.BuyerReceiveAddress)
+					require.Zero(t, order.BuyerChainDeadline)
+				}
 			}
 			var balanceRemovedFromPool uint64
 			// validate the close orders
@@ -166,12 +162,17 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				order := test.preset[closeOrder]
 				// validate the deletion of the order
 				_, e := sm.GetOrder(closeOrder, lib.CanopyCommitteeId)
-				require.ErrorContains(t, e, "not found")
-				// validate the addition of funds to the buyer
-				accountBalance, e := sm.GetAccountBalance(crypto.NewAddress(order.BuyerReceiveAddress))
-				require.NoError(t, e)
-				require.Equal(t, order.AmountForSale, accountBalance)
-				balanceRemovedFromPool += order.AmountForSale
+				// if order no buyer to close
+				if test.noBuyer {
+					require.NoError(t, e)
+				} else {
+					require.ErrorContains(t, e, "not found")
+					// validate the addition of funds to the buyer
+					accountBalance, e := sm.GetAccountBalance(crypto.NewAddress(order.BuyerReceiveAddress))
+					require.NoError(t, e)
+					require.Equal(t, order.AmountForSale, accountBalance)
+					balanceRemovedFromPool += order.AmountForSale
+				}
 			}
 			// validate the removal of funds from the escrow pool
 			balance, e := sm.GetPoolBalance(lib.CanopyCommitteeId + types.EscrowPoolAddend)
