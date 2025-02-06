@@ -57,11 +57,6 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
   const ks = Keystore();
   const ksRef = useRef(ks);
 
-  // Keep ksRef updated when context changes
-  useEffect(() => {
-    ksRef.current = ks;
-  }, [ks]);
-
   const [state, setState] = useState({
       showModal: false,
       txType: "send",
@@ -78,10 +73,11 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
 
   const stateRef = useRef(state);
 
-  // Keep stateRef updated when `state` changes
+  // Keep variables updated whenever they change
   useEffect(() => {
+    ksRef.current = ks;
     stateRef.current = state;
-  }, [state]);
+  }, [ks, state]);
 
   // resetState() resets the state back to its initial
   function resetState() {
