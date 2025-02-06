@@ -585,3 +585,12 @@ export const formatLocaleNumber = (num, minFractionDigits = 0, maxFractionDigits
     minimumFractionDigits: minFractionDigits,
   });
 };
+
+export function isValidJSON(text) {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}

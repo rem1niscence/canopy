@@ -17,6 +17,7 @@ import {
   VotePoll,
 } from "@/components/api";
 import {
+  isValidJSON,
   copy,
   getFormInputs,
   objEmpty,
@@ -368,7 +369,17 @@ function Header({ title, img }) {
 }
 
 // Accord() renders an accordion object for governance polling and proposals
-function Accord({ state, setState, title, keyName, targetName, buttons, showPwd, placeholder = placeholders.params }) {
+function Accord({
+  state,
+  setState,
+  title,
+  keyName,
+  targetName,
+  buttons,
+  showPwd,
+  placeholder = placeholders.params,
+  isJSON = true,
+}) {
   const handleChange = (key, value) =>
     setState((prevState) => ({
       ...prevState,
@@ -402,7 +413,19 @@ function Accord({ state, setState, title, keyName, targetName, buttons, showPwd,
             </InputGroup>
           )}
           {buttons.map((btn, idx) => (
-            <Button key={idx} className="propose-button" onClick={btn.onClick} variant="outline-dark">
+            <Button
+              key={idx}
+              className="propose-button"
+              onClick={() => {
+                let text = state[targetName];
+                if (isJSON && (text === "" || !isValidJSON(state[targetName]))) {
+                  setState({ ...state, toast: "Invalid JSON!" });
+                  return;
+                }
+                btn.onClick();
+              }}
+              variant="outline-dark"
+            >
               {btn.title}
             </Button>
           ))}
