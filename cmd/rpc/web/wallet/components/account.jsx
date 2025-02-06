@@ -1,7 +1,3 @@
-import { useState, useContext } from "react";
-import JsonView from "@uiw/react-json-view";
-import Truncate from "react-truncate-inside";
-import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
 import {
   KeystoreGet,
   KeystoreImport,
@@ -26,11 +22,16 @@ import {
   objEmpty,
   onFormSubmit,
   renderToast,
-  withTooltip,
-  toUCNPY,
   toCNPY,
+  toUCNPY,
+  withTooltip,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
+import JsonView from "@uiw/react-json-view";
+import { useContext, useState } from "react";
+import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
+import Alert from "react-bootstrap/Alert";
+import Truncate from "react-truncate-inside";
 
 function Keystore() {
   const keystore = useContext(KeystoreContext);
@@ -65,6 +66,8 @@ export default function Accounts({ keygroup, account, validator }) {
       pk: {},
       toast: "",
       showSpinner: false,
+      showAlert: false,
+      alertMsg: "",
     }),
     acc = account.account;
 
@@ -222,9 +225,17 @@ export default function Accounts({ keygroup, account, validator }) {
 
       const txFunction = txMap[state.txType];
       if (txFunction) {
-        txFunction().then((result) => {
-          setState({ ...state, showSubmit: !submit, txResult: result });
-        });
+        txFunction()
+          .then((result) => {
+            setState({ ...state, showSubmit: !submit, txResult: result, showAlert: false });
+          })
+          .catch((e) => {
+            setState({
+              ...state,
+              showAlert: true,
+              alertMsg: "Transaction failed. Please verify the fields and try again.",
+            });
+          });
       }
     });
   }
@@ -268,6 +279,8 @@ export default function Accounts({ keygroup, account, validator }) {
         state={state}
         closeOnClick={resetState}
         keystore={ks}
+        showAlert={state.showAlert}
+        alertMsg={state.alertMsg}
       />
       {transactionButtons.map((v, i) => (
         <ActionButton key={i} v={v} i={i} showModal={showModal} />
@@ -474,6 +487,8 @@ function RenderModal({
   state,
   closeOnClick,
   keystore,
+  showAlert = false,
+  alertMsg,
 }) {
   return (
     <Modal show={show} size="lg" onHide={onHide}>
@@ -489,6 +504,7 @@ function RenderModal({
             show={show}
             validator={validator}
           />
+          {showAlert && <Alert variant={"danger"}>{alertMsg}</Alert>}
           <JSONViewer pk={state.pk} txResult={state.txResult} />
           <Spinner style={{ display: state.showSpinner ? "block" : "none", margin: "0 auto" }} />
         </Modal.Body>
