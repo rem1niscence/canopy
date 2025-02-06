@@ -373,16 +373,25 @@ function Accord({ state, setState, title, keyName, targetName, buttons, showPwd,
     setState((prevState) => ({
       ...prevState,
       [key]: value,
-      ...(key === targetName && { voteJSON: value }),
     }));
+
+  placeholder = JSON.stringify(placeholder, null, 2);
+  const handleAccordionChange = (key, value) =>
+    setState((prevState) => ({
+      ...prevState,
+      // Set the targetName placeholder to the value of the textarea
+      ...(objEmpty(state[targetName]) && { [targetName]: placeholder }),
+      [key]: value,
+    }));
+
   return (
-    <Accordion className="accord" activeKey={state[keyName]} onSelect={(i) => handleChange(keyName, i)}>
+    <Accordion className="accord" activeKey={state[keyName]} onSelect={(i) => handleAccordionChange(keyName, i)}>
       <Accordion.Item className="accord-item" eventKey="0">
         <Accordion.Header>{title}</Accordion.Header>
         <Accordion.Body>
           <Form.Control
             className="accord-body-container"
-            defaultValue={JSON.stringify(placeholder, null, 2)}
+            defaultValue={placeholder}
             as="textarea"
             onChange={(e) => handleChange(targetName, e.target.value)}
           />
