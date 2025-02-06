@@ -225,6 +225,7 @@ export default function Accounts({ keygroup, account, validator }) {
 
       const txFunction = txMap[state.txType];
       if (txFunction) {
+        setState({ ...state, showAlert: false });
         txFunction()
           .then((result) => {
             setState({ ...state, showSubmit: !submit, txResult: result, showAlert: false });
