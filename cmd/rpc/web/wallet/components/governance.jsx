@@ -25,6 +25,7 @@ import {
   renderToast,
   toUCNPY,
   numberFromCommas,
+  formatLocaleNumber,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 import FormInputs from "@/components/form_inputs";
@@ -123,6 +124,18 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
     return AddVote(json, approve).then((_) => setState({ ...state, voteOnProposalAccord: "1", toast: "Voted!" }));
   }
 
+  // submitProposalAPI() executes a 'Raw Tx' API call and sets the state when complete
+  function submitProposalAPI() {
+    return sendRawTx(
+      state.rawTx,
+      {
+        ...state,
+        propAccord: "1",
+      },
+      setState,
+    );
+  }
+
   // delVoteAPI() executes a 'Delete Vote' API call and sets the state when complete
   function delVoteAPI(json) {
     return DelVote(json).then((_) => setState({ ...state, voteOnProposalAccord: "1", toast: "Deleted!" }));
@@ -153,7 +166,7 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
   }
 
   // sendRawTx() executes the RawTx API call and sets the state when complete
-  function sendRawTx(j) {
+  function sendRawTx(j, state, setState) {
     return RawTx(j).then((r) => {
       copy(state, setState, r, "tx hash copied to keyboard!");
     });
@@ -264,7 +277,7 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                       <Truncate text={"#" + key} />
                     </div>
                   </td>
-                  <td>{value.proposal["end_height"]}</td>
+                  <td>{formatLocaleNumber(value.proposal["end_height"], 0, 0)}</td>
                 </tr>
               );
             }),
@@ -292,7 +305,14 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
         title="SUBMIT PROPOSAL"
         keyName="propAccord"
         targetName="rawTx"
-        buttons={[{ title: "SUBMIT", onClick: () => sendRawTx(state.rawTx) }]}
+        buttons={[
+          {
+            title: "SUBMIT",
+            onClick: () => {
+              submitProposalAPI();
+            },
+          },
+        ]}
         showPwd={false}
         placeholder={placeholders.rawTx}
       />
