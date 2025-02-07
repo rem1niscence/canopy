@@ -320,6 +320,13 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
               ).map((formInput) => {
                 let input = Object.assign({}, formInput);
                 switch (formInput.label) {
+                  case "sender":
+                    input.options.sort((a, b) => {
+                      if (a === accountWithTxs.account.nickname) return -1;
+                      if (b === accountWithTxs.account.nickname) return 1;
+                      return 0;
+                    });
+                    break;
                   case "param_space":
                     input.options = Object.keys(state.apiResults.params);
                     break;
