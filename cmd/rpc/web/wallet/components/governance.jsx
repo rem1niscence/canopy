@@ -337,20 +337,27 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                 accountWithTxs.account,
                 validator,
                 ks,
-              ).map((input) => {
-                let formInput = Object.assign({}, input);
-                switch (input.label) {
+              ).map((formInput) => {
+                let input = Object.assign({}, formInput);
+                switch (formInput.label) {
+                  case "sender":
+                    input.options.sort((a, b) => {
+                      if (a === accountWithTxs.account.nickname) return -1;
+                      if (b === accountWithTxs.account.nickname) return 1;
+                      return 0;
+                    });
+                    break;
                   case "param_space":
-                    formInput.options = Object.keys(state.apiResults.params);
+                    input.options = Object.keys(state.apiResults.params);
                     break;
                   case "param_key":
                     // Add the first api result as the default param space
                     const paramSpace = state.paramSpace || Object.keys(state.apiResults.params)[0];
                     const params = state.apiResults.params[paramSpace];
-                    formInput.options = params ? Object.keys(params) : [];
+                    input.options = params ? Object.keys(params) : [];
                     break;
                 }
-                return formInput;
+                return input;
               })}
               keygroup={keygroup}
               account={accountWithTxs.account}

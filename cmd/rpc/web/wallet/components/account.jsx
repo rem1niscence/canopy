@@ -484,7 +484,17 @@ function RenderModal({
         <Modal.Body className="modal-body">
           <FormInputs
             keygroup={keyGroup}
-            fields={getFormInputs(txType, keyGroup, account, validator, keystore)}
+            fields={getFormInputs(txType, keyGroup, account, validator, keystore).map((formInput) => {
+              let input = Object.assign({}, formInput);
+              if (input.label === "sender") {
+                input.options.sort((a, b) => {
+                  if (a === account.nickname) return -1;
+                  if (b === account.nickname) return 1;
+                  return 0;
+                });
+              }
+              return input;
+            })}
             account={account}
             show={show}
             validator={validator}
