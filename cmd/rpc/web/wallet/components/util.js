@@ -586,6 +586,16 @@ export const formatLocaleNumber = (num, minFractionDigits = 0, maxFractionDigits
   });
 };
 
+// isValidJSON() checks if a given string is a valid JSON
+export function isValidJSON(text) {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // downloadJSON() downloads a JSON payload as a JSON file
 export function downloadJSON(payload, filename) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });

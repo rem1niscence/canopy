@@ -17,6 +17,7 @@ import {
   VotePoll,
 } from "@/components/api";
 import {
+  isValidJSON,
   copy,
   getFormInputs,
   objEmpty,
@@ -395,21 +396,40 @@ function Header({ title, img }) {
 }
 
 // Accord() renders an accordion object for governance polling and proposals
-function Accord({ state, setState, title, keyName, targetName, buttons, showPwd, placeholder = placeholders.params }) {
+function Accord({
+  state,
+  setState,
+  title,
+  keyName,
+  targetName,
+  buttons,
+  showPwd,
+  placeholder = placeholders.params,
+  isJSON = true,
+}) {
   const handleChange = (key, value) =>
     setState((prevState) => ({
       ...prevState,
       [key]: value,
-      ...(key === targetName && { voteJSON: value }),
     }));
+
+  placeholder = JSON.stringify(placeholder, null, 2);
+  const handleAccordionChange = (key, value) =>
+    setState((prevState) => ({
+      ...prevState,
+      // Set the targetName placeholder to the value of the textarea
+      ...(objEmpty(state[targetName]) && { [targetName]: placeholder }),
+      [key]: value,
+    }));
+
   return (
-    <Accordion className="accord" activeKey={state[keyName]} onSelect={(i) => handleChange(keyName, i)}>
+    <Accordion className="accord" activeKey={state[keyName]} onSelect={(i) => handleAccordionChange(keyName, i)}>
       <Accordion.Item className="accord-item" eventKey="0">
         <Accordion.Header>{title}</Accordion.Header>
         <Accordion.Body>
           <Form.Control
             className="accord-body-container"
-            defaultValue={JSON.stringify(placeholder, null, 2)}
+            defaultValue={placeholder}
             as="textarea"
             onChange={(e) => handleChange(targetName, e.target.value)}
           />
@@ -420,7 +440,19 @@ function Accord({ state, setState, title, keyName, targetName, buttons, showPwd,
             </InputGroup>
           )}
           {buttons.map((btn, idx) => (
-            <Button key={idx} className="propose-button" onClick={btn.onClick} variant="outline-dark">
+            <Button
+              key={idx}
+              className="propose-button"
+              onClick={() => {
+                let text = state[targetName];
+                if (isJSON && (text === "" || !isValidJSON(state[targetName]))) {
+                  setState({ ...state, toast: "Invalid JSON!" });
+                  return;
+                }
+                btn.onClick();
+              }}
+              variant="outline-dark"
+            >
               {btn.title}
             </Button>
           ))}
