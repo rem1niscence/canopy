@@ -586,6 +586,22 @@ export const formatLocaleNumber = (num, minFractionDigits = 0, maxFractionDigits
   });
 };
 
+// downloadJSON() downloads a JSON payload as a JSON file
+export function downloadJSON(payload, filename) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const blobUrl = URL.createObjectURL(blob);
+
+  const anchor = document.createElement("a");
+  anchor.href = blobUrl;
+  anchor.target = "_blank";
+  anchor.download = `${filename}.json`;
+
+  // Auto click on a element, trigger the file download
+  anchor.click();
+  // Free up the memory by revoking the object URL
+  URL.revokeObjectURL(blobUrl);
+}
+
 // retryWithDelay() retries a function with a delay between each attempt
 export async function retryWithDelay(fn, onFailure, retries = 8, delayMs = 1000, throwOnFailure = false) {
   for (let attempt = 1; attempt <= retries; attempt++) {

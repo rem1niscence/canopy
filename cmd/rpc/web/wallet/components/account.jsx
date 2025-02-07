@@ -29,6 +29,7 @@ import {
   withTooltip,
   toUCNPY,
   toCNPY,
+  downloadJSON,
   retryWithDelay,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
@@ -383,6 +384,16 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
       >
         Import Private Key
       </Button>
+      <Button
+        id="import-pk-button"
+        variant="outline-secondary"
+        onClick={() => {
+          downloadJSON(ks, "keystore");
+        }}
+      >
+        Download Keys
+      </Button>
+
       <Button id="reveal-pk-button" variant="outline-danger" onClick={() => setState({ ...state, showPKModal: true })}>
         Reveal Private Key
       </Button>
