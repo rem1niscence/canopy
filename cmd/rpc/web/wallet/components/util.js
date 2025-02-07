@@ -601,3 +601,23 @@ export function downloadJSON(payload, filename) {
   // Free up the memory by revoking the object URL
   URL.revokeObjectURL(blobUrl);
 }
+
+// retryWithDelay() retries a function with a delay between each attempt
+export async function retryWithDelay(fn, onFailure, retries = 8, delayMs = 1000, throwOnFailure = false) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        onFailure();
+        if (throwOnFailure) {
+          throw new Error(`All ${retries} attempts failed`);
+        } else {
+          return;
+        }
+      }
+    }
+  }
+}
