@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useRef, useEffect } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
 import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
@@ -29,6 +29,7 @@ import {
   withTooltip,
   toUCNPY,
   toCNPY,
+  retryWithDelay,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 
@@ -52,8 +53,10 @@ const transactionButtons = [
 ];
 
 // Accounts() returns the main component of this file
-export default function Accounts({ keygroup, account, validator }) {
+export default function Accounts({ keygroup, account, validator, setActiveKey }) {
   const ks = Keystore();
+  const ksRef = useRef(ks);
+
   const [state, setState] = useState({
       showModal: false,
       txType: "send",
@@ -67,6 +70,14 @@ export default function Accounts({ keygroup, account, validator }) {
       showSpinner: false,
     }),
     acc = account.account;
+
+  const stateRef = useRef(state);
+
+  // Keep variables updated whenever they change
+  useEffect(() => {
+    ksRef.current = ks;
+    stateRef.current = state;
+  }, [ks, state]);
 
   // resetState() resets the state back to its initial
   function resetState() {
@@ -115,6 +126,28 @@ export default function Accounts({ keygroup, account, validator }) {
     }
   }
 
+  // setActivePrivateKey() sets the active key to the newly added privte key if it is successfully imported
+  function setActivePrivateKey(nickname, closeModal) {
+    const resetState = () =>
+      setState({ ...stateRef.current, showSpinner: false, ...(closeModal && { [closeModal]: false }) });
+
+    retryWithDelay(
+      () => {
+        let idx = Object.keys(ksRef.current).findIndex((k) => k === nickname);
+        if (idx >= 0) {
+          setActiveKey(idx);
+          resetState();
+        } else {
+          throw new Error("failed to find key");
+        }
+      },
+      resetState,
+      10,
+      1000,
+      false,
+    );
+  }
+
   // onPKFormSubmit() handles the submission of the private key form and updates the state with the retrieved key
   function onPKFormSubmit(e) {
     onFormSubmit(state, e, ks, (r) =>
@@ -129,6 +162,7 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, ks, (r) =>
       KeystoreNew(r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
+        setActivePrivateKey(r.nickname);
       }),
     );
   }
@@ -137,11 +171,15 @@ export default function Accounts({ keygroup, account, validator }) {
   function onImportOrGenerateSubmit(e) {
     onFormSubmit(state, e, ks, (r) => {
       if (r.private_key) {
-        void KeystoreImport(r.private_key, r.password, r.nickname).then((_) =>
-          setState({ ...state, showSpinner: false }),
-        );
+        void KeystoreImport(r.private_key, r.password, r.nickname).then((_) => {
+          setState({ ...state, showSpinner: true });
+          setActivePrivateKey(r.nickname, "showPKImportModal");
+        });
       } else {
-        void KeystoreNew(r.password, r.nickname).then((_) => setState({ ...state, showSpinner: false }));
+        void KeystoreNew(r.password, r.nickname).then((_) => {
+          setState({ ...state, showSpinner: true });
+          setActivePrivateKey(r.nickname, "showPKImportModal");
+        });
       }
     });
   }
