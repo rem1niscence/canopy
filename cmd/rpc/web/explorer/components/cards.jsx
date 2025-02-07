@@ -1,6 +1,6 @@
+import { addDate, convertBytes, convertNumber, convertTime } from "@/components/util";
 import { Card, Col, Row } from "react-bootstrap";
 import Truncate from "react-truncate-inside";
-import { addDate, convertBytes, convertNumber, convertTime } from "@/components/util";
 
 const cardImages = ["./block-filled.png", "./chart-up.png", "./transaction-filled.png", "./lock-filled.png"];
 const cardTitles = ["Latest Block", "Supply", "Transactions", "Validators"];
@@ -89,11 +89,7 @@ function getCardNote(props, idx) {
   }
   switch (idx) {
     case 0:
-      return (
-        <div style={{ height: "25px", paddingTop: "10px" }}>
-          <Truncate text={v.results[0].block_header.hash} />
-        </div>
-      );
+      return <Truncate className="d-inline" text={v.results[0].block_header.hash} />;
     case 1:
       return "+" + Number(50) + "/blk";
     case 2:
@@ -130,9 +126,11 @@ function getCardFooter(props, idx) {
         return "Average fee in last blk: 0";
       }
       txs.forEach(function (tx) {
-        totalFee += Number(tx.transaction.fee);
+        let fee = Number(tx.transaction.fee);
+        totalFee += !isNaN(fee) ? fee : 0;
       });
-      return "Average fee in last blk: " + convertNumber(totalFee / txs.length, 1000000);
+      let txWithFee = txs.filter((tx) => tx.transaction.fee != null);
+      return "Average fee in last blk: " + convertNumber(totalFee / txWithFee.length, 1000000);
     case 3:
       let totalStake = 0;
       if (!props.canopyCommittee.results) {
@@ -172,12 +170,11 @@ export default function Cards(props) {
                 <div className="card-image" style={{ backgroundImage: "url(" + cardImages[idx] + ")" }} />
                 <Card.Title className="card-title">{cardTitles[idx]}</Card.Title>
                 <h5>{getCardHeader(cardData, idx)}</h5>
-                <Card.Text>
-                  <span>{getCardSubHeader(cardData, idx)}</span>
-                  <span className="card-info-3">{getCardRightAligned(cardData, idx)}</span>
-                  <br />
-                  <span className="card-info-4">{getCardNote(cardData, idx)}</span>
-                </Card.Text>
+                <div className="d-flex justify-content-between mb-1">
+                  <Card.Text className="mb-2">{getCardSubHeader(cardData, idx)}</Card.Text>
+                  <Card.Text className="card-info-3">{getCardRightAligned(cardData, idx)}</Card.Text>
+                </div>
+                <div className="card-info-4 mb-3">{getCardNote(cardData, idx)}</div>
                 <Card.Footer className="card-footer">{getCardFooter(cardData, idx)}</Card.Footer>
               </Card.Body>
             </Card>
