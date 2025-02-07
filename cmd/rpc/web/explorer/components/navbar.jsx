@@ -1,11 +1,14 @@
+import { convertIfNumber } from "@/components/util";
+import { useState } from "react";
+import { Form } from "react-bootstrap";
 import Container from "react-bootstrap/Container";
 import Navbar from "react-bootstrap/Navbar";
-import { Form } from "react-bootstrap";
-import { convertIfNumber } from "@/components/util";
 
 export default function Navigation({ openModal }) {
-  let q = "",
-    urls = { discord: "https://discord.gg/pNcSJj7Wdh", x: "https://x.com/CNPYNetwork" };
+  let [query, setQuery] = useState("");
+  let q = "";
+  let urls = { discord: "https://discord.gg/pNcSJj7Wdh", x: "https://x.com/CNPYNetwork" };
+
   return (
     <>
       <Navbar sticky="top" data-bs-theme="light" className="nav-bar">
@@ -14,13 +17,18 @@ export default function Navigation({ openModal }) {
             <span className="nav-bar-brand-highlight">scan</span>opy explorer
           </Navbar.Brand>
           <div className="nav-bar-center">
-            <Form onSubmit={() => openModal(convertIfNumber(q), 0)}>
+            <Form
+              onSubmit={(e) => {
+                e.preventDefault();
+                openModal(convertIfNumber(query), 0);
+              }}
+            >
               <Form.Control
                 type="search"
                 className="main-input nav-bar-search me-2"
                 placeholder="search by address, hash, or height"
                 onChange={(e) => {
-                  q = e.target.value;
+                  setQuery(e.target.value);
                 }}
               />
             </Form>
