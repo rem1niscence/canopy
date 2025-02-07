@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useRef, useEffect } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
 import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
@@ -29,6 +29,8 @@ import {
   withTooltip,
   toUCNPY,
   toCNPY,
+  downloadJSON,
+  retryWithDelay,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 
@@ -52,8 +54,10 @@ const transactionButtons = [
 ];
 
 // Accounts() returns the main component of this file
-export default function Accounts({ keygroup, account, validator }) {
+export default function Accounts({ keygroup, account, validator, setActiveKey }) {
   const ks = Keystore();
+  const ksRef = useRef(ks);
+
   const [state, setState] = useState({
       showModal: false,
       txType: "send",
@@ -67,6 +71,14 @@ export default function Accounts({ keygroup, account, validator }) {
       showSpinner: false,
     }),
     acc = account.account;
+
+  const stateRef = useRef(state);
+
+  // Keep variables updated whenever they change
+  useEffect(() => {
+    ksRef.current = ks;
+    stateRef.current = state;
+  }, [ks, state]);
 
   // resetState() resets the state back to its initial
   function resetState() {
@@ -115,6 +127,28 @@ export default function Accounts({ keygroup, account, validator }) {
     }
   }
 
+  // setActivePrivateKey() sets the active key to the newly added privte key if it is successfully imported
+  function setActivePrivateKey(nickname, closeModal) {
+    const resetState = () =>
+      setState({ ...stateRef.current, showSpinner: false, ...(closeModal && { [closeModal]: false }) });
+
+    retryWithDelay(
+      () => {
+        let idx = Object.keys(ksRef.current).findIndex((k) => k === nickname);
+        if (idx >= 0) {
+          setActiveKey(idx);
+          resetState();
+        } else {
+          throw new Error("failed to find key");
+        }
+      },
+      resetState,
+      10,
+      1000,
+      false,
+    );
+  }
+
   // onPKFormSubmit() handles the submission of the private key form and updates the state with the retrieved key
   function onPKFormSubmit(e) {
     onFormSubmit(state, e, ks, (r) =>
@@ -129,6 +163,7 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, ks, (r) =>
       KeystoreNew(r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
+        setActivePrivateKey(r.nickname);
       }),
     );
   }
@@ -137,11 +172,15 @@ export default function Accounts({ keygroup, account, validator }) {
   function onImportOrGenerateSubmit(e) {
     onFormSubmit(state, e, ks, (r) => {
       if (r.private_key) {
-        void KeystoreImport(r.private_key, r.password, r.nickname).then((_) =>
-          setState({ ...state, showSpinner: false }),
-        );
+        void KeystoreImport(r.private_key, r.password, r.nickname).then((_) => {
+          setState({ ...state, showSpinner: true });
+          setActivePrivateKey(r.nickname, "showPKImportModal");
+        });
       } else {
-        void KeystoreNew(r.password, r.nickname).then((_) => setState({ ...state, showSpinner: false }));
+        void KeystoreNew(r.password, r.nickname).then((_) => {
+          setState({ ...state, showSpinner: true });
+          setActivePrivateKey(r.nickname, "showPKImportModal");
+        });
       }
     });
   }
@@ -278,7 +317,7 @@ export default function Accounts({ keygroup, account, validator }) {
           { title: "Stake Amount", info: getValidatorAmount(), after: " cnpy" },
           { title: "Staked Status", info: getStakedStatus() },
         ].map((v, i) => (
-          <RenderAccountInfo v={v} i={i} />
+          <RenderAccountInfo key={i} v={v} i={i} />
         ))}
       </Row>
       <br />
@@ -345,6 +384,16 @@ export default function Accounts({ keygroup, account, validator }) {
       >
         Import Private Key
       </Button>
+      <Button
+        id="import-pk-button"
+        variant="outline-secondary"
+        onClick={() => {
+          downloadJSON(ks, "keystore");
+        }}
+      >
+        Download Keys
+      </Button>
+
       <Button id="reveal-pk-button" variant="outline-danger" onClick={() => setState({ ...state, showPKModal: true })}>
         Reveal Private Key
       </Button>
@@ -484,7 +533,17 @@ function RenderModal({
         <Modal.Body className="modal-body">
           <FormInputs
             keygroup={keyGroup}
-            fields={getFormInputs(txType, keyGroup, account, validator, keystore)}
+            fields={getFormInputs(txType, keyGroup, account, validator, keystore).map((formInput) => {
+              let input = Object.assign({}, formInput);
+              if (input.label === "sender") {
+                input.options.sort((a, b) => {
+                  if (a === account.nickname) return -1;
+                  if (b === account.nickname) return 1;
+                  return 0;
+                });
+              }
+              return input;
+            })}
             account={account}
             show={show}
             validator={validator}
