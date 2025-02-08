@@ -17,6 +17,7 @@ import {
   VotePoll,
 } from "@/components/api";
 import {
+  isValidJSON,
   copy,
   getFormInputs,
   objEmpty,
@@ -25,6 +26,7 @@ import {
   renderToast,
   toUCNPY,
   numberFromCommas,
+  formatLocaleNumber,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 import FormInputs from "@/components/form_inputs";
@@ -123,6 +125,18 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
     return AddVote(json, approve).then((_) => setState({ ...state, voteOnProposalAccord: "1", toast: "Voted!" }));
   }
 
+  // submitProposalAPI() executes a 'Raw Tx' API call and sets the state when complete
+  function submitProposalAPI() {
+    return sendRawTx(
+      state.rawTx,
+      {
+        ...state,
+        propAccord: "1",
+      },
+      setState,
+    );
+  }
+
   // delVoteAPI() executes a 'Delete Vote' API call and sets the state when complete
   function delVoteAPI(json) {
     return DelVote(json).then((_) => setState({ ...state, voteOnProposalAccord: "1", toast: "Deleted!" }));
@@ -153,7 +167,7 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
   }
 
   // sendRawTx() executes the RawTx API call and sets the state when complete
-  function sendRawTx(j) {
+  function sendRawTx(j, state, setState) {
     return RawTx(j).then((r) => {
       copy(state, setState, r, "tx hash copied to keyboard!");
     });
@@ -264,7 +278,7 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                       <Truncate text={"#" + key} />
                     </div>
                   </td>
-                  <td>{value.proposal["end_height"]}</td>
+                  <td>{formatLocaleNumber(value.proposal["end_height"], 0, 0)}</td>
                 </tr>
               );
             }),
@@ -292,7 +306,14 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
         title="SUBMIT PROPOSAL"
         keyName="propAccord"
         targetName="rawTx"
-        buttons={[{ title: "SUBMIT", onClick: () => sendRawTx(state.rawTx) }]}
+        buttons={[
+          {
+            title: "SUBMIT",
+            onClick: () => {
+              submitProposalAPI();
+            },
+          },
+        ]}
         showPwd={false}
         placeholder={placeholders.rawTx}
       />
@@ -317,20 +338,27 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
                 accountWithTxs.account,
                 validator,
                 ks,
-              ).map((input) => {
-                let formInput = Object.assign({}, input);
-                switch (input.label) {
+              ).map((formInput) => {
+                let input = Object.assign({}, formInput);
+                switch (formInput.label) {
+                  case "sender":
+                    input.options.sort((a, b) => {
+                      if (a === accountWithTxs.account.nickname) return -1;
+                      if (b === accountWithTxs.account.nickname) return 1;
+                      return 0;
+                    });
+                    break;
                   case "param_space":
-                    formInput.options = Object.keys(state.apiResults.params);
+                    input.options = Object.keys(state.apiResults.params);
                     break;
                   case "param_key":
                     // Add the first api result as the default param space
                     const paramSpace = state.paramSpace || Object.keys(state.apiResults.params)[0];
                     const params = state.apiResults.params[paramSpace];
-                    formInput.options = params ? Object.keys(params) : [];
+                    input.options = params ? Object.keys(params) : [];
                     break;
                 }
-                return formInput;
+                return input;
               })}
               keygroup={keygroup}
               account={accountWithTxs.account}
@@ -368,21 +396,40 @@ function Header({ title, img }) {
 }
 
 // Accord() renders an accordion object for governance polling and proposals
-function Accord({ state, setState, title, keyName, targetName, buttons, showPwd, placeholder = placeholders.params }) {
+function Accord({
+  state,
+  setState,
+  title,
+  keyName,
+  targetName,
+  buttons,
+  showPwd,
+  placeholder = placeholders.params,
+  isJSON = true,
+}) {
   const handleChange = (key, value) =>
     setState((prevState) => ({
       ...prevState,
       [key]: value,
-      ...(key === targetName && { voteJSON: value }),
     }));
+
+  placeholder = JSON.stringify(placeholder, null, 2);
+  const handleAccordionChange = (key, value) =>
+    setState((prevState) => ({
+      ...prevState,
+      // Set the targetName placeholder to the value of the textarea
+      ...(objEmpty(state[targetName]) && { [targetName]: placeholder }),
+      [key]: value,
+    }));
+
   return (
-    <Accordion className="accord" activeKey={state[keyName]} onSelect={(i) => handleChange(keyName, i)}>
+    <Accordion className="accord" activeKey={state[keyName]} onSelect={(i) => handleAccordionChange(keyName, i)}>
       <Accordion.Item className="accord-item" eventKey="0">
         <Accordion.Header>{title}</Accordion.Header>
         <Accordion.Body>
           <Form.Control
             className="accord-body-container"
-            defaultValue={JSON.stringify(placeholder, null, 2)}
+            defaultValue={placeholder}
             as="textarea"
             onChange={(e) => handleChange(targetName, e.target.value)}
           />
@@ -393,7 +440,19 @@ function Accord({ state, setState, title, keyName, targetName, buttons, showPwd,
             </InputGroup>
           )}
           {buttons.map((btn, idx) => (
-            <Button key={idx} className="propose-button" onClick={btn.onClick} variant="outline-dark">
+            <Button
+              key={idx}
+              className="propose-button"
+              onClick={() => {
+                let text = state[targetName];
+                if (isJSON && (text === "" || !isValidJSON(state[targetName]))) {
+                  setState({ ...state, toast: "Invalid JSON!" });
+                  return;
+                }
+                btn.onClick();
+              }}
+              variant="outline-dark"
+            >
               {btn.title}
             </Button>
           ))}

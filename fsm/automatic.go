@@ -97,9 +97,7 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	}
 	results, committeeId := qc.Results, qc.Header.CommitteeId
 	// handle the token swaps
-	if err = s.HandleCommitteeSwaps(results.Orders, committeeId); err != nil {
-		return err
-	}
+	s.HandleCommitteeSwaps(results.Orders, committeeId)
 	// index the checkpoint
 	if err = s.HandleCheckpoint(committeeId, results); err != nil {
 		return err
