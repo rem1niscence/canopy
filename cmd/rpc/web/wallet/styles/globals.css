@@ -1,17 +1,20 @@
 :root {
   --primary-color: #2C9B5A;
-  --secondary-color: #7749c0;
+  --secondary-color: #16502E;
   --grey-color: gray;
+  --font-heading: 'Unbounded', sans-serif;
+  --font-body: 'Unbounded', sans-serif;
 }
 
 #container {
   z-index: 0;
   width: 100%;
   height: 100vh;
+  font-family: var(--font-body);
 }
 
 .max-amount-btn {
-  color: #3caaa8;
+  color: var(--primary-color);
   padding: 0;
   border: 0;
   background-color: unset;
@@ -19,7 +22,7 @@
 }
 
 .max-amount-btn:hover {
-  color: #287170;
+  color: var(--primary-color);
 }
 
 #pageContent {
@@ -89,8 +92,8 @@
   margin: 0 auto;
 }
 
-.nav-link.active img {
-  filter: brightness(0) saturate(100%) invert(55%) sepia(15%) saturate(1502%) hue-rotate(92deg) brightness(87%) contrast(106%);
+.nav-link.active svg {
+  fill: var(--primary-color) !important;
 }
 
 .nav-link {
@@ -171,17 +174,32 @@
 
 #balance {
   font-weight: 800;
-  font-size: 65px;
+  font-family: var(--font-heading);
+  font-size: 50px;
   margin: 0 auto;
 }
 
 .input-text {
-  min-width: 125px;
+  min-width: 175px;
+  font-family: var(--font-body);
+}
+
+input {
+  font-family: var(--font-body) !important;
+}
+
+select {
+  font-family: var(--font-body) !important;
+}
+
+button {
+  font-family: var(--font-body) !important;
 }
 
 .input-group .input-text-field::placeholder {
   font-weight: lighter;
   opacity: 0.4;
+  font-family: var(--font-body);
 }
 
 #dashboard-container {
@@ -195,9 +213,7 @@
 
 .send-receive-button-container {
   height: 40px;
-  width: 40px;
-  margin-left: 25px;
-  margin-right: 25px;
+  width: 90px;
   margin-bottom: 50px;
   vertical-align: top;
   display: inline-block;
@@ -218,6 +234,7 @@
 .account-summary-container {
   width: 60%;
   margin: 0 auto !important;
+  font-family: var(--font-heading);
 }
 
 .account-summary-container-card {
@@ -235,6 +252,7 @@
   font-weight: bold;
   font-size: 20px;
   color: #212529;
+  font-family: var(--font-heading);
 }
 
 .account-summary-info-content-container {
@@ -331,6 +349,10 @@
   cursor: pointer;
 }
 
+th {
+  font-family: var(--font-heading) !important;
+}
+
 .logs-button-container {
   alignment: left;
   width: 20px;
@@ -395,6 +417,11 @@
 .carousel-item-title {
   font-size: 18px;
   font-weight: 800 !important;
+  font-family: var(--font-heading);
+}
+
+.navbar {
+  font-family: var(--font-heading);
 }
 
 .carousel-item-detail {
@@ -408,7 +435,9 @@
 
 #carousel-item-detail-title {
   font-weight: bold;
-  color: yellowgreen;
+  filter: invert(100%);
+  mix-blend-mode: difference;
+  color: var(--primary-color);
 }
 
 #dashboard-hr {
@@ -448,12 +477,14 @@
   font-weight: 800;
   font-size: 45px;
   margin: 0 auto;
+  font-family: var(--font-heading);
 }
 
 #propose-subtitle {
   font-weight: bold;
   font-size: 18px;
   color: var(--primary-color);
+  font-family: var(--font-heading);
 }
 
 .governance-header-image {

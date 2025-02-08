@@ -268,7 +268,7 @@ export default function Accounts({ keygroup, account, validator }) {
   return (
     <div className="content-container">
       <span id="balance">{formatNumber(acc.amount)}</span>
-      <span style={{ fontWeight: "bold", color: state.primaryColor }}>{" CNPY"}</span>
+      <span style={{ fontFamily: "var(--font-heading)", fontWeight: "500", color: state.primaryColor }}>{" CNPY"}</span>
       <br />
       <hr style={{ border: "1px dashed black", borderRadius: "5px", width: "60%", margin: "0 auto" }} />
       <br />
@@ -522,7 +522,8 @@ function ActionButton({ v, i, showModal }) {
   return (
     <div key={i} className="send-receive-button-container">
       <img className="send-receive-button" onClick={() => showModal(v.name)} src={`./${v.src}.png`} alt={v.title} />
-      <span style={{ fontSize: "10px" }}>{v.title}</span>
+        <br/>
+      <span style={{ fontSize: "10px", width: "100%"}}>{v.title}</span>
     </div>
   );
 }
