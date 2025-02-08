@@ -1,6 +1,6 @@
+import { addDate, convertBytes, convertNumber, convertTime } from "@/components/util";
 import { Card, Col, Row } from "react-bootstrap";
 import Truncate from "react-truncate-inside";
-import { addDate, convertBytes, convertNumber, convertTime } from "@/components/util";
 
 const cardImages = [
   <svg id="svg" width="400" height="400" viewBox="0, 0, 400,400"><g id="svgg"><path id="path0" d="M168.944 38.203 C 157.364 45.791,146.927 52.000,145.752 52.000 C 144.577 52.000,133.767 58.300,121.730 66.000 C 109.693 73.700,99.070 80.000,98.123 80.000 C 97.176 80.000,86.300 86.085,73.954 93.522 L 51.508 107.043 64.754 115.057 C 105.074 139.450,176.847 180.000,179.703 180.000 C 181.528 180.000,185.261 182.700,188.000 186.000 C 190.739 189.300,195.320 192.000,198.180 192.000 C 202.984 192.000,338.339 115.094,344.929 108.620 C 348.962 104.657,208.907 23.951,198.433 24.203 C 193.795 24.314,180.525 30.614,168.944 38.203 M48.000 205.490 L 48.000 291.237 120.000 333.344 L 192.000 375.452 192.000 288.606 L 192.000 201.761 139.000 171.227 C 109.850 154.434,77.450 135.980,67.000 130.218 L 48.000 119.743 48.000 205.490 M337.935 127.230 C 331.300 130.953,299.350 149.241,266.935 167.869 L 208.000 201.738 208.000 288.595 L 208.000 375.452 280.000 333.344 L 352.000 291.237 352.000 205.618 C 352.000 158.528,351.550 120.103,351.000 120.230 C 350.450 120.356,344.571 123.506,337.935 127.230 " stroke="none" fill-rule="evenodd"></path></g></svg>,
@@ -94,11 +94,7 @@ function getCardNote(props, idx) {
   }
   switch (idx) {
     case 0:
-      return (
-        <div style={{ height: "25px", paddingTop: "10px" }}>
-          <Truncate text={v.results[0].block_header.hash} />
-        </div>
-      );
+      return <Truncate className="d-inline" text={v.results[0].block_header.hash} />;
     case 1:
       return "+" + Number(50) + "/blk";
     case 2:
@@ -135,9 +131,11 @@ function getCardFooter(props, idx) {
         return "Average fee in last blk: 0";
       }
       txs.forEach(function (tx) {
-        totalFee += Number(tx.transaction.fee);
+        let fee = Number(tx.transaction.fee);
+        totalFee += !isNaN(fee) ? fee : 0;
       });
-      return "Average fee in last blk: " + convertNumber(totalFee / txs.length, 1000000);
+      let txWithFee = txs.filter((tx) => tx.transaction.fee != null);
+      return "Average fee in last blk: " + convertNumber(totalFee / txWithFee.length, 1000000);
     case 3:
       let totalStake = 0;
       if (!props.canopyCommittee.results) {
@@ -179,12 +177,11 @@ export default function Cards(props) {
                 </div>
                 <Card.Title className="card-title">{cardTitles[idx]}</Card.Title>
                 <h5>{getCardHeader(cardData, idx)}</h5>
-                <Card.Text>
-                  <span className="card-info-2">{getCardSubHeader(cardData, idx)}</span>
-                  <span className="card-info-3">{getCardRightAligned(cardData, idx)}</span>
-                  <br />
-                  <span className="card-info-4">{getCardNote(cardData, idx)}</span>
-                </Card.Text>
+                <div className="d-flex justify-content-between mb-1">
+                  <Card.Text className="card-info-2 mb-2">{getCardSubHeader(cardData, idx)}</Card.Text>
+                  <Card.Text className="card-info-3">{getCardRightAligned(cardData, idx)}</Card.Text>
+                </div>
+                <div className="card-info-4 mb-3">{getCardNote(cardData, idx)}</div>
                 <Card.Footer className="card-footer">{getCardFooter(cardData, idx)}</Card.Footer>
               </Card.Body>
             </Card>
