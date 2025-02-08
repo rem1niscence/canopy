@@ -842,28 +842,57 @@ func TestDeleteFinishedUnstaking(t *testing.T) {
 
 func TestSetValidatorsPaused(t *testing.T) {
 	tests := []struct {
-		name    string
-		detail  string
-		preset  []*types.Validator
-		toPause [][]byte
+		name        string
+		detail      string
+		preset      []*types.Validator
+		committeeId uint64
+		toPause     [][]byte
 	}{
 		{
 			name:   "single validator pause",
 			detail: "single validator pause",
 			preset: []*types.Validator{{
-				Address: newTestAddressBytes(t),
+				Address:    newTestAddressBytes(t),
+				Committees: []uint64{1},
 			}},
-			toPause: [][]byte{newTestAddressBytes(t)},
+			committeeId: 1,
+			toPause:     [][]byte{newTestAddressBytes(t)},
+		},
+		{
+			name:   "unauthorized validator pause",
+			detail: "unauthorized validator pause",
+			preset: []*types.Validator{{
+				Address:    newTestAddressBytes(t),
+				Committees: []uint64{1},
+			}},
+			committeeId: 2,
+			toPause:     [][]byte{},
 		},
 		{
 			name:   "multi validator pause",
 			detail: "multi validator pause",
 			preset: []*types.Validator{{
-				Address: newTestAddressBytes(t),
+				Address:    newTestAddressBytes(t),
+				Committees: []uint64{1},
 			}, {
-				Address: newTestAddressBytes(t, 1),
+				Address:    newTestAddressBytes(t, 1),
+				Committees: []uint64{1},
 			}},
-			toPause: [][]byte{newTestAddressBytes(t), newTestAddressBytes(t, 1)},
+			committeeId: 1,
+			toPause:     [][]byte{newTestAddressBytes(t), newTestAddressBytes(t, 1)},
+		},
+		{
+			name:   "mixed authorized multi validator pause",
+			detail: "mixed authorized multi validator pause",
+			preset: []*types.Validator{{
+				Address:    newTestAddressBytes(t),
+				Committees: []uint64{1},
+			}, {
+				Address:    newTestAddressBytes(t, 1),
+				Committees: []uint64{2},
+			}},
+			committeeId: 1,
+			toPause:     [][]byte{newTestAddressBytes(t)},
 		},
 	}
 	for _, test := range tests {
@@ -877,7 +906,7 @@ func TestSetValidatorsPaused(t *testing.T) {
 				require.NoError(t, sm.SetSupply(supply))
 			}
 			// execute the function call
-			sm.SetValidatorsPaused(test.toPause)
+			sm.SetValidatorsPaused(test.committeeId, test.toPause)
 			for _, validator := range test.toPause {
 				paused := crypto.NewAddress(validator)
 				// validate the unstaking of the validator object

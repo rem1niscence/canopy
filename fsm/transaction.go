@@ -151,6 +151,7 @@ func (s *StateMachine) CheckReplay(tx *lib.Transaction, txHash string) lib.Error
 		return lib.ErrDuplicateTx(txHash)
 	}
 	// get the latest block for the timestamp
+	// TODO this is expensive and should be cached
 	block, err := store.GetBlockByHeight(height - 1)
 	if err != nil {
 		return err

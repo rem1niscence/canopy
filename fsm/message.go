@@ -381,7 +381,7 @@ func (s *StateMachine) HandleMessageDAOTransfer(msg *types.MessageDAOTransfer) l
 // HandleMessageCertificateResults() is the proper handler for a `CertificateResults` message
 func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertificateResults) lib.ErrorI {
 	// base-chain only message
-	if s.Config.ChainId != lib.CanopyCommitteeId || msg.Qc.Header.CommitteeId == lib.CanopyCommitteeId {
+	if !s.Config.IsBaseChain() || msg.Qc.Header.CommitteeId == s.Config.BaseChainId {
 		return types.ErrInvalidCertificateResults()
 	}
 	s.log.Debugf("Handling certificate results msg with height %d:%d", msg.Qc.Header.Height, msg.Qc.Header.CanopyHeight)
@@ -417,8 +417,17 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 
 // HandleMessageSubsidy() is the proper handler for a `Subsidy` message
 func (s *StateMachine) HandleMessageSubsidy(msg *types.MessageSubsidy) lib.ErrorI {
+	// get the retired status of the committee
+	retired, err := s.CommitteeIsRetired(msg.CommitteeId)
+	if err != nil {
+		return err
+	}
+	// ensure the committee isn't retired
+	if retired {
+		return types.ErrNonSubsidizedCommittee()
+	}
 	// subtract from sender
-	if err := s.AccountSub(crypto.NewAddressFromBytes(msg.Address), msg.Amount); err != nil {
+	if err = s.AccountSub(crypto.NewAddressFromBytes(msg.Address), msg.Amount); err != nil {
 		return err
 	}
 	// add to recipient committee

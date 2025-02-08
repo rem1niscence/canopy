@@ -23,6 +23,10 @@ type ValidatorSet struct {
 // NewValidatorSet() initializes a ValidatorSet from a given set of consensus validators
 func NewValidatorSet(validators *ConsensusValidators) (vs ValidatorSet, err ErrorI) {
 	totalPower, count, points := uint64(0), uint64(0), make([]kyber.Point, 0)
+	// handle empty set
+	if validators == nil {
+		return ValidatorSet{}, ErrNoValidators()
+	}
 	// iterate through the ValidatorSet to get the count, total power, and convert
 	// the public keys to 'points' on an elliptic curve for the BLS multikey
 	for _, v := range validators.ValidatorSet {
@@ -89,6 +93,7 @@ type BaseChainInfo struct {
 
 // RemoteCallbacks are fallback rpc callbacks to the base-chain
 type RemoteCallbacks struct {
+	Checkpoint            func(height, id uint64) (blockHash HexBytes, i ErrorI)
 	ValidatorSet          func(height, id uint64) (ValidatorSet, ErrorI)
 	IsValidDoubleSigner   func(height uint64, address string) (p *bool, err ErrorI)
 	Transaction           func(tx TransactionI) (hash *string, err ErrorI)
@@ -155,6 +160,12 @@ func (b *BaseChainInfo) IsValidDoubleSigner(height uint64, address string) (*boo
 	return b.RemoteCallbacks.IsValidDoubleSigner(height, address)
 }
 
+// GetCheckpoint() returns the checkpoint if any for a specific chain height
+func (b *BaseChainInfo) GetCheckpoint(height, chainId uint64) (blockHash HexBytes, err ErrorI) {
+	// TODO should be able to get these from the file or the base-chain upon independence
+	return b.RemoteCallbacks.Checkpoint(height, chainId)
+}
+
 // GetLastChainHeightUpdated() returns the last chain (target) height the committee (meta) data was updated from the base-chain
 func (b *BaseChainInfo) GetLastChainHeightUpdated(height, id uint64) (uint64, ErrorI) {
 	if height == b.Height {
@@ -213,10 +224,7 @@ func (b *BaseChainInfo) UnmarshalJSON(bz []byte) (err error) {
 	if err != nil {
 		return
 	}
-	lastValidatorSet, err := NewValidatorSet(j.LastCommittee)
-	if err != nil {
-		return
-	}
+	lastValidatorSet, _ := NewValidatorSet(j.LastCommittee)
 	*b = BaseChainInfo{
 		Height:                 j.Height,
 		ValidatorSet:           validatorSet,

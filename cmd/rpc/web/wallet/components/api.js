@@ -107,12 +107,12 @@ function pollRequest(address, json, password, approve) {
   return JSON.stringify({ address: address, pollJSON: json, pollApprove: approve, password: password, submit: true });
 }
 
-function addressAndPwdRequest(address, password) {
-  return JSON.stringify({ address: address, password: password, submit: true });
+function addressNicknameAndPwdRequest(address, password, nickname) {
+  return JSON.stringify({ address: address, password: password, nickname: nickname, submit: true });
 }
 
-function pkAndPwdRequest(pk, password) {
-  return JSON.stringify({ privateKey: pk, password: password });
+function pkNicknameAndPwdRequest(pk, password, nickname) {
+  return JSON.stringify({ privateKey: pk, password: password, nickname: nickname });
 }
 
 function newTxRequest(
@@ -216,16 +216,16 @@ export async function Keystore() {
   return GET(adminRPCURL, keystorePath);
 }
 
-export async function KeystoreGet(address, password) {
-  return POST(adminRPCURL, keystoreGetPath, addressAndPwdRequest(address, password));
+export async function KeystoreGet(address, password, nickname) {
+  return POST(adminRPCURL, keystoreGetPath, addressNicknameAndPwdRequest(address, password, nickname));
 }
 
-export async function KeystoreNew(password) {
-  return POST(adminRPCURL, keystoreNewPath, addressAndPwdRequest("", password));
+export async function KeystoreNew(password, nickname) {
+  return POST(adminRPCURL, keystoreNewPath, addressNicknameAndPwdRequest("", password, nickname));
 }
 
-export async function KeystoreImport(pk, password) {
-  return POST(adminRPCURL, keystoreImportPath, pkAndPwdRequest(pk, password));
+export async function KeystoreImport(pk, password, nickname) {
+  return POST(adminRPCURL, keystoreImportPath, pkNicknameAndPwdRequest(pk, password, nickname));
 }
 
 export async function Logs() {
@@ -260,9 +260,10 @@ export async function VotePoll(address, json, approve, password) {
   return POST(adminRPCURL, txVotePoll, pollRequest(address, JSON.parse(json), password, approve));
 }
 
-export async function AccountWithTxs(height, address, page) {
+export async function AccountWithTxs(height, address, nickname, page) {
   let result = {};
   result.account = await Account(height, address);
+  result.account.nickname = nickname
 
   const setStatus = (status) => (tx) => {
     tx.status = status;
@@ -310,8 +311,10 @@ export function FailedTransactions(page, sender) {
   return POST(rpcURL, failedTxs, pageAddrReq(page, sender));
 }
 
-export async function Validator(height, address) {
-  return POST(rpcURL, validatorPath, heightAndAddrRequest(height, address));
+export async function Validator(height, address, nickname) {
+  let vl = POST(rpcURL, validatorPath, heightAndAddrRequest(height, address))
+  vl.nickname = nickname
+  return vl;
 }
 
 export async function Resource() {

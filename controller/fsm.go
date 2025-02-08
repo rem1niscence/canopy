@@ -86,6 +86,8 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 	c.CalculateSlashRecipients(results, be)
 	// set checkpoint
 	c.CalculateCheckpoint(blockResult, results)
+	// handle retired status
+	c.HandleRetired(results)
 	return
 }
 
@@ -123,6 +125,8 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 	c.CalculateSlashRecipients(compareResults, evidence)
 	// set checkpoint
 	c.CalculateCheckpoint(blockResult, compareResults)
+	// handle retired status
+	c.HandleRetired(compareResults)
 	// ensure generated the same results
 	if !qc.Results.Equals(compareResults) {
 		return types.ErrMismatchCertResults()
@@ -289,7 +293,8 @@ func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, baseChain
 	} else {
 		c.AddLotteryWinner(results, baseDelegateWinner)
 	}
-	if c.Config.ChainId != lib.CanopyCommitteeId {
+	// is isn't base chain
+	if !c.Config.IsBaseChain() {
 		// sub validator
 		subValidatorWinner, e := c.FSM.LotteryWinner(c.Config.ChainId, true)
 		if e != nil {
@@ -324,7 +329,7 @@ func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.Cert
 	// add the orders to the certificate result
 	// truncate for defensive spam protection
 	results.Orders = &lib.Orders{
-		BuyOrders:   lib.TruncateSlice(buyOrders, 100),
+		BuyOrders:   lib.TruncateSlice(buyOrders, 1000),
 		ResetOrders: resetOrders,
 		CloseOrders: closeOrders,
 	}
@@ -346,12 +351,28 @@ func (c *Controller) CalculateSlashRecipients(results *lib.CertificateResult, be
 // CalculateCheckpoint() calculates the checkpoint for the checkpoint as a service functionality
 func (c *Controller) CalculateCheckpoint(blockResult *lib.BlockResult, results *lib.CertificateResult) {
 	// checkpoint every 100 heights
-	if blockResult.BlockHeader.Height%100 == 0 {
+	if blockResult.BlockHeader.Height%c.GetCheckpointFrequency() == 0 {
+		c.log.Info("Checkpoint set in certificate results")
 		results.Checkpoint = &lib.Checkpoint{
 			Height:    blockResult.BlockHeader.Height,
 			BlockHash: blockResult.BlockHeader.Hash,
 		}
 	}
+}
+
+// GetCheckpointFrequency() returns how frequently the chain checkpoints
+func (c *Controller) GetCheckpointFrequency() uint64 {
+	return 100
+}
+
+// HandleRetired() checks if the committee is retiring and sets in the results accordingly
+func (c *Controller) HandleRetired(results *lib.CertificateResult) {
+	cons, err := c.FSM.GetParamsCons()
+	if err != nil {
+		c.log.Error(err.Error())
+		return
+	}
+	results.Retired = cons.Retired != 0
 }
 
 // AddLotteryWinner() adds a lottery winner (delegate, sub-delegate, or sub-validator) to the reward recipients
@@ -537,7 +558,7 @@ func (c *Controller) GetFailedTxsPage(address string, p lib.PageParams) (page *l
 }
 
 // GetFailedTxsPage() returns a list of failed transactions
-// func (c *Contoller) GetFailedTxPage(p lib.PageParams) (page *lib.Page)
+// func (c *Controller) GetFailedTxPage(p lib.PageParams) (page *lib.Page)
 
 // Mempool accepts or rejects incoming txs based on the mempool (ephemeral copy) state
 // - recheck when
@@ -568,6 +589,7 @@ func NewMempool(fsm *fsm.StateMachine, config lib.MempoolConfig, log lib.LoggerI
 	if err != nil {
 		return nil, err
 	}
+	m.FSM.ResetToBeginBlock()
 	return m, err
 }
 

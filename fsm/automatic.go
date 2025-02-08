@@ -28,7 +28,7 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	// so just set the committee to nil to ignore the byzantine evidence
 	// the byzantine evidence is handled at `Transaction Level` via
 	// HandleMessageCertificateResults
-	if s.Config.ChainId != lib.CanopyCommitteeId {
+	if !s.Config.IsBaseChain() {
 		return s.HandleCertificateResults(lastCertificate, nil)
 	}
 	// if is base-chain: load the committee from state as the certificate result
@@ -71,7 +71,7 @@ func (s *StateMachine) CheckProtocolVersion() lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	if s.Height() >= version.Height && uint64(s.ProtocolVersion) < version.Version {
+	if s.Height() >= version.Height && s.ProtocolVersion < version.Version {
 		return types.ErrInvalidProtocolVersion()
 	}
 	return nil
@@ -97,9 +97,7 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	}
 	results, committeeId := qc.Results, qc.Header.CommitteeId
 	// handle the token swaps
-	if err = s.HandleCommitteeSwaps(results.Orders, committeeId); err != nil {
-		return err
-	}
+	s.HandleCommitteeSwaps(results.Orders, committeeId)
 	// index the checkpoint
 	if err = s.HandleCheckpoint(committeeId, results); err != nil {
 		return err
@@ -113,10 +111,16 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	for i, p := range results.RewardRecipients.PaymentPercents {
 		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, uint64(nonSignerPercent))
 	}
+	// handle retired status
+	if qc.Results.Retired && qc.Header.CommitteeId != s.Config.ChainId {
+		if err = s.RetireCommittee(qc.Header.CommitteeId); err != nil {
+			return err
+		}
+	}
 	// update the committee data
 	return s.UpsertCommitteeData(&lib.CommitteeData{
 		CommitteeId:             committeeId,
-		LastCanopyHeightUpdated: qc.Header.CanopyHeight,
+		LastCanopyHeightUpdated: qc.Header.CanopyHeight, // TODO this may cause an issue when going independent if new root-chain height < old-root-chain height
 		LastChainHeightUpdated:  qc.Header.Height,
 		PaymentPercents:         results.RewardRecipients.PaymentPercents,
 	})
@@ -127,7 +131,7 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 func (s *StateMachine) HandleCheckpoint(committeeId uint64, results *lib.CertificateResult) (err lib.ErrorI) {
 	storeI := s.store.(lib.StoreI)
 	// index the checkpoint
-	if results.Checkpoint != nil {
+	if results.Checkpoint != nil && len(results.Checkpoint.BlockHash) != 0 {
 		// retrieve the last saved checkpoint for this chain
 		mostRecentCheckpoint, e := storeI.GetMostRecentCheckpoint(committeeId)
 		if e != nil {

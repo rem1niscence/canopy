@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Truncate from "react-truncate-inside";
-import { formatNumber, getRatio } from "@/components/util";
+import { getRatio, formatNumber } from "@/components/util";
 import Container from "react-bootstrap/Container";
 import { Button, Card, Carousel, Col, Row, Spinner } from "react-bootstrap";
 import { YAxis, Tooltip, Legend, AreaChart, Area } from "recharts";

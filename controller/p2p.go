@@ -108,7 +108,7 @@ func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
 
 // SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
 func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
-	if c.Config.ChainId == lib.CanopyCommitteeId {
+	if c.Config.IsBaseChain() {
 		return // base-chain doesn't send this
 	}
 	c.log.Debugf("Sending certificate results txn for: %s", lib.BytesToString(qc.ResultsHash))
@@ -117,7 +117,7 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 	defer func() { qc.Block = blk }()
 	// it's good practice to omit the block when sending the transaction as it's not relevant to canopy
 	qc.Block = nil
-	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, c.Config.NetworkID, 0, "")
+	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, c.Config.BaseChainId, c.Config.NetworkID, 0, "")
 	if err != nil {
 		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return
@@ -491,6 +491,10 @@ func (c *Controller) UpdateP2PMustConnect() {
 	}
 	// ensure self is a validator
 	var selfIsValidator bool
+	// handle empty validator set
+	if c.BaseChainInfo.ValidatorSet.ValidatorSet == nil {
+		return
+	}
 	// for each member of the committee
 	for _, member := range c.BaseChainInfo.ValidatorSet.ValidatorSet.ValidatorSet {
 		if bytes.Equal(member.PublicKey, c.PublicKey) {
@@ -596,12 +600,20 @@ func (c *Controller) checkPeerQC(maxBlockSize int, view *lib.View, v lib.Validat
 	if qc.Header.Height != view.Height {
 		return lib.ErrWrongHeight()
 	}
-	// enforce the last saved committee height as valid
-	// NOTE: historical committees are accepted up to the last saved height in the state
-	// else there's a potential for a long-range attack
-	if qc.Header.CanopyHeight < view.CanopyHeight {
-		c.P2P.ChangeReputation(senderID, p2p.InvalidJustifyRep)
-		return lib.ErrWrongCanopyHeight()
+	// use checkpoints to protect against long-range attacks
+	if qc.Header.Height%c.GetCheckpointFrequency() == 0 {
+		// get the checkpoint from the base chain (or file if independent)
+		checkpoint, e := c.BaseChainInfo.GetCheckpoint(qc.Header.Height, c.Config.ChainId)
+		if e != nil {
+			c.log.Warnf(e.Error())
+			return nil
+		}
+		// if checkpoint fails
+		if len(checkpoint) != 0 && !bytes.Equal(qc.BlockHash, checkpoint) {
+			c.log.Fatalf("Invalid checkpoint %s vs %s at height %d from sender %s",
+				lib.BytesToString(qc.BlockHash), checkpoint, qc.Header.Height, lib.BytesToString(senderID),
+			)
+		}
 	}
 	return nil
 }
@@ -653,7 +665,7 @@ func (c *Controller) pollMaxHeight(backoff int) (max, minVDFIterations uint64, s
 // singleNodeNetwork() returns true if there are no other participants in the committee besides self
 func (c *Controller) singleNodeNetwork() bool {
 	// if self is the only validator, return true
-	return c.BaseChainInfo.ValidatorSet.NumValidators == 1 &&
+	return c.BaseChainInfo.ValidatorSet.NumValidators == 0 || c.BaseChainInfo.ValidatorSet.NumValidators == 1 &&
 		bytes.Equal(c.BaseChainInfo.ValidatorSet.ValidatorSet.ValidatorSet[0].PublicKey, c.PublicKey)
 }
 

@@ -287,7 +287,10 @@ func (x *CertificateResult) Equals(y *CertificateResult) bool {
 	if !x.Orders.Equals(y.Orders) {
 		return false
 	}
-	return x.Checkpoint.Equals(y.Checkpoint)
+	if !x.Checkpoint.Equals(y.Checkpoint) {
+		return false
+	}
+	return x.Retired == y.Retired
 }
 
 // Hash() returns the cryptographic hash of the canonical Sign Bytes of the CertificateResult

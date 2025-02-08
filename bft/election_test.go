@@ -1,15 +1,56 @@
 package bft
 
 import (
+	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"math"
+	"math/big"
 	"math/rand"
 	"testing"
 )
+
+func TestIsCandidateDistribution(t *testing.T) {
+	const trials = 100000
+	tolerance := 0.01 // Allow ± 1% deviation
+
+	tests := []struct {
+		name               string
+		votingPower        uint64
+		totalVotingPower   uint64
+		expectedCandidates uint64
+	}{
+		{"Low Stake", 10, 1000, 100},
+		{"Medium Stake", 500, 1000, 100},
+		{"High Stake", 900, 1000, 100},
+		{"Single Candidate", 500, 1000, 1},
+		{"All Candidates", 500, 500, 10},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expectedProb := float64(tt.votingPower*tt.expectedCandidates) / float64(tt.totalVotingPower)
+			if expectedProb > 1 {
+				expectedProb = 1 // Since probabilities can't exceed 1
+			}
+			selectedCount := 0
+			for i := 0; i < trials; i++ {
+				// generate random 256 bit (32 bytes)
+				n, _ := crand.Int(crand.Reader, new(big.Int).Lsh(big.NewInt(1), 256))
+				// use VRF Out
+				vrfOut := n.Bytes()
+				if IsCandidate(tt.votingPower, tt.totalVotingPower, tt.expectedCandidates, vrfOut) {
+					selectedCount++
+				}
+			}
+			observedProb := float64(selectedCount) / float64(trials)
+			require.False(t, observedProb < expectedProb*(1-tolerance) || observedProb > expectedProb*(1+tolerance))
+		})
+	}
+}
 
 func TestSortitionAndVerifyCandidate(t *testing.T) {
 	tests := []struct {

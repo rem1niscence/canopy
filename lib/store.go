@@ -69,7 +69,7 @@ type RIndexerI interface {
 	GetQCByHeight(height uint64) (*QuorumCertificate, ErrorI)                                     // get certificate for a height
 	GetDoubleSigners() ([]*DoubleSigner, ErrorI)                                                  // all double signers in the indexer
 	IsValidDoubleSigner(address []byte, height uint64) (bool, ErrorI)                             // get if the DoubleSigner is already set for a height
-	GetCheckpoint(committeeId, height uint64) (blockHash []byte, err ErrorI)                      // get the checkpoint block hash for a certain committee and height combination
+	GetCheckpoint(committeeId, height uint64) (blockHash HexBytes, err ErrorI)                    // get the checkpoint block hash for a certain committee and height combination
 	GetMostRecentCheckpoint(committeeId uint64) (checkpoint *Checkpoint, err ErrorI)              // get the most recent checkpoint for a committee
 	GetAllCheckpoints(committeeId uint64) (checkpoints []*Checkpoint, err ErrorI)                 // export all checkpoints for a committee
 }

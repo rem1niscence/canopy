@@ -40,24 +40,27 @@ func (s *StateMachine) ReadGenesisFromFile() (genesis *types.GenesisState, e lib
 }
 
 // NewStateFromGenesis() creates a new beginning state using a GenesisState object
-func (s *StateMachine) NewStateFromGenesis(genesis *types.GenesisState) lib.ErrorI {
+func (s *StateMachine) NewStateFromGenesis(genesis *types.GenesisState) (err lib.ErrorI) {
 	supply := new(types.Supply)
-	if err := s.SetAccounts(genesis.Accounts, supply); err != nil {
-		return err
+	if err = s.SetAccounts(genesis.Accounts, supply); err != nil {
+		return
 	}
-	if err := s.SetPools(genesis.Pools, supply); err != nil {
-		return err
+	if err = s.SetPools(genesis.Pools, supply); err != nil {
+		return
 	}
-	if err := s.SetValidators(genesis.Validators, supply); err != nil {
-		return err
+	if err = s.SetValidators(genesis.Validators, supply); err != nil {
+		return
 	}
 	if genesis.OrderBooks != nil {
-		if err := s.SetOrderBooks(genesis.OrderBooks, supply); err != nil {
-			return err
+		if err = s.SetOrderBooks(genesis.OrderBooks, supply); err != nil {
+			return
 		}
 	}
-	if err := s.SetSupply(supply); err != nil {
-		return err
+	if err = s.SetSupply(supply); err != nil {
+		return
+	}
+	if err = s.SetRetiredCommittees(genesis.RetiredCommittees); err != nil {
+		return
 	}
 	return s.SetParams(genesis.Params)
 }
@@ -145,6 +148,10 @@ func (s *StateMachine) ExportState() (genesis *types.GenesisState, err lib.Error
 		return nil, err
 	}
 	genesis.Supply, err = s.GetSupply()
+	if err != nil {
+		return nil, err
+	}
+	genesis.RetiredCommittees, err = s.GetRetiredCommittees()
 	if err != nil {
 		return nil, err
 	}

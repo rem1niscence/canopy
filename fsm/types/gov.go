@@ -7,6 +7,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -49,6 +50,7 @@ func DefaultParams() *Params {
 		Consensus: &ConsensusParams{
 			BlockSize:       uint64(units.MB),
 			ProtocolVersion: NewProtocolVersion(0, 1),
+			Retired:         0,
 		},
 		Validator: &ValidatorParams{
 			ValidatorUnstakingBlocks:                    2,
@@ -106,15 +108,13 @@ func (x *Params) Check() lib.ErrorI {
 const (
 	ParamBlockSize       = "block_size"       // size of the block - header
 	ParamProtocolVersion = "protocol_version" // current protocol version (upgrade enforcement)
+	ParamRetired         = "retired"          // if the chain is marking itself as 'retired' to the base-chain making it forever un-subsidized
 )
 
 var _ ParamSpace = &ConsensusParams{}
 
 // Check() validates the consensus params
 func (x *ConsensusParams) Check() lib.ErrorI {
-	if x.BlockSize < lib.MaxBlockHeaderSize {
-		return ErrInvalidParam(ParamBlockSize)
-	}
 	if _, err := x.ParseProtocolVersion(); err != nil {
 		return err
 	}
@@ -126,6 +126,8 @@ func (x *ConsensusParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 	switch paramName {
 	case ParamBlockSize:
 		x.BlockSize = value
+	case ParamRetired:
+		x.Retired = value
 	default:
 		return ErrUnknownParam()
 	}
@@ -136,8 +138,19 @@ func (x *ConsensusParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 func (x *ConsensusParams) SetString(paramName string, value string) lib.ErrorI {
 	switch paramName {
 	case ParamProtocolVersion:
-		if _, err := checkProtocolVersion(value); err != nil {
+		// get new protocol version
+		newVersion, err := checkProtocolVersion(value)
+		if err != nil {
 			return err
+		}
+		// get old protocol version
+		oldVersion, err := checkProtocolVersion(x.ProtocolVersion)
+		if err != nil {
+			return err
+		}
+		// ensure new version isn't less than old version
+		if newVersion.Version <= oldVersion.Version || newVersion.Height <= oldVersion.Height {
+			return ErrInvalidProtocolVersion()
 		}
 		x.ProtocolVersion = value
 	default:
@@ -193,7 +206,7 @@ func FormatParamSpace(paramSpace string) string {
 
 // IsStringParam() validates if the param is a string by space and key
 func IsStringParam(paramSpace, paramKey string) (bool, lib.ErrorI) {
-	testValueStr, testValue := NewProtocolVersion(1, 1), uint64(2)
+	testValueStr, testValue := NewProtocolVersion(math.MaxInt, math.MaxInt), uint64(2)
 	params := DefaultParams()
 	switch paramSpace {
 	case ParamSpaceVal:

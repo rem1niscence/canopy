@@ -468,16 +468,34 @@ func CatchPanic(l LoggerI) {
 	}
 }
 
-var Delimiter = []byte("/") // the delimiter that allows safe key prefixing (ex. /tx/100/abc vs /tx/10/0abc)
-
-// Delimit() appends the items together separated by a delimiter
-func Delimit(toAppend ...[]byte) (res []byte) {
+// AppendAndLenPrefix() appends the items together separated by a single byte to represent the length of the segment
+func AppendAndLenPrefix(toAppend ...[]byte) (res []byte) {
 	for _, a := range toAppend {
 		if a == nil {
 			continue
 		}
-		withTerminatingDelim := append(a, Delimiter...)
-		res = append(res, withTerminatingDelim...)
+		// store the length of the segment in a single byte
+		length := []byte{byte(len(a))}
+		// append to the reset of the segment
+		res = append(append(res, length...), a...)
+	}
+	return
+}
+
+// DecodeLengthPrefixed() decodes a key that is delimited by the length of the segment in a single byte
+func DecodeLengthPrefixed(key []byte) (segments [][]byte) {
+	var length int
+	for i := 0; i < len(key); i += length {
+		if i >= len(key) {
+			break
+		}
+		// read the length prefix
+		length = int(key[i])
+		i++
+		if i+length > len(key) {
+			panic("corrupt or incomplete key")
+		}
+		segments = append(segments, key[i:i+length])
 	}
 	return
 }

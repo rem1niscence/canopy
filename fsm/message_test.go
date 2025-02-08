@@ -1625,7 +1625,7 @@ func TestMessageUnpause(t *testing.T) {
 
 func TestHandleMessageChangeParameter(t *testing.T) {
 	uint64Any, _ := lib.NewAny(&lib.UInt64Wrapper{Value: 100})
-	stringAny, _ := lib.NewAny(&lib.StringWrapper{Value: "1/2"})
+	stringAny, _ := lib.NewAny(&lib.StringWrapper{Value: "2/2"})
 	tests := []struct {
 		name           string
 		detail         string
@@ -2091,7 +2091,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				got, e := sm.store.(lib.StoreI).GetCheckpoint(lib.CanopyCommitteeId+1, expected.Height)
 				require.NoError(t, e)
 				// check got vs expected
-				require.Equal(t, expected.BlockHash, got)
+				require.Equal(t, lib.HexBytes(expected.BlockHash), got)
 			}()
 
 			// 5) validate the 'committee data'

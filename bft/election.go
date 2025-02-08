@@ -131,9 +131,14 @@ func VRF(lastNProposers [][]byte, height, round uint64, privateKey crypto.Privat
 // - Creates a candidacy cutoff point for a Validator based on their stake (more stake = higher chance of being a Candidate)
 // - Checks if number(vrfOut) is below the cutoff
 func IsCandidate(votingPower, totalVotingPower, expectedCandidates uint64, vrfOut []byte) bool {
-	vPower, totalVPower, expCand := lib.Uint64ToBigFloat(votingPower*expectedCandidates), lib.Uint64ToBigFloat(totalVotingPower), lib.Uint64ToBigFloat(expectedCandidates)
+	// safety checks
+	if totalVotingPower == 0 || expectedCandidates == 0 {
+		return false
+	}
+	// use big.Float logic
+	vPower, totalVPower, expCand := lib.Uint64ToBigFloat(votingPower), lib.Uint64ToBigFloat(totalVotingPower), lib.Uint64ToBigFloat(expectedCandidates)
 	// candidateCutoff = voting power * expected candidates / totalVotingPower
-	candidateCutoff, _ := new(big.Float).Quo(vPower.Mul(vPower, expCand), totalVPower).Float64() // may be > 1 but that works fine
+	candidateCutoff, _ := new(big.Float).Quo(new(big.Float).Mul(vPower, expCand), totalVPower).Float64() // may be > 1 if expCandidates > 1
 	// if VRF is under the candidateCutoff
 	return toFloatBetween0And1(vrfOut) < candidateCutoff
 }
@@ -152,6 +157,9 @@ func expectedCandidates(totalValidators uint64) uint64 {
 
 // toFloatBetween0And1 converts a hash into a floating point number between 0 and 1
 func toFloatBetween0And1(vrfOut []byte) float64 {
+	if len(vrfOut) == 0 {
+		return 0
+	}
 	f := new(big.Float).SetPrec(vrfFloatPrec)
 	f.SetInt(new(big.Int).SetBytes(vrfOut[:]))
 	prob, _ := new(big.Float).Quo(f, maxHashAsFloat).Float64()

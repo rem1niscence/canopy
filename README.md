@@ -78,8 +78,6 @@ Flags:
 
 <p>Before making large changes, we encourage you to discuss them with the Canopy team on <a href="https://discord.gg/pNcSJj7Wdh">Discord</a>. This ensures we're aligned on the direction of the project.</p>
 
-<p>You can also post research and ideas on our <a href="https://research.canopynetwork.org">forum</a>.</p>
-
 <h3 align="center">Coding Style</h3>
 
 <ul>
@@ -112,9 +110,6 @@ Flags:
   <br />
   <a href="https://x.com/CNPYNetwork">
     <img src="https://img.shields.io/twitter/url/http/shields.io.svg?style=social">
-  </a>
-  <a href="https://t.me/cnpynetwork">
-    <img src="https://img.shields.io/badge/Telegram-blue.svg">
   </a>
   <a href="https://discord.gg/pNcSJj7Wdh">
     <img src="https://img.shields.io/badge/discord-online-blue.svg">

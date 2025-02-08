@@ -138,7 +138,7 @@ func (l *Logger) Errorf(format string, args ...interface{}) {
 
 // Fatalf() logs a formatted error message and terminates the program
 func (l *Logger) Fatalf(format string, args ...interface{}) {
-	l.Errorf(format, args)
+	l.write(colorStringWithFormat(RED, "FATAL: "+format, args...))
 	os.Exit(1)
 }
 

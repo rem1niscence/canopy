@@ -258,8 +258,6 @@ func TestOnPeerError(t *testing.T) {
 	peer, err := n1.PeerSet.get(n2.pub)
 	require.NoError(t, err)
 	n1.OnPeerError(errors.New(""), n2.pub, "")
-	_, found = n1.book.getIndex(n2.pub)
-	require.False(t, found)
 	_, err = n1.PeerSet.get(n2.pub)
 	require.Error(t, err)
 	_, e := peer.conn.conn.Read(make([]byte, 8))

@@ -406,6 +406,53 @@ func TestValidURLInput(t *testing.T) {
 	}
 }
 
+func TestLengthedPrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		segments [][]byte
+	}{
+		{
+			name:     "empty key",
+			segments: nil,
+		},
+		{
+			name: "one segment",
+			segments: [][]byte{
+				[]byte("a"),
+			},
+		},
+		{
+			name: "two fixed length segments",
+			segments: [][]byte{
+				[]byte("ab"),
+				[]byte("cd"),
+			},
+		},
+		{
+			name: "three variable length segments",
+			segments: [][]byte{
+				[]byte("abcdef"),
+				[]byte("ghijk"),
+				[]byte("l"),
+			},
+		},
+		{
+			name: "zero length injected",
+			segments: [][]byte{
+				[]byte("abcdef"),
+				[]byte(""),
+				[]byte("l"),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := DecodeLengthPrefixed(AppendAndLenPrefix(test.segments...))
+			require.Equal(t, test.segments, got)
+		})
+	}
+}
+
 func TestResetTimer(t *testing.T) {
 	timer := NewTimer()
 	duration := 100 * time.Millisecond
