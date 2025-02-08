@@ -26,6 +26,10 @@
   --callout-border-rgb: 172, 175, 176;
   --card-rgb: 180, 185, 188;
   --card-border-rgb: 131, 134, 135;
+  --primary-color: #2C9B5A;
+  --secondary-color: #16502E;
+  --font-heading: 'Unbounded', sans-serif;
+  --font-body: 'Unbounded', sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -75,6 +79,7 @@ a {
   background-color: white;
   width: 100%;
   height: 100vh;
+  font-family: var(--font-body);
 }
 
 #pageContent {
@@ -140,16 +145,16 @@ input::placeholder {
 
 .page-item .page-link {
   z-index: 3;
-  color: #32908f !important;
-  border-color: #32908f !important;
+  color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
   background-color: #fff !important;
 }
 
 .page-item.active .page-link {
   z-index: 3;
   color: #fff !important;
-  border-color: #32908f !important;
-  background-color: #32908f !important;
+  border-color: var(--primary-color) !important;
+  background-color: var(--primary-color) !important;
 }
 
 body {
@@ -157,11 +162,11 @@ body {
 }
 
 a:link {
-  color: #32908f;
+  color: var(--primary-color);
 }
 
 a:visited {
-  color: #32908f;
+  color: var(--primary-color);
 }
 
 a:hover {
@@ -169,7 +174,7 @@ a:hover {
 }
 
 a:active {
-  color: #32908f;
+  color: var(--primary-color);
 }
 
 @media (min-width: 992px) {
@@ -248,10 +253,18 @@ a:active {
   float: left;
 }
 
+.card-image svg {
+  width: 100%;
+  height: 100%;
+  fill: var(--primary-color);
+}
+
 .card-title {
   font-size: 12px !important;
-  font-weight: bold !important;
+  font-weight: 400 !important;
+  letter-spacing: 1.5px;
   padding-top: 10px;
+  font-family: var(--font-heading);
 }
 
 .card-body {
@@ -259,15 +272,26 @@ a:active {
   cursor: pointer;
 }
 
+h5 {
+  font-size: 14px;
+  letter-spacing: 1px;
+  font-weight: 600 !important;
+}
+
+.card-info-2 {
+  font-size: 14px;
+}
+
 .card-info-3 {
-  font-size: 12px;
+  float: right;
+  font-size: 10px;
   padding-top: 5px;
 }
 
 .card-info-4 {
   font-size: 9px;
   color: #222222;
-  font-weight: bold;
+  font-weight:600;
 }
 
 .card-footer {
@@ -282,6 +306,11 @@ a:active {
 .modal-header {
   padding: 0 0 0 0;
   color: black;
+  font-family: var(--font-heading);
+}
+
+#modal-tab {
+  font-family: var(--font-heading);
 }
 
 .modal-cards {
@@ -298,11 +327,13 @@ a:active {
   padding: 5px 0 0 10px !important;
   margin: 0 0 0 0 !important;
   height: 50px;
+  font-family: var(--font-body) !important;
 }
 
 .modal-header {
   font-weight: 150;
   color: black;
+  font-family: var(--font-heading);
 }
 
 .copy-img {
@@ -321,7 +352,7 @@ a:active {
 }
 
 .search-toast-body {
-  font-weight: bold;
+  font-weight:600;
   color: darkred;
 }
 
@@ -333,11 +364,16 @@ a:active {
   margin-bottom: 25px !important;
 }
 
+th {
+  font-family: var(--font-heading);
+}
+
 .detail-table-title {
   white-space: nowrap;
-  font-weight: bold;
+  font-weight:600;
   font-size: 14px;
   background-color: white !important;
+  font-family: var(--font-heading);
 }
 
 .detail-table-info {
@@ -347,7 +383,8 @@ a:active {
 
 .detail-table-row-title {
   font-size: 14px;
-  font-weight: bold;
+  font-weight:600;
+  font-family: var(--font-heading);
 }
 
 .detail-table-row-info {
@@ -367,7 +404,7 @@ a:active {
 }
 
 .data-table-head {
-  font-weight: bold;
+  font-weight:600;
 }
 
 .pagination {
@@ -392,12 +429,14 @@ a:active {
 .modal-header-icon {
   width: 30px;
   height: 30px;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-image: url("../public/info.png");
   float: left;
   margin-right: 10px;
+}
+
+.modal-header-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: var(--primary-color);
 }
 
 .modal-card-group {
@@ -408,6 +447,7 @@ a:active {
   font-size: 12px;
   padding: 0 0 0 0 !important;
   margin: 0 0 0 0 !important;
+  font-family: var(--font-heading);
 }
 
 .modal-card-detail {
@@ -423,13 +463,13 @@ a:active {
 }
 
 .nav-bar-brand {
-  font-weight: bold;
+  font-weight:600;
   color: black;
   cursor: pointer;
 }
 
 .nav-bar-brand-highlight {
-  color: #32908f;
+  color: var(--primary-color);
 }
 
 .nav-bar-center {
@@ -444,16 +484,16 @@ a:active {
 }
 
 .nav-link.active {
-  color: #32908f !important;
+  color: var(--primary-color) !important;
   background-color: white !important;
-  font-weight: bold;
+  font-weight:600;
   opacity: 100%;
   border: 0 !important;
-  border-bottom: 2px solid #32908f !important;
+  border-bottom: 2px solid var(--primary-color) !important;
 }
 
 .nav-link {
-  color: #32908f !important;
+  color: var(--primary-color) !important;
   background-color: white !important;
   opacity: 50%;
   border: 0 !important;
@@ -535,4 +575,10 @@ a:active {
   html {
     color-scheme: dark;
   }
+}
+
+.nav-bar-logo {
+  height: 20px;
+  margin-right: 8px; 
+  vertical-align: middle;
 }

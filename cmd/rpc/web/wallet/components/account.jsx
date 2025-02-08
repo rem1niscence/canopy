@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useRef, useEffect } from "react";
 import JsonView from "@uiw/react-json-view";
 import Truncate from "react-truncate-inside";
 import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
@@ -29,6 +29,8 @@ import {
   withTooltip,
   toUCNPY,
   toCNPY,
+  downloadJSON,
+  retryWithDelay,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 
@@ -52,8 +54,10 @@ const transactionButtons = [
 ];
 
 // Accounts() returns the main component of this file
-export default function Accounts({ keygroup, account, validator }) {
+export default function Accounts({ keygroup, account, validator, setActiveKey }) {
   const ks = Keystore();
+  const ksRef = useRef(ks);
+
   const [state, setState] = useState({
       showModal: false,
       txType: "send",
@@ -65,8 +69,29 @@ export default function Accounts({ keygroup, account, validator }) {
       pk: {},
       toast: "",
       showSpinner: false,
+      primaryColor: "",
+      greyColor: "",
     }),
     acc = account.account;
+
+    const stateRef = useRef(state);
+
+  useEffect(() => {
+    // Ensure document is available
+    const rootStyles = getComputedStyle(document.documentElement);
+    const primaryColor = rootStyles.getPropertyValue("--primary-color").trim();
+    const greyColor = rootStyles.getPropertyValue("--grey-color").trim();
+
+    ksRef.current = ks;
+    stateRef.current = state;
+
+    // Update state with colors
+    setState((prevState) => ({
+      ...prevState,
+      primaryColor,
+      greyColor,
+    }));
+  }, []);
 
   // resetState() resets the state back to its initial
   function resetState() {
@@ -115,6 +140,28 @@ export default function Accounts({ keygroup, account, validator }) {
     }
   }
 
+  // setActivePrivateKey() sets the active key to the newly added privte key if it is successfully imported
+  function setActivePrivateKey(nickname, closeModal) {
+    const resetState = () =>
+      setState({ ...stateRef.current, showSpinner: false, ...(closeModal && { [closeModal]: false }) });
+
+    retryWithDelay(
+      () => {
+        let idx = Object.keys(ksRef.current).findIndex((k) => k === nickname);
+        if (idx >= 0) {
+          setActiveKey(idx);
+          resetState();
+        } else {
+          throw new Error("failed to find key");
+        }
+      },
+      resetState,
+      10,
+      1000,
+      false,
+    );
+  }
+
   // onPKFormSubmit() handles the submission of the private key form and updates the state with the retrieved key
   function onPKFormSubmit(e) {
     onFormSubmit(state, e, ks, (r) =>
@@ -129,6 +176,7 @@ export default function Accounts({ keygroup, account, validator }) {
     onFormSubmit(state, e, ks, (r) =>
       KeystoreNew(r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
+        setActivePrivateKey(r.nickname);
       }),
     );
   }
@@ -137,11 +185,15 @@ export default function Accounts({ keygroup, account, validator }) {
   function onImportOrGenerateSubmit(e) {
     onFormSubmit(state, e, ks, (r) => {
       if (r.private_key) {
-        void KeystoreImport(r.private_key, r.password, r.nickname).then((_) =>
-          setState({ ...state, showSpinner: false }),
-        );
+        void KeystoreImport(r.private_key, r.password, r.nickname).then((_) => {
+          setState({ ...state, showSpinner: true });
+          setActivePrivateKey(r.nickname, "showPKImportModal");
+        });
       } else {
-        void KeystoreNew(r.password, r.nickname).then((_) => setState({ ...state, showSpinner: false }));
+        void KeystoreNew(r.password, r.nickname).then((_) => {
+          setState({ ...state, showSpinner: true });
+          setActivePrivateKey(r.nickname, "showPKImportModal");
+        });
       }
     });
   }
@@ -252,7 +304,7 @@ export default function Accounts({ keygroup, account, validator }) {
   return (
     <div className="content-container">
       <span id="balance">{formatNumber(acc.amount)}</span>
-      <span style={{ fontWeight: "bold", color: "#32908f" }}>{" CNPY"}</span>
+      <span style={{ fontFamily: "var(--font-heading)", fontWeight: "500", color: state.primaryColor }}>{" CNPY"}</span>
       <br />
       <hr style={{ border: "1px dashed black", borderRadius: "5px", width: "60%", margin: "0 auto" }} />
       <br />
@@ -278,7 +330,7 @@ export default function Accounts({ keygroup, account, validator }) {
           { title: "Stake Amount", info: getValidatorAmount(), after: " cnpy" },
           { title: "Staked Status", info: getStakedStatus() },
         ].map((v, i) => (
-          <RenderAccountInfo key={i} v={v} i={i} />
+          <RenderAccountInfo key={i} v={v} i={i} color={state.primaryColor} />
         ))}
       </Row>
       <br />
@@ -345,8 +397,17 @@ export default function Accounts({ keygroup, account, validator }) {
       >
         Import Private Key
       </Button>
-      <Button id="reveal-pk-button" variant="outline-danger" onClick={() => setState({ ...state, showPKModal: true })}>
-        Reveal Private Key
+        <Button id="reveal-pk-button" variant="outline-danger" onClick={() => setState({ ...state, showPKModal: true })}>
+            Reveal Private Key
+        </Button>
+      <Button
+        id="import-pk-button"
+        variant="outline-secondary"
+        onClick={() => {
+          downloadJSON(ks, "keystore");
+        }}
+      >
+        Download Keys
       </Button>
     </div>
   );
@@ -484,7 +545,17 @@ function RenderModal({
         <Modal.Body className="modal-body">
           <FormInputs
             keygroup={keyGroup}
-            fields={getFormInputs(txType, keyGroup, account, validator, keystore)}
+            fields={getFormInputs(txType, keyGroup, account, validator, keystore).map((formInput) => {
+              let input = Object.assign({}, formInput);
+              if (input.label === "sender") {
+                input.options.sort((a, b) => {
+                  if (a === account.nickname) return -1;
+                  if (b === account.nickname) return 1;
+                  return 0;
+                });
+              }
+              return input;
+            })}
             account={account}
             show={show}
             validator={validator}
@@ -506,21 +577,22 @@ function ActionButton({ v, i, showModal }) {
   return (
     <div key={i} className="send-receive-button-container">
       <img className="send-receive-button" onClick={() => showModal(v.name)} src={`./${v.src}.png`} alt={v.title} />
-      <span style={{ fontSize: "10px" }}>{v.title}</span>
+        <br/>
+      <span style={{ fontSize: "10px", width: "100%"}}>{v.title}</span>
     </div>
   );
 }
 
 // RenderAccountInfo() generates a card displaying account summary details
-function RenderAccountInfo({ v, i }) {
+function RenderAccountInfo({ v, i }, color) {
   return (
     <Col key={i}>
       <Card className="account-summary-container-card">
         <Card.Header style={{ fontWeight: "100" }}>{v.title}</Card.Header>
         <Card.Body style={{ padding: "10px" }}>
-          <Card.Title style={{ fontWeight: "bold", fontSize: "14px" }}>
+          <Card.Title style={{ fontWeight: "500", fontSize: "14px" }}>
             {v.info}
-            <span style={{ fontSize: "10px", color: "#32908f" }}>{v.after}</span>
+            <span style={{ fontSize: "10px", color: color }}>{v.after}</span>
           </Card.Title>
         </Card.Body>
       </Card>
@@ -532,7 +604,7 @@ function RenderAccountInfo({ v, i }) {
 function RenderTransactions({ account, state, setState }) {
   return account.combined.length === 0 ? null : (
     <div className="recent-transactions-table">
-      <span style={{ textAlign: "center", fontWeight: "100", fontSize: "14px", color: "grey" }}>
+      <span style={{ textAlign: "center", fontWeight: "100", fontSize: "14px", color: state.greyColor }}>
         RECENT TRANSACTIONS
       </span>
       <Table className="table-fixed" bordered hover style={{ marginTop: "10px" }}>

@@ -196,7 +196,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
       defaultValue: "",
       tooltip: "the category 'space' of the parameter",
       label: "param_space",
-      inputText: "param space",
+      inputText: "space",
       feedback: "please choose a space for the parameter change",
       required: true,
       type: "select",
@@ -208,7 +208,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
       defaultValue: "",
       tooltip: "the identifier of the parameter",
       label: "param_key",
-      inputText: "param key",
+      inputText: "key",
       feedback: "please choose a key for the parameter change",
       required: true,
       type: "select",
@@ -220,7 +220,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
       defaultValue: "",
       tooltip: "the newly proposed value of the parameter",
       label: "param_value",
-      inputText: "param val",
+      inputText: "value",
       feedback: "please choose a value for the parameter change",
       required: true,
       type: "text",
@@ -585,3 +585,49 @@ export const formatLocaleNumber = (num, minFractionDigits = 0, maxFractionDigits
     minimumFractionDigits: minFractionDigits,
   });
 };
+
+// isValidJSON() checks if a given string is a valid JSON
+export function isValidJSON(text) {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// downloadJSON() downloads a JSON payload as a JSON file
+export function downloadJSON(payload, filename) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const blobUrl = URL.createObjectURL(blob);
+
+  const anchor = document.createElement("a");
+  anchor.href = blobUrl;
+  anchor.target = "_blank";
+  anchor.download = `${filename}.json`;
+
+  // Auto click on a element, trigger the file download
+  anchor.click();
+  // Free up the memory by revoking the object URL
+  URL.revokeObjectURL(blobUrl);
+}
+
+// retryWithDelay() retries a function with a delay between each attempt
+export async function retryWithDelay(fn, onFailure, retries = 8, delayMs = 1000, throwOnFailure = false) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        onFailure();
+        if (throwOnFailure) {
+          throw new Error(`All ${retries} attempts failed`);
+        } else {
+          return;
+        }
+      }
+    }
+  }
+}
