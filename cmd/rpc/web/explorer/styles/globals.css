@@ -309,6 +309,10 @@ h5 {
   font-family: var(--font-heading);
 }
 
+#modal-tab {
+  font-family: var(--font-heading);
+}
+
 .modal-cards {
   padding: 0 0 0 0;
 }

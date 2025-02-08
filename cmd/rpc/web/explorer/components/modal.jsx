@@ -297,7 +297,7 @@ export default function DetailModal({ state, setState }) {
           })}
         </CardGroup>
         {/* TABS */}
-        <Tabs defaultActiveKey="0" id="fill-tab-example" className="mb-3" fill>
+        <Tabs defaultActiveKey="0" id="modal-tab" className="mb-3" fill>
           {[...Array(3)].map((_, i) => (
             <Tab key={i} tabClassName="rb-tab" eventKey={i} title={getTabTitle(state, data, i)}>
               {renderTab(i)}
