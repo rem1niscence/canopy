@@ -4,20 +4,20 @@ import (
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"slices"
 )
 
 // HandleCommitteeSwaps() when the committee submits a 'certificate results transaction', it informs the chain of various actions over sell orders
 // - 'buy' is an actor 'claiming / reserving' the sell order
 // - 'reset' is a 'claimed' order whose 'buyer' did not send the tokens to the seller before the deadline, thus the order is re-opened for sale
 // - 'close' is a 'claimed' order whose 'buyer' sent the tokens to the seller before the deadline, thus the order is 'closed' and the tokens are moved from escrow to the buyer
-func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, committeeId uint64) lib.ErrorI {
+func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, committeeId uint64) {
 	if orders != nil {
 		// buy orders are a result of the committee witnessing a 'reserve transaction' for the order on the 'buyer chain'
 		// think of 'buy orders' like reserving the 'sell order'
 		for _, buyOrder := range orders.BuyOrders {
 			if err := s.BuyOrder(buyOrder, committeeId); err != nil {
-				// buy orders may error when base-chain
-				s.log.Warnf("BuyOrder failed (can happen due to race with base-chain): %s", err.Error())
+				s.log.Warnf("BuyOrder failed (can happen due to asynchronicity): %s", err.Error())
 			}
 		}
 		// reset orders are a result of the committee witnessing 'no-action' from the buyer of the sell order aka NOT sending the
@@ -25,18 +25,18 @@ func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, committeeId uint
 		// sell order is listed as 'available' to the rest of the market
 		for _, resetOrderId := range orders.ResetOrders {
 			if err := s.ResetOrder(resetOrderId, committeeId); err != nil {
-				return err
+				s.log.Warnf("ResetOrder failed (can happen due to asynchronicity): %s", err.Error())
 			}
 		}
 		// close orders are a result of the committee witnessing the buyer sending the
 		// buy assets before the 'deadline height' of the 'buyer chain'
 		for _, closeOrderId := range orders.CloseOrders {
 			if err := s.CloseOrder(closeOrderId, committeeId); err != nil {
-				return err
+				s.log.Warnf("CloseOrder failed (can happen due to asynchronicity): %s", err.Error())
 			}
 		}
 	}
-	return nil
+	return
 }
 
 // ParseBuyOrder() parses a transaction for an embedded buy order messages in the memo field
@@ -87,8 +87,37 @@ func (s *StateMachine) ProcessBaseChainOrderBook(book *lib.OrderBook, b *lib.Blo
 		if s.height > order.BuyerChainDeadline {
 			// add to reset orders
 			resetOrders = append(resetOrders, order.Id)
-		} else if transferred[key] == order.RequestedAmount {
-			closeOrders = append(closeOrders, order.Id)
+		} else {
+			// check if the order was closed this block
+			if transferred[key] == order.RequestedAmount {
+				closeOrders = append(closeOrders, order.Id)
+				continue // go to the next order
+			}
+			// scan the N-10 through N-15 blocks to ensure no orders are lost
+			start, end, n := uint64(0), uint64(0), b.BlockHeader.Height
+			// bounds check
+			if n >= 15 {
+				end = n - 15
+			}
+			// bounds check
+			if n >= 10 {
+				start = n - 10
+			}
+			for i := start; i > end; i-- {
+				// load the certificate (hopefully from cache)
+				qc, err := s.LoadCertificate(b.BlockHeader.Height)
+				if err != nil {
+					s.log.Error(err.Error())
+					continue
+				}
+				// check if the 'close order' command was issued previously
+				if qc.Results.Orders != nil && slices.Contains(qc.Results.Orders.CloseOrders, order.Id) {
+					// if so, add it to the close orders
+					closeOrders = append(closeOrders, order.Id)
+					// exit the loop
+					break
+				}
+			}
 		}
 	}
 	return

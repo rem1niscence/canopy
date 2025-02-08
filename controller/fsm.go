@@ -329,7 +329,7 @@ func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.Cert
 	// add the orders to the certificate result
 	// truncate for defensive spam protection
 	results.Orders = &lib.Orders{
-		BuyOrders:   lib.TruncateSlice(buyOrders, 100),
+		BuyOrders:   lib.TruncateSlice(buyOrders, 1000),
 		ResetOrders: resetOrders,
 		CloseOrders: closeOrders,
 	}
