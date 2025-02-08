@@ -469,7 +469,7 @@ func (b *BFT) StartCommitProcessPhase() {
 		DSE: b.GetLocalDSE(),
 	}
 	// gossip committed block message to peers
-	b.GossipBlock(msg.Qc)
+	b.GossipBlock(msg.Qc, b.PublicKey)
 }
 
 // RoundInterrupt() begins the ROUND-INTERRUPT phase after any phase errors
@@ -799,7 +799,7 @@ type (
 		// LoadCertificate() gets the Quorum Certificate from the committeeID-> plugin at a certain height
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
 		// GossipBlock() is a P2P call to gossip a completed Quorum Certificate with a Proposal
-		GossipBlock(certificate *lib.QuorumCertificate)
+		GossipBlock(certificate *lib.QuorumCertificate, sender []byte)
 		// SendToReplicas() is a P2P call to directly send a Consensus message to all Replicas
 		SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 		// SendToProposer() is a P2P call to directly send a Consensus message to the Leader

@@ -132,7 +132,7 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 }
 
 // GossipBlockMsg() gossips a QuorumCertificate (with block) through the P2P network for a specific committeeID
-func (c *Controller) GossipBlock(qc *lib.QuorumCertificate) {
+func (c *Controller) GossipBlock(qc *lib.QuorumCertificate, senderPubKey []byte) {
 	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(qc.ResultsHash))
 	// create the block message
 	blockMessage := &lib.BlockMessage{
@@ -142,14 +142,12 @@ func (c *Controller) GossipBlock(qc *lib.QuorumCertificate) {
 		BlockAndCertificate: qc,
 	}
 	// gossip the block message to peers
-	if err := c.P2P.SendToPeers(Block, blockMessage); err != nil {
+	if err := c.P2P.SendToPeers(Block, blockMessage, lib.BytesToString(senderPubKey)); err != nil {
 		c.log.Errorf("unable to gossip block with err: %s", err.Error())
 	}
-	// if a single node network - send to self
-	if c.singleNodeNetwork() || c.P2P.PeerCount() == 0 {
-		if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
-			c.log.Errorf("unable to self send block with err: %s", err.Error())
-		}
+	// send to self
+	if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
+		c.log.Errorf("unable to self send block with err: %s", err.Error())
 	}
 	c.log.Debugf("gossiping done")
 }
@@ -178,7 +176,7 @@ func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
 			CommitteeId: c.Config.ChainId,
 			Height:      height,
 			HeightOnly:  heightOnly,
-		}, true); err != nil {
+		}); err != nil {
 			c.log.Error(err.Error())
 		}
 	}
@@ -278,7 +276,9 @@ func (c *Controller) ListenForBlock() {
 			if ok := cache.Add(msg); !ok {
 				return
 			}
-			c.log.Infof("Received new block from %s ✉️", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
+			// convenience variable for sender key
+			sender := msg.Sender.Address.PublicKey
+			c.log.Infof("Received new block from %s ✉️", lib.BytesToTruncatedString(sender))
 			// try to cast the message to a block message
 			blockMessage, ok := msg.Message.(*lib.BlockMessage)
 			// if not a block message, slash the peer
@@ -290,7 +290,7 @@ func (c *Controller) ListenForBlock() {
 			// track processing time for consensus module
 			startTime := time.Now()
 			// handle the peer block
-			qc, outOfSync, err := c.handlePeerBlock(msg.Sender.Address.PublicKey, blockMessage)
+			qc, outOfSync, err := c.handlePeerBlock(sender, blockMessage)
 			// if the node has fallen 'out of sync' with the chain
 			if outOfSync {
 				c.log.Warnf("Node fell out of sync for committeeID: %d", blockMessage.CommitteeId)
@@ -304,7 +304,7 @@ func (c *Controller) ListenForBlock() {
 				return
 			}
 			// gossip the block to the node's peers
-			c.GossipBlock(qc)
+			c.GossipBlock(qc, sender)
 			// reset consensus
 			c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
 		}()
@@ -413,7 +413,7 @@ func (c *Controller) ListenForTx() {
 			// bump peer reputation positively
 			c.P2P.ChangeReputation(senderID, p2p.GoodTxRep)
 			// gossip the transaction to peers
-			if err := c.P2P.SendToPeers(Tx, msg.Message); err != nil {
+			if err := c.P2P.SendToPeers(Tx, msg.Message, lib.BytesToString(senderID)); err != nil {
 				c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
 			}
 		}()
