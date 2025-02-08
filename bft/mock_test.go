@@ -544,7 +544,7 @@ func (t *testController) BaseChainHeight() uint64                               
 func (t *testController) LoadLastProposers(_ uint64) (*lib.Proposers, lib.ErrorI) {
 	return t.proposers, nil
 }
-func (t *testController) GossipBlock(cert *lib.QuorumCertificate) {
+func (t *testController) GossipBlock(cert *lib.QuorumCertificate, _ []byte) {
 	t.gossipCertChan <- cert
 }
 
