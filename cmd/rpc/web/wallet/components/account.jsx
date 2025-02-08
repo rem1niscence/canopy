@@ -69,16 +69,29 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
       pk: {},
       toast: "",
       showSpinner: false,
+      primaryColor: "",
+      greyColor: "",
     }),
     acc = account.account;
 
-  const stateRef = useRef(state);
+    const stateRef = useRef(state);
 
-  // Keep variables updated whenever they change
   useEffect(() => {
+    // Ensure document is available
+    const rootStyles = getComputedStyle(document.documentElement);
+    const primaryColor = rootStyles.getPropertyValue("--primary-color").trim();
+    const greyColor = rootStyles.getPropertyValue("--grey-color").trim();
+
     ksRef.current = ks;
     stateRef.current = state;
-  }, [ks, state]);
+
+    // Update state with colors
+    setState((prevState) => ({
+      ...prevState,
+      primaryColor,
+      greyColor,
+    }));
+  }, []);
 
   // resetState() resets the state back to its initial
   function resetState() {
@@ -291,7 +304,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
   return (
     <div className="content-container">
       <span id="balance">{formatNumber(acc.amount)}</span>
-      <span style={{ fontWeight: "bold", color: "#32908f" }}>{" CNPY"}</span>
+      <span style={{ fontFamily: "var(--font-heading)", fontWeight: "500", color: state.primaryColor }}>{" CNPY"}</span>
       <br />
       <hr style={{ border: "1px dashed black", borderRadius: "5px", width: "60%", margin: "0 auto" }} />
       <br />
@@ -317,7 +330,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
           { title: "Stake Amount", info: getValidatorAmount(), after: " cnpy" },
           { title: "Staked Status", info: getStakedStatus() },
         ].map((v, i) => (
-          <RenderAccountInfo key={i} v={v} i={i} />
+          <RenderAccountInfo key={i} v={v} i={i} color={state.primaryColor} />
         ))}
       </Row>
       <br />
@@ -384,6 +397,9 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
       >
         Import Private Key
       </Button>
+        <Button id="reveal-pk-button" variant="outline-danger" onClick={() => setState({ ...state, showPKModal: true })}>
+            Reveal Private Key
+        </Button>
       <Button
         id="import-pk-button"
         variant="outline-secondary"
@@ -392,10 +408,6 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
         }}
       >
         Download Keys
-      </Button>
-
-      <Button id="reveal-pk-button" variant="outline-danger" onClick={() => setState({ ...state, showPKModal: true })}>
-        Reveal Private Key
       </Button>
     </div>
   );
@@ -565,21 +577,22 @@ function ActionButton({ v, i, showModal }) {
   return (
     <div key={i} className="send-receive-button-container">
       <img className="send-receive-button" onClick={() => showModal(v.name)} src={`./${v.src}.png`} alt={v.title} />
-      <span style={{ fontSize: "10px" }}>{v.title}</span>
+        <br/>
+      <span style={{ fontSize: "10px", width: "100%"}}>{v.title}</span>
     </div>
   );
 }
 
 // RenderAccountInfo() generates a card displaying account summary details
-function RenderAccountInfo({ v, i }) {
+function RenderAccountInfo({ v, i }, color) {
   return (
     <Col key={i}>
       <Card className="account-summary-container-card">
         <Card.Header style={{ fontWeight: "100" }}>{v.title}</Card.Header>
         <Card.Body style={{ padding: "10px" }}>
-          <Card.Title style={{ fontWeight: "bold", fontSize: "14px" }}>
+          <Card.Title style={{ fontWeight: "500", fontSize: "14px" }}>
             {v.info}
-            <span style={{ fontSize: "10px", color: "#32908f" }}>{v.after}</span>
+            <span style={{ fontSize: "10px", color: color }}>{v.after}</span>
           </Card.Title>
         </Card.Body>
       </Card>
@@ -591,7 +604,7 @@ function RenderAccountInfo({ v, i }) {
 function RenderTransactions({ account, state, setState }) {
   return account.combined.length === 0 ? null : (
     <div className="recent-transactions-table">
-      <span style={{ textAlign: "center", fontWeight: "100", fontSize: "14px", color: "grey" }}>
+      <span style={{ textAlign: "center", fontWeight: "100", fontSize: "14px", color: state.greyColor }}>
         RECENT TRANSACTIONS
       </span>
       <Table className="table-fixed" bordered hover style={{ marginTop: "10px" }}>

@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"path"
-
 	pprof2 "runtime/pprof"
 
 	"github.com/alecthomas/units"

@@ -11,7 +11,11 @@ export default function Navigation({ openModal }) {
       <Navbar sticky="top" data-bs-theme="light" className="nav-bar">
         <Container>
           <Navbar.Brand className="nav-bar-brand">
-            <span className="nav-bar-brand-highlight">scan</span>opy explorer
+            <img 
+              src="/scanopy.png" 
+              alt="Scanopy Logo" 
+              className="nav-bar-logo"
+             />
           </Navbar.Brand>
           <div className="nav-bar-center">
             <Form onSubmit={() => openModal(convertIfNumber(q), 0)}>

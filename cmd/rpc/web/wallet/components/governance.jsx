@@ -257,6 +257,8 @@ export default function Governance({ keygroup, account: accountWithTxs, validato
         showPwd={true}
         placeholder={placeholders.pollJSON}
       />
+        <br /><br />
+        <hr/>
       <Header title="propose" img="./proposal.png" />
       <Table className="vote-table" bordered responsive hover>
         <thead>
