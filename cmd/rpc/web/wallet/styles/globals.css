@@ -18,7 +18,7 @@
   padding: 0;
   border: 0;
   background-color: unset;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .max-amount-btn:hover {
@@ -45,7 +45,7 @@
 }
 
 #nav-bar-brand {
-  font-weight: bold;
+  font-weight: 600;
   color: black;
   cursor: pointer;
 }
@@ -85,7 +85,7 @@
   background-color: white !important;
   opacity: 100%;
   text-decoration: none;
-  font-weight: bold;
+  font-weight: 600;
   border: 0 !important;
   border-bottom: 1px solid var(--primary-color) !important;
   width: 100px !important;
@@ -173,9 +173,10 @@
 }
 
 #balance {
-  font-weight: 800;
+  font-weight: 600;
   font-family: var(--font-heading);
-  font-size: 50px;
+  text-transform: uppercase;
+  font-size: 45px;
   margin: 0 auto;
 }
 
@@ -235,6 +236,7 @@ button {
   width: 60%;
   margin: 0 auto !important;
   font-family: var(--font-heading);
+  text-transform: uppercase;
 }
 
 .account-summary-container-card {
@@ -249,10 +251,11 @@ button {
 }
 
 .account-summary-info-title {
-  font-weight: bold;
-  font-size: 20px;
+  font-weight: 400;
+  font-size: 15px;
   color: #212529;
   font-family: var(--font-heading);
+  text-transform: uppercase;
 }
 
 .account-summary-info-content-container {
@@ -347,10 +350,14 @@ button {
   border-radius: 5px !important;
   overflow: hidden;
   cursor: pointer;
+  font-weight: 300;
 }
 
 th {
   font-family: var(--font-heading) !important;
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 1.5px;
 }
 
 .logs-button-container {
@@ -416,12 +423,15 @@ th {
 
 .carousel-item-title {
   font-size: 18px;
-  font-weight: 800 !important;
+  font-weight: 400 !important;
   font-family: var(--font-heading);
+  text-transform: uppercase;
 }
 
 .navbar {
   font-family: var(--font-heading);
+  font-size: 12px;
+  text-transform: uppercase;
 }
 
 .carousel-item-detail {
@@ -434,7 +444,7 @@ th {
 }
 
 #carousel-item-detail-title {
-  font-weight: bold;
+  font-weight: 600;
   filter: invert(100%);
   mix-blend-mode: difference;
   color: var(--primary-color);
@@ -468,23 +478,25 @@ th {
 }
 
 .carousel-btn {
-  font-weight: bold;
+  font-weight: 600;
   font-size: 14px;
   margin: 5px;
 }
 
 #propose-title {
-  font-weight: 800;
-  font-size: 45px;
+  font-weight: 600;
+  font-size: 35px;
   margin: 0 auto;
   font-family: var(--font-heading);
+  text-transform: uppercase;
 }
 
 #propose-subtitle {
-  font-weight: bold;
+  font-weight: 400;
   font-size: 18px;
   color: var(--primary-color);
   font-family: var(--font-heading);
+  text-transform: uppercase;
 }
 
 .governance-header-image {
@@ -516,7 +528,7 @@ th {
 }
 
 .pi-label {
-  font-weight: 800;
+  font-weight: 600;
   font-size: 14px;
 }
 
@@ -544,7 +556,7 @@ th {
 .accord-item {
   margin: 0 auto;
   width: 50%;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .accord-body-container {
@@ -561,12 +573,14 @@ th {
 .poll-prop-name {
   width: 100%;
   margin: 0 auto;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .poll-prop-hash {
   margin: 0 auto;
   font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 1.5px;
   color: black;
 }
 

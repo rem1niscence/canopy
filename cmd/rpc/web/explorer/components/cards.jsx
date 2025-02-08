@@ -180,7 +180,7 @@ export default function Cards(props) {
                 <Card.Title className="card-title">{cardTitles[idx]}</Card.Title>
                 <h5>{getCardHeader(cardData, idx)}</h5>
                 <Card.Text>
-                  <span>{getCardSubHeader(cardData, idx)}</span>
+                  <span className="card-info-2">{getCardSubHeader(cardData, idx)}</span>
                   <span className="card-info-3">{getCardRightAligned(cardData, idx)}</span>
                   <br />
                   <span className="card-info-4">{getCardNote(cardData, idx)}</span>

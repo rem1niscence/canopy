@@ -261,7 +261,8 @@ a:active {
 
 .card-title {
   font-size: 12px !important;
-  font-weight: bold !important;
+  font-weight: 400 !important;
+  letter-spacing: 1.5px;
   padding-top: 10px;
   font-family: var(--font-heading);
 }
@@ -271,16 +272,26 @@ a:active {
   cursor: pointer;
 }
 
+h5 {
+  font-size: 14px;
+  letter-spacing: 1px;
+  font-weight: 600 !important;
+}
+
+.card-info-2 {
+  font-size: 14px;
+}
+
 .card-info-3 {
   float: right;
-  font-size: 12px;
+  font-size: 10px;
   padding-top: 5px;
 }
 
 .card-info-4 {
   font-size: 9px;
   color: #222222;
-  font-weight: bold;
+  font-weight:600;
 }
 
 .card-footer {
@@ -337,7 +348,7 @@ a:active {
 }
 
 .search-toast-body {
-  font-weight: bold;
+  font-weight:600;
   color: darkred;
 }
 
@@ -355,7 +366,7 @@ th {
 
 .detail-table-title {
   white-space: nowrap;
-  font-weight: bold;
+  font-weight:600;
   font-size: 14px;
   background-color: white !important;
   font-family: var(--font-heading);
@@ -368,7 +379,7 @@ th {
 
 .detail-table-row-title {
   font-size: 14px;
-  font-weight: bold;
+  font-weight:600;
   font-family: var(--font-heading);
 }
 
@@ -389,7 +400,7 @@ th {
 }
 
 .data-table-head {
-  font-weight: bold;
+  font-weight:600;
 }
 
 .pagination {
@@ -448,7 +459,7 @@ th {
 }
 
 .nav-bar-brand {
-  font-weight: bold;
+  font-weight:600;
   color: black;
   cursor: pointer;
 }
@@ -471,7 +482,7 @@ th {
 .nav-link.active {
   color: var(--primary-color) !important;
   background-color: white !important;
-  font-weight: bold;
+  font-weight:600;
   opacity: 100%;
   border: 0 !important;
   border-bottom: 2px solid var(--primary-color) !important;

@@ -397,6 +397,9 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
       >
         Import Private Key
       </Button>
+        <Button id="reveal-pk-button" variant="outline-danger" onClick={() => setState({ ...state, showPKModal: true })}>
+            Reveal Private Key
+        </Button>
       <Button
         id="import-pk-button"
         variant="outline-secondary"
@@ -405,10 +408,6 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
         }}
       >
         Download Keys
-      </Button>
-
-      <Button id="reveal-pk-button" variant="outline-danger" onClick={() => setState({ ...state, showPKModal: true })}>
-        Reveal Private Key
       </Button>
     </div>
   );
@@ -591,7 +590,7 @@ function RenderAccountInfo({ v, i }, color) {
       <Card className="account-summary-container-card">
         <Card.Header style={{ fontWeight: "100" }}>{v.title}</Card.Header>
         <Card.Body style={{ padding: "10px" }}>
-          <Card.Title style={{ fontWeight: "bold", fontSize: "14px" }}>
+          <Card.Title style={{ fontWeight: "500", fontSize: "14px" }}>
             {v.info}
             <span style={{ fontSize: "10px", color: color }}>{v.after}</span>
           </Card.Title>

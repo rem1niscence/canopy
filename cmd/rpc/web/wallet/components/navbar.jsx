@@ -93,7 +93,7 @@ export default function Navigation({keystore, setActiveKey, keyIdx, setNavIdx, h
                     <div style={{backgroundImage: "url(" + socials[1].icon + ")"}} className="nav-social-icon"/>
                 </a>
                 <Navbar.Text className="navbar ms-4">
-                    Latest height: <strong className="nav-bar-brand-highlight">{Math.max(height - 1, 1)}</strong>
+                    Latest height : <strong style={{paddingLeft: "4px"}} className="nav-bar-brand-highlight">{Math.max(height - 1, 1)}</strong>
                 </Navbar.Text>
             </Container>
         </Navbar>
