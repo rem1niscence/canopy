@@ -46,7 +46,7 @@
 - Added wallet number input formatting 
 
 ## [Unreleased] - 1/19/2024
-- Changed Canopy to act as a sub-chain to prepare for the sub-chain architecture
+- Changed Canopy to act as a nested-chain to prepare for the nested-chain architecture
 - Added various rpc calls to support this architecture
 
 ## [Unreleased] - 1/12/2024
