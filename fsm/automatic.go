@@ -24,11 +24,16 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	if err != nil {
 		return err
 	}
+	// load the root chain id
+	rootChainId, err := s.GetRootChainId()
+	if err != nil {
+		return err
+	}
 	// if not root-Chain: the committee won't match the certificate result
 	// so just set the committee to nil to ignore the byzantine evidence
 	// the byzantine evidence is handled at `Transaction Level` via
 	// HandleMessageCertificateResults
-	if !s.Config.IsRootChain() {
+	if s.Config.ChainId != rootChainId {
 		return s.HandleCertificateResults(lastCertificate, nil)
 	}
 	// if is root-Chain: load the committee from state as the certificate result
@@ -120,7 +125,7 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	// update the committee data
 	return s.UpsertCommitteeData(&lib.CommitteeData{
 		ChainId:                chainId,
-		LastRootHeightUpdated:  qc.Header.RootHeight, // TODO this may cause an issue when going independent if new root-chain height < old-root-chain height
+		LastRootHeightUpdated:  qc.Header.RootHeight,
 		LastChainHeightUpdated: qc.Header.Height,
 		PaymentPercents:        results.RewardRecipients.PaymentPercents,
 	})

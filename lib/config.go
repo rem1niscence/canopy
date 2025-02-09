@@ -48,15 +48,21 @@ func DefaultConfig() Config {
 // MAIN CONFIG BELOW
 
 type MainConfig struct {
-	LogLevel    string `json:"logLevel"`
-	ChainId     uint64 `json:"chainId"`
-	RootChainId uint64 `json:"rootChainId"`
-	Headless    bool   `json:"headless"`
+	LogLevel  string      `json:"logLevel"`
+	ChainId   uint64      `json:"chainId"`
+	RootChain []RootChain `json:"rootChain"`
+	RunVDF    bool        `json:"RunVDF"`
+	Headless  bool        `json:"headless"`
 }
 
 // DefaultMainConfig() sets log level to 'info'
 func DefaultMainConfig() MainConfig {
-	return MainConfig{LogLevel: "info", RootChainId: CanopyChainId, ChainId: CanopyChainId, Headless: false}
+	return MainConfig{LogLevel: "info", RootChain: []RootChain{
+		{
+			ChainId: 1,
+			Url:     "http://localhost:50002",
+		},
+	}, RunVDF: true, ChainId: CanopyChainId, Headless: false}
 }
 
 // GetLogLevel() parses the log string in the config file into a LogLevel Enum
@@ -83,9 +89,13 @@ type RPCConfig struct {
 	RPCPort         string // the port where the rpc server is hosted
 	AdminPort       string // the port where the admin rpc server is hosted
 	RPCUrl          string // the url without port where the rpc server is hosted
-	RootChainRPCURL string // the url of the root-Chain's rpc
 	RootChainPollMS uint64 // how often to poll the base chain in milliseconds
 	TimeoutS        int    // the rpc request timeout in seconds
+}
+
+type RootChain struct {
+	ChainId uint64 `json:"chainId"`
+	Url     string `json:"url"`
 }
 
 // DefaultRPCConfig() sets rpc url to localhost and sets wallet, explorer, rpc, and admin ports from [50000-50003]
@@ -96,14 +106,10 @@ func DefaultRPCConfig() RPCConfig {
 		RPCPort:         "50002",
 		AdminPort:       "50003",
 		RPCUrl:          "http://localhost",
-		RootChainRPCURL: "http://localhost:50002",
 		RootChainPollMS: 1000,
 		TimeoutS:        3,
 	}
 }
-
-// IsRootChain() returns whether the self chain is base
-func (c Config) IsRootChain() bool { return c.RootChainId == c.ChainId }
 
 // STATE MACHINE CONFIG BELOW
 
@@ -132,18 +138,17 @@ type ConsensusConfig struct {
 	RoundInterruptTimeoutMS int // minus gossiping current Round time, how long (in milliseconds) the replica sleeps before moving to PACEMAKER phase
 }
 
-// DefaultConsensusConfig() configures 10 minute blocks
+// DefaultConsensusConfig() configures the block time
 func DefaultConsensusConfig() ConsensusConfig {
 	return ConsensusConfig{
-		ElectionTimeoutMS:      5000,
-		ElectionVoteTimeoutMS:  2000,
-		ProposeTimeoutMS:       2000,
-		ProposeVoteTimeoutMS:   2000,
-		PrecommitTimeoutMS:     2000,
-		PrecommitVoteTimeoutMS: 2000,
-		CommitTimeoutMS:        2000,
-		CommitProcessMS:        5000,
-		//CommitProcessMS:         583000, // 10 minute blocks - ^
+		ElectionTimeoutMS:       5000,
+		ElectionVoteTimeoutMS:   2000,
+		ProposeTimeoutMS:        2000,
+		ProposeVoteTimeoutMS:    2000,
+		PrecommitTimeoutMS:      2000,
+		PrecommitVoteTimeoutMS:  2000,
+		CommitTimeoutMS:         2000,
+		CommitProcessMS:         5000,
 		RoundInterruptTimeoutMS: 5000,
 	}
 }

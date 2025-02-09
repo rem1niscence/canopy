@@ -719,7 +719,7 @@ func TestViewCheck(t *testing.T) {
 			detail:    "the committee ids are different",
 			view:      &View{ChainId: 1},
 			checkView: &View{ChainId: 2},
-			error:     "wrong committee id",
+			error:     "wrong chain id",
 		},
 		{
 			name:           "the height is incorrect",

@@ -380,8 +380,13 @@ func (s *StateMachine) HandleMessageDAOTransfer(msg *types.MessageDAOTransfer) l
 
 // HandleMessageCertificateResults() is the proper handler for a `CertificateResults` message
 func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertificateResults) lib.ErrorI {
+	// load the root chain id from state
+	rootChainId, err := s.GetRootChainId()
+	if err != nil {
+		return err
+	}
 	// block any tx message certificate result for self committee id, as it is stored in the qc
-	if msg.Qc.Header.ChainId == s.Config.RootChainId {
+	if msg.Qc.Header.ChainId == rootChainId {
 		return types.ErrInvalidCertificateResults()
 	}
 	s.log.Debugf("Handling certificate results msg with height %d:%d", msg.Qc.Header.Height, msg.Qc.Header.RootHeight)

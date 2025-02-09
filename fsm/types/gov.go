@@ -50,6 +50,7 @@ func DefaultParams() *Params {
 		Consensus: &ConsensusParams{
 			BlockSize:       uint64(units.MB),
 			ProtocolVersion: NewProtocolVersion(0, 1),
+			RootChainId:     1,
 			Retired:         0,
 		},
 		Validator: &ValidatorParams{
@@ -109,6 +110,7 @@ const (
 	ParamBlockSize       = "block_size"       // size of the block - header
 	ParamProtocolVersion = "protocol_version" // current protocol version (upgrade enforcement)
 	ParamRetired         = "retired"          // if the chain is marking itself as 'retired' to the root-Chain making it forever un-subsidized
+	ParamRootChainId     = "root_chain_id"    // the chain id of the root chain (source of the validator set)
 )
 
 var _ ParamSpace = &ConsensusParams{}
@@ -128,6 +130,8 @@ func (x *ConsensusParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.BlockSize = value
 	case ParamRetired:
 		x.Retired = value
+	case ParamRootChainId:
+		x.RootChainId = value
 	default:
 		return ErrUnknownParam()
 	}

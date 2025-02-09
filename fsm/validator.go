@@ -8,8 +8,6 @@ import (
 	"slices"
 )
 
-// TODO investigate 0 validator committee situations
-
 // GetValidator() gets the validator from the store via the address
 func (s *StateMachine) GetValidator(address crypto.AddressI) (*types.Validator, lib.ErrorI) {
 	bz, err := s.Get(types.KeyForValidator(address))

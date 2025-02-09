@@ -108,7 +108,9 @@ func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
 
 // SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
 func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
-	if c.Config.IsRootChain() {
+	// get the root chain id from the state
+	rootChainId, err := c.FSM.GetRootChainId()
+	if c.Config.ChainId == rootChainId {
 		return // root-Chain doesn't send this
 	}
 	c.log.Debugf("Sending certificate results txn for: %s", lib.BytesToString(qc.ResultsHash))
@@ -117,7 +119,7 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 	defer func() { qc.Block = blk }()
 	// it's good practice to omit the block when sending the transaction as it's not relevant to canopy
 	qc.Block = nil
-	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, c.Config.RootChainId, c.Config.NetworkID, 0, "")
+	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, rootChainId, c.Config.NetworkID, 0, "")
 	if err != nil {
 		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return

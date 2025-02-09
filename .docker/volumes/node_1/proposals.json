@@ -1,15 +1,4 @@
 {
-  "1835b9362af75cfeb3bc9492e1eba8572347a795c6ac900925caacc5b03295b5": {
-    "proposal": {
-      "parameter_space": "cons",
-      "parameter_key": "protocol_version",
-      "parameter_value": "3/40",
-      "start_height": 1,
-      "end_height": 100,
-      "signer": "851e90eaef1fa27debaee2c2591503bdeec1d123"
-    },
-    "approve": true
-  },
   "7bad44511419036edf4d2a3f88a5b92e857bc15ffc5fdb410dcc532cfc1796d2": {
     "proposal": {
       "parameter_space": "cons|fee|val|gov",
@@ -18,17 +7,6 @@
       "start_height": 1,
       "end_height": 1000000,
       "signer": "46464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646"
-    },
-    "approve": true
-  },
-  "df6ea90621f29af268652c81f1886f73a452ee08f845f1dd6a5d30d0a40b7a9a": {
-    "proposal": {
-      "parameter_space": "cons",
-      "parameter_key": "protocol_version",
-      "parameter_value": "2/10",
-      "start_height": 1,
-      "end_height": 100,
-      "signer": "851e90eaef1fa27debaee2c2591503bdeec1d123"
     },
     "approve": true
   }

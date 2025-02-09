@@ -59,13 +59,26 @@ func (s *StateMachine) UpdateParam(paramSpace, paramName string, value proto.Mes
 }
 
 // ConformStateToParamUpdate() ensures the state does not violate the new values of the governance parameters
-// NOTE: at the moment only MaxCommitteeSize requires an adjustment with the exception of MinSellOrderSize which
+// NOTE: at the moment only MaxCommitteeSize & RootChainId requires an adjustment with the exception of MinSellOrderSize which
 // is purposefully allowed to violate new updates
 func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) lib.ErrorI {
 	// retrieve the params from state
 	params, err := s.GetParams()
 	if err != nil {
 		return err
+	}
+	// if root chain id was updated
+	if previousParams.Consensus.RootChainId != params.Consensus.RootChainId {
+		selfCommittee, e := s.GetCommitteeData(s.Config.ChainId)
+		if e != nil {
+			return e
+		}
+		// reset the root height updated
+		selfCommittee.LastRootHeightUpdated = 0
+		// overwrite the committee data in state
+		if err = s.OverwriteCommitteeData(selfCommittee); err != nil {
+			return err
+		}
 	}
 	// check for a change in MaxCommitteeSize
 	if previousParams.Validator.MaxCommitteeSize <= params.Validator.MaxCommittees {
@@ -386,4 +399,13 @@ func (s *StateMachine) OnOrAfterVersion(version uint64) (isEnabled bool) {
 	}
 	// if on the version + on or greater than the upgrade height
 	return s.Height() >= v.Height && version == v.Version
+}
+
+// GetRootChainId() gets the latest root chain id from the state
+func (s *StateMachine) GetRootChainId() (uint64, lib.ErrorI) {
+	consParams, err := s.GetParamsCons()
+	if err != nil {
+		return 0, err
+	}
+	return consParams.RootChainId, nil
 }

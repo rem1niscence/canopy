@@ -362,7 +362,7 @@ func TestCheckReplay(t *testing.T) {
 				NetworkId: 1,
 				ChainId:   2,
 			},
-			error: "wrong committee id",
+			error: "wrong chain id",
 		},
 		{
 			name:   "before height 2",

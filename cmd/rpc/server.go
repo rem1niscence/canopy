@@ -283,58 +283,84 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 // PollRootChainInfo() retrieves the information from the root-Chain required for consensus
 func PollRootChainInfo() {
 	var rootChainHeight uint64
-	// create a rpc client
-	rpcClient := NewClient(conf.RootChainRPCURL, "", "")
-	// set the apps callbacks
-	app.RootChainInfo.RemoteCallbacks = &lib.RemoteCallbacks{
-		Checkpoint:            rpcClient.Checkpoint,
-		ValidatorSet:          rpcClient.ValidatorSet,
-		IsValidDoubleSigner:   rpcClient.IsValidDoubleSigner,
-		Transaction:           rpcClient.Transaction,
-		LastProposers:         rpcClient.LastProposers,
-		MinimumEvidenceHeight: rpcClient.MinimumEvidenceHeight,
-		CommitteeData:         rpcClient.CommitteeData,
-		Lottery:               rpcClient.Lottery,
-		Orders:                rpcClient.Orders,
-	}
 	// execute the loop every conf.RootChainPollMS duration
 	ticker := time.NewTicker(time.Duration(conf.RootChainPollMS) * time.Millisecond)
 	for range ticker.C {
-		// query the base chain height
-		height, err := rpcClient.Height()
-		if err != nil {
-			logger.Errorf("GetRootChainHeight failed with err %s", err.Error())
-			continue
-		}
-		// check if a new height was received
-		if *height <= rootChainHeight {
-			//logger.Debugf("Up to date with base chain height %d", rootChainHeight)
-			continue
-		}
-		// update the base chain hegiht
-		rootChainHeight = *height
-		// if a new height received
-		logger.Infof("New RootChain Height %d detected!", rootChainHeight)
-		// execute the requests to get the base chain information
-		for retry := lib.NewRetry(conf.RootChainPollMS, 3); retry.WaitAndDoRetry(); {
-			// retrieve the root-Chain info
-			rootChainInfo, e := rpcClient.RootChainInfo(rootChainHeight, conf.ChainId)
-			if e == nil {
-				// update the controller with new root-Chain info
-				app.UpdateRootChainInfo(rootChainInfo)
-				logger.Info("Updated RootChain information")
-				break
+		if err := func() (err error) {
+			state, err := app.FSM.TimeMachine(0)
+			if err != nil {
+				return
 			}
-			logger.Errorf("GetRootChainInfo failed with err %s", e.Error())
-			// update with empty root-Chain info to stop consensus
-			app.UpdateRootChainInfo(&lib.RootChainInfo{
-				Height:           rootChainHeight,
-				ValidatorSet:     lib.ValidatorSet{},
-				LastValidatorSet: lib.ValidatorSet{},
-				LastProposers:    &lib.Proposers{},
-				LotteryWinner:    &lib.LotteryWinner{},
-				Orders:           &lib.OrderBook{},
-			})
+			defer state.Discard()
+			// get the consensus params from the app
+			consParams, err := state.GetParamsCons()
+			if err != nil {
+				return
+			}
+			// get the url for the root chain as set by the state
+			var rootChainUrl string
+			for _, chain := range conf.RootChain {
+				if chain.ChainId == consParams.RootChainId {
+					rootChainUrl = chain.Url
+				}
+			}
+			// check if root chain url isn't empty
+			if rootChainUrl == "" {
+				logger.Errorf("Config.JSON missing RootChainID=%d failed with", consParams.RootChainId)
+				return lib.ErrEmptyChainId()
+			}
+			// create a rpc client
+			rpcClient := NewClient(rootChainUrl, "", "")
+			// set the apps callbacks
+			app.RootChainInfo.RemoteCallbacks = &lib.RemoteCallbacks{
+				Checkpoint:            rpcClient.Checkpoint,
+				ValidatorSet:          rpcClient.ValidatorSet,
+				IsValidDoubleSigner:   rpcClient.IsValidDoubleSigner,
+				Transaction:           rpcClient.Transaction,
+				LastProposers:         rpcClient.LastProposers,
+				MinimumEvidenceHeight: rpcClient.MinimumEvidenceHeight,
+				CommitteeData:         rpcClient.CommitteeData,
+				Lottery:               rpcClient.Lottery,
+				Orders:                rpcClient.Orders,
+			}
+			// query the base chain height
+			height, err := rpcClient.Height()
+			if err != nil {
+				logger.Errorf("GetRootChainHeight failed with err")
+				return err
+			}
+			// check if a new height was received
+			if *height <= rootChainHeight {
+				return
+			}
+			// update the base chain height
+			rootChainHeight = *height
+			// if a new height received
+			logger.Infof("New RootChain Height %d detected!", rootChainHeight)
+			// execute the requests to get the base chain information
+			for retry := lib.NewRetry(conf.RootChainPollMS, 3); retry.WaitAndDoRetry(); {
+				// retrieve the root-Chain info
+				rootChainInfo, e := rpcClient.RootChainInfo(rootChainHeight, conf.ChainId)
+				if e == nil {
+					// update the controller with new root-Chain info
+					app.UpdateRootChainInfo(rootChainInfo)
+					logger.Info("Updated RootChain information")
+					break
+				}
+				logger.Errorf("GetRootChainInfo failed with err %s", e.Error())
+				// update with empty root-Chain info to stop consensus
+				app.UpdateRootChainInfo(&lib.RootChainInfo{
+					Height:           rootChainHeight,
+					ValidatorSet:     lib.ValidatorSet{},
+					LastValidatorSet: lib.ValidatorSet{},
+					LastProposers:    &lib.Proposers{},
+					LotteryWinner:    &lib.LotteryWinner{},
+					Orders:           &lib.OrderBook{},
+				})
+			}
+			return
+		}(); err != nil {
+			logger.Warnf(err.Error())
 		}
 	}
 }
@@ -1909,10 +1935,9 @@ func injectConfig(html string, config lib.Config) string {
 		window.__CONFIG__ = {
             rpcURL: "%s:%s",
             adminRPCURL: "%s:%s",
-            rootChainRPCURL: "%s",
             chainId: %d
         };
-	</script>`, config.RPCUrl, config.RPCPort, config.RPCUrl, config.AdminPort, conf.RootChainRPCURL, conf.ChainId)
+	</script>`, config.RPCUrl, config.RPCPort, config.RPCUrl, config.AdminPort, conf.ChainId)
 
 	// inject the script just before </head>
 	return strings.Replace(html, "</head>", script+"</head>", 1)

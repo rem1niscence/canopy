@@ -407,6 +407,9 @@ func (s *StateMachine) DeleteDelegate(address crypto.AddressI, chainId, stakeFor
 func (s *StateMachine) UpsertCommitteeData(new *lib.CommitteeData) lib.ErrorI {
 	// retrieve the committees' data list, the target and index in the list based on the chainId
 	committeesData, targetData, idx, err := s.getCommitteeDataAndList(new.ChainId)
+	if err != nil {
+		return err
+	}
 	// check the new committee data is not 'out-dated'
 	if new.LastChainHeightUpdated <= targetData.LastChainHeightUpdated {
 		return lib.ErrInvalidQCCommitteeHeight()
@@ -416,6 +419,20 @@ func (s *StateMachine) UpsertCommitteeData(new *lib.CommitteeData) lib.ErrorI {
 	}
 	// combine the new data with the target
 	if err = targetData.Combine(new); err != nil {
+		return err
+	}
+	// add the target back into the list
+	committeesData.List[idx] = targetData
+	// set the list back into state
+	return s.SetCommitteesData(committeesData)
+}
+
+// OverwriteCommitteeData() overwrites the committee data in state
+// note: use UpsertCommitteeData for the safe committee upsert
+func (s *StateMachine) OverwriteCommitteeData(d *lib.CommitteeData) lib.ErrorI {
+	// retrieve the committees' data list, the target and index in the list based on the chainId
+	committeesData, targetData, idx, err := s.getCommitteeDataAndList(d.ChainId)
+	if err != nil {
 		return err
 	}
 	// add the target back into the list

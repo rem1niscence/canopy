@@ -720,7 +720,7 @@ func (b *BFT) SelfIsValidator() bool {
 
 // RunVDF() runs the verifiable delay service
 func (b *BFT) RunVDF() lib.ErrorI {
-	if !b.Config.IsRootChain() {
+	if !b.Config.RunVDF {
 		return nil
 	}
 	// generate the VDF seed

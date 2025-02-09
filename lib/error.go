@@ -615,7 +615,7 @@ func ErrEmptyChainId() ErrorI {
 }
 
 func ErrWrongChainId() ErrorI {
-	return NewError(CodeWrongChainId, StateMachineModule, "wrong committee id")
+	return NewError(CodeWrongChainId, StateMachineModule, "wrong chain id")
 }
 
 func ErrDuplicateTx(hash string) ErrorI {
