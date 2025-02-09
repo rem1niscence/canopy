@@ -604,7 +604,7 @@ function RenderAccountInfo({ v, i }, color) {
 function RenderTransactions({ account, state, setState }) {
   return account.combined.length === 0 ? null : (
     <div className="recent-transactions-table">
-      <span style={{ textAlign: "center", fontWeight: "100", fontSize: "14px", color: state.greyColor }}>
+      <span class="table-label">
         RECENT TRANSACTIONS
       </span>
       <Table className="table-fixed" bordered hover style={{ marginTop: "10px" }}>

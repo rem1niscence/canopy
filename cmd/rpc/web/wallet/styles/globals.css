@@ -25,19 +25,25 @@
   color: var(--primary-color);
 }
 
+/* TODO: Is this needed for something? Causes weird scrollbar issues
 #pageContent {
   margin: 0 auto;
   width: 95%;
   height: 100vh;
   overflow: scroll;
 }
+*/
 
 #nav-bar {
-  background: white;
+  background: var(--bs-body-bg);
   border-bottom: 1px solid lightgray;
   padding-bottom: 15px;
   position: fixed;
   width: 100%;
+}
+
+.navbar-dark #nav-bar{
+  background: #fff;
 }
 
 #nav-bar-container {
@@ -81,8 +87,6 @@
 }
 
 .nav-link.active {
-  color: var(--primary-color) !important;
-  background-color: white !important;
   opacity: 100%;
   text-decoration: none;
   font-weight: 600;
@@ -97,8 +101,6 @@
 }
 
 .nav-link {
-  color: lightgray !important;
-  background-color: white !important;
   opacity: 100%;
   width: 100px !important;
   margin: 0 auto;
@@ -107,7 +109,6 @@
 }
 
 #nav-dropdown {
-  color: black !important;
   font-weight: 300;
   margin: 0 auto !important;
   width: 100% !important;
@@ -129,6 +130,16 @@
 .navbar-image-link {
   width: 30px;
   height: 30px;
+}
+
+.navbar-dark .navbar-image-link {
+  fill: #fff;
+}
+
+.navbar-dark .navbar-text {
+  padding-top: .5rem;
+  padding-bottom: .5rem;
+  color: #fff;
 }
 
 #nav-dropdown-container {
@@ -169,7 +180,6 @@
   margin: 0 auto;
   text-align: center;
   padding-top: 100px;
-  background-color: white;
 }
 
 #balance {
@@ -232,6 +242,11 @@ button {
   width: 40px;
 }
 
+.account-summary-container-card .card-title {
+  margin: 0 var(--bs-card-title-spacer-y);
+  color: var(--bs-card-title-color);
+}
+
 .account-summary-container {
   width: 60%;
   margin: 0 auto !important;
@@ -253,16 +268,14 @@ button {
 .account-summary-info-title {
   font-weight: 400;
   font-size: 15px;
-  color: #212529;
   font-family: var(--font-heading);
   text-transform: uppercase;
 }
 
 .account-summary-info-content-container {
-  background-color: #f8f8f8;
   padding: 5px;
   border-radius: 5px;
-  margin-top: 10px;
+  margin: 1rem 0;
   border: 1px solid lightgray;
   cursor: pointer;
   transition: ease-in-out 0.2s;
@@ -276,7 +289,8 @@ button {
 .account-summary-info-content {
   font-size: 12px;
   font-weight: 100;
-  width: 90%;
+  width: 97%;
+  overflow: hidden;
 }
 
 .account-summary-info-content-image {
@@ -334,6 +348,12 @@ button {
 
 #import-pk-button:hover {
   margin: 10px;
+}
+
+.table-label{
+  text-align: center;
+  font-weight: 100;
+  font-size: 14px;
 }
 
 .recent-transactions-table {
@@ -644,3 +664,41 @@ th {
   margin-right: 8px; 
   vertical-align: middle;
 }
+
+/* TODO: Organize these CSS files into logical groups around page elements */
+
+.form-check.form-switch.color-mode {
+  padding: 0 1rem;
+}
+
+.form-check-input:checked#darkModeSwitch {
+  background-color: var(--primary-color);
+  border-color: var(--secondary-color);
+}
+
+.form-switch .form-check-input#darkModeSwitch, .form-switch .form-check-input:focus#darkModeSwitch {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%232c9b5a'/%3e%3c/svg%3e");
+  border-color: #2c9b5a;
+  outline: 0;
+  box-shadow: none;
+}
+
+.navbar-dark .form-switch .form-check-input#darkModeSwitch, .navbar-dark .form-switch .form-check-input:focus#darkModeSwitch {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ffffff'/%3e%3c/svg%3e");
+}
+
+input#darkModeSwitch {
+  width: 2rem;
+  height: 1.1rem;
+}
+
+label#colorSwitchLabel {
+  font-size: 1rem;
+  padding: 0 0.5rem;
+}
+
+i.bi {
+  color: var(--primary-color);
+}
+
+/* Dark Mode Support */

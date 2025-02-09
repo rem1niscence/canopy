@@ -1,7 +1,8 @@
 import Container from "react-bootstrap/Container";
 import Navbar from "react-bootstrap/Navbar";
-import {Nav, NavDropdown} from "react-bootstrap";
-import {withTooltip} from "@/components/util";
+import { Nav, NavDropdown } from "react-bootstrap";
+import { withTooltip } from "@/components/util";
+import DarkModeToggle from "@/components/color_mode";
 
 const navbarIconsAndTip = [
     {
@@ -82,6 +83,7 @@ export default function Navigation({keystore, setActiveKey, keyIdx, setNavIdx, h
                         ))}
                     </Nav>
                 </div>
+                <DarkModeToggle />
                 <a href={socials[0].url}>
                     <div
                         id="nav-social-icon-discord"
