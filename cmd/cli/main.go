@@ -69,6 +69,11 @@ var startCmd = &cobra.Command{
 
 // Start() is the entrypoint of the application
 func Start() {
+	// allow sleep and wake up using config
+	wakeDate := time.Unix(int64(config.SleepUntil), 0)
+	if time.Now().Before(wakeDate) {
+		time.Sleep(time.Until(wakeDate))
+	}
 	// create a new database object from the config
 	db, err := store.New(config, l)
 	if err != nil {

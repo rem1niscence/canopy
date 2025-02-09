@@ -48,11 +48,12 @@ func DefaultConfig() Config {
 // MAIN CONFIG BELOW
 
 type MainConfig struct {
-	LogLevel  string      `json:"logLevel"`
-	ChainId   uint64      `json:"chainId"`
-	RootChain []RootChain `json:"rootChain"`
-	RunVDF    bool        `json:"RunVDF"`
-	Headless  bool        `json:"headless"`
+	LogLevel   string      `json:"logLevel"`
+	ChainId    uint64      `json:"chainId"`
+	SleepUntil uint64      `json:"sleepUntil"`
+	RootChain  []RootChain `json:"rootChain"`
+	RunVDF     bool        `json:"RunVDF"`
+	Headless   bool        `json:"headless"`
 }
 
 // DefaultMainConfig() sets log level to 'info'
