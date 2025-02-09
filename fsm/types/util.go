@@ -245,15 +245,15 @@ func NewSlashTracker() *SlashTracker {
 }
 
 // AddSlash() adds a slash for an address at by a committee for a certain percent
-func (s *SlashTracker) AddSlash(address []byte, committeeId, percent uint64) {
+func (s *SlashTracker) AddSlash(address []byte, chainId, percent uint64) {
 	// add the percent to the total
-	(*s)[s.toKey(address)][committeeId] += percent
+	(*s)[s.toKey(address)][chainId] += percent
 }
 
 // GetTotalSlashPercent() returns the total percent for a slash
-func (s *SlashTracker) GetTotalSlashPercent(address []byte, committeeId uint64) (percent uint64) {
+func (s *SlashTracker) GetTotalSlashPercent(address []byte, chainId uint64) (percent uint64) {
 	// return the total percent
-	return (*s)[s.toKey(address)][committeeId]
+	return (*s)[s.toKey(address)][chainId]
 }
 
 // toKey() converts the address bytes to a string and ensures the map is initialized for that address

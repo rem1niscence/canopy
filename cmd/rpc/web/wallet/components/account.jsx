@@ -246,7 +246,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
         create_order: () =>
           TxCreateOrder(
             r.sender,
-            r.committeeId,
+            r.chainId,
             amount,
             receiveAmount,
             r.receiveAddress,
@@ -259,7 +259,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
         edit_order: () =>
           TxEditOrder(
             r.sender,
-            r.committeeId,
+            r.chainId,
             numberFromCommas(r.orderId),
             amount,
             receiveAmount,
@@ -269,7 +269,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
             r.password,
             submit,
           ),
-        delete_order: () => TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, fee, r.password, submit),
+        delete_order: () => TxDeleteOrder(r.sender, r.chainId, r.orderId, r.memo, fee, r.password, submit),
       };
 
       const txFunction = txMap[state.txType];

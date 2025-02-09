@@ -68,11 +68,11 @@ func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) l
 		return err
 	}
 	// check for a change in MaxCommitteeSize
-	if previousParams.Validator.ValidatorMaxCommitteeSize <= params.Validator.ValidatorMaxCommittees {
+	if previousParams.Validator.MaxCommitteeSize <= params.Validator.MaxCommittees {
 		return nil
 	}
 	// shrinking MaxCommitteeSize must be immediately enforced to ensure no 'grandfathered' in violators
-	maxCommitteeSize := int(params.Validator.ValidatorMaxCommittees)
+	maxCommitteeSize := int(params.Validator.MaxCommittees)
 	// maintain a counter for pseudorandom removal of the 'chain ids'
 	var idx int
 	// for each validator, remove the excess ids in a pseudorandom fashion
@@ -296,7 +296,7 @@ func (s *StateMachine) PollsToResults(polls *types.ActivePolls) (result types.Po
 	// get the canopy validator set
 	members, err := s.GetCommitteeMembers(s.Config.ChainId)
 	if err != nil {
-		// NOTE: sub-chains may have no validators - so not returning an error here
+		// NOTE: nested-chains may have no validators - so not returning an error here
 		return result, nil
 	}
 	// get the supply

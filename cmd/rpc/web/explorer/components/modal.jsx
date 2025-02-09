@@ -70,7 +70,7 @@ export function convertCertificateResults(qc) {
   return {
     certificate_height: qc.header.height,
     network_id: qc.header.networkID,
-    committee_id: qc.header.committeeID,
+    chain_id: qc.header.chainId,
     block_hash: qc.blockHash,
     results_hash: qc.resultsHash
   };

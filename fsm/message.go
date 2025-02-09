@@ -49,31 +49,31 @@ func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee uint64, err lib.E
 	}
 	switch x := msg.(type) {
 	case *types.MessageSend:
-		return feeParams.MessageSendFee, nil
+		return feeParams.SendFee, nil
 	case *types.MessageStake:
-		return feeParams.MessageStakeFee, nil
+		return feeParams.StakeFee, nil
 	case *types.MessageEditStake:
-		return feeParams.MessageEditStakeFee, nil
+		return feeParams.EditStakeFee, nil
 	case *types.MessageUnstake:
-		return feeParams.MessageUnstakeFee, nil
+		return feeParams.UnstakeFee, nil
 	case *types.MessagePause:
-		return feeParams.MessagePauseFee, nil
+		return feeParams.PauseFee, nil
 	case *types.MessageUnpause:
-		return feeParams.MessageUnpauseFee, nil
+		return feeParams.UnpauseFee, nil
 	case *types.MessageChangeParameter:
-		return feeParams.MessageChangeParameterFee, nil
+		return feeParams.ChangeParameterFee, nil
 	case *types.MessageDAOTransfer:
-		return feeParams.MessageDaoTransferFee, nil
+		return feeParams.DaoTransferFee, nil
 	case *types.MessageCertificateResults:
-		return feeParams.MessageCertificateResultsFee, nil
+		return feeParams.CertificateResultsFee, nil
 	case *types.MessageSubsidy:
-		return feeParams.MessageSubsidyFee, nil
+		return feeParams.SubsidyFee, nil
 	case *types.MessageCreateOrder:
-		return feeParams.MessageCreateOrderFee, nil
+		return feeParams.CreateOrderFee, nil
 	case *types.MessageEditOrder:
-		return feeParams.MessageEditOrderFee, nil
+		return feeParams.EditOrderFee, nil
 	case *types.MessageDeleteOrder:
-		return feeParams.MessageDeleteOrderFee, nil
+		return feeParams.DeleteOrderFee, nil
 	default:
 		return 0, types.ErrUnknownMessage(x)
 	}
@@ -87,31 +87,31 @@ func (s *StateMachine) GetFeeForMessageName(name string) (fee uint64, err lib.Er
 	}
 	switch name {
 	case types.MessageSendName:
-		return feeParams.MessageSendFee, nil
+		return feeParams.SendFee, nil
 	case types.MessageStakeName:
-		return feeParams.MessageStakeFee, nil
+		return feeParams.StakeFee, nil
 	case types.MessageEditStakeName:
-		return feeParams.MessageEditStakeFee, nil
+		return feeParams.EditStakeFee, nil
 	case types.MessageUnstakeName:
-		return feeParams.MessageUnstakeFee, nil
+		return feeParams.UnstakeFee, nil
 	case types.MessagePauseName:
-		return feeParams.MessagePauseFee, nil
+		return feeParams.PauseFee, nil
 	case types.MessageUnpauseName:
-		return feeParams.MessageUnpauseFee, nil
+		return feeParams.UnpauseFee, nil
 	case types.MessageChangeParameterName:
-		return feeParams.MessageChangeParameterFee, nil
+		return feeParams.ChangeParameterFee, nil
 	case types.MessageDAOTransferName:
-		return feeParams.MessageDaoTransferFee, nil
+		return feeParams.DaoTransferFee, nil
 	case types.MessageCertificateResultsName:
-		return feeParams.MessageCertificateResultsFee, nil
+		return feeParams.CertificateResultsFee, nil
 	case types.MessageSubsidyName:
-		return feeParams.MessageSubsidyFee, nil
+		return feeParams.SubsidyFee, nil
 	case types.MessageCreateOrderName:
-		return feeParams.MessageCreateOrderFee, nil
+		return feeParams.CreateOrderFee, nil
 	case types.MessageEditOrderName:
-		return feeParams.MessageEditOrderFee, nil
+		return feeParams.EditOrderFee, nil
 	case types.MessageDeleteOrderName:
-		return feeParams.MessageDeleteOrderFee, nil
+		return feeParams.DeleteOrderFee, nil
 	default:
 		return 0, lib.ErrUnknownMessageName(name)
 	}
@@ -145,13 +145,13 @@ func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]by
 	case *types.MessageCreateOrder:
 		return [][]byte{x.SellersSendAddress}, nil
 	case *types.MessageEditOrder:
-		order, e := s.GetOrder(x.OrderId, x.CommitteeId)
+		order, e := s.GetOrder(x.OrderId, x.ChainId)
 		if e != nil {
 			return nil, e
 		}
 		return [][]byte{order.SellersSendAddress}, nil
 	case *types.MessageDeleteOrder:
-		order, e := s.GetOrder(x.OrderId, x.CommitteeId)
+		order, e := s.GetOrder(x.OrderId, x.ChainId)
 		if e != nil {
 			return nil, e
 		}
@@ -292,9 +292,9 @@ func (s *StateMachine) HandleMessageUnstake(msg *types.MessageUnstake) lib.Error
 	// get unstaking blocks parameter
 	var unstakingBlocks uint64
 	if !validator.Delegate {
-		unstakingBlocks = p.ValidatorUnstakingBlocks
+		unstakingBlocks = p.UnstakingBlocks
 	} else {
-		unstakingBlocks = p.ValidatorDelegateUnstakingBlocks
+		unstakingBlocks = p.DelegateUnstakingBlocks
 	}
 	unstakingHeight := s.Height() + unstakingBlocks
 	// set validator unstaking
@@ -324,7 +324,7 @@ func (s *StateMachine) HandleMessagePause(msg *types.MessagePause) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	maxPausedHeight := s.Height() + params.ValidatorMaxPauseBlocks
+	maxPausedHeight := s.Height() + params.MaxPauseBlocks
 	// set validator paused
 	return s.SetValidatorPaused(address, validator, maxPausedHeight)
 }
@@ -381,14 +381,14 @@ func (s *StateMachine) HandleMessageDAOTransfer(msg *types.MessageDAOTransfer) l
 // HandleMessageCertificateResults() is the proper handler for a `CertificateResults` message
 func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertificateResults) lib.ErrorI {
 	// block any tx message certificate result for self committee id, as it is stored in the qc
-	if msg.Qc.Header.CommitteeId == s.Config.BaseChainId {
+	if msg.Qc.Header.ChainId == s.Config.RootChainId {
 		return types.ErrInvalidCertificateResults()
 	}
-	s.log.Debugf("Handling certificate results msg with height %d:%d", msg.Qc.Header.Height, msg.Qc.Header.CanopyHeight)
+	s.log.Debugf("Handling certificate results msg with height %d:%d", msg.Qc.Header.Height, msg.Qc.Header.RootHeight)
 	// define convenience variables
-	committeeId := msg.Qc.Header.CommitteeId
+	chainId := msg.Qc.Header.ChainId
 	// get the proper reward Pool
-	poolBalance, err := s.GetPoolBalance(committeeId)
+	poolBalance, err := s.GetPoolBalance(chainId)
 	if err != nil {
 		return err
 	}
@@ -397,13 +397,13 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 		return types.ErrNonSubsidizedCommittee()
 	}
 	// get committee for the QC
-	committee, err := s.LoadCommittee(committeeId, msg.Qc.Header.CanopyHeight)
+	committee, err := s.LoadCommittee(chainId, msg.Qc.Header.RootHeight)
 	if err != nil {
 		return err
 	}
 	// ensure it's a valid QC
 	// max block size is 0 here because there should not be a block attached to this QC
-	isPartialQC, err := msg.Qc.Check(committee, 0, &lib.View{NetworkId: uint64(s.NetworkID), CommitteeId: committeeId}, false)
+	isPartialQC, err := msg.Qc.Check(committee, 0, &lib.View{NetworkId: uint64(s.NetworkID), ChainId: chainId}, false)
 	if err != nil {
 		return err
 	}
@@ -418,7 +418,7 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 // HandleMessageSubsidy() is the proper handler for a `Subsidy` message
 func (s *StateMachine) HandleMessageSubsidy(msg *types.MessageSubsidy) lib.ErrorI {
 	// get the retired status of the committee
-	retired, err := s.CommitteeIsRetired(msg.CommitteeId)
+	retired, err := s.CommitteeIsRetired(msg.ChainId)
 	if err != nil {
 		return err
 	}
@@ -431,7 +431,7 @@ func (s *StateMachine) HandleMessageSubsidy(msg *types.MessageSubsidy) lib.Error
 		return err
 	}
 	// add to recipient committee
-	return s.PoolAdd(msg.CommitteeId, msg.Amount)
+	return s.PoolAdd(msg.ChainId, msg.Amount)
 }
 
 // HandleMessageCreateOrder() is the proper handler for a `CreateOrder` message
@@ -441,7 +441,7 @@ func (s *StateMachine) HandleMessageCreateOrder(msg *types.MessageCreateOrder) (
 		return
 	}
 	// ensure order isn't below the minimum size
-	if msg.RequestedAmount < valParams.ValidatorMinimumOrderSize {
+	if msg.RequestedAmount < valParams.MinimumOrderSize {
 		return types.ErrMinimumOrderSize()
 	}
 	// subtract from account balance
@@ -450,23 +450,23 @@ func (s *StateMachine) HandleMessageCreateOrder(msg *types.MessageCreateOrder) (
 		return
 	}
 	// add to committee escrow pool
-	if err = s.PoolAdd(msg.CommitteeId+uint64(types.EscrowPoolAddend), msg.AmountForSale); err != nil {
+	if err = s.PoolAdd(msg.ChainId+uint64(types.EscrowPoolAddend), msg.AmountForSale); err != nil {
 		return
 	}
 	// save the order in state
 	_, err = s.CreateOrder(&lib.SellOrder{
-		Committee:            msg.CommitteeId,
+		Committee:            msg.ChainId,
 		AmountForSale:        msg.AmountForSale,
 		RequestedAmount:      msg.RequestedAmount,
 		SellerReceiveAddress: msg.SellerReceiveAddress,
 		SellersSendAddress:   msg.SellersSendAddress,
-	}, msg.CommitteeId)
+	}, msg.ChainId)
 	return
 }
 
 // HandleMessageEditOrder() is the proper handler for a `EditOrder` message
 func (s *StateMachine) HandleMessageEditOrder(msg *types.MessageEditOrder) (err lib.ErrorI) {
-	order, err := s.GetOrder(msg.OrderId, msg.CommitteeId)
+	order, err := s.GetOrder(msg.OrderId, msg.ChainId)
 	if err != nil {
 		return
 	}
@@ -478,7 +478,7 @@ func (s *StateMachine) HandleMessageEditOrder(msg *types.MessageEditOrder) (err 
 		return
 	}
 	// ensure order isn't below the minimum size
-	if msg.RequestedAmount < valParams.ValidatorMinimumOrderSize {
+	if msg.RequestedAmount < valParams.MinimumOrderSize {
 		return types.ErrMinimumOrderSize()
 	}
 	difference, address := int(msg.AmountForSale-order.AmountForSale), crypto.NewAddress(order.SellersSendAddress)
@@ -488,13 +488,13 @@ func (s *StateMachine) HandleMessageEditOrder(msg *types.MessageEditOrder) (err 
 			return
 		}
 		// add to committee escrow pool
-		if err = s.PoolAdd(msg.CommitteeId+uint64(types.EscrowPoolAddend), amountDifference); err != nil {
+		if err = s.PoolAdd(msg.ChainId+uint64(types.EscrowPoolAddend), amountDifference); err != nil {
 			return
 		}
 	} else if difference < 0 {
 		amountDifference := uint64(difference * -1)
 		// subtract from the committee escrow pool
-		if err = s.PoolSub(msg.CommitteeId+uint64(types.EscrowPoolAddend), amountDifference); err != nil {
+		if err = s.PoolSub(msg.ChainId+uint64(types.EscrowPoolAddend), amountDifference); err != nil {
 			return
 		}
 		if err = s.AccountAdd(address, amountDifference); err != nil {
@@ -503,18 +503,18 @@ func (s *StateMachine) HandleMessageEditOrder(msg *types.MessageEditOrder) (err 
 	}
 	err = s.EditOrder(&lib.SellOrder{
 		Id:                   order.Id,
-		Committee:            msg.CommitteeId,
+		Committee:            msg.ChainId,
 		AmountForSale:        msg.AmountForSale,
 		RequestedAmount:      msg.RequestedAmount,
 		SellerReceiveAddress: msg.SellerReceiveAddress,
 		SellersSendAddress:   order.SellersSendAddress,
-	}, msg.CommitteeId)
+	}, msg.ChainId)
 	return
 }
 
 // HandleMessageDeleteOrder() is the proper handler for a `DeleteOrder` message
 func (s *StateMachine) HandleMessageDeleteOrder(msg *types.MessageDeleteOrder) (err lib.ErrorI) {
-	order, err := s.GetOrder(msg.OrderId, msg.CommitteeId)
+	order, err := s.GetOrder(msg.OrderId, msg.ChainId)
 	if err != nil {
 		return
 	}
@@ -522,12 +522,12 @@ func (s *StateMachine) HandleMessageDeleteOrder(msg *types.MessageDeleteOrder) (
 		return lib.ErrOrderAlreadyAccepted()
 	}
 	// subtract from the committee escrow pool
-	if err = s.PoolSub(msg.CommitteeId+uint64(types.EscrowPoolAddend), order.AmountForSale); err != nil {
+	if err = s.PoolSub(msg.ChainId+uint64(types.EscrowPoolAddend), order.AmountForSale); err != nil {
 		return
 	}
 	if err = s.AccountAdd(crypto.NewAddress(order.SellersSendAddress), order.AmountForSale); err != nil {
 		return
 	}
-	err = s.DeleteOrder(msg.OrderId, msg.CommitteeId)
+	err = s.DeleteOrder(msg.OrderId, msg.ChainId)
 	return
 }

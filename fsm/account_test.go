@@ -206,7 +206,7 @@ func TestAccountDeductFees(t *testing.T) {
 				Address: newTestAddress(t).Bytes(),
 			},
 			pool: &types.Pool{
-				Id: lib.CanopyCommitteeId,
+				Id: lib.CanopyChainId,
 			},
 			error: true,
 		},
@@ -218,7 +218,7 @@ func TestAccountDeductFees(t *testing.T) {
 				Amount:  100,
 			},
 			pool: &types.Pool{
-				Id: lib.CanopyCommitteeId,
+				Id: lib.CanopyChainId,
 			},
 			error: true,
 		},
@@ -230,7 +230,7 @@ func TestAccountDeductFees(t *testing.T) {
 				Amount:  10000,
 			},
 			pool: &types.Pool{
-				Id: lib.CanopyCommitteeId,
+				Id: lib.CanopyChainId,
 			},
 		},
 		{
@@ -241,7 +241,7 @@ func TestAccountDeductFees(t *testing.T) {
 				Amount:  100000,
 			},
 			pool: &types.Pool{
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 100,
 			},
 		},
@@ -268,7 +268,7 @@ func TestAccountDeductFees(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, test.account.Amount-fee, balance)
 			// check pool balance
-			balance, err = sm.GetPoolBalance(lib.CanopyCommitteeId)
+			balance, err = sm.GetPoolBalance(lib.CanopyChainId)
 			require.NoError(t, err)
 			require.Equal(t, test.pool.Amount+fee, balance)
 		})
@@ -462,10 +462,10 @@ func TestSetGetPool(t *testing.T) {
 			name:   "single pool",
 			detail: "test setting and getting a pool",
 			pools: []*types.Pool{{
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 100,
 			}, {
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 101,
 			}},
 		},
@@ -473,10 +473,10 @@ func TestSetGetPool(t *testing.T) {
 			name:   "multi-pool",
 			detail: "test setting and getting multiple pools",
 			pools: []*types.Pool{{
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 100,
 			}, {
-				Id:     lib.CanopyCommitteeId + 1,
+				Id:     lib.CanopyChainId + 1,
 				Amount: 100,
 			}},
 		},
@@ -488,9 +488,9 @@ func TestSetGetPool(t *testing.T) {
 			// special case to test getting a pool that doesn't exist
 			// should return a non-nil pool with a zero balance
 			if test.pools == nil {
-				got, err := sm.GetPool(lib.CanopyCommitteeId)
+				got, err := sm.GetPool(lib.CanopyChainId)
 				require.NoError(t, err)
-				require.Equal(t, lib.CanopyCommitteeId, got.Id)
+				require.Equal(t, lib.CanopyChainId, got.Id)
 				require.Zero(t, got.Amount)
 				return
 			}
@@ -526,10 +526,10 @@ func TestGetSetPools(t *testing.T) {
 			name:   "multi-pool",
 			detail: "test with multiple pool",
 			pools: []*types.Pool{{
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 100,
 			}, {
-				Id:     lib.CanopyCommitteeId + 1,
+				Id:     lib.CanopyChainId + 1,
 				Amount: 100,
 			}},
 		},
@@ -581,10 +581,10 @@ func TestGetPoolsPaginated(t *testing.T) {
 			name:   "multi-pool",
 			detail: "test with multiple pools and default page params",
 			pools: []*types.Pool{{
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 100,
 			}, {
-				Id:     lib.CanopyCommitteeId + 1,
+				Id:     lib.CanopyChainId + 1,
 				Amount: 100,
 			}},
 			pageParams: lib.PageParams{
@@ -645,7 +645,7 @@ func TestMintToPool(t *testing.T) {
 			name:   "non empty pool",
 			detail: "mint to a non-empty pool",
 			pool: &types.Pool{
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 1000,
 			},
 			amount: 100,
@@ -654,7 +654,7 @@ func TestMintToPool(t *testing.T) {
 			name:   "non empty supply",
 			detail: "mint with a non-zero starting supply",
 			pool: &types.Pool{
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 1000,
 			},
 			startingSupply: 1000,
@@ -672,14 +672,14 @@ func TestMintToPool(t *testing.T) {
 			// setup starting supply
 			require.NoError(t, sm.AddToTotalSupply(test.amount))
 			// retrieve the pool to be minted to
-			pool, err := sm.GetPool(lib.CanopyCommitteeId)
+			pool, err := sm.GetPool(lib.CanopyChainId)
 			require.NoError(t, err)
 			// retrieve the supply before minting
 			sup, err := sm.GetSupply()
 			// ensure no error on function call
-			require.NoError(t, sm.MintToPool(lib.CanopyCommitteeId, test.amount))
+			require.NoError(t, sm.MintToPool(lib.CanopyChainId, test.amount))
 			// retrieve the pool after being minted to
-			poolAfter, err := sm.GetPool(lib.CanopyCommitteeId)
+			poolAfter, err := sm.GetPool(lib.CanopyChainId)
 			require.NoError(t, err)
 			// retrieve the supply after mint
 			supAfter, err := sm.GetSupply()
@@ -708,7 +708,7 @@ func TestPoolAdd(t *testing.T) {
 			name:   "non empty pool",
 			detail: "add to a non-empty pool",
 			pool: &types.Pool{
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 1000,
 			},
 			amount: 100,
@@ -723,12 +723,12 @@ func TestPoolAdd(t *testing.T) {
 				require.NoError(t, sm.SetPool(test.pool))
 			}
 			// retrieve the pool to be added to
-			pool, err := sm.GetPool(lib.CanopyCommitteeId)
+			pool, err := sm.GetPool(lib.CanopyChainId)
 			require.NoError(t, err)
 			// ensure no error on function call
-			require.NoError(t, sm.PoolAdd(lib.CanopyCommitteeId, test.amount))
+			require.NoError(t, sm.PoolAdd(lib.CanopyChainId, test.amount))
 			// retrieve the pool after being minted to
-			poolAfter, err := sm.GetPool(lib.CanopyCommitteeId)
+			poolAfter, err := sm.GetPool(lib.CanopyChainId)
 			require.NoError(t, err)
 			// ensure the difference of the pool is expected
 			require.Equal(t, test.amount, poolAfter.Amount-pool.Amount)
@@ -754,7 +754,7 @@ func TestPoolSub(t *testing.T) {
 			name:   "insufficient pool balance",
 			detail: "try (and fail) to subtract from an insufficient pool balance",
 			pool: &types.Pool{
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 99,
 			},
 			amount: 100,
@@ -764,7 +764,7 @@ func TestPoolSub(t *testing.T) {
 			name:   "non empty pool",
 			detail: "subtract from a non-empty pool",
 			pool: &types.Pool{
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 1000,
 			},
 			amount: 100,
@@ -779,16 +779,16 @@ func TestPoolSub(t *testing.T) {
 				require.NoError(t, sm.SetPool(test.pool))
 			}
 			// retrieve the pool to be added to
-			pool, err := sm.GetPool(lib.CanopyCommitteeId)
+			pool, err := sm.GetPool(lib.CanopyChainId)
 			require.NoError(t, err)
 			// ensure no error on function call
-			err = sm.PoolSub(lib.CanopyCommitteeId, test.amount)
+			err = sm.PoolSub(lib.CanopyChainId, test.amount)
 			require.Equal(t, test.error, err != nil)
 			if err != nil {
 				return
 			}
 			// retrieve the account after being minted to
-			poolAfter, err := sm.GetPool(lib.CanopyCommitteeId)
+			poolAfter, err := sm.GetPool(lib.CanopyChainId)
 			require.NoError(t, err)
 			// ensure the difference of the account is expected
 			require.Equal(t, pool.Amount, poolAfter.Amount+test.amount)

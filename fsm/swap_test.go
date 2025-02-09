@@ -23,7 +23,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			detail: "the buy order cannot be claimed as its already reserved",
 			preset: []*lib.SellOrder{
 				{
-					Committee:           lib.CanopyCommitteeId,
+					Committee:           lib.CanopyChainId,
 					AmountForSale:       100,
 					RequestedAmount:     100,
 					BuyerReceiveAddress: newTestAddressBytes(t),
@@ -46,7 +46,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			detail: "can't reset an order that doesn't exist",
 			preset: []*lib.SellOrder{
 				{
-					Committee:           lib.CanopyCommitteeId,
+					Committee:           lib.CanopyChainId,
 					AmountForSale:       100,
 					RequestedAmount:     100,
 					BuyerReceiveAddress: newTestAddressBytes(t),
@@ -63,7 +63,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			detail: "can't close an order that doesn't have a buyer",
 			preset: []*lib.SellOrder{
 				{
-					Committee:          lib.CanopyCommitteeId,
+					Committee:          lib.CanopyChainId,
 					AmountForSale:      100,
 					RequestedAmount:    100,
 					SellersSendAddress: newTestAddressBytes(t),
@@ -79,20 +79,20 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			detail: "test buy, reset, and sell without error",
 			preset: []*lib.SellOrder{
 				{
-					Committee:          lib.CanopyCommitteeId,
+					Committee:          lib.CanopyChainId,
 					AmountForSale:      100,
 					RequestedAmount:    100,
 					SellersSendAddress: newTestAddressBytes(t),
 				},
 				{
-					Committee:           lib.CanopyCommitteeId,
+					Committee:           lib.CanopyChainId,
 					AmountForSale:       100,
 					RequestedAmount:     100,
 					BuyerReceiveAddress: newTestAddressBytes(t, 1),
 					SellersSendAddress:  newTestAddressBytes(t),
 				},
 				{
-					Committee:           lib.CanopyCommitteeId,
+					Committee:           lib.CanopyChainId,
 					AmountForSale:       100,
 					RequestedAmount:     100,
 					BuyerReceiveAddress: newTestAddressBytes(t, 1),
@@ -119,18 +119,18 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// preset the sell orders
 			for _, preset := range test.preset {
-				_, err := sm.CreateOrder(preset, lib.CanopyCommitteeId)
+				_, err := sm.CreateOrder(preset, lib.CanopyChainId)
 				require.NoError(t, err)
 				// simulate the escrow supply
 				escrowPoolBalance += preset.AmountForSale
-				require.NoError(t, sm.PoolAdd(lib.CanopyCommitteeId+types.EscrowPoolAddend, preset.AmountForSale))
+				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+types.EscrowPoolAddend, preset.AmountForSale))
 			}
 			// execute the function call
-			sm.HandleCommitteeSwaps(test.orders, lib.CanopyCommitteeId)
+			sm.HandleCommitteeSwaps(test.orders, lib.CanopyChainId)
 			// validate the buy orders
 			for _, buyOrder := range test.orders.BuyOrders {
 				// get the order
-				order, e := sm.GetOrder(buyOrder.OrderId, lib.CanopyCommitteeId)
+				order, e := sm.GetOrder(buyOrder.OrderId, lib.CanopyChainId)
 				require.NoError(t, e)
 				// if the buy order is already accepted
 				if test.alreadyAccepted {
@@ -144,7 +144,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			// validate the reset orders
 			for _, resetOrderId := range test.orders.ResetOrders {
 				// get the order
-				order, e := sm.GetOrder(resetOrderId, lib.CanopyCommitteeId)
+				order, e := sm.GetOrder(resetOrderId, lib.CanopyChainId)
 				// if order not found to be reset
 				if test.notFound {
 					require.ErrorContains(t, e, "not found")
@@ -161,7 +161,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				// define convenience variable for order
 				order := test.preset[closeOrder]
 				// validate the deletion of the order
-				_, e := sm.GetOrder(closeOrder, lib.CanopyCommitteeId)
+				_, e := sm.GetOrder(closeOrder, lib.CanopyChainId)
 				// if order no buyer to close
 				if test.noBuyer {
 					require.NoError(t, e)
@@ -175,7 +175,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				}
 			}
 			// validate the removal of funds from the escrow pool
-			balance, e := sm.GetPoolBalance(lib.CanopyCommitteeId + types.EscrowPoolAddend)
+			balance, e := sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
 			require.NoError(t, e)
 			require.Equal(t, escrowPoolBalance-balanceRemovedFromPool, balance)
 		})
@@ -194,7 +194,7 @@ func TestCreateOrder(t *testing.T) {
 			expected: []*lib.SellOrder{
 				{
 					Id:                   0,
-					Committee:            lib.CanopyCommitteeId,
+					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t, 1),
@@ -208,7 +208,7 @@ func TestCreateOrder(t *testing.T) {
 			expected: []*lib.SellOrder{
 				{
 					Id:                   0,
-					Committee:            lib.CanopyCommitteeId,
+					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t, 1),
@@ -216,7 +216,7 @@ func TestCreateOrder(t *testing.T) {
 				},
 				{
 					Id:                   0,
-					Committee:            lib.CanopyCommitteeId + 1,
+					Committee:            lib.CanopyChainId + 1,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t, 1),
@@ -230,7 +230,7 @@ func TestCreateOrder(t *testing.T) {
 			expected: []*lib.SellOrder{
 				{
 					Id:                   0,
-					Committee:            lib.CanopyCommitteeId,
+					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t, 1),
@@ -238,7 +238,7 @@ func TestCreateOrder(t *testing.T) {
 				},
 				{
 					Id:                   0,
-					Committee:            lib.CanopyCommitteeId + 1,
+					Committee:            lib.CanopyChainId + 1,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t, 1),
@@ -246,7 +246,7 @@ func TestCreateOrder(t *testing.T) {
 				},
 				{
 					Id:                   1, // only used for validation
-					Committee:            lib.CanopyCommitteeId + 1,
+					Committee:            lib.CanopyChainId + 1,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t, 1),
@@ -254,7 +254,7 @@ func TestCreateOrder(t *testing.T) {
 				},
 				{
 					Id:                   1, // only used for validation
-					Committee:            lib.CanopyCommitteeId,
+					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t, 1),
@@ -294,7 +294,7 @@ func TestEditOrder(t *testing.T) {
 			detail: "order not preset so no order id is found",
 			expected: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        101,
 				RequestedAmount:      100,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -306,14 +306,14 @@ func TestEditOrder(t *testing.T) {
 			name:   "update amount",
 			detail: "update the amount for sale without error",
 			preset: &lib.SellOrder{
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        100,
 				RequestedAmount:      100,
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			expected: &lib.SellOrder{
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        101,
 				RequestedAmount:      100,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -331,7 +331,7 @@ func TestEditOrder(t *testing.T) {
 				require.NoError(t, err)
 			}
 			// execute the function call
-			err := sm.EditOrder(test.expected, lib.CanopyCommitteeId)
+			err := sm.EditOrder(test.expected, lib.CanopyChainId)
 			// validate the expected error
 			require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {
@@ -370,7 +370,7 @@ func TestBuyOrder(t *testing.T) {
 			name:   "buy order already accepted",
 			detail: "the buy order cannot be claimed as its already reserved",
 			preset: &lib.SellOrder{
-				Committee:           lib.CanopyCommitteeId,
+				Committee:           lib.CanopyChainId,
 				AmountForSale:       100,
 				RequestedAmount:     100,
 				BuyerReceiveAddress: newTestAddressBytes(t),
@@ -388,7 +388,7 @@ func TestBuyOrder(t *testing.T) {
 			name:   "buy order",
 			detail: "successful buy order without error",
 			preset: &lib.SellOrder{
-				Committee:          lib.CanopyCommitteeId,
+				Committee:          lib.CanopyChainId,
 				AmountForSale:      100,
 				RequestedAmount:    100,
 				SellersSendAddress: newTestAddressBytes(t),
@@ -406,11 +406,11 @@ func TestBuyOrder(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// preset the order
 			if test.preset != nil {
-				_, err := sm.CreateOrder(test.preset, lib.CanopyCommitteeId)
+				_, err := sm.CreateOrder(test.preset, lib.CanopyChainId)
 				require.NoError(t, err)
 			}
 			// execute the function call
-			err := sm.BuyOrder(test.order, lib.CanopyCommitteeId)
+			err := sm.BuyOrder(test.order, lib.CanopyChainId)
 			// validate the expected error
 			require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {
@@ -418,7 +418,7 @@ func TestBuyOrder(t *testing.T) {
 				return
 			}
 			// get the order
-			order, e := sm.GetOrder(test.order.OrderId, lib.CanopyCommitteeId)
+			order, e := sm.GetOrder(test.order.OrderId, lib.CanopyChainId)
 			require.NoError(t, e)
 			// validate the update of the 'buy' fields
 			require.Equal(t, test.order.BuyerReceiveAddress, order.BuyerReceiveAddress)
@@ -445,7 +445,7 @@ func TestResetOrder(t *testing.T) {
 			name:   "reset order",
 			detail: "successful reset order without error",
 			preset: &lib.SellOrder{
-				Committee:           lib.CanopyCommitteeId,
+				Committee:           lib.CanopyChainId,
 				AmountForSale:       100,
 				RequestedAmount:     100,
 				BuyerReceiveAddress: newTestAddressBytes(t),
@@ -460,11 +460,11 @@ func TestResetOrder(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// preset the order
 			if test.preset != nil {
-				_, err := sm.CreateOrder(test.preset, lib.CanopyCommitteeId)
+				_, err := sm.CreateOrder(test.preset, lib.CanopyChainId)
 				require.NoError(t, err)
 			}
 			// execute the function call
-			err := sm.ResetOrder(test.order, lib.CanopyCommitteeId)
+			err := sm.ResetOrder(test.order, lib.CanopyChainId)
 			// validate the expected error
 			require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {
@@ -472,7 +472,7 @@ func TestResetOrder(t *testing.T) {
 				return
 			}
 			// get the order
-			order, e := sm.GetOrder(test.order, lib.CanopyCommitteeId)
+			order, e := sm.GetOrder(test.order, lib.CanopyChainId)
 			require.NoError(t, e)
 			// validate the update of the 'buy' fields
 			require.Empty(t, order.BuyerReceiveAddress)
@@ -493,7 +493,7 @@ func TestCloseOrder(t *testing.T) {
 			name:   "close order not already accepted",
 			detail: "there's no existing buyer for the close order",
 			preset: &lib.SellOrder{
-				Committee:          lib.CanopyCommitteeId,
+				Committee:          lib.CanopyChainId,
 				AmountForSale:      100,
 				RequestedAmount:    100,
 				SellersSendAddress: newTestAddressBytes(t),
@@ -505,7 +505,7 @@ func TestCloseOrder(t *testing.T) {
 			name:   "close order",
 			detail: "successful reset order without error",
 			preset: &lib.SellOrder{
-				Committee:           lib.CanopyCommitteeId,
+				Committee:           lib.CanopyChainId,
 				AmountForSale:       100,
 				RequestedAmount:     100,
 				BuyerReceiveAddress: newTestAddressBytes(t),
@@ -520,12 +520,12 @@ func TestCloseOrder(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// preset the order
 			if test.preset != nil {
-				_, err := sm.CreateOrder(test.preset, lib.CanopyCommitteeId)
+				_, err := sm.CreateOrder(test.preset, lib.CanopyChainId)
 				require.NoError(t, err)
-				require.NoError(t, sm.PoolAdd(lib.CanopyCommitteeId+types.EscrowPoolAddend, test.preset.AmountForSale))
+				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+types.EscrowPoolAddend, test.preset.AmountForSale))
 			}
 			// execute the function call
-			err := sm.CloseOrder(test.order, lib.CanopyCommitteeId)
+			err := sm.CloseOrder(test.order, lib.CanopyChainId)
 			// validate the expected error
 			require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {
@@ -535,14 +535,14 @@ func TestCloseOrder(t *testing.T) {
 			// define convenience variable for order
 			order := test.preset
 			// validate the deletion of the order
-			_, e := sm.GetOrder(test.order, lib.CanopyCommitteeId)
+			_, e := sm.GetOrder(test.order, lib.CanopyChainId)
 			require.ErrorContains(t, e, "not found")
 			// validate the addition of funds to the buyer
 			accountBalance, e := sm.GetAccountBalance(crypto.NewAddress(order.BuyerReceiveAddress))
 			require.NoError(t, e)
 			require.Equal(t, order.AmountForSale, accountBalance)
 			// validate the removal of funds from the escrow pool
-			balance, e := sm.GetPoolBalance(lib.CanopyCommitteeId + types.EscrowPoolAddend)
+			balance, e := sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
 			require.NoError(t, e)
 			require.Zero(t, balance)
 		})
@@ -575,7 +575,7 @@ func TestDeleteOrder(t *testing.T) {
 			preset: []*lib.SellOrder{
 				{
 					Id:                   0,
-					Committee:            lib.CanopyCommitteeId,
+					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t, 1),
@@ -589,7 +589,7 @@ func TestDeleteOrder(t *testing.T) {
 			preset: []*lib.SellOrder{
 				{
 					Id:                   0,
-					Committee:            lib.CanopyCommitteeId,
+					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t, 1),
@@ -597,7 +597,7 @@ func TestDeleteOrder(t *testing.T) {
 				},
 				{
 					Id:                   0,
-					Committee:            lib.CanopyCommitteeId + 1,
+					Committee:            lib.CanopyChainId + 1,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t, 1),
@@ -650,7 +650,7 @@ func TestGetSetOrderBooks(t *testing.T) {
 			detail: "various set to ensure get returns proper order books and supply",
 			expected: &lib.OrderBooks{OrderBooks: []*lib.OrderBook{
 				{
-					CommitteeId: 0,
+					ChainId: 0,
 					Orders: []*lib.SellOrder{
 						{
 							Id:                   1,
@@ -671,7 +671,7 @@ func TestGetSetOrderBooks(t *testing.T) {
 					},
 				},
 				{
-					CommitteeId: 1,
+					ChainId: 1,
 					Orders: []*lib.SellOrder{
 						{
 							Id:                   1,

@@ -78,16 +78,16 @@ func TestBeginBlock(t *testing.T) {
 						Address:      newTestAddressBytes(t, i),
 						PublicKey:    newTestPublicKeyBytes(t, i),
 						StakedAmount: 100,
-						Committees:   []uint64{lib.CanopyCommitteeId},
+						Committees:   []uint64{lib.CanopyChainId},
 					}}, supply))
 					// set the committee member
-					require.NoError(t, sm.SetCommitteeMember(newTestAddress(t, i), lib.CanopyCommitteeId, 100))
+					require.NoError(t, sm.SetCommitteeMember(newTestAddress(t, i), lib.CanopyChainId, 100))
 				}
 				// set the supply in state
 				require.NoError(t, sm.SetSupply(supply))
 				// create an aggregate signature
 				// get the committee members
-				committee, err := sm.GetCommitteeMembers(lib.CanopyCommitteeId, true)
+				committee, err := sm.GetCommitteeMembers(lib.CanopyChainId, true)
 				require.NoError(t, err)
 				// create a copy of the multikey
 				mk := committee.MultiKey.Copy()
@@ -133,7 +133,7 @@ func TestBeginBlock(t *testing.T) {
 				expectedCommitteeMint, expectedDAOMint = sm.calculateRewardPerCommittee(t, 1)
 			}
 			// check canopy reward pool for proper mint
-			canopyRewardPool, err := sm.GetPool(lib.CanopyCommitteeId)
+			canopyRewardPool, err := sm.GetPool(lib.CanopyChainId)
 			require.NoError(t, err)
 			require.Equal(t, expectedCommitteeMint, canopyRewardPool.Amount, fmt.Sprintf("%d, %d", expectedCommitteeMint, canopyRewardPool.Amount))
 			// check DAO reward pool for proper mint
@@ -148,25 +148,25 @@ func TestEndBlock(t *testing.T) {
 	// generate committee data for testing
 	committeeData := []*lib.CommitteeData{
 		{
-			CommitteeId:             lib.CanopyCommitteeId,
-			LastChainHeightUpdated:  1,
-			LastCanopyHeightUpdated: 2,
+			ChainId:                lib.CanopyChainId,
+			LastChainHeightUpdated: 1,
+			LastRootHeightUpdated:  2,
 			PaymentPercents: []*lib.PaymentPercents{
 				{Address: newTestAddressBytes(t, 1), Percent: 100},
 			},
 		},
 		{
-			CommitteeId:             lib.CanopyCommitteeId,
-			LastChainHeightUpdated:  2,
-			LastCanopyHeightUpdated: 2,
+			ChainId:                lib.CanopyChainId,
+			LastChainHeightUpdated: 2,
+			LastRootHeightUpdated:  2,
 			PaymentPercents: []*lib.PaymentPercents{
 				{Address: newTestAddressBytes(t, 2), Percent: 100},
 			},
 		},
 		{
-			CommitteeId:             lib.CanopyCommitteeId,
-			LastChainHeightUpdated:  3,
-			LastCanopyHeightUpdated: 2,
+			ChainId:                lib.CanopyChainId,
+			LastChainHeightUpdated: 3,
+			LastRootHeightUpdated:  2,
 			PaymentPercents: []*lib.PaymentPercents{
 				{Address: newTestAddressBytes(t, 3), Percent: 100},
 			},
@@ -257,7 +257,7 @@ func TestEndBlock(t *testing.T) {
 					Addresses: test.previousProposers,
 				}))
 				// set the committee reward
-				require.NoError(t, sm.MintToPool(lib.CanopyCommitteeId, test.committeeRewardAmount))
+				require.NoError(t, sm.MintToPool(lib.CanopyChainId, test.committeeRewardAmount))
 				// set the committee data
 				for _, d := range test.committeeData {
 					require.NoError(t, sm.UpsertCommitteeData(d))
@@ -298,7 +298,7 @@ func TestEndBlock(t *testing.T) {
 						// full_reward = ROUND_DOWN( percentage / number_of_samples * available_reward )
 						fullReward := uint64(float64(paymentPercents.Percent) / float64(len(committeeData)*100) * float64(test.committeeRewardAmount))
 						// if not compounding, use the early withdrawal reward
-						earlyWithdrawalReward := lib.Uint64ReducePercentage(fullReward, valParams.ValidatorEarlyWithdrawalPenalty)
+						earlyWithdrawalReward := lib.Uint64ReducePercentage(fullReward, valParams.EarlyWithdrawalPenalty)
 						require.NoError(t, err)
 						// compare got and expected
 						require.Equal(t, earlyWithdrawalReward, account.Amount)

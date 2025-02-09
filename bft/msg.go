@@ -66,10 +66,6 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 		if x.Header.Height != b.Height {
 			return false, lib.ErrWrongHeight()
 		}
-		// validate committee height
-		//if x.Header.CanopyHeight != b.CanopyHeight { TODO this shouldn't be here cause it's stopping 'locks' with older Canopy heights from proceeding
-		//	return false, lib.ErrWrongCanopyHeight()
-		//}
 		// sanity check the VRF
 		if err = checkSignatureBasic(x.Vrf); err != nil {
 			return false, err
@@ -87,7 +83,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 			return
 		}
 		// load the proper committee
-		vals, err = b.LoadCommittee(x.Qc.Header.CanopyHeight) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
+		vals, err = b.LoadCommittee(x.Qc.Header.RootHeight) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
 		if err != nil {
 			return false, err
 		}
@@ -105,10 +101,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 		if x.Header.Height != b.Height {
 			return false, lib.ErrWrongHeight()
 		}
-		//if x.Header.CanopyHeight != b.CanopyHeight { TODO this shouldn't be here cause it's stopping 'locks' with older Canopy heights from proceeding
-		//	return false, lib.ErrWrongCanopyHeight()
-		//}
-		committeeHeightInState, e := b.LoadCommitteeHeightInState(b.CanopyHeight)
+		committeeHeightInState, e := b.LoadCommitteeHeightInState(b.RootHeight)
 		if e != nil {
 			return false, e
 		}

@@ -29,7 +29,7 @@ func newTestConsensus(t *testing.T, phase Phase, numValidators int) (tc *testCon
 	tc.cont = &testController{
 		Mutex:              sync.Mutex{},
 		proposers:          &proposers,
-		valSet:             map[uint64]ValSet{lib.CanopyCommitteeId: tc.valSet},
+		valSet:             map[uint64]ValSet{lib.CanopyChainId: tc.valSet},
 		gossipCertChan:     make(chan *lib.QuorumCertificate),
 		sendToProposerChan: make(chan lib.Signable),
 		sendToReplicasChan: make(chan lib.Signable),
@@ -463,12 +463,12 @@ func (tc *testConsensus) view(phase Phase, round ...uint64) *lib.View {
 		r = round[0]
 	}
 	return &lib.View{
-		NetworkId:    lib.CanopyMainnetNetworkId,
-		CommitteeId:  lib.CanopyCommitteeId,
-		Height:       1,
-		Round:        r,
-		CanopyHeight: 1,
-		Phase:        phase,
+		NetworkId:  lib.CanopyMainnetNetworkId,
+		ChainId:    lib.CanopyChainId,
+		Height:     1,
+		Round:      r,
+		RootHeight: 1,
+		Phase:      phase,
 	}
 }
 
@@ -494,7 +494,7 @@ type testController struct {
 }
 
 func (t *testController) ChainHeight() uint64 {
-	return t.BaseChainHeight()
+	return t.RootChainHeight()
 }
 
 func (t *testController) ProduceProposal(_ *ByzantineEvidence, _ *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI) {
@@ -517,8 +517,8 @@ func (t *testController) ValidateProposal(qc *lib.QuorumCertificate, _ *Byzantin
 	return ErrEmptyMessage()
 }
 
-func (t *testController) LoadCommittee(canopyHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
-	return t.valSet[canopyHeight], nil
+func (t *testController) LoadCommittee(rootHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
+	return t.valSet[rootHeight], nil
 }
 func (t *testController) LoadCertificate(_ uint64) (*lib.QuorumCertificate, lib.ErrorI) {
 	return nil, nil
@@ -540,7 +540,7 @@ func (t *testController) LoadMinimumEvidenceHeight(_ uint64) (uint64, lib.ErrorI
 func (t *testController) IsValidDoubleSigner(_ uint64, _ []byte) bool              { return true }
 func (t *testController) Syncing() *atomic.Bool                                    { return &atomic.Bool{} }
 func (t *testController) LoadCommitteeHeightInState(_ uint64) (uint64, lib.ErrorI) { return 0, nil }
-func (t *testController) BaseChainHeight() uint64                                  { return 0 }
+func (t *testController) RootChainHeight() uint64                                  { return 0 }
 func (t *testController) LoadLastProposers(_ uint64) (*lib.Proposers, lib.ErrorI) {
 	return t.proposers, nil
 }

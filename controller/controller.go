@@ -18,7 +18,7 @@ var _ bft.Controller = new(Controller)
 // Controller acts as the 'manager' of the modules of the application
 type Controller struct {
 	FSM           *fsm.StateMachine
-	BaseChainInfo lib.BaseChainInfo
+	RootChainInfo lib.RootChainInfo
 	Mempool       *Mempool
 	Consensus     *bft.BFT           // the async consensus process between the committee members for the chain
 	isSyncing     *atomic.Bool       // is the chain currently being downloaded from peers
@@ -76,11 +76,11 @@ func (c *Controller) Start() {
 	// start internal Controller listeners for P2P
 	c.StartListeners()
 	go func() {
-		c.log.Warnf("Attempting to connect to the base-chain")
+		c.log.Warnf("Attempting to connect to the root-Chain")
 		t := time.NewTicker(time.Second)
 		defer t.Stop()
 		for range t.C {
-			if c.BaseChainInfo.GetHeight() != 0 {
+			if c.RootChainInfo.GetHeight() != 0 {
 				break
 			}
 		}
@@ -105,53 +105,53 @@ func (c *Controller) Stop() {
 	c.P2P.Stop()
 }
 
-// UpdateBaseChainInfo() receives updates from the base-chain thread
-func (c *Controller) UpdateBaseChainInfo(info *lib.BaseChainInfo) {
+// UpdateRootChainInfo() receives updates from the root-Chain thread
+func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 	c.Lock()
 	defer c.Unlock()
-	info.RemoteCallbacks = c.BaseChainInfo.RemoteCallbacks
+	info.RemoteCallbacks = c.RootChainInfo.RemoteCallbacks
 	info.Log = c.log
-	// update the base-chain info
-	c.BaseChainInfo = *info
+	// update the root-Chain info
+	c.RootChainInfo = *info
 	if info.LastValidatorSet.NumValidators == 0 {
 		// signal to reset consensus and start a new height
-		c.Consensus.ResetBFT <- bft.ResetBFT{IsBaseChainUpdate: false}
+		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: false}
 	} else {
 		// signal to reset consensus
-		c.Consensus.ResetBFT <- bft.ResetBFT{IsBaseChainUpdate: true}
+		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: true}
 	}
 	// update the peer 'must connect'
 	c.UpdateP2PMustConnect()
 }
 
-// LoadCommittee() gets the ValidatorSet that is authorized to come to Consensus agreement on the Proposal for a specific height/committeeId
+// LoadCommittee() gets the ValidatorSet that is authorized to come to Consensus agreement on the Proposal for a specific height/chainId
 func (c *Controller) LoadCommittee(height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	return c.BaseChainInfo.GetValidatorSet(c.Config.ChainId, height)
+	return c.RootChainInfo.GetValidatorSet(c.Config.ChainId, height)
 }
 
-// LoadBaseChainOrderBook() gets the order book from the base-chain
-func (c *Controller) LoadBaseChainOrderBook(height uint64) (*lib.OrderBook, lib.ErrorI) {
-	return c.BaseChainInfo.GetOrders(height, c.Config.ChainId)
+// LoadRootChainOrderBook() gets the order book from the root-Chain
+func (c *Controller) LoadRootChainOrderBook(height uint64) (*lib.OrderBook, lib.ErrorI) {
+	return c.RootChainInfo.GetOrders(height, c.Config.ChainId)
 }
 
-// LoadCertificate() gets the Quorum Block from the committeeID-> plugin at a certain height
+// LoadCertificate() gets the Quorum Block from the chainId-> plugin at a certain height
 func (c *Controller) LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
 	return c.FSM.LoadCertificate(height)
 }
 
 // LoadMinimumEvidenceHeight() gets the minimum evidence height from Canopy
 func (c *Controller) LoadMinimumEvidenceHeight(height uint64) (uint64, lib.ErrorI) {
-	return c.BaseChainInfo.GetMinimumEvidenceHeight(height)
+	return c.RootChainInfo.GetMinimumEvidenceHeight(height)
 }
 
-// GetBaseChainLotteryWinner() gets the pseudorandomly selected delegate to reward and their cut
-func (c *Controller) GetBaseChainLotteryWinner(canopyHeight uint64) (winner *lib.LotteryWinner, err lib.ErrorI) {
-	return c.BaseChainInfo.GetLotteryWinner(canopyHeight, c.Config.ChainId)
+// GetRootChainLotteryWinner() gets the pseudorandomly selected delegate to reward and their cut
+func (c *Controller) GetRootChainLotteryWinner(rootHeight uint64) (winner *lib.LotteryWinner, err lib.ErrorI) {
+	return c.RootChainInfo.GetLotteryWinner(rootHeight, c.Config.ChainId)
 }
 
 // IsValidDoubleSigner() Canopy checks if the double signer is valid at a certain height
 func (c *Controller) IsValidDoubleSigner(height uint64, address []byte) bool {
-	isValidDoubleSigner, err := c.BaseChainInfo.IsValidDoubleSigner(height, lib.BytesToString(address))
+	isValidDoubleSigner, err := c.RootChainInfo.IsValidDoubleSigner(height, lib.BytesToString(address))
 	if err != nil {
 		c.log.Errorf("IsValidDoubleSigner failed with error: %s", err.Error())
 		return false
@@ -186,23 +186,23 @@ func (c *Controller) LoadLastCommitTime(height uint64) time.Time {
 	return time.UnixMicro(int64(block.BlockHeader.Time))
 }
 
-// LoadProposerKeys() gets the last Base-ChainId proposer keys
+// LoadProposerKeys() gets the last Root-ChainId proposer keys
 func (c *Controller) LoadLastProposers(height uint64) (*lib.Proposers, lib.ErrorI) {
-	// return the last proposers from the Base-ChainId
-	return c.BaseChainInfo.GetLastProposers(height)
+	// return the last proposers from the Root-ChainId
+	return c.RootChainInfo.GetLastProposers(height)
 }
 
 // LoadCommitteeHeightInState() returns the last height the committee submitted a proposal for rewards
 func (c *Controller) LoadCommitteeHeightInState(height uint64) (uint64, lib.ErrorI) {
 	// return the committee height
-	return c.BaseChainInfo.GetLastChainHeightUpdated(height, c.Config.ChainId)
+	return c.RootChainInfo.GetLastChainHeightUpdated(height, c.Config.ChainId)
 }
 
 // Syncing() returns if any of the supported chains are currently syncing
 func (c *Controller) Syncing() *atomic.Bool { return c.isSyncing }
 
-// BaseChainHeight() returns the height of the canopy base-chain
-func (c *Controller) BaseChainHeight() uint64 { return c.BaseChainInfo.GetHeight() }
+// RootChainHeight() returns the height of the canopy root-Chain
+func (c *Controller) RootChainHeight() uint64 { return c.RootChainInfo.GetHeight() }
 
 // ChainHeight() returns the height of this target chain
 func (c *Controller) ChainHeight() uint64 { return c.FSM.Height() }

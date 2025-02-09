@@ -245,7 +245,7 @@ func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFile
 		Validators: []*types.Validator{{
 			Address:      addr.Bytes(),
 			PublicKey:    consPubKey.Bytes(),
-			Committees:   []uint64{lib.CanopyCommitteeId},
+			Committees:   []uint64{lib.CanopyChainId},
 			NetAddress:   "tcp://localhost",
 			StakedAmount: 1000000000000,
 			Output:       addr.Bytes(),

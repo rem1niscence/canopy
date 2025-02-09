@@ -15,8 +15,8 @@ const (
 	GenesisFilePath        = "genesis.json"
 	ProposalsFilePath      = "proposals.json"
 	PollsFilePath          = "polls.json"
-	UnknownCommitteeId     = uint64(0)
-	CanopyCommitteeId      = uint64(1) // NOTE: to not break sub-chain recursion, this should not be used except for 'default config/genesis' developer setups
+	UnknownChainId         = uint64(0)
+	CanopyChainId          = uint64(1) // NOTE: to not break nested-chain recursion, this should not be used except for 'default config/genesis' developer setups
 	DAOPoolID              = math.MaxUint32 + 1
 	CanopyMainnetNetworkId = 1
 )
@@ -50,13 +50,13 @@ func DefaultConfig() Config {
 type MainConfig struct {
 	LogLevel    string `json:"logLevel"`
 	ChainId     uint64 `json:"chainId"`
-	BaseChainId uint64 `json:"baseChainId"`
+	RootChainId uint64 `json:"rootChainId"`
 	Headless    bool   `json:"headless"`
 }
 
 // DefaultMainConfig() sets log level to 'info'
 func DefaultMainConfig() MainConfig {
-	return MainConfig{LogLevel: "info", BaseChainId: CanopyCommitteeId, ChainId: CanopyCommitteeId, Headless: false}
+	return MainConfig{LogLevel: "info", RootChainId: CanopyChainId, ChainId: CanopyChainId, Headless: false}
 }
 
 // GetLogLevel() parses the log string in the config file into a LogLevel Enum
@@ -83,8 +83,8 @@ type RPCConfig struct {
 	RPCPort         string // the port where the rpc server is hosted
 	AdminPort       string // the port where the admin rpc server is hosted
 	RPCUrl          string // the url without port where the rpc server is hosted
-	BaseChainRPCURL string // the url of the base-chain's rpc
-	BaseChainPollMS uint64 // how often to poll the base chain in milliseconds
+	RootChainRPCURL string // the url of the root-Chain's rpc
+	RootChainPollMS uint64 // how often to poll the base chain in milliseconds
 	TimeoutS        int    // the rpc request timeout in seconds
 }
 
@@ -96,14 +96,14 @@ func DefaultRPCConfig() RPCConfig {
 		RPCPort:         "50002",
 		AdminPort:       "50003",
 		RPCUrl:          "http://localhost",
-		BaseChainRPCURL: "http://localhost:50002",
-		BaseChainPollMS: 1000,
+		RootChainRPCURL: "http://localhost:50002",
+		RootChainPollMS: 1000,
 		TimeoutS:        3,
 	}
 }
 
-// IsBaseChain() returns whether the self chain is base
-func (c Config) IsBaseChain() bool { return c.BaseChainId == c.ChainId }
+// IsRootChain() returns whether the self chain is base
+func (c Config) IsRootChain() bool { return c.RootChainId == c.ChainId }
 
 // STATE MACHINE CONFIG BELOW
 

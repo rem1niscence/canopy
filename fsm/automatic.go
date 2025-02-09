@@ -24,14 +24,14 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	// if not base-chain: the committee won't match the certificate result
+	// if not root-Chain: the committee won't match the certificate result
 	// so just set the committee to nil to ignore the byzantine evidence
 	// the byzantine evidence is handled at `Transaction Level` via
 	// HandleMessageCertificateResults
-	if !s.Config.IsBaseChain() {
+	if !s.Config.IsRootChain() {
 		return s.HandleCertificateResults(lastCertificate, nil)
 	}
-	// if is base-chain: load the committee from state as the certificate result
+	// if is root-Chain: load the committee from state as the certificate result
 	// will match the evidence and there's no Transaction to HandleMessageCertificateResults
 	committee, err := s.LoadCommittee(s.Config.ChainId, s.Height()-1)
 	if err != nil {
@@ -84,22 +84,22 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 		return lib.ErrNilCertResults()
 	}
 	// get the last data for the committee
-	data, err := s.GetCommitteeData(qc.Header.CommitteeId)
+	data, err := s.GetCommitteeData(qc.Header.ChainId)
 	if err != nil {
 		return err
 	}
 	// ensure the canopy height isn't too old
-	if qc.Header.CanopyHeight < data.LastCanopyHeightUpdated {
-		return lib.ErrInvalidQCBaseChainHeight()
+	if qc.Header.RootHeight < data.LastRootHeightUpdated {
+		return lib.ErrInvalidQCRootChainHeight()
 	} // ensure the committee height isn't too old
 	if qc.Header.Height <= data.LastChainHeightUpdated {
 		return lib.ErrInvalidQCCommitteeHeight()
 	}
-	results, committeeId := qc.Results, qc.Header.CommitteeId
+	results, chainId := qc.Results, qc.Header.ChainId
 	// handle the token swaps
-	s.HandleCommitteeSwaps(results.Orders, committeeId)
+	s.HandleCommitteeSwaps(results.Orders, chainId)
 	// index the checkpoint
-	if err = s.HandleCheckpoint(committeeId, results); err != nil {
+	if err = s.HandleCheckpoint(chainId, results); err != nil {
 		return err
 	}
 	// handle byzantine evidence
@@ -112,28 +112,28 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, uint64(nonSignerPercent))
 	}
 	// handle retired status
-	if qc.Results.Retired && qc.Header.CommitteeId != s.Config.ChainId {
-		if err = s.RetireCommittee(qc.Header.CommitteeId); err != nil {
+	if qc.Results.Retired && qc.Header.ChainId != s.Config.ChainId {
+		if err = s.RetireCommittee(qc.Header.ChainId); err != nil {
 			return err
 		}
 	}
 	// update the committee data
 	return s.UpsertCommitteeData(&lib.CommitteeData{
-		CommitteeId:             committeeId,
-		LastCanopyHeightUpdated: qc.Header.CanopyHeight, // TODO this may cause an issue when going independent if new root-chain height < old-root-chain height
-		LastChainHeightUpdated:  qc.Header.Height,
-		PaymentPercents:         results.RewardRecipients.PaymentPercents,
+		ChainId:                chainId,
+		LastRootHeightUpdated:  qc.Header.RootHeight, // TODO this may cause an issue when going independent if new root-chain height < old-root-chain height
+		LastChainHeightUpdated: qc.Header.Height,
+		PaymentPercents:        results.RewardRecipients.PaymentPercents,
 	})
 }
 
-// HandleCheckpoint() handles the `checkpoint-as-a-service` base-chain functionality
-// NOTE: this will index self checkpoints - but allows for sub-chain checkpointing too
-func (s *StateMachine) HandleCheckpoint(committeeId uint64, results *lib.CertificateResult) (err lib.ErrorI) {
+// HandleCheckpoint() handles the `checkpoint-as-a-service` root-Chain functionality
+// NOTE: this will index self checkpoints - but allows for nested-chain checkpointing too
+func (s *StateMachine) HandleCheckpoint(chainId uint64, results *lib.CertificateResult) (err lib.ErrorI) {
 	storeI := s.store.(lib.StoreI)
 	// index the checkpoint
 	if results.Checkpoint != nil && len(results.Checkpoint.BlockHash) != 0 {
 		// retrieve the last saved checkpoint for this chain
-		mostRecentCheckpoint, e := storeI.GetMostRecentCheckpoint(committeeId)
+		mostRecentCheckpoint, e := storeI.GetMostRecentCheckpoint(chainId)
 		if e != nil {
 			return e
 		}
@@ -142,7 +142,7 @@ func (s *StateMachine) HandleCheckpoint(committeeId uint64, results *lib.Certifi
 			return types.ErrInvalidCheckpoint()
 		}
 		// index the checkpoint
-		if err = storeI.IndexCheckpoint(committeeId, results.Checkpoint); err != nil {
+		if err = storeI.IndexCheckpoint(chainId, results.Checkpoint); err != nil {
 			return err
 		}
 	}

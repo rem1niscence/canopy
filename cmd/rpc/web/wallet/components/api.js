@@ -1,12 +1,12 @@
 let rpcURL = "http://127.0.0.1:50002"; // default RPC URL
 let adminRPCURL = "http://127.0.0.1:50003"; // default Admin RPC URL
-let baseChainRPCURL = rpcURL; // default BaseChain RPC URL
+let rootChainRPCURL = rpcURL; // default RootChain RPC URL
 let chainId = 1; // default chain id
 
 if (typeof window !== "undefined" && window.__CONFIG__) {
   rpcURL = window.__CONFIG__.rpcURL;
   adminRPCURL = window.__CONFIG__.adminRPCURL;
-  baseChainRPCURL = window.__CONFIG__.baseChainRPCURL;
+  rootChainRPCURL = window.__CONFIG__.rootChainRPCURL;
   chainId = Number(window.__CONFIG__.chainId);
 } else {
   console.log("config undefined");
@@ -149,7 +149,7 @@ function newTxRequest(
 
 function newSellOrderTxRequest(
   address,
-  committeeId,
+  chainId,
   orderId,
   sellAmount,
   receiveAmount,
@@ -161,7 +161,7 @@ function newSellOrderTxRequest(
 ) {
   return JSON.stringify({
     address: address,
-    committees: committeeId.toString(),
+    committees: chainId.toString(),
     orderId: orderId,
     amount: sellAmount,
     receiveAmount: receiveAmount,
@@ -476,7 +476,7 @@ export async function TxDAOTransfer(address, amount, startBlock, endBlock, memo,
 
 export async function TxCreateOrder(
   address,
-  committeeId,
+  chainId,
   sellAmount,
   receiveAmount,
   receiveAddress,
@@ -490,7 +490,7 @@ export async function TxCreateOrder(
     txCreateOrder,
     newSellOrderTxRequest(
       address,
-      committeeId,
+      chainId,
       0,
       Number(sellAmount),
       Number(receiveAmount),
@@ -513,7 +513,7 @@ export async function TxBuyOrder(address, receiveAddress, orderId, fee, password
 
 export async function TxEditOrder(
   address,
-  committeeId,
+  chainId,
   orderId,
   sellAmount,
   receiveAmount,
@@ -528,7 +528,7 @@ export async function TxEditOrder(
     txEditOrder,
     newSellOrderTxRequest(
       address,
-      committeeId,
+      chainId,
       Number(orderId),
       Number(sellAmount),
       Number(receiveAmount),
@@ -541,11 +541,11 @@ export async function TxEditOrder(
   );
 }
 
-export async function TxDeleteOrder(address, committeeId, orderId, memo, fee, password, submit) {
+export async function TxDeleteOrder(address, chainId, orderId, memo, fee, password, submit) {
   return POST(
     adminRPCURL,
     txDeleteOrder,
-    newSellOrderTxRequest(address, committeeId, Number(orderId), 0, 0, "", memo, Number(fee), submit, password),
+    newSellOrderTxRequest(address, chainId, Number(orderId), 0, 0, "", memo, Number(fee), submit, password),
   );
 }
 

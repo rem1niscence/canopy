@@ -78,16 +78,16 @@ message PeerMeta {
 
 // ConsensusMessage is a p2p message payload that is handled by the BFT module
 message ConsensusMessage {
-  // committee_id: is the unique identifier of the committee associated with this message
-  uint64 committee_id = 1;
+  // chain_id: is the unique identifier of the committee associated with this message
+  uint64 chain_id = 1;
   // message: the bytes of the consensus message that may be unmarshalled into a consensus.Message object
   bytes message = 2;
 }
 
 // BlockRequestMessage is a p2p message payload that is requesting a block and/or max_height of the peer
 message BlockRequestMessage {
-  // committee_id: is the unique identifier of the committee associated with this message
-  uint64 committee_id = 1;
+  // chain_id: is the unique identifier of the committee associated with this message
+  uint64 chain_id = 1;
   // height: the height of the block being requested
   uint64 height = 2;
   // height_only: signals if this is a max-height only request, no block is expected in the response to this type
@@ -97,8 +97,8 @@ message BlockRequestMessage {
 
 // BlockMessage is a p2p message payload that is responding to a block request message
 message BlockMessage {
-  // committee_id: is the unique identifier of the committee associated with this message
-  uint64 committee_id = 1;
+  // chain_id: is the unique identifier of the committee associated with this message
+  uint64 chain_id = 1;
   // max_height: the maximum height of this blockchain the peer is aware of
   uint64 max_height = 2;
   // total_vdf_iterations: the total number of vdf iterations associated with this blockchain
@@ -111,8 +111,8 @@ message BlockMessage {
 // TxMessage is a p2p message payload that is an inbound transaction to be processed by the blockchain's FSM and saved
 // in that chains mempool
 message TxMessage {
-  // committee_id: is the unique identifier of the committee associated with this message
-  uint64 committee_id = 1;
+  // chain_id: is the unique identifier of the committee associated with this message
+  uint64 chain_id = 1;
   // tx: is the bytes of the transaction that may be unmarshalled into a Transaction object
   bytes tx = 2;
 }

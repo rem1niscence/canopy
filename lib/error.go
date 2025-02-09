@@ -176,7 +176,7 @@ const (
 	CodeParamValEmpty                     ErrorCode = 23
 	CodeInvalidSubsidy                    ErrorCode = 24
 	CodeInvalidOpcode                     ErrorCode = 25
-	CodeWrongCommitteeID                  ErrorCode = 26
+	CodeWrongChainId                      ErrorCode = 26
 	CodeUnknownMsg                        ErrorCode = 27
 	CodeInsufficientFunds                 ErrorCode = 28
 	CodeValidatorExists                   ErrorCode = 29
@@ -218,10 +218,10 @@ const (
 	CodeInvalidCommitteeStakeDistribution ErrorCode = 65
 	CodeValidatorIsADelegate              ErrorCode = 66
 	CodeInvalidCommittee                  ErrorCode = 67
-	CodeInvalidCommitteeID                ErrorCode = 68
+	CodeInvalidChainId                    ErrorCode = 68
 	CodeWrongNetworkID                    ErrorCode = 69
 	CodeInvalidSlashRecipients            ErrorCode = 70
-	CodeCanopyHeight                      ErrorCode = 71
+	CodeRootHeight                        ErrorCode = 71
 	CodeInvalidQCCommitteeHeight          ErrorCode = 72
 	CodeInvalidOrders                     ErrorCode = 73
 	CodeOrderNotFound                     ErrorCode = 74
@@ -236,9 +236,9 @@ const (
 	CodeInvalidCheckpoint                 ErrorCode = 83
 	CodeInvalidSellOrder                  ErrorCode = 84
 	CodeStartPollHeight                   ErrorCode = 85
-	CodeEmptyCommitteeID                  ErrorCode = 86
+	CodeEmptyChainId                      ErrorCode = 86
 	CodeMismatchCertResults               ErrorCode = 87
-	CodeInvalidQCBaseChainHeight          ErrorCode = 88
+	CodeInvalidQCRootChainHeight          ErrorCode = 88
 	CodeEmptyCertificateResults           ErrorCode = 89
 
 	// P2P Module
@@ -426,16 +426,16 @@ func ErrWrongHeight() ErrorI {
 	return NewError(CodeWrongHeight, ConsensusModule, "wrong height")
 }
 
-func ErrWrongCanopyHeight() ErrorI {
-	return NewError(CodeCanopyHeight, ConsensusModule, "wrong canopy height")
+func ErrWrongRootHeight() ErrorI {
+	return NewError(CodeRootHeight, ConsensusModule, "wrong canopy height")
 }
 
 func ErrInvalidQCCommitteeHeight() ErrorI {
 	return NewError(CodeInvalidQCCommitteeHeight, ConsensusModule, "invalid certificate committee height")
 }
 
-func ErrInvalidQCBaseChainHeight() ErrorI {
-	return NewError(CodeInvalidQCBaseChainHeight, ConsensusModule, "invalid certificate base-chain height")
+func ErrInvalidQCRootChainHeight() ErrorI {
+	return NewError(CodeInvalidQCRootChainHeight, ConsensusModule, "invalid certificate root-Chain height")
 }
 
 func ErrWrongMaxHeight() ErrorI {
@@ -610,12 +610,12 @@ func ErrWrongNetworkID() ErrorI {
 	return NewError(CodeWrongNetworkID, StateMachineModule, "wrong network id")
 }
 
-func ErrEmptyCommitteeId() ErrorI {
-	return NewError(CodeEmptyCommitteeID, StateMachineModule, "empty committee id")
+func ErrEmptyChainId() ErrorI {
+	return NewError(CodeEmptyChainId, StateMachineModule, "empty committee id")
 }
 
-func ErrWrongCommitteeID() ErrorI {
-	return NewError(CodeWrongCommitteeID, StateMachineModule, "wrong committee id")
+func ErrWrongChainId() ErrorI {
+	return NewError(CodeWrongChainId, StateMachineModule, "wrong committee id")
 }
 
 func ErrDuplicateTx(hash string) ErrorI {

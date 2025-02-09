@@ -73,7 +73,7 @@ func TestApplyTransaction(t *testing.T) {
 				test.expected.TxHash = crypto.HashString(tx)
 			}
 			// preset the state limit for send fee
-			require.NoError(t, sm.UpdateParam("fee", types.ParamMessageSendFee, &lib.UInt64Wrapper{Value: 1}))
+			require.NoError(t, sm.UpdateParam("fee", types.ParamSendFee, &lib.UInt64Wrapper{Value: 1}))
 			// preset tokens to the sender account (for the fee)
 			require.NoError(t, sm.AccountAdd(newTestAddress(t), test.presetSender))
 			// preset last block for timestamp verification
@@ -185,7 +185,7 @@ func TestCheckTx(t *testing.T) {
 			// convenience variable for store
 			s := sm.store.(lib.StoreI)
 			// preset the state limit for send fee
-			require.NoError(t, sm.UpdateParam("fee", types.ParamMessageSendFee, &lib.UInt64Wrapper{Value: 1}))
+			require.NoError(t, sm.UpdateParam("fee", types.ParamSendFee, &lib.UInt64Wrapper{Value: 1}))
 			// preset tokens to the sender account (for the fee)
 			require.NoError(t, sm.AccountAdd(newTestAddress(t), test.presetSender))
 			// preset last block for timestamp verification
@@ -548,7 +548,7 @@ func TestCheckFee(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
 			// preset the state limit
-			require.NoError(t, sm.UpdateParam("fee", types.ParamMessageSendFee, &lib.UInt64Wrapper{Value: test.stateLimit}))
+			require.NoError(t, sm.UpdateParam("fee", types.ParamSendFee, &lib.UInt64Wrapper{Value: test.stateLimit}))
 			// execute the function call
 			err := sm.CheckFee(test.fee, test.msg)
 			// validate the expected error
