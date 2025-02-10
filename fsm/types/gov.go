@@ -50,40 +50,41 @@ func DefaultParams() *Params {
 		Consensus: &ConsensusParams{
 			BlockSize:       uint64(units.MB),
 			ProtocolVersion: NewProtocolVersion(0, 1),
+			RootChainId:     1,
 			Retired:         0,
 		},
 		Validator: &ValidatorParams{
-			ValidatorUnstakingBlocks:                    2,
-			ValidatorMaxPauseBlocks:                     4380,
-			ValidatorDoubleSignSlashPercentage:          10,
-			ValidatorNonSignSlashPercentage:             1,
-			ValidatorMaxNonSign:                         3,
-			ValidatorNonSignWindow:                      5,
-			ValidatorMaxCommittees:                      15,
-			ValidatorMaxCommitteeSize:                   100,
-			ValidatorEarlyWithdrawalPenalty:             20,
-			ValidatorDelegateUnstakingBlocks:            2,
-			ValidatorMinimumOrderSize:                   1000000000,
-			ValidatorStakePercentForSubsidizedCommittee: 33,
-			ValidatorMaxSlashPerCommittee:               15,
-			ValidatorDelegateRewardPercentage:           10,
-			ValidatorBuyDeadlineBlocks:                  15,
-			ValidatorBuyOrderFeeMultiplier:              2,
+			UnstakingBlocks:                    2,
+			MaxPauseBlocks:                     4380,
+			DoubleSignSlashPercentage:          10,
+			NonSignSlashPercentage:             1,
+			MaxNonSign:                         3,
+			NonSignWindow:                      5,
+			MaxCommittees:                      15,
+			MaxCommitteeSize:                   100,
+			EarlyWithdrawalPenalty:             20,
+			DelegateUnstakingBlocks:            2,
+			MinimumOrderSize:                   1000000000,
+			StakePercentForSubsidizedCommittee: 33,
+			MaxSlashPerCommittee:               15,
+			DelegateRewardPercentage:           10,
+			BuyDeadlineBlocks:                  15,
+			BuyOrderFeeMultiplier:              2,
 		},
 		Fee: &FeeParams{
-			MessageSendFee:               10000,
-			MessageStakeFee:              10000,
-			MessageEditStakeFee:          10000,
-			MessageUnstakeFee:            10000,
-			MessagePauseFee:              10000,
-			MessageUnpauseFee:            10000,
-			MessageChangeParameterFee:    10000,
-			MessageDaoTransferFee:        10000,
-			MessageCertificateResultsFee: 0,
-			MessageSubsidyFee:            10000,
-			MessageCreateOrderFee:        10000,
-			MessageEditOrderFee:          10000,
-			MessageDeleteOrderFee:        10000,
+			SendFee:               10000,
+			StakeFee:              10000,
+			EditStakeFee:          10000,
+			UnstakeFee:            10000,
+			PauseFee:              10000,
+			UnpauseFee:            10000,
+			ChangeParameterFee:    10000,
+			DaoTransferFee:        10000,
+			CertificateResultsFee: 0,
+			SubsidyFee:            10000,
+			CreateOrderFee:        10000,
+			EditOrderFee:          10000,
+			DeleteOrderFee:        10000,
 		},
 		Governance: &GovernanceParams{DaoRewardPercentage: 5},
 	}
@@ -108,7 +109,8 @@ func (x *Params) Check() lib.ErrorI {
 const (
 	ParamBlockSize       = "block_size"       // size of the block - header
 	ParamProtocolVersion = "protocol_version" // current protocol version (upgrade enforcement)
-	ParamRetired         = "retired"          // if the chain is marking itself as 'retired' to the base-chain making it forever un-subsidized
+	ParamRetired         = "retired"          // if the chain is marking itself as 'retired' to the root-Chain making it forever un-subsidized
+	ParamRootChainId     = "root_chain_id"    // the chain id of the root chain (source of the validator set)
 )
 
 var _ ParamSpace = &ConsensusParams{}
@@ -128,6 +130,8 @@ func (x *ConsensusParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.BlockSize = value
 	case ParamRetired:
 		x.Retired = value
+	case ParamRootChainId:
+		x.RootChainId = value
 	default:
 		return ErrUnknownParam()
 	}
@@ -251,70 +255,70 @@ func IsStringParam(paramSpace, paramKey string) (bool, lib.ErrorI) {
 var _ ParamSpace = &ValidatorParams{}
 
 const (
-	ParamValidatorUnstakingBlocks                    = "validator_unstaking_blocks"                       // number of blocks a committee member must be 'unstaking' for
-	ParamValidatorMaxPauseBlocks                     = "validator_max_pause_blocks"                       // maximum blocks a validator may be paused for before force-unstaking
-	ParamValidatorNonSignSlashPercentage             = "validator_non_sign_slash_percentage"              // how much a non-signer is slashed if exceeds threshold in window (% of stake)
-	ParamValidatorMaxNonSign                         = "validator_max_non_sign"                           // how much a committee member can not sign before being slashed
-	ParamValidatorNonSignWindow                      = "validator_non_sign_window"                        // how frequently the non-sign-count is reset
-	ParamValidatorDoubleSignSlashPercentage          = "validator_double_sign_slash_percentage"           // how much a double signer is slashed (% of stake)
-	ParamValidatorMaxCommittees                      = "validator_max_committees"                         // maximum number of committees a single validator may participate in
-	ParamValidatorMaxCommitteeSize                   = "validator_max_committee_size"                     // maximum number of members a committee may have
-	ParamValidatorEarlyWithdrawalPenalty             = "validator_early_withdrawal_penalty"               // reduction percentage of non-compounded rewards
-	ParamValidatorDelegateUnstakingBlocks            = "validator_delegate_unstaking_blocks"              // number of blocks a delegator must be 'unstaking' for
-	ParamValidatorMinimumOrderSize                   = "validator_minimum_order_size"                     // minimum sell tokens in a sell order
-	ParamValidatorStakePercentForSubsidizedCommittee = "validator_stake_percent_for_subsidized_committee" // the minimum percentage of total stake needed to be a 'paid committee'
-	ParamValidatorMaxSlashPerCommittee               = "validator_max_slash_per_committee"                // the maximum validator slash per committee per block
-	ParamValidatorDelegateRewardPercentage           = "validator_delegate_reward_percentage"             // the percentage of the block reward that is awarded to the delegates
-	ParamValidatorBuyDeadlineBlocks                  = "validator_buy_deadline_blocks"                    // the amount of blocks a 'buyer' has to complete an order they reserved
-	ParamValidatorBuyOrderFeeMultiplier              = "validator_buy_order_fee_multiplier"               // the fee multiplier of the 'send' fee that is required to execute a buy order
+	ParamUnstakingBlocks                    = "unstaking_blocks"                       // number of blocks a committee member must be 'unstaking' for
+	ParamMaxPauseBlocks                     = "max_pause_blocks"                       // maximum blocks a validator may be paused for before force-unstaking
+	ParamNonSignSlashPercentage             = "non_sign_slash_percentage"              // how much a non-signer is slashed if exceeds threshold in window (% of stake)
+	ParamMaxNonSign                         = "max_non_sign"                           // how much a committee member can not sign before being slashed
+	ParamNonSignWindow                      = "non_sign_window"                        // how frequently the non-sign-count is reset
+	ParamDoubleSignSlashPercentage          = "double_sign_slash_percentage"           // how much a double signer is slashed (% of stake)
+	ParamMaxCommittees                      = "max_committees"                         // maximum number of committees a single validator may participate in
+	ParamMaxCommitteeSize                   = "max_committee_size"                     // maximum number of members a committee may have
+	ParamEarlyWithdrawalPenalty             = "early_withdrawal_penalty"               // reduction percentage of non-compounded rewards
+	ParamDelegateUnstakingBlocks            = "delegate_unstaking_blocks"              // number of blocks a delegator must be 'unstaking' for
+	ParamMinimumOrderSize                   = "minimum_order_size"                     // minimum sell tokens in a sell order
+	ParamStakePercentForSubsidizedCommittee = "stake_percent_for_subsidized_committee" // the minimum percentage of total stake needed to be a 'paid committee'
+	ParamMaxSlashPerCommittee               = "max_slash_per_committee"                // the maximum validator slash per committee per block
+	ParamDelegateRewardPercentage           = "delegate_reward_percentage"             // the percentage of the block reward that is awarded to the delegates
+	ParamBuyDeadlineBlocks                  = "buy_deadline_blocks"                    // the amount of blocks a 'buyer' has to complete an order they reserved
+	ParamBuyOrderFeeMultiplier              = "buy_order_fee_multiplier"               // the fee multiplier of the 'send' fee that is required to execute a buy order
 )
 
 // Check() validates the Validator params
 func (x *ValidatorParams) Check() lib.ErrorI {
-	if x.ValidatorUnstakingBlocks == 0 {
-		return ErrInvalidParam(ParamValidatorUnstakingBlocks)
+	if x.UnstakingBlocks == 0 {
+		return ErrInvalidParam(ParamUnstakingBlocks)
 	}
-	if x.ValidatorMaxPauseBlocks == 0 {
-		return ErrInvalidParam(ParamValidatorMaxPauseBlocks)
+	if x.MaxPauseBlocks == 0 {
+		return ErrInvalidParam(ParamMaxPauseBlocks)
 	}
-	if x.ValidatorNonSignSlashPercentage > 100 {
-		return ErrInvalidParam(ParamValidatorNonSignSlashPercentage)
+	if x.NonSignSlashPercentage > 100 {
+		return ErrInvalidParam(ParamNonSignSlashPercentage)
 	}
-	if x.ValidatorNonSignWindow == 0 {
-		return ErrInvalidParam(ParamValidatorNonSignWindow)
+	if x.NonSignWindow == 0 {
+		return ErrInvalidParam(ParamNonSignWindow)
 	}
-	if x.ValidatorMaxNonSign > x.ValidatorNonSignWindow {
-		return ErrInvalidParam(ParamValidatorMaxNonSign)
+	if x.MaxNonSign > x.NonSignWindow {
+		return ErrInvalidParam(ParamMaxNonSign)
 	}
-	if x.ValidatorDoubleSignSlashPercentage > 100 {
-		return ErrInvalidParam(ParamValidatorDoubleSignSlashPercentage)
+	if x.DoubleSignSlashPercentage > 100 {
+		return ErrInvalidParam(ParamDoubleSignSlashPercentage)
 	}
-	if x.ValidatorMaxCommittees > 100 {
-		return ErrInvalidParam(ParamValidatorMaxCommittees)
+	if x.MaxCommittees > 100 {
+		return ErrInvalidParam(ParamMaxCommittees)
 	}
-	if x.ValidatorMaxCommitteeSize == 0 {
-		return ErrInvalidParam(ParamValidatorMaxCommitteeSize)
+	if x.MaxCommitteeSize == 0 {
+		return ErrInvalidParam(ParamMaxCommitteeSize)
 	}
-	if x.ValidatorDelegateUnstakingBlocks < 2 {
-		return ErrInvalidParam(ParamValidatorDelegateUnstakingBlocks)
+	if x.DelegateUnstakingBlocks < 2 {
+		return ErrInvalidParam(ParamDelegateUnstakingBlocks)
 	}
-	if x.ValidatorEarlyWithdrawalPenalty > 100 {
-		return ErrInvalidParam(ParamValidatorEarlyWithdrawalPenalty)
+	if x.EarlyWithdrawalPenalty > 100 {
+		return ErrInvalidParam(ParamEarlyWithdrawalPenalty)
 	}
-	if x.ValidatorStakePercentForSubsidizedCommittee == 0 || x.ValidatorStakePercentForSubsidizedCommittee > 100 {
-		return ErrInvalidParam(ParamValidatorStakePercentForSubsidizedCommittee)
+	if x.StakePercentForSubsidizedCommittee == 0 || x.StakePercentForSubsidizedCommittee > 100 {
+		return ErrInvalidParam(ParamStakePercentForSubsidizedCommittee)
 	}
-	if x.ValidatorMaxSlashPerCommittee == 0 || x.ValidatorMaxSlashPerCommittee > 100 {
-		return ErrInvalidParam(ParamValidatorMaxSlashPerCommittee)
+	if x.MaxSlashPerCommittee == 0 || x.MaxSlashPerCommittee > 100 {
+		return ErrInvalidParam(ParamMaxSlashPerCommittee)
 	}
-	if x.ValidatorDelegateRewardPercentage == 0 || x.ValidatorDelegateRewardPercentage > 100 {
-		return ErrInvalidParam(ParamValidatorDelegateRewardPercentage)
+	if x.DelegateRewardPercentage == 0 || x.DelegateRewardPercentage > 100 {
+		return ErrInvalidParam(ParamDelegateRewardPercentage)
 	}
-	if x.ValidatorBuyDeadlineBlocks == 0 {
-		return ErrInvalidParam(ParamValidatorBuyDeadlineBlocks)
+	if x.BuyDeadlineBlocks == 0 {
+		return ErrInvalidParam(ParamBuyDeadlineBlocks)
 	}
-	if x.ValidatorBuyOrderFeeMultiplier == 0 {
-		return ErrInvalidParam(ParamValidatorBuyOrderFeeMultiplier)
+	if x.BuyOrderFeeMultiplier == 0 {
+		return ErrInvalidParam(ParamBuyOrderFeeMultiplier)
 	}
 	return nil
 }
@@ -322,38 +326,38 @@ func (x *ValidatorParams) Check() lib.ErrorI {
 // SetUint64() update a uint64 parameter in the structure
 func (x *ValidatorParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 	switch paramName {
-	case ParamValidatorUnstakingBlocks:
-		x.ValidatorUnstakingBlocks = value
-	case ParamValidatorMaxPauseBlocks:
-		x.ValidatorMaxPauseBlocks = value
-	case ParamValidatorNonSignWindow:
-		x.ValidatorNonSignWindow = value
-	case ParamValidatorMaxNonSign:
-		x.ValidatorMaxNonSign = value
-	case ParamValidatorNonSignSlashPercentage:
-		x.ValidatorNonSignSlashPercentage = value
-	case ParamValidatorDoubleSignSlashPercentage:
-		x.ValidatorDoubleSignSlashPercentage = value
-	case ParamValidatorMaxCommittees:
-		x.ValidatorMaxCommittees = value
-	case ParamValidatorMaxCommitteeSize:
-		x.ValidatorMaxCommitteeSize = value
-	case ParamValidatorEarlyWithdrawalPenalty:
-		x.ValidatorEarlyWithdrawalPenalty = value
-	case ParamValidatorDelegateUnstakingBlocks:
-		x.ValidatorDelegateUnstakingBlocks = value
-	case ParamValidatorMinimumOrderSize:
-		x.ValidatorMinimumOrderSize = value
-	case ParamValidatorStakePercentForSubsidizedCommittee:
-		x.ValidatorStakePercentForSubsidizedCommittee = value
-	case ParamValidatorMaxSlashPerCommittee:
-		x.ValidatorMaxSlashPerCommittee = value
-	case ParamValidatorDelegateRewardPercentage:
-		x.ValidatorDelegateRewardPercentage = value
-	case ParamValidatorBuyDeadlineBlocks:
-		x.ValidatorBuyDeadlineBlocks = value
-	case ParamValidatorBuyOrderFeeMultiplier:
-		x.ValidatorBuyOrderFeeMultiplier = value
+	case ParamUnstakingBlocks:
+		x.UnstakingBlocks = value
+	case ParamMaxPauseBlocks:
+		x.MaxPauseBlocks = value
+	case ParamNonSignWindow:
+		x.NonSignWindow = value
+	case ParamMaxNonSign:
+		x.MaxNonSign = value
+	case ParamNonSignSlashPercentage:
+		x.NonSignSlashPercentage = value
+	case ParamDoubleSignSlashPercentage:
+		x.DoubleSignSlashPercentage = value
+	case ParamMaxCommittees:
+		x.MaxCommittees = value
+	case ParamMaxCommitteeSize:
+		x.MaxCommitteeSize = value
+	case ParamEarlyWithdrawalPenalty:
+		x.EarlyWithdrawalPenalty = value
+	case ParamDelegateUnstakingBlocks:
+		x.DelegateUnstakingBlocks = value
+	case ParamMinimumOrderSize:
+		x.MinimumOrderSize = value
+	case ParamStakePercentForSubsidizedCommittee:
+		x.StakePercentForSubsidizedCommittee = value
+	case ParamMaxSlashPerCommittee:
+		x.MaxSlashPerCommittee = value
+	case ParamDelegateRewardPercentage:
+		x.DelegateRewardPercentage = value
+	case ParamBuyDeadlineBlocks:
+		x.BuyDeadlineBlocks = value
+	case ParamBuyOrderFeeMultiplier:
+		x.BuyOrderFeeMultiplier = value
 	default:
 		return ErrUnknownParam()
 	}
@@ -370,58 +374,58 @@ func (x *ValidatorParams) SetString(_ string, _ string) lib.ErrorI {
 var _ ParamSpace = &FeeParams{}
 
 const (
-	ParamMessageSendFee               = "message_send_fee"                // transaction fee for MessageSend
-	ParamMessageStakeFee              = "message_stake_fee"               // transaction fee for MessageStake
-	ParamMessageEditStakeFee          = "message_edit_stake_fee"          // transaction fee for MessageEditStake
-	ParamMessageUnstakeFee            = "message_unstake_fee"             // transaction fee for MessageUnstake
-	ParamMessagePauseFee              = "message_pause_fee"               // transaction fee for MessagePause
-	ParamMessageUnpauseFee            = "message_unpause_fee"             // transaction fee for MessageUnpause
-	ParamMessageChangeParameterFee    = "message_change_parameter_fee"    // transaction fee for MessageChangeParameter
-	ParamMessageDAOTransferFee        = "message_dao_transfer_fee"        // transaction fee for MessageDAOTransfer
-	ParamMessageCertificateResultsFee = "message_certificate_results_fee" // transaction fee for MessageCertificateResults
-	ParamMessageSubsidyFee            = "message_subsidy_fee"             // transaction fee for MessageSubsidy
-	ParamMessageCreateOrder           = "message_create_order"            // transaction fee for MessageCreateOrder
-	ParamMessageEditOrder             = "message_edit_order"              // transaction fee for MessageEditOrder
-	ParamMessageDeleteOrder           = "message_delete_order"            // transaction fee for MessageDeleteOrder
+	ParamSendFee               = "send_fee"                // transaction fee for MessageSend
+	ParamStakeFee              = "stake_fee"               // transaction fee for MessageStake
+	ParamEditStakeFee          = "edit_stake_fee"          // transaction fee for MessageEditStake
+	ParamUnstakeFee            = "unstake_fee"             // transaction fee for MessageUnstake
+	ParamPauseFee              = "pause_fee"               // transaction fee for MessagePause
+	ParamUnpauseFee            = "unpause_fee"             // transaction fee for MessageUnpause
+	ParamChangeParameterFee    = "change_parameter_fee"    // transaction fee for MessageChangeParameter
+	ParamDAOTransferFee        = "dao_transfer_fee"        // transaction fee for MessageDAOTransfer
+	ParamCertificateResultsFee = "certificate_results_fee" // transaction fee for MessageCertificateResults
+	ParamSubsidyFee            = "subsidy_fee"             // transaction fee for MessageSubsidy
+	ParamCreateOrderFee        = "create_order_fee"        // transaction fee for MessageCreateOrder
+	ParamEditOrderFee          = "edit_order_fee"          // transaction fee for MessageEditOrder
+	ParamDeleteOrderFee        = "delete_order_fee"        // transaction fee for MessageDeleteOrder
 )
 
 // Check() validates the Fee params
 func (x *FeeParams) Check() lib.ErrorI {
-	if x.MessageSendFee == 0 {
-		return ErrInvalidParam(ParamMessageSendFee)
+	if x.SendFee == 0 {
+		return ErrInvalidParam(ParamSendFee)
 	}
-	if x.MessageStakeFee == 0 {
-		return ErrInvalidParam(ParamMessageStakeFee)
+	if x.StakeFee == 0 {
+		return ErrInvalidParam(ParamStakeFee)
 	}
-	if x.MessageEditStakeFee == 0 {
-		return ErrInvalidParam(ParamMessageEditStakeFee)
+	if x.EditStakeFee == 0 {
+		return ErrInvalidParam(ParamEditStakeFee)
 	}
-	if x.MessageUnstakeFee == 0 {
-		return ErrInvalidParam(ParamMessageUnstakeFee)
+	if x.UnstakeFee == 0 {
+		return ErrInvalidParam(ParamUnstakeFee)
 	}
-	if x.MessagePauseFee == 0 {
-		return ErrInvalidParam(ParamMessagePauseFee)
+	if x.PauseFee == 0 {
+		return ErrInvalidParam(ParamPauseFee)
 	}
-	if x.MessageUnpauseFee == 0 {
-		return ErrInvalidParam(ParamMessageUnpauseFee)
+	if x.UnpauseFee == 0 {
+		return ErrInvalidParam(ParamUnpauseFee)
 	}
-	if x.MessageChangeParameterFee == 0 {
-		return ErrInvalidParam(ParamMessageChangeParameterFee)
+	if x.ChangeParameterFee == 0 {
+		return ErrInvalidParam(ParamChangeParameterFee)
 	}
-	if x.MessageDaoTransferFee == 0 {
-		return ErrInvalidParam(ParamMessageDAOTransferFee)
+	if x.DaoTransferFee == 0 {
+		return ErrInvalidParam(ParamDAOTransferFee)
 	}
-	if x.MessageSubsidyFee == 0 {
-		return ErrInvalidParam(ParamMessageSubsidyFee)
+	if x.SubsidyFee == 0 {
+		return ErrInvalidParam(ParamSubsidyFee)
 	}
-	if x.MessageCreateOrderFee == 0 {
-		return ErrInvalidParam(ParamMessageCreateOrder)
+	if x.CreateOrderFee == 0 {
+		return ErrInvalidParam(ParamCreateOrderFee)
 	}
-	if x.MessageEditOrderFee == 0 {
-		return ErrInvalidParam(ParamMessageEditOrder)
+	if x.EditOrderFee == 0 {
+		return ErrInvalidParam(ParamEditOrderFee)
 	}
-	if x.MessageDeleteOrderFee == 0 {
-		return ErrInvalidParam(ParamMessageDeleteOrder)
+	if x.DeleteOrderFee == 0 {
+		return ErrInvalidParam(ParamDeleteOrderFee)
 	}
 	return nil
 }
@@ -434,26 +438,32 @@ func (x *FeeParams) SetString(_ string, _ string) lib.ErrorI {
 // SetUint64() update a uint64 parameter in the structure
 func (x *FeeParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 	switch paramName {
-	case ParamMessageSendFee:
-		x.MessageSendFee = value
-	case ParamMessageStakeFee:
-		x.MessageStakeFee = value
-	case ParamMessageEditStakeFee:
-		x.MessageEditStakeFee = value
-	case ParamMessageUnstakeFee:
-		x.MessageUnstakeFee = value
-	case ParamMessagePauseFee:
-		x.MessagePauseFee = value
-	case ParamMessageUnpauseFee:
-		x.MessageUnpauseFee = value
-	case ParamMessageChangeParameterFee:
-		x.MessageChangeParameterFee = value
-	case ParamMessageDAOTransferFee:
-		x.MessageDaoTransferFee = value
-	case ParamMessageCertificateResultsFee:
-		x.MessageCertificateResultsFee = value
-	case ParamMessageSubsidyFee:
-		x.MessageSubsidyFee = value
+	case ParamSendFee:
+		x.SendFee = value
+	case ParamStakeFee:
+		x.StakeFee = value
+	case ParamEditStakeFee:
+		x.EditStakeFee = value
+	case ParamUnstakeFee:
+		x.UnstakeFee = value
+	case ParamPauseFee:
+		x.PauseFee = value
+	case ParamUnpauseFee:
+		x.UnpauseFee = value
+	case ParamChangeParameterFee:
+		x.ChangeParameterFee = value
+	case ParamDAOTransferFee:
+		x.DaoTransferFee = value
+	case ParamCertificateResultsFee:
+		x.CertificateResultsFee = value
+	case ParamSubsidyFee:
+		x.SubsidyFee = value
+	case ParamCreateOrderFee:
+		x.CreateOrderFee = value
+	case ParamDeleteOrderFee:
+		x.DeleteOrderFee = value
+	case ParamEditOrderFee:
+		x.EditOrderFee = value
 	default:
 		return ErrUnknownParam()
 	}

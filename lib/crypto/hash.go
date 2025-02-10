@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	HashSize      = sha256.Size
-	ShortHashSize = 20
+	HashSize = sha256.Size
 )
 
 var (

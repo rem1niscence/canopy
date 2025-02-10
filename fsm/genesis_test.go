@@ -59,7 +59,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				Params: types.DefaultParams(),
@@ -69,7 +69,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				OrderBooks: new(lib.OrderBooks),
@@ -78,7 +78,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Total:  100,
 					Staked: 100,
 					CommitteeStaked: []*types.Pool{{
-						Id:     lib.CanopyCommitteeId,
+						Id:     lib.CanopyChainId,
 						Amount: 100,
 					}, {
 						Id:     2,
@@ -92,14 +92,14 @@ func TestNewFromGenesisFile(t *testing.T) {
 			detail: "the genesis file tests pools only",
 			input: types.GenesisState{
 				Pools: []*types.Pool{{
-					Id:     lib.CanopyCommitteeId,
+					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}},
 				Params: types.DefaultParams(),
 			},
 			expected: types.GenesisState{
 				Pools: []*types.Pool{{
-					Id:     lib.CanopyCommitteeId,
+					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}},
 				OrderBooks: new(lib.OrderBooks),
@@ -115,10 +115,10 @@ func TestNewFromGenesisFile(t *testing.T) {
 			input: types.GenesisState{
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{{
-						CommitteeId: lib.CanopyCommitteeId,
+						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
 							Id:                   1,
-							Committee:            lib.CanopyCommitteeId,
+							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
 							SellerReceiveAddress: newTestAddressBytes(t),
@@ -137,15 +137,15 @@ func TestNewFromGenesisFile(t *testing.T) {
 			},
 			expected: types.GenesisState{
 				Pools: []*types.Pool{{
-					Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
+					Id:     lib.CanopyChainId + types.EscrowPoolAddend,
 					Amount: 200,
 				}},
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{{
-						CommitteeId: lib.CanopyCommitteeId,
+						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
 							Id:                   1,
-							Committee:            lib.CanopyCommitteeId,
+							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
 							SellerReceiveAddress: newTestAddressBytes(t),
@@ -270,7 +270,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 			detail: "the complete genesis file testing",
 			input: &types.GenesisState{
 				Pools: []*types.Pool{{
-					Id:     lib.CanopyCommitteeId,
+					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}},
 				Accounts: []*types.Account{{
@@ -281,15 +281,15 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{{
-						CommitteeId: lib.CanopyCommitteeId,
+						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
 							Id:                   1,
-							Committee:            lib.CanopyCommitteeId,
+							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
 							SellerReceiveAddress: newTestAddressBytes(t),
@@ -309,10 +309,10 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 			},
 			expected: &types.GenesisState{
 				Pools: []*types.Pool{{
-					Id:     lib.CanopyCommitteeId,
+					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}, {
-					Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
+					Id:     lib.CanopyChainId + types.EscrowPoolAddend,
 					Amount: 200,
 				}},
 				Accounts: []*types.Account{{
@@ -323,15 +323,15 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{{
-						CommitteeId: lib.CanopyCommitteeId,
+						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
 							Id:                   1,
-							Committee:            lib.CanopyCommitteeId,
+							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
 							SellerReceiveAddress: newTestAddressBytes(t),
@@ -351,7 +351,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Total:  500,
 					Staked: 100,
 					CommitteeStaked: []*types.Pool{{
-						Id:     lib.CanopyCommitteeId,
+						Id:     lib.CanopyChainId,
 						Amount: 100,
 					}, {
 						Id:     2,
@@ -395,7 +395,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				Params: types.DefaultParams(),
@@ -405,7 +405,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
 				OrderBooks: new(lib.OrderBooks),
@@ -414,7 +414,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Total:  100,
 					Staked: 100,
 					CommitteeStaked: []*types.Pool{{
-						Id:     lib.CanopyCommitteeId,
+						Id:     lib.CanopyChainId,
 						Amount: 100,
 					}, {
 						Id:     2,
@@ -428,14 +428,14 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 			detail: "the genesis file tests pools only",
 			input: &types.GenesisState{
 				Pools: []*types.Pool{{
-					Id:     lib.CanopyCommitteeId,
+					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}},
 				Params: types.DefaultParams(),
 			},
 			expected: &types.GenesisState{
 				Pools: []*types.Pool{{
-					Id:     lib.CanopyCommitteeId,
+					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}},
 				OrderBooks: new(lib.OrderBooks),
@@ -451,10 +451,10 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 			input: &types.GenesisState{
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{{
-						CommitteeId: lib.CanopyCommitteeId,
+						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
 							Id:                   1,
-							Committee:            lib.CanopyCommitteeId,
+							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
 							SellerReceiveAddress: newTestAddressBytes(t),
@@ -473,15 +473,15 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 			},
 			expected: &types.GenesisState{
 				Pools: []*types.Pool{{
-					Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
+					Id:     lib.CanopyChainId + types.EscrowPoolAddend,
 					Amount: 200,
 				}},
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{{
-						CommitteeId: lib.CanopyCommitteeId,
+						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
 							Id:                   1,
-							Committee:            lib.CanopyCommitteeId,
+							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
 							SellerReceiveAddress: newTestAddressBytes(t),
@@ -609,7 +609,7 @@ func TestValidateGenesisState(t *testing.T) {
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{
 						{
-							CommitteeId: 0,
+							ChainId: 0,
 							Orders: []*lib.SellOrder{
 								{
 									Id:                 1,
@@ -620,7 +620,7 @@ func TestValidateGenesisState(t *testing.T) {
 							},
 						},
 						{
-							CommitteeId: 0,
+							ChainId: 0,
 							Orders: []*lib.SellOrder{
 								{
 									Id:                 2,
@@ -643,7 +643,7 @@ func TestValidateGenesisState(t *testing.T) {
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{
 						{
-							CommitteeId: 0,
+							ChainId: 0,
 							Orders: []*lib.SellOrder{
 								{
 									Id:                 1,
@@ -685,7 +685,7 @@ func TestValidateGenesisState(t *testing.T) {
 func newTestGenesisState(t *testing.T) *types.GenesisState {
 	return &types.GenesisState{
 		Pools: []*types.Pool{{
-			Id:     lib.CanopyCommitteeId,
+			Id:     lib.CanopyChainId,
 			Amount: 100,
 		}},
 		Accounts: []*types.Account{{
@@ -696,15 +696,15 @@ func newTestGenesisState(t *testing.T) *types.GenesisState {
 			Address:      newTestAddressBytes(t),
 			PublicKey:    newTestPublicKeyBytes(t),
 			StakedAmount: 100,
-			Committees:   []uint64{lib.CanopyCommitteeId, 2},
+			Committees:   []uint64{lib.CanopyChainId, 2},
 			Output:       newTestAddressBytes(t),
 		}},
 		OrderBooks: &lib.OrderBooks{
 			OrderBooks: []*lib.OrderBook{{
-				CommitteeId: lib.CanopyCommitteeId,
+				ChainId: lib.CanopyChainId,
 				Orders: []*lib.SellOrder{{
 					Id:                   1,
-					Committee:            lib.CanopyCommitteeId,
+					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t),
@@ -727,10 +727,10 @@ func newTestGenesisState(t *testing.T) *types.GenesisState {
 func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 	return &types.GenesisState{
 		Pools: []*types.Pool{{
-			Id:     lib.CanopyCommitteeId,
+			Id:     lib.CanopyChainId,
 			Amount: 100,
 		}, {
-			Id:     lib.CanopyCommitteeId + types.EscrowPoolAddend,
+			Id:     lib.CanopyChainId + types.EscrowPoolAddend,
 			Amount: 200,
 		}},
 		Accounts: []*types.Account{{
@@ -741,15 +741,15 @@ func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 			Address:      newTestAddressBytes(t),
 			PublicKey:    newTestPublicKeyBytes(t),
 			StakedAmount: 100,
-			Committees:   []uint64{lib.CanopyCommitteeId, 2},
+			Committees:   []uint64{lib.CanopyChainId, 2},
 			Output:       newTestAddressBytes(t),
 		}},
 		OrderBooks: &lib.OrderBooks{
 			OrderBooks: []*lib.OrderBook{{
-				CommitteeId: lib.CanopyCommitteeId,
+				ChainId: lib.CanopyChainId,
 				Orders: []*lib.SellOrder{{
 					Id:                   1,
-					Committee:            lib.CanopyCommitteeId,
+					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
 					SellerReceiveAddress: newTestAddressBytes(t),
@@ -770,7 +770,7 @@ func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 			Total:  500,
 			Staked: 100,
 			CommitteeStaked: []*types.Pool{{
-				Id:     lib.CanopyCommitteeId,
+				Id:     lib.CanopyChainId,
 				Amount: 100,
 			}, {
 				Id:     2,

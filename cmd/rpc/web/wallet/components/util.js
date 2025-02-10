@@ -138,12 +138,12 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
       minLength: 1,
       maxLength: 100,
     },
-    committeeId: {
+    chainId: {
       placeholder: "the id of the committee / counter asset",
       tooltip: "the unique identifier of the committee / counter asset",
-      label: "committeeId",
+      label: "chainId",
       inputText: "commit-Id",
-      feedback: "please input a committeeId id",
+      feedback: "please input a chainId id",
       required: true,
       type: "number",
       minLength: 1,
@@ -196,7 +196,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
       defaultValue: "",
       tooltip: "the category 'space' of the parameter",
       label: "param_space",
-      inputText: "param space",
+      inputText: "space",
       feedback: "please choose a space for the parameter change",
       required: true,
       type: "select",
@@ -208,7 +208,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
       defaultValue: "",
       tooltip: "the identifier of the parameter",
       label: "param_key",
-      inputText: "param key",
+      inputText: "key",
       feedback: "please choose a key for the parameter change",
       required: true,
       type: "select",
@@ -220,7 +220,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
       defaultValue: "",
       tooltip: "the newly proposed value of the parameter",
       label: "param_value",
-      inputText: "param val",
+      inputText: "value",
       feedback: "please choose a value for the parameter change",
       required: true,
       type: "text",
@@ -316,13 +316,13 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
         a.password,
       ];
     case "create_order":
-      return [a.account, a.committeeId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password];
+      return [a.account, a.chainId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password];
     case "buy_order":
       return [a.account, a.buyersReceiveAddress, a.orderId, a.fee, a.password];
     case "edit_order":
       return [
         a.account,
-        a.committeeId,
+        a.chainId,
         a.orderId,
         a.amount,
         a.receiveAmount,
@@ -332,7 +332,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
         a.password,
       ];
     case "delete_order":
-      return [a.account, a.committeeId, a.orderId, a.memo, a.fee, a.password];
+      return [a.account, a.chainId, a.orderId, a.memo, a.fee, a.password];
     case "edit-stake":
       return [
         a.account,

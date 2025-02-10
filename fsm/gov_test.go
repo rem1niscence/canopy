@@ -26,7 +26,7 @@ func TestUpdateParam(t *testing.T) {
 			detail: "the parameter space passed is invalid",
 			update: paramUpdate{
 				space: "app",
-				name:  types.ParamValidatorMaxCommittees,
+				name:  types.ParamMaxCommittees,
 				value: &lib.UInt64Wrapper{Value: 100},
 			},
 			error: "unknown param space",
@@ -36,7 +36,7 @@ func TestUpdateParam(t *testing.T) {
 			detail: "the parameter type passed is invalid",
 			update: paramUpdate{
 				space: "val",
-				name:  types.ParamValidatorMaxCommittees,
+				name:  types.ParamMaxCommittees,
 				value: &lib.ConsensusValidator{},
 			},
 			error: "unknown param type",
@@ -46,7 +46,7 @@ func TestUpdateParam(t *testing.T) {
 			detail: "the parameter passed is unknown (this space doesn't have a max committees)",
 			update: paramUpdate{
 				space: "cons",
-				name:  types.ParamValidatorMaxCommittees,
+				name:  types.ParamMaxCommittees,
 				value: &lib.UInt64Wrapper{Value: 100},
 			},
 			error: "unknown param",
@@ -56,7 +56,7 @@ func TestUpdateParam(t *testing.T) {
 			detail: "an update to max committees under the validator param space",
 			update: paramUpdate{
 				space: "val",
-				name:  types.ParamValidatorMaxCommittees,
+				name:  types.ParamMaxCommittees,
 				value: &lib.UInt64Wrapper{Value: 100},
 			},
 		},
@@ -85,7 +85,7 @@ func TestUpdateParam(t *testing.T) {
 			detail: "an update to certificate result tx fee under the fee param space",
 			update: paramUpdate{
 				space: "fee",
-				name:  types.ParamMessageCertificateResultsFee,
+				name:  types.ParamCertificateResultsFee,
 				value: &lib.UInt64Wrapper{Value: 100},
 			},
 		},
@@ -116,14 +116,14 @@ func TestUpdateParam(t *testing.T) {
 			require.NoError(t, err)
 			// validate the update
 			switch test.update.name {
-			case types.ParamValidatorMaxCommittees: // validator
-				require.Equal(t, uint64Value.Value, got.Validator.ValidatorMaxCommittees)
+			case types.ParamMaxCommittees: // validator
+				require.Equal(t, uint64Value.Value, got.Validator.MaxCommittees)
 			case types.ParamProtocolVersion: // consensus
 				require.Equal(t, stringValue.Value, got.Consensus.ProtocolVersion)
 			case types.ParamDAORewardPercentage: // gov
 				require.Equal(t, uint64Value.Value, got.Governance.DaoRewardPercentage)
-			case types.ParamMessageCertificateResultsFee: // fee
-				require.Equal(t, uint64Value.Value, got.Fee.MessageCertificateResultsFee)
+			case types.ParamCertificateResultsFee: // fee
+				require.Equal(t, uint64Value.Value, got.Fee.CertificateResultsFee)
 			}
 		})
 	}
@@ -134,11 +134,11 @@ func TestConformStateToParamUpdate(t *testing.T) {
 	// preset param sets to test the adjustment after the update
 	defaultParams, higherMaxCommittee, lowerMaxCommittee := types.DefaultParams(), types.DefaultParams(), types.DefaultParams()
 	// preset the default to have deterinism in this test
-	defaultParams.Validator.ValidatorMaxCommittees = 2
+	defaultParams.Validator.MaxCommittees = 2
 	// increment the default for the higher max committee
-	higherMaxCommittee.Validator.ValidatorMaxCommittees = defaultParams.Validator.ValidatorMaxCommittees + 1
+	higherMaxCommittee.Validator.MaxCommittees = defaultParams.Validator.MaxCommittees + 1
 	// decrement the default for a lower max committee
-	lowerMaxCommittee.Validator.ValidatorMaxCommittees = defaultParams.Validator.ValidatorMaxCommittees - 1
+	lowerMaxCommittee.Validator.MaxCommittees = defaultParams.Validator.MaxCommittees - 1
 	// run the test cases
 	tests := []struct {
 		name               string

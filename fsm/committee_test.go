@@ -30,14 +30,14 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 				Staked: 100,
 				CommitteeStaked: []*types.Pool{
 					{
-						Id:     lib.CanopyCommitteeId,
+						Id:     lib.CanopyChainId,
 						Amount: 10,
 					},
 				},
 			},
 			expected: []*types.Pool{
 				{
-					Id:     lib.CanopyCommitteeId,
+					Id:     lib.CanopyChainId,
 					Amount: 90,
 				},
 				{
@@ -55,22 +55,22 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 				Staked: 100,
 				CommitteeStaked: []*types.Pool{
 					{
-						Id:     lib.CanopyCommitteeId,
+						Id:     lib.CanopyChainId,
 						Amount: 10,
 					},
 					{
-						Id:     lib.CanopyCommitteeId + 1,
+						Id:     lib.CanopyChainId + 1,
 						Amount: 10,
 					},
 				},
 			},
 			expected: []*types.Pool{
 				{
-					Id:     lib.CanopyCommitteeId,
+					Id:     lib.CanopyChainId,
 					Amount: 45,
 				},
 				{
-					Id:     lib.CanopyCommitteeId + 1,
+					Id:     lib.CanopyChainId + 1,
 					Amount: 45,
 				},
 				{
@@ -88,38 +88,38 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 				Staked: 100,
 				CommitteeStaked: []*types.Pool{
 					{
-						Id:     lib.CanopyCommitteeId,
+						Id:     lib.CanopyChainId,
 						Amount: 10,
 					},
 					{
-						Id:     lib.CanopyCommitteeId + 1,
+						Id:     lib.CanopyChainId + 1,
 						Amount: 10,
 					},
 					{
-						Id:     lib.CanopyCommitteeId + 2,
+						Id:     lib.CanopyChainId + 2,
 						Amount: 10,
 					},
 					{
-						Id:     lib.CanopyCommitteeId + 3,
+						Id:     lib.CanopyChainId + 3,
 						Amount: 10,
 					},
 				},
 			},
 			expected: []*types.Pool{
 				{
-					Id:     lib.CanopyCommitteeId,
+					Id:     lib.CanopyChainId,
 					Amount: 22,
 				},
 				{
-					Id:     lib.CanopyCommitteeId + 1,
+					Id:     lib.CanopyChainId + 1,
 					Amount: 22,
 				},
 				{
-					Id:     lib.CanopyCommitteeId + 2,
+					Id:     lib.CanopyChainId + 2,
 					Amount: 22,
 				},
 				{
-					Id:     lib.CanopyCommitteeId + 3,
+					Id:     lib.CanopyChainId + 3,
 					Amount: 22,
 				},
 				{
@@ -137,7 +137,7 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 			params, err := sm.GetParams()
 			require.NoError(t, err)
 			// override the minimum percent for paid committee
-			params.Validator.ValidatorStakePercentForSubsidizedCommittee = minPercentForPaidCommittee
+			params.Validator.StakePercentForSubsidizedCommittee = minPercentForPaidCommittee
 			// override the mint amount
 			types.InitialTokensPerBlock = int(test.mintAmount)
 			// override the DAO cut percent
@@ -177,7 +177,7 @@ func TestGetPaidCommittees(t *testing.T) {
 		detail                     string
 		minPercentForPaidCommittee uint64
 		supply                     *types.Supply
-		paidCommitteeIds           []uint64
+		paidChainIds               []uint64
 	}{
 		{
 			name:                       "0 committees",
@@ -212,7 +212,7 @@ func TestGetPaidCommittees(t *testing.T) {
 					},
 				},
 			},
-			paidCommitteeIds: []uint64{0},
+			paidChainIds: []uint64{0},
 		},
 		{
 			name:                       "1 paid committee, 1 non paid committee",
@@ -231,7 +231,7 @@ func TestGetPaidCommittees(t *testing.T) {
 					},
 				},
 			},
-			paidCommitteeIds: []uint64{0},
+			paidChainIds: []uint64{0},
 		},
 		{
 			name:                       "2 100% paid committees",
@@ -250,7 +250,7 @@ func TestGetPaidCommittees(t *testing.T) {
 					},
 				},
 			},
-			paidCommitteeIds: []uint64{0, 1},
+			paidChainIds: []uint64{0, 1},
 		},
 		{
 			name:                       "2 10% paid committees",
@@ -269,7 +269,7 @@ func TestGetPaidCommittees(t *testing.T) {
 					},
 				},
 			},
-			paidCommitteeIds: []uint64{0, 1},
+			paidChainIds: []uint64{0, 1},
 		},
 	}
 	for _, test := range tests {
@@ -280,7 +280,7 @@ func TestGetPaidCommittees(t *testing.T) {
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
 			// override the minimum percent for paid committee
-			valParams.ValidatorStakePercentForSubsidizedCommittee = test.minPercentForPaidCommittee
+			valParams.StakePercentForSubsidizedCommittee = test.minPercentForPaidCommittee
 			// set the params back in state
 			require.NoError(t, sm.SetParamsVal(valParams))
 			// get the supply in state
@@ -292,10 +292,10 @@ func TestGetPaidCommittees(t *testing.T) {
 			// set the supply back in state
 			require.NoError(t, sm.SetSupply(supply))
 			// execute the function call
-			paidCommitteeIds, err := sm.GetSubsidizedCommittees()
+			paidChainIds, err := sm.GetSubsidizedCommittees()
 			require.NoError(t, err)
 			// ensure expected = got
-			require.Equal(t, test.paidCommitteeIds, paidCommitteeIds)
+			require.Equal(t, test.paidChainIds, paidChainIds)
 		})
 	}
 }
@@ -318,11 +318,11 @@ func TestGetCommitteeMembers(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: stakedAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			expected: map[uint64][][]byte{
-				lib.CanopyCommitteeId: {
+				lib.CanopyChainId: {
 					newTestPublicKeyBytes(t),
 				},
 			},
@@ -336,23 +336,23 @@ func TestGetCommitteeMembers(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: stakedAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t, 1),
 					StakedAmount: stakedAmount + 2,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 2),
 					PublicKey:    newTestPublicKeyBytes(t, 2),
 					StakedAmount: stakedAmount + 1,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			expected: map[uint64][][]byte{
-				lib.CanopyCommitteeId: {
+				lib.CanopyChainId: {
 					newTestPublicKeyBytes(t, 1),
 					newTestPublicKeyBytes(t, 2),
 					newTestPublicKeyBytes(t, 0),
@@ -368,23 +368,23 @@ func TestGetCommitteeMembers(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: stakedAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t, 1),
 					StakedAmount: stakedAmount + 2,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 				{
 					Address:      newTestAddressBytes(t, 2),
 					PublicKey:    newTestPublicKeyBytes(t, 2),
 					StakedAmount: stakedAmount + 1,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 			},
 			expected: map[uint64][][]byte{
-				lib.CanopyCommitteeId: {
+				lib.CanopyChainId: {
 					newTestPublicKeyBytes(t, 1),
 					newTestPublicKeyBytes(t, 2),
 					newTestPublicKeyBytes(t, 0),
@@ -406,23 +406,23 @@ func TestGetCommitteeMembers(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: stakedAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t, 1),
 					StakedAmount: stakedAmount + 2,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 2),
 					PublicKey:    newTestPublicKeyBytes(t, 2),
 					StakedAmount: stakedAmount + 1,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 			},
 			expected: map[uint64][][]byte{
-				lib.CanopyCommitteeId: {
+				lib.CanopyChainId: {
 					newTestPublicKeyBytes(t, 1),
 					newTestPublicKeyBytes(t, 2),
 					newTestPublicKeyBytes(t, 0),
@@ -442,24 +442,24 @@ func TestGetCommitteeMembers(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: stakedAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:         newTestAddressBytes(t, 1),
 					PublicKey:       newTestPublicKeyBytes(t, 1),
 					StakedAmount:    stakedAmount + 2,
 					MaxPausedHeight: 1,
-					Committees:      []uint64{lib.CanopyCommitteeId},
+					Committees:      []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 2),
 					PublicKey:    newTestPublicKeyBytes(t, 2),
 					StakedAmount: stakedAmount + 1,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			expected: map[uint64][][]byte{
-				lib.CanopyCommitteeId: {
+				lib.CanopyChainId: {
 					newTestPublicKeyBytes(t, 2),
 					newTestPublicKeyBytes(t, 0),
 				},
@@ -474,24 +474,24 @@ func TestGetCommitteeMembers(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: stakedAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:         newTestAddressBytes(t, 1),
 					PublicKey:       newTestPublicKeyBytes(t, 1),
 					StakedAmount:    stakedAmount + 2,
 					UnstakingHeight: 1,
-					Committees:      []uint64{lib.CanopyCommitteeId},
+					Committees:      []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 2),
 					PublicKey:    newTestPublicKeyBytes(t, 2),
 					StakedAmount: stakedAmount + 1,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			expected: map[uint64][][]byte{
-				lib.CanopyCommitteeId: {
+				lib.CanopyChainId: {
 					newTestPublicKeyBytes(t, 2),
 					newTestPublicKeyBytes(t, 0),
 				},
@@ -506,23 +506,23 @@ func TestGetCommitteeMembers(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: stakedAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t, 1),
 					StakedAmount: stakedAmount + 2,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 2),
 					PublicKey:    newTestPublicKeyBytes(t, 2),
 					StakedAmount: stakedAmount + 1,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			expected: map[uint64][][]byte{
-				lib.CanopyCommitteeId: {
+				lib.CanopyChainId: {
 					newTestPublicKeyBytes(t, 1),
 					newTestPublicKeyBytes(t, 2),
 				},
@@ -537,7 +537,7 @@ func TestGetCommitteeMembers(t *testing.T) {
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
 			// override the minimum percent for paid committee
-			valParams.ValidatorMaxCommitteeSize = test.limit
+			valParams.MaxCommitteeSize = test.limit
 			// set the params back in state
 			require.NoError(t, sm.SetParamsVal(valParams))
 			// preset the validators
@@ -581,13 +581,13 @@ func TestGetCommitteePaginated(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 1,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t, 1),
 					StakedAmount: 2,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			pageParams: lib.PageParams{
@@ -604,13 +604,13 @@ func TestGetCommitteePaginated(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 1,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t, 1),
 					StakedAmount: 2,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			pageParams: lib.PageParams{
@@ -627,13 +627,13 @@ func TestGetCommitteePaginated(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 1,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t, 1),
 					StakedAmount: 2,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			pageParams: lib.PageParams{
@@ -655,7 +655,7 @@ func TestGetCommitteePaginated(t *testing.T) {
 				require.NoError(t, sm.SetCommittees(crypto.NewAddress(v.Address), v.StakedAmount, v.Committees))
 			}
 			// run the function call
-			page, err := sm.GetCommitteePaginated(test.pageParams, lib.CanopyCommitteeId)
+			page, err := sm.GetCommitteePaginated(test.pageParams, lib.CanopyChainId)
 			require.NoError(t, err)
 			// validate the page params
 			require.Equal(t, test.pageParams, page.PageParams)
@@ -674,7 +674,7 @@ func TestSetGetCommittees(t *testing.T) {
 		name                  string
 		detail                string
 		validators            []*types.Validator
-		expected              map[uint64][][]byte // committeeId -> Public Key
+		expected              map[uint64][][]byte // chainId -> Public Key
 		expectedTotalPower    map[uint64]uint64
 		expectedMin23MajPower map[uint64]uint64
 	}{
@@ -1041,13 +1041,13 @@ func TestGetDelegatesPaginated(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 1,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t, 1),
 					StakedAmount: 2,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			pageParams: lib.PageParams{
@@ -1064,13 +1064,13 @@ func TestGetDelegatesPaginated(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 1,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t, 1),
 					StakedAmount: 2,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			pageParams: lib.PageParams{
@@ -1087,13 +1087,13 @@ func TestGetDelegatesPaginated(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 1,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t, 1),
 					StakedAmount: 2,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			pageParams: lib.PageParams{
@@ -1115,7 +1115,7 @@ func TestGetDelegatesPaginated(t *testing.T) {
 				require.NoError(t, sm.SetDelegations(crypto.NewAddress(v.Address), v.StakedAmount, v.Committees))
 			}
 			// run the function call
-			page, err := sm.GetDelegatesPaginated(test.pageParams, lib.CanopyCommitteeId)
+			page, err := sm.GetDelegatesPaginated(test.pageParams, lib.CanopyChainId)
 			require.NoError(t, err)
 			// validate the page params
 			require.Equal(t, test.pageParams, page.PageParams)
@@ -1377,9 +1377,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			detail: "1 insert for 2 different committees i.e. no 'updates'",
 			upsert: []*lib.CommitteeData{
 				{
-					CommitteeId:             1,
-					LastCanopyHeightUpdated: 1,
-					LastChainHeightUpdated:  1,
+					ChainId:                1,
+					LastRootHeightUpdated:  1,
+					LastChainHeightUpdated: 1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1389,9 +1389,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 2, // can't overwrite number of samples
 				},
 				{
-					CommitteeId:             2,
-					LastCanopyHeightUpdated: 2,
-					LastChainHeightUpdated:  2,
+					ChainId:                2,
+					LastRootHeightUpdated:  2,
+					LastChainHeightUpdated: 2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
@@ -1403,9 +1403,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			},
 			expected: []*lib.CommitteeData{
 				{
-					CommitteeId:             1,
-					LastCanopyHeightUpdated: 1,
-					LastChainHeightUpdated:  1,
+					ChainId:                1,
+					LastRootHeightUpdated:  1,
+					LastChainHeightUpdated: 1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1415,9 +1415,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 1,
 				},
 				{
-					CommitteeId:             2,
-					LastCanopyHeightUpdated: 2,
-					LastChainHeightUpdated:  2,
+					ChainId:                2,
+					LastRootHeightUpdated:  2,
+					LastChainHeightUpdated: 2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
@@ -1433,9 +1433,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			detail: "2 'sets' for the same committees i.e. one 'update'",
 			upsert: []*lib.CommitteeData{
 				{
-					CommitteeId:             1,
-					LastCanopyHeightUpdated: 1,
-					LastChainHeightUpdated:  1,
+					ChainId:                1,
+					LastRootHeightUpdated:  1,
+					LastChainHeightUpdated: 1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1445,9 +1445,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 2, // can't overwrite number of samples
 				},
 				{
-					CommitteeId:             1,
-					LastCanopyHeightUpdated: 2,
-					LastChainHeightUpdated:  2,
+					ChainId:                1,
+					LastRootHeightUpdated:  2,
+					LastChainHeightUpdated: 2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
@@ -1459,9 +1459,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			},
 			expected: []*lib.CommitteeData{
 				{
-					CommitteeId:             1,
-					LastCanopyHeightUpdated: 2,
-					LastChainHeightUpdated:  2,
+					ChainId:                1,
+					LastRootHeightUpdated:  2,
+					LastChainHeightUpdated: 2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1481,9 +1481,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			detail: "can't update with a LTE chain height",
 			upsert: []*lib.CommitteeData{
 				{
-					CommitteeId:             1,
-					LastCanopyHeightUpdated: 1,
-					LastChainHeightUpdated:  1,
+					ChainId:                1,
+					LastRootHeightUpdated:  1,
+					LastChainHeightUpdated: 1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1493,9 +1493,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 2, // can't overwrite number of samples
 				},
 				{
-					CommitteeId:             1,
-					LastCanopyHeightUpdated: 2,
-					LastChainHeightUpdated:  1,
+					ChainId:                1,
+					LastRootHeightUpdated:  2,
+					LastChainHeightUpdated: 1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
@@ -1512,9 +1512,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			detail: "can't update with a smaller committee height",
 			upsert: []*lib.CommitteeData{
 				{
-					CommitteeId:             1,
-					LastCanopyHeightUpdated: 1,
-					LastChainHeightUpdated:  1,
+					ChainId:                1,
+					LastRootHeightUpdated:  1,
+					LastChainHeightUpdated: 1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1524,9 +1524,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 2, // can't overwrite number of samples
 				},
 				{
-					CommitteeId:             1,
-					LastCanopyHeightUpdated: 0,
-					LastChainHeightUpdated:  2,
+					ChainId:                1,
+					LastRootHeightUpdated:  0,
+					LastChainHeightUpdated: 2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
@@ -1553,10 +1553,10 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 			}
 			// 'get' the expected committee data
 			for _, expected := range test.expected {
-				got, err := sm.GetCommitteeData(expected.CommitteeId)
+				got, err := sm.GetCommitteeData(expected.ChainId)
 				require.NoError(t, err)
-				// check committeeId
-				require.Equal(t, expected.CommitteeId, got.CommitteeId)
+				// check chainId
+				require.Equal(t, expected.ChainId, got.ChainId)
 				// check number of samples
 				require.Equal(t, expected.NumberOfSamples, got.NumberOfSamples)
 				// check chain heights
@@ -1581,9 +1581,9 @@ func TestGetSetCommitteesData(t *testing.T) {
 			detail: "only one committee data inserted",
 			set: &lib.CommitteesData{List: []*lib.CommitteeData{
 				{
-					CommitteeId:             1,
-					LastCanopyHeightUpdated: 1,
-					LastChainHeightUpdated:  1,
+					ChainId:                1,
+					LastRootHeightUpdated:  1,
+					LastChainHeightUpdated: 1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1599,9 +1599,9 @@ func TestGetSetCommitteesData(t *testing.T) {
 			detail: "two different committee data inserted",
 			set: &lib.CommitteesData{List: []*lib.CommitteeData{
 				{
-					CommitteeId:             1,
-					LastCanopyHeightUpdated: 1,
-					LastChainHeightUpdated:  1,
+					ChainId:                1,
+					LastRootHeightUpdated:  1,
+					LastChainHeightUpdated: 1,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
@@ -1611,9 +1611,9 @@ func TestGetSetCommitteesData(t *testing.T) {
 					NumberOfSamples: 1,
 				},
 				{
-					CommitteeId:             0,
-					LastCanopyHeightUpdated: 2,
-					LastChainHeightUpdated:  2,
+					ChainId:                0,
+					LastRootHeightUpdated:  2,
+					LastChainHeightUpdated: 2,
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),

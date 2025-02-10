@@ -5,6 +5,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
+	"slices"
 	"sync"
 )
 
@@ -200,15 +201,15 @@ func (ps *PeerSet) SendTo(publicKey []byte, topic lib.Topic, msg proto.Message) 
 }
 
 // SendToPeers() sends a message to all peers
-func (ps *PeerSet) SendToPeers(topic lib.Topic, msg proto.Message, excludeBadRep ...bool) lib.ErrorI {
+func (ps *PeerSet) SendToPeers(topic lib.Topic, msg proto.Message, excludeKeys ...string) lib.ErrorI {
 	ps.RLock()
 	defer ps.RUnlock()
 	for _, p := range ps.m {
-		if len(excludeBadRep) == 1 && excludeBadRep[0] {
-			if p.Reputation < MinimumPeerReputation {
-				continue
-			}
+		// exclude specific public keys to send to
+		if slices.Contains(excludeKeys, lib.BytesToString(p.Address.PublicKey)) {
+			continue
 		}
+		// send to peer
 		if err := ps.send(p, topic, msg); err != nil {
 			return err
 		}

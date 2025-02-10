@@ -150,11 +150,11 @@ func TestCertificateMarshalJSON(t *testing.T) {
 	// predefine a quorum certificate
 	qc := &QuorumCertificate{
 		Header: &View{
-			NetworkId:    1,
-			CommitteeId:  CanopyCommitteeId,
-			Height:       1,
-			CanopyHeight: 1,
-			Round:        1,
+			NetworkId:  1,
+			ChainId:    CanopyChainId,
+			Height:     1,
+			RootHeight: 1,
+			Round:      1,
 		},
 		Results:     results,
 		ResultsHash: results.Hash(),
@@ -192,11 +192,11 @@ func TestCertificateSignBytes(t *testing.T) {
 	// predefine a quorum certificate
 	qc := &QuorumCertificate{
 		Header: &View{
-			NetworkId:    1,
-			CommitteeId:  CanopyCommitteeId,
-			Height:       1,
-			CanopyHeight: 1,
-			Round:        1,
+			NetworkId:  1,
+			ChainId:    CanopyChainId,
+			Height:     1,
+			RootHeight: 1,
+			Round:      1,
 		},
 		Results:     results,
 		ResultsHash: results.Hash(),

@@ -109,12 +109,12 @@ func TestSet(t *testing.T) {
 							Value: func() []byte {
 								// NOTE: the tree values on the right side are nulled, so the inputs for the right side are incomplete
 								// grandchildren
-								input000, input010 := []byte{0b0, 2}, append([]byte{0b10, 1}, crypto.ShortHash([]byte("some_value"))...)
+								input000, input010 := []byte{0b0, 2}, append([]byte{0b10, 1}, crypto.Hash([]byte("some_value"))...)
 								// children
-								input0 := append([]byte{0b0, 0}, crypto.ShortHash(append(input000, input010...))...)
+								input0 := append([]byte{0b0, 0}, crypto.Hash(append(input000, input010...))...)
 								input1 := append([]byte{0b1, 0})
 								// root value
-								return crypto.ShortHash(append(input0, input1...))
+								return crypto.Hash(append(input0, input1...))
 							}(),
 							LeftChildKey:  []byte{0b0, 0}, // 0
 							RightChildKey: []byte{0b1, 0}, // 1
@@ -214,13 +214,13 @@ func TestSet(t *testing.T) {
 						Node: Node{
 							Value: func() []byte {
 								// great-grandchildren
-								in000000000, in000010000 := []byte{0b00000000, 0, 0}, append([]byte{0b00001000, 0, 0}, crypto.ShortHash([]byte("some_value"))...)
+								in000000000, in000010000 := []byte{0b00000000, 0, 0}, append([]byte{0b00001000, 0, 0}, crypto.Hash([]byte("some_value"))...)
 								// grandchildren
-								in0000, in001111111 := append([]byte{0b0, 3}, crypto.ShortHash(append(in000000000, in000010000...))...), []byte{0b00111111, 1, 0}
+								in0000, in001111111 := append([]byte{0b0, 3}, crypto.Hash(append(in000000000, in000010000...))...), []byte{0b00111111, 1, 0}
 								// children
-								in00, in111111111 := append([]byte{0b0, 1}, crypto.ShortHash(append(in0000, in001111111...))...), []byte{0b11111111, 1, 0}
+								in00, in111111111 := append([]byte{0b0, 1}, crypto.Hash(append(in0000, in001111111...))...), []byte{0b11111111, 1, 0}
 								// root value
-								return crypto.ShortHash(append(in00, in111111111...))
+								return crypto.Hash(append(in00, in111111111...))
 							}(),
 							LeftChildKey:  []byte{0b0, 1},             // 00
 							RightChildKey: []byte{0b11111111, 0b1, 0}, // 111111111
@@ -334,13 +334,13 @@ func TestSet(t *testing.T) {
 						Node: Node{
 							Value: func() []byte {
 								// great-grandchildren
-								input1101, input111 := append([]byte{0b1101, 0}, crypto.ShortHash([]byte("some_value"))...), append([]byte{0b111, 0})
+								input1101, input111 := append([]byte{0b1101, 0}, crypto.Hash([]byte("some_value"))...), append([]byte{0b111, 0})
 								// grandchildren
-								input1000, input11 := []byte{0b1000, 0}, append([]byte{0b11, 0}, crypto.ShortHash(append(input1101, input111...))...)
+								input1000, input11 := []byte{0b1000, 0}, append([]byte{0b11, 0}, crypto.Hash(append(input1101, input111...))...)
 								// children
-								input0000, input1 := []byte{0b0000, 3}, append([]byte{0b1, 0}, crypto.ShortHash(append(input1000, input11...))...)
+								input0000, input1 := []byte{0b0000, 3}, append([]byte{0b1, 0}, crypto.Hash(append(input1000, input11...))...)
 								// root value
-								return crypto.ShortHash(append(input0000, input1...))
+								return crypto.Hash(append(input0000, input1...))
 							}(),
 							LeftChildKey:  []byte{0b0, 3}, // 0000
 							RightChildKey: []byte{0b1, 0}, // 1
@@ -464,11 +464,11 @@ func TestSet(t *testing.T) {
 						Node: Node{
 							Value: func() []byte {
 								// grandchildren
-								input0000, input0110 := []byte{0b0, 3}, append([]byte{0b110, 1}, crypto.ShortHash([]byte("some_value"))...)
+								input0000, input0110 := []byte{0b0, 3}, append([]byte{0b110, 1}, crypto.Hash([]byte("some_value"))...)
 								// children
-								input0, input1 := append([]byte{0b0, 0}, crypto.ShortHash(append(input0000, input0110...))...), []byte{0b1, 0}
+								input0, input1 := append([]byte{0b0, 0}, crypto.Hash(append(input0000, input0110...))...), []byte{0b1, 0}
 								// root value
-								return crypto.ShortHash(append(input0, input1...))
+								return crypto.Hash(append(input0, input1...))
 							}(),
 							LeftChildKey:  []byte{0b0, 0}, // 0
 							RightChildKey: []byte{0b1, 0}, // 1
@@ -624,7 +624,7 @@ func TestDelete(t *testing.T) {
 								input000 := append([]byte{0b0, 2})
 								input1 := append([]byte{0b1, 0})
 								// root value
-								return crypto.ShortHash(append(input000, input1...))
+								return crypto.Hash(append(input000, input1...))
 							}(),
 							LeftChildKey:  []byte{0b0, 2}, // 000
 							RightChildKey: []byte{0b1, 0}, // 1
@@ -722,7 +722,7 @@ func TestDelete(t *testing.T) {
 								// children
 								in0000, in111 := []byte{0, 3}, []byte{0b111, 0}
 								// root value
-								return crypto.ShortHash(append(in0000, in111...))
+								return crypto.Hash(append(in0000, in111...))
 							}(),
 							LeftChildKey:  []byte{0b0, 3},   // 0000
 							RightChildKey: []byte{0b111, 0}, // 111
@@ -923,7 +923,7 @@ func TestTraverse(t *testing.T) {
 							// right child key + value
 							rightInput := append([]byte{7, 0}, bytes.Repeat([]byte{255}, 20)...)
 							// hash ( left + right )
-							return crypto.ShortHash(append(leftInput, rightInput...))
+							return crypto.Hash(append(leftInput, rightInput...))
 						}(),
 						LeftChildKey:  []byte{0, 2},
 						RightChildKey: []byte{7, 0},
@@ -957,7 +957,7 @@ func TestTraverse(t *testing.T) {
 							// right child key + value
 							rightInput := append([]byte{7, 0}, bytes.Repeat([]byte{255}, 20)...)
 							// hash ( left + right )
-							return crypto.ShortHash(append(leftInput, rightInput...))
+							return crypto.Hash(append(leftInput, rightInput...))
 						}(),
 						LeftChildKey:  []byte{0, 2},
 						RightChildKey: []byte{7, 0},
@@ -991,7 +991,7 @@ func TestTraverse(t *testing.T) {
 							// right child key + value
 							rightInput := append([]byte{15, 0}, bytes.Repeat([]byte{255}, 20)...)
 							// hash ( left + right )
-							return crypto.ShortHash(append(leftInput, rightInput...))
+							return crypto.Hash(append(leftInput, rightInput...))
 						}(),
 						LeftChildKey:  []byte{0, 3},
 						RightChildKey: []byte{15, 0},
@@ -1025,7 +1025,7 @@ func TestTraverse(t *testing.T) {
 							// right child key + value
 							rightInput := append([]byte{31, 0}, bytes.Repeat([]byte{255}, 20)...)
 							// hash ( left + right )
-							return crypto.ShortHash(append(leftInput, rightInput...))
+							return crypto.Hash(append(leftInput, rightInput...))
 						}(),
 						LeftChildKey:  []byte{0, 4},
 						RightChildKey: []byte{31, 0},
@@ -1339,7 +1339,7 @@ func TestNewSMT(t *testing.T) {
 								// right child key + value
 								rightInput := append([]byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0}, bytes.Repeat([]byte{255}, 20)...)
 								// hash ( left + right )
-								return crypto.ShortHash(append(leftInput, rightInput...))
+								return crypto.Hash(append(leftInput, rightInput...))
 							}(),
 							LeftChildKey:  []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7},
 							RightChildKey: []byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
@@ -1379,7 +1379,7 @@ func TestNewSMT(t *testing.T) {
 								// right child key + value
 								rightInput := append([]byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0}, bytes.Repeat([]byte{255}, 20)...)
 								// hash ( left + right )
-								return crypto.ShortHash(append(leftInput, rightInput...))
+								return crypto.Hash(append(leftInput, rightInput...))
 							}(),
 							LeftChildKey:  []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 7},
 							RightChildKey: []byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
@@ -1415,7 +1415,7 @@ func TestNewSMT(t *testing.T) {
 								// right child key + value
 								rightInput := append([]byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0}, bytes.Repeat([]byte{255}, 20)...)
 								// hash ( left + right )
-								return crypto.ShortHash(append(leftInput, rightInput...))
+								return crypto.Hash(append(leftInput, rightInput...))
 							}(),
 							LeftChildKey:  []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 7},
 							RightChildKey: []byte{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},

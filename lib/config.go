@@ -15,8 +15,8 @@ const (
 	GenesisFilePath        = "genesis.json"
 	ProposalsFilePath      = "proposals.json"
 	PollsFilePath          = "polls.json"
-	UnknownCommitteeId     = uint64(0)
-	CanopyCommitteeId      = uint64(1) // NOTE: to not break sub-chain recursion, this should not be used except for 'default config/genesis' developer setups
+	UnknownChainId         = uint64(0)
+	CanopyChainId          = uint64(1) // NOTE: to not break nested-chain recursion, this should not be used except for 'default config/genesis' developer setups
 	DAOPoolID              = math.MaxUint32 + 1
 	CanopyMainnetNetworkId = 1
 )
@@ -48,15 +48,22 @@ func DefaultConfig() Config {
 // MAIN CONFIG BELOW
 
 type MainConfig struct {
-	LogLevel    string `json:"logLevel"`
-	ChainId     uint64 `json:"chainId"`
-	BaseChainId uint64 `json:"baseChainId"`
-	Headless    bool   `json:"headless"`
+	LogLevel   string      `json:"logLevel"`
+	ChainId    uint64      `json:"chainId"`
+	SleepUntil uint64      `json:"sleepUntil"`
+	RootChain  []RootChain `json:"rootChain"`
+	RunVDF     bool        `json:"RunVDF"`
+	Headless   bool        `json:"headless"`
 }
 
 // DefaultMainConfig() sets log level to 'info'
 func DefaultMainConfig() MainConfig {
-	return MainConfig{LogLevel: "info", BaseChainId: CanopyCommitteeId, ChainId: CanopyCommitteeId, Headless: false}
+	return MainConfig{LogLevel: "info", RootChain: []RootChain{
+		{
+			ChainId: 1,
+			Url:     "http://localhost:50002",
+		},
+	}, RunVDF: true, ChainId: CanopyChainId, Headless: false}
 }
 
 // GetLogLevel() parses the log string in the config file into a LogLevel Enum
@@ -83,9 +90,13 @@ type RPCConfig struct {
 	RPCPort         string // the port where the rpc server is hosted
 	AdminPort       string // the port where the admin rpc server is hosted
 	RPCUrl          string // the url without port where the rpc server is hosted
-	BaseChainRPCURL string // the url of the base-chain's rpc
-	BaseChainPollMS uint64 // how often to poll the base chain in milliseconds
+	RootChainPollMS uint64 // how often to poll the base chain in milliseconds
 	TimeoutS        int    // the rpc request timeout in seconds
+}
+
+type RootChain struct {
+	ChainId uint64 `json:"chainId"`
+	Url     string `json:"url"`
 }
 
 // DefaultRPCConfig() sets rpc url to localhost and sets wallet, explorer, rpc, and admin ports from [50000-50003]
@@ -96,14 +107,10 @@ func DefaultRPCConfig() RPCConfig {
 		RPCPort:         "50002",
 		AdminPort:       "50003",
 		RPCUrl:          "http://localhost",
-		BaseChainRPCURL: "http://localhost:50002",
-		BaseChainPollMS: 1000,
+		RootChainPollMS: 1000,
 		TimeoutS:        3,
 	}
 }
-
-// IsBaseChain() returns whether the self chain is base
-func (c Config) IsBaseChain() bool { return c.BaseChainId == c.ChainId }
 
 // STATE MACHINE CONFIG BELOW
 
@@ -132,18 +139,17 @@ type ConsensusConfig struct {
 	RoundInterruptTimeoutMS int // minus gossiping current Round time, how long (in milliseconds) the replica sleeps before moving to PACEMAKER phase
 }
 
-// DefaultConsensusConfig() configures 10 minute blocks
+// DefaultConsensusConfig() configures the block time
 func DefaultConsensusConfig() ConsensusConfig {
 	return ConsensusConfig{
-		ElectionTimeoutMS:      5000,
-		ElectionVoteTimeoutMS:  2000,
-		ProposeTimeoutMS:       2000,
-		ProposeVoteTimeoutMS:   2000,
-		PrecommitTimeoutMS:     2000,
-		PrecommitVoteTimeoutMS: 2000,
-		CommitTimeoutMS:        2000,
-		CommitProcessMS:        5000,
-		//CommitProcessMS:         583000, // 10 minute blocks - ^
+		ElectionTimeoutMS:       5000,
+		ElectionVoteTimeoutMS:   2000,
+		ProposeTimeoutMS:        2000,
+		ProposeVoteTimeoutMS:    2000,
+		PrecommitTimeoutMS:      2000,
+		PrecommitVoteTimeoutMS:  2000,
+		CommitTimeoutMS:         2000,
+		CommitProcessMS:         5000,
 		RoundInterruptTimeoutMS: 5000,
 	}
 }

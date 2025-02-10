@@ -11,12 +11,12 @@ import (
 // - 'buy' is an actor 'claiming / reserving' the sell order
 // - 'reset' is a 'claimed' order whose 'buyer' did not send the tokens to the seller before the deadline, thus the order is re-opened for sale
 // - 'close' is a 'claimed' order whose 'buyer' sent the tokens to the seller before the deadline, thus the order is 'closed' and the tokens are moved from escrow to the buyer
-func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, committeeId uint64) {
+func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, chainId uint64) {
 	if orders != nil {
 		// buy orders are a result of the committee witnessing a 'reserve transaction' for the order on the 'buyer chain'
 		// think of 'buy orders' like reserving the 'sell order'
 		for _, buyOrder := range orders.BuyOrders {
-			if err := s.BuyOrder(buyOrder, committeeId); err != nil {
+			if err := s.BuyOrder(buyOrder, chainId); err != nil {
 				s.log.Warnf("BuyOrder failed (can happen due to asynchronicity): %s", err.Error())
 			}
 		}
@@ -24,14 +24,14 @@ func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, committeeId uint
 		// corresponding assets before the 'deadline height' of the 'buyer chain'. The buyer address and deadline height are reset and the
 		// sell order is listed as 'available' to the rest of the market
 		for _, resetOrderId := range orders.ResetOrders {
-			if err := s.ResetOrder(resetOrderId, committeeId); err != nil {
+			if err := s.ResetOrder(resetOrderId, chainId); err != nil {
 				s.log.Warnf("ResetOrder failed (can happen due to asynchronicity): %s", err.Error())
 			}
 		}
 		// close orders are a result of the committee witnessing the buyer sending the
 		// buy assets before the 'deadline height' of the 'buyer chain'
 		for _, closeOrderId := range orders.CloseOrders {
-			if err := s.CloseOrder(closeOrderId, committeeId); err != nil {
+			if err := s.CloseOrder(closeOrderId, chainId); err != nil {
 				s.log.Warnf("CloseOrder failed (can happen due to asynchronicity): %s", err.Error())
 			}
 		}
@@ -52,8 +52,8 @@ func (s *StateMachine) ParseBuyOrder(tx *lib.Transaction, deadlineBlocks uint64)
 	return
 }
 
-// ProcessBaseChainOrderBook() processes the order book from the base-chain and cross-references
-func (s *StateMachine) ProcessBaseChainOrderBook(book *lib.OrderBook, b *lib.BlockResult) (closeOrders, resetOrders []uint64) {
+// ProcessRootChainOrderBook() processes the order book from the root-Chain and cross-references
+func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.BlockResult) (closeOrders, resetOrders []uint64) {
 	transferred := make(map[string]uint64) // [from+to] -> amount sent
 	// get all the 'Send' transactions from the block
 	for _, tx := range b.Transactions {
@@ -131,7 +131,7 @@ func (s *StateMachine) ParseBuyOrders(b *lib.BlockResult) (buyOrders []*lib.BuyO
 		return
 	}
 	// calculate the minimum buy order fee
-	minFee := params.Fee.MessageSendFee * params.Validator.ValidatorBuyOrderFeeMultiplier
+	minFee := params.Fee.SendFee * params.Validator.BuyOrderFeeMultiplier
 	// for each transaction in the block
 	for _, tx := range b.Transactions {
 		deDupeBuyOrders := make(map[uint64]struct{})
@@ -140,7 +140,7 @@ func (s *StateMachine) ParseBuyOrders(b *lib.BlockResult) (buyOrders []*lib.BuyO
 			continue
 		}
 		// parse the transaction for embedded 'buy orders'
-		if buyOrder, ok := s.ParseBuyOrder(tx.Transaction, params.Validator.ValidatorBuyDeadlineBlocks); ok {
+		if buyOrder, ok := s.ParseBuyOrder(tx.Transaction, params.Validator.BuyDeadlineBlocks); ok {
 			if _, found := deDupeBuyOrders[buyOrder.OrderId]; !found {
 				buyOrders = append(buyOrders, buyOrder)
 				deDupeBuyOrders[buyOrder.OrderId] = struct{}{}
@@ -151,8 +151,8 @@ func (s *StateMachine) ParseBuyOrders(b *lib.BlockResult) (buyOrders []*lib.BuyO
 }
 
 // CreateOrder() adds an order to the order book for a committee in the state db
-func (s *StateMachine) CreateOrder(order *lib.SellOrder, committeeId uint64) (orderId uint64, err lib.ErrorI) {
-	orderBook, err := s.GetOrderBook(committeeId)
+func (s *StateMachine) CreateOrder(order *lib.SellOrder, chainId uint64) (orderId uint64, err lib.ErrorI) {
+	orderBook, err := s.GetOrderBook(chainId)
 	if err != nil {
 		return
 	}
@@ -162,8 +162,8 @@ func (s *StateMachine) CreateOrder(order *lib.SellOrder, committeeId uint64) (or
 }
 
 // EditOrder() updates an existing order in the order book for a committee in the state db
-func (s *StateMachine) EditOrder(order *lib.SellOrder, committeeId uint64) (err lib.ErrorI) {
-	orderBook, err := s.GetOrderBook(committeeId)
+func (s *StateMachine) EditOrder(order *lib.SellOrder, chainId uint64) (err lib.ErrorI) {
+	orderBook, err := s.GetOrderBook(chainId)
 	if err != nil {
 		return
 	}
@@ -175,8 +175,8 @@ func (s *StateMachine) EditOrder(order *lib.SellOrder, committeeId uint64) (err 
 }
 
 // BuyOrder() adds a recipient and a deadline height to an existing order and saves it to the state
-func (s *StateMachine) BuyOrder(buyOrder *lib.BuyOrder, committeeId uint64) (err lib.ErrorI) {
-	orderBook, err := s.GetOrderBook(committeeId)
+func (s *StateMachine) BuyOrder(buyOrder *lib.BuyOrder, chainId uint64) (err lib.ErrorI) {
+	orderBook, err := s.GetOrderBook(chainId)
 	if err != nil {
 		return
 	}
@@ -188,8 +188,8 @@ func (s *StateMachine) BuyOrder(buyOrder *lib.BuyOrder, committeeId uint64) (err
 }
 
 // ResetOrder() removes the recipient and deadline height from an existing order and saves it to the state
-func (s *StateMachine) ResetOrder(orderId, committeeId uint64) (err lib.ErrorI) {
-	orderBook, err := s.GetOrderBook(committeeId)
+func (s *StateMachine) ResetOrder(orderId, chainId uint64) (err lib.ErrorI) {
+	orderBook, err := s.GetOrderBook(chainId)
 	if err != nil {
 		return
 	}
@@ -201,9 +201,9 @@ func (s *StateMachine) ResetOrder(orderId, committeeId uint64) (err lib.ErrorI) 
 }
 
 // CloseOrder() sends the tokens from escrow to the 'buyer address' and deletes the order
-func (s *StateMachine) CloseOrder(orderId, committeeId uint64) (err lib.ErrorI) {
+func (s *StateMachine) CloseOrder(orderId, chainId uint64) (err lib.ErrorI) {
 	// the order is 'closed' and the tokens are moved from escrow to the buyer
-	order, err := s.GetOrder(orderId, committeeId)
+	order, err := s.GetOrder(orderId, chainId)
 	if err != nil {
 		// due to the redundancy 'Look Back' design of the swaps submitting a close order that has no available order is allowed
 		// this is considered safe due to the +2/3rd committee signature requirement
@@ -215,7 +215,7 @@ func (s *StateMachine) CloseOrder(orderId, committeeId uint64) (err lib.ErrorI) 
 		return types.ErrInvalidBuyOrder()
 	}
 	// remove the funds from the escrow pool
-	if err = s.PoolSub(committeeId+types.EscrowPoolAddend, order.AmountForSale); err != nil {
+	if err = s.PoolSub(chainId+types.EscrowPoolAddend, order.AmountForSale); err != nil {
 		return err
 	}
 	// send the funds to the recipient address
@@ -223,12 +223,12 @@ func (s *StateMachine) CloseOrder(orderId, committeeId uint64) (err lib.ErrorI) 
 		return err
 	}
 	// delete the order
-	return s.DeleteOrder(orderId, committeeId)
+	return s.DeleteOrder(orderId, chainId)
 }
 
 // DeleteOrder() deletes an existing order in the order book for a committee in the state db
-func (s *StateMachine) DeleteOrder(orderId, committeeId uint64) (err lib.ErrorI) {
-	orderBook, err := s.GetOrderBook(committeeId)
+func (s *StateMachine) DeleteOrder(orderId, chainId uint64) (err lib.ErrorI) {
+	orderBook, err := s.GetOrderBook(chainId)
 	if err != nil {
 		return
 	}
@@ -240,8 +240,8 @@ func (s *StateMachine) DeleteOrder(orderId, committeeId uint64) (err lib.ErrorI)
 }
 
 // GetOrder() sets the order book for a committee in the state db
-func (s *StateMachine) GetOrder(orderId uint64, committeeId uint64) (order *lib.SellOrder, err lib.ErrorI) {
-	orderBook, err := s.GetOrderBook(committeeId)
+func (s *StateMachine) GetOrder(orderId uint64, chainId uint64) (order *lib.SellOrder, err lib.ErrorI) {
+	orderBook, err := s.GetOrderBook(chainId)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func (s *StateMachine) SetOrderBook(b *lib.OrderBook) lib.ErrorI {
 		return err
 	}
 	// set the order book in the store
-	return s.store.Set(types.KeyForOrderBook(b.CommitteeId), orderBookBz)
+	return s.store.Set(types.KeyForOrderBook(b.ChainId), orderBookBz)
 }
 
 // SetOrderBooks() sets a series of OrderBooks in the state db
@@ -268,14 +268,14 @@ func (s *StateMachine) SetOrderBooks(b *lib.OrderBooks, supply *types.Supply) li
 			return err
 		}
 		// write the order book for the committee to state
-		key := types.KeyForOrderBook(book.CommitteeId)
+		key := types.KeyForOrderBook(book.ChainId)
 		if err = s.store.Set(key, orderBookBz); err != nil {
 			return err
 		}
 		// properly mint to the supply pool
 		for _, order := range book.Orders {
 			supply.Total += order.AmountForSale
-			if err = s.PoolAdd(book.CommitteeId+uint64(types.EscrowPoolAddend), order.AmountForSale); err != nil {
+			if err = s.PoolAdd(book.ChainId+uint64(types.EscrowPoolAddend), order.AmountForSale); err != nil {
 				return err
 			}
 		}
@@ -284,12 +284,12 @@ func (s *StateMachine) SetOrderBooks(b *lib.OrderBooks, supply *types.Supply) li
 }
 
 // GetOrderBook() retrieves the order book for a committee from the state db
-func (s *StateMachine) GetOrderBook(committeeId uint64) (b *lib.OrderBook, err lib.ErrorI) {
+func (s *StateMachine) GetOrderBook(chainId uint64) (b *lib.OrderBook, err lib.ErrorI) {
 	// initialize the order book variable
 	b = new(lib.OrderBook)
-	b.Orders, b.CommitteeId = make([]*lib.SellOrder, 0), committeeId
+	b.Orders, b.ChainId = make([]*lib.SellOrder, 0), chainId
 	// get order book bytes from the db
-	bz, err := s.Get(types.KeyForOrderBook(committeeId))
+	bz, err := s.Get(types.KeyForOrderBook(chainId))
 	if err != nil {
 		return
 	}

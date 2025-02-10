@@ -1,10 +1,10 @@
 let rpcURL = "http://127.0.0.1:50002"; // default value for the RPC URL
-let baseChainRPCURL = rpcURL; // default BaseChain RPC URL
+let rootChainRPCURL = rpcURL; // default RootChain RPC URL
 let chainId = 1; // default chain id
 
 if (typeof window !== "undefined" && window.__CONFIG__) {
   rpcURL = window.__CONFIG__.rpcURL;
-  baseChainRPCURL = window.__CONFIG__.baseChainRPCURL;
+  rootChainRPCURL = window.__CONFIG__.rootChainRPCURL;
   chainId = Number(window.__CONFIG__.chainId);
 } else {
   console.log("config undefined");
@@ -96,8 +96,8 @@ export function Validators(page, _) {
   return POST(pageHeightReq(page, 0), validatorsPath);
 }
 
-export function Committee(page, committee_id) {
-  return POST(validatorsReq(page, 0, committee_id), validatorsPath);
+export function Committee(page, chain_id) {
+  return POST(validatorsReq(page, 0, chain_id), validatorsPath);
 }
 
 export function DAO(height, _) {
@@ -152,8 +152,8 @@ export function Pending(page, _) {
   return POST(pageAddrReq(page, ""), pendingPath);
 }
 
-export function Orders(committee_id) {
-  return POST(heightAndIDRequest(0, committee_id), ordersPath);
+export function Orders(chain_id) {
+  return POST(heightAndIDRequest(0, chain_id), ordersPath);
 }
 
 // COMPONENT SPECIFIC API CALLS BELOW

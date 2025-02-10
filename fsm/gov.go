@@ -59,7 +59,7 @@ func (s *StateMachine) UpdateParam(paramSpace, paramName string, value proto.Mes
 }
 
 // ConformStateToParamUpdate() ensures the state does not violate the new values of the governance parameters
-// NOTE: at the moment only MaxCommitteeSize requires an adjustment with the exception of MinSellOrderSize which
+// NOTE: at the moment only MaxCommitteeSize & RootChainId requires an adjustment with the exception of MinSellOrderSize which
 // is purposefully allowed to violate new updates
 func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) lib.ErrorI {
 	// retrieve the params from state
@@ -67,12 +67,25 @@ func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) l
 	if err != nil {
 		return err
 	}
+	// if root chain id was updated
+	if previousParams.Consensus.RootChainId != params.Consensus.RootChainId {
+		selfCommittee, e := s.GetCommitteeData(s.Config.ChainId)
+		if e != nil {
+			return e
+		}
+		// reset the root height updated
+		selfCommittee.LastRootHeightUpdated = 0
+		// overwrite the committee data in state
+		if err = s.OverwriteCommitteeData(selfCommittee); err != nil {
+			return err
+		}
+	}
 	// check for a change in MaxCommitteeSize
-	if previousParams.Validator.ValidatorMaxCommitteeSize <= params.Validator.ValidatorMaxCommittees {
+	if previousParams.Validator.MaxCommitteeSize <= params.Validator.MaxCommittees {
 		return nil
 	}
 	// shrinking MaxCommitteeSize must be immediately enforced to ensure no 'grandfathered' in violators
-	maxCommitteeSize := int(params.Validator.ValidatorMaxCommittees)
+	maxCommitteeSize := int(params.Validator.MaxCommittees)
 	// maintain a counter for pseudorandom removal of the 'chain ids'
 	var idx int
 	// for each validator, remove the excess ids in a pseudorandom fashion
@@ -296,7 +309,7 @@ func (s *StateMachine) PollsToResults(polls *types.ActivePolls) (result types.Po
 	// get the canopy validator set
 	members, err := s.GetCommitteeMembers(s.Config.ChainId)
 	if err != nil {
-		// NOTE: sub-chains may have no validators - so not returning an error here
+		// NOTE: nested-chains may have no validators - so not returning an error here
 		return result, nil
 	}
 	// get the supply
@@ -386,4 +399,13 @@ func (s *StateMachine) OnOrAfterVersion(version uint64) (isEnabled bool) {
 	}
 	// if on the version + on or greater than the upgrade height
 	return s.Height() >= v.Height && version == v.Version
+}
+
+// GetRootChainId() gets the latest root chain id from the state
+func (s *StateMachine) GetRootChainId() (uint64, lib.ErrorI) {
+	consParams, err := s.GetParamsCons()
+	if err != nil {
+		return 0, err
+	}
+	return consParams.RootChainId, nil
 }

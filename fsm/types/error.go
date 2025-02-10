@@ -216,8 +216,8 @@ func ErrInvalidCommittee() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidCommittee, lib.StateMachineModule, "invalid committee")
 }
 
-func ErrInvalidCommitteeID() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidCommitteeID, lib.StateMachineModule, "invalid committee id")
+func ErrInvalidChainId() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidChainId, lib.StateMachineModule, "invalid committee id")
 }
 
 func ErrInvalidSlashRecipients() lib.ErrorI {

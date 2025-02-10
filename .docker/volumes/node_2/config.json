@@ -5,9 +5,17 @@
   "RPCPort": "40002",
   "AdminPort": "40003",
   "RPCUrl": "http://localhost",
-  "BaseChainRPCURL": "http://node-1:50002",
-  "BaseChainPollMS": 333,
-  "BaseChainId": 1,
+  "RootChain": [
+    {
+      "chainId": 1,
+      "url": "http://node-1:50002"
+    },
+    {
+      "chainId": 2,
+      "url": "http://localhost:40002"
+    }
+  ],
+  "RootChainPollMS": 333,
   "TimeoutS": 3,
   "DataDirPath": "/root/.canopy",
   "DBName": "canopy",
