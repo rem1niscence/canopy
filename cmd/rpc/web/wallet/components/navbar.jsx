@@ -34,11 +34,6 @@ const navbarIconsAndTip = [
     },
 ];
 
-const socials = [
-    {url: "https://discord.gg/pNcSJj7Wdh", icon: "./discord-filled.png"},
-    {url: "https://x.com/CNPYNetwork", icon: "./twitter.png"},
-];
-
 export default function Navigation({keystore, setActiveKey, keyIdx, setNavIdx, height}) {
     return (
         <Navbar sticky="top" data-bs-theme="light" id="nav-bar">
@@ -84,16 +79,6 @@ export default function Navigation({keystore, setActiveKey, keyIdx, setNavIdx, h
                     </Nav>
                 </div>
                 <DarkModeToggle />
-                <a href={socials[0].url}>
-                    <div
-                        id="nav-social-icon-discord"
-                        style={{backgroundImage: "url(" + socials[0].icon + ")"}}
-                        className="nav-social-icon"
-                    />
-                </a>
-                <a href={socials[1].url}>
-                    <div style={{backgroundImage: "url(" + socials[1].icon + ")"}} className="nav-social-icon"/>
-                </a>
                 <Navbar.Text className="navbar ms-4">
                     Latest height : <strong style={{paddingLeft: "4px"}} className="nav-bar-brand-highlight">{Math.max(height - 1, 1)}</strong>
                 </Navbar.Text>

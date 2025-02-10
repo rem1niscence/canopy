@@ -4,6 +4,7 @@ import { createContext, use, useEffect, useState } from "react";
 import Accounts from "@/components/account";
 import Dashboard from "@/components/dashboard";
 import Governance from "@/components/governance";
+import Footer from "@/components/footer";
 import { Spinner } from "react-bootstrap";
 
 export const KeystoreContext = createContext();
@@ -79,6 +80,7 @@ export default function Home() {
           {state.navIdx == 2 && <Dashboard />}
         </div>
       </div>
+      <Footer />
     </KeystoreContext.Provider>
   );
 }

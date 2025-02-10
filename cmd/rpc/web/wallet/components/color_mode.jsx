@@ -29,6 +29,15 @@ const DarkModeToggle = () => {
                 element.classList.replace("bi-moon-stars-fill", "bi-sun-fill");
             }
         }
+
+        const element = document.querySelector("footer");
+        if (element) {
+            if (theme === 'dark') {
+                element.classList.replace("footer-light", "footer-dark");
+            } else {
+                element.classList.replace("footer-dark", "footer-light");
+            }
+        }
     }, [theme]);
 
     const handleChange = (event) => {

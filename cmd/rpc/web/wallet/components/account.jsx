@@ -306,7 +306,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
       <span id="balance">{formatNumber(acc.amount)}</span>
       <span style={{ fontFamily: "var(--font-heading)", fontWeight: "500", color: state.primaryColor }}>{" CNPY"}</span>
       <br />
-      <hr style={{ border: "1px dashed black", borderRadius: "5px", width: "60%", margin: "0 auto" }} />
+      <hr />
       <br />
       <RenderModal
         show={state.showModal}
