@@ -35,7 +35,12 @@ export default function Dashboard() {
     const promises = [ConsensusInfo(), PeerInfo(), Resource()];
     if (!state.pauseLogs) promises.push(Logs());
 
-    Promise.all(promises).then(([consensusInfo, peerInfo, resource, logs]) => {
+    Promise.allSettled(promises).then(([consensusInfo, peerInfo, resource, logs]) => {
+      consensusInfo = consensusInfo.status === "fulfilled" ? consensusInfo.value : {};
+      peerInfo = peerInfo.status === "fulfilled" ? peerInfo.value : {};
+      resource = resource.status === "fulfilled" ? resource.value : {};
+      logs = logs.status === "fulfilled" ? logs.value : {};
+
       setState((prevState) => {
         const updatedResource =
           prevState.resource.length >= 30

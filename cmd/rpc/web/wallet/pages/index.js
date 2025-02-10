@@ -34,19 +34,28 @@ export default function Home() {
         return acc;
       }, {});
 
-      Promise.all([
+      Promise.allSettled([
         AccountWithTxs(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, Object.keys(mergedKS)[i], 0),
         Validator(0, mergedKS[Object.keys(mergedKS)[i]].keyAddress, Object.keys(mergedKS)[i]),
         Height(),
-      ]).then((r) => {
+      ]).then((results) => {
+        let settledResults = [];
+        for (const result of results) {
+          if (result.status === "rejected") {
+            settledResults.push({});
+            continue;
+          }
+          settledResults.push(result.value);
+        }
+
         setState({
           ...state,
           keys: Object.keys(mergedKS),
           keyIdx: i,
           keystore: mergedKS,
-          account: r[0],
-          validator: r[1],
-          height: r[2],
+          account: settledResults[0],
+          validator: settledResults[1],
+          height: settledResults[2],
         });
       });
     });
