@@ -179,6 +179,9 @@ export async function getModalData(query, page) {
         acc = {};
       await Promise.allSettled([Validator(0, query), AccountWithTxs(0, query, page)]).then((results) => {
         for (const result of results) {
+          if (result.status === "rejected") {
+            continue;
+          }
           if (result.value.validator) {
             val = result.value.validator;
           }
