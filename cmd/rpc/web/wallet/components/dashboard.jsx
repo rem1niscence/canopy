@@ -165,7 +165,7 @@ export default function Dashboard() {
                     <Card className="carousel-item-container">
                       <Card.Body>
                         <Card.Title className="carousel-item-title">
-                          <span className="text-white">{k.title}</span>
+                          <span>{k.title}</span>
                         </Card.Title>
                         <p id="carousel-item-detail-title" className="carousel-item-detail">
                           {<Truncate text={k.dT} />}
