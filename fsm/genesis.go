@@ -97,13 +97,13 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) lib.Err
 	if genesis.OrderBooks != nil {
 		deDuplicateCommittees := make(map[uint64]struct{})
 		for _, orderBook := range genesis.OrderBooks.OrderBooks {
-			if _, found := deDuplicateCommittees[orderBook.CommitteeId]; found {
+			if _, found := deDuplicateCommittees[orderBook.ChainId]; found {
 				return types.InvalidSellOrder()
 			}
 			if len(orderBook.Orders) == 0 {
 				return types.InvalidSellOrder()
 			}
-			deDuplicateCommittees[orderBook.CommitteeId] = struct{}{}
+			deDuplicateCommittees[orderBook.ChainId] = struct{}{}
 			deDuplicateIds := make(map[uint64]struct{})
 			for _, order := range orderBook.Orders {
 				if _, found := deDuplicateIds[order.Id]; found {

@@ -61,7 +61,7 @@ func TestHandleMessage(t *testing.T) {
 			msg: &types.MessageStake{
 				PublicKey:     newTestPublicKeyBytes(t),
 				Amount:        amount,
-				Committees:    []uint64{lib.CanopyCommitteeId},
+				Committees:    []uint64{lib.CanopyChainId},
 				NetAddress:    "http://example.com",
 				OutputAddress: newTestAddressBytes(t),
 			},
@@ -86,7 +86,7 @@ func TestHandleMessage(t *testing.T) {
 				v := &types.Validator{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				}
 				// add the validator stake to total supply
 				require.NoError(t, sm.AddToTotalSupply(v.StakedAmount))
@@ -100,7 +100,7 @@ func TestHandleMessage(t *testing.T) {
 			msg: &types.MessageEditStake{
 				Address:       newTestAddressBytes(t),
 				Amount:        amount + 1,
-				Committees:    []uint64{lib.CanopyCommitteeId},
+				Committees:    []uint64{lib.CanopyChainId},
 				NetAddress:    "http://example.com",
 				OutputAddress: newTestAddressBytes(t),
 			},
@@ -123,7 +123,7 @@ func TestHandleMessage(t *testing.T) {
 				v := &types.Validator{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				}
 				// set the validator in state
 				require.NoError(t, sm.SetValidator(v))
@@ -144,7 +144,7 @@ func TestHandleMessage(t *testing.T) {
 				v := &types.Validator{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				}
 				// set the validator in state
 				require.NoError(t, sm.SetValidator(v))
@@ -165,7 +165,7 @@ func TestHandleMessage(t *testing.T) {
 				v := &types.Validator{
 					Address:         newTestAddressBytes(t),
 					StakedAmount:    amount,
-					Committees:      []uint64{lib.CanopyCommitteeId},
+					Committees:      []uint64{lib.CanopyChainId},
 					MaxPausedHeight: 1,
 				}
 				// set the validator in state
@@ -221,10 +221,10 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, sm.AccountAdd(newTestAddress(t), amount))
 			},
 			msg: &types.MessageSubsidy{
-				Address:     newTestAddressBytes(t),
-				CommitteeId: lib.CanopyCommitteeId,
-				Amount:      amount,
-				Opcode:      "note",
+				Address: newTestAddressBytes(t),
+				ChainId: lib.CanopyChainId,
+				Amount:  amount,
+				Opcode:  "note",
 			},
 			validate: func(sm StateMachine) {
 				// ensure the account was subtracted from
@@ -232,7 +232,7 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, e)
 				require.Zero(t, got)
 				// ensure the pool was added to
-				got, e = sm.GetPoolBalance(lib.CanopyCommitteeId)
+				got, e = sm.GetPoolBalance(lib.CanopyChainId)
 				require.NoError(t, e)
 				require.Equal(t, amount, got)
 			},
@@ -246,12 +246,12 @@ func TestHandleMessage(t *testing.T) {
 				params, e := sm.GetParamsVal()
 				require.NoError(t, e)
 				// update the minimum order size to accomodate the small amount
-				params.ValidatorMinimumOrderSize = amount
+				params.MinimumOrderSize = amount
 				// set the params back in state
 				require.NoError(t, sm.SetParamsVal(params))
 			},
 			msg: &types.MessageCreateOrder{
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        amount,
 				RequestedAmount:      1000,
 				SellerReceiveAddress: newTestPublicKeyBytes(t),
@@ -263,11 +263,11 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, e)
 				require.Zero(t, got)
 				// ensure the pool was added to
-				got, e = sm.GetPoolBalance(lib.CanopyCommitteeId + types.EscrowPoolAddend)
+				got, e = sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
 				require.NoError(t, e)
 				require.Equal(t, amount, got)
 				// ensure the order was created
-				order, e := sm.GetOrder(0, lib.CanopyCommitteeId)
+				order, e := sm.GetOrder(0, lib.CanopyChainId)
 				require.NoError(t, e)
 				require.Equal(t, amount, order.AmountForSale)
 			},
@@ -281,25 +281,25 @@ func TestHandleMessage(t *testing.T) {
 				params, e := sm.GetParamsVal()
 				require.NoError(t, e)
 				// update the minimum order size to accomodate the small amount
-				params.ValidatorMinimumOrderSize = amount
+				params.MinimumOrderSize = amount
 				// set the params back in state
 				require.NoError(t, sm.SetParamsVal(params))
 				// pre-set an order to edit
 				// add to the pool
-				require.NoError(t, sm.PoolAdd(lib.CanopyCommitteeId+types.EscrowPoolAddend, amount))
+				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+types.EscrowPoolAddend, amount))
 				// save the order in state
 				_, err = sm.CreateOrder(&lib.SellOrder{
-					Committee:            lib.CanopyCommitteeId,
+					Committee:            lib.CanopyChainId,
 					AmountForSale:        amount,
 					RequestedAmount:      1000,
 					SellerReceiveAddress: newTestPublicKeyBytes(t),
 					SellersSendAddress:   newTestAddressBytes(t),
-				}, lib.CanopyCommitteeId)
+				}, lib.CanopyChainId)
 				require.NoError(t, err)
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        amount * 2,
 				RequestedAmount:      2000,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -310,11 +310,11 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, e)
 				require.Zero(t, got)
 				// ensure the pool was added to
-				got, e = sm.GetPoolBalance(lib.CanopyCommitteeId + types.EscrowPoolAddend)
+				got, e = sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
 				require.NoError(t, e)
 				require.Equal(t, amount*2, got)
 				// ensure the order was edited
-				order, e := sm.GetOrder(0, lib.CanopyCommitteeId)
+				order, e := sm.GetOrder(0, lib.CanopyChainId)
 				require.NoError(t, e)
 				require.Equal(t, amount*2, order.AmountForSale)
 			},
@@ -324,20 +324,20 @@ func TestHandleMessage(t *testing.T) {
 			detail: "basic 'happy path' handling for message delete order",
 			preset: func(sm StateMachine) {
 				// add to the pool
-				require.NoError(t, sm.PoolAdd(lib.CanopyCommitteeId+types.EscrowPoolAddend, amount))
+				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+types.EscrowPoolAddend, amount))
 				// save the order in state
 				_, err = sm.CreateOrder(&lib.SellOrder{
-					Committee:            lib.CanopyCommitteeId,
+					Committee:            lib.CanopyChainId,
 					AmountForSale:        amount,
 					RequestedAmount:      1000,
 					SellerReceiveAddress: newTestPublicKeyBytes(t),
 					SellersSendAddress:   newTestAddressBytes(t),
-				}, lib.CanopyCommitteeId)
+				}, lib.CanopyChainId)
 				require.NoError(t, err)
 			},
 			msg: &types.MessageDeleteOrder{
-				OrderId:     0,
-				CommitteeId: lib.CanopyCommitteeId,
+				OrderId: 0,
+				ChainId: lib.CanopyChainId,
 			},
 			validate: func(sm StateMachine) {
 				// ensure the account was subtracted from
@@ -345,11 +345,11 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, e)
 				require.Equal(t, amount, got)
 				// ensure the pool was added to
-				got, e = sm.GetPoolBalance(lib.CanopyCommitteeId + types.EscrowPoolAddend)
+				got, e = sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
 				require.NoError(t, e)
 				require.Zero(t, got)
 				// ensure the order was deleted
-				_, e = sm.GetOrder(0, lib.CanopyCommitteeId)
+				_, e = sm.GetOrder(0, lib.CanopyChainId)
 				require.ErrorContains(t, e, "not found")
 			},
 		},
@@ -457,31 +457,31 @@ func TestGetFeeForMessage(t *testing.T) {
 			expected := func() uint64 {
 				switch test.msg.(type) {
 				case *types.MessageSend:
-					return feeParams.MessageSendFee
+					return feeParams.SendFee
 				case *types.MessageStake:
-					return feeParams.MessageStakeFee
+					return feeParams.StakeFee
 				case *types.MessageEditStake:
-					return feeParams.MessageEditStakeFee
+					return feeParams.EditStakeFee
 				case *types.MessageUnstake:
-					return feeParams.MessageUnstakeFee
+					return feeParams.UnstakeFee
 				case *types.MessagePause:
-					return feeParams.MessagePauseFee
+					return feeParams.PauseFee
 				case *types.MessageUnpause:
-					return feeParams.MessageUnpauseFee
+					return feeParams.UnpauseFee
 				case *types.MessageChangeParameter:
-					return feeParams.MessageChangeParameterFee
+					return feeParams.ChangeParameterFee
 				case *types.MessageDAOTransfer:
-					return feeParams.MessageDaoTransferFee
+					return feeParams.DaoTransferFee
 				case *types.MessageCertificateResults:
-					return feeParams.MessageCertificateResultsFee
+					return feeParams.CertificateResultsFee
 				case *types.MessageSubsidy:
-					return feeParams.MessageSubsidyFee
+					return feeParams.SubsidyFee
 				case *types.MessageCreateOrder:
-					return feeParams.MessageCreateOrderFee
+					return feeParams.CreateOrderFee
 				case *types.MessageEditOrder:
-					return feeParams.MessageEditOrderFee
+					return feeParams.EditOrderFee
 				case *types.MessageDeleteOrder:
-					return feeParams.MessageDeleteOrderFee
+					return feeParams.DeleteOrderFee
 				default:
 					panic("unknown msg")
 				}
@@ -551,24 +551,24 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 		}, {
 			name:     "msg create order",
 			detail:   "retrieves the authorized signers for message create order",
-			msg:      &types.MessageCreateOrder{CommitteeId: lib.CanopyCommitteeId, SellersSendAddress: newTestAddressBytes(t)},
+			msg:      &types.MessageCreateOrder{ChainId: lib.CanopyChainId, SellersSendAddress: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg edit order",
 			detail:   "retrieves the authorized signers for message edit order",
-			msg:      &types.MessageEditOrder{CommitteeId: lib.CanopyCommitteeId},
+			msg:      &types.MessageEditOrder{ChainId: lib.CanopyChainId},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg delete order",
 			detail:   "retrieves the authorized signers for message delete order",
-			msg:      &types.MessageEditOrder{CommitteeId: lib.CanopyCommitteeId},
+			msg:      &types.MessageEditOrder{ChainId: lib.CanopyChainId},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:   "msg certificate results",
 			detail: "retrieves the authorized signers for message delete order",
 			msg: &types.MessageCertificateResults{
 				Qc: &lib.QuorumCertificate{
-					Header:      &lib.View{CommitteeId: lib.CanopyCommitteeId, Height: 1},
+					Header:      &lib.View{ChainId: lib.CanopyChainId, Height: 1},
 					ProposerKey: newTestPublicKeyBytes(t),
 				},
 			},
@@ -589,12 +589,12 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 				Output:       newTestAddressBytes(t, 1),
 			}))
 			// preset a committee member
-			require.NoError(t, sm.SetCommitteeMember(newTestAddress(t), lib.CanopyCommitteeId, 100))
+			require.NoError(t, sm.SetCommitteeMember(newTestAddress(t), lib.CanopyChainId, 100))
 			// preset an order
 			_, err := sm.CreateOrder(&lib.SellOrder{
-				Committee:          lib.CanopyCommitteeId,
+				Committee:          lib.CanopyChainId,
 				SellersSendAddress: newTestAddressBytes(t),
-			}, lib.CanopyCommitteeId)
+			}, lib.CanopyChainId)
 			require.NoError(t, err)
 			// execute function call
 			got, err := sm.GetAuthorizedSignersFor(test.msg)
@@ -1437,9 +1437,9 @@ func TestMessageUnstake(t *testing.T) {
 			// calculate the finish unstaking height
 			var unstakingBlocks uint64
 			if val.Delegate {
-				unstakingBlocks = valParams.ValidatorDelegateUnstakingBlocks
+				unstakingBlocks = valParams.DelegateUnstakingBlocks
 			} else {
-				unstakingBlocks = valParams.ValidatorUnstakingBlocks
+				unstakingBlocks = valParams.UnstakingBlocks
 			}
 			finishUnstakingHeight := unstakingBlocks + sm.Height()
 			// compare got vs expected
@@ -1531,7 +1531,7 @@ func TestMessagePause(t *testing.T) {
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
 			// calculate the finish unstaking height
-			maxPauseBlocks := valParams.ValidatorMaxPauseBlocks + sm.Height()
+			maxPauseBlocks := valParams.MaxPauseBlocks + sm.Height()
 			// compare got vs expected
 			require.Equal(t, maxPauseBlocks, val.MaxPausedHeight)
 			// check for the paused key
@@ -1616,7 +1616,7 @@ func TestMessageUnpause(t *testing.T) {
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
 			// check for the paused key
-			bz, err := sm.Get(types.KeyForPaused(valParams.ValidatorMaxPauseBlocks+sm.Height(), sender))
+			bz, err := sm.Get(types.KeyForPaused(valParams.MaxPauseBlocks+sm.Height(), sender))
 			require.NoError(t, err)
 			require.Nil(t, bz)
 		})
@@ -1641,7 +1641,7 @@ func TestHandleMessageChangeParameter(t *testing.T) {
 			proposalConfig: types.AcceptAllProposals,
 			msg: &types.MessageChangeParameter{
 				ParameterSpace: "val",
-				ParameterKey:   types.ParamValidatorUnstakingBlocks,
+				ParameterKey:   types.ParamUnstakingBlocks,
 				ParameterValue: uint64Any,
 				StartHeight:    2,
 				EndHeight:      3,
@@ -1656,7 +1656,7 @@ func TestHandleMessageChangeParameter(t *testing.T) {
 			proposalConfig: types.AcceptAllProposals,
 			msg: &types.MessageChangeParameter{
 				ParameterSpace: "val",
-				ParameterKey:   types.ParamValidatorUnstakingBlocks,
+				ParameterKey:   types.ParamUnstakingBlocks,
 				ParameterValue: uint64Any,
 				StartHeight:    2,
 				EndHeight:      3,
@@ -1671,7 +1671,7 @@ func TestHandleMessageChangeParameter(t *testing.T) {
 			height:         2,
 			msg: &types.MessageChangeParameter{
 				ParameterSpace: "val",
-				ParameterKey:   types.ParamValidatorUnstakingBlocks,
+				ParameterKey:   types.ParamUnstakingBlocks,
 				ParameterValue: uint64Any,
 				StartHeight:    2,
 				EndHeight:      3,
@@ -1686,7 +1686,7 @@ func TestHandleMessageChangeParameter(t *testing.T) {
 			height:         2,
 			msg: &types.MessageChangeParameter{
 				ParameterSpace: "val",
-				ParameterKey:   types.ParamValidatorUnstakingBlocks,
+				ParameterKey:   types.ParamUnstakingBlocks,
 				ParameterValue: uint64Any,
 				StartHeight:    2,
 				EndHeight:      3,
@@ -1742,8 +1742,8 @@ func TestHandleMessageChangeParameter(t *testing.T) {
 			require.NoError(t, err)
 			// validate the update
 			switch test.msg.ParameterKey {
-			case types.ParamValidatorUnstakingBlocks: // validator
-				require.Equal(t, uint64Value.Value, got.Validator.ValidatorUnstakingBlocks)
+			case types.ParamUnstakingBlocks: // validator
+				require.Equal(t, uint64Value.Value, got.Validator.UnstakingBlocks)
 			case types.ParamProtocolVersion: // consensus
 				require.Equal(t, stringValue.Value, got.Consensus.ProtocolVersion)
 			}
@@ -1896,9 +1896,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			nonSubsidizedCommittee: true,
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:       1,
-					CanopyHeight: 3,
-					CommitteeId:  lib.CanopyCommitteeId,
+					Height:     1,
+					RootHeight: 3,
+					ChainId:    lib.CanopyChainId,
 				},
 			}},
 			error: "invalid certificate results",
@@ -1909,9 +1909,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			nonSubsidizedCommittee: true,
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:       1,
-					CanopyHeight: 3,
-					CommitteeId:  lib.CanopyCommitteeId + 1,
+					Height:     1,
+					RootHeight: 3,
+					ChainId:    lib.CanopyChainId + 1,
 				},
 			}},
 			error: "non subsidized committee",
@@ -1922,9 +1922,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			noCommitteeMembers: true,
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:       1,
-					CanopyHeight: 3,
-					CommitteeId:  lib.CanopyCommitteeId + 1,
+					Height:     1,
+					RootHeight: 3,
+					ChainId:    lib.CanopyChainId + 1,
 				},
 			}},
 			error: "there are no validators in the set",
@@ -1935,9 +1935,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			noCommitteeMembers: true,
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:       1,
-					CanopyHeight: 3,
-					CommitteeId:  lib.CanopyCommitteeId + 1,
+					Height:     1,
+					RootHeight: 3,
+					ChainId:    lib.CanopyChainId + 1,
 				},
 			}},
 			error: "there are no validators in the set",
@@ -1947,9 +1947,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			detail: "the QC is empty",
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:       1,
-					CanopyHeight: 2,
-					CommitteeId:  lib.CanopyCommitteeId + 1,
+					Height:     1,
+					RootHeight: 2,
+					ChainId:    lib.CanopyChainId + 1,
 				},
 			}},
 			error: "empty quorum certificate",
@@ -1959,10 +1959,10 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			detail: "the qc sent is valid",
 			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
-					Height:       1,
-					NetworkId:    1,
-					CanopyHeight: 3,
-					CommitteeId:  lib.CanopyCommitteeId + 1,
+					Height:     1,
+					NetworkId:  1,
+					RootHeight: 3,
+					ChainId:    lib.CanopyChainId + 1,
 				},
 				Results:     certificateResults,
 				ResultsHash: certificateResults.Hash(),
@@ -1977,7 +1977,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			// check if the pool is subsidized
 			if !test.nonSubsidizedCommittee {
 				// subsidize the committee
-				require.NoError(t, sm.PoolAdd(test.msg.Qc.Header.CommitteeId, 1))
+				require.NoError(t, sm.PoolAdd(test.msg.Qc.Header.ChainId, 1))
 			}
 			// check if there exists a committee
 			if !test.noCommitteeMembers {
@@ -1990,16 +1990,16 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 						Address:      newTestAddressBytes(t, i),
 						PublicKey:    newTestPublicKeyBytes(t, i),
 						StakedAmount: 100,
-						Committees:   []uint64{lib.CanopyCommitteeId + 1},
+						Committees:   []uint64{lib.CanopyChainId + 1},
 					}}, supply))
 					// set the committee member
-					require.NoError(t, sm.SetCommitteeMember(newTestAddress(t, i), lib.CanopyCommitteeId+1, 100))
+					require.NoError(t, sm.SetCommitteeMember(newTestAddress(t, i), lib.CanopyChainId+1, 100))
 				}
 				// set the supply in state
 				require.NoError(t, sm.SetSupply(supply))
 				// create an aggregate signature
 				// get the committee members
-				committee, err := sm.GetCommitteeMembers(lib.CanopyCommitteeId+1, true)
+				committee, err := sm.GetCommitteeMembers(lib.CanopyChainId+1, true)
 				require.NoError(t, err)
 				// create a copy of the multikey
 				mk := committee.MultiKey.Copy()
@@ -2040,11 +2040,11 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				}
 				// upsert each order in state
 				_, err = sm.CreateOrder(&lib.SellOrder{
-					Committee:           lib.CanopyCommitteeId + 1,
+					Committee:           lib.CanopyChainId + 1,
 					BuyerReceiveAddress: buyerAddress,
 					BuyerChainDeadline:  0,
 					SellersSendAddress:  newTestAddressBytes(t),
-				}, lib.CanopyCommitteeId+1)
+				}, lib.CanopyChainId+1)
 				// ensure no error
 				require.NoError(t, err)
 			}
@@ -2058,7 +2058,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			}
 			// 1) validate the 'buy order'
 			func() {
-				order, e := sm.GetOrder(0, lib.CanopyCommitteeId+1)
+				order, e := sm.GetOrder(0, lib.CanopyChainId+1)
 				require.NoError(t, e)
 				// convenience variable for buy order
 				buyOrder := test.msg.Qc.Results.Orders.BuyOrders[0]
@@ -2069,7 +2069,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			}()
 			// 2) validate the 'reset order'
 			func() {
-				order, e := sm.GetOrder(1, lib.CanopyCommitteeId+1)
+				order, e := sm.GetOrder(1, lib.CanopyChainId+1)
 				require.NoError(t, e)
 				// validate the receipt address was reset
 				require.Len(t, order.BuyerReceiveAddress, 0)
@@ -2079,7 +2079,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 
 			// 3) validate the 'close order'
 			func() {
-				_, err = sm.GetOrder(2, lib.CanopyCommitteeId+1)
+				_, err = sm.GetOrder(2, lib.CanopyChainId+1)
 				require.ErrorContains(t, err, "order with id 2 not found")
 			}()
 
@@ -2088,7 +2088,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				// define convenience variable for checkpoint
 				expected := test.msg.Qc.Results.Checkpoint
 				// get the checkpoint
-				got, e := sm.store.(lib.StoreI).GetCheckpoint(lib.CanopyCommitteeId+1, expected.Height)
+				got, e := sm.store.(lib.StoreI).GetCheckpoint(lib.CanopyChainId+1, expected.Height)
 				require.NoError(t, e)
 				// check got vs expected
 				require.Equal(t, lib.HexBytes(expected.BlockHash), got)
@@ -2096,10 +2096,10 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 
 			// 5) validate the 'committee data'
 			func() {
-				committeeData, e := sm.GetCommitteeData(lib.CanopyCommitteeId + 1)
+				committeeData, e := sm.GetCommitteeData(lib.CanopyChainId + 1)
 				require.NoError(t, e)
 				// validate the committee height was properly set
-				require.Equal(t, test.msg.Qc.Header.CanopyHeight, committeeData.LastCanopyHeightUpdated)
+				require.Equal(t, test.msg.Qc.Header.RootHeight, committeeData.LastRootHeightUpdated)
 				// validate the chain height was properly set
 				require.Equal(t, test.msg.Qc.Header.Height, committeeData.LastChainHeightUpdated)
 				// validate the number of samples was properly set
@@ -2129,9 +2129,9 @@ func TestMessageSubsidy(t *testing.T) {
 			detail:        "the account does not have enough funds to complete the transfer",
 			presetAccount: 1,
 			msg: &types.MessageSubsidy{
-				Address:     newTestAddressBytes(t),
-				CommitteeId: lib.CanopyCommitteeId,
-				Amount:      2,
+				Address: newTestAddressBytes(t),
+				ChainId: lib.CanopyChainId,
+				Amount:  2,
 			},
 			error: "insufficient funds",
 		},
@@ -2140,9 +2140,9 @@ func TestMessageSubsidy(t *testing.T) {
 			detail:        "the transfer is successful",
 			presetAccount: 1,
 			msg: &types.MessageSubsidy{
-				Address:     newTestAddressBytes(t),
-				CommitteeId: lib.CanopyCommitteeId,
-				Amount:      1,
+				Address: newTestAddressBytes(t),
+				ChainId: lib.CanopyChainId,
+				Amount:  1,
 			},
 		},
 		{
@@ -2151,9 +2151,9 @@ func TestMessageSubsidy(t *testing.T) {
 			presetAccount: 1,
 			presetPool:    2,
 			msg: &types.MessageSubsidy{
-				Address:     newTestAddressBytes(t),
-				CommitteeId: lib.CanopyCommitteeId,
-				Amount:      1,
+				Address: newTestAddressBytes(t),
+				ChainId: lib.CanopyChainId,
+				Amount:  1,
 			},
 		},
 	}
@@ -2166,7 +2166,7 @@ func TestMessageSubsidy(t *testing.T) {
 			// preset the account with tokens
 			require.NoError(t, sm.AccountAdd(address, test.presetAccount))
 			// preset the pool with tokens
-			require.NoError(t, sm.PoolAdd(test.msg.CommitteeId, test.presetPool))
+			require.NoError(t, sm.PoolAdd(test.msg.ChainId, test.presetPool))
 			// execute the function
 			err := sm.HandleMessageSubsidy(test.msg)
 			// validate the expected error
@@ -2181,7 +2181,7 @@ func TestMessageSubsidy(t *testing.T) {
 			// validate the subtraction from the account
 			require.Equal(t, test.presetAccount-test.msg.Amount, got)
 			// get the pool balance
-			got, err = sm.GetPoolBalance(test.msg.CommitteeId)
+			got, err = sm.GetPoolBalance(test.msg.ChainId)
 			require.NoError(t, err)
 			// validate the addition to the pool
 			require.Equal(t, test.presetPool+test.msg.Amount, got)
@@ -2204,7 +2204,7 @@ func TestMessageCreateOrder(t *testing.T) {
 			presetAccount:    1,
 			minimumOrderSize: 2,
 			msg: &types.MessageCreateOrder{
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -2217,7 +2217,7 @@ func TestMessageCreateOrder(t *testing.T) {
 			detail:           "the account does not have sufficient funds to cover the sell order",
 			minimumOrderSize: 1,
 			msg: &types.MessageCreateOrder{
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -2231,7 +2231,7 @@ func TestMessageCreateOrder(t *testing.T) {
 			presetAccount:    1,
 			minimumOrderSize: 1,
 			msg: &types.MessageCreateOrder{
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -2249,7 +2249,7 @@ func TestMessageCreateOrder(t *testing.T) {
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
 			// set minimum order size
-			valParams.ValidatorMinimumOrderSize = test.minimumOrderSize
+			valParams.MinimumOrderSize = test.minimumOrderSize
 			// set back in state
 			require.NoError(t, sm.SetParamsVal(valParams))
 			// preset the account with tokens
@@ -2268,16 +2268,16 @@ func TestMessageCreateOrder(t *testing.T) {
 			// validate the subtraction from the account
 			require.Equal(t, test.presetAccount-test.msg.AmountForSale, got)
 			// get the pool balance
-			got, err = sm.GetPoolBalance(test.msg.CommitteeId + types.EscrowPoolAddend)
+			got, err = sm.GetPoolBalance(test.msg.ChainId + types.EscrowPoolAddend)
 			require.NoError(t, err)
 			// validate the addition to the pool
 			require.Equal(t, test.msg.AmountForSale, got)
 			// get the order in state
-			order, err := sm.GetOrder(0, test.msg.CommitteeId)
+			order, err := sm.GetOrder(0, test.msg.ChainId)
 			require.NoError(t, err)
 			// validate the creation of the order
 			require.EqualExportedValues(t, &lib.SellOrder{
-				Committee:            test.msg.CommitteeId,
+				Committee:            test.msg.ChainId,
 				AmountForSale:        test.msg.AmountForSale,
 				RequestedAmount:      test.msg.RequestedAmount,
 				SellerReceiveAddress: test.msg.SellerReceiveAddress,
@@ -2303,7 +2303,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			detail: "there exists no order",
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
@@ -2315,7 +2315,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
 			preset: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -2325,7 +2325,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
@@ -2338,7 +2338,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			minimumOrderSize: 2,
 			preset: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -2346,7 +2346,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
@@ -2357,7 +2357,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			detail: "the account does not have the balance to cover the edit",
 			preset: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -2365,7 +2365,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
@@ -2377,7 +2377,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			detail: "the order simply updates the receive address but the amount stays the same",
 			preset: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -2385,14 +2385,14 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
 			expected: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 				SellersSendAddress:   newTestAddressBytes(t),
@@ -2405,7 +2405,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			minimumOrderSize: 0,
 			preset: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -2413,14 +2413,14 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
 			expected: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        2,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 				SellersSendAddress:   newTestAddressBytes(t),
@@ -2431,7 +2431,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			detail: "the order has a decreased the sell amount",
 			preset: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -2439,14 +2439,14 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			},
 			msg: &types.MessageEditOrder{
 				OrderId:              0,
-				CommitteeId:          lib.CanopyCommitteeId,
+				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
 			expected: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 				SellersSendAddress:   newTestAddressBytes(t),
@@ -2465,13 +2465,13 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				valParams, err := sm.GetParamsVal()
 				require.NoError(t, err)
 				// set minimum order size
-				valParams.ValidatorMinimumOrderSize = test.minimumOrderSize
+				valParams.MinimumOrderSize = test.minimumOrderSize
 				// set back in state
 				require.NoError(t, sm.SetParamsVal(valParams))
 				// preset the account with tokens
 				require.NoError(t, sm.AccountAdd(address, test.presetAccount))
 				// get the proper order book
-				orderBook, err := sm.GetOrderBook(lib.CanopyCommitteeId)
+				orderBook, err := sm.GetOrderBook(lib.CanopyChainId)
 				require.NoError(t, err)
 				// preset the sell order
 				_ = orderBook.AddOrder(test.preset)
@@ -2494,12 +2494,12 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			// validate the subtraction/addition to/from the account
 			require.Equal(t, test.presetAccount-(test.msg.AmountForSale-test.preset.AmountForSale), got)
 			// get the pool balance
-			got, err = sm.GetPoolBalance(test.msg.CommitteeId + types.EscrowPoolAddend)
+			got, err = sm.GetPoolBalance(test.msg.ChainId + types.EscrowPoolAddend)
 			require.NoError(t, err)
 			// validate the subtraction/addition to/from the pool
 			require.Equal(t, test.preset.AmountForSale-(test.preset.AmountForSale-test.msg.AmountForSale), got)
 			// get the order in state
-			order, err := sm.GetOrder(0, test.msg.CommitteeId)
+			order, err := sm.GetOrder(0, test.msg.ChainId)
 			require.NoError(t, err)
 			// validate the creation of the order
 			require.EqualExportedValues(t, test.expected, order)
@@ -2520,8 +2520,8 @@ func TestHandleMessageDelete(t *testing.T) {
 			name:   "no order found",
 			detail: "there exists no order",
 			msg: &types.MessageDeleteOrder{
-				OrderId:     0,
-				CommitteeId: lib.CanopyCommitteeId,
+				OrderId: 0,
+				ChainId: lib.CanopyChainId,
 			},
 			error: "not found",
 		},
@@ -2530,7 +2530,7 @@ func TestHandleMessageDelete(t *testing.T) {
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
 			preset: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
@@ -2539,8 +2539,8 @@ func TestHandleMessageDelete(t *testing.T) {
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageDeleteOrder{
-				OrderId:     0,
-				CommitteeId: lib.CanopyCommitteeId,
+				OrderId: 0,
+				ChainId: lib.CanopyChainId,
 			},
 			error: "order already accepted",
 		},
@@ -2549,15 +2549,15 @@ func TestHandleMessageDelete(t *testing.T) {
 			detail: "the order delete was successful",
 			preset: &lib.SellOrder{
 				Id:                   0,
-				Committee:            lib.CanopyCommitteeId,
+				Committee:            lib.CanopyChainId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &types.MessageDeleteOrder{
-				OrderId:     0,
-				CommitteeId: lib.CanopyCommitteeId,
+				OrderId: 0,
+				ChainId: lib.CanopyChainId,
 			},
 		},
 	}
@@ -2572,7 +2572,7 @@ func TestHandleMessageDelete(t *testing.T) {
 				// preset the account with tokens
 				require.NoError(t, sm.AccountAdd(address, test.presetAccount))
 				// get the proper order book
-				orderBook, err := sm.GetOrderBook(lib.CanopyCommitteeId)
+				orderBook, err := sm.GetOrderBook(lib.CanopyChainId)
 				require.NoError(t, err)
 				// preset the sell order
 				_ = orderBook.AddOrder(test.preset)
@@ -2595,12 +2595,12 @@ func TestHandleMessageDelete(t *testing.T) {
 			// validate the addition to the account
 			require.Equal(t, test.presetAccount+test.preset.AmountForSale, got)
 			// get the pool balance
-			got, err = sm.GetPoolBalance(test.msg.CommitteeId + types.EscrowPoolAddend)
+			got, err = sm.GetPoolBalance(test.msg.ChainId + types.EscrowPoolAddend)
 			require.NoError(t, err)
 			// validate the subtraction from the pool
 			require.Zero(t, got)
 			// validate the delete
-			_, err = sm.GetOrder(0, test.msg.CommitteeId)
+			_, err = sm.GetOrder(0, test.msg.ChainId)
 			require.ErrorContains(t, err, "not found")
 		})
 	}

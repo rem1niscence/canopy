@@ -153,8 +153,8 @@ message MessageCertificateResults {
 message MessageSubsidy {
   // address: is the sender of the funds
   bytes address = 1;
-  // committee_id: is the id of the committee the funds are being sent to
-  uint64 committee_id = 2;
+  // chain_id: is the id of the committee the funds are being sent to
+  uint64 chain_id = 2;
   // amount: is the amount of funds that are taken from the sender and transferred to the recipient pool
   uint64 amount = 3;
   // opcode: a generic code field to allow fund designation instructions
@@ -164,8 +164,8 @@ message MessageSubsidy {
 // MessageCreateOrder creates a new token swap 'sell order', removing tokens from the sender
 // account and transferring them to an escrow pool while awaiting a buyer
 message MessageCreateOrder {
-  // committee_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
-  uint64 CommitteeId = 1;
+  // chain_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
+  uint64 ChainId = 1;
   // amount_for_sale: the amount of uCNPY listed for sale, transferred to escrow
   uint64 AmountForSale = 2;
   // requested_amount: the amount of the 'counter asset' the buyer must send in order to complete a swap
@@ -183,9 +183,9 @@ message MessageEditOrder {
   // order_id: is the number id that is unique to this committee to identify the order
   // not modifiable, used for order identification only
   uint64 OrderId = 1;
-  // committee_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
+  // chain_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
   // not modifiable, used for order identification only
-  uint64 CommitteeId = 2;
+  uint64 ChainId = 2;
   // amount_for_sale: the updated amount of uCNPY listed for sale, a reduction will return escrowed tokens to the seller's
   // receive address
   uint64 AmountForSale = 3;
@@ -200,6 +200,6 @@ message MessageEditOrder {
 message MessageDeleteOrder {
   // order_id: is the number id that is unique to this committee to identify the order
   uint64 OrderId = 1;
-  // committee_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
-  uint64 CommitteeId = 2;
+  // chain_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
+  uint64 ChainId = 2;
 }

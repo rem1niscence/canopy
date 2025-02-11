@@ -31,12 +31,23 @@ export default function Home() {
   });
 
   function getCardAndTableData(setLoading) {
-    Promise.all([getTableData(state.tablePage, state.category, state.committee), getCardData()]).then((values) => {
-      if (setLoading) {
-        return setState({ ...state, loading: false, tableData: values[0], cardData: values[1] });
-      }
-      return setState({ ...state, tableData: values[0], cardData: values[1] });
-    });
+    Promise.allSettled([getTableData(state.tablePage, state.category, state.committee), getCardData()]).then(
+      (values) => {
+        let settledValues = [];
+        for (const v of values) {
+          if (v.status === "rejected") {
+            settledValues.push({});
+            continue;
+          }
+          settledValues.push(v.value);
+        }
+
+        if (setLoading) {
+          return setState({ ...state, loading: false, tableData: settledValues[0], cardData: settledValues[1] });
+        }
+        return setState({ ...state, tableData: settledValues[0], cardData: settledValues[1] });
+      },
+    );
   }
 
   async function openModal(query) {

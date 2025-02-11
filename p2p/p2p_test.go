@@ -413,7 +413,7 @@ func newTestP2PNodeWithConfig(t *testing.T, c lib.Config, noLog ...bool) (n test
 
 func newTestP2PConfig(_ *testing.T) lib.Config {
 	config := lib.DefaultConfig()
-	config.ChainId = lib.CanopyCommitteeId
+	config.ChainId = lib.CanopyChainId
 	config.ListenAddress = ":0"
 	return config
 }

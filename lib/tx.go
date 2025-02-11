@@ -107,7 +107,7 @@ func (x *Transaction) CheckBasic() ErrorI {
 		return ErrNilNetworkID()
 	}
 	if x.ChainId == 0 {
-		return ErrEmptyCommitteeId()
+		return ErrEmptyChainId()
 	}
 	return nil
 }

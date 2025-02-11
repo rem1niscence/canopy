@@ -14,7 +14,7 @@ import (
 // BLOCK HEADER CODE BELOW
 
 // Check() 'sanity checks' the block header
-func (x *BlockHeader) Check(networkID, committeeID uint64) ErrorI {
+func (x *BlockHeader) Check(networkID, chainId uint64) ErrorI {
 	// rejects empty block header
 	if x == nil {
 		return ErrNilBlockHeader()
@@ -28,7 +28,7 @@ func (x *BlockHeader) Check(networkID, committeeID uint64) ErrorI {
 		return ErrWrongLengthBlockHash()
 	}
 	// check StateRoot hash size
-	if len(x.StateRoot) != crypto.ShortHashSize {
+	if len(x.StateRoot) != crypto.HashSize {
 		return ErrWrongLengthStateRoot()
 	}
 	// check TransactionRoot hash size
@@ -56,8 +56,8 @@ func (x *BlockHeader) Check(networkID, committeeID uint64) ErrorI {
 			return ErrWrongNetworkID()
 		}
 		// check committee id
-		if x.LastQuorumCertificate.Header.CommitteeId != committeeID {
-			return ErrWrongCommitteeID()
+		if x.LastQuorumCertificate.Header.ChainId != chainId {
+			return ErrWrongChainId()
 		}
 	}
 	// check network id
@@ -174,11 +174,11 @@ func (x *BlockHeader) UnmarshalJSON(b []byte) error {
 // BLOCK CODE BELOW
 
 // Check() 'sanity checks' the Block structure
-func (x *Block) Check(networkID, committeeID uint64) ErrorI {
+func (x *Block) Check(networkID, chainId uint64) ErrorI {
 	if x == nil {
 		return ErrNilBlock()
 	}
-	return x.BlockHeader.Check(networkID, committeeID)
+	return x.BlockHeader.Check(networkID, chainId)
 }
 
 // Hash() computes, sets, and returns the BlockHash

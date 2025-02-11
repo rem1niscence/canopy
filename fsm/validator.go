@@ -8,8 +8,6 @@ import (
 	"slices"
 )
 
-// TODO investigate 0 validator committee situations
-
 // GetValidator() gets the validator from the store via the address
 func (s *StateMachine) GetValidator(address crypto.AddressI) (*types.Validator, lib.ErrorI) {
 	bz, err := s.Get(types.KeyForValidator(address))
@@ -163,12 +161,12 @@ func (s *StateMachine) UpdateValidatorStake(val *types.Validator, newCommittees 
 		if err = s.AddToDelegateSupply(amountToAdd); err != nil {
 			return err
 		}
-		// update the delegations with the new committeeIds and stake amount
+		// update the delegations with the new chainIds and stake amount
 		if err = s.UpdateDelegations(address, val, newStakedAmount, newCommittees); err != nil {
 			return err
 		}
 	} else {
-		// update the committees with the new committeeIds and stake amount
+		// update the committees with the new chainIds and stake amount
 		if err = s.UpdateCommittees(address, val, newStakedAmount, newCommittees); err != nil {
 			return err
 		}
@@ -264,7 +262,7 @@ func (s *StateMachine) DeleteFinishedUnstaking() lib.ErrorI {
 // PAUSED VALIDATORS BELOW
 
 // SetValidatorsPaused() automatically updates all validators as if they'd submitted a MessagePause
-func (s *StateMachine) SetValidatorsPaused(committeeId uint64, addresses [][]byte) {
+func (s *StateMachine) SetValidatorsPaused(chainId uint64, addresses [][]byte) {
 	for _, addr := range addresses {
 		// get the validator
 		val, err := s.GetValidator(crypto.NewAddress(addr))
@@ -273,9 +271,9 @@ func (s *StateMachine) SetValidatorsPaused(committeeId uint64, addresses [][]byt
 			continue
 		}
 		// ensure no unauthorized auto-pauses
-		if !slices.Contains(val.Committees, committeeId) {
+		if !slices.Contains(val.Committees, chainId) {
 			// NOTE: expected - this can happen during a race between edit-stake and pause
-			s.log.Warn(types.ErrInvalidCommitteeID().Error())
+			s.log.Warn(types.ErrInvalidChainId().Error())
 			return
 		}
 		// handle pausing
@@ -364,7 +362,7 @@ func (s *StateMachine) LotteryWinner(id uint64, validators ...bool) (lottery *li
 	}
 	// if there are no validators in the set - return
 	if p.NumValidators == 0 {
-		return &lib.LotteryWinner{Winner: nil, Cut: valParams.ValidatorDelegateRewardPercentage}, nil
+		return &lib.LotteryWinner{Winner: nil, Cut: valParams.DelegateRewardPercentage}, nil
 	}
 	// get the last proposers
 	lastProposers, err := s.GetLastProposers()
@@ -380,7 +378,7 @@ func (s *StateMachine) LotteryWinner(id uint64, validators ...bool) (lottery *li
 				TotalValidators:       p.NumValidators,
 				TotalPower:            p.TotalPower,
 			}, ValidatorSet: p.ValidatorSet,
-		}).Address().Bytes(), Cut: valParams.ValidatorDelegateRewardPercentage,
+		}).Address().Bytes(), Cut: valParams.DelegateRewardPercentage,
 	}, nil
 }
 

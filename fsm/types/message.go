@@ -444,7 +444,7 @@ func (x *MessageCertificateResults) Check() lib.ErrorI {
 	if x.Qc.Block != nil {
 		return lib.ErrNilBlock()
 	}
-	if err := checkCommitteeId(x.Qc.Header.CommitteeId); err != nil {
+	if err := checkChainId(x.Qc.Header.ChainId); err != nil {
 		return err
 	}
 	if err := results.RewardRecipients.CheckBasic(); err != nil {
@@ -511,10 +511,10 @@ func (x *MessageSubsidy) Recipient() []byte { return nil }
 // MarshalJSON() is the json.Marshaller implementation for MessageSubsidy
 func (x MessageSubsidy) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageSubsidy{
-		Address:     x.Address,
-		CommitteeId: x.CommitteeId,
-		Amount:      x.Amount,
-		Opcode:      x.Opcode,
+		Address: x.Address,
+		ChainId: x.ChainId,
+		Amount:  x.Amount,
+		Opcode:  x.Opcode,
 	})
 }
 
@@ -525,19 +525,19 @@ func (x *MessageSubsidy) UnmarshalJSON(b []byte) (err error) {
 		return
 	}
 	*x = MessageSubsidy{
-		Address:     x.Address,
-		CommitteeId: j.CommitteeId,
-		Amount:      j.Amount,
-		Opcode:      j.Opcode,
+		Address: x.Address,
+		ChainId: j.ChainId,
+		Amount:  j.Amount,
+		Opcode:  j.Opcode,
 	}
 	return
 }
 
 type jsonMessageSubsidy struct {
-	Address     lib.HexBytes `json:"address"`
-	CommitteeId uint64       `json:"committee_id"`
-	Amount      uint64       `json:"amount"`
-	Opcode      string       `json:"opcode"`
+	Address lib.HexBytes `json:"address"`
+	ChainId uint64       `json:"chain_id"`
+	Amount  uint64       `json:"amount"`
+	Opcode  string       `json:"opcode"`
 }
 
 var _ lib.MessageI = &MessageCreateOrder{} // interface enforcement
@@ -548,7 +548,7 @@ func (x *MessageCreateOrder) Recipient() []byte { return nil }
 
 // Check() validates the Message structure
 func (x *MessageCreateOrder) Check() lib.ErrorI {
-	if err := checkCommitteeId(x.CommitteeId); err != nil {
+	if err := checkChainId(x.ChainId); err != nil {
 		return err
 	}
 	if x.AmountForSale == 0 || x.RequestedAmount == 0 {
@@ -560,7 +560,7 @@ func (x *MessageCreateOrder) Check() lib.ErrorI {
 // MarshalJSON() is the json.Marshaller implementation for MessageCreateOrder
 func (x *MessageCreateOrder) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageCreateOrder{
-		CommitteeId:          x.CommitteeId,
+		ChainId:              x.ChainId,
 		AmountForSale:        x.AmountForSale,
 		RequestedAmount:      x.RequestedAmount,
 		SellerReceiveAddress: x.SellerReceiveAddress,
@@ -575,7 +575,7 @@ func (x *MessageCreateOrder) UnmarshalJSON(b []byte) (err error) {
 		return
 	}
 	*x = MessageCreateOrder{
-		CommitteeId:          j.CommitteeId,
+		ChainId:              j.ChainId,
 		AmountForSale:        j.AmountForSale,
 		RequestedAmount:      j.RequestedAmount,
 		SellerReceiveAddress: j.SellerReceiveAddress,
@@ -585,7 +585,7 @@ func (x *MessageCreateOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageCreateOrder struct {
-	CommitteeId          uint64       `json:"CommitteeId"`
+	ChainId              uint64       `json:"ChainId"`
 	AmountForSale        uint64       `json:"AmountForSale"`
 	RequestedAmount      uint64       `json:"RequestedAmount"`
 	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress"`
@@ -600,7 +600,7 @@ func (x *MessageEditOrder) Recipient() []byte { return nil }
 
 // Check() validates the Message structure
 func (x *MessageEditOrder) Check() lib.ErrorI {
-	if err := checkCommitteeId(x.CommitteeId); err != nil {
+	if err := checkChainId(x.ChainId); err != nil {
 		return err
 	}
 	if x.AmountForSale == 0 || x.RequestedAmount == 0 {
@@ -613,7 +613,7 @@ func (x *MessageEditOrder) Check() lib.ErrorI {
 func (x *MessageEditOrder) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageEditOrder{
 		OrderId:              x.OrderId,
-		CommitteeId:          x.CommitteeId,
+		ChainId:              x.ChainId,
 		AmountForSale:        x.AmountForSale,
 		RequestedAmount:      x.RequestedAmount,
 		SellerReceiveAddress: x.SellerReceiveAddress,
@@ -628,7 +628,7 @@ func (x *MessageEditOrder) UnmarshalJSON(b []byte) (err error) {
 	}
 	*x = MessageEditOrder{
 		OrderId:              j.OrderId,
-		CommitteeId:          j.CommitteeId,
+		ChainId:              j.ChainId,
 		AmountForSale:        j.AmountForSale,
 		RequestedAmount:      j.RequestedAmount,
 		SellerReceiveAddress: j.SellerReceiveAddress,
@@ -638,7 +638,7 @@ func (x *MessageEditOrder) UnmarshalJSON(b []byte) (err error) {
 
 type jsonMessageEditOrder struct {
 	OrderId              uint64       `json:"OrderId"`
-	CommitteeId          uint64       `json:"CommitteeId"`
+	ChainId              uint64       `json:"ChainId"`
 	AmountForSale        uint64       `json:"AmountForSale"`
 	RequestedAmount      uint64       `json:"RequestedAmount"`
 	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress"`
@@ -651,13 +651,13 @@ func (x *MessageDeleteOrder) Name() string      { return MessageDeleteOrderName 
 func (x *MessageDeleteOrder) Recipient() []byte { return nil }
 
 // Check() validates the Message structure
-func (x *MessageDeleteOrder) Check() lib.ErrorI { return checkCommitteeId(x.CommitteeId) }
+func (x *MessageDeleteOrder) Check() lib.ErrorI { return checkChainId(x.ChainId) }
 
 // MarshalJSON() is the json.Marshaller implementation for MessageEditOrder
 func (x *MessageDeleteOrder) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageDeleteOrder{
-		OrderId:     x.OrderId,
-		CommitteeId: x.CommitteeId,
+		OrderId: x.OrderId,
+		ChainId: x.ChainId,
 	})
 }
 
@@ -668,15 +668,15 @@ func (x *MessageDeleteOrder) UnmarshalJSON(b []byte) (err error) {
 		return
 	}
 	*x = MessageDeleteOrder{
-		OrderId:     j.OrderId,
-		CommitteeId: j.CommitteeId,
+		OrderId: j.OrderId,
+		ChainId: j.ChainId,
 	}
 	return
 }
 
 type jsonMessageDeleteOrder struct {
-	OrderId     uint64 `json:"OrderId"`
-	CommitteeId uint64 `json:"CommitteeId"`
+	OrderId uint64 `json:"OrderId"`
+	ChainId uint64 `json:"ChainId"`
 }
 
 // checkAmount() validates the amount sent in the Message
@@ -749,22 +749,22 @@ func checkCommittees(committees []uint64) lib.ErrorI {
 		return ErrInvalidNumCommittees()
 	}
 	for _, committee := range committees {
-		if err := checkCommitteeId(committee); err != nil {
+		if err := checkChainId(committee); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func checkCommitteeId(i uint64) lib.ErrorI {
+func checkChainId(i uint64) lib.ErrorI {
 	for _, reserved := range ReservedIDs {
 		if i == reserved {
-			return ErrInvalidCommitteeID()
+			return ErrInvalidChainId()
 		}
 	}
-	// NOTE: committeeIds should never be GTE MaxUint16, as the 'escrow pool' is just <committeeId + uint16>
+	// NOTE: chainIds should never be GTE MaxUint16, as the 'escrow pool' is just <chainId + uint16>
 	if i >= EscrowPoolAddend {
-		return ErrInvalidCommitteeID()
+		return ErrInvalidChainId()
 	}
 	return nil
 }

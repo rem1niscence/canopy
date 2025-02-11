@@ -164,7 +164,7 @@ func (x *PeerAddress) FromString(s string) (e ErrorI) {
 }
 
 // ResolvePort() executes a network wide protocol for determining what the p2p port of the peer is
-// This is useful to allow 1 URL in state to expand to many different routing paths for sub-chains
+// This is useful to allow 1 URL in state to expand to many different routing paths for nested-chains
 // Example: ResolvePort(CHAIN-ID = 2) returns 9002
 func ResolvePort(chainId uint64) (string, ErrorI) {
 	return AddToPort(":9000", chainId)

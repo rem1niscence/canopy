@@ -47,14 +47,14 @@ type RWIndexerI interface {
 
 // WIndexerI defines the write interface for the indexing operations
 type WIndexerI interface {
-	IndexQC(qc *QuorumCertificate) ErrorI                              // save a quorum certificate by height
-	IndexTx(result *TxResult) ErrorI                                   // save a tx by hash, height.index, sender, and recipient
-	IndexBlock(b *BlockResult) ErrorI                                  // save a block by hash and height
-	IndexDoubleSigner(address []byte, height uint64) ErrorI            // save a double signer for a height
-	IndexCheckpoint(committeeId uint64, checkpoint *Checkpoint) ErrorI // save a checkpoint for a committee chain
-	DeleteTxsForHeight(height uint64) ErrorI                           // deletes all transactions for a height
-	DeleteBlockForHeight(height uint64) ErrorI                         // deletes a block and transaction data for a height
-	DeleteQCForHeight(height uint64) ErrorI                            // deletes a certificate for a height
+	IndexQC(qc *QuorumCertificate) ErrorI                          // save a quorum certificate by height
+	IndexTx(result *TxResult) ErrorI                               // save a tx by hash, height.index, sender, and recipient
+	IndexBlock(b *BlockResult) ErrorI                              // save a block by hash and height
+	IndexDoubleSigner(address []byte, height uint64) ErrorI        // save a double signer for a height
+	IndexCheckpoint(chainId uint64, checkpoint *Checkpoint) ErrorI // save a checkpoint for a committee chain
+	DeleteTxsForHeight(height uint64) ErrorI                       // deletes all transactions for a height
+	DeleteBlockForHeight(height uint64) ErrorI                     // deletes a block and transaction data for a height
+	DeleteQCForHeight(height uint64) ErrorI                        // deletes a certificate for a height
 }
 
 // RIndexerI defines the read interface for the indexing operations
@@ -69,9 +69,9 @@ type RIndexerI interface {
 	GetQCByHeight(height uint64) (*QuorumCertificate, ErrorI)                                     // get certificate for a height
 	GetDoubleSigners() ([]*DoubleSigner, ErrorI)                                                  // all double signers in the indexer
 	IsValidDoubleSigner(address []byte, height uint64) (bool, ErrorI)                             // get if the DoubleSigner is already set for a height
-	GetCheckpoint(committeeId, height uint64) (blockHash HexBytes, err ErrorI)                    // get the checkpoint block hash for a certain committee and height combination
-	GetMostRecentCheckpoint(committeeId uint64) (checkpoint *Checkpoint, err ErrorI)              // get the most recent checkpoint for a committee
-	GetAllCheckpoints(committeeId uint64) (checkpoints []*Checkpoint, err ErrorI)                 // export all checkpoints for a committee
+	GetCheckpoint(chainId, height uint64) (blockHash HexBytes, err ErrorI)                        // get the checkpoint block hash for a certain committee and height combination
+	GetMostRecentCheckpoint(chainId uint64) (checkpoint *Checkpoint, err ErrorI)                  // get the most recent checkpoint for a committee
+	GetAllCheckpoints(chainId uint64) (checkpoints []*Checkpoint, err ErrorI)                     // export all checkpoints for a committee
 }
 
 // StoreTxnI defines an interface for discardable
