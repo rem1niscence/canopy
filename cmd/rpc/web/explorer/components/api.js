@@ -6,7 +6,7 @@ if (typeof window !== "undefined") {
     rpcURL = window.__CONFIG__.rpcURL;
     chainId = Number(window.__CONFIG__.chainId);
   }
-  rpcURL.replace("localhost", window.location.hostname)
+  rpcURL = rpcURL.replace("localhost", window.location.hostname)
   console.log(rpcURL)
 } else {
   console.log("config undefined");
