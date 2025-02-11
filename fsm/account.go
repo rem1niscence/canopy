@@ -176,9 +176,6 @@ func (s *StateMachine) GetPools() ([]*types.Pool, lib.ErrorI) {
 		if err != nil {
 			return nil, err
 		}
-		if acc.Amount == 0 {
-			continue
-		}
 		result = append(result, acc)
 	}
 	return result, nil
@@ -208,6 +205,9 @@ func (s *StateMachine) GetPoolBalance(id uint64) (uint64, lib.ErrorI) {
 
 // SetPool() upserts a Pool structure into the state
 func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
+	if pool.Amount == 0 {
+		return s.Delete(types.KeyForPool(pool.Id))
+	}
 	bz, err := s.marshalPool(pool)
 	if err != nil {
 		return err

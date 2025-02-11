@@ -533,7 +533,7 @@ func TestGetSetPools(t *testing.T) {
 				Id:     lib.CanopyChainId + 1,
 				Amount: 100,
 			}, {
-				Id:     lib.CanopyCommitteeId + 2,
+				Id:     lib.CanopyChainId + 2,
 				Amount: 0,
 			}},
 		},
