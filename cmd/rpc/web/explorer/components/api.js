@@ -167,7 +167,7 @@ export async function getModalData(query, page) {
     // Block by hash
     if (query.length === 64) {
       const block = await BlockByHash(query);
-      if (block?.block_header?.hash) return { block: block };
+      if (block?.block_header?.hash) return { block };
 
       const tx = await TxByHash(query);
       return tx?.sender ? tx : noResult;
@@ -175,24 +175,13 @@ export async function getModalData(query, page) {
 
     // Validator or account by address
     if (query.length === 40) {
-      let val,
-        acc = {};
-      await Promise.allSettled([Validator(0, query), AccountWithTxs(0, query, page)]).then((results) => {
-        for (const result of results) {
-          if (result.status === "rejected") {
-            continue;
-          }
-          if (result.value.validator) {
-            val = result.value.validator;
-          }
-          if (result.value.account) {
-            acc = result.value;
-          }
-        }
-      });
+      const [valResult, accResult] = await Promise.allSettled([Validator(0, query), AccountWithTxs(0, query, page)]);
+
+      const val = valResult.status === "fulfilled" ? valResult.value : null;
+      const acc = accResult.status === "fulfilled" ? accResult.value : null;
 
       if (!acc?.account?.address && !val?.address) return noResult;
-      return acc.account.address ? { ...acc, validator: val } : { validator: val };
+      return acc?.account?.address ? { ...acc, validator: val } : { validator: val };
     }
 
     return noResult;
@@ -200,7 +189,7 @@ export async function getModalData(query, page) {
 
   // Handle block by height
   const block = await BlockByHeight(query);
-  return block?.block_header?.hash ? { block: block } : noResult;
+  return block?.block_header?.hash ? { block } : noResult;
 }
 
 // getCardData() executes api calls and prepares the data for the cards
