@@ -192,7 +192,7 @@ export default function Dashboard() {
         <img
           className="logs-button"
           alt="play-pause-btn"
-          src={state.pauseLogs ? "./unpause_filled.png" : "./pause_filled.png"}
+          src={state.pauseLogs ? "./unpause.png" : "./pause.png"}
         />
       </div>
       <LazyLog enableSearch={true} id="lazy-log" text={state.logs.replace("\n", "")} />

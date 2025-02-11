@@ -33,6 +33,19 @@ import {
   retryWithDelay,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
+import {
+  BuyIcon,
+  CopyIcon,
+  EditOrderIcon,
+  EditStakeIcon,
+  DeleteOrderIcon,
+  PauseIcon,
+  UnpauseIcon,
+  SendIcon,
+  StakeIcon,
+  SwapIcon,
+  UnstakeIcon,
+} from "@/components/svg_icons";
 
 function Keystore() {
   const keystore = useContext(KeystoreContext);
@@ -41,16 +54,16 @@ function Keystore() {
 
 // transactionButtons defines the icons for the transactions
 const transactionButtons = [
-  { title: "SEND", name: "send", src: "arrow-up" },
-  { title: "STAKE", name: "stake", src: "stake" },
-  { title: "EDIT", name: "edit-stake", src: "edit-stake" },
-  { title: "UNSTAKE", name: "unstake", src: "unstake" },
-  { title: "PAUSE", name: "pause", src: "pause" },
-  { title: "PLAY", name: "unpause", src: "unpause" },
-  { title: "SWAP", name: "create_order", src: "swap" },
-  { title: "LOCK", name: "buy_order", src: "buy" },
-  { title: "REPRICE", name: "edit_order", src: "edit_order" },
-  { title: "VOID", name: "delete_order", src: "delete_order" },
+  { title: "SEND", name: "send", src: SendIcon },
+  { title: "STAKE", name: "stake", src: StakeIcon },
+  { title: "EDIT", name: "edit-stake", src: EditStakeIcon },
+  { title: "UNSTAKE", name: "unstake", src: UnstakeIcon },
+  { title: "PAUSE", name: "pause", src: PauseIcon },
+  { title: "PLAY", name: "unpause", src: UnpauseIcon },
+  { title: "SWAP", name: "create_order", src: SwapIcon },
+  { title: "LOCK", name: "buy_order", src: BuyIcon },
+  { title: "REPRICE", name: "edit_order", src: EditOrderIcon },
+  { title: "VOID", name: "delete_order", src: DeleteOrderIcon },
 ];
 
 // Accounts() returns the main component of this file
@@ -322,7 +335,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
         keystore={ks}
       />
       {transactionButtons.map((v, i) => (
-        <ActionButton key={i} v={v} i={i} showModal={showModal} />
+        <RenderActionButton key={i} v={v} i={i} showModal={showModal} />
       ))}
       <Row className="account-summary-container">
         {[
@@ -422,7 +435,7 @@ function KeyDetail({ i, title, info, state, setState }) {
         <div className="account-summary-info-content">
           <Truncate text={info} />
         </div>
-        <img className="account-summary-info-content-image" style={{ top: "-20px" }} src="./copy.png" />
+          <CopyIcon />
       </div>
     </div>
   );
@@ -446,7 +459,7 @@ function JSONViewer({ pk, txResult }) {
 function AccSumTabCol({ detail, i, state, setState }) {
   return withTooltip(
     <td onClick={() => copy(state, setState, detail)}>
-      <img className="account-summary-info-content-image" src="./copy.png" />
+      <CopyIcon />
       <div className="account-summary-info-table-column">
         <Truncate text={detail} />
       </div>
@@ -572,15 +585,24 @@ function RenderModal({
   );
 }
 
-// RenderActionButton() creates a button with an image and title, triggering a modal on click
-function ActionButton({ v, i, showModal }) {
+// RenderActionButton() creates a button with an SVG and title, triggering a modal on click
+function RenderActionButton({ v, i, showModal }) {
+  const IconComponent = (v.src);
+
+  if (!IconComponent) {
+    return null; // Or a placeholder if the SVG isn't found
+  }
+
   return (
     <div key={i} className="send-receive-button-container">
-      <img className="send-receive-button" onClick={() => showModal(v.name)} src={`./${v.src}.png`} alt={v.title} />
-        <br/>
-      <span style={{ fontSize: "10px", width: "100%"}}>{v.title}</span>
+      <IconComponent
+        className="send-receive-button"
+        onClick={() => showModal(v.name)}
+      />
+      <br />
+      <span class="action-button-title">{v.title}</span>
     </div>
-  );
+    );
 }
 
 // RenderAccountInfo() generates a card displaying account summary details

@@ -6,9 +6,21 @@
   --font-body: 'Unbounded', sans-serif;
 }
 
-hr {
-  border: 1px dashed --primary-color;
+/* Inheritance override for a persnickety HR rule in Bootstrap */
+.content-container hr{
   border-radius: 5px;
+  width: 80%;
+  margin: 1rem auto;
+}
+
+.content-light hr {
+  border: 1px dashed var(--primary-color);
+  width: 80%;
+  margin: 1rem auto;
+}
+
+.content-dark hr {
+  border: 1px dashed #fff;
   width: 80%;
   margin: 1rem auto;
 }
@@ -36,6 +48,15 @@ hr {
   padding-bottom: 15px;
   position: fixed;
   width: 100%;
+}
+
+#nav-dropdown svg {
+  width: 16px;
+  margin: 0 0.5rem 0 1rem;
+}
+
+.navbar-dark #nav-dropdown svg path {
+  fill: #fff;
 }
 
 .navbar-dark #nav-bar{
@@ -153,13 +174,15 @@ hr {
 
 .nav-social-icon {
   transition: all .3s ease-in-out;
-  background-size: contain;
-  background-repeat: no-repeat;
   width: 50px;
   height: 50px;
 }
 
-.navbar-dark .nav-social-icon svg {
+.nav-social-icon svg, .nav-social-icon svg {
+  fill: --primary-color;
+}
+
+.navbar-dark .nav-social-icon svg, .footer-dark .nav-social-icon svg {
   fill: #fff;
 }
 
@@ -206,23 +229,21 @@ button {
   font-family: var(--font-body);
 }
 
-#dashboard-container {
-  background-color: #000;
-  mix-blend-mode: difference;
-}
-
 #dashboard-inner {
   margin-bottom: 20px;
 }
 
+.action-button-title{
+  font-size: 0.7rem;
+}
+
 .send-receive-button-container {
-  height: 40px;
-  width: 90px;
-  margin-bottom: 50px;
+  width: 85px;
+  margin: 0 1rem 3rem;
   vertical-align: top;
   display: inline-block;
   text-align: center;
-  transition: ease-in-out 0.2s;
+  transition: .2s ease-in-out;
   cursor: pointer;
 }
 
@@ -233,6 +254,10 @@ button {
 .send-receive-button {
   height: 40px;
   width: 40px;
+}
+
+.content-dark svg path {
+  fill: #fff;
 }
 
 .account-summary-container-card .card-title {
@@ -273,6 +298,14 @@ button {
   cursor: pointer;
   transition: ease-in-out 0.2s;
   width: 100%;
+  position: relative;
+}
+
+.account-summary-info svg {
+  max-width: 30px;
+  position: absolute;
+  top: 7px;
+  right: -7px;
 }
 
 .account-summary-info-content-container:hover {
@@ -296,6 +329,28 @@ button {
 .account-summary-info-table-column {
   max-width: 90%;
   margin: 0 auto;
+}
+
+.table-hover tr td {
+  position: relative;
+}
+
+.table-hover tr td svg {
+  position: absolute;
+  max-width: 30px;
+  top: 7px;
+  right: -11px;
+}
+
+.gov-header svg {
+  max-width: 50px;
+  margin: 0 1rem;
+  padding-bottom: 1rem;
+}
+
+.gov-header span {
+  margin: 0 0.5rem;
+  display: inline-block;
 }
 
 #pk-button {
@@ -430,8 +485,6 @@ th {
   display: inline-block;
   vertical-align: middle;
   line-height: normal;
-  background: black !important;
-  color: white !important;
 }
 
 .carousel-item-title {
@@ -439,6 +492,19 @@ th {
   font-weight: 400 !important;
   font-family: var(--font-heading);
   text-transform: uppercase;
+}
+
+.content-dark .carousel-item-detail {
+  width: 50%;
+  font-size: 14px;
+  font-weight: 400;
+  margin: 0 auto 10px;
+  color: inherit;
+}
+
+#carousel-item-detail-title {
+  font-weight: 600;
+  color: var(--primary-color);
 }
 
 .navbar {
@@ -456,11 +522,20 @@ th {
   color: #7b7b7b;
 }
 
-#carousel-item-detail-title {
-  font-weight: 600;
-  filter: invert(100%);
-  mix-blend-mode: difference;
-  color: var(--primary-color);
+[data-bs-theme=dark] .content-dark .carousel .carousel-indicators [data-bs-target], [data-bs-theme=dark].content-dark.carousel .carousel-indicators [data-bs-target] {
+   background-color: #fff;
+ }
+
+[data-bs-theme=dark] .content-dark .carousel .carousel-control-next-icon, [data-bs-theme=dark] .content-dark .carousel .carousel-control-prev-icon, [data-bs-theme=dark] .content-dark.carousel .carousel-control-next-icon, [data-bs-theme=dark].content-dark.carousel .carousel-control-prev-icon {
+  filter: invert(0) grayscale(100);
+}
+
+[data-bs-theme=light] .content-light .carousel .carousel-indicators [data-bs-target], [data-bs-theme=light].content-light.carousel .carousel-indicators [data-bs-target] {
+  background-color: #000;
+}
+
+[data-bs-theme=light] .content-light .carousel .carousel-control-next-icon, [data-bs-theme=light] .content-light .carousel .carousel-control-prev-icon, [data-bs-theme=light].content-light.carousel .carousel-control-next-icon, [data-bs-theme=light].content-light.carousel .carousel-control-prev-icon {
+  filter: invert(1) grayscale(100);
 }
 
 #dashboard-hr {
@@ -474,8 +549,44 @@ th {
   height: 300px !important;
   margin-bottom: 50px;
   border: 2px solid #222222;
-  background-color: #000;
   filter: grayscale(100%);
+}
+
+.content-dark .react-lazylog-searchbar {
+  background: #111;
+  color: #fff;
+}
+
+.content-dark .logs-button {
+  width: 25px;
+  height: 25px;
+  filter: invert(1);
+}
+
+.content-dark span.react-lazylog-searchbar-matches.inactive {
+  color: #fff;
+}
+
+.content-light .react-lazylog-searchbar {
+  background: #ddd;
+  color: #111;
+}
+
+.content-light span.react-lazylog-searchbar-matches.inactive {
+  color: #111;
+}
+
+.content-light input.react-lazylog-searchbar-input {
+  background: #fff;
+}
+
+.content-light #lazy-log {
+  text-align: left;
+  height: 300px!important;
+  margin-bottom: 50px;
+  border: 0;
+  filter: grayscale(100%);
+  background: #eee;
 }
 
 #charts-container {
@@ -594,13 +705,11 @@ th {
   font-weight: 600;
   font-size: 12px;
   letter-spacing: 1.5px;
-  color: black;
 }
 
 .poll-prop-url {
   margin: 0 auto;
   font-weight: 300;
-  color: black;
 }
 
 .poll-container {
@@ -609,6 +718,21 @@ th {
   margin-bottom: 20px;
   font-size: 14px;
 }
+
+.poll-prop-url {
+  margin: 1rem auto;
+  font-weight: 300;
+  display: block;
+}
+
+.content-light .poll-prop-url {
+  color: var(--primary-color);
+}
+
+.content-dark .poll-prop-url {
+  color: #fff;
+}
+
 
 .poll-form {
   width: 100%;
@@ -688,6 +812,10 @@ input#darkModeSwitch {
 label#colorSwitchLabel {
   font-size: 1rem;
   padding: 0 0.5rem;
+}
+
+.navbar-dark .navbar-brand svg path {
+  fill: #fff;
 }
 
 i.bi {

@@ -21,21 +21,30 @@ const DarkModeToggle = () => {
 
         localStorage.setItem('bsTheme', theme);
 
-        const element = document.querySelector("#colorSwitchLabel");
-        if (element) {
+        const switchElement = document.querySelector("#colorSwitchLabel");
+        if (switchElement) {
             if (theme === 'dark') {
-                element.classList.replace("bi-sun-fill", "bi-moon-stars-fill");
+                switchElement.classList.replace("bi-sun-fill", "bi-moon-stars-fill");
             } else {
-                element.classList.replace("bi-moon-stars-fill", "bi-sun-fill");
+                switchElement.classList.replace("bi-moon-stars-fill", "bi-sun-fill");
             }
         }
 
-        const element = document.querySelector("footer");
-        if (element) {
+        const contentElement = document.querySelector("#container");
+        if (contentElement) {
             if (theme === 'dark') {
-                element.classList.replace("footer-light", "footer-dark");
+                contentElement.classList.replace("content-light", "content-dark");
             } else {
-                element.classList.replace("footer-dark", "footer-light");
+                contentElement.classList.replace("content-dark", "content-light");
+            }
+        }
+
+        const footerElement = document.querySelector("footer");
+        if (footerElement) {
+            if (theme === 'dark') {
+                footerElement.classList.replace("footer-light", "footer-dark");
+            } else {
+                footerElement.classList.replace("footer-dark", "footer-light");
             }
         }
     }, [theme]);

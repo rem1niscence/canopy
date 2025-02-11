@@ -70,7 +70,7 @@ export default function Home() {
   }
   return (
     <KeystoreContext.Provider value={state.keystore}>
-      <div id="container">
+      <div id="container" class="content-light">
         <Navigation {...state} setActiveKey={queryAPI} setNavIdx={setNavIdx} />
         <div id="pageContent">
           {state.navIdx == 0 && (

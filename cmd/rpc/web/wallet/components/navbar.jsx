@@ -3,6 +3,7 @@ import Navbar from "react-bootstrap/Navbar";
 import { Nav, NavDropdown } from "react-bootstrap";
 import { withTooltip } from "@/components/util";
 import DarkModeToggle from "@/components/color_mode";
+import { WalletLogoIcon, KeyIcon } from "@/components/svg_icons";
 
 const navbarIconsAndTip = [
     {
@@ -39,11 +40,7 @@ export default function Navigation({keystore, setActiveKey, keyIdx, setNavIdx, h
         <Navbar sticky="top" data-bs-theme="light" id="nav-bar">
             <Container id="nav-bar-container">
                 <Navbar.Brand id="nav-bar-brand">
-                    <img
-                        src="/wallet_logo.png"
-                        alt="Wallet Logo"
-                        className="nav-bar-logo"
-                    />
+                    <WalletLogoIcon className="nav-bar-logo" />
                 </Navbar.Brand>
                 <div id="nav-dropdown-container">
                     <NavDropdown
@@ -51,7 +48,7 @@ export default function Navigation({keystore, setActiveKey, keyIdx, setNavIdx, h
                         title={
                             <>
                                 {Object.keys(keystore)[keyIdx]}
-                                <img alt="key" id="dropdown-image" src="./key.png"/>
+                                <KeyIcon />
                             </>
                         }
                     >
