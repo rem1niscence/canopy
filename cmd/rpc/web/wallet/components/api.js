@@ -1,13 +1,15 @@
 let rpcURL = "http://localhost:50002"; // default RPC URL
 let adminRPCURL = "http://localhost:50003"; // default Admin RPC URL
-let rootChainRPCURL = rpcURL; // default RootChain RPC URL
 let chainId = 1; // default chain id
 
-if (typeof window !== "undefined" && window.__CONFIG__) {
-  rpcURL = window.__CONFIG__.rpcURL;
-  adminRPCURL = window.__CONFIG__.adminRPCURL;
-  rootChainRPCURL = window.__CONFIG__.rootChainRPCURL;
-  chainId = Number(window.__CONFIG__.chainId);
+if (typeof window !== "undefined") {
+  if (window.__CONFIG__) {
+    rpcURL = window.__CONFIG__.rpcURL;
+    adminRPCURL = window.__CONFIG__.adminRPCURL;
+    chainId = Number(window.__CONFIG__.chainId);
+  }
+  rpcURL.replace("localhost", window.location.hostname)
+  adminRPCURL.replace("localhost", window.location.hostname)
 } else {
   console.log("config undefined");
 }

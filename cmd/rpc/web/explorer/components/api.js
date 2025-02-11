@@ -1,11 +1,12 @@
 let rpcURL = "http://localhost:50002"; // default value for the RPC URL
-let rootChainRPCURL = rpcURL; // default RootChain RPC URL
 let chainId = 1; // default chain id
 
-if (typeof window !== "undefined" && window.__CONFIG__) {
-  rpcURL = window.__CONFIG__.rpcURL;
-  rootChainRPCURL = window.__CONFIG__.rootChainRPCURL;
-  chainId = Number(window.__CONFIG__.chainId);
+if (typeof window !== "undefined") {
+  if (window.__CONFIG__) {
+    rpcURL = window.__CONFIG__.rpcURL;
+    chainId = Number(window.__CONFIG__.chainId);
+  }
+  rpcURL.replace("localhost", window.location.hostname)
 } else {
   console.log("config undefined");
 }
