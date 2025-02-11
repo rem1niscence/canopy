@@ -163,7 +163,7 @@ func (c *Controller) ValidateProposalBasic(qc *lib.QuorumCertificate, evidence *
 		return nil, e
 	}
 	if !bytes.Equal(qc.BlockHash, blockHash) {
-		return nil, lib.ErrMismatchBlockHash()
+		return nil, lib.ErrMismatchBlockHash("ValidateProposalBasic")
 	}
 	return
 }
@@ -480,7 +480,7 @@ func (c *Controller) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (s
 	}
 	// ensure the Proposal.BlockHash corresponds to the actual hash of the block
 	if !bytes.Equal(qc.BlockHash, hash) {
-		err = lib.ErrMismatchBlockHash()
+		err = lib.ErrMismatchBlockHash("CheckPeerQC")
 		return
 	}
 	// check the height of the block

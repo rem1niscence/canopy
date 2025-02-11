@@ -128,7 +128,7 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 			}
 			// check the block hash
 			if !bytes.Equal(x.BlockHash, hash) {
-				return ErrMismatchBlockHash()
+				return ErrMismatchBlockHash("qc.CheckBasic")
 			}
 			blockSize := len(x.Block)
 			// global max block size enforcement
@@ -144,7 +144,7 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 			return ErrMismatchResultsHash()
 		}
 		if len(x.BlockHash) != 0 || len(x.Block) != 0 {
-			return ErrMismatchBlockHash()
+			return ErrNonNilBlock()
 		}
 	}
 	// ensure a valid aggregate signature is possible

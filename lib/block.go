@@ -85,7 +85,7 @@ func (x *BlockHeader) Check(networkID, chainId uint64) ErrorI {
 	x.Hash = tmp
 	// check got vs expected
 	if !bytes.Equal(x.Hash, crypto.Hash(bz)) {
-		return ErrMismatchBlockHash()
+		return ErrMismatchBlockHash("BlockHeader.Check")
 	}
 	return nil
 }

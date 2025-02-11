@@ -128,7 +128,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 			}
 			// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
 			if !bytes.Equal(x.Qc.BlockHash, b.GetBlockHash()) {
-				return false, lib.ErrMismatchBlockHash()
+				return false, lib.ErrMismatchBlockHash("CheckProposerMsg")
 			}
 			if !bytes.Equal(x.Qc.ResultsHash, b.Results.Hash()) {
 				return false, lib.ErrMismatchResultsHash()
@@ -169,11 +169,11 @@ func (b *BFT) CheckReplicaMessage(x *Message) lib.ErrorI {
 		// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
 		if b.Block == nil {
 			if !bytes.Equal(x.Qc.BlockHash, b.BlockToHash(x.Qc.Block)) {
-				return lib.ErrMismatchBlockHash()
+				return lib.ErrMismatchBlockHash("CheckReplicaMessage.Propose-Vote")
 			}
 		} else {
 			if !bytes.Equal(x.Qc.BlockHash, b.GetBlockHash()) {
-				return lib.ErrMismatchBlockHash()
+				return lib.ErrMismatchBlockHash("CheckReplicaMessage.Precommit-Vote")
 			}
 		}
 		if !bytes.Equal(x.Qc.ResultsHash, b.Results.Hash()) {

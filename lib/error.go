@@ -594,8 +594,8 @@ func ErrMismatchResultsHash() ErrorI {
 	return NewError(CodeMismatchResultsHash, ConsensusModule, "mismatch results hash")
 }
 
-func ErrMismatchBlockHash() ErrorI {
-	return NewError(CodeMismatchBlockHash, ConsensusModule, "mismatch block hash")
+func ErrMismatchBlockHash(s string) ErrorI {
+	return NewError(CodeMismatchBlockHash, ConsensusModule, fmt.Sprintf("mismatch block hash: %s", s))
 }
 
 func ErrInvalidPercentAllocation() ErrorI {
