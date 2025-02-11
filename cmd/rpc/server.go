@@ -33,7 +33,6 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/julienschmidt/httprouter"
 	"github.com/nsf/jsondiff"
-	"github.com/rs/cors"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -235,24 +234,24 @@ const (
 )
 
 func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
-	cor := cors.New(cors.Options{
-		//AllowedOrigins: []string{"http://localhost:*", fmt.Sprintf("http://%s:*", c.ExternalAddress)},
-		AllowedMethods: []string{"GET", "OPTIONS", "POST"},
-	})
+	//cor := cors.New(cors.Options{
+	//	//AllowedOrigins: []string{"http://localhost:*", fmt.Sprintf("http://%s:*", c.ExternalAddress)},
+	//	AllowedMethods: []string{"GET", "OPTIONS", "POST"},
+	//})
 	s, timeout := a.FSM.Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
 	app, conf, db, logger = a, c, s.DB(), l
 	l.Infof("Starting RPC server at 0.0.0.0:%s", c.RPCPort)
 	go func() {
 		l.Fatal((&http.Server{
 			Addr:    colon + c.RPCPort,
-			Handler: cor.Handler(http.TimeoutHandler(router.New(), timeout, ErrServerTimeout().Error())),
+			Handler: http.TimeoutHandler(router.New(), timeout, ErrServerTimeout().Error()),
 		}).ListenAndServe().Error())
 	}()
 	l.Infof("Starting Admin RPC server at %s:%s", localhost, c.AdminPort)
 	go func() {
 		l.Fatal((&http.Server{
 			Addr:    colon + c.AdminPort,
-			Handler: cor.Handler(http.TimeoutHandler(router.NewAdmin(), timeout, ErrServerTimeout().Error())),
+			Handler: http.TimeoutHandler(router.NewAdmin(), timeout, ErrServerTimeout().Error()),
 		}).ListenAndServe().Error())
 	}()
 	go updatePollResults()
