@@ -3,7 +3,6 @@ import Truncate from "react-truncate-inside";
 import {
   cpyObj,
   convertIfTime,
-  convertNumberWCommas,
   convertTime,
   isHex,
   isNumber,
@@ -11,6 +10,7 @@ import {
   upperCaseAndRepUnderscore,
   convertTx,
   toCNPY,
+  formatLocaleNumber,
 } from "@/components/util";
 
 // convertValue() converts the value based on its key and handles different types
@@ -25,7 +25,7 @@ function convertValue(k, v, openModal) {
     );
   }
   if (k.includes("time")) return convertTime(v);
-  if (isNumber(v)) return convertNumberWCommas(v);
+  if (isNumber(v)) return formatLocaleNumber(v, 0, 6);
   return convertIfTime(k, v);
 }
 
@@ -90,7 +90,7 @@ function convertAccount(v) {
 }
 
 // convertParams() processes different consensus parameters for table structure
-function convertParams(v) {
+function convertGovernanceParams(v) {
   if (!v.Consensus) return ["0"];
   let value = cpyObj(v);
   let toCNPYParams = [
@@ -108,7 +108,6 @@ function convertParams(v) {
     "delete_order_fee",
     "minimum_order_size",
   ];
-
   return ["Consensus", "Validator", "Fee", "Governance"].flatMap((space) =>
     Object.entries(value[space] || {}).map(([k, v]) => ({
       ParamName: k,
@@ -161,7 +160,7 @@ function getHeader(v) {
 // getTableBody() determines the body of the table based on the provided object type
 function getTableBody(v) {
   let empty = [{ Results: "null" }];
-  if ("Consensus" in v) return convertParams(v);
+  if ("Consensus" in v) return convertGovernanceParams(v);
   if ("committee_staked" in v) return v.committee_staked.map((item) => convertCommitteeSupply(item, v.staked));
   if (!v.hasOwnProperty("type")) return v[0]?.orders?.map(convertOrder) || empty;
   if (v.results === null) return empty;
