@@ -236,7 +236,7 @@ const (
 
 func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	cor := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:*"},
+		//AllowedOrigins: []string{"http://localhost:*", fmt.Sprintf("http://%s:*", c.ExternalAddress)},
 		AllowedMethods: []string{"GET", "OPTIONS", "POST"},
 	})
 	s, timeout := a.FSM.Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
