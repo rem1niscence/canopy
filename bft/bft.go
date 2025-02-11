@@ -137,6 +137,8 @@ func (b *BFT) Start() {
 					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
+					// start BFT over after sleeping CommitProcessMS
+					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
 				}
 			}()
 		}
