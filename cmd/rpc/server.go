@@ -44,7 +44,7 @@ import (
 const (
 	ContentType     = "Content-MessageType"
 	ApplicationJSON = "application/json; charset=utf-8"
-	localhost       = "127.0.0.1"
+	localhost       = "localhost"
 	colon           = ":"
 
 	VersionRouteName               = "version"
@@ -236,7 +236,7 @@ const (
 
 func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	cor := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:*"},
+		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"GET", "OPTIONS", "POST"},
 	})
 	s, timeout := a.FSM.Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
@@ -248,7 +248,7 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 			Handler: cor.Handler(http.TimeoutHandler(router.New(), timeout, ErrServerTimeout().Error())),
 		}).ListenAndServe().Error())
 	}()
-	l.Infof("Starting Admin RPC server at %s:%s", localhost, c.AdminPort)
+	l.Infof("Starting Admin RPC server at %s:%s", "0.0.0.0", c.AdminPort)
 	go func() {
 		l.Fatal((&http.Server{
 			Addr:    colon + c.AdminPort,
