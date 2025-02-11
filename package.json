@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@svgr/webpack": "^8.1.0",
+    "bootstrap-icons": "^1.11.3",
+    "react-bootstrap-icons": "^1.11.5"
+  }
+}
