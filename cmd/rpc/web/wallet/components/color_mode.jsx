@@ -39,6 +39,18 @@ const DarkModeToggle = () => {
             }
         }
 
+        // This is a very broad scope intended to catch all buttons using the button-outline syntax. Watch for scope
+        // creep on this one, may need to be narrowed.
+        const btnElements = document.querySelectorAll(".btn"); // Select ALL buttons
+
+        btnElements.forEach(btnElement => { // Loop through all buttons
+            if (theme === 'dark') {
+                btnElement.classList.replace("btn-outline-dark", "btn-outline-light");
+            } else {
+                btnElement.classList.replace("btn-outline-light", "btn-outline-dark");
+            }
+        });
+
         const footerElement = document.querySelector("footer");
         if (footerElement) {
             if (theme === 'dark') {
@@ -54,18 +66,18 @@ const DarkModeToggle = () => {
     };
 
     return (
-        <div className="form-check form-switch color-mode"> {/* Added color-mode class */}
-            <input
-                className="form-check-input"
-                type="checkbox"
-                id="darkModeSwitch"
-                checked={theme === 'dark'}
-                onChange={handleChange}
-            />
-            <label className="form-check-label" htmlFor="darkModeSwitch" id="colorSwitchLabel">
-                <i className={`bi bi-${theme === 'dark' ? 'moon-stars-fill' : 'sun-fill'}`}></i>
-            </label>
-        </div>
+      <div className="form-check form-switch color-mode"> {/* Added color-mode class */}
+          <input
+            className="form-check-input"
+            type="checkbox"
+            id="darkModeSwitch"
+            checked={theme === 'dark'}
+            onChange={handleChange}
+          />
+          <label className="form-check-label" htmlFor="darkModeSwitch" id="colorSwitchLabel">
+              <i className={`bi bi-${theme === 'dark' ? 'moon-stars-fill' : 'sun-fill'}`}></i>
+          </label>
+      </div>
     );
 };
 
