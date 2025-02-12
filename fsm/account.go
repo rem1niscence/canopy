@@ -65,11 +65,14 @@ func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (uint64, lib.E
 
 // SetAccount() upserts an account into the state
 func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
+	address := crypto.NewAddressFromBytes(account.Address)
+	if account.Amount == 0 {
+		return s.Delete(types.KeyForAccount(address))
+	}
 	bz, err := s.marshalAccount(account)
 	if err != nil {
 		return err
 	}
-	address := crypto.NewAddressFromBytes(account.Address)
 	if err = s.Set(types.KeyForAccount(address), bz); err != nil {
 		return err
 	}
@@ -205,6 +208,9 @@ func (s *StateMachine) GetPoolBalance(id uint64) (uint64, lib.ErrorI) {
 
 // SetPool() upserts a Pool structure into the state
 func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
+	if pool.Amount == 0 {
+		return s.Delete(types.KeyForPool(pool.Id))
+	}
 	bz, err := s.marshalPool(pool)
 	if err != nil {
 		return err
