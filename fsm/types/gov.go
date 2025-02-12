@@ -7,7 +7,6 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
-	"math"
 	"strconv"
 	"strings"
 )
@@ -206,48 +205,6 @@ func FormatParamSpace(paramSpace string) string {
 		return ParamSpaceVal
 	}
 	return paramSpace
-}
-
-// IsStringParam() validates if the param is a string by space and key
-func IsStringParam(paramSpace, paramKey string) (bool, lib.ErrorI) {
-	testValueStr, testValue := NewProtocolVersion(math.MaxInt, math.MaxInt), uint64(2)
-	params := DefaultParams()
-	switch paramSpace {
-	case ParamSpaceVal:
-		if err := params.Validator.SetString(paramKey, testValueStr); err != nil {
-			if err = params.Validator.SetUint64(paramKey, testValue); err != nil {
-				return false, err
-			}
-			return false, nil
-		}
-		return true, nil
-	case ParamSpaceCons:
-		if err := params.Consensus.SetString(paramKey, testValueStr); err != nil {
-			if err = params.Consensus.SetUint64(paramKey, testValue); err != nil {
-				return false, err
-			}
-			return false, nil
-		}
-		return true, nil
-	case ParamSpaceGov:
-		if err := params.Governance.SetString(paramKey, testValueStr); err != nil {
-			if err = params.Governance.SetUint64(paramKey, testValue); err != nil {
-				return false, err
-			}
-			return false, nil
-		}
-		return true, nil
-	case ParamSpaceFee:
-		if err := params.Fee.SetString(paramKey, testValueStr); err != nil {
-			if err = params.Fee.SetUint64(paramKey, testValue); err != nil {
-				return false, err
-			}
-			return false, nil
-		}
-		return true, nil
-	default:
-		return false, ErrUnknownParamSpace()
-	}
 }
 
 // validator param space

@@ -998,22 +998,17 @@ func TransactionUnpause(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 func TransactionChangeParam(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		ptr.ParamSpace = types.FormatParamSpace(ptr.ParamSpace)
-		isString, err := types.IsStringParam(ptr.ParamSpace, ptr.ParamKey)
+		if err := GetFeeFromState(w, ptr, types.MessageChangeParameterName); err != nil {
+			return nil, err
+		}
+		if ptr.ParamKey == types.ParamProtocolVersion {
+			return types.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
+		}
+		paramValue, err := strconv.ParseUint(ptr.ParamValue, 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		if err = GetFeeFromState(w, ptr, types.MessageChangeParameterName); err != nil {
-			return nil, err
-		}
-		if isString {
-			return types.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
-		} else {
-			paramValue, err := strconv.ParseUint(ptr.ParamValue, 10, 64)
-			if err != nil {
-				return nil, err
-			}
-			return types.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
-		}
+		return types.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
