@@ -12,7 +12,7 @@ import {
   upperCaseAndRepUnderscore,
   withTooltip,
   convertTx,
-  toCNPY
+  toCNPY,
 } from "@/components/util";
 
 // convertCardData() converts the data from state into a display object for rendering
@@ -27,9 +27,11 @@ function convertCardData(state, v) {
     ? convertBlock(value)
     : value.validator && !state.modalState.accOnly
       ? {
-        address: value.validator.address, public_key: value.validator.public_key, net_address:
-        value.validator.net_address, output_address: value.validator.output
-      }
+          address: value.validator.address,
+          public_key: value.validator.public_key,
+          net_address: value.validator.net_address,
+          output_address: value.validator.output,
+        }
       : value.account;
 }
 
@@ -72,7 +74,7 @@ export function convertCertificateResults(qc) {
     network_id: qc.header.networkID,
     chain_id: qc.header.chainId,
     block_hash: qc.blockHash,
-    results_hash: qc.resultsHash
+    results_hash: qc.resultsHash,
   };
 }
 
@@ -100,15 +102,16 @@ function convertTabData(state, v, tab) {
   } else if ("validator" in v && !state.modalState.accOnly) {
     return cpyObj(v.validator);
   } else if ("account" in v) {
+    let txs = v.sent_transactions.results.length > 0 ? v.sent_transactions.results : v.rec_transactions.results;
     switch (tab) {
       case 0:
         let account = cpyObj(v.account);
         account.amount = toCNPY(account.amount);
         return account;
       case 1:
-        return convertTransactions(v.sent_transactions.results);
+        return convertTransactions(txs);
       default:
-        return convertTransactions(v.rec_transactions.results);
+        return convertTransactions(txs);
     }
   }
 }
@@ -179,12 +182,12 @@ export default function DetailModal({ state, setState }) {
     return (
       <Table responsive>
         <tbody>
-        {Object.keys(body).map((k, i) => (
-          <tr key={i}>
-            <td className="detail-table-title">{upperCaseAndRepUnderscore(k)}</td>
-            <td className="detail-table-info">{convertIfTime(k, body[k])}</td>
-          </tr>
-        ))}
+          {Object.keys(body).map((k, i) => (
+            <tr key={i}>
+              <td className="detail-table-title">{upperCaseAndRepUnderscore(k)}</td>
+              <td className="detail-table-info">{convertIfTime(k, body[k])}</td>
+            </tr>
+          ))}
         </tbody>
       </Table>
     );
@@ -212,28 +215,28 @@ export default function DetailModal({ state, setState }) {
       <>
         <Table responsive>
           <tbody>
-          <tr>
-            {Object.keys(convertPaginated(convertTabData(state, data, 1)[0])).map((k, i) => (
-              <td key={i} className="detail-table-row-title">
-                {upperCaseAndRepUnderscore(k)}
-              </td>
-            ))}
-          </tr>
-          {page.slice(start, end).map((item, key) => (
-            <tr key={key}>
-              {Object.keys(convertPaginated(item)).map((k, i) => (
-                <td key={i} className="detail-table-row-info">
-                  {convertIfTime(k, item[k])}
+            <tr>
+              {Object.keys(convertPaginated(convertTabData(state, data, 1)[0])).map((k, i) => (
+                <td key={i} className="detail-table-row-title">
+                  {upperCaseAndRepUnderscore(k)}
                 </td>
               ))}
             </tr>
-          ))}
+            {page.slice(start, end).map((item, key) => (
+              <tr key={key}>
+                {Object.keys(convertPaginated(item)).map((k, i) => (
+                  <td key={i} className="detail-table-row-info">
+                    {convertIfTime(k, item[k])}
+                  </td>
+                ))}
+              </tr>
+            ))}
           </tbody>
         </Table>
         {pagination(d, (p) =>
           API.getModalData(ms.query, p).then((r) => {
             setState({ ...state, modalState: { ...ms, show: true, query: ms.query, page: p, data: r } });
-          })
+          }),
         )}
       </>
     );
@@ -269,9 +272,12 @@ export default function DetailModal({ state, setState }) {
           <div className="modal-header-icon">
             <svg id="svg" version="1.1" width="400" height="400" viewBox="0, 0, 400,400">
               <g id="svgg">
-                <path id="path0"
-                      d="M156.013 18.715 C 21.871 46.928,-30.448 226.543,66.017 327.677 C 136.809 401.895,253.592 404.648,327.818 333.848 C 462.974 204.931,340.320 -20.049,156.013 18.715 M215.200 96.800 C 217.840 99.440,220.000 106.280,220.000 112.000 C 220.000 130.024,197.388 139.788,184.800 127.200 C 182.160 124.560,180.000 117.720,180.000 112.000 C 180.000 106.280,182.160 99.440,184.800 96.800 C 187.440 94.160,194.280 92.000,200.000 92.000 C 205.720 92.000,212.560 94.160,215.200 96.800 M216.000 228.000 C 216.000 285.333,216.356 288.000,224.000 288.000 C 229.333 288.000,232.000 290.667,232.000 296.000 C 232.000 303.333,229.333 304.000,200.000 304.000 C 170.667 304.000,168.000 303.333,168.000 296.000 C 168.000 290.667,170.667 288.000,176.000 288.000 C 183.590 288.000,184.000 285.333,184.000 236.000 C 184.000 186.667,183.590 184.000,176.000 184.000 C 170.667 184.000,168.000 181.333,168.000 176.000 C 168.000 168.889,170.667 168.000,192.000 168.000 L 216.000 168.000 216.000 228.000 "
-                      stroke="none" fill-rule="evenodd"></path>
+                <path
+                  id="path0"
+                  d="M156.013 18.715 C 21.871 46.928,-30.448 226.543,66.017 327.677 C 136.809 401.895,253.592 404.648,327.818 333.848 C 462.974 204.931,340.320 -20.049,156.013 18.715 M215.200 96.800 C 217.840 99.440,220.000 106.280,220.000 112.000 C 220.000 130.024,197.388 139.788,184.800 127.200 C 182.160 124.560,180.000 117.720,180.000 112.000 C 180.000 106.280,182.160 99.440,184.800 96.800 C 187.440 94.160,194.280 92.000,200.000 92.000 C 205.720 92.000,212.560 94.160,215.200 96.800 M216.000 228.000 C 216.000 285.333,216.356 288.000,224.000 288.000 C 229.333 288.000,232.000 290.667,232.000 296.000 C 232.000 303.333,229.333 304.000,200.000 304.000 C 170.667 304.000,168.000 303.333,168.000 296.000 C 168.000 290.667,170.667 288.000,176.000 288.000 C 183.590 288.000,184.000 285.333,184.000 236.000 C 184.000 186.667,183.590 184.000,176.000 184.000 C 170.667 184.000,168.000 181.333,168.000 176.000 C 168.000 168.889,170.667 168.000,192.000 168.000 L 216.000 168.000 216.000 228.000 "
+                  stroke="none"
+                  fillRule="evenodd"
+                ></path>
               </g>
             </svg>
           </div>
@@ -292,7 +298,7 @@ export default function DetailModal({ state, setState }) {
               </Card>,
               cards[k],
               i,
-              "top"
+              "top",
             );
           })}
         </CardGroup>
