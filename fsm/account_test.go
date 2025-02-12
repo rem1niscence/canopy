@@ -2,12 +2,13 @@ package fsm
 
 import (
 	"bytes"
+	"sort"
+	"testing"
+
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
-	"sort"
-	"testing"
 )
 
 func TestSetGetAccount(t *testing.T) {
@@ -41,6 +42,9 @@ func TestSetGetAccount(t *testing.T) {
 			}, {
 				Address: newTestAddress(t, 1).Bytes(),
 				Amount:  100,
+			}, {
+				Address: newTestAddress(t, 2).Bytes(),
+				Amount:  0,
 			}},
 		},
 	}
@@ -57,8 +61,18 @@ func TestSetGetAccount(t *testing.T) {
 				require.Zero(t, got.Amount)
 				return
 			}
+			// needed vars to ensure non zero are not returned later
+			lenNonZero := 0
+			accsMap := make(map[string]bool, len(test.accounts))
 			// test setting and getting accounts
 			for _, acc := range test.accounts {
+				ok := accsMap[crypto.NewAddress(acc.Address).String()]
+				if !ok {
+					accsMap[crypto.NewAddress(acc.Address).String()] = true
+					if acc.Amount != 0 {
+						lenNonZero++
+					}
+				}
 				// ensure no error on setting the account
 				require.NoError(t, sm.SetAccount(acc))
 				// ensure expected
@@ -70,6 +84,10 @@ func TestSetGetAccount(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, acc.Amount, balance)
 			}
+			// ensure amoun 0 accounts are not returned on GetAccounts()
+			accs, err := sm.GetAccounts()
+			require.NoError(t, err)
+			require.Equal(t, lenNonZero, len(accs))
 		})
 	}
 }
@@ -531,6 +549,9 @@ func TestGetSetPools(t *testing.T) {
 			}, {
 				Id:     lib.CanopyChainId + 1,
 				Amount: 100,
+			}, {
+				Id:     lib.CanopyChainId + 2,
+				Amount: 0,
 			}},
 		},
 	}
@@ -553,6 +574,14 @@ func TestGetSetPools(t *testing.T) {
 			// ensure no error on function call
 			got, err := sm.GetPools()
 			require.NoError(t, err)
+			// ensure 0 amount pools are not returned
+			var noZeroAccounts int
+			for _, pool := range test.pools {
+				if pool.Amount != 0 {
+					noZeroAccounts++
+				}
+			}
+			require.Equal(t, len(got), noZeroAccounts)
 			// ensure results equal expected
 			for i, pool := range got {
 				require.EqualExportedValues(t, pool, test.pools[i])

@@ -1,11 +1,12 @@
 package fsm
 
 import (
+	"runtime/debug"
+	"strings"
+
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"runtime/debug"
-	"strings"
 )
 
 const (
