@@ -223,14 +223,20 @@ func (c *Controller) ConsensusSummary() ([]byte, lib.ErrorI) {
 		PublicKey:            c.PublicKey,
 		Proposer:             c.Consensus.ProposerKey,
 		Proposals:            c.Consensus.Proposals,
-		Votes:                c.Consensus.Votes,
 		PartialQCs:           c.Consensus.PartialQCs,
-		MinimumPowerFor23Maj: c.Consensus.ValidatorSet.MinimumMaj23,
 		PacemakerVotes:       c.Consensus.PacemakerMessages,
+		MinimumPowerFor23Maj: c.Consensus.ValidatorSet.MinimumMaj23,
+		Votes:                c.Consensus.Votes,
+		Status:               "",
 	}
+	consensusSummary.BlockHash = c.Consensus.BlockHash
 	// if exists, populate the proposal hash
 	if c.Consensus.Results != nil {
-		consensusSummary.ProposalHash = c.Consensus.Results.Hash()
+		consensusSummary.ResultsHash = c.Consensus.Results.Hash()
+	}
+	if c.Consensus.HighQC != nil {
+		consensusSummary.BlockHash = c.Consensus.HighQC.BlockHash
+		consensusSummary.ResultsHash = c.Consensus.HighQC.ResultsHash
 	}
 	// if exists, populate the proposer address
 	if c.Consensus.ProposerKey != nil {
@@ -262,7 +268,8 @@ func (c *Controller) ConsensusSummary() ([]byte, lib.ErrorI) {
 type ConsensusSummary struct {
 	Syncing              bool                   `json:"isSyncing"`
 	View                 *lib.View              `json:"view"`
-	ProposalHash         lib.HexBytes           `json:"blockHash"`
+	BlockHash            lib.HexBytes           `json:"blockHash"`
+	ResultsHash          lib.HexBytes           `json:"resultsHash"`
 	Locked               bool                   `json:"locked"`
 	Address              lib.HexBytes           `json:"address"`
 	PublicKey            lib.HexBytes           `json:"publicKey"`

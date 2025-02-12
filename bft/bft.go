@@ -244,7 +244,11 @@ func (b *BFT) StartElectionVotePhase() {
 	// select Proposer (set is required for self-send)
 	b.ProposerKey = SelectProposerFromCandidates(candidates, b.SortitionData, b.ValidatorSet.ValidatorSet)
 	defer func() { b.ProposerKey = nil }()
-	b.log.Infof("Voting %s as the proposer", lib.BytesToTruncatedString(b.ProposerKey))
+	if b.SelfIsProposer() {
+		b.log.Info("Voting SELF as the proposer")
+	} else {
+		b.log.Infof("Voting %s as the proposer", lib.BytesToTruncatedString(b.ProposerKey))
+	}
 	// get locally produced Verifiable delay function
 	b.HighVDF = b.VDFService.Finish()
 	// sign and send vote to Proposer
@@ -317,7 +321,11 @@ func (b *BFT) StartProposeVotePhase() {
 		return
 	}
 	b.ProposerKey = msg.Signature.PublicKey
-	b.log.Infof("Proposer is %s 👑", lib.BytesToTruncatedString(b.ProposerKey))
+	if b.SelfIsProposer() {
+		b.log.Infof("Proposer is SELF 👑")
+	} else {
+		b.log.Infof("Proposer is %s 👑", lib.BytesToTruncatedString(b.ProposerKey))
+	}
 	// if locked, confirm safe to unlock
 	if b.HighQC != nil {
 		if err := b.SafeNode(msg); err != nil {
@@ -330,7 +338,7 @@ func (b *BFT) StartProposeVotePhase() {
 	byzantineEvidence := &ByzantineEvidence{
 		DSE: NewDSE(msg.LastDoubleSignEvidence),
 	}
-	// check candidate block against plugin
+	// check candidate block against FSM
 	if err := b.ValidateProposal(msg.Qc, byzantineEvidence); err != nil {
 		b.log.Error(err.Error())
 		b.RoundInterrupt()
@@ -404,6 +412,7 @@ func (b *BFT) StartPrecommitVotePhase() {
 	b.HighQC = msg.Qc
 	b.HighQC.Block = b.Block
 	b.HighQC.Results = b.Results
+	b.log.Infof("🔒 Locked on proposal %s", lib.BytesToTruncatedString(b.HighQC.BlockHash))
 	// send vote to the proposer
 	b.SendToProposer(&Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
@@ -568,6 +577,10 @@ func (b *BFT) NewRound(newHeight bool) {
 	} else {
 		b.Round++
 	}
+	b.Block = nil
+	b.BlockHash = nil
+	b.Results = nil
+	b.ProposerKey = nil
 	b.Votes.NewRound(b.Round)
 	b.Proposals[b.Round] = make(map[string][]*Message)
 }
@@ -622,7 +635,7 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 //   - LIVENESS: uses a lock with a higher round (safe because replica is convinced no other replica committed to their locked value as +2/3rds locked on a higher round)
 func (b *BFT) SafeNode(msg *Message) lib.ErrorI {
 	if msg == nil || msg.Qc == nil || msg.HighQc == nil {
-		return ErrEmptyMessage()
+		return ErrNoSafeNodeJustification()
 	}
 	// ensure the messages' HighQC justifies its proposal (should have the same hashes)
 	if !bytes.Equal(b.GetBlockHash(), msg.HighQc.BlockHash) && !bytes.Equal(msg.Qc.Results.Hash(), msg.HighQc.ResultsHash) {
@@ -630,10 +643,12 @@ func (b *BFT) SafeNode(msg *Message) lib.ErrorI {
 	}
 	// if the hashes of the Locked proposal is the same as the Leader's message
 	if bytes.Equal(b.HighQC.BlockHash, msg.HighQc.BlockHash) && bytes.Equal(b.HighQC.ResultsHash, msg.HighQc.ResultsHash) {
+		b.log.Infof("Proposal %s satisfied the safe node predicate with SAFETY", lib.BytesToTruncatedString(b.HighQC.BlockHash))
 		return nil // SAFETY (SAME PROPOSAL AS LOCKED)
 	}
 	// if the view of the Locked proposal is older than the Leader's message
 	if msg.HighQc.Header.Round > b.HighQC.Header.Round {
+		b.log.Infof("Proposal %s satisfied the safe node predicate with LIVENESS", lib.BytesToTruncatedString(b.HighQC.BlockHash))
 		return nil // LIVENESS (HIGHER ROUND v COMMITTEE THAN LOCKED)
 	}
 	return ErrFailedSafeNodePredicate()

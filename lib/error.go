@@ -146,6 +146,8 @@ const (
 	CodeMaxPort                         ErrorCode = 48
 	CodePanic                           ErrorCode = 49
 	CodeInvalidVDF                      ErrorCode = 50
+	CodeNoSafeNodeJustification         ErrorCode = 51
+	CodeNoSavedBlockOrResults           ErrorCode = 52
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -572,6 +574,10 @@ func ErrEmptyTransaction() ErrorI {
 
 func ErrEmptyMessage() ErrorI {
 	return NewError(CodeEmptyMessage, StateMachineModule, "message is empty")
+}
+
+func ErrNoSavedBlockOrResults() ErrorI {
+	return NewError(CodeNoSavedBlockOrResults, StateMachineModule, "no saved block or results to validate the msg")
 }
 
 func ErrEmptySignature() ErrorI {

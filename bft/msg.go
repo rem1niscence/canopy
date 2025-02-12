@@ -124,7 +124,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 		} else {
 			// in PRECOMMIT or COMMIT phase
 			if b.Block == nil || b.Results == nil {
-				return false, lib.ErrEmptyMessage()
+				return false, lib.ErrNoSavedBlockOrResults()
 			}
 			// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
 			if !bytes.Equal(x.Qc.BlockHash, b.GetBlockHash()) {
