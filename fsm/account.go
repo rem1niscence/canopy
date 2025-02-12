@@ -65,11 +65,14 @@ func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (uint64, lib.E
 
 // SetAccount() upserts an account into the state
 func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
+	address := crypto.NewAddressFromBytes(account.Address)
+	if account.Amount == 0 {
+		return s.Delete(types.KeyForAccount(address))
+	}
 	bz, err := s.marshalAccount(account)
 	if err != nil {
 		return err
 	}
-	address := crypto.NewAddressFromBytes(account.Address)
 	if err = s.Set(types.KeyForAccount(address), bz); err != nil {
 		return err
 	}

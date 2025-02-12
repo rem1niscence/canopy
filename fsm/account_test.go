@@ -42,6 +42,9 @@ func TestSetGetAccount(t *testing.T) {
 			}, {
 				Address: newTestAddress(t, 1).Bytes(),
 				Amount:  100,
+			}, {
+				Address: newTestAddress(t, 2).Bytes(),
+				Amount:  0,
 			}},
 		},
 	}
@@ -58,8 +61,18 @@ func TestSetGetAccount(t *testing.T) {
 				require.Zero(t, got.Amount)
 				return
 			}
+			// needed vars to ensure non zero are not returned later
+			lenNonZero := 0
+			accsMap := make(map[string]bool, len(test.accounts))
 			// test setting and getting accounts
 			for _, acc := range test.accounts {
+				ok := accsMap[crypto.NewAddress(acc.Address).String()]
+				if !ok {
+					accsMap[crypto.NewAddress(acc.Address).String()] = true
+					if acc.Amount != 0 {
+						lenNonZero++
+					}
+				}
 				// ensure no error on setting the account
 				require.NoError(t, sm.SetAccount(acc))
 				// ensure expected
@@ -71,6 +84,10 @@ func TestSetGetAccount(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, acc.Amount, balance)
 			}
+			// ensure amoun 0 accounts are not returned on GetAccounts()
+			accs, err := sm.GetAccounts()
+			require.NoError(t, err)
+			require.Equal(t, lenNonZero, len(accs))
 		})
 	}
 }
