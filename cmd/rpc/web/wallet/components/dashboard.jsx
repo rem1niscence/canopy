@@ -5,6 +5,7 @@ import { getRatio, formatNumber } from "@/components/util";
 import Container from "react-bootstrap/Container";
 import { Button, Card, Carousel, Col, Row, Spinner } from "react-bootstrap";
 import { YAxis, Tooltip, Legend, AreaChart, Area } from "recharts";
+import {PauseIcon, UnpauseIcon} from "@/components/svg_icons";
 import {
   getAdminRPCURL,
   configPath,
@@ -194,11 +195,11 @@ export default function Dashboard() {
       </Container>
       <hr id="dashboard-hr" />
       <div onClick={() => setState({ ...state, pauseLogs: !state.pauseLogs })} className="logs-button-container">
-        <img
+        <div
           className="logs-button"
-          alt="play-pause-btn"
-          src={state.pauseLogs ? "./unpause.png" : "./pause.png"}
-        />
+        >
+          {state.pauseLogs ? UnpauseIcon() : PauseIcon()}
+        </div>
       </div>
       <LazyLog enableSearch={true} id="lazy-log" text={state.logs.replace("\n", "")} />
       <Container id="charts-container">
