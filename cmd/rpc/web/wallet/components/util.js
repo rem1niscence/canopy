@@ -63,7 +63,6 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
             type: "text",
             minLength: 5,
             maxLength: 50,
-            shouldNotRender: (keygroup, account, validator) => validator?.delegate === true,
         },
         earlyWithdrawal: {
             placeholder: "early withdrawal rewards for 20% penalty",
@@ -86,9 +85,8 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
             inputText: "delegate",
             feedback: "please choose if your validator is delegating or not",
             required: true,
-            type: "text",
-            minLength: 4,
-            maxLength: 5,
+            type: "select",
+            options: ["true", "false"],
         },
         rec: {
             placeholder: "recipient of the tx",
@@ -304,10 +302,10 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
         case "stake":
             return [
                 a.account,
+                a.delegate,
                 a.committees,
                 a.netAddr,
                 a.amount,
-                a.delegate,
                 a.earlyWithdrawal,
                 a.output,
                 a.signer,
