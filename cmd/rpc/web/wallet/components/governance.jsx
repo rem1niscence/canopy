@@ -30,6 +30,7 @@ import {
 } from "@/components/util";
 import {KeystoreContext} from "@/pages";
 import FormInputs from "@/components/form_inputs";
+import { PollIcon, ProposalIcon } from "@/components/svg_icons";
 
 function useKeystore() {
     const keystore = useContext(KeystoreContext);
@@ -202,7 +203,7 @@ export default function Governance({keygroup, account: accountWithTxs, validator
 
     return (
         <div className="content-container">
-            <Header title="poll" img="./poll.png"/>
+            <Header title="poll" svg={PollIcon}/>
             <Carousel className="poll-carousel" interval={null} data-bs-theme="dark">
                 {Array.from(Object.entries(state.apiResults.poll)).map((entry, idx) => {
                     const [key, val] = entry;
@@ -270,7 +271,7 @@ export default function Governance({keygroup, account: accountWithTxs, validator
             />
             <br/><br/>
             <hr/>
-            <Header title="propose" img="./proposal.png"/>
+            <Header title="propose" svg={ProposalIcon}/>
             <Table className="vote-table" bordered responsive hover>
                 <thead>
                 <tr>
@@ -393,17 +394,24 @@ export default function Governance({keygroup, account: accountWithTxs, validator
 }
 
 // Header() renders the section header in the governance tab
-function Header({title, img}) {
+function Header({ title, svg: SVGComponent }) {
+
+    if (!SVGComponent) {
+        return null; // Or a placeholder if the SVG isn't found
+    }
+
     return (
         <>
-            <img className="governance-header-image" alt="vote" src={img}/>
-            <span id="propose-title">{title}</span>
-            <span id="propose-subtitle"> on CANOPY</span>
-            <br/>
-            <br/>
-            <hr className="gov-header-hr"/>
-            <br/>
-            <br/>
+        <div class="gov-header">
+          <SVGComponent />
+          <span id="propose-title">{title}</span>
+          <span id="propose-subtitle"> on CANOPY</span>
+          <br />
+          <br />
+          <hr className="gov-header-hr" />
+          <br />
+          <br />
+        </div>
         </>
     );
 }

@@ -170,7 +170,7 @@ export default function Dashboard() {
                     <Card className="carousel-item-container">
                       <Card.Body>
                         <Card.Title className="carousel-item-title">
-                          <span className="text-white">{k.title}</span>
+                          <span>{k.title}</span>
                         </Card.Title>
                         <p id="carousel-item-detail-title" className="carousel-item-detail">
                           {<Truncate text={k.dT} />}
@@ -197,7 +197,7 @@ export default function Dashboard() {
         <img
           className="logs-button"
           alt="play-pause-btn"
-          src={state.pauseLogs ? "./unpause_filled.png" : "./pause_filled.png"}
+          src={state.pauseLogs ? "./unpause.png" : "./pause.png"}
         />
       </div>
       <LazyLog enableSearch={true} id="lazy-log" text={state.logs.replace("\n", "")} />

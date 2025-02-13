@@ -6,10 +6,27 @@
   --font-body: 'Unbounded', sans-serif;
 }
 
+/* Inheritance override for a persnickety HR rule in Bootstrap */
+.content-container hr{
+  border-radius: 5px;
+  width: 80%;
+  margin: 1rem auto;
+}
+
+.content-light hr {
+  border: 1px dashed var(--primary-color);
+  width: 80%;
+  margin: 1rem auto;
+}
+
+.content-dark hr {
+  border: 1px dashed #fff;
+  width: 80%;
+  margin: 1rem auto;
+}
+
 #container {
   z-index: 0;
-  width: 100%;
-  height: 100vh;
   font-family: var(--font-body);
 }
 
@@ -25,19 +42,25 @@
   color: var(--primary-color);
 }
 
-#pageContent {
-  margin: 0 auto;
-  width: 95%;
-  height: 100vh;
-  overflow: scroll;
-}
-
 #nav-bar {
-  background: white;
+  background: var(--bs-body-bg);
   border-bottom: 1px solid lightgray;
   padding-bottom: 15px;
   position: fixed;
   width: 100%;
+}
+
+#nav-dropdown svg {
+  width: 16px;
+  margin: 0 0.5rem 0 1rem;
+}
+
+.navbar-dark #nav-dropdown svg path {
+  fill: #fff;
+}
+
+.navbar-dark #nav-bar{
+  background: #fff;
 }
 
 #nav-bar-container {
@@ -81,8 +104,6 @@
 }
 
 .nav-link.active {
-  color: var(--primary-color) !important;
-  background-color: white !important;
   opacity: 100%;
   text-decoration: none;
   font-weight: 600;
@@ -97,8 +118,6 @@
 }
 
 .nav-link {
-  color: lightgray !important;
-  background-color: white !important;
   opacity: 100%;
   width: 100px !important;
   margin: 0 auto;
@@ -107,7 +126,6 @@
 }
 
 #nav-dropdown {
-  color: black !important;
   font-weight: 300;
   margin: 0 auto !important;
   width: 100% !important;
@@ -131,6 +149,16 @@
   height: 30px;
 }
 
+.navbar-dark .navbar-image-link {
+  fill: #fff;
+}
+
+.navbar-dark .navbar-text {
+  padding-top: .5rem;
+  padding-bottom: .5rem;
+  color: #fff;
+}
+
 #nav-dropdown-container {
   margin-top: 5px;
   margin-left: 7%;
@@ -145,18 +173,17 @@
 }
 
 .nav-social-icon {
-  transition: all 0.3s ease-in-out;
-  background-size: cover;
-  background-repeat: no-repeat;
-  width: 25px;
-  height: 25px;
+  transition: all .3s ease-in-out;
+  width: 50px;
+  height: 50px;
 }
 
-#nav-social-icon-discord {
-  margin-right: 10px;
-  margin-top: 3px;
-  width: 30px;
-  height: 30px;
+.nav-social-icon svg, .nav-social-icon svg {
+  fill: --primary-color;
+}
+
+.navbar-dark .nav-social-icon svg, .footer-dark .nav-social-icon svg {
+  fill: #fff;
 }
 
 .nav-social-icon:hover {
@@ -169,7 +196,6 @@
   margin: 0 auto;
   text-align: center;
   padding-top: 100px;
-  background-color: white;
 }
 
 #balance {
@@ -203,23 +229,21 @@ button {
   font-family: var(--font-body);
 }
 
-#dashboard-container {
-  background-color: #000;
-  mix-blend-mode: difference;
-}
-
 #dashboard-inner {
   margin-bottom: 20px;
 }
 
+.action-button-title{
+  font-size: 0.7rem;
+}
+
 .send-receive-button-container {
-  height: 40px;
-  width: 90px;
-  margin-bottom: 50px;
+  width: 85px;
+  margin: 0 1rem 3rem;
   vertical-align: top;
   display: inline-block;
   text-align: center;
-  transition: ease-in-out 0.2s;
+  transition: .2s ease-in-out;
   cursor: pointer;
 }
 
@@ -230,6 +254,15 @@ button {
 .send-receive-button {
   height: 40px;
   width: 40px;
+}
+
+.content-dark svg path {
+  fill: #fff;
+}
+
+.account-summary-container-card .card-title {
+  margin: 0 var(--bs-card-title-spacer-y);
+  color: var(--bs-card-title-color);
 }
 
 .account-summary-container {
@@ -253,20 +286,26 @@ button {
 .account-summary-info-title {
   font-weight: 400;
   font-size: 15px;
-  color: #212529;
   font-family: var(--font-heading);
   text-transform: uppercase;
 }
 
 .account-summary-info-content-container {
-  background-color: #f8f8f8;
   padding: 5px;
   border-radius: 5px;
-  margin-top: 10px;
+  margin: 1rem 0;
   border: 1px solid lightgray;
   cursor: pointer;
   transition: ease-in-out 0.2s;
   width: 100%;
+  position: relative;
+}
+
+.account-summary-info svg {
+  max-width: 30px;
+  position: absolute;
+  top: 7px;
+  right: -7px;
 }
 
 .account-summary-info-content-container:hover {
@@ -276,7 +315,8 @@ button {
 .account-summary-info-content {
   font-size: 12px;
   font-weight: 100;
-  width: 90%;
+  width: 97%;
+  overflow: hidden;
 }
 
 .account-summary-info-content-image {
@@ -289,6 +329,28 @@ button {
 .account-summary-info-table-column {
   max-width: 90%;
   margin: 0 auto;
+}
+
+.table-hover tr td {
+  position: relative;
+}
+
+.table-hover tr td svg {
+  position: absolute;
+  max-width: 30px;
+  top: 7px;
+  right: -11px;
+}
+
+.gov-header svg {
+  max-width: 50px;
+  margin: 0 1rem;
+  padding-bottom: 1rem;
+}
+
+.gov-header span {
+  margin: 0 0.5rem;
+  display: inline-block;
 }
 
 #pk-button {
@@ -334,6 +396,12 @@ button {
 
 #import-pk-button:hover {
   margin: 10px;
+}
+
+.table-label{
+  text-align: center;
+  font-weight: 100;
+  font-size: 14px;
 }
 
 .recent-transactions-table {
@@ -417,8 +485,6 @@ th {
   display: inline-block;
   vertical-align: middle;
   line-height: normal;
-  background: black !important;
-  color: white !important;
 }
 
 .carousel-item-title {
@@ -426,6 +492,19 @@ th {
   font-weight: 400 !important;
   font-family: var(--font-heading);
   text-transform: uppercase;
+}
+
+.content-dark .carousel-item-detail {
+  width: 50%;
+  font-size: 14px;
+  font-weight: 400;
+  margin: 0 auto 10px;
+  color: inherit;
+}
+
+#carousel-item-detail-title {
+  font-weight: 600;
+  color: var(--primary-color);
 }
 
 .navbar {
@@ -443,11 +522,20 @@ th {
   color: #7b7b7b;
 }
 
-#carousel-item-detail-title {
-  font-weight: 600;
-  filter: invert(100%);
-  mix-blend-mode: difference;
-  color: var(--primary-color);
+[data-bs-theme=dark] .content-dark .carousel .carousel-indicators [data-bs-target], [data-bs-theme=dark].content-dark.carousel .carousel-indicators [data-bs-target] {
+   background-color: #fff;
+ }
+
+[data-bs-theme=dark] .content-dark .carousel .carousel-control-next-icon, [data-bs-theme=dark] .content-dark .carousel .carousel-control-prev-icon, [data-bs-theme=dark] .content-dark.carousel .carousel-control-next-icon, [data-bs-theme=dark].content-dark.carousel .carousel-control-prev-icon {
+  filter: invert(0) grayscale(100);
+}
+
+[data-bs-theme=light] .content-light .carousel .carousel-indicators [data-bs-target], [data-bs-theme=light].content-light.carousel .carousel-indicators [data-bs-target] {
+  background-color: #000;
+}
+
+[data-bs-theme=light] .content-light .carousel .carousel-control-next-icon, [data-bs-theme=light] .content-light .carousel .carousel-control-prev-icon, [data-bs-theme=light].content-light.carousel .carousel-control-next-icon, [data-bs-theme=light].content-light.carousel .carousel-control-prev-icon {
+  filter: invert(1) grayscale(100);
 }
 
 #dashboard-hr {
@@ -461,8 +549,44 @@ th {
   height: 300px !important;
   margin-bottom: 50px;
   border: 2px solid #222222;
-  background-color: #000;
   filter: grayscale(100%);
+}
+
+.content-dark .react-lazylog-searchbar {
+  background: #111;
+  color: #fff;
+}
+
+.content-dark .logs-button {
+  width: 25px;
+  height: 25px;
+  filter: invert(1);
+}
+
+.content-dark span.react-lazylog-searchbar-matches.inactive {
+  color: #fff;
+}
+
+.content-light .react-lazylog-searchbar {
+  background: #ddd;
+  color: #111;
+}
+
+.content-light span.react-lazylog-searchbar-matches.inactive {
+  color: #111;
+}
+
+.content-light input.react-lazylog-searchbar-input {
+  background: #fff;
+}
+
+.content-light #lazy-log {
+  text-align: left;
+  height: 300px!important;
+  margin-bottom: 50px;
+  border: 0;
+  filter: grayscale(100%);
+  background: #eee;
 }
 
 #charts-container {
@@ -581,13 +705,11 @@ th {
   font-weight: 600;
   font-size: 12px;
   letter-spacing: 1.5px;
-  color: black;
 }
 
 .poll-prop-url {
   margin: 0 auto;
   font-weight: 300;
-  color: black;
 }
 
 .poll-container {
@@ -596,6 +718,21 @@ th {
   margin-bottom: 20px;
   font-size: 14px;
 }
+
+.poll-prop-url {
+  margin: 1rem auto;
+  font-weight: 300;
+  display: block;
+}
+
+.content-light .poll-prop-url {
+  color: var(--primary-color);
+}
+
+.content-dark .poll-prop-url {
+  color: #fff;
+}
+
 
 .poll-form {
   width: 100%;
@@ -643,4 +780,59 @@ th {
   height: 20px;
   margin-right: 8px; 
   vertical-align: middle;
+}
+
+/* TODO: Organize these CSS files into logical groups around page elements */
+
+.form-check.form-switch.color-mode {
+  padding: 0 1rem;
+}
+
+.form-check-input:checked#darkModeSwitch {
+  background-color: var(--primary-color);
+  border-color: var(--secondary-color);
+}
+
+.form-switch .form-check-input#darkModeSwitch, .form-switch .form-check-input:focus#darkModeSwitch {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%232c9b5a'/%3e%3c/svg%3e");
+  border-color: #2c9b5a;
+  outline: 0;
+  box-shadow: none;
+}
+
+.navbar-dark .form-switch .form-check-input#darkModeSwitch, .navbar-dark .form-switch .form-check-input:focus#darkModeSwitch {
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ffffff'/%3e%3c/svg%3e");
+}
+
+input#darkModeSwitch {
+  width: 2rem;
+  height: 1.1rem;
+}
+
+label#colorSwitchLabel {
+  font-size: 1rem;
+  padding: 0 0.5rem;
+}
+
+.navbar-dark .navbar-brand svg path {
+  fill: #fff;
+}
+
+i.bi {
+  color: var(--primary-color);
+}
+
+/* Footer */
+
+footer {
+  padding: 2rem;
+}
+
+footer .container {
+  text-align: center;
+}
+
+footer .container a {
+  display: inline-block;
+  margin: 1rem;
 }
