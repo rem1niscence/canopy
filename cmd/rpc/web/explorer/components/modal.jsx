@@ -4,7 +4,7 @@ import { JsonViewer } from "@textea/json-viewer";
 import { Modal, Table, Tab, Tabs, CardGroup, Card, Toast, ToastContainer, Button } from "react-bootstrap";
 import * as API from "@/components/api";
 import {
-  clipboard,
+  copy,
   cpyObj,
   convertIfTime,
   isEmpty,
@@ -24,7 +24,11 @@ function convertCardData(state, v) {
     return value;
   }
   return value.block
-    ? convertBlock(value)
+    ? {
+      height: value.block.block_header.height,
+      hash: value.block.block_header.hash,
+      proposer: value.block.block_header.proposer_address,
+    }
     : value.validator && !state.modalState.accOnly
       ? {
           address: value.validator.address,
@@ -59,8 +63,6 @@ export function convertBlock(blk) {
     state_root,
     transaction_root,
     validator_root,
-    last_block_hash,
-    network_id,
     vdf,
     ...value
   } = blk.block.block_header;
@@ -287,7 +289,7 @@ export default function DetailModal({ state, setState }) {
         <CardGroup className="modal-card-group">
           {Object.keys(cards).map((k, i) => {
             return withTooltip(
-              <Card onClick={() => clipboard(state, setState, cards[k])} key={i} className="modal-cards">
+              <Card onClick={() => copy(state, setState, cards[k])} key={i} className="modal-cards">
                 <Card.Body className="modal-card">
                   <h5 className="modal-card-title">{k}</h5>
                   <div className="modal-card-detail">

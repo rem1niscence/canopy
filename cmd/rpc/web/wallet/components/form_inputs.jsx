@@ -20,7 +20,6 @@ export default function FormInputs({ keygroup, account, validator, fields, show,
   useEffect(() => {
     const initialValues = fields.reduce((form, field) => {
       const value = field.defaultValue || "";
-
       form[field.label] =
         field.type === "number" || field.type === "currency" ? sanitizeNumberInput(value.toString()) : value;
       return form;
@@ -97,6 +96,7 @@ const FormSelect = ({ onChange, input, value }) => {
       <Form.Select
         className="input-text-field"
         onChange={(e) => onChange(input.label, e.target.value, input.type)}
+        defaultValue={input.defaultValue}
         value={value}
         aria-label={input.label}
       >
