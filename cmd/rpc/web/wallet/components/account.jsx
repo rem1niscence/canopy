@@ -569,7 +569,7 @@ function RenderModal({
     <Modal show={show} size="lg" onHide={onHide}>
       <Form onSubmit={onFormSub}>
         <Modal.Header>
-          <Modal.Title>{title}</Modal.Title>
+          <Modal.Title className="modal-title">{title}</Modal.Title>
         </Modal.Header>
         <Modal.Body className="modal-body">
           <FormInputs

@@ -99,6 +99,10 @@
   color: white;
 }
 
+.modal-title {
+  font-family: var(--font-heading);
+}
+
 .modal-body {
   overflow-wrap: break-word;
 }
