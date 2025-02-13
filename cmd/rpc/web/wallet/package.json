@@ -12,6 +12,7 @@
     "@next/font": "^14.2.3",
     "@uiw/react-json-view": "^2.0.0-alpha.24",
     "bootstrap": "^5.3.3",
+    "bootstrap-icons": "^1.11.3",
     "chart.js": "^4.4.7",
     "components": "^0.1.0",
     "eslint": "8.57.0",
