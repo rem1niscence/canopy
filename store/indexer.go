@@ -289,20 +289,20 @@ func (t *Indexer) IsValidDoubleSigner(address []byte, height uint64) (bool, lib.
 
 // IndexCheckpoint() indexes a 'checkpoint block hash' for a committee chain at a certain height
 // this is for the 'checkpointing as a service' long-range-attack prevention
-func (t *Indexer) IndexCheckpoint(committeeId uint64, checkpoint *lib.Checkpoint) lib.ErrorI {
-	return t.db.Set(t.checkpointKey(committeeId, checkpoint.Height), checkpoint.BlockHash)
+func (t *Indexer) IndexCheckpoint(chainId uint64, checkpoint *lib.Checkpoint) lib.ErrorI {
+	return t.db.Set(t.checkpointKey(chainId, checkpoint.Height), checkpoint.BlockHash)
 }
 
 // GetCheckpoint() retrieves a 'checkpoint block hash' for a committee chain at a certain height
 // this is for the 'checkpointing as a service' long-range-attack prevention
-func (t *Indexer) GetCheckpoint(committeeId, height uint64) (blockHash lib.HexBytes, err lib.ErrorI) {
-	return t.db.Get(t.checkpointKey(committeeId, height))
+func (t *Indexer) GetCheckpoint(chainId, height uint64) (blockHash lib.HexBytes, err lib.ErrorI) {
+	return t.db.Get(t.checkpointKey(chainId, height))
 }
 
 // GetMostRecentCheckpoint() retrieves a 'checkpoint block hash' for a committee chain at the most recent height
 // this is for the 'checkpointing as a service' long-range-attack prevention
-func (t *Indexer) GetMostRecentCheckpoint(committeeId uint64) (checkpoint *lib.Checkpoint, err lib.ErrorI) {
-	it, err := t.db.RevIterator(t.checkpointsCommitteeKey(committeeId))
+func (t *Indexer) GetMostRecentCheckpoint(chainId uint64) (checkpoint *lib.Checkpoint, err lib.ErrorI) {
+	it, err := t.db.RevIterator(t.checkpointsCommitteeKey(chainId))
 	if err != nil {
 		return
 	}
@@ -318,8 +318,8 @@ func (t *Indexer) GetMostRecentCheckpoint(committeeId uint64) (checkpoint *lib.C
 
 // GetAllCheckpoints() exports all 'checkpoint block hashes' for a committee chain
 // this is for the 'checkpointing as a service' long-range-attack prevention
-func (t *Indexer) GetAllCheckpoints(committeeId uint64) (checkpoints []*lib.Checkpoint, err lib.ErrorI) {
-	it, err := t.db.Iterator(t.checkpointsCommitteeKey(committeeId))
+func (t *Indexer) GetAllCheckpoints(chainId uint64) (checkpoints []*lib.Checkpoint, err lib.ErrorI) {
+	it, err := t.db.Iterator(t.checkpointsCommitteeKey(chainId))
 	if err != nil {
 		return
 	}

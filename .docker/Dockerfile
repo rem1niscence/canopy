@@ -3,7 +3,7 @@ FROM golang:1.21.6-alpine AS builder
 ARG BUILD_PATH
 
 WORKDIR /go/src/github.com/canopy-network/canopy
-COPY .. .
+COPY . /go/src/github.com/canopy-network/canopy
 
 RUN go build -a -o bin ./${BUILD_PATH}/*.go
 

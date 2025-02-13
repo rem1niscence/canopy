@@ -129,7 +129,7 @@ func (s *StateMachine) CheckReplay(tx *lib.Transaction, txHash string) lib.Error
 	}
 	// ensure the right chain
 	if s.Config.ChainId != tx.ChainId {
-		return lib.ErrWrongCommitteeID()
+		return lib.ErrWrongChainId()
 	}
 	// if below height 2, skip this check as GetBlockByHeight will load a block that has a lastQC that doesn't exist
 	height := s.Height()

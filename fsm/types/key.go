@@ -8,7 +8,7 @@ import (
 )
 
 var ReservedIDs = []uint64{
-	lib.UnknownCommitteeId,
+	lib.UnknownChainId,
 	lib.DAOPoolID,
 }
 
@@ -37,14 +37,14 @@ func KeyForUnstaking(height uint64, address crypto.AddressI) []byte {
 func KeyForPaused(maxPausedHeight uint64, address crypto.AddressI) []byte {
 	return append(PausedPrefix(maxPausedHeight), lib.AppendAndLenPrefix(address.Bytes())...)
 }
-func KeyForCommittee(committeeID uint64, addr crypto.AddressI, stake uint64) []byte {
-	return append(CommitteePrefix(committeeID), lib.AppendAndLenPrefix(formatUint64(stake), addr.Bytes())...)
+func KeyForCommittee(chainId uint64, addr crypto.AddressI, stake uint64) []byte {
+	return append(CommitteePrefix(chainId), lib.AppendAndLenPrefix(formatUint64(stake), addr.Bytes())...)
 }
-func KeyForDelegate(committeeID uint64, addr crypto.AddressI, stake uint64) []byte {
-	return append(DelegatePrefix(committeeID), lib.AppendAndLenPrefix(formatUint64(stake), addr.Bytes())...)
+func KeyForDelegate(chainId uint64, addr crypto.AddressI, stake uint64) []byte {
+	return append(DelegatePrefix(chainId), lib.AppendAndLenPrefix(formatUint64(stake), addr.Bytes())...)
 }
-func KeyForRetiredCommittee(committeeID uint64) []byte {
-	return lib.AppendAndLenPrefix(retiredCommitteePrefix, formatUint64(committeeID))
+func KeyForRetiredCommittee(chainId uint64) []byte {
+	return lib.AppendAndLenPrefix(retiredCommitteePrefix, formatUint64(chainId))
 }
 func KeyForAccount(addr crypto.AddressI) []byte {
 	return lib.AppendAndLenPrefix(accountPrefix, addr.Bytes())

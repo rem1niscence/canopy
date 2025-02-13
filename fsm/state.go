@@ -1,11 +1,12 @@
 package fsm
 
 import (
+	"runtime/debug"
+	"strings"
+
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"runtime/debug"
-	"strings"
 )
 
 const (
@@ -89,7 +90,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 		return nil, nil, err
 	}
 	// load the last validator set
-	// NOTE: there may be no validators for sub-chains
+	// NOTE: there may be no validators for nested-chains
 	var lastValidatorRoot []byte
 	lastValidatorSet, _ := s.LoadCommittee(s.Config.ChainId, s.Height()-1)
 	if lastValidatorSet.NumValidators != 0 {
@@ -101,7 +102,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 		s.log.Debug("No committee for LastValidatorRoot - skipping")
 	}
 	// load the next validator set
-	// NOTE: there may be no validators for sub-chains
+	// NOTE: there may be no validators for nested-chains
 	var nextValidatorRoot []byte
 	nextValidatorSet, _ := s.LoadCommittee(s.Config.ChainId, s.Height())
 	if nextValidatorSet.NumValidators != 0 {
@@ -209,12 +210,12 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 }
 
 // LoadCommittee() loads the Consensus Validators for a particular committee at a particular height
-func (s *StateMachine) LoadCommittee(committeeID uint64, height uint64) (lib.ValidatorSet, lib.ErrorI) {
+func (s *StateMachine) LoadCommittee(chainId uint64, height uint64) (lib.ValidatorSet, lib.ErrorI) {
 	fsm, err := s.TimeMachine(height)
 	if err != nil {
 		return lib.ValidatorSet{}, err
 	}
-	return fsm.GetCommitteeMembers(committeeID)
+	return fsm.GetCommitteeMembers(chainId)
 }
 
 // GetMaxValidators() returns the max validators per committee
@@ -223,7 +224,7 @@ func (s *StateMachine) GetMaxValidators() (uint64, lib.ErrorI) {
 	if err != nil {
 		return 0, err
 	}
-	return valParams.ValidatorMaxCommitteeSize, nil
+	return valParams.MaxCommitteeSize, nil
 }
 
 // GetMaxBlockSize() returns the maximum size of a block

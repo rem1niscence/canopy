@@ -19,15 +19,15 @@ func (s *StateMachine) HandleByzantine(qc *lib.QuorumCertificate, vs *lib.Valida
 	}
 	slashRecipients := qc.Results.SlashRecipients
 	// if the non-signers window has completed, reset the window and slash non-signers
-	if s.Height()%params.ValidatorNonSignWindow == 0 {
-		if err = s.SlashAndResetNonSigners(qc.Header.CommitteeId, params); err != nil {
+	if s.Height()%params.NonSignWindow == 0 {
+		if err = s.SlashAndResetNonSigners(qc.Header.ChainId, params); err != nil {
 			return 0, err
 		}
 	}
 	// sanity check the slash recipient isn't nil
 	if slashRecipients != nil {
 		// set in state and slash double signers
-		if err = s.HandleDoubleSigners(qc.Header.CommitteeId, params, slashRecipients.DoubleSigners); err != nil {
+		if err = s.HandleDoubleSigners(qc.Header.ChainId, params, slashRecipients.DoubleSigners); err != nil {
 			return 0, err
 		}
 	}
@@ -43,10 +43,10 @@ func (s *StateMachine) HandleByzantine(qc *lib.QuorumCertificate, vs *lib.Valida
 	return
 }
 
-// SlashAndResetNonSigners() resets the non-signer tracking and slashes those who exceeded the ValidatorMaxNonSign threshold
-func (s *StateMachine) SlashAndResetNonSigners(committeeId uint64, params *types.ValidatorParams) lib.ErrorI {
+// SlashAndResetNonSigners() resets the non-signer tracking and slashes those who exceeded the MaxNonSign threshold
+func (s *StateMachine) SlashAndResetNonSigners(chainId uint64, params *types.ValidatorParams) lib.ErrorI {
 	var keys, badList [][]byte
-	// this callback slashes the validator if exceeded the ValidatorMaxNonSign threshold
+	// this callback slashes the validator if exceeded the MaxNonSign threshold
 	// it is executed for every key found under 'non-signers'
 	callback := func(k, v []byte) lib.ErrorI {
 		// track non-signer keys to delete
@@ -61,7 +61,7 @@ func (s *StateMachine) SlashAndResetNonSigners(committeeId uint64, params *types
 		if err = lib.Unmarshal(v, ptr); err != nil {
 			return err
 		}
-		if ptr.Counter > params.ValidatorMaxNonSign {
+		if ptr.Counter > params.MaxNonSign {
 			badList = append(badList, addr.Bytes())
 		}
 		return nil
@@ -71,9 +71,9 @@ func (s *StateMachine) SlashAndResetNonSigners(committeeId uint64, params *types
 		return err
 	}
 	// pause all on the bad list
-	s.SetValidatorsPaused(committeeId, badList)
+	s.SetValidatorsPaused(chainId, badList)
 	// slash all on the bad list
-	if err := s.SlashNonSigners(committeeId, params, badList); err != nil {
+	if err := s.SlashNonSigners(chainId, params, badList); err != nil {
 		return err
 	}
 	// delete all keys under 'non-signer' prefix as part of the reset
@@ -140,7 +140,7 @@ func (s *StateMachine) IncrementNonSigners(nonSigners [][]byte) lib.ErrorI {
 }
 
 // HandleDoubleSigners() validates, sets, and slashes the list of doubleSigners
-func (s *StateMachine) HandleDoubleSigners(committeeId uint64, params *types.ValidatorParams, doubleSigners []*lib.DoubleSigner) lib.ErrorI {
+func (s *StateMachine) HandleDoubleSigners(chainId uint64, params *types.ValidatorParams, doubleSigners []*lib.DoubleSigner) lib.ErrorI {
 	store := s.Store().(lib.StoreI)
 	var badList [][]byte
 	for _, doubleSigner := range doubleSigners {
@@ -172,7 +172,7 @@ func (s *StateMachine) HandleDoubleSigners(committeeId uint64, params *types.Val
 			badList = append(badList, pubKey.Address().Bytes())
 		}
 	}
-	return s.SlashDoubleSigners(committeeId, params, badList)
+	return s.SlashDoubleSigners(chainId, params, badList)
 }
 
 // IsValidDoubleSigner() checks if the double signer was already slashed for this height
@@ -183,13 +183,13 @@ func (s *StateMachine) IsValidDoubleSigner(height uint64, address []byte) bool {
 }
 
 // SlashNonSigners() burns the staked tokens of non-(QC)-signers
-func (s *StateMachine) SlashNonSigners(committeeId uint64, params *types.ValidatorParams, nonSigners [][]byte) lib.ErrorI {
-	return s.SlashValidators(nonSigners, committeeId, params.ValidatorNonSignSlashPercentage, params)
+func (s *StateMachine) SlashNonSigners(chainId uint64, params *types.ValidatorParams, nonSigners [][]byte) lib.ErrorI {
+	return s.SlashValidators(nonSigners, chainId, params.NonSignSlashPercentage, params)
 }
 
 // SlashNonSigners() burns the staked tokens of double signers
-func (s *StateMachine) SlashDoubleSigners(committeeId uint64, params *types.ValidatorParams, doubleSigners [][]byte) lib.ErrorI {
-	return s.SlashValidators(doubleSigners, committeeId, params.ValidatorDoubleSignSlashPercentage, params)
+func (s *StateMachine) SlashDoubleSigners(chainId uint64, params *types.ValidatorParams, doubleSigners [][]byte) lib.ErrorI {
+	return s.SlashValidators(doubleSigners, chainId, params.DoubleSignSlashPercentage, params)
 }
 
 // ForceUnstakeValidator() automatically begins unstaking the validator
@@ -216,20 +216,20 @@ func (s *StateMachine) ForceUnstakeValidator(address crypto.AddressI) lib.ErrorI
 
 // forceUnstakeValidator() automatically begins unstaking the validator (helper)
 func (s *StateMachine) forceUnstakeValidator(address crypto.AddressI, val *types.Validator, p *types.ValidatorParams) lib.ErrorI {
-	unstakingBlocks := p.GetValidatorUnstakingBlocks()
+	unstakingBlocks := p.GetUnstakingBlocks()
 	unstakingHeight := s.Height() + unstakingBlocks
 	// set validator unstaking
 	return s.SetValidatorUnstaking(address, val, unstakingHeight)
 }
 
 // SlashValidators() burns a specified percentage of multiple validator's staked tokens
-func (s *StateMachine) SlashValidators(addresses [][]byte, committeeId, percent uint64, p *types.ValidatorParams) lib.ErrorI {
+func (s *StateMachine) SlashValidators(addresses [][]byte, chainId, percent uint64, p *types.ValidatorParams) lib.ErrorI {
 	for _, addr := range addresses {
 		validator, err := s.GetValidator(crypto.NewAddressFromBytes(addr))
 		if err != nil {
 			return err
 		}
-		if err = s.SlashValidator(validator, committeeId, percent, p); err != nil {
+		if err = s.SlashValidator(validator, chainId, percent, p); err != nil {
 			return err
 		}
 	}
@@ -237,32 +237,32 @@ func (s *StateMachine) SlashValidators(addresses [][]byte, committeeId, percent 
 }
 
 // SlashValidator() burns a specified percentage of a validator's staked tokens
-func (s *StateMachine) SlashValidator(validator *types.Validator, committeeId, percent uint64, p *types.ValidatorParams) (err lib.ErrorI) {
+func (s *StateMachine) SlashValidator(validator *types.Validator, chainId, percent uint64, p *types.ValidatorParams) (err lib.ErrorI) {
 	// ensure no unauthorized slashes may occur
-	if !slices.Contains(validator.Committees, committeeId) {
+	if !slices.Contains(validator.Committees, chainId) {
 		// NOTE: expected - this can happen during a race between edit-stake and slash
-		s.log.Warn(types.ErrInvalidCommitteeID().Error())
+		s.log.Warn(types.ErrInvalidChainId().Error())
 		return nil
 	}
 	newCommittees := slices.Clone(validator.Committees)
 	// if a 'slash tracker' is used to limit the max slash per committee per block
 	if s.slashTracker != nil {
 		// get the slashed percent so far in this block by this committee
-		slashTotal := s.slashTracker.GetTotalSlashPercent(validator.Address, committeeId)
+		slashTotal := s.slashTracker.GetTotalSlashPercent(validator.Address, chainId)
 		// check to see if it exceeds the max
-		if slashTotal >= p.ValidatorMaxSlashPerCommittee {
+		if slashTotal >= p.MaxSlashPerCommittee {
 			return nil // no slash nor no removal logic occurs because this block already hit the limit with a previous slash
 		}
 		// check to see if it 'now' exceeds the max
-		if slashTotal+percent >= p.ValidatorMaxSlashPerCommittee {
+		if slashTotal+percent >= p.MaxSlashPerCommittee {
 			// only slash up to the maximum
-			percent = p.ValidatorMaxSlashPerCommittee - slashTotal
+			percent = p.MaxSlashPerCommittee - slashTotal
 			// get the number of committees for this validator
 			numCommittees := len(newCommittees)
 			// defensive coding, this function basically requires 1 committee
 			if numCommittees != 0 {
 				for i, id := range newCommittees {
-					if id == committeeId {
+					if id == chainId {
 						// remove the committee from the validator
 						newCommittees = append(newCommittees[:i], newCommittees[i+1:]...)
 						break
@@ -272,7 +272,7 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, committeeId, p
 		}
 		// update the slash tracker
 		// NOTE: the slash tracker is automatically reset every block
-		s.slashTracker.AddSlash(validator.Address, committeeId, percent)
+		s.slashTracker.AddSlash(validator.Address, chainId, percent)
 	}
 	// initialize address and new stake variable
 	addr, stakeAfterSlash := crypto.NewAddressFromBytes(validator.Address), lib.Uint64ReducePercentage(validator.StakedAmount, percent)
@@ -308,7 +308,7 @@ func (s *StateMachine) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) {
 	if err != nil {
 		return 0, err
 	}
-	height, unstakingBlocks := s.Height(), valParams.GetValidatorUnstakingBlocks()
+	height, unstakingBlocks := s.Height(), valParams.GetUnstakingBlocks()
 	if height < unstakingBlocks {
 		return 0, nil
 	}

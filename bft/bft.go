@@ -43,7 +43,7 @@ type BFT struct {
 }
 
 // New() creates a new instance of HotstuffBFT for a specific Committee
-func New(c lib.Config, valKey crypto.PrivateKeyI, canopyHeight, height uint64,
+func New(c lib.Config, valKey crypto.PrivateKeyI, rootHeight, height uint64,
 	con Controller, vdfEnabled bool, l lib.LoggerI) (*BFT, lib.ErrorI) {
 	// determine if using a Verifiable Delay Function for long-range-attack protection
 	var vdf *lib.VDFService
@@ -54,10 +54,10 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, canopyHeight, height uint64,
 	}
 	return &BFT{
 		View: &lib.View{
-			Height:       height,
-			CanopyHeight: canopyHeight,
-			NetworkId:    c.NetworkID,
-			CommitteeId:  c.ChainId,
+			Height:     height,
+			RootHeight: rootHeight,
+			NetworkId:  c.NetworkID,
+			ChainId:    c.ChainId,
 		},
 		Votes:     make(VotesForHeight),
 		Proposals: make(ProposalsForHeight),
@@ -85,12 +85,12 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, canopyHeight, height uint64,
 // - Optimistic Timeout enables 'Optimistic Responsiveness Mode' starting from Round 10, allowing faster consensus
 // This design balances synchronization speed during adverse conditions with maximizing voter participation under normal conditions
 // - ResetBFT occurs upon receipt of a Quorum Certificate
-//   - (a) Canopy committeeID <committeeSet changed, reset but keep locks to prevent conflicting validator sets between peers during a view change>
-//   - (b) Target committeeID <mission accomplished, move to next height>
+//   - (a) Canopy chainId <committeeSet changed, reset but keep locks to prevent conflicting validator sets between peers during a view change>
+//   - (b) Target chainId <mission accomplished, move to next height>
 func (b *BFT) Start() {
 	var err lib.ErrorI
 	// load the committee from the base chain
-	b.ValidatorSet, err = b.Controller.LoadCommittee(b.Controller.BaseChainHeight())
+	b.ValidatorSet, err = b.Controller.LoadCommittee(b.Controller.RootChainHeight())
 	if err != nil {
 		b.log.Warn(err.Error())
 	}
@@ -122,21 +122,23 @@ func (b *BFT) Start() {
 			}()
 
 		// RESET BFT
-		// - This triggers when receiving a new Commit Block (QC) from either Base-ChainId (a) or the Target-ChainId (b)
+		// - This triggers when receiving a new Commit Block (QC) from either Root-ChainId (a) or the Target-ChainId (b)
 		case resetBFT := <-b.ResetBFT:
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
-				// if is a base-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
+				// if is a root-Chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
 				// else increment the height and don't maintain locks
-				b.NewHeight(resetBFT.IsBaseChainUpdate)
+				b.NewHeight(resetBFT.IsRootChainUpdate)
 				// if not a base chain update, reset the timers
-				if !resetBFT.IsBaseChainUpdate {
+				if !resetBFT.IsRootChainUpdate {
 					b.log.Info("Reset BFT (NEW_HEIGHT)")
 					// start BFT over after sleeping CommitProcessMS
 					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
+					// start BFT over after sleeping CommitProcessMS
+					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
 				}
 			}()
 		}
@@ -197,7 +199,7 @@ func (b *BFT) StartElectionPhase() {
 		b.log.Error(err.Error())
 		return
 	}
-	lastProposers, err := b.LoadLastProposers(b.CanopyHeight)
+	lastProposers, err := b.LoadLastProposers(b.RootHeight)
 	if err != nil {
 		b.log.Error(err.Error())
 		return
@@ -242,7 +244,11 @@ func (b *BFT) StartElectionVotePhase() {
 	// select Proposer (set is required for self-send)
 	b.ProposerKey = SelectProposerFromCandidates(candidates, b.SortitionData, b.ValidatorSet.ValidatorSet)
 	defer func() { b.ProposerKey = nil }()
-	b.log.Infof("Voting %s as the proposer", lib.BytesToTruncatedString(b.ProposerKey))
+	if b.SelfIsProposer() {
+		b.log.Info("Voting SELF as the proposer")
+	} else {
+		b.log.Infof("Voting %s as the proposer", lib.BytesToTruncatedString(b.ProposerKey))
+	}
 	// get locally produced Verifiable delay function
 	b.HighVDF = b.VDFService.Finish()
 	// sign and send vote to Proposer
@@ -315,7 +321,11 @@ func (b *BFT) StartProposeVotePhase() {
 		return
 	}
 	b.ProposerKey = msg.Signature.PublicKey
-	b.log.Infof("Proposer is %s 👑", lib.BytesToTruncatedString(b.ProposerKey))
+	if b.SelfIsProposer() {
+		b.log.Infof("Proposer is SELF 👑")
+	} else {
+		b.log.Infof("Proposer is %s 👑", lib.BytesToTruncatedString(b.ProposerKey))
+	}
 	// if locked, confirm safe to unlock
 	if b.HighQC != nil {
 		if err := b.SafeNode(msg); err != nil {
@@ -328,7 +338,7 @@ func (b *BFT) StartProposeVotePhase() {
 	byzantineEvidence := &ByzantineEvidence{
 		DSE: NewDSE(msg.LastDoubleSignEvidence),
 	}
-	// check candidate block against plugin
+	// check candidate block against FSM
 	if err := b.ValidateProposal(msg.Qc, byzantineEvidence); err != nil {
 		b.log.Error(err.Error())
 		b.RoundInterrupt()
@@ -402,6 +412,7 @@ func (b *BFT) StartPrecommitVotePhase() {
 	b.HighQC = msg.Qc
 	b.HighQC.Block = b.Block
 	b.HighQC.Results = b.Results
+	b.log.Infof("🔒 Locked on proposal %s", lib.BytesToTruncatedString(b.HighQC.BlockHash))
 	// send vote to the proposer
 	b.SendToProposer(&Message{
 		Qc: &QC{ // NOTE: Replicas use the QC to communicate important information so that it's aggregable by the Leader
@@ -469,7 +480,7 @@ func (b *BFT) StartCommitProcessPhase() {
 		DSE: b.GetLocalDSE(),
 	}
 	// gossip committed block message to peers
-	b.GossipBlock(msg.Qc)
+	b.GossipBlock(msg.Qc, b.PublicKey)
 }
 
 // RoundInterrupt() begins the ROUND-INTERRUPT phase after any phase errors
@@ -566,6 +577,10 @@ func (b *BFT) NewRound(newHeight bool) {
 	} else {
 		b.Round++
 	}
+	b.Block = nil
+	b.BlockHash = nil
+	b.Results = nil
+	b.ProposerKey = nil
 	b.Votes.NewRound(b.Round)
 	b.Proposals[b.Round] = make(map[string][]*Message)
 }
@@ -593,9 +608,9 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	// update height
 	b.Height = b.Controller.ChainHeight()
 	// update canopy height
-	b.CanopyHeight = b.Controller.BaseChainHeight()
+	b.RootHeight = b.Controller.RootChainHeight()
 	// update the validator set
-	b.ValidatorSet, err = b.Controller.LoadCommittee(b.CanopyHeight)
+	b.ValidatorSet, err = b.Controller.LoadCommittee(b.RootHeight)
 	if err != nil {
 		b.log.Errorf("LoadCommittee() failed with err: %s", err.Error())
 	}
@@ -620,7 +635,7 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 //   - LIVENESS: uses a lock with a higher round (safe because replica is convinced no other replica committed to their locked value as +2/3rds locked on a higher round)
 func (b *BFT) SafeNode(msg *Message) lib.ErrorI {
 	if msg == nil || msg.Qc == nil || msg.HighQc == nil {
-		return ErrEmptyMessage()
+		return ErrNoSafeNodeJustification()
 	}
 	// ensure the messages' HighQC justifies its proposal (should have the same hashes)
 	if !bytes.Equal(b.GetBlockHash(), msg.HighQc.BlockHash) && !bytes.Equal(msg.Qc.Results.Hash(), msg.HighQc.ResultsHash) {
@@ -628,10 +643,12 @@ func (b *BFT) SafeNode(msg *Message) lib.ErrorI {
 	}
 	// if the hashes of the Locked proposal is the same as the Leader's message
 	if bytes.Equal(b.HighQC.BlockHash, msg.HighQc.BlockHash) && bytes.Equal(b.HighQC.ResultsHash, msg.HighQc.ResultsHash) {
+		b.log.Infof("Proposal %s satisfied the safe node predicate with SAFETY", lib.BytesToTruncatedString(b.HighQC.BlockHash))
 		return nil // SAFETY (SAME PROPOSAL AS LOCKED)
 	}
 	// if the view of the Locked proposal is older than the Leader's message
 	if msg.HighQc.Header.Round > b.HighQC.Header.Round {
+		b.log.Infof("Proposal %s satisfied the safe node predicate with LIVENESS", lib.BytesToTruncatedString(b.HighQC.BlockHash))
 		return nil // LIVENESS (HIGHER ROUND v COMMITTEE THAN LOCKED)
 	}
 	return ErrFailedSafeNodePredicate()
@@ -720,7 +737,7 @@ func (b *BFT) SelfIsValidator() bool {
 
 // RunVDF() runs the verifiable delay service
 func (b *BFT) RunVDF() lib.ErrorI {
-	if !b.Config.IsBaseChain() {
+	if !b.Config.RunVDF {
 		return nil
 	}
 	// generate the VDF seed
@@ -790,16 +807,16 @@ type (
 		Unlock()
 		// ChainHeight returns the height of the target-chain
 		ChainHeight() uint64
-		// BaseChainHeight returns the height of the base-chain
-		BaseChainHeight() uint64
+		// RootChainHeight returns the height of the root-Chain
+		RootChainHeight() uint64
 		// ProduceProposal() is a plugin call to produce a Proposal object as a Leader
 		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
 		// ValidateCertificate() is a plugin call to validate a Certificate object as a Replica
 		ValidateProposal(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
-		// LoadCertificate() gets the Quorum Certificate from the committeeID-> plugin at a certain height
+		// LoadCertificate() gets the Quorum Certificate from the chainId-> plugin at a certain height
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
 		// GossipBlock() is a P2P call to gossip a completed Quorum Certificate with a Proposal
-		GossipBlock(certificate *lib.QuorumCertificate)
+		GossipBlock(certificate *lib.QuorumCertificate, sender []byte)
 		// SendToReplicas() is a P2P call to directly send a Consensus message to all Replicas
 		SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 		// SendToProposer() is a P2P call to directly send a Consensus message to the Leader
@@ -807,24 +824,24 @@ type (
 		// Syncing() returns true if the plugin is currently syncing
 		Syncing() *atomic.Bool
 
-		/* Base-ChainId Functionality Below*/
+		/* Root-ChainId Functionality Below*/
 		// SendCertificateResultsTx() is a P2P call that allows a Leader to submit their CertificateResults (reward) transaction
 		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
-		// LoadCommittee() loads the ValidatorSet operating under CommitteeID
-		LoadCommittee(canopyHeight uint64) (lib.ValidatorSet, lib.ErrorI)
+		// LoadCommittee() loads the ValidatorSet operating under ChainId
+		LoadCommittee(rootHeight uint64) (lib.ValidatorSet, lib.ErrorI)
 		// LoadCommitteeHeightInState() loads the last height a committee member executed a Proposal (reward) transaction
-		LoadCommitteeHeightInState(canopyHeight uint64) (uint64, lib.ErrorI)
+		LoadCommitteeHeightInState(rootHeight uint64) (uint64, lib.ErrorI)
 		// LoadLastProposers() loads the last Canopy committee proposers for sortition data
-		LoadLastProposers(canopyHeight uint64) (*lib.Proposers, lib.ErrorI)
+		LoadLastProposers(rootHeight uint64) (*lib.Proposers, lib.ErrorI)
 		// LoadMinimumEvidenceHeight() loads the Canopy enforced minimum height for valid Byzantine Evidence
-		LoadMinimumEvidenceHeight(canopyHeight uint64) (uint64, lib.ErrorI)
+		LoadMinimumEvidenceHeight(rootHeight uint64) (uint64, lib.ErrorI)
 		// IsValidDoubleSigner() checks to see if the double signer is valid for this specific height
 		IsValidDoubleSigner(height uint64, address []byte) bool
 	}
 )
 
 type ResetBFT struct {
-	IsBaseChainUpdate bool
+	IsRootChainUpdate bool
 	ProcessTime       time.Duration
 }
 

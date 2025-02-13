@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/rs/cors"
 	"io"
 	"io/fs"
 	"net/http"
@@ -33,7 +34,6 @@ import (
 	"github.com/dgraph-io/badger/v4"
 	"github.com/julienschmidt/httprouter"
 	"github.com/nsf/jsondiff"
-	"github.com/rs/cors"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -44,7 +44,7 @@ import (
 const (
 	ContentType     = "Content-MessageType"
 	ApplicationJSON = "application/json; charset=utf-8"
-	localhost       = "127.0.0.1"
+	localhost       = "localhost"
 	colon           = ":"
 
 	VersionRouteName               = "version"
@@ -90,7 +90,7 @@ const (
 	DoubleSignersRouteName         = "double-signers"
 	MinimumEvidenceHeightRouteName = "minimum-evidence-height"
 	LotteryRouteName               = "lottery"
-	BaseChainInfoRouteName         = "base-chain-info"
+	RootChainInfoRouteName         = "root-Chain-info"
 	ValidatorSetRouteName          = "validator-set"
 	CheckpointRouteName            = "checkpoint"
 	// debug
@@ -182,7 +182,7 @@ var (
 		FailedTxRouteName:              {Method: http.MethodPost, Path: "/v1/query/failed-txs", HandlerFunc: FailedTxs},
 		ProposalsRouteName:             {Method: http.MethodGet, Path: "/v1/gov/proposals", HandlerFunc: Proposals},
 		PollRouteName:                  {Method: http.MethodGet, Path: "/v1/gov/poll", HandlerFunc: Poll},
-		BaseChainInfoRouteName:         {Method: http.MethodPost, Path: "/v1/query/base-chain-info", HandlerFunc: BaseChainInfo},
+		RootChainInfoRouteName:         {Method: http.MethodPost, Path: "/v1/query/root-Chain-info", HandlerFunc: RootChainInfo},
 		ValidatorSetRouteName:          {Method: http.MethodPost, Path: "/v1/query/validator-set", HandlerFunc: ValidatorSet},
 		CheckpointRouteName:            {Method: http.MethodPost, Path: "/v1/query/checkpoint", HandlerFunc: Checkpoint},
 		// debug
@@ -236,7 +236,7 @@ const (
 
 func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	cor := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:*"},
+		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"GET", "OPTIONS", "POST"},
 	})
 	s, timeout := a.FSM.Store().(lib.StoreI), time.Duration(c.TimeoutS)*time.Second
@@ -248,7 +248,7 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 			Handler: cor.Handler(http.TimeoutHandler(router.New(), timeout, ErrServerTimeout().Error())),
 		}).ListenAndServe().Error())
 	}()
-	l.Infof("Starting Admin RPC server at %s:%s", localhost, c.AdminPort)
+	l.Infof("Starting Admin RPC server at %s:%s", "0.0.0.0", c.AdminPort)
 	go func() {
 		l.Fatal((&http.Server{
 			Addr:    colon + c.AdminPort,
@@ -256,7 +256,7 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 		}).ListenAndServe().Error())
 	}()
 	go updatePollResults()
-	go PollBaseChainInfo()
+	go PollRootChainInfo()
 	go func() { // TODO remove DEBUG ONLY
 		fileName := "heap1.out"
 		for range time.Tick(time.Second * 10) {
@@ -280,61 +280,87 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	}
 }
 
-// PollBaseChainInfo() retrieves the information from the base-chain required for consensus
-func PollBaseChainInfo() {
-	var baseChainHeight uint64
-	// create a rpc client
-	rpcClient := NewClient(conf.BaseChainRPCURL, "", "")
-	// set the apps callbacks
-	app.BaseChainInfo.RemoteCallbacks = &lib.RemoteCallbacks{
-		Checkpoint:            rpcClient.Checkpoint,
-		ValidatorSet:          rpcClient.ValidatorSet,
-		IsValidDoubleSigner:   rpcClient.IsValidDoubleSigner,
-		Transaction:           rpcClient.Transaction,
-		LastProposers:         rpcClient.LastProposers,
-		MinimumEvidenceHeight: rpcClient.MinimumEvidenceHeight,
-		CommitteeData:         rpcClient.CommitteeData,
-		Lottery:               rpcClient.Lottery,
-		Orders:                rpcClient.Orders,
-	}
-	// execute the loop every conf.BaseChainPollMS duration
-	ticker := time.NewTicker(time.Duration(conf.BaseChainPollMS) * time.Millisecond)
+// PollRootChainInfo() retrieves the information from the root-Chain required for consensus
+func PollRootChainInfo() {
+	var rootChainHeight uint64
+	// execute the loop every conf.RootChainPollMS duration
+	ticker := time.NewTicker(time.Duration(conf.RootChainPollMS) * time.Millisecond)
 	for range ticker.C {
-		// query the base chain height
-		height, err := rpcClient.Height()
-		if err != nil {
-			logger.Errorf("GetBaseChainHeight failed with err %s", err.Error())
-			continue
-		}
-		// check if a new height was received
-		if *height <= baseChainHeight {
-			//logger.Debugf("Up to date with base chain height %d", baseChainHeight)
-			continue
-		}
-		// update the base chain hegiht
-		baseChainHeight = *height
-		// if a new height received
-		logger.Infof("New BaseChain Height %d detected!", baseChainHeight)
-		// execute the requests to get the base chain information
-		for retry := lib.NewRetry(conf.BaseChainPollMS, 3); retry.WaitAndDoRetry(); {
-			// retrieve the base-chain info
-			baseChainInfo, e := rpcClient.BaseChainInfo(baseChainHeight, conf.ChainId)
-			if e == nil {
-				// update the controller with new base-chain info
-				app.UpdateBaseChainInfo(baseChainInfo)
-				logger.Info("Updated BaseChain information")
-				break
+		if err := func() (err error) {
+			state, err := app.FSM.TimeMachine(0)
+			if err != nil {
+				return
 			}
-			logger.Errorf("GetBaseChainInfo failed with err %s", e.Error())
-			// update with empty base-chain info to stop consensus
-			app.UpdateBaseChainInfo(&lib.BaseChainInfo{
-				Height:           baseChainHeight,
-				ValidatorSet:     lib.ValidatorSet{},
-				LastValidatorSet: lib.ValidatorSet{},
-				LastProposers:    &lib.Proposers{},
-				LotteryWinner:    &lib.LotteryWinner{},
-				Orders:           &lib.OrderBook{},
-			})
+			defer state.Discard()
+			// get the consensus params from the app
+			consParams, err := state.GetParamsCons()
+			if err != nil {
+				return
+			}
+			// get the url for the root chain as set by the state
+			var rootChainUrl string
+			for _, chain := range conf.RootChain {
+				if chain.ChainId == consParams.RootChainId {
+					rootChainUrl = chain.Url
+				}
+			}
+			// check if root chain url isn't empty
+			if rootChainUrl == "" {
+				logger.Errorf("Config.JSON missing RootChainID=%d failed with", consParams.RootChainId)
+				return lib.ErrEmptyChainId()
+			}
+			// create a rpc client
+			rpcClient := NewClient(rootChainUrl, "", "")
+			// set the apps callbacks
+			app.RootChainInfo.RemoteCallbacks = &lib.RemoteCallbacks{
+				Checkpoint:            rpcClient.Checkpoint,
+				ValidatorSet:          rpcClient.ValidatorSet,
+				IsValidDoubleSigner:   rpcClient.IsValidDoubleSigner,
+				Transaction:           rpcClient.Transaction,
+				LastProposers:         rpcClient.LastProposers,
+				MinimumEvidenceHeight: rpcClient.MinimumEvidenceHeight,
+				CommitteeData:         rpcClient.CommitteeData,
+				Lottery:               rpcClient.Lottery,
+				Orders:                rpcClient.Orders,
+			}
+			// query the base chain height
+			height, err := rpcClient.Height()
+			if err != nil {
+				logger.Errorf("GetRootChainHeight failed with err")
+				return err
+			}
+			// check if a new height was received
+			if *height <= rootChainHeight {
+				return
+			}
+			// update the base chain height
+			rootChainHeight = *height
+			// if a new height received
+			logger.Infof("New RootChain Height %d detected!", rootChainHeight)
+			// execute the requests to get the base chain information
+			for retry := lib.NewRetry(conf.RootChainPollMS, 3); retry.WaitAndDoRetry(); {
+				// retrieve the root-Chain info
+				rootChainInfo, e := rpcClient.RootChainInfo(rootChainHeight, conf.ChainId)
+				if e == nil {
+					// update the controller with new root-Chain info
+					app.UpdateRootChainInfo(rootChainInfo)
+					logger.Info("Updated RootChain information")
+					break
+				}
+				logger.Errorf("GetRootChainInfo failed with err %s", e.Error())
+				// update with empty root-Chain info to stop consensus
+				app.UpdateRootChainInfo(&lib.RootChainInfo{
+					Height:           rootChainHeight,
+					ValidatorSet:     lib.ValidatorSet{},
+					LastValidatorSet: lib.ValidatorSet{},
+					LastProposers:    &lib.Proposers{},
+					LotteryWinner:    &lib.LotteryWinner{},
+					Orders:           &lib.OrderBook{},
+				})
+			}
+			return
+		}(); err != nil {
+			logger.Warnf(err.Error())
 		}
 	}
 }
@@ -548,7 +574,7 @@ func Checkpoint(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	})
 }
 
-func BaseChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func RootChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
 		// get the previous state machine height
 		lastSM, err := s.TimeMachine(s.Height() - 1)
@@ -588,7 +614,7 @@ func BaseChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		if err != nil {
 			return nil, err
 		}
-		return &lib.BaseChainInfo{
+		return &lib.RootChainInfo{
 			Height:                 s.Height(),
 			ValidatorSet:           validatorSet,
 			LastValidatorSet:       lastValidatorSet,
@@ -623,7 +649,7 @@ func RetiredCommittees(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 
 func Order(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	orderParams(w, r, func(s *fsm.StateMachine, p *orderRequest) (any, lib.ErrorI) {
-		return s.GetOrder(p.OrderId, p.CommitteeId)
+		return s.GetOrder(p.OrderId, p.ChainId)
 	})
 }
 
@@ -893,7 +919,7 @@ func GetFeeFromState(w http.ResponseWriter, ptr *txRequest, messageName string, 
 		if e != nil {
 			return e
 		}
-		minimumFee *= params.ValidatorBuyOrderFeeMultiplier
+		minimumFee *= params.BuyOrderFeeMultiplier
 	}
 	if ptr.Fee == 0 {
 		ptr.Fee = minimumFee
@@ -972,22 +998,17 @@ func TransactionUnpause(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 func TransactionChangeParam(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		ptr.ParamSpace = types.FormatParamSpace(ptr.ParamSpace)
-		isString, err := types.IsStringParam(ptr.ParamSpace, ptr.ParamKey)
+		if err := GetFeeFromState(w, ptr, types.MessageChangeParameterName); err != nil {
+			return nil, err
+		}
+		if ptr.ParamKey == types.ParamProtocolVersion {
+			return types.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
+		}
+		paramValue, err := strconv.ParseUint(ptr.ParamValue, 10, 64)
 		if err != nil {
 			return nil, err
 		}
-		if err = GetFeeFromState(w, ptr, types.MessageChangeParameterName); err != nil {
-			return nil, err
-		}
-		if isString {
-			return types.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
-		} else {
-			paramValue, err := strconv.ParseUint(ptr.ParamValue, 10, 64)
-			if err != nil {
-				return nil, err
-			}
-			return types.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
-		}
+		return types.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -1002,53 +1023,53 @@ func TransactionDAOTransfer(w http.ResponseWriter, r *http.Request, _ httprouter
 
 func TransactionSubsidy(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		committeeId := uint64(0)
+		chainId := uint64(0)
 		if c, err := StringToCommittees(ptr.Committees); err == nil {
-			committeeId = c[0]
+			chainId = c[0]
 		}
 		if err := GetFeeFromState(w, ptr, types.MessageSubsidyName); err != nil {
 			return nil, err
 		}
-		return types.NewSubsidyTx(p, ptr.Amount, committeeId, ptr.OpCode, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
+		return types.NewSubsidyTx(p, ptr.Amount, chainId, ptr.OpCode, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
 func TransactionCreateOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		committeeId := uint64(0)
+		chainId := uint64(0)
 		if c, err := StringToCommittees(ptr.Committees); err == nil {
-			committeeId = c[0]
+			chainId = c[0]
 		}
 		if err := GetFeeFromState(w, ptr, types.MessageCreateOrderName); err != nil {
 			return nil, err
 		}
-		return types.NewCreateOrderTx(p, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
+		return types.NewCreateOrderTx(p, ptr.Amount, ptr.ReceiveAmount, chainId, ptr.ReceiveAddress, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
 func TransactionEditOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		committeeId := uint64(0)
+		chainId := uint64(0)
 		if c, err := StringToCommittees(ptr.Committees); err == nil {
-			committeeId = c[0]
+			chainId = c[0]
 		}
 		if err := GetFeeFromState(w, ptr, types.MessageEditOrderName); err != nil {
 			return nil, err
 		}
-		return types.NewEditOrderTx(p, ptr.OrderId, ptr.Amount, ptr.ReceiveAmount, committeeId, ptr.ReceiveAddress, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
+		return types.NewEditOrderTx(p, ptr.OrderId, ptr.Amount, ptr.ReceiveAmount, chainId, ptr.ReceiveAddress, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
 func TransactionDeleteOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
-		committeeId := uint64(0)
+		chainId := uint64(0)
 		if c, err := StringToCommittees(ptr.Committees); err == nil {
-			committeeId = c[0]
+			chainId = c[0]
 		}
 		if err := GetFeeFromState(w, ptr, types.MessageDeleteOrderName); err != nil {
 			return nil, err
 		}
-		return types.NewDeleteOrderTx(p, ptr.OrderId, committeeId, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
+		return types.NewDeleteOrderTx(p, ptr.OrderId, chainId, conf.NetworkID, conf.ChainId, ptr.Fee, ptr.Memo)
 	})
 }
 
@@ -1588,8 +1609,8 @@ type heightRequest struct {
 }
 
 type orderRequest struct {
-	CommitteeId uint64 `json:"committeeId"`
-	OrderId     uint64 `json:"orderId"`
+	ChainId uint64 `json:"chainId"`
+	OrderId uint64 `json:"orderId"`
 	heightRequest
 }
 
@@ -1909,10 +1930,9 @@ func injectConfig(html string, config lib.Config) string {
 		window.__CONFIG__ = {
             rpcURL: "%s:%s",
             adminRPCURL: "%s:%s",
-            baseChainRPCURL: "%s",
             chainId: %d
         };
-	</script>`, config.RPCUrl, config.RPCPort, config.RPCUrl, config.AdminPort, conf.BaseChainRPCURL, conf.ChainId)
+	</script>`, config.RPCUrl, config.RPCPort, config.RPCUrl, config.AdminPort, conf.ChainId)
 
 	// inject the script just before </head>
 	return strings.Replace(html, "</head>", script+"</head>", 1)

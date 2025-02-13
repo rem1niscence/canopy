@@ -89,9 +89,9 @@ type jsonSellOrder struct {
 	RequestedAmount      uint64   `json:"RequestedAmount,omitempty"`      // amount of 'token' to receive
 	SellerReceiveAddress HexBytes `json:"SellerReceiveAddress,omitempty"` // the external chain address to receive the 'token'
 	BuyerSendAddress     HexBytes `json:"BuyerSendAddress,omitempty"`     // the send address from the buyer
-	BuyerReceiveAddress  HexBytes `json:"BuyerReceiveAddress,omitempty"`  // the buyer Canopy address to receive the CNPY
+	BuyerReceiveAddress  HexBytes `json:"BuyerReceiveAddress,omitempty"`  // the buyers address to receive the 'coin'
 	BuyerChainDeadline   uint64   `json:"BuyerChainDeadline,omitempty"`   // the external chain height deadline to send the 'tokens' to SellerReceiveAddress
-	SellersSellAddress   HexBytes `json:"SellersSendAddress,omitempty"`   // the address of seller who is selling the CNPY
+	SellersSellAddress   HexBytes `json:"SellersSendAddress,omitempty"`   // the address of seller who is selling the 'coin'
 }
 
 // MarshalJSON() is the json.Marshaller implementation for the SellOrder object

@@ -30,7 +30,7 @@ func TestHandleByzantine(t *testing.T) {
 			Address:      k.Address.Bytes(),
 			PublicKey:    k.PublicKey.Bytes(),
 			StakedAmount: stakeAmount,
-			Committees:   []uint64{lib.CanopyCommitteeId},
+			Committees:   []uint64{lib.CanopyChainId},
 		})
 	}
 
@@ -95,7 +95,7 @@ func TestHandleByzantine(t *testing.T) {
 			sm.height = 3
 			// if testing the non signers reset, set the height to the reset window as the modulo 0 condition will trigger
 			if test.slashResetNonSigners {
-				sm.height = valParams.ValidatorNonSignWindow
+				sm.height = valParams.NonSignWindow
 			}
 
 			// STEP 0) inject input data into state
@@ -112,10 +112,10 @@ func TestHandleByzantine(t *testing.T) {
 				require.NoError(t, sm.SetCommittees(crypto.NewAddress(val.Address), val.StakedAmount, val.Committees))
 			}
 			// get committee to have a reference to the validator set handy
-			committee, err := sm.GetCommitteeMembers(lib.CanopyCommitteeId)
+			committee, err := sm.GetCommitteeMembers(lib.CanopyChainId)
 			require.NoError(t, err)
 			// generate non-signer history for the first validator for 'reset and slash' testing
-			for j := uint64(0); j <= valParams.ValidatorMaxNonSign; j++ {
+			for j := uint64(0); j <= valParams.MaxNonSign; j++ {
 				require.NoError(t, sm.IncrementNonSigners([][]byte{committee.ValidatorSet.ValidatorSet[0].PublicKey}))
 			}
 			// get the non-signers of the QC from the committee
@@ -196,7 +196,7 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 			detail: "there exists one non-signer who is not eligible for slashing as they are LTE the 'max' non-signs",
 			nonSigners: types.NonSigners{{
 				Address: newTestAddressBytes(t),
-				Counter: types.DefaultParams().Validator.ValidatorMaxNonSign,
+				Counter: types.DefaultParams().Validator.MaxNonSign,
 			}},
 		},
 		{
@@ -204,7 +204,7 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 			detail: "there exists one non-signer who is eligible for slashing as they are above the 'max' non-signs",
 			nonSigners: types.NonSigners{{
 				Address: newTestAddressBytes(t),
-				Counter: types.DefaultParams().Validator.ValidatorMaxNonSign + 1,
+				Counter: types.DefaultParams().Validator.MaxNonSign + 1,
 			}},
 		},
 		{
@@ -212,10 +212,10 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 			detail: "there exists one non-signer who is eligible for slashing and one who is not eligible",
 			nonSigners: types.NonSigners{{
 				Address: newTestAddressBytes(t),
-				Counter: types.DefaultParams().Validator.ValidatorMaxNonSign,
+				Counter: types.DefaultParams().Validator.MaxNonSign,
 			}, {
 				Address: newTestAddressBytes(t, 1),
-				Counter: types.DefaultParams().Validator.ValidatorMaxNonSign + 1,
+				Counter: types.DefaultParams().Validator.MaxNonSign + 1,
 			}},
 		},
 	}
@@ -233,12 +233,12 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 				// add the validator stake to supply
 				require.NoError(t, sm.AddToStakedSupply(stakeAmount))
 				// add the validator stake to supply
-				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyCommitteeId, stakeAmount))
+				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyChainId, stakeAmount))
 				// set the non signer as a validator in state
 				require.NoError(t, sm.SetValidator(&types.Validator{
 					Address:      nonSigner.Address,
 					StakedAmount: stakeAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				}))
 				// convert the non signer to bytes
 				bz, e := lib.Marshal(&types.NonSigner{
@@ -252,7 +252,7 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 			beforeSupply, err := sm.GetSupply()
 			require.NoError(t, err)
 			// run the function call
-			err = sm.SlashAndResetNonSigners(lib.CanopyCommitteeId, valParams)
+			err = sm.SlashAndResetNonSigners(lib.CanopyChainId, valParams)
 			// check for the expected error
 			require.Equal(t, test.error, err)
 			if err != nil {
@@ -269,7 +269,7 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 				val, e := sm.GetValidator(crypto.NewAddress(nonSigner.Address))
 				require.NoError(t, e)
 				// if the validator was passed the max, it qualified for a slash
-				if nonSigner.Counter > valParams.ValidatorMaxNonSign {
+				if nonSigner.Counter > valParams.MaxNonSign {
 					// retrieve the supply after the fact
 					afterSupply, e := sm.GetSupply()
 					require.NoError(t, e)
@@ -496,20 +496,20 @@ func TestHandleDoubleSigners(t *testing.T) {
 				// save the public key for later use in the test
 				pubs = append(pubs, pub)
 				// add to the committee supply
-				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyCommitteeId, stakeAmount))
+				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyChainId, stakeAmount))
 				// set the double signer as a validator in state
 				require.NoError(t, sm.SetValidator(&types.Validator{
 					Address:      pub.Address().Bytes(),
 					PublicKey:    pub.Bytes(),
 					StakedAmount: stakeAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				}))
 			}
 			// get the validator params
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
 			// run the function call
-			err = sm.HandleDoubleSigners(lib.CanopyCommitteeId, valParams, test.doubleSigners)
+			err = sm.HandleDoubleSigners(lib.CanopyChainId, valParams, test.doubleSigners)
 			// check for expected error
 			require.Equal(t, test.error, err)
 			if err != nil {
@@ -526,7 +526,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 					// ensure no longer is a valid double signer
 					require.False(t, sm.IsValidDoubleSigner(height, validator.Address))
 					// re-calculate the expected
-					expected = lib.Uint64ReducePercentage(expected, valParams.ValidatorDoubleSignSlashPercentage)
+					expected = lib.Uint64ReducePercentage(expected, valParams.DoubleSignSlashPercentage)
 				}
 				// validate the slash
 				require.Equal(t, validator.StakedAmount, expected)
@@ -614,7 +614,7 @@ func TestForceUnstakeValidator(t *testing.T) {
 					require.EqualExportedValues(t, beforeVal, afterVal)
 					return
 				}
-				unstakingBlocks := p.GetValidatorUnstakingBlocks()
+				unstakingBlocks := p.GetUnstakingBlocks()
 				unstakingHeight := sm.Height() + unstakingBlocks
 				// validate the exact height
 				require.Equal(t, afterVal.UnstakingHeight, unstakingHeight)
@@ -630,9 +630,9 @@ func TestSlash(t *testing.T) {
 	stakeAmount := uint64(100)
 	// pre define a slash structure
 	type slash struct {
-		Type        string
-		Address     []byte
-		CommitteeId uint64
+		Type    string
+		Address []byte
+		ChainId uint64
 	}
 	// pre-define the slash types
 	const (
@@ -652,9 +652,9 @@ func TestSlash(t *testing.T) {
 			validators: nil,
 			slashes: []slash{
 				{
-					Type:        doubleSignerSlash,
-					Address:     newTestAddressBytes(t),
-					CommitteeId: lib.CanopyCommitteeId,
+					Type:    doubleSignerSlash,
+					Address: newTestAddressBytes(t),
+					ChainId: lib.CanopyChainId,
 				},
 			},
 			error: "validator does not exist",
@@ -666,14 +666,14 @@ func TestSlash(t *testing.T) {
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			slashes: []slash{
 				{
-					Type:        doubleSignerSlash,
-					Address:     newTestAddressBytes(t),
-					CommitteeId: lib.CanopyCommitteeId,
+					Type:    doubleSignerSlash,
+					Address: newTestAddressBytes(t),
+					ChainId: lib.CanopyChainId,
 				},
 			},
 		},
@@ -684,14 +684,14 @@ func TestSlash(t *testing.T) {
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			slashes: []slash{
 				{
-					Type:        nonSignerSlash,
-					Address:     newTestAddressBytes(t),
-					CommitteeId: lib.CanopyCommitteeId,
+					Type:    nonSignerSlash,
+					Address: newTestAddressBytes(t),
+					ChainId: lib.CanopyChainId,
 				},
 			},
 		},
@@ -702,19 +702,19 @@ func TestSlash(t *testing.T) {
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			slashes: []slash{
 				{
-					Type:        doubleSignerSlash,
-					Address:     newTestAddressBytes(t),
-					CommitteeId: lib.CanopyCommitteeId,
+					Type:    doubleSignerSlash,
+					Address: newTestAddressBytes(t),
+					ChainId: lib.CanopyChainId,
 				},
 				{
-					Type:        nonSignerSlash,
-					Address:     newTestAddressBytes(t),
-					CommitteeId: lib.CanopyCommitteeId,
+					Type:    nonSignerSlash,
+					Address: newTestAddressBytes(t),
+					ChainId: lib.CanopyChainId,
 				},
 			},
 		},
@@ -725,34 +725,34 @@ func TestSlash(t *testing.T) {
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					StakedAmount: stakeAmount,
-					Committees:   []uint64{lib.CanopyCommitteeId},
+					Committees:   []uint64{lib.CanopyChainId},
 				},
 			},
 			slashes: []slash{
 				{
-					Type:        doubleSignerSlash,
-					Address:     newTestAddressBytes(t),
-					CommitteeId: lib.CanopyCommitteeId,
+					Type:    doubleSignerSlash,
+					Address: newTestAddressBytes(t),
+					ChainId: lib.CanopyChainId,
 				},
 				{
-					Type:        nonSignerSlash,
-					Address:     newTestAddressBytes(t),
-					CommitteeId: lib.CanopyCommitteeId,
+					Type:    nonSignerSlash,
+					Address: newTestAddressBytes(t),
+					ChainId: lib.CanopyChainId,
 				},
 				{
-					Type:        doubleSignerSlash,
-					Address:     newTestAddressBytes(t, 1),
-					CommitteeId: lib.CanopyCommitteeId,
+					Type:    doubleSignerSlash,
+					Address: newTestAddressBytes(t, 1),
+					ChainId: lib.CanopyChainId,
 				},
 				{
-					Type:        nonSignerSlash,
-					Address:     newTestAddressBytes(t, 1),
-					CommitteeId: lib.CanopyCommitteeId,
+					Type:    nonSignerSlash,
+					Address: newTestAddressBytes(t, 1),
+					ChainId: lib.CanopyChainId,
 				},
 			},
 		},
@@ -774,7 +774,7 @@ func TestSlash(t *testing.T) {
 				// set the bad proposer as a validator in state
 				require.NoError(t, sm.SetValidator(v))
 				// add to the committee supply
-				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyCommitteeId, stakeAmount))
+				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyChainId, stakeAmount))
 			}
 			// execute the slashes
 			for _, s := range test.slashes {
@@ -789,11 +789,11 @@ func TestSlash(t *testing.T) {
 				// slash based on the type
 				switch s.Type {
 				case doubleSignerSlash:
-					err = sm.SlashDoubleSigners(s.CommitteeId, valParams, [][]byte{s.Address})
-					expected = lib.Uint64ReducePercentage(expected, valParams.ValidatorDoubleSignSlashPercentage)
+					err = sm.SlashDoubleSigners(s.ChainId, valParams, [][]byte{s.Address})
+					expected = lib.Uint64ReducePercentage(expected, valParams.DoubleSignSlashPercentage)
 				case nonSignerSlash:
-					err = sm.SlashNonSigners(s.CommitteeId, valParams, [][]byte{s.Address})
-					expected = lib.Uint64ReducePercentage(expected, valParams.ValidatorNonSignSlashPercentage)
+					err = sm.SlashNonSigners(s.ChainId, valParams, [][]byte{s.Address})
+					expected = lib.Uint64ReducePercentage(expected, valParams.NonSignSlashPercentage)
 				default:
 					t.Fatal("unknown slash type")
 				}
@@ -820,7 +820,7 @@ func TestSlashTracker(t *testing.T) {
 	type slash struct {
 		Percent                   uint64
 		Address                   []byte
-		CommitteeId               uint64
+		ChainId                   uint64
 		expectedRemovedCommittees []uint64
 		expectedTotalSlashState   uint64
 	}
@@ -843,7 +843,7 @@ func TestSlashTracker(t *testing.T) {
 			slashes: []slash{{
 				Percent:                   10,
 				Address:                   newTestAddressBytes(t),
-				CommitteeId:               0,
+				ChainId:                   0,
 				expectedRemovedCommittees: nil,
 				expectedTotalSlashState:   10,
 			}},
@@ -860,7 +860,7 @@ func TestSlashTracker(t *testing.T) {
 			slashes: []slash{{
 				Percent:                   20,
 				Address:                   newTestAddressBytes(t),
-				CommitteeId:               1,
+				ChainId:                   1,
 				expectedRemovedCommittees: []uint64{1},
 				expectedTotalSlashState:   15,
 			}},
@@ -877,13 +877,13 @@ func TestSlashTracker(t *testing.T) {
 			slashes: []slash{{
 				Percent:                   20,
 				Address:                   newTestAddressBytes(t),
-				CommitteeId:               1,
+				ChainId:                   1,
 				expectedRemovedCommittees: []uint64{1},
 				expectedTotalSlashState:   15,
 			}, {
 				Percent:                   20,
 				Address:                   newTestAddressBytes(t),
-				CommitteeId:               0,
+				ChainId:                   0,
 				expectedRemovedCommittees: []uint64{0},
 				expectedTotalSlashState:   15,
 			}},
@@ -904,12 +904,12 @@ func TestSlashTracker(t *testing.T) {
 			slashes: []slash{{
 				Percent:                 10,
 				Address:                 newTestAddressBytes(t),
-				CommitteeId:             0,
+				ChainId:                 0,
 				expectedTotalSlashState: 10,
 			}, {
 				Percent:                 10,
 				Address:                 newTestAddressBytes(t, 1),
-				CommitteeId:             0,
+				ChainId:                 0,
 				expectedTotalSlashState: 10,
 			}},
 		},
@@ -930,12 +930,12 @@ func TestSlashTracker(t *testing.T) {
 			slashes: []slash{{
 				Percent:                 10,
 				Address:                 newTestAddressBytes(t),
-				CommitteeId:             0,
+				ChainId:                 0,
 				expectedTotalSlashState: 10,
 			}, {
 				Percent:                   20,
 				Address:                   newTestAddressBytes(t, 1),
-				CommitteeId:               0,
+				ChainId:                   0,
 				expectedRemovedCommittees: []uint64{0},
 				expectedTotalSlashState:   15,
 			}},
@@ -949,7 +949,7 @@ func TestSlashTracker(t *testing.T) {
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
 			// set max slash per committee based on test param
-			valParams.ValidatorMaxSlashPerCommittee = test.maxSlashPerCommittee
+			valParams.MaxSlashPerCommittee = test.maxSlashPerCommittee
 			// preset the validators
 			for _, v := range test.validators {
 				// add the validator stake to total supply
@@ -969,9 +969,9 @@ func TestSlashTracker(t *testing.T) {
 				val, e := sm.GetValidator(addr)
 				require.NoError(t, e)
 				// execute the slash function call and ensure no error
-				require.NoError(t, sm.SlashValidator(val, s.CommitteeId, s.Percent, valParams))
+				require.NoError(t, sm.SlashValidator(val, s.ChainId, s.Percent, valParams))
 				// validate the slash tracker state
-				require.Equal(t, s.expectedTotalSlashState, sm.slashTracker.GetTotalSlashPercent(s.Address, s.CommitteeId))
+				require.Equal(t, s.expectedTotalSlashState, sm.slashTracker.GetTotalSlashPercent(s.Address, s.ChainId))
 				// retrieve the validator
 				val, e = sm.GetValidator(addr)
 				require.NoError(t, err)
@@ -1031,7 +1031,7 @@ func TestLoadMinimumEvidenceHeight(t *testing.T) {
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
 			// set unstaking blocks
-			valParams.ValidatorUnstakingBlocks = test.unstakingBlocks
+			valParams.UnstakingBlocks = test.unstakingBlocks
 			// set the params
 			require.NoError(t, sm.SetParamsVal(valParams))
 			// run the function call with no errors
