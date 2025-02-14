@@ -70,8 +70,8 @@ message OrderBooks {
 
 // OrderBook: a list of sell orders associated with a particular committee held in the blockchain state
 message OrderBook {
-  // committee_id: the unique identifier of the 'counter asset' committee
-  uint64 committeeId = 1 ;
+  // chain_id: the unique identifier of the 'counter asset' committee
+  uint64 chainId = 1 ;
   // orders: the actual list of sell orders
   repeated SellOrder orders = 2;
 }

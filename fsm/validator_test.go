@@ -31,7 +31,7 @@ func TestGetValidator(t *testing.T) {
 			preset: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
-				Committees:   []uint64{lib.CanopyCommitteeId},
+				Committees:   []uint64{lib.CanopyChainId},
 			},
 			tryGet: newTestAddress(t, 1),
 			error:  "validator does not exist",
@@ -42,7 +42,7 @@ func TestGetValidator(t *testing.T) {
 			preset: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
-				Committees:   []uint64{lib.CanopyCommitteeId},
+				Committees:   []uint64{lib.CanopyChainId},
 			},
 			tryGet: newTestAddress(t),
 		},
@@ -88,7 +88,7 @@ func TestGetValidatorExists(t *testing.T) {
 			preset: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
-				Committees:   []uint64{lib.CanopyCommitteeId},
+				Committees:   []uint64{lib.CanopyChainId},
 			},
 			tryGet: newTestAddress(t, 1),
 			exists: false,
@@ -99,7 +99,7 @@ func TestGetValidatorExists(t *testing.T) {
 			preset: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
-				Committees:   []uint64{lib.CanopyCommitteeId},
+				Committees:   []uint64{lib.CanopyChainId},
 			},
 			tryGet: newTestAddress(t),
 			exists: true,
@@ -138,19 +138,19 @@ func TestSetGetValidators(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: amount + 2,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: amount + 1,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 				{
 					Address:      newTestAddressBytes(t, 2),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: amount,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 			},
 			expectedSupply: &types.Supply{
@@ -158,7 +158,7 @@ func TestSetGetValidators(t *testing.T) {
 				Staked: amount*3 + 3,
 				CommitteeStaked: []*types.Pool{
 					{
-						Id:     lib.CanopyCommitteeId,
+						Id:     lib.CanopyChainId,
 						Amount: amount*3 + 3,
 					},
 					{
@@ -177,21 +177,21 @@ func TestSetGetValidators(t *testing.T) {
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: amount + 2,
 					Delegate:     true,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 				{
 					Address:      newTestAddressBytes(t, 1),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: amount + 1,
 					Delegate:     true,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 				{
 					Address:      newTestAddressBytes(t, 2),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: amount,
 					Delegate:     true,
-					Committees:   []uint64{lib.CanopyCommitteeId, 2},
+					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 			},
 			expectedSupply: &types.Supply{
@@ -200,7 +200,7 @@ func TestSetGetValidators(t *testing.T) {
 				DelegatedOnly: amount*3 + 3,
 				CommitteeStaked: []*types.Pool{
 					{
-						Id:     lib.CanopyCommitteeId,
+						Id:     lib.CanopyChainId,
 						Amount: amount*3 + 3,
 					},
 					{
@@ -210,7 +210,7 @@ func TestSetGetValidators(t *testing.T) {
 				},
 				CommitteeDelegatedOnly: []*types.Pool{
 					{
-						Id:     lib.CanopyCommitteeId,
+						Id:     lib.CanopyChainId,
 						Amount: amount*3 + 3,
 					},
 					{
@@ -252,14 +252,14 @@ func TestSetGetValidators(t *testing.T) {
 				require.EqualExportedValues(t, test.preset[i], v)
 			}
 			// get the committees from state
-			set, err := sm.GetCommitteePaginated(lib.PageParams{}, lib.CanopyCommitteeId)
+			set, err := sm.GetCommitteePaginated(lib.PageParams{}, lib.CanopyChainId)
 			require.NoError(t, err)
 			// check committees got vs expected
 			for i, member := range *set.Results.(*types.ValidatorPage) {
 				require.EqualExportedValues(t, test.preset[i], member)
 			}
 			// get delegates from state
-			set, err = sm.GetDelegatesPaginated(lib.PageParams{}, lib.CanopyCommitteeId)
+			set, err = sm.GetDelegatesPaginated(lib.PageParams{}, lib.CanopyChainId)
 			require.NoError(t, err)
 			// check delegates got vs expected
 			for i, member := range *set.Results.(*types.ValidatorPage) {
@@ -842,11 +842,11 @@ func TestDeleteFinishedUnstaking(t *testing.T) {
 
 func TestSetValidatorsPaused(t *testing.T) {
 	tests := []struct {
-		name        string
-		detail      string
-		preset      []*types.Validator
-		committeeId uint64
-		toPause     [][]byte
+		name    string
+		detail  string
+		preset  []*types.Validator
+		chainId uint64
+		toPause [][]byte
 	}{
 		{
 			name:   "single validator pause",
@@ -855,8 +855,8 @@ func TestSetValidatorsPaused(t *testing.T) {
 				Address:    newTestAddressBytes(t),
 				Committees: []uint64{1},
 			}},
-			committeeId: 1,
-			toPause:     [][]byte{newTestAddressBytes(t)},
+			chainId: 1,
+			toPause: [][]byte{newTestAddressBytes(t)},
 		},
 		{
 			name:   "unauthorized validator pause",
@@ -865,8 +865,8 @@ func TestSetValidatorsPaused(t *testing.T) {
 				Address:    newTestAddressBytes(t),
 				Committees: []uint64{1},
 			}},
-			committeeId: 2,
-			toPause:     [][]byte{},
+			chainId: 2,
+			toPause: [][]byte{},
 		},
 		{
 			name:   "multi validator pause",
@@ -878,8 +878,8 @@ func TestSetValidatorsPaused(t *testing.T) {
 				Address:    newTestAddressBytes(t, 1),
 				Committees: []uint64{1},
 			}},
-			committeeId: 1,
-			toPause:     [][]byte{newTestAddressBytes(t), newTestAddressBytes(t, 1)},
+			chainId: 1,
+			toPause: [][]byte{newTestAddressBytes(t), newTestAddressBytes(t, 1)},
 		},
 		{
 			name:   "mixed authorized multi validator pause",
@@ -891,8 +891,8 @@ func TestSetValidatorsPaused(t *testing.T) {
 				Address:    newTestAddressBytes(t, 1),
 				Committees: []uint64{2},
 			}},
-			committeeId: 1,
-			toPause:     [][]byte{newTestAddressBytes(t)},
+			chainId: 1,
+			toPause: [][]byte{newTestAddressBytes(t)},
 		},
 	}
 	for _, test := range tests {
@@ -906,7 +906,7 @@ func TestSetValidatorsPaused(t *testing.T) {
 				require.NoError(t, sm.SetSupply(supply))
 			}
 			// execute the function call
-			sm.SetValidatorsPaused(test.committeeId, test.toPause)
+			sm.SetValidatorsPaused(test.chainId, test.toPause)
 			for _, validator := range test.toPause {
 				paused := crypto.NewAddress(validator)
 				// validate the unstaking of the validator object
@@ -916,7 +916,7 @@ func TestSetValidatorsPaused(t *testing.T) {
 				valParams, e := sm.GetParamsVal()
 				require.NoError(t, e)
 				// calculate the finish unstaking height
-				maxPauseBlocks := valParams.ValidatorMaxPauseBlocks + sm.Height()
+				maxPauseBlocks := valParams.MaxPauseBlocks + sm.Height()
 				// compare got vs expected
 				require.Equal(t, maxPauseBlocks, val.MaxPausedHeight)
 				// check for the paused key
@@ -1049,7 +1049,7 @@ func TestForceUnstakeMaxPaused(t *testing.T) {
 			// set the height
 			sm.height = test.height
 			// set the unstaking blocks
-			require.NoError(t, sm.UpdateParam(types.ParamSpaceVal, types.ParamValidatorUnstakingBlocks, &lib.UInt64Wrapper{Value: test.unstakingBlocks}))
+			require.NoError(t, sm.UpdateParam(types.ParamSpaceVal, types.ParamUnstakingBlocks, &lib.UInt64Wrapper{Value: test.unstakingBlocks}))
 			// get the validator params
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
@@ -1075,7 +1075,7 @@ func TestForceUnstakeMaxPaused(t *testing.T) {
 				// validate not paused on structure
 				require.Zero(t, expected.MaxPausedHeight)
 				// calculate the expected unstaking height
-				expectedUnstakingHeight := valParams.ValidatorUnstakingBlocks + sm.height
+				expectedUnstakingHeight := valParams.UnstakingBlocks + sm.height
 				// validate unstaking on structure
 				require.Equal(t, expectedUnstakingHeight, expected.UnstakingHeight)
 				// validate unstaking key exists

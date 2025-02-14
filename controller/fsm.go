@@ -79,9 +79,9 @@ func (c *Controller) ProduceProposal(be *bft.ByzantineEvidence, vdf *crypto.VDF)
 		return
 	}
 	// set block reward recipients
-	results = c.CalculateRewardRecipients(c.Address, c.BaseChainHeight())
+	results = c.CalculateRewardRecipients(c.Address, c.RootChainHeight())
 	// handle swaps
-	c.HandleSwaps(blockResult, results, c.BaseChainHeight())
+	c.HandleSwaps(blockResult, results, c.RootChainHeight())
 	// set slash recipients
 	c.CalculateSlashRecipients(results, be)
 	// set checkpoint
@@ -118,9 +118,9 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 		return
 	}
 	// generate a comparable
-	compareResults := c.CalculateRewardRecipients(blk.BlockHeader.ProposerAddress, c.BaseChainHeight())
+	compareResults := c.CalculateRewardRecipients(blk.BlockHeader.ProposerAddress, c.RootChainHeight())
 	// handle swaps
-	c.HandleSwaps(blockResult, compareResults, c.BaseChainHeight())
+	c.HandleSwaps(blockResult, compareResults, c.RootChainHeight())
 	// set slash recipients
 	c.CalculateSlashRecipients(compareResults, evidence)
 	// set checkpoint
@@ -163,7 +163,7 @@ func (c *Controller) ValidateProposalBasic(qc *lib.QuorumCertificate, evidence *
 		return nil, e
 	}
 	if !bytes.Equal(qc.BlockHash, blockHash) {
-		return nil, lib.ErrMismatchBlockHash()
+		return nil, lib.ErrMismatchBlockHash("ValidateProposalBasic")
 	}
 	return
 }
@@ -272,13 +272,13 @@ func (c *Controller) ApplyAndValidateBlock(b *lib.Block, commit bool) (*lib.Bloc
 }
 
 // CalculateRewardRecipients() calculates the block reward recipients of the proposal
-func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, baseChainHeight uint64) (results *lib.CertificateResult) {
+func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, rootChainHeight uint64) (results *lib.CertificateResult) {
 	// set block reward recipients
 	results = &lib.CertificateResult{
 		RewardRecipients: &lib.RewardRecipients{
 			PaymentPercents: []*lib.PaymentPercents{
 				{
-					Address: proposerAddress, // base-chain proposer reward
+					Address: proposerAddress, // root-Chain proposer reward
 					Percent: 100,             // proposer gets what's left after the delegate's cut
 				},
 			},
@@ -286,15 +286,20 @@ func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, baseChain
 		SlashRecipients: new(lib.SlashRecipients),
 	}
 	// get the delegate and their cut from the state machine
-	baseDelegateWinner, err := c.GetBaseChainLotteryWinner(baseChainHeight)
+	baseDelegateWinner, err := c.GetRootChainLotteryWinner(rootChainHeight)
 	if err != nil {
-		c.log.Warnf("An error occurred choosing a base-chain delegate lottery winner: %s", err.Error())
+		c.log.Warnf("An error occurred choosing a root-Chain delegate lottery winner: %s", err.Error())
 		// continue
 	} else {
 		c.AddLotteryWinner(results, baseDelegateWinner)
 	}
-	// is isn't base chain
-	if !c.Config.IsBaseChain() {
+	// load the root chain id from state
+	rootChainId, err := c.FSM.GetRootChainId()
+	if err != nil {
+		c.log.Warnf("An error occurred getting the root chain id from state: %s", err.Error())
+	}
+	// is isn't root chain
+	if c.Config.ChainId != rootChainId {
 		// sub validator
 		subValidatorWinner, e := c.FSM.LotteryWinner(c.Config.ChainId, true)
 		if e != nil {
@@ -316,16 +321,16 @@ func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, baseChain
 }
 
 // HandleSwaps() handles the 'buy' side of the sell orders
-func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.CertificateResult, baseChainHeight uint64) {
+func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.CertificateResult, rootChainHeight uint64) {
 	// parse the last block for buy orders and polling
 	buyOrders := c.FSM.ParseBuyOrders(blockResult)
-	// get orders from the base-chain
-	orders, e := c.LoadBaseChainOrderBook(baseChainHeight)
+	// get orders from the root-Chain
+	orders, e := c.LoadRootChainOrderBook(rootChainHeight)
 	if e != nil {
 		return
 	}
-	// process the base-chain order book against the state
-	closeOrders, resetOrders := c.FSM.ProcessBaseChainOrderBook(orders, blockResult)
+	// process the root-Chain order book against the state
+	closeOrders, resetOrders := c.FSM.ProcessRootChainOrderBook(orders, blockResult)
 	// add the orders to the certificate result
 	// truncate for defensive spam protection
 	results.Orders = &lib.Orders{
@@ -335,7 +340,7 @@ func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.Cert
 	}
 }
 
-// CalculateSlashRecipients() calculates the addresses who receive slashes on the base-chain
+// CalculateSlashRecipients() calculates the addresses who receive slashes on the root-Chain
 func (c *Controller) CalculateSlashRecipients(results *lib.CertificateResult, be *bft.ByzantineEvidence) {
 	var err lib.ErrorI
 	// use the bft object to fill in the Byzantine Evidence
@@ -382,7 +387,7 @@ func (c *Controller) AddLotteryWinner(results *lib.CertificateResult, lotteryWin
 		return
 	}
 	if results.RewardRecipients.PaymentPercents[0].Percent <= lotteryWinner.Cut {
-		c.log.Warn("No cut left for block proposer, skipping lottery winner (ensure base-chain-lottery-cut + 2 x sub-chain-lottery-cut < 100%)")
+		c.log.Warn("No cut left for block proposer, skipping lottery winner (ensure root-Chain-lottery-cut + 2 x nested-chain-lottery-cut < 100%)")
 		return
 	}
 	results.RewardRecipients.PaymentPercents[0].Percent -= lotteryWinner.Cut
@@ -417,17 +422,17 @@ func (c *Controller) CompareBlockHeaders(candidate *lib.BlockHeader, compare *li
 			return lib.ErrInvalidLastQuorumCertificate()
 		}
 		// load the committee for the last qc
-		committeeHeight := candidate.LastQuorumCertificate.Header.CanopyHeight
+		committeeHeight := candidate.LastQuorumCertificate.Header.RootHeight
 		vs, err := c.LoadCommittee(committeeHeight)
 		if err != nil {
 			return err
 		}
 		// check the last QC
 		isPartialQC, err := candidate.LastQuorumCertificate.Check(vs, 0, &lib.View{
-			Height:       candidate.Height - 1,
-			CanopyHeight: committeeHeight,
-			NetworkId:    c.Config.NetworkID,
-			CommitteeId:  c.Config.ChainId,
+			Height:     candidate.Height - 1,
+			RootHeight: committeeHeight,
+			NetworkId:  c.Config.NetworkID,
+			ChainId:    c.Config.ChainId,
 		}, true)
 		if err != nil {
 			return err
@@ -475,7 +480,7 @@ func (c *Controller) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (s
 	}
 	// ensure the Proposal.BlockHash corresponds to the actual hash of the block
 	if !bytes.Equal(qc.BlockHash, hash) {
-		err = lib.ErrMismatchBlockHash()
+		err = lib.ErrMismatchBlockHash("CheckPeerQC")
 		return
 	}
 	// check the height of the block

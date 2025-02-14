@@ -61,7 +61,7 @@ func init() {
 	queryCmd.AddCommand(checkpointCmd)
 	queryCmd.AddCommand(doubleSignersCmd)
 	queryCmd.AddCommand(delegateLotteryCmd)
-	queryCmd.AddCommand(baseChainInfoCmd)
+	queryCmd.AddCommand(rootChainInfoCmd)
 	queryCmd.AddCommand(validatorSetCmd)
 }
 
@@ -92,7 +92,7 @@ var (
 	}
 
 	poolCmd = &cobra.Command{
-		Use:   "pool <committee_id> --height=1",
+		Use:   "pool <chain_id> --height=1",
 		Short: "query a pool on the blockchain",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -126,7 +126,7 @@ var (
 	}
 
 	committeeCmd = &cobra.Command{
-		Use:   "committee <committee_id> --height=1 --per-page=10 --page-number=1",
+		Use:   "committee <chain_id> --height=1 --per-page=10 --page-number=1",
 		Short: "query committee members",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -136,7 +136,7 @@ var (
 	}
 
 	committeeDataCmd = &cobra.Command{
-		Use:   "committee-data <committee_id> --height=1",
+		Use:   "committee-data <chain_id> --height=1",
 		Short: "query the chain metadata for a committee",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -364,7 +364,7 @@ var (
 	}
 
 	delegateLotteryCmd = &cobra.Command{
-		Use:   "delegate-lottery <committee-id> --height=1",
+		Use:   "delegate-lottery <chain-id> --height=1",
 		Short: "query the winner of the delegate lottery",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -372,18 +372,18 @@ var (
 		},
 	}
 
-	baseChainInfoCmd = &cobra.Command{
-		Use:   "base-chain-info <committee-id> --height=1",
+	rootChainInfoCmd = &cobra.Command{
+		Use:   "root-Chain-info <chain-id> --height=1",
 		Short: "query the base chain information needed to complete consensus",
-		Long:  "query the base chain information needed to complete consensus: this is a local call so will only work if self is the base-chain",
+		Long:  "query the base chain information needed to complete consensus: this is a local call so will only work if self is the root-Chain",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeToConsole(client.BaseChainInfo(height, uint64(argToInt(args[0]))))
+			writeToConsole(client.RootChainInfo(height, uint64(argToInt(args[0]))))
 		},
 	}
 
 	validatorSetCmd = &cobra.Command{
-		Use:   "validator-set <committee-id> --height=1",
+		Use:   "validator-set <chain-id> --height=1",
 		Short: "query the validator set for a committee at a certain height",
 		Long:  "query the validator set for a committee at a certain height",
 		Args:  cobra.MinimumNArgs(1),

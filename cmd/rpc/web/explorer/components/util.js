@@ -169,3 +169,15 @@ export function convertTx(tx) {
   );
   return tx;
 }
+
+// formatLocaleNumber formats a number with the default en-us configuration
+export const formatLocaleNumber = (num, minFractionDigits = 0, maxFractionDigits = 2) => {
+  if (isNaN(num)) {
+    return 0;
+  }
+
+  return num.toLocaleString("en-US", {
+    maximumFractionDigits: maxFractionDigits,
+    minimumFractionDigits: minFractionDigits,
+  });
+};

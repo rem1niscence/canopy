@@ -98,24 +98,24 @@ func NewDAOTransferTx(from crypto.PrivateKeyI, amount, start, end, networkId, ch
 }
 
 // NewCertificateResultsTx() creates a CertificateResultsTransaction object in the interface form of TransactionI
-func NewCertificateResultsTx(from crypto.PrivateKeyI, qc *lib.QuorumCertificate, baseChainId, networkId, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
-	return NewTransaction(from, &MessageCertificateResults{Qc: qc}, networkId, baseChainId, fee, memo)
+func NewCertificateResultsTx(from crypto.PrivateKeyI, qc *lib.QuorumCertificate, rootChainId, networkId, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+	return NewTransaction(from, &MessageCertificateResults{Qc: qc}, networkId, rootChainId, fee, memo)
 }
 
 // NewSubsidyTx() creates a SubsidyTransaction object in the interface form of TransactionI
 func NewSubsidyTx(from crypto.PrivateKeyI, amount, committeeId uint64, opCode string, networkId, chainId, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageSubsidy{
-		Address:     from.PublicKey().Address().Bytes(),
-		CommitteeId: committeeId,
-		Amount:      amount,
-		Opcode:      opCode,
+		Address: from.PublicKey().Address().Bytes(),
+		ChainId: committeeId,
+		Amount:  amount,
+		Opcode:  opCode,
 	}, networkId, chainId, fee, memo)
 }
 
 // NewCreateOrderTx() creates a CreateOrderTransaction object in the interface form of TransactionI
 func NewCreateOrderTx(from crypto.PrivateKeyI, sellAmount, requestAmount, committeeId uint64, receiveAddress []byte, networkId, chainId, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageCreateOrder{
-		CommitteeId:          committeeId,
+		ChainId:              committeeId,
 		AmountForSale:        sellAmount,
 		RequestedAmount:      requestAmount,
 		SellerReceiveAddress: receiveAddress,
@@ -127,7 +127,7 @@ func NewCreateOrderTx(from crypto.PrivateKeyI, sellAmount, requestAmount, commit
 func NewEditOrderTx(from crypto.PrivateKeyI, orderId, sellAmount, requestAmount, committeeId uint64, receiveAddress []byte, networkId, chainId, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageEditOrder{
 		OrderId:              orderId,
-		CommitteeId:          committeeId,
+		ChainId:              committeeId,
 		AmountForSale:        sellAmount,
 		RequestedAmount:      requestAmount,
 		SellerReceiveAddress: receiveAddress,
@@ -137,8 +137,8 @@ func NewEditOrderTx(from crypto.PrivateKeyI, orderId, sellAmount, requestAmount,
 // NewDeleteOrderTx() creates an DeleteOrderTransaction object in the interface form of TransactionI
 func NewDeleteOrderTx(from crypto.PrivateKeyI, orderId, committeeId uint64, networkId, chainId, fee uint64, memo string) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageDeleteOrder{
-		OrderId:     orderId,
-		CommitteeId: committeeId,
+		OrderId: orderId,
+		ChainId: committeeId,
 	}, networkId, chainId, fee, memo)
 }
 

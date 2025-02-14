@@ -146,7 +146,7 @@ func (s *SMT) Root() []byte { return bytes.Clone(s.root.Value) }
 // Set: insert or update a target
 func (s *SMT) Set(k, v []byte) lib.ErrorI {
 	// calculate the key and value to upsert
-	s.target = &node{Key: newNodeKey(crypto.ShortHash(k), s.keyBitLength), Node: Node{Value: crypto.ShortHash(v)}}
+	s.target = &node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), Node: Node{Value: crypto.Hash(v)}}
 	// check to make sure the target is valid
 	if err := s.validateTarget(); err != nil {
 		return err
@@ -189,7 +189,7 @@ func (s *SMT) Set(k, v []byte) lib.ErrorI {
 // Delete: removes a target node if exists in the tree
 func (s *SMT) Delete(k []byte) lib.ErrorI {
 	// calculate the key and value to upsert
-	s.target = &node{Key: newNodeKey(crypto.ShortHash(k), s.keyBitLength)}
+	s.target = &node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength)}
 	// check to make sure the target is valid
 	if err := s.validateTarget(); err != nil {
 		return err
@@ -342,7 +342,7 @@ func (s *SMT) updateParentValue(parent, child *node) (err lib.ErrorI) {
 		return err
 	}
 	// concatenate the left and right children values; update the parents value
-	parent.Value = crypto.ShortHash(append(leftChildInput, rightChildInput...))
+	parent.Value = crypto.Hash(append(leftChildInput, rightChildInput...))
 	// save the updated root value to the structure
 	if bytes.Equal(parent.Key.bytes(), s.root.Key.bytes()) {
 		s.root = parent.copy()

@@ -5,7 +5,7 @@ import DetailModal from "@/components/modal";
 import Cards from "@/components/cards";
 import { useEffect, useState } from "react";
 import { Spinner, Toast, ToastContainer } from "react-bootstrap";
-import { getCardData, getTableData, getModalData, Orders } from "@/components/api";
+import { getCardData, getTableData, getModalData } from "@/components/api";
 
 export default function Home() {
   const [state, setState] = useState({
@@ -31,18 +31,36 @@ export default function Home() {
   });
 
   function getCardAndTableData(setLoading) {
-    Promise.all([getTableData(state.tablePage, state.category, state.committee), getCardData()]).then((values) => {
-      if (setLoading) {
-        return setState({ ...state, loading: false, tableData: values[0], cardData: values[1] });
-      }
-      return setState({ ...state, tableData: values[0], cardData: values[1] });
-    });
+    Promise.allSettled([getTableData(state.tablePage, state.category, state.committee), getCardData()]).then(
+      (values) => {
+        let settledValues = [];
+        for (const v of values) {
+          if (v.status === "rejected") {
+            settledValues.push({});
+            continue;
+          }
+          settledValues.push(v.value);
+        }
+
+        if (setLoading) {
+          return setState({ ...state, loading: false, tableData: settledValues[0], cardData: settledValues[1] });
+        }
+        return setState({ ...state, tableData: settledValues[0], cardData: settledValues[1] });
+      },
+    );
   }
 
   async function openModal(query) {
+    let data = await getModalData(query, 0);
     setState({
       ...state,
-      modalState: { show: true, query: query, page: 0, accOnly: false, data: await getModalData(query, 0) },
+      modalState: {
+        show: true,
+        query: query,
+        page: 0,
+        accOnly: !Boolean(data?.validator),
+        data,
+      },
     });
   }
 

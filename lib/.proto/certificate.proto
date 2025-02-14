@@ -55,7 +55,7 @@ message CertificateResult {
   Orders orders = 3;
   // checkpoint: contains information from the 3rd party chain in order for Canopy to provide Checkpoint-as-a-Service
   Checkpoint checkpoint = 4;
-  // retired: signals if the committee wants to shut down and mark itself as 'forever unsubsidized' on the base-chain
+  // retired: signals if the committee wants to shut down and mark itself as 'forever unsubsidized' on the root-Chain
   bool retired = 5;
 }
 
@@ -139,11 +139,11 @@ message CommitteesData {
 
 // CommitteeData is current status information about the current status of the Committee
 message CommitteeData {
-  // committee_id: is the unique identifier of the chain and the committee of Validators responsible for it
-  uint64 committee_id = 1;
+  // chain_id: is the unique identifier of the chain and the committee of Validators responsible for it
+  uint64 chain_id = 1;
   // last_updated_height: is the Canopy height included in the most recently processed Certificate Results transaction
   // This protects against historical committee attacks and ensures sequentiality among committees
-  uint64 last_canopy_height_updated = 2;
+  uint64 last_root_height_updated = 2;
   // last_chain_height_updated: is the 3rd party chain height included in the most recent processed Certificate Results
   // transaction. This protects against reformatting the replay attacks
   uint64 last_chain_height_updated = 3;

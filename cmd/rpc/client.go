@@ -176,9 +176,9 @@ func (c *Client) CommitteesData(height uint64) (p *lib.CommitteesData, err lib.E
 	return
 }
 
-func (c *Client) BaseChainInfo(height, committeeId uint64) (p *lib.BaseChainInfo, err lib.ErrorI) {
-	p = new(lib.BaseChainInfo)
-	err = c.heightAndIdRequest(BaseChainInfoRouteName, height, committeeId, p)
+func (c *Client) RootChainInfo(height, chainId uint64) (p *lib.RootChainInfo, err lib.ErrorI) {
+	p = new(lib.RootChainInfo)
+	err = c.heightAndIdRequest(RootChainInfoRouteName, height, chainId, p)
 	return
 }
 
@@ -194,15 +194,15 @@ func (c *Client) RetiredCommittees(height uint64) (p *[]uint64, err lib.ErrorI) 
 	return
 }
 
-func (c *Client) Order(height, orderId, committeeId uint64) (p *lib.SellOrder, err lib.ErrorI) {
+func (c *Client) Order(height, orderId, chainId uint64) (p *lib.SellOrder, err lib.ErrorI) {
 	p = new(lib.SellOrder)
-	err = c.orderRequest(OrderRouteName, height, orderId, committeeId, p)
+	err = c.orderRequest(OrderRouteName, height, orderId, chainId, p)
 	return
 }
 
-func (c *Client) Orders(height, committeeId uint64) (p *lib.OrderBooks, err lib.ErrorI) {
+func (c *Client) Orders(height, chainId uint64) (p *lib.OrderBooks, err lib.ErrorI) {
 	p = new(lib.OrderBooks)
-	err = c.heightAndIdRequest(OrdersRouteName, height, committeeId, p)
+	err = c.heightAndIdRequest(OrdersRouteName, height, chainId, p)
 	return
 }
 
@@ -547,13 +547,13 @@ func (c *Client) TxDaoTransfer(from AddrOrNickname, amt, startBlk, endBlk uint64
 	return c.transactionRequest(TxDAOTransferRouteName, txReq)
 }
 
-func (c *Client) TxSubsidy(from AddrOrNickname, amt, committeeID uint64, opCode string,
+func (c *Client) TxSubsidy(from AddrOrNickname, amt, chainId uint64, opCode string,
 	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	txReq := txRequest{
 		Amount:            amt,
 		Fee:               optFee,
 		OpCode:            opCode,
-		committeesRequest: committeesRequest{fmt.Sprintf("%d", committeeID)},
+		committeesRequest: committeesRequest{fmt.Sprintf("%d", chainId)},
 		Submit:            submit,
 		passwordRequest:   passwordRequest{Password: pwd},
 	}
@@ -565,7 +565,7 @@ func (c *Client) TxSubsidy(from AddrOrNickname, amt, committeeID uint64, opCode 
 	return c.transactionRequest(TxSubsidyRouteName, txReq)
 }
 
-func (c *Client) TxCreateOrder(from AddrOrNickname, sellAmount, receiveAmount, committeeID uint64, receiveAddress string,
+func (c *Client) TxCreateOrder(from AddrOrNickname, sellAmount, receiveAmount, chainId uint64, receiveAddress string,
 	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	receiveAddr, err := lib.NewHexBytesFromString(receiveAddress)
 	if err != nil {
@@ -579,7 +579,7 @@ func (c *Client) TxCreateOrder(from AddrOrNickname, sellAmount, receiveAmount, c
 		ReceiveAddress:       receiveAddr,
 		passwordRequest:      passwordRequest{Password: pwd},
 		txChangeParamRequest: txChangeParamRequest{},
-		committeesRequest:    committeesRequest{fmt.Sprintf("%d", committeeID)},
+		committeesRequest:    committeesRequest{fmt.Sprintf("%d", chainId)},
 	}
 	txReq, err = setFrom(from, txReq)
 	if err != nil {
@@ -588,7 +588,7 @@ func (c *Client) TxCreateOrder(from AddrOrNickname, sellAmount, receiveAmount, c
 	return c.transactionRequest(TxCreateOrderRouteName, txReq)
 }
 
-func (c *Client) TxEditOrder(from AddrOrNickname, sellAmount, receiveAmount, orderId, committeeID uint64, receiveAddress string,
+func (c *Client) TxEditOrder(from AddrOrNickname, sellAmount, receiveAmount, orderId, chainId uint64, receiveAddress string,
 	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	receiveAddr, err := lib.NewHexBytesFromString(receiveAddress)
 	if err != nil {
@@ -603,7 +603,7 @@ func (c *Client) TxEditOrder(from AddrOrNickname, sellAmount, receiveAmount, ord
 		OrderId:              orderId,
 		passwordRequest:      passwordRequest{Password: pwd},
 		txChangeParamRequest: txChangeParamRequest{},
-		committeesRequest:    committeesRequest{fmt.Sprintf("%d", committeeID)},
+		committeesRequest:    committeesRequest{fmt.Sprintf("%d", chainId)},
 	}
 	txReq, err = setFrom(from, txReq)
 	if err != nil {
@@ -612,14 +612,14 @@ func (c *Client) TxEditOrder(from AddrOrNickname, sellAmount, receiveAmount, ord
 	return c.transactionRequest(TxEditOrderRouteName, txReq)
 }
 
-func (c *Client) TxDeleteOrder(from AddrOrNickname, orderId, committeeID uint64,
+func (c *Client) TxDeleteOrder(from AddrOrNickname, orderId, chainId uint64,
 	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	txReq := txRequest{
 		Fee:               optFee,
 		Submit:            submit,
 		OrderId:           orderId,
 		passwordRequest:   passwordRequest{Password: pwd},
-		committeesRequest: committeesRequest{fmt.Sprintf("%d", committeeID)},
+		committeesRequest: committeesRequest{fmt.Sprintf("%d", chainId)},
 	}
 	var err lib.ErrorI
 	txReq, err = setFrom(from, txReq)
@@ -841,10 +841,10 @@ func (c *Client) heightRequest(routeName string, height uint64, ptr any) (err li
 	return
 }
 
-func (c *Client) orderRequest(routeName string, height, orderId, committeeId uint64, ptr any) (err lib.ErrorI) {
+func (c *Client) orderRequest(routeName string, height, orderId, chainId uint64, ptr any) (err lib.ErrorI) {
 	bz, err := lib.MarshalJSON(orderRequest{
-		CommitteeId: committeeId,
-		OrderId:     orderId,
+		ChainId: chainId,
+		OrderId: orderId,
 		heightRequest: heightRequest{
 			Height: height,
 		},

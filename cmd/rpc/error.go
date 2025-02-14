@@ -43,5 +43,5 @@ func ErrReadBody(err error) lib.ErrorI {
 }
 
 func ErrStringToCommittee(s string) lib.ErrorI {
-	return lib.NewError(lib.CodeStringToCommittee, lib.RPCModule, fmt.Sprintf("committee arg %s is invalid, requires a comma separated list of <committeeID>=<percent> ex. 0=50,21=25,99=25", s))
+	return lib.NewError(lib.CodeStringToCommittee, lib.RPCModule, fmt.Sprintf("committee arg %s is invalid, requires a comma separated list of <chainId>=<percent> ex. 0=50,21=25,99=25", s))
 }

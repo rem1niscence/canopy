@@ -69,6 +69,13 @@ var startCmd = &cobra.Command{
 
 // Start() is the entrypoint of the application
 func Start() {
+	// allow sleep and wake up using config
+	wakeDate := time.Unix(int64(config.SleepUntil), 0)
+	if time.Now().Before(wakeDate) {
+		untilTime := time.Until(wakeDate)
+		l.Infof("Sleeping until %s", untilTime.String())
+		time.Sleep(untilTime)
+	}
 	// create a new database object from the config
 	db, err := store.New(config, l)
 	if err != nil {
@@ -245,7 +252,7 @@ func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFile
 		Validators: []*types.Validator{{
 			Address:      addr.Bytes(),
 			PublicKey:    consPubKey.Bytes(),
-			Committees:   []uint64{lib.CanopyCommitteeId},
+			Committees:   []uint64{lib.CanopyChainId},
 			NetAddress:   "tcp://localhost",
 			StakedAmount: 1000000000000,
 			Output:       addr.Bytes(),

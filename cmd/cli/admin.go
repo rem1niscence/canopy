@@ -138,7 +138,7 @@ var (
 	txStakeCmd = &cobra.Command{
 		Use:     "tx-stake <address or nickname> <net-address> <amount> <committees> <output> <signer address or nickname> --delegated --early-withdrawal --fee=10000 --simulate=true",
 		Short:   "stake a validator",
-		Long:    "tx-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of committeeIds> <address for rewards> <signer address>--delegated --early-withdrawal  --fee=10000 --simulate=true",
+		Long:    "tx-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of chainIds> <address for rewards> <signer address>--delegated --early-withdrawal  --fee=10000 --simulate=true",
 		Example: "tx-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9000 100000000 0,21,22 abc3c8dff19da7682f7fe5fde062c813b55c9abc dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
 		Args:    cobra.MinimumNArgs(6),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -149,7 +149,7 @@ var (
 	txEditStakeCmd = &cobra.Command{
 		Use:     "tx-edit-stake <address or nickname> <net-address> <amount> <committees> <output> <signer address or nickname> --delegated --early-withdrawal --fee=10000 --simulate=true",
 		Short:   "edit-stake an active validator. Use the existing value to not edit a field",
-		Long:    "tx-edit-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of committeeIds> <address for rewards> <address for rewards> <signer address> --delegated --early-withdrawal  --fee=10000 --simulate=true",
+		Long:    "tx-edit-stake <address that signs blocks and operates the validators> <url where the node hosted> <the amount to be staked> <comma separated list of chainIds> <address for rewards> <address for rewards> <signer address> --delegated --early-withdrawal  --fee=10000 --simulate=true",
 		Example: "tx-edit-stake dfd3c8dff19da7682f7fe5fde062c813b55c9eee https://canopy-rocks.net:9001 100000001 0,21,22 abc3c8dff19da7682f7fe5fde062c813b55c9abc dfd3c8dff19da7682f7fe5fde062c813b55c9eee",
 		Args:    cobra.MinimumNArgs(6),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -206,7 +206,7 @@ var (
 	}
 
 	txSubsidyCmd = &cobra.Command{
-		Use:   "tx-subsidy <address or nickname> <amount> <committee-id> <opcode> --fee=10000 --simulate=true",
+		Use:   "tx-subsidy <address or nickname> <amount> <chain-id> <opcode> --fee=10000 --simulate=true",
 		Short: "subsidize the reward pool of a committee - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(4),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -215,7 +215,7 @@ var (
 	}
 
 	txCreateOrderCmd = &cobra.Command{
-		Use:   "tx-create-order <address or nickname> <sell-amount> <receive-amount> <committee-id> <receive-address> --fee=10000 --simulate=true",
+		Use:   "tx-create-order <address or nickname> <sell-amount> <receive-amount> <chain-id> <receive-address> --fee=10000 --simulate=true",
 		Short: "create a sell order - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(5),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -224,7 +224,7 @@ var (
 	}
 
 	txEditOrderCmd = &cobra.Command{
-		Use:   "tx-edit-order <address or nickname> <sell-amount> <receive-amount> <order-id> <committee-id> <receive-address> --fee=10000 --simulate=true",
+		Use:   "tx-edit-order <address or nickname> <sell-amount> <receive-amount> <order-id> <chain-id> <receive-address> --fee=10000 --simulate=true",
 		Short: "edit an existing sell order - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(6),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -233,7 +233,7 @@ var (
 	}
 
 	txDeleteOrderCmd = &cobra.Command{
-		Use:   "tx-delete-order <address or nickname> <order-id> <committee-id>--fee=10000 --simulate=true",
+		Use:   "tx-delete-order <address or nickname> <order-id> <chain-id>--fee=10000 --simulate=true",
 		Short: "delete an existing sell order - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {

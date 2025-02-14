@@ -1,11 +1,13 @@
-let rpcURL = "http://127.0.0.1:50002"; // default value for the RPC URL
-let baseChainRPCURL = rpcURL; // default BaseChain RPC URL
+let rpcURL = "http://localhost:50002"; // default value for the RPC URL
 let chainId = 1; // default chain id
 
-if (typeof window !== "undefined" && window.__CONFIG__) {
-  rpcURL = window.__CONFIG__.rpcURL;
-  baseChainRPCURL = window.__CONFIG__.baseChainRPCURL;
-  chainId = Number(window.__CONFIG__.chainId);
+if (typeof window !== "undefined") {
+  if (window.__CONFIG__) {
+    rpcURL = window.__CONFIG__.rpcURL;
+    chainId = Number(window.__CONFIG__.chainId);
+  }
+  rpcURL = rpcURL.replace("localhost", window.location.hostname)
+  console.log(rpcURL)
 } else {
   console.log("config undefined");
 }
@@ -32,16 +34,20 @@ const ordersPath = "/v1/query/orders";
 // POST
 
 export async function POST(request, path) {
-  let resp = await fetch(rpcURL + path, {
+  return fetch(rpcURL + path, {
     method: "POST",
     body: request,
-  }).catch((rejected) => {
-    console.log(rejected);
-  });
-  if (resp == null) {
-    return {};
-  }
-  return resp.json();
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        return Promise.reject(response);
+      }
+      return response.json();
+    })
+    .catch((rejected) => {
+      console.log(rejected);
+      return Promise.reject(rejected);
+    });
 }
 
 // REQUEST OBJECTS BELOW
@@ -92,8 +98,8 @@ export function Validators(page, _) {
   return POST(pageHeightReq(page, 0), validatorsPath);
 }
 
-export function Committee(page, committee_id) {
-  return POST(validatorsReq(page, 0, committee_id), validatorsPath);
+export function Committee(page, chain_id) {
+  return POST(validatorsReq(page, 0, chain_id), validatorsPath);
 }
 
 export function DAO(height, _) {
@@ -148,8 +154,8 @@ export function Pending(page, _) {
   return POST(pageAddrReq(page, ""), pendingPath);
 }
 
-export function Orders(committee_id) {
-  return POST(heightAndIDRequest(0, committee_id), ordersPath);
+export function Orders(chain_id) {
+  return POST(heightAndIDRequest(0, chain_id), ordersPath);
 }
 
 // COMPONENT SPECIFIC API CALLS BELOW
@@ -163,7 +169,7 @@ export async function getModalData(query, page) {
     // Block by hash
     if (query.length === 64) {
       const block = await BlockByHash(query);
-      if (block?.block_header?.hash) return { block: block };
+      if (block?.block_header?.hash) return { block };
 
       const tx = await TxByHash(query);
       return tx?.sender ? tx : noResult;
@@ -171,9 +177,13 @@ export async function getModalData(query, page) {
 
     // Validator or account by address
     if (query.length === 40) {
-      const [val, acc] = await Promise.all([Validator(0, query), AccountWithTxs(0, query, page)]);
-      if (!acc.account.address && !val.address) return noResult;
-      return acc.account.address ? { ...acc, validator: val } : { validator: val };
+      const [valResult, accResult] = await Promise.allSettled([Validator(0, query), AccountWithTxs(0, query, page)]);
+
+      const val = valResult.status === "fulfilled" ? valResult.value : null;
+      const acc = accResult.status === "fulfilled" ? accResult.value : null;
+
+      if (!acc?.account?.address && !val?.address) return noResult;
+      return acc?.account?.address ? { ...acc, validator: val } : { validator: val };
     }
 
     return noResult;
@@ -181,7 +191,7 @@ export async function getModalData(query, page) {
 
   // Handle block by height
   const block = await BlockByHeight(query);
-  return block?.block_header?.hash ? { block: block } : noResult;
+  return block?.block_header?.hash ? { block } : noResult;
 }
 
 // getCardData() executes api calls and prepares the data for the cards

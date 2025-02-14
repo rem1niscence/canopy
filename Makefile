@@ -24,10 +24,13 @@ build-explorer:
 	cd $(EXPLORER_DIR) && npm install && npm run build
 
 docker-up:
-	cd $(DOCKER_DIR) && docker-compose down && docker-compose up --build
+	cd $(DOCKER_DIR) && docker-compose down && docker-compose up --build -d
 
 docker-down:
 	cd $(DOCKER_DIR) && docker-compose down
 
 docker-up-fast:
-	cd $(DOCKER_DIR) && docker-compose down && docker-compose up
+	cd $(DOCKER_DIR) && docker-compose down && docker-compose up -d
+	
+docker-logs:
+	cd $(DOCKER_DIR) && docker-compose logs -f

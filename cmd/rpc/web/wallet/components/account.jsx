@@ -1,7 +1,3 @@
-import { useState, useContext, useRef, useEffect } from "react";
-import JsonView from "@uiw/react-json-view";
-import Truncate from "react-truncate-inside";
-import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
 import {
   KeystoreGet,
   KeystoreImport,
@@ -20,17 +16,17 @@ import {
 import FormInputs from "@/components/form_inputs";
 import {
   copy,
+  downloadJSON,
   formatNumber,
   getFormInputs,
   numberFromCommas,
   objEmpty,
   onFormSubmit,
   renderToast,
-  withTooltip,
-  toUCNPY,
-  toCNPY,
-  downloadJSON,
   retryWithDelay,
+  toCNPY,
+  toUCNPY,
+  withTooltip,
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 import {
@@ -46,6 +42,11 @@ import {
   SwapIcon,
   UnstakeIcon,
 } from "@/components/svg_icons";
+import JsonView from "@uiw/react-json-view";
+import { useContext, useEffect, useRef, useState } from "react";
+import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
+import Alert from "react-bootstrap/Alert";
+import Truncate from "react-truncate-inside";
 
 function Keystore() {
   const keystore = useContext(KeystoreContext);
@@ -82,6 +83,8 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
       pk: {},
       toast: "",
       showSpinner: false,
+      showAlert: false,
+      alertMsg: "",
       primaryColor: "",
       greyColor: "",
     }),
@@ -259,7 +262,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
         create_order: () =>
           TxCreateOrder(
             r.sender,
-            r.committeeId,
+            r.chainId,
             amount,
             receiveAmount,
             r.receiveAddress,
@@ -272,7 +275,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
         edit_order: () =>
           TxEditOrder(
             r.sender,
-            r.committeeId,
+            r.chainId,
             numberFromCommas(r.orderId),
             amount,
             receiveAmount,
@@ -282,14 +285,23 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
             r.password,
             submit,
           ),
-        delete_order: () => TxDeleteOrder(r.sender, r.committeeId, r.orderId, r.memo, fee, r.password, submit),
+        delete_order: () => TxDeleteOrder(r.sender, r.chainId, r.orderId, r.memo, fee, r.password, submit),
       };
 
       const txFunction = txMap[state.txType];
       if (txFunction) {
-        txFunction().then((result) => {
-          setState({ ...state, showSubmit: !submit, txResult: result });
-        });
+        setState({ ...state, showAlert: false });
+        txFunction()
+          .then((result) => {
+            setState({ ...state, showSubmit: !submit, txResult: result, showAlert: false });
+          })
+          .catch((e) => {
+            setState({
+              ...state,
+              showAlert: true,
+              alertMsg: "Transaction failed. Please verify the fields and try again.",
+            });
+          });
       }
     });
   }
@@ -333,6 +345,8 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
         state={state}
         closeOnClick={resetState}
         keystore={ks}
+        showAlert={state.showAlert}
+        alertMsg={state.alertMsg}
       />
       {transactionButtons.map((v, i) => (
         <RenderActionButton key={i} v={v} i={i} showModal={showModal} />
@@ -548,6 +562,8 @@ function RenderModal({
   state,
   closeOnClick,
   keystore,
+  showAlert = false,
+  alertMsg,
 }) {
   return (
     <Modal show={show} size="lg" onHide={onHide}>
@@ -573,6 +589,7 @@ function RenderModal({
             show={show}
             validator={validator}
           />
+          {showAlert && <Alert variant={"danger"}>{alertMsg}</Alert>}
           <JSONViewer pk={state.pk} txResult={state.txResult} />
           <Spinner style={{ display: state.showSpinner ? "block" : "none", margin: "0 auto" }} />
         </Modal.Body>

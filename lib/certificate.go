@@ -39,12 +39,12 @@ func init() {
 		},
 		LastQuorumCertificate: &QuorumCertificate{
 			Header: &View{
-				NetworkId:    math.MaxInt8,
-				CommitteeId:  math.MaxUint64,
-				Height:       math.MaxUint64,
-				CanopyHeight: math.MaxUint64,
-				Round:        math.MaxUint64,
-				Phase:        math.MaxInt8,
+				NetworkId:  math.MaxInt8,
+				ChainId:    math.MaxUint64,
+				Height:     math.MaxUint64,
+				RootHeight: math.MaxUint64,
+				Round:      math.MaxUint64,
+				Phase:      math.MaxInt8,
 			},
 			ResultsHash: crypto.MaxHash,
 			BlockHash:   crypto.MaxHash,
@@ -128,7 +128,7 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 			}
 			// check the block hash
 			if !bytes.Equal(x.BlockHash, hash) {
-				return ErrMismatchBlockHash()
+				return ErrMismatchBlockHash("qc.CheckBasic")
 			}
 			blockSize := len(x.Block)
 			// global max block size enforcement
@@ -144,7 +144,7 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 			return ErrMismatchResultsHash()
 		}
 		if len(x.BlockHash) != 0 || len(x.Block) != 0 {
-			return ErrMismatchBlockHash()
+			return ErrNonNilBlock()
 		}
 	}
 	// ensure a valid aggregate signature is possible
@@ -181,8 +181,8 @@ func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommi
 	}
 	// invalid 'historical committee', must be before the last committee height saved in the state
 	// if not, there is a potential for a long range attack
-	if stateCommitteeHeight > x.Header.CanopyHeight {
-		return ErrWrongCanopyHeight()
+	if stateCommitteeHeight > x.Header.RootHeight {
+		return ErrWrongRootHeight()
 	}
 	// enforce same target height
 	if x.Header.Height != view.Height {
@@ -640,11 +640,11 @@ func (x *CommitteeData) Combine(f *CommitteeData) ErrorI {
 	// this is to ensure both Proposals have the latest Block and Meta information
 	// in the case where the caller uses a pattern where there may be a stale Block/Meta
 	*x = CommitteeData{
-		PaymentPercents:         x.PaymentPercents,
-		NumberOfSamples:         x.NumberOfSamples + 1,
-		CommitteeId:             f.CommitteeId,
-		LastCanopyHeightUpdated: f.LastCanopyHeightUpdated,
-		LastChainHeightUpdated:  f.LastChainHeightUpdated,
+		PaymentPercents:        x.PaymentPercents,
+		NumberOfSamples:        x.NumberOfSamples + 1,
+		ChainId:                f.ChainId,
+		LastRootHeightUpdated:  f.LastRootHeightUpdated,
+		LastChainHeightUpdated: f.LastChainHeightUpdated,
 	}
 	return nil
 }

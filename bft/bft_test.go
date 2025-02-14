@@ -67,12 +67,12 @@ func TestStartElectionPhase(t *testing.T) {
 			} else {
 				// if supposed to be a 'candidate', validate the ELECTION message
 				expectedView := lib.View{
-					Height:       1,
-					Round:        0,
-					Phase:        Election,
-					CanopyHeight: 1,
-					NetworkId:    1,
-					CommitteeId:  lib.CanopyCommitteeId,
+					Height:     1,
+					Round:      0,
+					Phase:      Election,
+					RootHeight: 1,
+					NetworkId:  1,
+					ChainId:    lib.CanopyChainId,
 				}
 				select {
 				case <-time.After(testTimeout):
@@ -141,12 +141,12 @@ func TestStartElectionVotePhase(t *testing.T) {
 				}
 			}
 			pub, _, expectedView := c.valKeys[0].PublicKey(), c.valKeys[0], lib.View{
-				NetworkId:    lib.CanopyMainnetNetworkId,
-				CommitteeId:  lib.CanopyCommitteeId,
-				Height:       1,
-				CanopyHeight: 1,
-				Round:        0,
-				Phase:        ElectionVote,
+				NetworkId:  lib.CanopyMainnetNetworkId,
+				ChainId:    lib.CanopyChainId,
+				Height:     1,
+				RootHeight: 1,
+				Round:      0,
+				Phase:      ElectionVote,
 			}
 			go c.bft.StartElectionVotePhase()
 			select {
@@ -217,19 +217,19 @@ func TestStartProposePhase(t *testing.T) {
 				multiKey = c.simElectionVotePhase(t, 0, test.hasBE, test.hasLivenessHQC, test.hasSafetyHQC, 0)
 			}
 			expectedView, expectedQCView := lib.View{
-				NetworkId:    lib.CanopyMainnetNetworkId,
-				CommitteeId:  lib.CanopyCommitteeId,
-				Height:       1,
-				Round:        0,
-				Phase:        Propose,
-				CanopyHeight: 1,
+				NetworkId:  lib.CanopyMainnetNetworkId,
+				ChainId:    lib.CanopyChainId,
+				Height:     1,
+				Round:      0,
+				Phase:      Propose,
+				RootHeight: 1,
 			}, lib.View{
-				NetworkId:    lib.CanopyMainnetNetworkId,
-				CommitteeId:  lib.CanopyCommitteeId,
-				Height:       1,
-				CanopyHeight: 1,
-				Round:        0,
-				Phase:        ElectionVote,
+				NetworkId:  lib.CanopyMainnetNetworkId,
+				ChainId:    lib.CanopyChainId,
+				Height:     1,
+				RootHeight: 1,
+				Round:      0,
+				Phase:      ElectionVote,
 			}
 			go c.bft.StartProposePhase()
 			select {
@@ -324,12 +324,12 @@ func TestStartProposeVotePhase(t *testing.T) {
 			}
 			_, results := c.simProposePhase(t, 0, test.validProposal, be, highQC, 0)
 			expectedView := lib.View{
-				Height:       1,
-				Round:        0,
-				Phase:        ProposeVote,
-				CanopyHeight: 1,
-				NetworkId:    1,
-				CommitteeId:  lib.CanopyCommitteeId,
+				Height:     1,
+				Round:      0,
+				Phase:      ProposeVote,
+				RootHeight: 1,
+				NetworkId:  1,
+				ChainId:    lib.CanopyChainId,
 			}
 			// valid proposal
 			go c.bft.StartProposeVotePhase()
@@ -385,19 +385,19 @@ func TestStartPrecommitPhase(t *testing.T) {
 			// setup
 			c, multiKey, blockHash, resultsHash := newTestConsensus(t, Precommit, 3), crypto.MultiPublicKeyI(nil), []byte(nil), []byte(nil)
 			expectedView, expectedQCView := lib.View{
-				Height:       1,
-				Round:        0,
-				Phase:        Precommit,
-				CanopyHeight: 1,
-				NetworkId:    lib.CanopyMainnetNetworkId,
-				CommitteeId:  lib.CanopyCommitteeId,
+				Height:     1,
+				Round:      0,
+				Phase:      Precommit,
+				RootHeight: 1,
+				NetworkId:  lib.CanopyMainnetNetworkId,
+				ChainId:    lib.CanopyChainId,
 			}, lib.View{
-				Height:       1,
-				Round:        0,
-				Phase:        ProposeVote,
-				CanopyHeight: 1,
-				NetworkId:    lib.CanopyMainnetNetworkId,
-				CommitteeId:  lib.CanopyCommitteeId,
+				Height:     1,
+				Round:      0,
+				Phase:      ProposeVote,
+				RootHeight: 1,
+				NetworkId:  lib.CanopyMainnetNetworkId,
+				ChainId:    lib.CanopyChainId,
 			}
 			if test.has23MajPropVote {
 				multiKey, blockHash, resultsHash = c.simProposeVotePhase(t, test.isProposer, true, 0)
@@ -477,12 +477,12 @@ func TestStartPrecommitVotePhase(t *testing.T) {
 				c.bft.ProposerKey = []byte("some other proposer")
 			}
 			expectedView := lib.View{
-				NetworkId:    lib.CanopyMainnetNetworkId,
-				CommitteeId:  lib.CanopyCommitteeId,
-				Height:       1,
-				Round:        0,
-				CanopyHeight: 1,
-				Phase:        PrecommitVote,
+				NetworkId:  lib.CanopyMainnetNetworkId,
+				ChainId:    lib.CanopyChainId,
+				Height:     1,
+				Round:      0,
+				RootHeight: 1,
+				Phase:      PrecommitVote,
 			}
 			go c.bft.StartPrecommitVotePhase()
 			select {
@@ -537,19 +537,19 @@ func TestStartCommitPhase(t *testing.T) {
 			c := newTestConsensus(t, Commit, 3)
 			multiKey, blockHash, resultsHash := crypto.MultiPublicKeyI(nil), []byte(nil), []byte(nil)
 			expectedView, expectedQCView := lib.View{
-				NetworkId:    lib.CanopyMainnetNetworkId,
-				CommitteeId:  lib.CanopyCommitteeId,
-				Height:       1,
-				Round:        0,
-				CanopyHeight: 1,
-				Phase:        Commit,
+				NetworkId:  lib.CanopyMainnetNetworkId,
+				ChainId:    lib.CanopyChainId,
+				Height:     1,
+				Round:      0,
+				RootHeight: 1,
+				Phase:      Commit,
 			}, lib.View{
-				NetworkId:    lib.CanopyMainnetNetworkId,
-				CommitteeId:  lib.CanopyCommitteeId,
-				Height:       1,
-				Round:        0,
-				CanopyHeight: 1,
-				Phase:        PrecommitVote,
+				NetworkId:  lib.CanopyMainnetNetworkId,
+				ChainId:    lib.CanopyChainId,
+				Height:     1,
+				Round:      0,
+				RootHeight: 1,
+				Phase:      PrecommitVote,
 			}
 			if !test.isProposer {
 				c.bft.ProposerKey = []byte("some other proposer")
@@ -654,12 +654,12 @@ func TestStartCommitProcessPhase(t *testing.T) {
 				multiKey, block, results = c.simCommitPhase(t, 1, 1)
 			}
 			expectedQCView := lib.View{
-				Height:       1,
-				Round:        1,
-				CanopyHeight: 1,
-				NetworkId:    lib.CanopyMainnetNetworkId,
-				CommitteeId:  lib.CanopyCommitteeId,
-				Phase:        PrecommitVote,
+				Height:     1,
+				Round:      1,
+				RootHeight: 1,
+				NetworkId:  lib.CanopyMainnetNetworkId,
+				ChainId:    lib.CanopyChainId,
+				Phase:      PrecommitVote,
 			}
 			if test.hasEVDSE {
 				c.bft.ProposerKey = c.valKeys[1].PublicKey().Bytes()
@@ -698,12 +698,12 @@ func TestRoundInterrupt(t *testing.T) {
 		msg, ok := m.(*Message)
 		require.True(t, ok)
 		require.EqualExportedValues(t, msg.Qc.Header, &lib.View{
-			NetworkId:    lib.CanopyMainnetNetworkId,
-			Height:       1,
-			Round:        0,
-			CanopyHeight: 1,
-			CommitteeId:  lib.CanopyCommitteeId,
-			Phase:        RoundInterrupt,
+			NetworkId:  lib.CanopyMainnetNetworkId,
+			Height:     1,
+			Round:      0,
+			RootHeight: 1,
+			ChainId:    lib.CanopyChainId,
+			Phase:      RoundInterrupt,
 		})
 		require.Equal(t, c.bft.Phase, RoundInterrupt)
 	}

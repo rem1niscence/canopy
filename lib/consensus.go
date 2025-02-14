@@ -77,21 +77,21 @@ func (vs *ValidatorSet) GetValidatorAndIdx(publicKey []byte) (val *ConsensusVali
 	return nil, 0, ErrValidatorNotInSet(publicKey)
 }
 
-// BaseChainInfo maintains base-chain data needed for consensus
-type BaseChainInfo struct {
+// RootChainInfo maintains root-Chain data needed for consensus
+type RootChainInfo struct {
 	Height                 uint64         `json:"height"`
 	ValidatorSet           ValidatorSet   `json:"validator_set"`
 	LastValidatorSet       ValidatorSet   `json:"last_validator_set"`
 	LastProposers          *Proposers     `json:"last_proposers"`
 	MinimumEvidenceHeight  uint64         `json:"minimum_evidence_height"`
-	LastChainHeightUpdated uint64         `json:"last_canopy_height_updated"`
+	LastChainHeightUpdated uint64         `json:"last_root_height_updated"`
 	LotteryWinner          *LotteryWinner `json:"lottery_winner"`
 	Orders                 *OrderBook     `json:"orders"`
 	RemoteCallbacks        *RemoteCallbacks
 	Log                    LoggerI
 }
 
-// RemoteCallbacks are fallback rpc callbacks to the base-chain
+// RemoteCallbacks are fallback rpc callbacks to the root-Chain
 type RemoteCallbacks struct {
 	Checkpoint            func(height, id uint64) (blockHash HexBytes, i ErrorI)
 	ValidatorSet          func(height, id uint64) (ValidatorSet, ErrorI)
@@ -101,14 +101,14 @@ type RemoteCallbacks struct {
 	MinimumEvidenceHeight func(height uint64) (p *uint64, err ErrorI)
 	CommitteeData         func(height, id uint64) (p *CommitteeData, err ErrorI)
 	Lottery               func(height, id uint64) (p *LotteryWinner, err ErrorI)
-	Orders                func(height, committeeId uint64) (p *OrderBooks, err ErrorI)
+	Orders                func(height, chainId uint64) (p *OrderBooks, err ErrorI)
 }
 
-// GetHeight() returns the height from the base-chain
-func (b *BaseChainInfo) GetHeight() uint64 { return b.Height }
+// GetHeight() returns the height from the root-Chain
+func (b *RootChainInfo) GetHeight() uint64 { return b.Height }
 
-// GetValidatorSet() returns the validator set from the base-chain
-func (b *BaseChainInfo) GetValidatorSet(id, height uint64) (ValidatorSet, ErrorI) {
+// GetValidatorSet() returns the validator set from the root-Chain
+func (b *RootChainInfo) GetValidatorSet(id, height uint64) (ValidatorSet, ErrorI) {
 	if height == b.Height {
 		return NewValidatorSet(b.ValidatorSet.ValidatorSet)
 	}
@@ -119,8 +119,8 @@ func (b *BaseChainInfo) GetValidatorSet(id, height uint64) (ValidatorSet, ErrorI
 	return b.RemoteCallbacks.ValidatorSet(height, id)
 }
 
-// GetLastProposers() returns the last proposers from the base-chain
-func (b *BaseChainInfo) GetLastProposers(height uint64) (*Proposers, ErrorI) {
+// GetLastProposers() returns the last proposers from the root-Chain
+func (b *RootChainInfo) GetLastProposers(height uint64) (*Proposers, ErrorI) {
 	if height == b.Height {
 		return b.LastProposers, nil
 	}
@@ -128,8 +128,8 @@ func (b *BaseChainInfo) GetLastProposers(height uint64) (*Proposers, ErrorI) {
 	return b.RemoteCallbacks.LastProposers(height)
 }
 
-// GetOrders() returns the order book from the base-chain
-func (b *BaseChainInfo) GetOrders(height, id uint64) (*OrderBook, ErrorI) {
+// GetOrders() returns the order book from the root-Chain
+func (b *RootChainInfo) GetOrders(height, id uint64) (*OrderBook, ErrorI) {
 	if height == b.Height {
 		return b.Orders, nil
 	}
@@ -141,8 +141,8 @@ func (b *BaseChainInfo) GetOrders(height, id uint64) (*OrderBook, ErrorI) {
 	return books.OrderBooks[0], nil
 }
 
-// GetMinimumEvidenceHeight() returns the minimum evidence height from the base-chain
-func (b *BaseChainInfo) GetMinimumEvidenceHeight(height uint64) (i uint64, err ErrorI) {
+// GetMinimumEvidenceHeight() returns the minimum evidence height from the root-Chain
+func (b *RootChainInfo) GetMinimumEvidenceHeight(height uint64) (i uint64, err ErrorI) {
 	if height == b.Height {
 		return b.MinimumEvidenceHeight, nil
 	}
@@ -155,19 +155,19 @@ func (b *BaseChainInfo) GetMinimumEvidenceHeight(height uint64) (i uint64, err E
 }
 
 // IsValidDoubleSigner() returns if an address is a valid double signer
-func (b *BaseChainInfo) IsValidDoubleSigner(height uint64, address string) (*bool, ErrorI) {
+func (b *RootChainInfo) IsValidDoubleSigner(height uint64, address string) (*bool, ErrorI) {
 	b.Log.Warnf("Executing remote IsValidDoubleSigner call with requested height %d and address %s", height, address)
 	return b.RemoteCallbacks.IsValidDoubleSigner(height, address)
 }
 
 // GetCheckpoint() returns the checkpoint if any for a specific chain height
-func (b *BaseChainInfo) GetCheckpoint(height, chainId uint64) (blockHash HexBytes, err ErrorI) {
-	// TODO should be able to get these from the file or the base-chain upon independence
+func (b *RootChainInfo) GetCheckpoint(height, chainId uint64) (blockHash HexBytes, err ErrorI) {
+	// TODO should be able to get these from the file or the root-Chain upon independence
 	return b.RemoteCallbacks.Checkpoint(height, chainId)
 }
 
-// GetLastChainHeightUpdated() returns the last chain (target) height the committee (meta) data was updated from the base-chain
-func (b *BaseChainInfo) GetLastChainHeightUpdated(height, id uint64) (uint64, ErrorI) {
+// GetLastChainHeightUpdated() returns the last chain (target) height the committee (meta) data was updated from the root-Chain
+func (b *RootChainInfo) GetLastChainHeightUpdated(height, id uint64) (uint64, ErrorI) {
 	if height == b.Height {
 		return b.LastChainHeightUpdated, nil
 	}
@@ -179,8 +179,8 @@ func (b *BaseChainInfo) GetLastChainHeightUpdated(height, id uint64) (uint64, Er
 	return committeeData.LastChainHeightUpdated, nil
 }
 
-// GetLotteryWinner() returns the winner of the delegate lottery from the base-chain
-func (b *BaseChainInfo) GetLotteryWinner(height, id uint64) (*LotteryWinner, ErrorI) {
+// GetLotteryWinner() returns the winner of the delegate lottery from the root-Chain
+func (b *RootChainInfo) GetLotteryWinner(height, id uint64) (*LotteryWinner, ErrorI) {
 	if height == b.Height {
 		return b.LotteryWinner, nil
 	}
@@ -188,35 +188,35 @@ func (b *BaseChainInfo) GetLotteryWinner(height, id uint64) (*LotteryWinner, Err
 	return b.RemoteCallbacks.Lottery(height, id)
 }
 
-// baseChainInfoJSON is the encoding structure used for json for BaseChainInfo
-type baseChainInfoJSON struct {
-	Height                  uint64               `json:"height"`
-	Committee               *ConsensusValidators `json:"committee"`
-	LastCommittee           *ConsensusValidators `json:"last_committee"`
-	LastProposers           *Proposers           `json:"last_proposers"`
-	LastCanopyHeightUpdated uint64               `json:"last_canopy_height_updated"`
-	MinimumEvidenceHeight   uint64               `json:"minimum_evidence_height"`
-	LotteryWinner           *LotteryWinner       `json:"lottery_winner"`
-	Orders                  *OrderBook           `json:"orders"`
+// rootChainInfoJSON is the encoding structure used for json for RootChainInfo
+type rootChainInfoJSON struct {
+	Height                uint64               `json:"height"`
+	Committee             *ConsensusValidators `json:"committee"`
+	LastCommittee         *ConsensusValidators `json:"last_committee"`
+	LastProposers         *Proposers           `json:"last_proposers"`
+	LastRootHeightUpdated uint64               `json:"last_root_height_updated"`
+	MinimumEvidenceHeight uint64               `json:"minimum_evidence_height"`
+	LotteryWinner         *LotteryWinner       `json:"lottery_winner"`
+	Orders                *OrderBook           `json:"orders"`
 }
 
-// MarshalJSON() implements the json.Marshaller for BaseChainInfo
-func (b *BaseChainInfo) MarshalJSON() ([]byte, error) {
-	return json.Marshal(baseChainInfoJSON{
-		Height:                  b.Height,
-		Committee:               b.ValidatorSet.ValidatorSet,
-		LastCommittee:           b.LastValidatorSet.ValidatorSet,
-		LastProposers:           b.LastProposers,
-		LastCanopyHeightUpdated: b.LastChainHeightUpdated,
-		MinimumEvidenceHeight:   b.MinimumEvidenceHeight,
-		LotteryWinner:           b.LotteryWinner,
-		Orders:                  b.Orders,
+// MarshalJSON() implements the json.Marshaller for RootChainInfo
+func (b *RootChainInfo) MarshalJSON() ([]byte, error) {
+	return json.Marshal(rootChainInfoJSON{
+		Height:                b.Height,
+		Committee:             b.ValidatorSet.ValidatorSet,
+		LastCommittee:         b.LastValidatorSet.ValidatorSet,
+		LastProposers:         b.LastProposers,
+		LastRootHeightUpdated: b.LastChainHeightUpdated,
+		MinimumEvidenceHeight: b.MinimumEvidenceHeight,
+		LotteryWinner:         b.LotteryWinner,
+		Orders:                b.Orders,
 	})
 }
 
-// UnmarshalJSON() implements the json.Unmarshaler for BaseChainInfo
-func (b *BaseChainInfo) UnmarshalJSON(bz []byte) (err error) {
-	j := new(baseChainInfoJSON)
+// UnmarshalJSON() implements the json.Unmarshaler for RootChainInfo
+func (b *RootChainInfo) UnmarshalJSON(bz []byte) (err error) {
+	j := new(rootChainInfoJSON)
 	if err = json.Unmarshal(bz, j); err != nil {
 		return
 	}
@@ -225,13 +225,13 @@ func (b *BaseChainInfo) UnmarshalJSON(bz []byte) (err error) {
 		return
 	}
 	lastValidatorSet, _ := NewValidatorSet(j.LastCommittee)
-	*b = BaseChainInfo{
+	*b = RootChainInfo{
 		Height:                 j.Height,
 		ValidatorSet:           validatorSet,
 		LastValidatorSet:       lastValidatorSet,
 		LastProposers:          j.LastProposers,
 		MinimumEvidenceHeight:  j.MinimumEvidenceHeight,
-		LastChainHeightUpdated: j.LastCanopyHeightUpdated,
+		LastChainHeightUpdated: j.LastRootHeightUpdated,
 		LotteryWinner:          j.LotteryWinner,
 		Orders:                 j.Orders,
 	}
@@ -478,14 +478,14 @@ func (x *View) Check(view *View, enforceHeights bool) ErrorI {
 	if view.NetworkId != x.NetworkId {
 		return ErrWrongNetworkID()
 	}
-	if view.CommitteeId != x.CommitteeId {
-		return ErrWrongCommitteeID()
+	if view.ChainId != x.ChainId {
+		return ErrWrongChainId()
 	}
 	if enforceHeights && x.Height != view.Height {
 		return ErrWrongHeight()
 	}
-	if enforceHeights && x.CanopyHeight != view.CanopyHeight {
-		return ErrWrongCanopyHeight()
+	if enforceHeights && x.RootHeight != view.RootHeight {
+		return ErrWrongRootHeight()
 	}
 	return nil
 }
@@ -493,12 +493,12 @@ func (x *View) Check(view *View, enforceHeights bool) ErrorI {
 // Copy() returns a reference to a clone of the View
 func (x *View) Copy() *View {
 	return &View{
-		Height:       x.Height,
-		Round:        x.Round,
-		Phase:        x.Phase,
-		CanopyHeight: x.CanopyHeight,
-		NetworkId:    x.NetworkId,
-		CommitteeId:  x.CommitteeId,
+		Height:     x.Height,
+		Round:      x.Round,
+		Phase:      x.Phase,
+		RootHeight: x.RootHeight,
+		NetworkId:  x.NetworkId,
+		ChainId:    x.ChainId,
 	}
 }
 
@@ -511,10 +511,10 @@ func (x *View) Equals(v *View) bool {
 	if x.Height != v.Height {
 		return false
 	}
-	if x.CanopyHeight != v.CanopyHeight {
+	if x.RootHeight != v.RootHeight {
 		return false
 	}
-	if x.CommitteeId != v.CommitteeId {
+	if x.ChainId != v.ChainId {
 		return false
 	}
 	if x.NetworkId != v.NetworkId {
@@ -545,10 +545,10 @@ func (x *View) Less(v *View) bool {
 		return false
 	}
 	// if Canopy height is less
-	if x.CanopyHeight < v.CanopyHeight {
+	if x.RootHeight < v.RootHeight {
 		return true
 	}
-	if x.CanopyHeight > v.CanopyHeight {
+	if x.RootHeight > v.RootHeight {
 		return false
 	}
 	// if round is less
@@ -567,28 +567,28 @@ func (x *View) Less(v *View) bool {
 
 // ToString() returns the log string format of View
 func (x *View) ToString() string {
-	return fmt.Sprintf("(ID: %d H:%d, CH:%d, R:%d, P:%s)", x.CommitteeId, x.Height, x.CanopyHeight, x.Round, x.Phase)
+	return fmt.Sprintf("(ID: %d H:%d, CH:%d, R:%d, P:%s)", x.ChainId, x.Height, x.RootHeight, x.Round, x.Phase)
 }
 
 // jsonView represents the json.Marshaller and json.Unmarshaler implementation of View
 type jsonView struct {
-	Height       uint64 `json:"height"`
-	CanopyHeight uint64 `json:"committeeHeight"`
-	Round        uint64 `json:"round"`
-	Phase        string `json:"phase"` // string version of phase
-	NetworkID    uint64 `json:"networkID"`
-	CommitteeID  uint64 `json:"committeeID"`
+	Height     uint64 `json:"height"`
+	RootHeight uint64 `json:"committeeHeight"`
+	Round      uint64 `json:"round"`
+	Phase      string `json:"phase"` // string version of phase
+	NetworkID  uint64 `json:"networkID"`
+	ChainId    uint64 `json:"chainId"`
 }
 
 // MarshalJSON() implements the json.Marshaller interface
 func (x View) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonView{
-		Height:       x.Height,
-		CanopyHeight: x.CanopyHeight,
-		Round:        x.Round,
-		Phase:        Phase_name[int32(x.Phase)],
-		NetworkID:    x.NetworkId,
-		CommitteeID:  x.CommitteeId,
+		Height:     x.Height,
+		RootHeight: x.RootHeight,
+		Round:      x.Round,
+		Phase:      Phase_name[int32(x.Phase)],
+		NetworkID:  x.NetworkId,
+		ChainId:    x.ChainId,
 	})
 }
 
@@ -599,12 +599,12 @@ func (x *View) UnmarshalJSON(b []byte) (err error) {
 		return
 	}
 	*x = View{
-		NetworkId:    j.NetworkID,
-		CommitteeId:  j.CommitteeID,
-		Height:       j.Height,
-		CanopyHeight: j.CanopyHeight,
-		Round:        j.Round,
-		Phase:        Phase(Phase_value[j.Phase]),
+		NetworkId:  j.NetworkID,
+		ChainId:    j.ChainId,
+		Height:     j.Height,
+		RootHeight: j.RootHeight,
+		Round:      j.Round,
+		Phase:      Phase(Phase_value[j.Phase]),
 	}
 	return
 }

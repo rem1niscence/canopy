@@ -66,10 +66,6 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 		if x.Header.Height != b.Height {
 			return false, lib.ErrWrongHeight()
 		}
-		// validate committee height
-		//if x.Header.CanopyHeight != b.CanopyHeight { TODO this shouldn't be here cause it's stopping 'locks' with older Canopy heights from proceeding
-		//	return false, lib.ErrWrongCanopyHeight()
-		//}
 		// sanity check the VRF
 		if err = checkSignatureBasic(x.Vrf); err != nil {
 			return false, err
@@ -87,7 +83,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 			return
 		}
 		// load the proper committee
-		vals, err = b.LoadCommittee(x.Qc.Header.CanopyHeight) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
+		vals, err = b.LoadCommittee(x.Qc.Header.RootHeight) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
 		if err != nil {
 			return false, err
 		}
@@ -105,10 +101,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 		if x.Header.Height != b.Height {
 			return false, lib.ErrWrongHeight()
 		}
-		//if x.Header.CanopyHeight != b.CanopyHeight { TODO this shouldn't be here cause it's stopping 'locks' with older Canopy heights from proceeding
-		//	return false, lib.ErrWrongCanopyHeight()
-		//}
-		committeeHeightInState, e := b.LoadCommitteeHeightInState(b.CanopyHeight)
+		committeeHeightInState, e := b.LoadCommitteeHeightInState(b.RootHeight)
 		if e != nil {
 			return false, e
 		}
@@ -131,11 +124,11 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 		} else {
 			// in PRECOMMIT or COMMIT phase
 			if b.Block == nil || b.Results == nil {
-				return false, lib.ErrEmptyMessage()
+				return false, lib.ErrNoSavedBlockOrResults()
 			}
 			// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
 			if !bytes.Equal(x.Qc.BlockHash, b.GetBlockHash()) {
-				return false, lib.ErrMismatchBlockHash()
+				return false, lib.ErrMismatchBlockHash("CheckProposerMsg")
 			}
 			if !bytes.Equal(x.Qc.ResultsHash, b.Results.Hash()) {
 				return false, lib.ErrMismatchResultsHash()
@@ -176,11 +169,11 @@ func (b *BFT) CheckReplicaMessage(x *Message) lib.ErrorI {
 		// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
 		if b.Block == nil {
 			if !bytes.Equal(x.Qc.BlockHash, b.BlockToHash(x.Qc.Block)) {
-				return lib.ErrMismatchBlockHash()
+				return lib.ErrMismatchBlockHash("CheckReplicaMessage.Propose-Vote")
 			}
 		} else {
 			if !bytes.Equal(x.Qc.BlockHash, b.GetBlockHash()) {
-				return lib.ErrMismatchBlockHash()
+				return lib.ErrMismatchBlockHash("CheckReplicaMessage.Precommit-Vote")
 			}
 		}
 		if !bytes.Equal(x.Qc.ResultsHash, b.Results.Hash()) {

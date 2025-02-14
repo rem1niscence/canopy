@@ -42,6 +42,10 @@ func ErrEmptyMessage() lib.ErrorI {
 	return lib.NewError(lib.CodeEmptyMessage, lib.ConsensusModule, "empty consensus message")
 }
 
+func ErrNoSafeNodeJustification() lib.ErrorI {
+	return lib.NewError(lib.CodeNoSafeNodeJustification, lib.ConsensusModule, "no safe node justification")
+}
+
 func ErrMismatchPublicKeys() lib.ErrorI {
 	return lib.NewError(lib.CodeMismatchPublicKeys, lib.ConsensusModule, "mismatch public keys")
 }
