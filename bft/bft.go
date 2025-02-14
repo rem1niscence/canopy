@@ -6,18 +6,19 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"sort"
+	"strings"
 	"sync/atomic"
 	"time"
 )
 
 // BFT is a structure that holds data for a Hotstuff BFT instance
 type BFT struct {
-	*lib.View                            // the current period during which the BFT is occurring (Height/Round/Phase)
+	*lib.View                            // the current period during which the BFT is occurring (CreatedHeight/Round/Phase)
 	Votes         VotesForHeight         // 'votes' received from Replica (non-leader) Validators
 	Proposals     ProposalsForHeight     // 'proposals' received from the Leader Validator(s)
 	ProposerKey   []byte                 // the public key of the proposer
 	ValidatorSet  ValSet                 // the current set of Validators
-	HighQC        *QC                    // the highest PRECOMMIT quorum certificate the node is aware of for this Height
+	HighQC        *QC                    // the highest PRECOMMIT quorum certificate the node is aware of for this CreatedHeight
 	Block         []byte                 // the current Block being voted on (the foundational unit of the blockchain)
 	BlockHash     []byte                 // the current hash of the block being voted on
 	Results       *lib.CertificateResult // the current Result being voted on (reward and slash recipients)
@@ -137,6 +138,10 @@ func (b *BFT) Start() {
 					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
+					if strings.Contains(lib.BytesToString(b.PublicKey), "b88a5928") {
+						fmt.Println("SLEEPING")
+						time.Sleep(2 * time.Second)
+					}
 					// start BFT over after sleeping CommitProcessMS
 					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
 				}
@@ -257,7 +262,7 @@ func (b *BFT) StartElectionVotePhase() {
 			Header:      b.View.Copy(),
 			ProposerKey: b.ProposerKey, // using voting power, authorizes Candidate to act as the 'Leader'
 		},
-		HighQc:                 b.HighQC,                         // forward highest known 'Lock' for this Height, so the new Proposer may satisfy SAFE-NODE-PREDICATE
+		HighQc:                 b.HighQC,                         // forward highest known 'Lock' for this CreatedHeight, so the new Proposer may satisfy SAFE-NODE-PREDICATE
 		LastDoubleSignEvidence: b.ByzantineEvidence.DSE.Evidence, // forward any evidence of DoubleSigning
 		Vdf:                    b.HighVDF,                        // forward local VDF to the candidate
 	})
@@ -266,7 +271,7 @@ func (b *BFT) StartElectionVotePhase() {
 // StartProposePhase() begins the ProposePhase after the ELECTION-VOTE phase timeout
 // PROPOSE PHASE:
 // - Leader reviews the collected vote messages from Replicas
-//   - Determines the highest 'lock' (HighQC) if one exists for this Height
+//   - Determines the highest 'lock' (HighQC) if one exists for this CreatedHeight
 //   - Combines any ByzantineEvidence sent from Replicas into their own
 //   - Aggregates the signatures from the Replicas to form a +2/3 threshold multi-signature
 //
@@ -309,7 +314,7 @@ func (b *BFT) StartProposePhase() {
 // StartProposeVotePhase() begins the ProposeVote after the PROPOSE phase timeout
 // PROPOSE-VOTE PHASE:
 // - Replica reviews the message from the Leader by validating the justification (+2/3 multi-sig) proving that they are in-fact the leader
-// - If the Replica is currently Locked on a previous Proposal for this Height, the new Proposal must pass the SAFE-NODE-PREDICATE
+// - If the Replica is currently Locked on a previous Proposal for this CreatedHeight, the new Proposal must pass the SAFE-NODE-PREDICATE
 // - Replica Validates the proposal using the byzantine evidence and the specific plugin
 // - Replicas send a signed (aggregable) PROPOSE vote to the Leader
 func (b *BFT) StartProposeVotePhase() {
@@ -489,6 +494,7 @@ func (b *BFT) StartCommitProcessPhase() {
 func (b *BFT) RoundInterrupt() {
 	b.log.Warn(b.View.ToString())
 	b.Config.RoundInterruptTimeoutMS = b.msLeftInRound()
+	fmt.Printf("There is %d miliseconds left in the round\n", b.Config.RoundInterruptTimeoutMS)
 	b.Phase = RoundInterrupt
 	// send pacemaker message
 	b.SendToReplicas(b.ValidatorSet, &Message{
@@ -579,10 +585,10 @@ func (b *BFT) NewRound(newHeight bool) {
 	} else {
 		b.Round++
 	}
-	b.Block = nil
-	b.BlockHash = nil
-	b.Results = nil
+	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
+	b.Block, b.BlockHash, b.Results = nil, nil, nil
+	b.SortitionData = nil
 	b.Votes.NewRound(b.Round)
 	b.Proposals[b.Round] = make(map[string][]*Message)
 }
@@ -599,10 +605,6 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.PacemakerMessages = make(PacemakerMessages)
 	// reset PartialQCs
 	b.PartialQCs = make(PartialQCs)
-	// reset ProposerKey, Proposal, and Sortition data
-	b.ProposerKey = nil
-	b.Block, b.BlockHash, b.Results = nil, nil, nil
-	b.SortitionData = nil
 	// initialize Round 0
 	b.NewRound(true)
 	// set phase to Election
@@ -692,7 +694,7 @@ func (b *BFT) WaitTime(phase Phase, round uint64) (waitTime time.Duration) {
 	case RoundInterrupt:
 		waitTime = b.waitTime(b.Config.RoundInterruptTimeoutMS, round)
 	case Pacemaker:
-		waitTime = b.waitTime(b.Config.CommitProcessMS, round)
+		waitTime = b.waitTime(0, round)
 	}
 	return
 }

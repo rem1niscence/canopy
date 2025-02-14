@@ -119,7 +119,7 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 	defer func() { qc.Block = blk }()
 	// it's good practice to omit the block when sending the transaction as it's not relevant to canopy
 	qc.Block = nil
-	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, rootChainId, c.Config.NetworkID, 0, "")
+	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, rootChainId, c.Config.NetworkID, 0, c.RootChainHeight(), "")
 	if err != nil {
 		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return

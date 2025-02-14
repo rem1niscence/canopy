@@ -97,6 +97,9 @@ func (x *Transaction) CheckBasic() ErrorI {
 	if x.Signature == nil || x.Signature.Signature == nil || x.Signature.PublicKey == nil {
 		return ErrEmptySignature()
 	}
+	if x.CreatedHeight == 0 {
+		return ErrInvalidTxHeight()
+	}
 	if x.Time == 0 {
 		return ErrInvalidTxTime()
 	}
@@ -127,14 +130,15 @@ func (x *Transaction) GetSig() SignatureI { return x.Signature }
 // GetSignBytes() returns the canonical byte representation of the Transaction for signing and signature verification
 func (x *Transaction) GetSignBytes() ([]byte, ErrorI) {
 	return Marshal(&Transaction{
-		MessageType: x.MessageType,
-		Msg:         x.Msg,
-		Signature:   nil,
-		Time:        x.Time,
-		Fee:         x.Fee,
-		Memo:        x.Memo,
-		NetworkId:   x.NetworkId,
-		ChainId:     x.ChainId,
+		MessageType:   x.MessageType,
+		Msg:           x.Msg,
+		Signature:     nil,
+		Time:          x.Time,
+		CreatedHeight: x.CreatedHeight,
+		Fee:           x.Fee,
+		Memo:          x.Memo,
+		NetworkId:     x.NetworkId,
+		ChainId:       x.ChainId,
 	})
 }
 
@@ -152,14 +156,15 @@ func (x *Transaction) Sign(pk crypto.PrivateKeyI) ErrorI {
 }
 
 type jsonTx struct {
-	Type      string          `json:"type,omitempty"`
-	Msg       json.RawMessage `json:"msg,omitempty"`
-	Signature *Signature      `json:"signature,omitempty"`
-	Time      uint64          `json:"time,omitempty"`
-	Fee       uint64          `json:"fee,omitempty"`
-	Memo      string          `json:"memo,omitempty"`
-	NetworkId uint64          `json:"networkId,omitempty"`
-	ChainId   uint64          `json:"chainId,omitempty"`
+	Type          string          `json:"type,omitempty"`
+	Msg           json.RawMessage `json:"msg,omitempty"`
+	Signature     *Signature      `json:"signature,omitempty"`
+	Time          uint64          `json:"time,omitempty"`
+	CreatedHeight uint64          `json:"createdHeight,omitempty"`
+	Fee           uint64          `json:"fee,omitempty"`
+	Memo          string          `json:"memo,omitempty"`
+	NetworkId     uint64          `json:"networkId,omitempty"`
+	ChainId       uint64          `json:"chainId,omitempty"`
 }
 
 // nolint:all
@@ -177,14 +182,15 @@ func (x Transaction) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(jsonTx{
-		Type:      x.MessageType,
-		Msg:       bz,
-		Signature: x.Signature,
-		Time:      x.Time,
-		Fee:       x.Fee,
-		Memo:      x.Memo,
-		NetworkId: x.NetworkId,
-		ChainId:   x.ChainId,
+		Type:          x.MessageType,
+		Msg:           bz,
+		Signature:     x.Signature,
+		Time:          x.Time,
+		CreatedHeight: x.CreatedHeight,
+		Fee:           x.Fee,
+		Memo:          x.Memo,
+		NetworkId:     x.NetworkId,
+		ChainId:       x.ChainId,
 	})
 }
 
@@ -207,14 +213,15 @@ func (x *Transaction) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	*x = Transaction{
-		MessageType: j.Type,
-		Msg:         a,
-		Signature:   j.Signature,
-		Time:        j.Time,
-		Fee:         j.Fee,
-		Memo:        j.Memo,
-		NetworkId:   j.NetworkId,
-		ChainId:     j.ChainId,
+		MessageType:   j.Type,
+		Msg:           a,
+		Signature:     j.Signature,
+		CreatedHeight: j.CreatedHeight,
+		Time:          j.Time,
+		Fee:           j.Fee,
+		Memo:          j.Memo,
+		NetworkId:     j.NetworkId,
+		ChainId:       j.ChainId,
 	}
 	return nil
 }

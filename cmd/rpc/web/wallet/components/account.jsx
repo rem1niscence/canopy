@@ -612,9 +612,9 @@ function RenderActionButton({ v, i, showModal }) {
 
   return (
     <div key={i} className="send-receive-button-container" onClick={() => showModal(v.name)}>
-      <IconComponent />
+      <IconComponent className="icon-button"/>
       <br />
-      <span class="action-button-title">{v.title}</span>
+      <span className="action-button-title">{v.title}</span>
     </div>
     );
 }

@@ -128,7 +128,7 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 			}
 			// check the block hash
 			if !bytes.Equal(x.BlockHash, hash) {
-				return ErrMismatchBlockHash("qc.CheckBasic")
+				return ErrMismatchQCBlockHash()
 			}
 			blockSize := len(x.Block)
 			// global max block size enforcement
@@ -138,7 +138,7 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 		}
 	} else { // is QC with proposer key (ELECTION)
 		if len(x.ProposerKey) != crypto.BLS12381PubKeySize {
-			return ErrInvalidProposerPubKey()
+			return ErrInvalidSigner()
 		}
 		if len(x.ResultsHash) != 0 || x.Results != nil {
 			return ErrMismatchResultsHash()

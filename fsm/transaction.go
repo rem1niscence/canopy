@@ -5,7 +5,6 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"time"
 )
 
 // ApplyTransaction() processes the transaction within the state machine, returning the corresponding TxResult.
@@ -150,19 +149,16 @@ func (s *StateMachine) CheckReplay(tx *lib.Transaction, txHash string) lib.Error
 	if txResult.TxHash != "" {
 		return lib.ErrDuplicateTx(txHash)
 	}
-	// get the latest block for the timestamp
-	// TODO this is expensive and should be cached
-	block, err := store.GetBlockByHeight(height - 1)
-	if err != nil {
-		return err
-	}
+	// define some safe mempool acceptance policy
+	const blockAcceptancePolicy = 120
 	// this gives us a safe mempool to block acceptance while providing a safe tx indexer prune time
-	// NOTE: due to factors like 'clock drift' the maximum prune should be no less than 24 hours
-	clockVarianceAcceptancePolicy := 2 * 24 * time.Hour // double the block acceptance policy
-	txTime, lastBlockTime := time.UnixMicro(int64(tx.Time)), time.UnixMicro(int64(block.BlockHeader.Time))
-	minimumTime, maximumTime := lastBlockTime.Add(-1*clockVarianceAcceptancePolicy), lastBlockTime.Add(clockVarianceAcceptancePolicy)
-	if txTime.Before(minimumTime) || txTime.After(maximumTime) {
-		return types.ErrInvalidTxTime()
+	maxHeight, minHeight := s.Height()+blockAcceptancePolicy, uint64(0)
+	if s.Height() > blockAcceptancePolicy {
+		minHeight = s.Height() - blockAcceptancePolicy
+	}
+	// ensure the tx 'created height' is not above or below the acceptable bounds
+	if tx.CreatedHeight > maxHeight || tx.CreatedHeight < minHeight {
+		return lib.ErrInvalidTxHeight()
 	}
 	return nil
 }

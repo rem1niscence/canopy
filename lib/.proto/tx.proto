@@ -28,16 +28,18 @@ message Transaction {
   google.protobuf.Any msg = 2;
   // signature: The cryptographic signature used to verify the authenticity of the transaction
   Signature signature = 3;
-  // time: The timestamp when the transaction was created
-  uint64 time = 4;
+  // created_height: The height when the transaction was created - allows 'safe pruning'
+  uint64 created_height = 4;
+  // time: The timestamp when the transaction was created - used as temporal entropy to prevent hash collisions in txs
+  uint64 time = 5;
   // fee: The fee associated with processing the transaction
-  uint64 fee = 5;
+  uint64 fee = 6;
   // memo: An optional message or note attached to the transaction
-  string memo = 6;
+  string memo = 7;
   // network_id: The identity of the network the transaction is intended for
-  uint64 network_id = 7;
+  uint64 network_id = 8;
   // chain_id: The identity of the committee the transaction is intended for
-  uint64 chain_id = 8;
+  uint64 chain_id = 9;
 }
 
 // TxResult represents the result of a processed transaction, including information about the sender, recipient,

@@ -163,7 +163,7 @@ func (c *Controller) ValidateProposalBasic(qc *lib.QuorumCertificate, evidence *
 		return nil, e
 	}
 	if !bytes.Equal(qc.BlockHash, blockHash) {
-		return nil, lib.ErrMismatchBlockHash("ValidateProposalBasic")
+		return nil, lib.ErrMismatchHeaderBlockHash()
 	}
 	return
 }
@@ -452,13 +452,6 @@ func (c *Controller) CompareBlockHeaders(candidate *lib.BlockHeader, compare *li
 			}
 		}
 	}
-	// check the timestamp if actively in BFT - else it's been validated by the validator set
-	if !commit {
-		// validate the timestamp in the block header
-		if err := c.validateBlockTime(candidate); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -480,7 +473,7 @@ func (c *Controller) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (s
 	}
 	// ensure the Proposal.BlockHash corresponds to the actual hash of the block
 	if !bytes.Equal(qc.BlockHash, hash) {
-		err = lib.ErrMismatchBlockHash("CheckPeerQC")
+		err = lib.ErrMismatchQCBlockHash()
 		return
 	}
 	// check the height of the block
@@ -498,17 +491,6 @@ func (c *Controller) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (s
 	// height of this block is not local height, the node is still catching up
 	stillCatchingUp = h != blk.BlockHeader.Height
 	return
-}
-
-// validateBlockTime() validates the timestamp in the block header for safe pruning
-// accepts +/- hour variance for clock drift
-func (c *Controller) validateBlockTime(header *lib.BlockHeader) lib.ErrorI {
-	now := time.Now()
-	maxTime, minTime, t := now.Add(24*time.Hour), now.Add(24*-time.Hour), time.UnixMicro(int64(header.Time))
-	if minTime.Compare(t) > 0 || maxTime.Compare(t) < 0 {
-		return lib.ErrInvalidBlockTime()
-	}
-	return nil
 }
 
 // ValidatorProposalConfig() is how the Validator is configured for `base chain` specific parameter upgrades
