@@ -47,6 +47,8 @@ func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
 		return err
 	}
 	// calculate the amount given to each qualifying committee
+	// mintAmountPerCommittee may truncate, but that's expected,
+	// less mint will be created and effectively 'burned'
 	mintAmountPerCommittee := mintAmountAfterDAOCut / subsidizedCount
 	// issue that amount to each subsidized committee
 	for _, chainId := range subsidizedChainIds {

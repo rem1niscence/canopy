@@ -7,11 +7,14 @@ import (
 	"math"
 )
 
+// ReservedIds ensures Validators can't stake for 'reserved ids'
 var ReservedIDs = []uint64{
 	lib.UnknownChainId,
-	lib.DAOPoolID,
+	lib.DAOPoolID, // NOTE: DAOPoolId cannot be staked for as the max chain Id is the EscrowPoolAddend
 }
 
+// EscrowPoolAddend is used to translate a chainId into the id for the 'swap' escrow pool
+// Example: pools[chainId] -> stake pool && pools[chainId+EscrowPoolAddend] -> escrow pool for token swaps
 const EscrowPoolAddend = math.MaxUint16
 
 var (
@@ -30,6 +33,19 @@ var (
 	orderBookPrefix        = []byte{13} // store key prefix for 'sell orders' before they are bid on
 	retiredCommitteePrefix = []byte{14} // store key prefix for 'retired' (dead) committees
 )
+
+/*
+	- Prefixes are used to allow 'grouping' and organization in a schemaless key-value database environment
+
+	- Segments are used to allow 'sub-groupings' ex. CommitteeKey allows iteration over all committees (CommitteePrefix)
+      or a specific committee (CommitteePrefix+CommitteeId)
+
+	- Iterating over a prefix enables operations over groups of similar datastructures (accounts, validators, params etc.)
+
+	- Length prefixed append is used to be able to easily separate the segments of a key
+
+	- BigEndianEncoding is used for uint64 to accommodate the 'lexicographical' sorting nature of the key-value database
+*/
 
 func KeyForUnstaking(height uint64, address crypto.AddressI) []byte {
 	return append(UnstakingPrefix(height), lib.AppendAndLenPrefix(address.Bytes())...)

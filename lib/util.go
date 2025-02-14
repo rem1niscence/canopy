@@ -345,14 +345,14 @@ func Uint64Percentage(amount uint64, percentage uint64) (res uint64) {
 }
 
 // Uint64ReducePercentage() reduces an amount by a specified percentage
-func Uint64ReducePercentage(amount uint64, percentage uint64) (res uint64) {
+func Uint64ReducePercentage(amount, percentage uint64) (res uint64) {
 	if percentage >= 100 || amount == 0 {
 		return 0
 	}
 	if percentage == 0 {
 		return amount
 	}
-	return (amount * (100 - uint64(percentage))) / 100
+	return (amount * (100 - percentage)) / 100
 }
 
 // Uint64ToBigFloat() converts a uint64 to a big.Float
@@ -470,14 +470,15 @@ func CatchPanic(l LoggerI) {
 
 // AppendAndLenPrefix() appends the items together separated by a single byte to represent the length of the segment
 func AppendAndLenPrefix(toAppend ...[]byte) (res []byte) {
-	for _, a := range toAppend {
-		if a == nil {
+	// for each item to append
+	for _, item := range toAppend {
+		if item == nil {
 			continue
 		}
 		// store the length of the segment in a single byte
-		length := []byte{byte(len(a))}
+		length := []byte{byte(len(item))}
 		// append to the reset of the segment
-		res = append(append(res, length...), a...)
+		res = append(append(res, length...), item...)
 	}
 	return
 }

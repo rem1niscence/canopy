@@ -10,26 +10,30 @@ import (
 
 // GetAccount() returns an Account structure for a specific address
 func (s *StateMachine) GetAccount(address crypto.AddressI) (*types.Account, lib.ErrorI) {
+	// retrieve the account from the state store
 	bz, err := s.Get(types.KeyForAccount(address))
 	if err != nil {
 		return nil, err
 	}
+	// convert the account bytes into a structure
 	acc, err := s.unmarshalAccount(bz)
 	if err != nil {
 		return nil, err
 	}
+	// convert the address into bytes and set it
 	acc.Address = address.Bytes()
 	return acc, nil
 }
 
 // GetAccounts() returns all Account structures in the state
-func (s *StateMachine) GetAccounts() ([]*types.Account, lib.ErrorI) {
+func (s *StateMachine) GetAccounts() (result []*types.Account, err lib.ErrorI) {
+	// iterate through the account prefix
 	it, err := s.Iterator(types.AccountPrefix())
 	if err != nil {
 		return nil, err
 	}
 	defer it.Close()
-	var result []*types.Account
+	// for each item of the iterator
 	for ; it.Valid(); it.Next() {
 		var acc *types.Account
 		acc, err = s.unmarshalAccount(it.Value())
@@ -38,12 +42,15 @@ func (s *StateMachine) GetAccounts() ([]*types.Account, lib.ErrorI) {
 		}
 		result = append(result, acc)
 	}
+	// return the result
 	return result, nil
 }
 
 // GetAccountsPaginated() returns a page of Account structures in the state
 func (s *StateMachine) GetAccountsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	// create a new 'accounts' page
 	page, res := lib.NewPage(p, types.AccountsPageName), make(types.AccountPage, 0)
+	// load the page using the account prefix iterator
 	err = page.Load(types.AccountPrefix(), false, &res, s.store, func(_, b []byte) (err lib.ErrorI) {
 		acc, err := s.unmarshalAccount(b)
 		if err == nil {
@@ -56,23 +63,29 @@ func (s *StateMachine) GetAccountsPaginated(p lib.PageParams) (page *lib.Page, e
 
 // GetAccountBalance() returns the balance of an Account at a specific address
 func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (uint64, lib.ErrorI) {
+	// get the account from the state
 	account, err := s.GetAccount(address)
 	if err != nil {
 		return 0, err
 	}
+	// return the amount linked to the account
 	return account.Amount, nil
 }
 
 // SetAccount() upserts an account into the state
 func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
+	// convert bytes to the address object
 	address := crypto.NewAddressFromBytes(account.Address)
+	// if the amount is 0, delete the account from state to prevent unnecessary bloat
 	if account.Amount == 0 {
 		return s.Delete(types.KeyForAccount(address))
 	}
+	// convert the account into bytes
 	bz, err := s.marshalAccount(account)
 	if err != nil {
 		return err
 	}
+	// set the account into state using the 'prefixed' key for the account
 	if err = s.Set(types.KeyForAccount(address), bz); err != nil {
 		return err
 	}
@@ -80,61 +93,68 @@ func (s *StateMachine) SetAccount(account *types.Account) lib.ErrorI {
 }
 
 // SetAccount() upserts multiple accounts into the state
-func (s *StateMachine) SetAccounts(accounts []*types.Account, supply *types.Supply) lib.ErrorI {
+func (s *StateMachine) SetAccounts(accounts []*types.Account, supply *types.Supply) (err lib.ErrorI) {
+	// for each account
 	for _, acc := range accounts {
+		// add the account amount to the supply object
 		supply.Total += acc.Amount
-		if err := s.SetAccount(acc); err != nil {
-			return err
+		// set the account in state
+		if err = s.SetAccount(acc); err != nil {
+			return
 		}
 	}
-	return nil
+	return
 }
 
 // AccountDeductFees() removes fees from a specific address and adds them to the Canopy reward pool
 func (s *StateMachine) AccountDeductFees(address crypto.AddressI, fee uint64) lib.ErrorI {
+	// deduct the fee from the account
 	if err := s.AccountSub(address, fee); err != nil {
 		return err
 	}
+	// add the fee to the reward pool for the 'self' chain id
 	return s.PoolAdd(s.Config.ChainId, fee)
-}
-
-// MintToAccount() adds newly created tokens to an Account
-func (s *StateMachine) MintToAccount(address crypto.AddressI, amount uint64) lib.ErrorI {
-	if err := s.AddToTotalSupply(amount); err != nil {
-		return err
-	}
-	return s.AccountAdd(address, amount)
 }
 
 // AccountAdd() adds tokens to an Account
 func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd uint64) lib.ErrorI {
+	// get the account from state
 	account, err := s.GetAccount(address)
 	if err != nil {
 		return err
 	}
+	// add the tokens to the account structure
 	account.Amount += amountToAdd
+	// set the account back in state
 	return s.SetAccount(account)
 }
 
 // AccountSub() removes tokens from an Account
 func (s *StateMachine) AccountSub(address crypto.AddressI, amountToSub uint64) lib.ErrorI {
+	// get the account from the state
 	account, err := s.GetAccount(address)
 	if err != nil {
 		return err
 	}
+	// if the account amount is less than the amount to subtract; return insufficient funds
 	if account.Amount < amountToSub {
 		return types.ErrInsufficientFunds()
 	}
+	// subtract from the account amount
 	account.Amount -= amountToSub
+	// set the account in state
 	return s.SetAccount(account)
 }
 
 // unmarshalAccount() converts bytes into an Account structure
 func (s *StateMachine) unmarshalAccount(bz []byte) (*types.Account, lib.ErrorI) {
+	// create a new account structure to ensure we never have 'nil' accounts
 	acc := new(types.Account)
+	// unmarshal the bytes into the account structure
 	if err := lib.Unmarshal(bz, acc); err != nil {
 		return nil, err
 	}
+	// return the account
 	return acc, nil
 }
 
@@ -153,40 +173,48 @@ func (s *StateMachine) marshalAccount(account *types.Account) ([]byte, lib.Error
 
 // GetPool() returns a Pool structure for a specific ID
 func (s *StateMachine) GetPool(id uint64) (*types.Pool, lib.ErrorI) {
+	// get the pool bytes from the state using the Key a specific id
 	bz, err := s.Get(types.KeyForPool(id))
 	if err != nil {
 		return nil, err
 	}
+	// convert the bytes into a pool structure
 	pool, err := s.unmarshalPool(bz)
 	if err != nil {
 		return nil, err
 	}
+	// set the pool id from the key
 	pool.Id = id
+	// return the pool
 	return pool, nil
 }
 
 // GetPools() returns all Pool structures in the state
-func (s *StateMachine) GetPools() ([]*types.Pool, lib.ErrorI) {
+func (s *StateMachine) GetPools() (result []*types.Pool, err lib.ErrorI) {
+	// get an iterator for the pool group
 	it, err := s.Iterator(types.PoolPrefix())
 	if err != nil {
-		return nil, err
+		return
 	}
 	defer it.Close()
-	var result []*types.Pool
+	// for each item of the iterator
 	for ; it.Valid(); it.Next() {
-		var acc *types.Pool
-		acc, err = s.unmarshalPool(it.Value())
+		var p *types.Pool
+		p, err = s.unmarshalPool(it.Value())
 		if err != nil {
-			return nil, err
+			return
 		}
-		result = append(result, acc)
+		// append the pool to the result slice
+		result = append(result, p)
 	}
-	return result, nil
+	return
 }
 
 // GetPoolsPaginated() returns a particular page of Pool structures in the state
 func (s *StateMachine) GetPoolsPaginated(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	// create a new pool page
 	res, page := make(types.PoolPage, 0), lib.NewPage(p, types.PoolPageName)
+	// populate the pool page using the pool prefix
 	err = page.Load(types.PoolPrefix(), false, &res, s.store, func(_, b []byte) (err lib.ErrorI) {
 		acc, err := s.unmarshalPool(b)
 		if err == nil {
@@ -199,49 +227,60 @@ func (s *StateMachine) GetPoolsPaginated(p lib.PageParams) (page *lib.Page, err 
 
 // GetPoolBalance() returns the balance of a Pool at an ID
 func (s *StateMachine) GetPoolBalance(id uint64) (uint64, lib.ErrorI) {
+	// get the pool from state
 	pool, err := s.GetPool(id)
 	if err != nil {
 		return 0, err
 	}
+	// return the pool amount
 	return pool.Amount, nil
 }
 
 // SetPool() upserts a Pool structure into the state
-func (s *StateMachine) SetPool(pool *types.Pool) lib.ErrorI {
+func (s *StateMachine) SetPool(pool *types.Pool) (err lib.ErrorI) {
+	// if the pool has a 0 balance
 	if pool.Amount == 0 {
 		return s.Delete(types.KeyForPool(pool.Id))
 	}
+	// convert the pool to bytes
 	bz, err := s.marshalPool(pool)
 	if err != nil {
-		return err
+		return
 	}
+	// set the pool bytes in state using the pool id
 	if err = s.Set(types.KeyForPool(pool.Id), bz); err != nil {
-		return err
+		return
 	}
-	return nil
+	return
 }
 
 // SetPools() upserts multiple Pool structures into the state
-func (s *StateMachine) SetPools(pools []*types.Pool, supply *types.Supply) lib.ErrorI {
+func (s *StateMachine) SetPools(pools []*types.Pool, supply *types.Supply) (err lib.ErrorI) {
+	// for each pool
 	for _, pool := range pools {
+		// add the pool amount to the total supply
 		supply.Total += pool.Amount
-		if err := s.SetPool(pool); err != nil {
-			return err
+		// set the pool in state
+		if err = s.SetPool(pool); err != nil {
+			return
 		}
 	}
-	return nil
+	return
 }
 
 // MintToPool() adds newly created tokens to the Pool structure
 func (s *StateMachine) MintToPool(id uint64, amount uint64) lib.ErrorI {
+	// track the newly created inflation with the supply structure
 	if err := s.AddToTotalSupply(amount); err != nil {
 		return err
 	}
+	// update the pools balance with the new inflation
 	return s.PoolAdd(id, amount)
 }
 
 // PoolAdd() adds tokens to the Pool structure
 func (s *StateMachine) PoolAdd(id uint64, amountToAdd uint64) lib.ErrorI {
+	// get the pool from the
 	pool, err := s.GetPool(id)
 	if err != nil {
 		return err
@@ -252,23 +291,30 @@ func (s *StateMachine) PoolAdd(id uint64, amountToAdd uint64) lib.ErrorI {
 
 // PoolSub() removes tokens from the Pool structure
 func (s *StateMachine) PoolSub(id uint64, amountToSub uint64) lib.ErrorI {
+	// get the pool from the state using the 'id'
 	pool, err := s.GetPool(id)
 	if err != nil {
 		return err
 	}
+	// if the pool amount is less than the subtracted amount; return insufficient funds
 	if pool.Amount < amountToSub {
 		return types.ErrInsufficientFunds()
 	}
+	// subtract from the pool balance
 	pool.Amount -= amountToSub
+	// update the pool in state
 	return s.SetPool(pool)
 }
 
 // unmarshalPool() coverts bytes into a Pool structure
 func (s *StateMachine) unmarshalPool(bz []byte) (*types.Pool, lib.ErrorI) {
+	// create a new pool object reference to ensure no 'nil' pools are used
 	pool := new(types.Pool)
+	// populate the pool object with the bytes
 	if err := lib.Unmarshal(bz, pool); err != nil {
 		return nil, err
 	}
+	// return the pool
 	return pool, nil
 }
 
