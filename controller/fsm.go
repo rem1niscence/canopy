@@ -504,7 +504,7 @@ func (c *Controller) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (s
 // accepts +/- hour variance for clock drift
 func (c *Controller) validateBlockTime(header *lib.BlockHeader) lib.ErrorI {
 	now := time.Now()
-	maxTime, minTime, t := now.Add(10*time.Second), now.Add(-10*time.Second), time.UnixMicro(int64(header.Time))
+	maxTime, minTime, t := now.Add(time.Hour), now.Add(-time.Hour), time.UnixMicro(int64(header.Time))
 	if minTime.Compare(t) > 0 || maxTime.Compare(t) < 0 {
 		return lib.ErrInvalidBlockTime()
 	}
