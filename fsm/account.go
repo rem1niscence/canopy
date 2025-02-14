@@ -332,21 +332,27 @@ func (s *StateMachine) marshalPool(pool *types.Pool) ([]byte, lib.ErrorI) {
 
 // AddToStakedSupply() adds to the staked supply count (staked + delegated)
 func (s *StateMachine) AddToStakedSupply(amount uint64) lib.ErrorI {
+	// get the supply tracker from the state
 	supply, err := s.GetSupply()
 	if err != nil {
 		return err
 	}
+	// add to the staked amount in the supply tracker
 	supply.Staked += amount
+	// set the supply tracker back in state
 	return s.SetSupply(supply)
 }
 
 // AddToStakedSupply() adds to the staked supply count
 func (s *StateMachine) AddToDelegateSupply(amount uint64) lib.ErrorI {
+	// get the supply from the state
 	supply, err := s.GetSupply()
 	if err != nil {
 		return err
 	}
+	// add to the delegation only amount in the supply tracker
 	supply.DelegatedOnly += amount
+	// set the supply structure back in state
 	return s.SetSupply(supply)
 }
 

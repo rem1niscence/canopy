@@ -158,7 +158,7 @@ func (s *StateMachine) CheckReplay(tx *lib.Transaction, txHash string) lib.Error
 	}
 	// this gives us a safe mempool to block acceptance while providing a safe tx indexer prune time
 	// NOTE: due to factors like 'clock drift' the maximum prune should be no less than 24 hours
-	clockVarianceAcceptancePolicy := 6 * time.Hour
+	clockVarianceAcceptancePolicy := 2 * 24 * time.Hour // double the block acceptance policy
 	txTime, lastBlockTime := time.UnixMicro(int64(tx.Time)), time.UnixMicro(int64(block.BlockHeader.Time))
 	minimumTime, maximumTime := lastBlockTime.Add(-1*clockVarianceAcceptancePolicy), lastBlockTime.Add(clockVarianceAcceptancePolicy)
 	if txTime.Before(minimumTime) || txTime.After(maximumTime) {

@@ -488,6 +488,7 @@ func (b *BFT) StartCommitProcessPhase() {
 // - Replica sends current View message to other replicas (Pacemaker vote)
 func (b *BFT) RoundInterrupt() {
 	b.log.Warn(b.View.ToString())
+	b.Config.RoundInterruptTimeoutMS = b.msLeftInRound()
 	b.Phase = RoundInterrupt
 	// send pacemaker message
 	b.SendToReplicas(b.ValidatorSet, &Message{
@@ -519,12 +520,13 @@ func (b *BFT) Pacemaker() {
 			continue
 		}
 		totalVotedPower += validator.VotingPower
-		if totalVotedPower >= b.ValidatorSet.MinimumMaj23 {
-			pacemakerRound = vote.Qc.Header.Round // set the highest round where +2/3rds have been
+		// if totalVotePower >= +33%, it's safe to advance to that round
+		if totalVotedPower >= lib.Uint64ReducePercentage(b.ValidatorSet.MinimumMaj23, 50) {
+			pacemakerRound = vote.Qc.Header.Round // set the highest round where +1/3rds have been
 			break
 		}
 	}
-	// if +2/3rd Round is larger than local Round - advance to the +2/3rd Round to better join the Majority
+	// if +1/3rd Round is larger than local Round - advance to the +1/3rd Round to better join the Majority
 	if pacemakerRound > b.Round {
 		b.log.Infof("Pacemaker peers set round: %d", pacemakerRound)
 		b.Round = pacemakerRound
@@ -698,6 +700,35 @@ func (b *BFT) WaitTime(phase Phase, round uint64) (waitTime time.Duration) {
 // waitTime() calculates the waiting time for a specific sleepTime configuration and Round number (helper)
 func (b *BFT) waitTime(sleepTimeMS int, round uint64) time.Duration {
 	return time.Duration(uint64(sleepTimeMS)*(2*round+1)) * time.Millisecond
+}
+
+// msLeftInRound() calculates the milliseconds left in the round
+func (b *BFT) msLeftInRound() int {
+	// calculate the ms for each phase
+	electionMs := b.WaitTime(Election, b.Round).Milliseconds()
+	electionVoteMs := b.WaitTime(ElectionVote, b.Round).Milliseconds()
+	proposeMs := b.WaitTime(Propose, b.Round).Milliseconds()
+	proposeVoteMs := b.WaitTime(ProposeVote, b.Round).Milliseconds()
+	precommitMs := b.WaitTime(Precommit, b.Round).Milliseconds()
+	precommitVoteMs := b.WaitTime(PrecommitVote, b.Round).Milliseconds()
+	commitMs := b.WaitTime(Commit, b.Round).Milliseconds()
+	// ms left in round = RoundWaitTime - TimeSpentInRound
+	switch b.Phase {
+	case Election:
+		return int(electionMs + electionVoteMs + proposeMs + proposeVoteMs + precommitMs + precommitVoteMs + commitMs)
+	case ElectionVote:
+		return int(electionVoteMs + proposeMs + proposeVoteMs + precommitMs + precommitVoteMs + commitMs)
+	case Propose:
+		return int(proposeMs + proposeVoteMs + precommitMs + precommitVoteMs + commitMs)
+	case ProposeVote:
+		return int(proposeVoteMs + precommitMs + precommitVoteMs + commitMs)
+	case Precommit:
+		return int(precommitMs + precommitVoteMs + commitMs)
+	case PrecommitVote:
+		return int(precommitVoteMs + commitMs)
+	default:
+		return int(commitMs)
+	}
 }
 
 // SetWaitTimers() sets the phase and optimistic timers
