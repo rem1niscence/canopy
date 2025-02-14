@@ -57,8 +57,21 @@ export default function Governance({keygroup, account: accountWithTxs, validator
     });
     const [primaryColor, setPrimaryColor] = useState('');
     const [secondaryColor, setSecondaryColor] = useState('');
+    const [buttonVariant, setButtonVariant] = useState('outline-dark');
 
-    // onFormChange() handles the form input change callback
+    // Using a standalone useEffect here to isolate the color states
+    useEffect(() => {
+      // Check data-bs-theme on mount
+      const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+
+      if (currentTheme === 'dark') {
+        setButtonVariant('outline-light');
+      } else {
+        setButtonVariant('outline-dark');
+      }
+    }, []);
+
+  // onFormChange() handles the form input change callback
     function onFormChange(key, value, newValue) {
         if (key === "param_space") {
             setState({...state, paramSpace: newValue});
@@ -252,6 +265,7 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                 title="START OR VOTE ON POLL"
                 keyName="voteOnPollAccord"
                 targetName="voteJSON"
+                buttonVariant={buttonVariant}
                 buttons={[
                     {
                         title: "START NEW",
@@ -305,6 +319,7 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                 title="VOTE ON PROPOSAL"
                 keyName="voteOnProposalAccord"
                 targetName="voteJSON"
+                buttonVariant={buttonVariant}
                 buttons={[
                     {title: "APPROVE", onClick: () => addVoteAPI(state.voteJSON, true)},
                     {title: "REJECT", onClick: () => addVoteAPI(state.voteJSON, false)},
@@ -312,14 +327,13 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                 ]}
                 showPwd={false}
             />
-            {renderToast(state, setState)}
-            <br/>
             <Accord
                 state={state}
                 setState={setState}
                 title="SUBMIT PROPOSAL"
                 keyName="propAccord"
                 targetName="rawTx"
+                buttonVariant={buttonVariant}
                 buttons={[
                     {
                         title: "SUBMIT",
@@ -331,10 +345,10 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                 showPwd={false}
                 placeholder={placeholders.rawTx}
             />
-            <Button className="propose-button" onClick={() => handlePropOpen(0)} variant="outline-dark">
+            <Button className="propose-button" onClick={() => handlePropOpen(0)} variant={buttonVariant}>
                 New Protocol Change
             </Button>
-            <Button className="propose-button" onClick={() => handlePropOpen(1)} variant="outline-dark">
+            <Button className="propose-button" onClick={() => handlePropOpen(1)} variant={buttonVariant}>
                 New Treasury Subsidy
             </Button>
             <br/>
@@ -389,6 +403,7 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                     </Modal.Footer>
                 </Form>
             </Modal>
+          {renderToast(state, setState)}
         </div>
     );
 }
@@ -427,6 +442,7 @@ function Accord({
                     showPwd,
                     placeholder = placeholders.params,
                     isJSON = true,
+                    buttonVariant,
                 }) {
     const handleChange = (key, value) =>
         setState((prevState) => ({
@@ -472,7 +488,7 @@ function Accord({
                                 }
                                 btn.onClick();
                             }}
-                            variant="outline-dark"
+                            variant={buttonVariant}
                         >
                             {btn.title}
                         </Button>

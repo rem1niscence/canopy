@@ -21,15 +21,6 @@ const DarkModeToggle = () => {
 
         localStorage.setItem('bsTheme', theme);
 
-        const switchElement = document.querySelector("#colorSwitchLabel");
-        if (switchElement) {
-            if (theme === 'dark') {
-                switchElement.classList.replace("bi-sun-fill", "bi-moon-stars-fill");
-            } else {
-                switchElement.classList.replace("bi-moon-stars-fill", "bi-sun-fill");
-            }
-        }
-
         const contentElement = document.querySelector("#container");
         if (contentElement) {
             if (theme === 'dark') {

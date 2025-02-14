@@ -755,6 +755,14 @@ th {
   width: 125px;
 }
 
+.accord-item.accordion-item {
+  margin-bottom: 1rem;
+}
+
+.accordion-header {
+  margin-bottom: 0;
+}
+
 .accordion-button {
   font-weight: 800 !important;
   display: block !important;
