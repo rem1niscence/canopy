@@ -6,7 +6,6 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"sort"
-	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -138,10 +137,6 @@ func (b *BFT) Start() {
 					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
-					if strings.Contains(lib.BytesToString(b.PublicKey), "b88a5928") {
-						fmt.Println("SLEEPING")
-						time.Sleep(2 * time.Second)
-					}
 					// start BFT over after sleeping CommitProcessMS
 					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
 				}
@@ -494,7 +489,6 @@ func (b *BFT) StartCommitProcessPhase() {
 func (b *BFT) RoundInterrupt() {
 	b.log.Warn(b.View.ToString())
 	b.Config.RoundInterruptTimeoutMS = b.msLeftInRound()
-	fmt.Printf("There is %d miliseconds left in the round\n", b.Config.RoundInterruptTimeoutMS)
 	b.Phase = RoundInterrupt
 	// send pacemaker message
 	b.SendToReplicas(b.ValidatorSet, &Message{
