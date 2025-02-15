@@ -647,19 +647,6 @@ func TestSlash(t *testing.T) {
 		error      string
 	}{
 		{
-			name:       "non existent validator",
-			detail:     "the slashing validator does not exist",
-			validators: nil,
-			slashes: []slash{
-				{
-					Type:    doubleSignerSlash,
-					Address: newTestAddressBytes(t),
-					ChainId: lib.CanopyChainId,
-				},
-			},
-			error: "validator does not exist",
-		},
-		{
 			name:   "one double signer",
 			detail: "one validator slashed as a double signer",
 			validators: []*types.Validator{

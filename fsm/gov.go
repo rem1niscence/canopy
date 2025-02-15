@@ -409,3 +409,13 @@ func (s *StateMachine) GetRootChainId() (uint64, lib.ErrorI) {
 	}
 	return consParams.RootChainId, nil
 }
+
+// LoadRootChainId() loads the root chain id from the state at a certain height
+func (s *StateMachine) LoadRootChainId(height uint64) (uint64, lib.ErrorI) {
+	sm, err := s.TimeMachine(height)
+	if err != nil {
+		return 0, err
+	}
+	defer sm.Discard()
+	return sm.GetRootChainId()
+}

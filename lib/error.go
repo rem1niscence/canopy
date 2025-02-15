@@ -246,6 +246,7 @@ const (
 	CodeMismatchCertResults               ErrorCode = 87
 	CodeInvalidQCRootChainHeight          ErrorCode = 88
 	CodeEmptyCertificateResults           ErrorCode = 89
+	CodeSlashNonValidator                 ErrorCode = 90
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"

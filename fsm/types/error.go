@@ -303,3 +303,7 @@ func ErrInvalidCheckpoint() lib.ErrorI {
 func ErrInvalidStartPollHeight() lib.ErrorI {
 	return lib.NewError(lib.CodeStartPollHeight, lib.StateMachineModule, "start poll height is invalid")
 }
+
+func ErrSlashNonExistentValidator() lib.ErrorI {
+	return lib.NewError(lib.CodeSlashNonValidator, lib.StateMachineModule, "cannot slash non-existent validator")
+}

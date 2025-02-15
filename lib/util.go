@@ -468,8 +468,8 @@ func CatchPanic(l LoggerI) {
 	}
 }
 
-// AppendAndLenPrefix() appends the items together separated by a single byte to represent the length of the segment
-func AppendAndLenPrefix(toAppend ...[]byte) (res []byte) {
+// JoinLenPrefix() appends the items together separated by a single byte to represent the length of the segment
+func JoinLenPrefix(toAppend ...[]byte) (res []byte) {
 	// for each item to append
 	for _, item := range toAppend {
 		if item == nil {

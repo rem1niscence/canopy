@@ -330,6 +330,19 @@ func (s *StateMachine) marshalPool(pool *types.Pool) ([]byte, lib.ErrorI) {
     showing both the total amount available and how it's distributed among various pools and purposes.
 */
 
+// AddToTotalSupply() adds to the total supply count
+func (s *StateMachine) AddToTotalSupply(amount uint64) lib.ErrorI {
+	// get the supply tracker
+	supply, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	// add to the total supply
+	supply.Total += amount
+	// set the supply back in state
+	return s.SetSupply(supply)
+}
+
 // AddToStakedSupply() adds to the staked supply count (staked + delegated)
 func (s *StateMachine) AddToStakedSupply(amount uint64) lib.ErrorI {
 	// get the supply tracker from the state
@@ -356,16 +369,6 @@ func (s *StateMachine) AddToDelegateSupply(amount uint64) lib.ErrorI {
 	return s.SetSupply(supply)
 }
 
-// AddToTotalSupply() adds to the total supply count
-func (s *StateMachine) AddToTotalSupply(amount uint64) lib.ErrorI {
-	supply, err := s.GetSupply()
-	if err != nil {
-		return err
-	}
-	supply.Total += amount
-	return s.SetSupply(supply)
-}
-
 // AddToCommitteeStakedSupply() adds to the committee staked supply count
 func (s *StateMachine) AddToCommitteeStakedSupply(chainId uint64, amount uint64) lib.ErrorI {
 	return s.addToSupplyPool(chainId, amount, types.CommitteesWithDelegations)
@@ -378,40 +381,52 @@ func (s *StateMachine) AddToDelegateStakedSupply(chainId uint64, amount uint64) 
 
 // SubFromTotalSupply() removes from the total supply count
 func (s *StateMachine) SubFromTotalSupply(amount uint64) lib.ErrorI {
+	// get the supply tracker
 	supply, err := s.GetSupply()
 	if err != nil {
 		return err
 	}
+	// ensure there's enough supply to subtract
 	if supply.Total < amount {
 		return types.ErrInsufficientSupply()
 	}
+	// reduce the total supply
 	supply.Total -= amount
+	// set the supply tracker in the state
 	return s.SetSupply(supply)
 }
 
 // SubFromStakedSupply() removes from the staked supply count (staked + delegated)
 func (s *StateMachine) SubFromStakedSupply(amount uint64) lib.ErrorI {
+	// get the supply tracker
 	supply, err := s.GetSupply()
 	if err != nil {
 		return err
 	}
+	// ensure there's enough staked supply to subtract
 	if supply.Staked < amount {
 		return types.ErrInsufficientSupply()
 	}
+	// subtract the amount from the staked supply
 	supply.Staked -= amount
+	// set the supply in state
 	return s.SetSupply(supply)
 }
 
 // SubFromDelegatedSupply() removes from the delegated supply count
 func (s *StateMachine) SubFromDelegatedSupply(amount uint64) lib.ErrorI {
+	// get the supply tracker
 	supply, err := s.GetSupply()
 	if err != nil {
 		return err
 	}
+	// ensure there's enough delegation only supply
 	if supply.DelegatedOnly < amount {
 		return types.ErrInsufficientSupply()
 	}
+	// subtract the delegation only amount
 	supply.DelegatedOnly -= amount
+	// set the supply in state
 	return s.SetSupply(supply)
 }
 
@@ -437,19 +452,23 @@ func (s *StateMachine) GetDelegateStakedSupply(chainId uint64) (p *types.Pool, e
 
 // GetSupply() returns the Supply structure held in the state
 func (s *StateMachine) GetSupply() (*types.Supply, lib.ErrorI) {
+	// get the supply tracker bytes from the state
 	bz, err := s.Get(types.SupplyPrefix())
 	if err != nil {
 		return nil, err
 	}
+	// convert the supply tracker bytes into an object
 	return s.unmarshalSupply(bz)
 }
 
 // SetSupply() upserts the Supply structure into the state
 func (s *StateMachine) SetSupply(supply *types.Supply) lib.ErrorI {
+	// convert the supply tracker object to bytes
 	bz, err := s.marshalSupply(supply)
 	if err != nil {
 		return err
 	}
+	// set the bytes in state under the 'supply prefix'
 	if err = s.Set(types.SupplyPrefix(), bz); err != nil {
 		return err
 	}
@@ -459,9 +478,11 @@ func (s *StateMachine) SetSupply(supply *types.Supply) lib.ErrorI {
 // unmarshalSupply() converts bytes into the supply
 func (s *StateMachine) unmarshalSupply(bz []byte) (*types.Supply, lib.ErrorI) {
 	supply := new(types.Supply)
+	// convert the supply bytes into a supply object
 	if err := lib.Unmarshal(bz, supply); err != nil {
 		return nil, err
 	}
+	// return the object
 	return supply, nil
 }
 
@@ -472,7 +493,9 @@ func (s *StateMachine) marshalSupply(supply *types.Supply) ([]byte, lib.ErrorI) 
 
 // addToSupplyPool() adds to a supply pool using an addition callback with 'executeOnSupplyPool'
 func (s *StateMachine) addToSupplyPool(chainId, amount uint64, targetType types.SupplyPoolType) lib.ErrorI {
+	// execute the callback on the supply pool that has a certain chainID and type
 	return s.executeOnSupplyPool(chainId, targetType, func(s *types.Supply, p *types.Pool) (err lib.ErrorI) {
+		// add to the supply pool amount
 		p.Amount += amount
 		return
 	})
@@ -480,10 +503,13 @@ func (s *StateMachine) addToSupplyPool(chainId, amount uint64, targetType types.
 
 // subFromSupplyPool() subtracts from a supply pool using a subtraction callback with 'executeOnSupplyPool'
 func (s *StateMachine) subFromSupplyPool(chainId, amount uint64, targetType types.SupplyPoolType) lib.ErrorI {
+	// execute the callback on the supply pool that has a certain chainID and type
 	return s.executeOnSupplyPool(chainId, targetType, func(s *types.Supply, p *types.Pool) (err lib.ErrorI) {
+		// ensure no nil or insufficient supply
 		if p == nil || p.Amount < amount {
 			return types.ErrInsufficientSupply()
 		}
+		// subtract from the supply pool
 		p.Amount -= amount
 		return
 	})
@@ -491,16 +517,19 @@ func (s *StateMachine) subFromSupplyPool(chainId, amount uint64, targetType type
 
 // getSupplyPool() returns the supply pool based on the target type
 func (s *StateMachine) getSupplyPool(chainId uint64, targetType types.SupplyPoolType) (p *types.Pool, err lib.ErrorI) {
-	arr, _, err := s.getSupplyPools(targetType)
+	// get the supply pools for the given type
+	poolList, _, err := s.getSupplyPools(targetType)
 	if err != nil {
 		return
 	}
-	p = s.findOrCreateSupplyPool(arr, chainId)
+	// find or insert the pool for the chainId
+	p = s.findOrCreateSupplyPool(poolList, chainId)
 	return
 }
 
 // getSupplyPools retrieves a particular pool based on the target type
-func (s *StateMachine) getSupplyPools(targetType types.SupplyPoolType) (arr *[]*types.Pool, supply *types.Supply, err lib.ErrorI) {
+func (s *StateMachine) getSupplyPools(targetType types.SupplyPoolType) (poolList *[]*types.Pool, supply *types.Supply, err lib.ErrorI) {
+	// get the supply object from state
 	supply, err = s.GetSupply()
 	if err != nil {
 		return
@@ -508,9 +537,9 @@ func (s *StateMachine) getSupplyPools(targetType types.SupplyPoolType) (arr *[]*
 	// determine the type of the target
 	switch targetType {
 	case types.CommitteesWithDelegations:
-		arr = &supply.CommitteeStaked
+		poolList = &supply.CommitteeStaked
 	case types.DelegationsOnly:
-		arr = &supply.CommitteeDelegatedOnly
+		poolList = &supply.CommitteeDelegatedOnly
 	}
 	return
 }
@@ -542,8 +571,10 @@ func (s *StateMachine) findOrCreateSupplyPool(poolArr *[]*types.Pool, chainId ui
 			return
 		}
 	}
-	// if pool not found, add it to the list
+	// if pool not found
+	// 1. set pool return variable
 	pool = &types.Pool{Id: chainId}
+	// 2. add it to the list
 	*poolArr = append(*poolArr, pool)
 	return
 }

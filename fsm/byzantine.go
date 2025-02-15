@@ -227,7 +227,8 @@ func (s *StateMachine) SlashValidators(addresses [][]byte, chainId, percent uint
 	for _, addr := range addresses {
 		validator, err := s.GetValidator(crypto.NewAddressFromBytes(addr))
 		if err != nil {
-			return err
+			s.log.Warn(types.ErrSlashNonExistentValidator().Error())
+			continue
 		}
 		if err = s.SlashValidator(validator, chainId, percent, p); err != nil {
 			return err
@@ -284,6 +285,7 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, chainId, perce
 	}
 	// if stake after slash is 0, remove the validator
 	if stakeAfterSlash == 0 {
+		// DeleteValidator subtracts from staked supply
 		return s.DeleteValidator(validator)
 	}
 	// subtract from staked supply

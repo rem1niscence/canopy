@@ -507,7 +507,7 @@ func (s *StateMachine) GetCommitteesData() (f *lib.CommitteesData, err lib.Error
 }
 
 // RetireCommittee marks a committee as non-subsidized for eternity
-// This is a useful mechanism to gracefully 'stop' a committee
+// This is a useful mechanism to gracefully 'end' a committee
 func (s *StateMachine) RetireCommittee(id uint64) lib.ErrorI {
 	return s.Set(types.KeyForRetiredCommittee(id), types.RetiredCommitteesPrefix())
 }
@@ -523,7 +523,9 @@ func (s *StateMachine) CommitteeIsRetired(id uint64) (bool, lib.ErrorI) {
 
 // GetRetiredCommittees() returns a list of the retired chainIds
 func (s *StateMachine) GetRetiredCommittees() (result []uint64, err lib.ErrorI) {
+	// for each item under the retired committee prefix
 	err = s.IterateAndExecute(types.RetiredCommitteesPrefix(), func(key, _ []byte) (e lib.ErrorI) {
+		// extract the id from the key
 		id, e := types.IdFromKey(key)
 		if e != nil {
 			return
