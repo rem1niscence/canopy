@@ -528,8 +528,8 @@ func ErrEvidenceTooOld() ErrorI {
 	return NewError(CodeEvidenceTooOld, ConsensusModule, "evidence is too old")
 }
 
-func ErrInvalidProposerPubKey() ErrorI {
-	return NewError(CodeInvalidProposerPubKey, ConsensusModule, "invalid proposer public key")
+func ErrInvalidProposerPubKey(expected []byte) ErrorI {
+	return NewError(CodeInvalidProposerPubKey, ConsensusModule, fmt.Sprintf("invalid proposer public key, expected %s", BytesToTruncatedString(expected)))
 }
 
 func ErrInvalidSigner() ErrorI {

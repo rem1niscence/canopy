@@ -559,7 +559,7 @@ func (b *BFT) PhaseHas23Maj() bool {
 func (b *BFT) CheckProposerAndProposal(msg *Message) (interrupt bool) {
 	// confirm is expected proposer
 	if !b.IsProposer(msg.Signature.PublicKey) {
-		b.log.Error(lib.ErrInvalidProposerPubKey().Error())
+		b.log.Error(lib.ErrInvalidProposerPubKey(b.ProposerKey).Error())
 		return true
 	}
 

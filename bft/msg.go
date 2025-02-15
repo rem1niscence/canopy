@@ -58,7 +58,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 	// if we already have an expected 'proposer' for this round - ensure the sender is correct
 	if b.ProposerKey != nil {
 		if !bytes.Equal(b.ProposerKey, x.Signature.PublicKey) {
-			return false, lib.ErrInvalidProposerPubKey()
+			return false, lib.ErrInvalidProposerPubKey(b.ProposerKey)
 		}
 	}
 	if x.Header.Phase == Election { // ELECTION
