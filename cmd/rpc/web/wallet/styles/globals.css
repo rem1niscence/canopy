@@ -549,7 +549,6 @@ th {
   height: 300px !important;
   margin-bottom: 50px;
   border: 2px solid #222222;
-  filter: grayscale(100%);
 }
 
 .content-dark .react-lazylog-searchbar {
@@ -585,8 +584,7 @@ th {
   height: 300px!important;
   margin-bottom: 50px;
   border: 0;
-  filter: grayscale(100%);
-  background: #eee;
+  background: #fff;
 }
 
 #charts-container {

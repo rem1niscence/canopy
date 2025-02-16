@@ -1,6 +1,8 @@
 import React, {useEffect, useState, useContext} from "react";
 import Truncate from "react-truncate-inside";
 import JsonView from "@uiw/react-json-view";
+import { lightTheme } from '@uiw/react-json-view/light';
+import { darkTheme } from '@uiw/react-json-view/dark';
 import {Bar} from "react-chartjs-2";
 import {Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend} from "chart.js";
 import {Accordion, Button, Carousel, Container, Form, InputGroup, Modal, Spinner, Table} from "react-bootstrap";
@@ -58,6 +60,7 @@ export default function Governance({keygroup, account: accountWithTxs, validator
     const [primaryColor, setPrimaryColor] = useState('');
     const [secondaryColor, setSecondaryColor] = useState('');
     const [buttonVariant, setButtonVariant] = useState('outline-dark');
+    const [JsonViewVariant, setJsonViewVariant] = useState('darkTheme');
 
     // Using a standalone useEffect here to isolate the color states
     useEffect(() => {
@@ -66,8 +69,10 @@ export default function Governance({keygroup, account: accountWithTxs, validator
 
       if (currentTheme === 'dark') {
         setButtonVariant('outline-light');
+        setJsonViewVariant('lightTheme');
       } else {
         setButtonVariant('outline-dark');
+        setJsonViewVariant('darkTheme');
       }
     }, []);
 
@@ -395,7 +400,12 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                             onFieldChange={onFormChange}
                         />
                         {!objEmpty(state.txResult) && (
-                            <JsonView value={state.txResult} shortenTextAfterLength={100} displayDataTypes={false}/>
+                            <JsonView
+                              value={state.txResult}
+                              shortenTextAfterLength={100}
+                              displayDataTypes={false}
+                              theme={JsonViewVariant}
+                            />
                         )}
                     </Modal.Body>
                     <Modal.Footer>

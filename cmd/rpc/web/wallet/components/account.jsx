@@ -42,8 +42,10 @@ import {
   SwapIcon,
   UnstakeIcon,
 } from "@/components/svg_icons";
-import JsonView from "@uiw/react-json-view";
 import { useContext, useEffect, useRef, useState } from "react";
+import JsonView from "@uiw/react-json-view";
+import { lightTheme } from '@uiw/react-json-view/light';
+import { darkTheme } from '@uiw/react-json-view/dark';
 import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
 import Alert from "react-bootstrap/Alert";
 import Truncate from "react-truncate-inside";
@@ -90,7 +92,23 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
     }),
     acc = account.account;
 
-    const stateRef = useRef(state);
+  const stateRef = useRef(state);
+  const [buttonVariant, setButtonVariant] = useState('outline-dark');
+  const [JsonViewVariant, setJsonViewVariant] = useState(darkTheme);
+
+  // Using a standalone useEffect here to isolate the color states 
+  useEffect(() => {
+    // Check data-bs-theme on mount
+    const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+
+    if (currentTheme === 'dark') {
+      setButtonVariant('outline-light');
+      setJsonViewVariant(lightTheme);
+    } else {
+      setButtonVariant('outline-dark');
+      setJsonViewVariant(darkTheme);
+    }
+  }, []);
 
   useEffect(() => {
     // Ensure document is available
@@ -347,6 +365,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
         keystore={ks}
         showAlert={state.showAlert}
         alertMsg={state.alertMsg}
+        JsonViewVariant={JsonViewVariant}
       />
       {transactionButtons.map((v, i) => (
         <RenderActionButton key={i} v={v} i={i} showModal={showModal} />
@@ -456,7 +475,7 @@ function KeyDetail({ i, title, info, state, setState }) {
 }
 
 // JSONViewer() returns a raw JSON viewer based on the state of pk and txResult
-function JSONViewer({ pk, txResult }) {
+function JSONViewer({ pk, txResult, JsonViewVariant }) {
   const isEmptyPK = objEmpty(pk);
   const isEmptyTxRes = objEmpty(txResult);
 
@@ -466,6 +485,7 @@ function JSONViewer({ pk, txResult }) {
       value={isEmptyPK ? { result: txResult } : { result: pk }}
       shortenTextAfterLength={100}
       displayDataTypes={false}
+      style={JsonViewVariant}
     />
   );
 }
@@ -564,6 +584,7 @@ function RenderModal({
   keystore,
   showAlert = false,
   alertMsg,
+  JsonViewVariant,
 }) {
   return (
     <Modal show={show} size="lg" onHide={onHide}>
@@ -590,7 +611,7 @@ function RenderModal({
             validator={validator}
           />
           {showAlert && <Alert variant={"danger"}>{alertMsg}</Alert>}
-          <JSONViewer pk={state.pk} txResult={state.txResult} />
+          <JSONViewer pk={state.pk} txResult={state.txResult} JsonViewVariant={JsonViewVariant} />
           <Spinner style={{ display: state.showSpinner ? "block" : "none", margin: "0 auto" }} />
         </Modal.Body>
 
