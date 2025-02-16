@@ -464,7 +464,7 @@ function JSONViewer({pk, txResult}) {
     return (
         <JsonView
             onCopied={(text) => {
-                console.log("Copied:", text);
+                copy(text)
             }}
             value={isEmptyPK ? {result: txResult} : {result: pk}}
             shortenTextAfterLength={100}
