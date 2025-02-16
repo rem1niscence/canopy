@@ -453,8 +453,8 @@ export function formatNumber(nString, div = true, cutoff = 1000000000000000) {
 
 // copy() copies text to clipboard and triggers a toast notification
 export function copy(state, setState, detail, toastText = "Copied!") {
-    if (typeof navigator.clipboard?.writeText === "function") {
-        // if HTTPS - use Clipboard API
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        // if available use Clipboard API
         navigator.clipboard.writeText(detail)
             .then(() => setState({...state, toast: toastText}))
             .catch(() => fallbackCopy(detail, state, setState, toastText));
