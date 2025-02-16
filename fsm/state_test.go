@@ -224,7 +224,7 @@ func TestApplyBlock(t *testing.T) {
 				require.NoError(t, sm.SetSupply(supply))
 				// create an aggregate signature
 				// get the committee members
-				committee, er := sm.GetCommitteeMembers(lib.CanopyChainId, true)
+				committee, er := sm.GetCommitteeMembers(lib.CanopyChainId)
 				require.NoError(t, er)
 				// create a copy of the multikey
 				mk := committee.MultiKey.Copy()

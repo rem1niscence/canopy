@@ -87,7 +87,7 @@ func TestBeginBlock(t *testing.T) {
 				require.NoError(t, sm.SetSupply(supply))
 				// create an aggregate signature
 				// get the committee members
-				committee, err := sm.GetCommitteeMembers(lib.CanopyChainId, true)
+				committee, err := sm.GetCommitteeMembers(lib.CanopyChainId)
 				require.NoError(t, err)
 				// create a copy of the multikey
 				mk := committee.MultiKey.Copy()

@@ -85,6 +85,7 @@ func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorF
 			return
 		})
 	} else { // if no filters
+		// validators are stored lexicographically not ordered stake
 		err = page.Load(types.ValidatorPrefix(), false, &res, s.store, func(_, b []byte) (err lib.ErrorI) {
 			val, err := s.unmarshalValidator(b)
 			if err == nil {

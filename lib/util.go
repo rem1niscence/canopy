@@ -48,13 +48,13 @@ type Pageable interface{ New() Pageable }
 func NewPage(p PageParams, pageType string) *Page { return &Page{PageParams: p, Type: pageType} }
 
 // Load() fills a page from an IteratorI
-func (p *Page) Load(storePrefix []byte, newestToOldest bool, results Pageable, db RStoreI, callback func(k, v []byte) ErrorI) (err ErrorI) {
+func (p *Page) Load(storePrefix []byte, reverse bool, results Pageable, db RStoreI, callback func(k, v []byte) ErrorI) (err ErrorI) {
 	var it IteratorI
 	// set the page results so that even if it's a zero page, it will have a castable type
 	p.Results = results
 	// prefix keys with numbers in big endian ensure that reverse iteration
-	// is newest to oldest and vise versa
-	switch newestToOldest {
+	// is highest to lowest and vise versa
+	switch reverse {
 	case true:
 		it, err = db.RevIterator(storePrefix)
 	case false:

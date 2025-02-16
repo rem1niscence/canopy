@@ -560,7 +560,7 @@ func Committee(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 func ValidatorSet(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
-		members, err := s.GetCommitteeMembers(id, false)
+		members, err := s.GetCommitteeMembers(id)
 		if err != nil {
 			return nil, err
 		}
@@ -582,13 +582,13 @@ func RootChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 			return nil, err
 		}
 		// get the committee
-		validatorSet, err := s.GetCommitteeMembers(id, false)
+		validatorSet, err := s.GetCommitteeMembers(id)
 		if err != nil {
 			return nil, err
 		}
 		// get the previous committee
 		// allow an error here to have size 0 validator sets
-		lastValidatorSet, _ := lastSM.GetCommitteeMembers(id, false)
+		lastValidatorSet, _ := lastSM.GetCommitteeMembers(id)
 		// get the last proposers
 		lastProposers, err := s.GetLastProposers()
 		if err != nil {
