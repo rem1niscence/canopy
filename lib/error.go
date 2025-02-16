@@ -638,7 +638,7 @@ func ErrWrongNetworkID() ErrorI {
 }
 
 func ErrEmptyChainId() ErrorI {
-	return NewError(CodeEmptyChainId, StateMachineModule, "empty committee id")
+	return NewError(CodeEmptyChainId, StateMachineModule, "empty chain id")
 }
 
 func ErrWrongChainId() ErrorI {

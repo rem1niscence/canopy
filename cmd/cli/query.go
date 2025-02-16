@@ -21,7 +21,7 @@ func init() {
 	queryCmd.PersistentFlags().Uint64Var(&height, "start-height", 0, "starting height for queries with a range")
 	queryCmd.PersistentFlags().IntVar(&pageNumber, "page-number", 0, "page number on a paginated call")
 	queryCmd.PersistentFlags().IntVar(&perPage, "per-page", 0, "number of items per page on a paginated call")
-	queryCmd.PersistentFlags().Uint64Var(&committee, "committee", 0, "filter validators by committee id")
+	queryCmd.PersistentFlags().Uint64Var(&committee, "committee", 0, "filter validators by chain id")
 	queryCmd.PersistentFlags().StringVar(&unstaking, "unstaking", "", "yes = only unstaking validators, no = only non-unstaking validators")
 	queryCmd.PersistentFlags().StringVar(&paused, "paused", "", "yes = only paused validators, no = only unpaused validators")
 	queryCmd.PersistentFlags().StringVar(&delegated, "delegated", "", "yes = only delegated validators, no = only non-delegated validators")

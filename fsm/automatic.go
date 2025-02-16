@@ -169,6 +169,31 @@ func (s *StateMachine) HandleCheckpoint(chainId uint64, results *lib.Certificate
 	return
 }
 
+// ForceUnstakeMaxPaused() forcefully unstakes validators who have reached MaxPauseHeight and removes their 'paused' key
+// EXPLAINER: Addresses under the (max) paused prefix for the latest height indicate the validator has hit their 'max paused height'
+// This key was set at an earlier height when the validators were initially paused
+// Note: These validators remain paused because the key is not deleted unless they are un-paused
+func (s *StateMachine) ForceUnstakeMaxPaused() lib.ErrorI {
+	var deleteList [][]byte
+	// force unstake all addresses under the (max) paused prefix for the latest height
+	err := s.IterateAndExecute(types.PausedPrefix(s.Height()), func(key, _ []byte) lib.ErrorI {
+		// add the key to the 'delete list'
+		deleteList = append(deleteList, key)
+		// extract the address from the key
+		addr, err := types.AddressFromKey(key)
+		if err != nil {
+			return err
+		}
+		// force unstake the validator
+		return s.ForceUnstakeValidator(addr)
+	})
+	if err != nil {
+		return err
+	}
+	// delete all the 'max paused' keys in the list
+	return s.DeleteAll(deleteList)
+}
+
 // LAST PROPOSERS CODE BELOW
 
 // UpdateLastProposers() adds an address to the 'last proposers'

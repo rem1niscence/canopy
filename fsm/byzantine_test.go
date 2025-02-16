@@ -461,7 +461,10 @@ func TestHandleDoubleSigners(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
 			// nullify the slash tracker to ensure no conflicts with slash amount validation
-			sm.slashTracker = nil
+			valParams, e := sm.GetParamsVal()
+			require.NoError(t, e)
+			valParams.DoubleSignSlashPercentage = 1
+			require.NoError(t, sm.SetParamsVal(valParams))
 			// preset the double signers
 			for _, doubleSigner := range test.preset {
 				s := sm.Store().(lib.StoreI)
@@ -748,7 +751,6 @@ func TestSlash(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
-			sm.slashTracker = nil
 			// get validator params
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)

@@ -129,7 +129,7 @@ func TestTransactionCheckBasic(t *testing.T) {
 				Memo:          "",
 				NetworkId:     1,
 			},
-			error: "empty committee id",
+			error: "empty chain id",
 		},
 		{
 			name:   "no error",

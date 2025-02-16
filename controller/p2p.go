@@ -96,7 +96,7 @@ func (c *Controller) Sync() {
 
 // SendTxMsg() gossips a Transaction through the P2P network for a specific chainId
 func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
-	// create a transaction message object using the tx bytes and the committee id
+	// create a transaction message object using the tx bytes and the chain id
 	msg := &lib.TxMessage{ChainId: c.Config.ChainId, Tx: tx}
 	// send it to self for de-duplication and awareness of self originated transactions
 	if err := c.P2P.SelfSend(c.PublicKey, Tx, msg); err != nil {
@@ -342,7 +342,7 @@ func (c *Controller) ListenForConsensus() {
 			if c.isSyncing.Load() {
 				return
 			}
-			// load the committee associated with the committee id at the latest canopy height
+			// load the committee associated with the chain id at the latest canopy height
 			vs, err := c.LoadCommittee(c.RootChainHeight())
 			if err != nil {
 				handleErr(err, 0)

@@ -454,7 +454,7 @@ func (s *StateMachine) GetCommitteeData(targetChainId uint64) (*lib.CommitteeDat
 	return targetData, nil
 }
 
-// getCommitteeDataAndList() returns the master list of committee data and the specified target data and its index from the target committee id
+// getCommitteeDataAndList() returns the master list of committee data and the specified target data and its index from the target chain id
 func (s *StateMachine) getCommitteeDataAndList(targetChainId uint64) (list *lib.CommitteesData, d *lib.CommitteeData, idx int, err lib.ErrorI) {
 	// first, get the master list of 'committee data'
 	list, err = s.GetCommitteesData()

@@ -433,6 +433,108 @@ func TestCheckProtocolVersion(t *testing.T) {
 	}
 }
 
+func TestForceUnstakeMaxPaused(t *testing.T) {
+	tests := []struct {
+		name            string
+		detail          string
+		preset          []*types.Validator
+		expected        []*types.Validator
+		unstakingBlocks uint64
+		height          uint64
+	}{
+		{
+			name:   "single validator",
+			detail: "only 1 validator",
+			preset: []*types.Validator{
+				{
+					Address:         newTestAddressBytes(t),
+					MaxPausedHeight: 2,
+				},
+			},
+			expected: []*types.Validator{
+				{
+					Address:         newTestAddressBytes(t),
+					MaxPausedHeight: 0,
+					UnstakingHeight: 3,
+				},
+			},
+			height:          2,
+			unstakingBlocks: 1,
+		},
+		{
+			name:   "multi validator all max paused",
+			detail: "multiple validators all max paused",
+			preset: []*types.Validator{
+				{
+					Address:         newTestAddressBytes(t),
+					MaxPausedHeight: 2,
+				},
+				{
+					Address:         newTestAddressBytes(t, 1),
+					MaxPausedHeight: 2,
+				},
+			},
+			expected: []*types.Validator{
+				{
+					Address:         newTestAddressBytes(t),
+					MaxPausedHeight: 0,
+					UnstakingHeight: 3,
+				},
+				{
+					Address:         newTestAddressBytes(t, 1),
+					MaxPausedHeight: 0,
+					UnstakingHeight: 3,
+				},
+			},
+			height:          2,
+			unstakingBlocks: 1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a state machine instance with default parameters
+			sm := newTestStateMachine(t)
+			// set the height
+			sm.height = test.height
+			// set the unstaking blocks
+			require.NoError(t, sm.UpdateParam(types.ParamSpaceVal, types.ParamUnstakingBlocks, &lib.UInt64Wrapper{Value: test.unstakingBlocks}))
+			// get the validator params
+			valParams, err := sm.GetParamsVal()
+			require.NoError(t, err)
+			// for each validator
+			for _, val := range test.preset {
+				// preset the validators as paused
+				require.NoError(t, sm.SetValidatorPaused(crypto.NewAddress(val.Address), val, sm.Height()))
+			}
+			// execute the function call
+			require.NoError(t, sm.ForceUnstakeMaxPaused())
+			// validate the effects
+			for _, expected := range test.expected {
+				address := crypto.NewAddress(expected.Address)
+				// get the validator from state
+				got, e := sm.GetValidator(address)
+				require.NoError(t, e)
+				// compare got vs expected
+				require.EqualExportedValues(t, expected, got)
+				// validate pause key removed
+				bz, e := sm.Get(types.KeyForPaused(sm.Height(), address))
+				require.NoError(t, e)
+				require.Len(t, bz, 0)
+				// validate not paused on structure
+				require.Zero(t, expected.MaxPausedHeight)
+				// calculate the expected unstaking height
+				expectedUnstakingHeight := valParams.UnstakingBlocks + sm.height
+				// validate unstaking on structure
+				require.Equal(t, expectedUnstakingHeight, expected.UnstakingHeight)
+				// validate unstaking key exists
+				bz, e = sm.Get(types.KeyForUnstaking(expectedUnstakingHeight, address))
+				require.NoError(t, e)
+				require.Len(t, bz, 1)
+			}
+		})
+	}
+}
+
 func TestLastProposers(t *testing.T) {
 	tests := []struct {
 		name              string

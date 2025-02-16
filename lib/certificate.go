@@ -202,7 +202,7 @@ func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommi
 }
 
 // GetNonSigners() returns the public keys and the percentage (of voting power out of total) of those who did not sign the QC
-func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) (nonSigners [][]byte, nonSignerPercent int, err ErrorI) {
+func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) (nonSignerPubKeys [][]byte, nonSignerPercent int, err ErrorI) {
 	if x == nil || x.Signature == nil {
 		return nil, 0, ErrEmptyQuorumCertificate()
 	}

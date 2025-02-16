@@ -715,8 +715,8 @@ func TestViewCheck(t *testing.T) {
 			error:     "wrong network id",
 		},
 		{
-			name:      "the committee id is incorrect",
-			detail:    "the committee ids are different",
+			name:      "the chain id is incorrect",
+			detail:    "the chain ids are different",
 			view:      &View{ChainId: 1},
 			checkView: &View{ChainId: 2},
 			error:     "wrong chain id",

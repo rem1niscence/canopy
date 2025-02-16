@@ -65,7 +65,7 @@ type GenesisState struct {
 	// supply: keeps track of the total amount of tokens or funds available across the entire blockchain
 	// this field is not importable (auto generated using pools, accounts, validators etc.)
 	Supply *Supply `protobuf:"bytes,9,opt,name=supply,proto3" json:"supply,omitempty"`
-	// retired committees: a list of the committee ids that are permanently retired
+	// retired committees: a list of the chain ids that are permanently retired
 	RetiredCommittees []uint64 `protobuf:"varint,10,rep,packed,name=retired_committees,json=retiredCommittees,proto3" json:"retired_committees,omitempty"`
 }
 

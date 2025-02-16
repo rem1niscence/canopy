@@ -49,6 +49,6 @@ message GenesisState {
   // supply: keeps track of the total amount of tokens or funds available across the entire blockchain
   // this field is not importable (auto generated using pools, accounts, validators etc.)
   Supply supply = 9;
-  // retired committees: a list of the committee ids that are permanently retired
+  // retired committees: a list of the chain ids that are permanently retired
   repeated uint64 retired_committees = 10;
 }
