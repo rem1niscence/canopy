@@ -319,6 +319,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                 validator={null}
                 onHide={null}
                 btnType={"import-or-generate"}
+                setState={setState}
                 state={state}
                 closeOnClick={resetState}
                 keystore={ks}
@@ -342,6 +343,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                 account={acc}
                 validator={validator}
                 onHide={resetState}
+                setState={setState}
                 state={state}
                 closeOnClick={resetState}
                 keystore={ks}
@@ -381,6 +383,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                 account={acc}
                 validator={null}
                 onHide={resetState}
+                setState={setState}
                 state={state}
                 closeOnClick={resetState}
                 btnType={"reveal-pk"}
@@ -395,6 +398,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                 account={acc}
                 validator={null}
                 onHide={resetState}
+                setState={setState}
                 state={state}
                 closeOnClick={resetState}
                 btnType={"import-pk"}
@@ -409,6 +413,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                 account={null}
                 validator={null}
                 onHide={resetState}
+                setState={setState}
                 state={state}
                 closeOnClick={resetState}
                 btnType={"new-pk"}
@@ -456,17 +461,17 @@ function KeyDetail({i, title, info, state, setState}) {
 }
 
 // JSONViewer() returns a raw JSON viewer based on the state of pk and txResult
-function JSONViewer({pk, txResult}) {
-    const isEmptyPK = objEmpty(pk);
-    const isEmptyTxRes = objEmpty(txResult);
+function JSONViewer({state, setState}) {
+    const isEmptyPK = objEmpty(state.pk);
+    const isEmptyTxRes = objEmpty(state.txResult);
 
     if (isEmptyPK && isEmptyTxRes) return <></>;
     return (
         <JsonView
             onCopied={(text) => {
-                copy(text)
+                copy(state, setState, text, "copied to keyboard!")
             }}
-            value={isEmptyPK ? {result: txResult} : {result: pk}}
+            value={isEmptyPK ? {result: state.txResult} : {result: state.pk}}
             shortenTextAfterLength={100}
             displayDataTypes={false}
         />
@@ -563,6 +568,7 @@ function RenderModal({
                          validator,
                          onHide,
                          btnType,
+                         setState,
                          state,
                          closeOnClick,
                          keystore,
@@ -594,7 +600,7 @@ function RenderModal({
                         validator={validator}
                     />
                     {showAlert && <Alert variant={"danger"}>{alertMsg}</Alert>}
-                    <JSONViewer pk={state.pk} txResult={state.txResult}/>
+                    <JSONViewer state={state} setState={setState}/>
                     <Spinner style={{display: state.showSpinner ? "block" : "none", margin: "0 auto"}}/>
                 </Modal.Body>
 

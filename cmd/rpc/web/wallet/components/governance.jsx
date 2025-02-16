@@ -395,7 +395,9 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                             onFieldChange={onFormChange}
                         />
                         {!objEmpty(state.txResult) && (
-                            <JsonView value={state.txResult} shortenTextAfterLength={100} displayDataTypes={false}/>
+                            <JsonView  onCopied={(text) => {
+                                copy(state, setState, text, "copied to keyboard!")
+                            }} value={state.txResult} shortenTextAfterLength={100} displayDataTypes={false}/>
                         )}
                     </Modal.Body>
                     <Modal.Footer>
