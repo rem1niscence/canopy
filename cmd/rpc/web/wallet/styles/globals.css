@@ -428,66 +428,6 @@ th {
   letter-spacing: 1.5px;
 }
 
-.logs-button-container {
-  alignment: left;
-  width: 20px;
-  height: 20px;
-  position: relative;
-  top: 27px;
-  left: 42px;
-  cursor: pointer;
-  transition: ease-in-out 0.2s;
-}
-
-.logs-container {
-  background-color: red;
-}
-
-.logs {
-  text-align: left;
-  height: 350px;
-}
-
-.logs-button-container:hover {
-  scale: 1.2;
-}
-
-.logs-button {
-  width: 25px;
-  height: 25px;
-}
-
-.canalog-row {
-  padding: 0.5rem 0.75rem;
-}
-
-.canalog-row:nth-child(odd) {
-  background-color: rgba(0, 0, 0, 0.4);
-}
-
-
-span.canalog-label{
-  color: var(--primary-color);
-  margin-right: 2rem;
-}
-
-span.canalog-body {
-  margin: 0.25rem 1rem;
-  display: inline-block;
-}
-
-span.canalog-msgtype {
-  margin-right: 0.75rem;
-}
-
-span.canalog-msgtype.canalog-info {
-  color: #ffc107;
-}
-
-span.canalog-msgtype.canalog-debug {
-  color: #0dcaf0;
-}
-
 .col {
   padding: 0;
   margin: 0 auto;
@@ -569,15 +509,35 @@ span.canalog-msgtype.canalog-debug {
   filter: invert(1) grayscale(100);
 }
 
-#dashboard-hr {
-  border: 1px dashed white;
-  margin: 0 auto;
-  width: 25%;
+h2.dashboard-label {
+  margin: 2rem 0;
+}
+
+div#log-container {
+  padding: 0 3.8rem;
+}
+
+.logs-button-container {
+  alignment: left;
+  width: 20px;
+  height: 20px;
+  position: relative;
+  top: 27px;
+  left: 42px;
+  cursor: pointer;
+  transition: ease-in-out 0.2s;
+}
+
+.logs-button-container:hover {
+  scale: 1.2;
+}
+
+.logs-button {
+  width: 25px;
+  height: 25px;
 }
 
 .content-dark .logs-button {
-  width: 25px;
-  height: 25px;
   filter: invert(1);
 }
 
@@ -591,9 +551,39 @@ span.canalog-msgtype.canalog-debug {
   text-align: left;
 }
 
+.canalog-row {
+  padding: 0.5rem 0.75rem;
+}
+
+span.canalog-label{
+  color: var(--primary-color);
+  margin-right: 2rem;
+}
+
+span.canalog-body {
+  margin: 0.25rem 1rem;
+  display: inline-block;
+}
+
+span.canalog-msgtype {
+  margin-right: 0.75rem;
+}
+
+span.canalog-msgtype.canalog-info {
+  color: #ffc107;
+}
+
+span.canalog-msgtype.canalog-debug {
+  color: #0dcaf0;
+}
+
 .content-dark .canalog-container {
   background-color: #111;
   border: 1px solid #111;
+}
+
+.content-dark .canalog-row:nth-child(odd) {
+  background-color: rgba(0, 0, 0, 0.4);
 }
 
 .content-light .canalog-container {
@@ -601,10 +591,12 @@ span.canalog-msgtype.canalog-debug {
   border: 1px solid #eee;
 }
 
+.content-light .canalog-row:nth-child(odd) {
+  background-color: rgba(255, 255, 255, 0.6);
+}
 
 #charts-container {
-  margin-top: 350px;
-  margin-bottom: 50px;
+  margin-top: 2rem;
 }
 
 .area-chart {

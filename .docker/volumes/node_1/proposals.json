@@ -1,4 +1,13 @@
 {
+  "2fdef3aa11fc8969531f151341b00af6bc5e4b0c0c3baa5946744ad23288def3": {
+    "proposal": {
+      "address": "",
+      "amount": 0,
+      "start_height": 1,
+      "end_height": 100
+    },
+    "approve": true
+  },
   "7bad44511419036edf4d2a3f88a5b92e857bc15ffc5fdb410dcc532cfc1796d2": {
     "proposal": {
       "parameter_space": "cons|fee|val|gov",

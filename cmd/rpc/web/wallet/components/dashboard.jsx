@@ -27,7 +27,7 @@ export default function Dashboard() {
     consensusInfo: {},
     peerInfo: {},
   });
-  
+
   // queryAPI() executes the page api calls
   function queryAPI() {
     const promises = [ConsensusInfo(), PeerInfo(), Resource()];
@@ -129,7 +129,7 @@ export default function Dashboard() {
         ],
       },
     ];
-  
+
   // renderButtonCarouselItem() generates the button for the carousel
   function renderButtonCarouselItem(props) {
     return (
@@ -154,7 +154,7 @@ export default function Dashboard() {
       </Carousel.Item>
     );
   }
-  
+
   // return the dashboard rendering
   return (
     <div className="content-container" id="dashboard-container">
@@ -190,16 +190,8 @@ export default function Dashboard() {
           ))}
         </Row>
       </Container>
-      <hr id="dashboard-hr" />
-      <div onClick={() => setState({ ...state, pauseLogs: !state.pauseLogs })} className="logs-button-container">
-        <img
-          className="logs-button"
-          alt="play-pause-btn"
-          src={state.pauseLogs ? "./unpause.png" : "./pause.png"}
-        />
-      </div>
-      <CanaLog text={state.logs} />
-      <Container id="charts-container">
+      <h2 className="dashboard-label">Performance</h2>
+      <Container id="charts-container" fluid>
         {[
           [
             { yax: "PROCESS", n1: "CPU %", d1: "process.usedCPUPercent", n2: "RAM %", d2: "process.usedMemoryPercent" },
@@ -264,7 +256,17 @@ export default function Dashboard() {
           </Row>
         ))}
       </Container>
-      <div style={{ height: "50px", width: "100%" }} />
+      <h2 className="dashboard-label">Transaction Log</h2>
+      <Container id="log-container" fluid>
+        <div onClick={() => setState({ ...state, pauseLogs: !state.pauseLogs })} className="logs-button-container">
+          <img
+            className="logs-button"
+            alt="play-pause-btn"
+            src={state.pauseLogs ? "./unpause.png" : "./pause.png"}
+          />
+        </div>
+        <CanaLog text={state.logs} />
+      </Container>
     </div>
   );
 }
