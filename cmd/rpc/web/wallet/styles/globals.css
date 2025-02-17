@@ -428,35 +428,6 @@ th {
     letter-spacing: 1.5px;
 }
 
-.logs-button-container {
-    alignment: left;
-    width: 20px;
-    height: 20px;
-    position: relative;
-    top: 27px;
-    left: 42px;
-    cursor: pointer;
-    transition: ease-in-out 0.2s;
-}
-
-.logs-container {
-    background-color: red;
-}
-
-.logs {
-    text-align: left;
-    height: 350px;
-}
-
-.logs-button-container:hover {
-    scale: 1.2;
-}
-
-.logs-button {
-    width: 25px;
-    height: 25px;
-}
-
 .col {
     padding: 0;
     margin: 0 auto;
@@ -538,60 +509,94 @@ th {
     filter: invert(1) grayscale(100);
 }
 
-#dashboard-hr {
-    border: 1px dashed white;
-    margin: 0 auto;
-    width: 25%;
+h2.dashboard-label {
+  margin: 2rem 0;
 }
 
-#lazy-log {
-    text-align: left;
-    height: 300px !important;
-    margin-bottom: 50px;
-    border: 2px solid #222222;
-    filter: grayscale(100%);
+div#log-container {
+  padding: 0 3.8rem;
 }
 
-.content-dark .react-lazylog-searchbar {
-    background: #111;
-    color: #fff;
+.logs-button-container {
+  alignment: left;
+  width: 20px;
+  height: 20px;
+  position: relative;
+  top: 27px;
+  left: 42px;
+  cursor: pointer;
+  transition: ease-in-out 0.2s;
+}
+
+.logs-button-container:hover {
+  scale: 1.2;
+}
+
+.logs-button {
+  width: 25px;
+  height: 25px;
 }
 
 .content-dark .logs-button {
-    width: 25px;
-    height: 25px;
-    filter: invert(1);
+  filter: invert(1);
 }
 
-.content-dark span.react-lazylog-searchbar-matches.inactive {
-    color: #fff;
+.canalog-container {
+  font-family: monospace;
+  width: 100%;
+  overflow: auto;
+  height: 30rem;
+  padding: 3rem 2rem;
+  font-size: 14px;
+  text-align: left;
 }
 
-.content-light .react-lazylog-searchbar {
-    background: #ddd;
-    color: #111;
+.canalog-row {
+  padding: 0.5rem 0.75rem;
 }
 
-.content-light span.react-lazylog-searchbar-matches.inactive {
-    color: #111;
+span.canalog-label{
+  color: var(--primary-color);
+  margin-right: 2rem;
 }
 
-.content-light input.react-lazylog-searchbar-input {
-    background: #fff;
+span.canalog-body {
+  margin: 0.25rem 1rem;
+  display: inline-block;
 }
 
-.content-light #lazy-log {
-    text-align: left;
-    height: 300px !important;
-    margin-bottom: 50px;
-    border: 0;
-    filter: grayscale(100%);
-    background: #eee;
+span.canalog-msgtype {
+  margin-right: 0.75rem;
+}
+
+span.canalog-msgtype.canalog-info {
+  color: #ffc107;
+}
+
+span.canalog-msgtype.canalog-debug {
+  color: #0dcaf0;
+}
+
+.content-dark .canalog-container {
+  background-color: #111;
+  border: 1px solid #111;
+}
+
+.content-dark .canalog-row:nth-child(odd) {
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.content-light .canalog-container {
+  background-color: #eee;
+  border: 1px solid #eee;
+}
+
+.content-light .canalog-row:nth-child(odd) {
+  background-color: rgba(255, 255, 255, 0.6);
 }
 
 #charts-container {
-    margin-top: 350px;
-    margin-bottom: 50px;
+  margin-top: 2rem;
 }
 
 .area-chart {

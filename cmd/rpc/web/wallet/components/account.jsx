@@ -42,9 +42,11 @@ import {
     SwapIcon,
     UnstakeIcon,
 } from "@/components/svg_icons";
+import { useContext, useEffect, useRef, useState } from "react";
 import JsonView from "@uiw/react-json-view";
-import {useContext, useEffect, useRef, useState} from "react";
-import {Button, Card, Col, Form, Modal, Row, Spinner, Table} from "react-bootstrap";
+import { lightTheme } from '@uiw/react-json-view/light';
+import { darkTheme } from '@uiw/react-json-view/dark';
+import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
 import Alert from "react-bootstrap/Alert";
 import Truncate from "react-truncate-inside";
 
@@ -90,7 +92,23 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
         }),
         acc = account.account;
 
-    const stateRef = useRef(state);
+  const stateRef = useRef(state);
+  const [buttonVariant, setButtonVariant] = useState('outline-dark');
+  const [JsonViewVariant, setJsonViewVariant] = useState(darkTheme);
+
+  // Using a standalone useEffect here to isolate the color states 
+  useEffect(() => {
+    // Check data-bs-theme on mount
+    const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+
+    if (currentTheme === 'dark') {
+      setButtonVariant('outline-light');
+      setJsonViewVariant(lightTheme);
+    } else {
+      setButtonVariant('outline-dark');
+      setJsonViewVariant(darkTheme);
+    }
+  }, []);
 
     useEffect(() => {
         // Ensure document is available
@@ -349,6 +367,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                 keystore={ks}
                 showAlert={state.showAlert}
                 alertMsg={state.alertMsg}
+                JsonViewVariant={JsonViewVariant}
             />
             {transactionButtons.map((v, i) => (
                 <RenderActionButton key={i} v={v} i={i} showModal={showModal}/>
@@ -461,7 +480,7 @@ function KeyDetail({i, title, info, state, setState}) {
 }
 
 // JSONViewer() returns a raw JSON viewer based on the state of pk and txResult
-function JSONViewer({state, setState}) {
+function JSONViewer({state, setState, JsonViewVariant}) {
     const isEmptyPK = objEmpty(state.pk);
     const isEmptyTxRes = objEmpty(state.txResult);
 
@@ -474,6 +493,7 @@ function JSONViewer({state, setState}) {
             value={isEmptyPK ? {result: state.txResult} : {result: state.pk}}
             shortenTextAfterLength={100}
             displayDataTypes={false}
+            style={JsonViewVariant}
         />
     );
 }
@@ -559,57 +579,58 @@ function RenderButtons({type, state, closeOnClick}) {
 
 // RenderModal() returns the transaction modal
 function RenderModal({
-                         show,
-                         title,
-                         txType,
-                         onFormSub,
-                         keyGroup,
-                         account,
-                         validator,
-                         onHide,
-                         btnType,
-                         setState,
-                         state,
-                         closeOnClick,
-                         keystore,
-                         showAlert = false,
-                         alertMsg,
-                     }) {
-    return (
-        <Modal show={show} size="lg" onHide={onHide}>
-            <Form onSubmit={onFormSub}>
-                <Modal.Header>
-                    <Modal.Title className="modal-title">{title}</Modal.Title>
-                </Modal.Header>
-                <Modal.Body className="modal-body">
-                    <FormInputs
-                        keygroup={keyGroup}
-                        fields={getFormInputs(txType, keyGroup, account, validator, keystore).map((formInput) => {
-                            let input = Object.assign({}, formInput);
-                            if (input.label === "sender") {
-                                input.options.sort((a, b) => {
-                                    if (a === account.nickname) return -1;
-                                    if (b === account.nickname) return 1;
-                                    return 0;
-                                });
-                            }
-                            return input;
-                        })}
-                        account={account}
-                        show={show}
-                        validator={validator}
-                    />
-                    {showAlert && <Alert variant={"danger"}>{alertMsg}</Alert>}
-                    <JSONViewer state={state} setState={setState}/>
-                    <Spinner style={{display: state.showSpinner ? "block" : "none", margin: "0 auto"}}/>
-                </Modal.Body>
+  show,
+  title,
+  txType,
+  onFormSub,
+  keyGroup,
+  account,
+  validator,
+  onHide,
+  btnType,
+  setState,
+  state,
+  closeOnClick,
+  keystore,
+  showAlert = false,
+  alertMsg,
+  JsonViewVariant,
+}) {
+  return (
+    <Modal show={show} size="lg" onHide={onHide}>
+      <Form onSubmit={onFormSub}>
+        <Modal.Header>
+          <Modal.Title>{title}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="modal-body">
+          <FormInputs
+            keygroup={keyGroup}
+            fields={getFormInputs(txType, keyGroup, account, validator, keystore).map((formInput) => {
+              let input = Object.assign({}, formInput);
+              if (input.label === "sender") {
+                input.options.sort((a, b) => {
+                  if (a === account.nickname) return -1;
+                  if (b === account.nickname) return 1;
+                  return 0;
+                });
+              }
+              return input;
+            })}
+            account={account}
+            show={show}
+            validator={validator}
+          />
+          {showAlert && <Alert variant={"danger"}>{alertMsg}</Alert>}
+          <JSONViewer state={state} setState={setState} JsonViewVariant={JsonViewVariant} />
+          <Spinner style={{ display: state.showSpinner ? "block" : "none", margin: "0 auto" }} />
+        </Modal.Body>
 
-                <Modal.Footer>
-                    <RenderButtons type={btnType} state={state} closeOnClick={closeOnClick}/>
-                </Modal.Footer>
-            </Form>
-        </Modal>
-    );
+        <Modal.Footer>
+          <RenderButtons type={btnType} state={state} closeOnClick={closeOnClick} />
+        </Modal.Footer>
+      </Form>
+    </Modal>
+  );
 }
 
 // RenderActionButton() creates a button with an SVG and title, triggering a modal on click
