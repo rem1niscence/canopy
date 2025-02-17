@@ -48,13 +48,13 @@ type Pageable interface{ New() Pageable }
 func NewPage(p PageParams, pageType string) *Page { return &Page{PageParams: p, Type: pageType} }
 
 // Load() fills a page from an IteratorI
-func (p *Page) Load(storePrefix []byte, newestToOldest bool, results Pageable, db RStoreI, callback func(k, v []byte) ErrorI) (err ErrorI) {
+func (p *Page) Load(storePrefix []byte, reverse bool, results Pageable, db RStoreI, callback func(k, v []byte) ErrorI) (err ErrorI) {
 	var it IteratorI
 	// set the page results so that even if it's a zero page, it will have a castable type
 	p.Results = results
 	// prefix keys with numbers in big endian ensure that reverse iteration
-	// is newest to oldest and vise versa
-	switch newestToOldest {
+	// is highest to lowest and vise versa
+	switch reverse {
 	case true:
 		it, err = db.RevIterator(storePrefix)
 	case false:
@@ -345,14 +345,14 @@ func Uint64Percentage(amount uint64, percentage uint64) (res uint64) {
 }
 
 // Uint64ReducePercentage() reduces an amount by a specified percentage
-func Uint64ReducePercentage(amount uint64, percentage uint64) (res uint64) {
+func Uint64ReducePercentage(amount, percentage uint64) (res uint64) {
 	if percentage >= 100 || amount == 0 {
 		return 0
 	}
 	if percentage == 0 {
 		return amount
 	}
-	return (amount * (100 - uint64(percentage))) / 100
+	return (amount * (100 - percentage)) / 100
 }
 
 // Uint64ToBigFloat() converts a uint64 to a big.Float
@@ -468,16 +468,17 @@ func CatchPanic(l LoggerI) {
 	}
 }
 
-// AppendAndLenPrefix() appends the items together separated by a single byte to represent the length of the segment
-func AppendAndLenPrefix(toAppend ...[]byte) (res []byte) {
-	for _, a := range toAppend {
-		if a == nil {
+// JoinLenPrefix() appends the items together separated by a single byte to represent the length of the segment
+func JoinLenPrefix(toAppend ...[]byte) (res []byte) {
+	// for each item to append
+	for _, item := range toAppend {
+		if item == nil {
 			continue
 		}
 		// store the length of the segment in a single byte
-		length := []byte{byte(len(a))}
+		length := []byte{byte(len(item))}
 		// append to the reset of the segment
-		res = append(append(res, length...), a...)
+		res = append(append(res, length...), item...)
 	}
 	return
 }

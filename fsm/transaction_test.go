@@ -15,7 +15,7 @@ func TestApplyTransaction(t *testing.T) {
 	// predefine a keygroup for signing the transaction
 	kg := newTestKeyGroup(t)
 	// predefine a send-transaction to insert into the block
-	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, 1, 1, "")
+	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, 1, 1, 1, "")
 	require.NoError(t, e)
 	tests := []struct {
 		name          string
@@ -103,13 +103,21 @@ func TestCheckTx(t *testing.T) {
 	// predefine a keygroup for signing the transaction
 	kg := newTestKeyGroup(t)
 	// predefine a send-transaction to insert into the block
-	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, 1, 1, "")
+	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, 1, 1, 1, "")
 	require.NoError(t, e)
 	// convert the object to bytes
 	tx, e := lib.Marshal(sendTx)
 	require.NoError(t, e)
+	// define a version with a bad height
+	sendTxBadHeight := sendTx.(*lib.Transaction)
+	sendTxBadHeight.CreatedHeight = 123
+	require.NoError(t, sendTxBadHeight.Sign(kg.PrivateKey))
+	// convert the object to bytes
+	txBadHeight, e := lib.Marshal(sendTxBadHeight)
+	require.NoError(t, e)
 	// define a version with a bad fee (below state limit)
 	sendTxBadFee := sendTx.(*lib.Transaction)
+	sendTxBadHeight.CreatedHeight = 120
 	sendTxBadFee.Fee = 0
 	require.NoError(t, sendTxBadFee.Sign(kg.PrivateKey))
 	// convert the object to bytes
@@ -123,13 +131,12 @@ func TestCheckTx(t *testing.T) {
 	require.NoError(t, e)
 	// define test cases
 	tests := []struct {
-		name          string
-		detail        string
-		tx            []byte
-		presetSender  uint64
-		lastBlockTime time.Time
-		expected      *CheckTxResult
-		error         string
+		name         string
+		detail       string
+		tx           []byte
+		presetSender uint64
+		expected     *CheckTxResult
+		error        string
 	}{
 		{
 			name:   "unmarshal fails",
@@ -143,30 +150,27 @@ func TestCheckTx(t *testing.T) {
 			error:  "message is empty",
 		},
 		{
-			name:   "tx timestamp fails",
-			detail: "failure on transaction timestamp",
+			name:   "tx height fails",
+			detail: "failure on transaction height",
+			tx:     txBadHeight,
+			error:  "invalid tx height",
+		},
+		{
+			name:   "tx signature verification fails",
+			detail: "failure on transaction signature verification",
+			tx:     txBadSig,
+			error:  "invalid signature",
+		},
+		{
+			name:   "tx fee check fails",
+			detail: "failure on transaction fee checking",
+			tx:     txBadFee,
+			error:  "below state limit",
+		},
+		{
+			name:   "passes check tx",
+			detail: "the happy path of check tx",
 			tx:     tx,
-			error:  "invalid tx timestamp",
-		},
-		{
-			name:          "tx signature verification fails",
-			detail:        "failure on transaction signature verification",
-			lastBlockTime: time.Now(),
-			tx:            txBadSig,
-			error:         "invalid signature",
-		},
-		{
-			name:          "tx fee check fails",
-			detail:        "failure on transaction fee checking",
-			lastBlockTime: time.Now(),
-			tx:            txBadFee,
-			error:         "below state limit",
-		},
-		{
-			name:          "passes check tx",
-			detail:        "the happy path of check tx",
-			lastBlockTime: time.Now(),
-			tx:            tx,
 			expected: &CheckTxResult{
 				tx: sendTx.(*lib.Transaction),
 				msg: &types.MessageSend{
@@ -182,20 +186,10 @@ func TestCheckTx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
-			// convenience variable for store
-			s := sm.store.(lib.StoreI)
 			// preset the state limit for send fee
 			require.NoError(t, sm.UpdateParam("fee", types.ParamSendFee, &lib.UInt64Wrapper{Value: 1}))
 			// preset tokens to the sender account (for the fee)
 			require.NoError(t, sm.AccountAdd(newTestAddress(t), test.presetSender))
-			// preset last block for timestamp verification
-			require.NoError(t, s.IndexBlock(&lib.BlockResult{
-				BlockHeader: &lib.BlockHeader{
-					Height: 1,
-					Hash:   crypto.Hash([]byte("block_hash")),
-					Time:   uint64(test.lastBlockTime.UnixMicro()),
-				},
-			}))
 			// execute the function call
 			got, err := sm.CheckTx(test.tx, crypto.HashString(test.tx))
 			// validate the expected error
@@ -337,14 +331,12 @@ func TestCheckSignature(t *testing.T) {
 }
 
 func TestCheckReplay(t *testing.T) {
-	start := time.Now()
 	tests := []struct {
-		name          string
-		detail        string
-		height        uint64
-		tx            *lib.Transaction
-		lastBlockTime time.Time
-		error         string
+		name   string
+		detail string
+		height uint64
+		tx     *lib.Transaction
+		error  string
 	}{
 		{
 			name:   "bad network id",
@@ -373,50 +365,46 @@ func TestCheckReplay(t *testing.T) {
 			},
 		},
 		{
-			name:   "above maximum time",
-			detail: "above maximum timestamp should fail",
+			name:   "above maximum height",
+			detail: "above maximum height should fail",
 			tx: &lib.Transaction{
-				Time:      uint64(start.Add(time.Hour*6 + 1000).UnixMicro()),
-				NetworkId: 1,
-				ChainId:   1,
+				CreatedHeight: 123,
+				NetworkId:     1,
+				ChainId:       1,
 			},
-			height:        2,
-			lastBlockTime: start,
-			error:         "invalid tx timestamp",
+			height: 2,
+			error:  "invalid tx height",
 		},
 		{
-			name:   "below minimum time",
+			name:   "below minimum height",
 			detail: "below minimum timestamp should fail",
 			tx: &lib.Transaction{
-				Time:      uint64(start.UnixMicro()),
-				NetworkId: 1,
-				ChainId:   1,
+				CreatedHeight: 1,
+				NetworkId:     1,
+				ChainId:       1,
 			},
-			height:        2,
-			lastBlockTime: start.Add(-time.Hour*6 - 1000),
-			error:         "invalid tx timestamp",
+			height: 122,
+			error:  "invalid tx height",
 		},
 		{
-			name:   "maximum time",
-			detail: "maximum timestamp should succeed",
+			name:   "maximum height",
+			detail: "at maximum height should succeed",
 			tx: &lib.Transaction{
-				Time:      uint64(start.UnixMicro()),
-				NetworkId: 1,
-				ChainId:   1,
+				CreatedHeight: 122,
+				NetworkId:     1,
+				ChainId:       1,
 			},
-			height:        2,
-			lastBlockTime: start.Add(time.Hour * 6),
+			height: 2,
 		},
 		{
 			name:   "minimum time",
 			detail: "minimum timestamp should succeed",
 			tx: &lib.Transaction{
-				Time:      uint64(start.UnixMicro()),
-				NetworkId: 1,
-				ChainId:   1,
+				CreatedHeight: 2,
+				NetworkId:     1,
+				ChainId:       1,
 			},
-			height:        2,
-			lastBlockTime: start.Add(-time.Hour * 6),
+			height: 122,
 		},
 	}
 	for _, test := range tests {
@@ -425,16 +413,6 @@ func TestCheckReplay(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// set sm height
 			sm.height = test.height
-			// convenience variable for store
-			s := sm.store.(lib.StoreI)
-			// preset last block for timestamp verification
-			require.NoError(t, s.IndexBlock(&lib.BlockResult{
-				BlockHeader: &lib.BlockHeader{
-					Height: 1,
-					Hash:   crypto.Hash([]byte("block_hash")),
-					Time:   uint64(test.lastBlockTime.UnixMicro()),
-				},
-			}))
 			// execute the function call
 			err := sm.CheckReplay(test.tx, crypto.HashString([]byte("hash")))
 			// validate the expected error

@@ -617,6 +617,8 @@ type DoubleSigner struct {
 	unknownFields protoimpl.UnknownFields
 
 	// id: the cryptographic identifier of the malicious actor
+	// - at the consensus level, this represents the Public_Key of the actor
+	// - at the state machine level, this represents the Address of the actor
 	Id []byte `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// heights: the list of heights when the infractions occurred
 	Heights []uint64 `protobuf:"varint,2,rep,packed,name=heights,proto3" json:"heights,omitempty"`

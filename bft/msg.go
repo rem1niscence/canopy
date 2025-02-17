@@ -58,7 +58,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 	// if we already have an expected 'proposer' for this round - ensure the sender is correct
 	if b.ProposerKey != nil {
 		if !bytes.Equal(b.ProposerKey, x.Signature.PublicKey) {
-			return false, lib.ErrInvalidProposerPubKey()
+			return false, lib.ErrInvalidProposerPubKey(b.ProposerKey)
 		}
 	}
 	if x.Header.Phase == Election { // ELECTION
@@ -111,7 +111,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 		if x.Header.Phase == Propose {
 			// ensure the sender is justified as the proposer
 			if !bytes.Equal(x.Qc.ProposerKey, x.Signature.PublicKey) {
-				return false, lib.ErrInvalidProposerPubKey()
+				return false, lib.ErrInvalidSigner()
 			}
 			// ensure the block isn't nil
 			if x.Qc.Block == nil {
@@ -128,7 +128,7 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 			}
 			// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
 			if !bytes.Equal(x.Qc.BlockHash, b.GetBlockHash()) {
-				return false, lib.ErrMismatchBlockHash("CheckProposerMsg")
+				return false, lib.ErrMismatchConsBlockHash()
 			}
 			if !bytes.Equal(x.Qc.ResultsHash, b.Results.Hash()) {
 				return false, lib.ErrMismatchResultsHash()
@@ -163,17 +163,17 @@ func (b *BFT) CheckReplicaMessage(x *Message) lib.ErrorI {
 	if x.Qc.Header.Phase == ElectionVote {
 		// ELECTION-VOTE Replica message
 		if len(x.Qc.ProposerKey) != crypto.BLS12381PubKeySize {
-			return lib.ErrInvalidProposerPubKey()
+			return lib.ErrInvalidSigner()
 		}
 	} else {
 		// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
 		if b.Block == nil {
 			if !bytes.Equal(x.Qc.BlockHash, b.BlockToHash(x.Qc.Block)) {
-				return lib.ErrMismatchBlockHash("CheckReplicaMessage.Propose-Vote")
+				return lib.ErrMismatchQCBlockHash()
 			}
 		} else {
 			if !bytes.Equal(x.Qc.BlockHash, b.GetBlockHash()) {
-				return lib.ErrMismatchBlockHash("CheckReplicaMessage.Precommit-Vote")
+				return lib.ErrMismatchConsBlockHash()
 			}
 		}
 		if !bytes.Equal(x.Qc.ResultsHash, b.Results.Hash()) {

@@ -85,6 +85,7 @@ func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorF
 			return
 		})
 	} else { // if no filters
+		// validators are stored lexicographically not ordered stake
 		err = page.Load(types.ValidatorPrefix(), false, &res, s.store, func(_, b []byte) (err lib.ErrorI) {
 			val, err := s.unmarshalValidator(b)
 			if err == nil {
@@ -223,7 +224,9 @@ func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator 
 			return err
 		}
 	}
-	validator.UnstakingHeight = finishUnstakingHeight // height at which the validator finishes unstaking
+	// set the height at which the validator finishes unstaking
+	validator.UnstakingHeight = finishUnstakingHeight
+	// update the validator structure
 	return s.SetValidator(validator)
 }
 
@@ -301,28 +304,6 @@ func (s *StateMachine) SetValidatorUnpaused(address crypto.AddressI, validator *
 	}
 	validator.MaxPausedHeight = 0
 	return s.SetValidator(validator)
-}
-
-// ForceUnstakeMaxPaused() force unstakes validators who have reached MaxPauseHeight and deletes their 'paused' key
-// EXPLAINER: addresses under the (max) paused prefix for the latest height indicate the Validator
-// reached their 'max paused height' as this key was set some heights ago when the validators were initially paused.
-// Note that these Validators still remain paused or else the key would have been deleted upon 'un-pausing'
-func (s *StateMachine) ForceUnstakeMaxPaused() lib.ErrorI {
-	var keys [][]byte
-	// this callback force unstakes all addresses under the prefix
-	forceUnstakeCallback := func(key, _ []byte) lib.ErrorI {
-		keys = append(keys, key)
-		addr, err := types.AddressFromKey(key)
-		if err != nil {
-			return err
-		}
-		return s.ForceUnstakeValidator(addr)
-	}
-	// force unstake all addresses under the (max) paused prefix for the latest height
-	if err := s.IterateAndExecute(types.PausedPrefix(s.Height()), forceUnstakeCallback); err != nil {
-		return err
-	}
-	return s.DeleteAll(keys)
 }
 
 // GetAuthorizedSignersForValidator() returns the addresses that are able to sign messages on behalf of the validator

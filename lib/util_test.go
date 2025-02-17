@@ -447,7 +447,7 @@ func TestLengthedPrefix(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := DecodeLengthPrefixed(AppendAndLenPrefix(test.segments...))
+			got := DecodeLengthPrefixed(JoinLenPrefix(test.segments...))
 			require.Equal(t, test.segments, got)
 		})
 	}

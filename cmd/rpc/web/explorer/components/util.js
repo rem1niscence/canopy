@@ -150,10 +150,33 @@ export function isEmpty(obj) {
   return Object.keys(obj).length === 0;
 }
 
-// clipboard() copies a value to the clipboard and shows a toast message
-export function clipboard(state, setState, detail) {
-  navigator.clipboard.writeText(detail);
-  setState({ ...state, showToast: true });
+// copy() copies text to clipboard and triggers a toast notification
+export function copy(state, setState, detail, toastText = "Copied!") {
+  if (navigator.clipboard && window.isSecureContext) {
+    // if HTTPS - use Clipboard API
+    navigator.clipboard.writeText(detail)
+      .then(() => setState({...state, toast: toastText}))
+      .catch(() => fallbackCopy(detail, state, setState, toastText));
+  } else {
+    fallbackCopy(state, setState, detail, toastText)
+  }
+}
+
+// fallbackCopy() copies text to clipboard if clipboard API is unavailable
+export function fallbackCopy(state, setState, detail, toastText = "Copied!") {
+  // if http - use textarea
+  const textArea = document.createElement("textarea");
+  textArea.value = detail;
+  document.body.appendChild(textArea);
+  textArea.select();
+  try {
+    document.execCommand("copy");
+    setState({...state, toast: toastText});
+  } catch (err) {
+    console.error("Fallback copy failed", err);
+    setState({...state, toast: "Clipboard access denied"});
+  }
+  document.body.removeChild(textArea);
 }
 
 // convertTx() sanitizes and simplifies a transaction object

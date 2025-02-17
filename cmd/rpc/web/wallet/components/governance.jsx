@@ -92,8 +92,8 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                     r.param_space,
                     r.param_key,
                     r.param_value,
-                    r.start_block,
-                    r.end_block,
+                    numberFromCommas(r.start_block),
+                    numberFromCommas(r.end_block),
                     r.memo,
                     toUCNPY(numberFromCommas(r.fee)),
                     r.password,
@@ -102,8 +102,8 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                 createDAOTransferTx(
                     r.sender,
                     toUCNPY(numberFromCommas(r.amount)),
-                    r.start_block,
-                    r.end_block,
+                    numberFromCommas(r.start_block),
+                    numberFromCommas(r.end_block),
                     r.memo,
                     r.fee,
                     r.password,
@@ -401,8 +401,10 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                         />
                         {!objEmpty(state.txResult) && (
                             <JsonView
-                              value={state.txResult}
-                              shortenTextAfterLength={100}
+                              onCopied={(text) => {
+                                copy(state, setState, text, "copied to keyboard!")
+                              }} value={state.txResult} 
+                              shortenTextAfterLength={100} 
                               displayDataTypes={false}
                               theme={JsonViewVariant}
                             />

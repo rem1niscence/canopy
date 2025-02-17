@@ -79,6 +79,7 @@ function convertBlock(v) {
 function convertValidator(v) {
   let value = Object.assign({}, v);
   value.staked_amount = toCNPY(value.staked_amount);
+  value.committees = value.committees.toString()
   return value;
 }
 
@@ -139,7 +140,7 @@ function convertOrder(v) {
 function convertCommitteeSupply(v, total) {
   const percent = 100 * (v.amount / total);
   return {
-    Chain: 1,
+    Chain: v.id,
     stake_cut: `${percent}%`,
     total_restake: toCNPY(v.amount),
   };

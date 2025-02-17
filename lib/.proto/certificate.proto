@@ -127,6 +127,8 @@ message PaymentPercents {
 // The structure includes the validator's public key and a list of block heights where the double signing occurred
 message DoubleSigner {
   // id: the cryptographic identifier of the malicious actor
+  // - at the consensus level, this represents the Public_Key of the actor
+  // - at the state machine level, this represents the Address of the actor
   bytes id = 1;
   // heights: the list of heights when the infractions occurred
   repeated uint64 heights = 2;

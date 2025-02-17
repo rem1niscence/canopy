@@ -55,7 +55,7 @@ func (x *BlockHeader) Check(networkID, chainId uint64) ErrorI {
 		if x.LastQuorumCertificate.Header.NetworkId != networkID {
 			return ErrWrongNetworkID()
 		}
-		// check committee id
+		// check chain id
 		if x.LastQuorumCertificate.Header.ChainId != chainId {
 			return ErrWrongChainId()
 		}
@@ -85,7 +85,7 @@ func (x *BlockHeader) Check(networkID, chainId uint64) ErrorI {
 	x.Hash = tmp
 	// check got vs expected
 	if !bytes.Equal(x.Hash, crypto.Hash(bz)) {
-		return ErrMismatchBlockHash("BlockHeader.Check")
+		return ErrMismatchHeaderBlockHash()
 	}
 	return nil
 }

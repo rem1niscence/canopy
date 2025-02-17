@@ -5,6 +5,7 @@ import Container from "react-bootstrap/Container";
 import { Button, Card, Carousel, Col, Row, Spinner } from "react-bootstrap";
 import { YAxis, Tooltip, Legend, AreaChart, Area } from "recharts";
 import CanaLog from "@/components/canalog";
+import {PauseIcon, UnpauseIcon} from "@/components/svg_icons";
 import {
   getAdminRPCURL,
   configPath,
