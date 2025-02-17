@@ -1,0 +1,39 @@
+syntax = "proto3";
+package types;
+
+option go_package = "github.com/canopy-network/canopy/lib";
+
+// *****************************************************************************************************
+// This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
+//
+// Protobuf is a language-neutral, platform-neutral serialization format. It allows users
+// to define objects in a way that’s both efficient to store and fast to transmit over the network.
+// These definitions are compiled into code that *enables different systems and programming languages
+// to communicate in a byte-perfect manner*
+//
+// To update these structures, make changes to the source .proto files, then recompile
+// to regenerate this file.
+// These auto-generated files are easily recognized by checking for a `.pb.go` ending
+// *****************************************************************************************************
+//_
+//_
+//_
+// MerkleProof represents Canopy's implementation of a Sparse Merkle Tree Proof
+// It is used for membership and non-membership proof functionality
+message MerkleProof {
+  // Hashes: an array of sibling node hashes encountered while traversing up to the leaf of the proof
+  repeated bytes Hashes = 1;
+  // HashKeys: an array of keys corresponding to each sibling node hash encountered during traversal
+  repeated bytes HashKeys = 2;
+  // NodeKeys: a byte array of keys for the nodes traversed in the proof
+  repeated bytes NodeKeys = 3;
+  // Bitmask: a byte array indicating whether each node hash is a left or right sibling
+  // 0 represents a left sibling, and 1 represents a right sibling
+  bytes Bitmask = 4;
+  // Value: is the cryptographic hash of the data included in the database, or empty
+  // in the case of proof of non-membership
+  bytes Value = 5;
+  // Root: is the cryptographic hash of the root of the Sparse Merkle Tree at the time of 
+  // the proof
+  bytes Root = 6;
+}
