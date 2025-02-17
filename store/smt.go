@@ -2,9 +2,10 @@ package store
 
 import (
 	"bytes"
+	"slices"
+
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"slices"
 )
 
 // =====================================================
@@ -107,11 +108,18 @@ type OpData struct {
 	pathBit int
 	// target: the node that is being added or deleted (or its ID)
 	target *node
-	// current: the current selected nod
+	// current: the current selected node
 	current *node
 	// traversed: a descending list of traversed nodes from root to parent of current
 	traversed *NodeList
 }
+
+const (
+	// leftChild: enum identifier of left child (0)
+	leftChild = iota
+	// leftChild: enum identifier of right child (1)
+	rightChild
+)
 
 // NewDefaultSMT() creates a new abstraction fo the SMT object using default parameters
 func NewDefaultSMT(store lib.RWStoreI) (smt *SMT) {
@@ -207,7 +215,7 @@ func (s *SMT) Delete(k []byte) lib.ErrorI {
 	// get the parent and grandparent
 	parent, grandparent := s.traversed.Parent(), s.traversed.GrandParent()
 	// get the sibling of the target
-	sibling := parent.getOtherChild(targetBytes)
+	sibling, _ := parent.getOtherChild(targetBytes)
 	// replace the parent reference with the sibling in the grandparent
 	grandparent.replaceChild(parent.Key.bytes(), sibling)
 	// delete the parent from the database and remove it from the traversal array
@@ -252,9 +260,6 @@ func (s *SMT) traverse() (err lib.ErrorI) {
 		s.current.Key.fromBytes(currentKey)
 		// update the greatest common prefix and the bit position based on the new current key
 		s.target.Key.greatestCommonPrefix(&s.bitPos, s.gcp, s.current.Key)
-		if err != nil {
-			return
-		}
 		// exit conditions
 		if !s.current.Key.equals(s.gcp) || s.target.Key.equals(s.gcp) {
 			return // exit loop
@@ -419,6 +424,104 @@ func (s *SMT) validateTarget() lib.ErrorI {
 	return nil
 }
 
+// GetMerkleProof() returns the merkle proof-of-membership for a given key if it exists,
+// and the proof of non-membership otherwise
+func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
+	// calculate the key and value to traverse
+	s.target = &node{Key: newNodeKey(crypto.Hash(key), s.keyBitLength)}
+	// check to make sure the target is valid
+	if err := s.validateTarget(); err != nil {
+		return nil, err
+	}
+
+	// generate the proof structure
+	proof := &lib.MerkleProof{
+		Hashes:   make([][]byte, 0),
+		HashKeys: make([][]byte, 0),
+		Bitmask:  make([]byte, 0),
+		Root:     s.Root(),
+		Value:    []byte(nil),
+	}
+
+	// navigates the tree downward
+	if err := s.traverse(); err != nil {
+		return nil, err
+	}
+	// if gcp != target key then this becomes a proof of non-membership
+	// and the value needs to be temporarily added to the smt to calculate the proof
+	if !s.target.Key.equals(s.gcp) {
+		proof.Value = nil
+		// save the node in the tree temporarily
+		if err := s.Set(key, nil); err != nil {
+			return nil, err
+		}
+
+		// traverse again to get the path to the target
+		if err := s.traverse(); err != nil {
+			return nil, err
+		}
+
+		// remove the node from the tree when done
+		defer func() {
+			if err := s.Delete(key); err != nil {
+				panic("failed to delete temporary node: " + err.Error())
+			}
+		}()
+	}
+
+	// get the target node from the database
+	targetNode, err := s.getNode(s.target.Key.bytes())
+	if err != nil {
+		return nil, err
+	}
+	proof.Value = targetNode.Value
+
+	// Add target to the list of traversed nodes
+	s.traversed.Nodes = append(s.traversed.Nodes, targetNode.copy())
+
+	// traverse the nodes back up to the root to generate the proof
+	for i := len(s.traversed.Nodes) - 1; i > 0; i-- {
+		node := s.traversed.Nodes[i]
+		parent := s.traversed.Nodes[i-1]
+		siblingKey, order := parent.getOtherChild(node.Key.bytes())
+		siblingNode, err := s.getNode(siblingKey)
+		if err != nil {
+			return nil, err
+		}
+
+		// Add the bitmask, node key, sibling key and sibling hash to the proof
+		proof.Bitmask = append(proof.Bitmask, order)
+		proof.NodeKeys = append(proof.NodeKeys, node.Key.bytes())
+		proof.Hashes = append(proof.Hashes, siblingNode.Value)
+		proof.HashKeys = append(proof.HashKeys, siblingNode.Key.bytes())
+	}
+
+	return proof, nil
+}
+
+// VerifyProof verifies a Sparse Merkle Tree proof for a given value
+// reconstructing the root hash and comparing it against the provided root hash
+func (s *SMT) VerifyProof(key []byte, proof *lib.MerkleProof) bool {
+	n := &node{Key: newNodeKey(crypto.Hash(key), s.keyBitLength), Node: Node{Value: crypto.Hash(proof.Value)}}
+	hash := append(n.Key.bytes(), proof.Value...)
+	for i := 0; i < len(proof.Hashes); i++ {
+		// Get the key of the traversed node, as there's no way to get it from the generated hashes
+		var nodeKey []byte
+		if i > 0 {
+			nodeKey = proof.NodeKeys[i]
+		}
+
+		if proof.Bitmask[i] == leftChild {
+			// left sibling of the given node
+			hash = crypto.Hash(append(append(proof.HashKeys[i], proof.Hashes[i]...), append(nodeKey, hash...)...))
+		} else {
+			// right sibling of the given node
+			hash = crypto.Hash(append(append(nodeKey, hash...), append(proof.HashKeys[i], proof.Hashes[i]...)...))
+		}
+	}
+	return bytes.Equal(hash, proof.Root)
+}
+
 // NODE KEY CODE BELOW
 
 /*
@@ -503,7 +606,6 @@ func (k *key) greatestCommonPrefix(bitPos *int, gcp *key, current *key) {
 		// if the bits match, add to the common prefix
 		gcp.addBit(bit1)
 	}
-	return
 }
 
 // bitAt() returns the bit value <0 or 1> at a 0 indexed position left to right (MSB)
@@ -647,13 +749,13 @@ func (x *node) setChildren(leftKey, rightKey []byte) {
 	x.LeftChildKey, x.RightChildKey = leftKey, rightKey
 }
 
-// getOtherChild() returns the sibling for the child key passed
-func (x *node) getOtherChild(childKey []byte) []byte {
+// getOtherChild() returns the sibling for the child key passed and which child it is
+func (x *node) getOtherChild(childKey []byte) ([]byte, byte) {
 	switch {
 	case bytes.Equal(x.LeftChildKey, childKey):
-		return x.RightChildKey
+		return x.RightChildKey, rightChild
 	case bytes.Equal(x.RightChildKey, childKey):
-		return x.LeftChildKey
+		return x.LeftChildKey, leftChild
 	}
 	panic("no child node was a match for getOtherChild")
 }
@@ -711,3 +813,7 @@ var (
 		255, 255, 255, 255, 255, 255, 255, 255,
 	}
 )
+
+// 11
+// 1100
+// 1101
