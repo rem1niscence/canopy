@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import Truncate from "react-truncate-inside";
 import { getRatio, formatNumber } from "@/components/util";
 import Container from "react-bootstrap/Container";
 import { Button, Card, Carousel, Col, Row, Spinner } from "react-bootstrap";
 import { YAxis, Tooltip, Legend, AreaChart, Area } from "recharts";
+import CanaLog from "@/components/canalog";
 import {
   getAdminRPCURL,
   configPath,
@@ -17,8 +17,6 @@ import {
   peerInfoPath,
   Resource,
 } from "@/components/api";
-
-const LazyLog = dynamic(() => import("react-lazylog").then((mod) => mod.LazyLog), { ssr: false });
 
 // Dashboard() is the main component of this file
 export default function Dashboard() {
@@ -131,7 +129,7 @@ export default function Dashboard() {
         ],
       },
     ];
-
+  
   // renderButtonCarouselItem() generates the button for the carousel
   function renderButtonCarouselItem(props) {
     return (
@@ -200,7 +198,7 @@ export default function Dashboard() {
           src={state.pauseLogs ? "./unpause.png" : "./pause.png"}
         />
       </div>
-      <LazyLog enableSearch={true} id="lazy-log" text={state.logs.replace("\n", "")}/>
+      <CanaLog text={state.logs} />
       <Container id="charts-container">
         {[
           [
