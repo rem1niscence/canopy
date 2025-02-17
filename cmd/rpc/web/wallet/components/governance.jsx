@@ -1,8 +1,6 @@
 import React, {useEffect, useState, useContext} from "react";
 import Truncate from "react-truncate-inside";
 import JsonView from "@uiw/react-json-view";
-import { lightTheme } from '@uiw/react-json-view/light';
-import { darkTheme } from '@uiw/react-json-view/dark';
 import {Bar} from "react-chartjs-2";
 import {Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend} from "chart.js";
 import {Accordion, Button, Carousel, Container, Form, InputGroup, Modal, Spinner, Table} from "react-bootstrap";
