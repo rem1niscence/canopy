@@ -170,7 +170,7 @@ func (x *QuorumCertificate) Check(vs ValidatorSet, maxBlockSize int, view *View,
 }
 
 // CheckHighQC() performs additional validation on the special `HighQC` (justify unlock QC)
-func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommitteeHeight uint64, vs ValidatorSet) ErrorI {
+func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, lastRootHeightUpdated uint64, vs ValidatorSet) ErrorI {
 	isPartialQC, err := x.Check(vs, maxBlockSize, view, false)
 	if err != nil {
 		return err
@@ -181,7 +181,7 @@ func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommi
 	}
 	// invalid 'historical committee', must be before the last committee height saved in the state
 	// if not, there is a potential for a long range attack
-	if stateCommitteeHeight > x.Header.RootHeight {
+	if lastRootHeightUpdated > x.Header.RootHeight {
 		return ErrWrongRootHeight()
 	}
 	// enforce same target height

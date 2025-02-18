@@ -189,7 +189,7 @@ func (s *StateMachine) GetCommitteeMembers(chainId uint64) (vs lib.ValidatorSet,
 	// create a variable to hold the committee members
 	members := make([]*lib.ConsensusValidator, 0)
 	// for each item of the iterator up to MaxCommitteeSize
-	for i := uint64(0); it.Valid() && i <= p.MaxCommitteeSize; func() { it.Next(); i++ }() {
+	for i := uint64(0); it.Valid() && i < p.MaxCommitteeSize; func() { it.Next(); i++ }() {
 		// extract the address from the iterator key
 		address, e := types.AddressFromKey(it.Key())
 		if e != nil {

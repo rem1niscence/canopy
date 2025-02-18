@@ -434,7 +434,7 @@ func ErrWrongHeight() ErrorI {
 }
 
 func ErrWrongRootHeight() ErrorI {
-	return NewError(CodeRootHeight, ConsensusModule, "wrong canopy height")
+	return NewError(CodeRootHeight, ConsensusModule, "wrong root height")
 }
 
 func ErrInvalidQCCommitteeHeight() ErrorI {

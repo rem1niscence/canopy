@@ -192,10 +192,13 @@ func (c *Controller) LoadLastProposers(height uint64) (*lib.Proposers, lib.Error
 	return c.RootChainInfo.GetLastProposers(height)
 }
 
-// LoadCommitteeHeightInState() returns the last height the committee submitted a proposal for rewards
-func (c *Controller) LoadCommitteeHeightInState(height uint64) (uint64, lib.ErrorI) {
-	// return the committee height
-	return c.RootChainInfo.GetLastChainHeightUpdated(height, c.Config.ChainId)
+// LoadCommitteeData() returns the state metadata for the 'self chain'
+func (c *Controller) LoadCommitteeData() (*lib.CommitteeData, lib.ErrorI) {
+	data, err := c.FSM.GetCommitteeData(c.Config.ChainId)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 // Syncing() returns if any of the supported chains are currently syncing

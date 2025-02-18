@@ -536,11 +536,13 @@ func (t *testController) SendToProposer(msg lib.Signable) {
 	t.sendToProposerChan <- msg
 }
 
-func (t *testController) LoadMinimumEvidenceHeight(_ uint64) (uint64, lib.ErrorI)  { return 0, nil }
-func (t *testController) IsValidDoubleSigner(_ uint64, _ []byte) bool              { return true }
-func (t *testController) Syncing() *atomic.Bool                                    { return &atomic.Bool{} }
-func (t *testController) LoadCommitteeHeightInState(_ uint64) (uint64, lib.ErrorI) { return 0, nil }
-func (t *testController) RootChainHeight() uint64                                  { return 0 }
+func (t *testController) LoadMinimumEvidenceHeight(_ uint64) (uint64, lib.ErrorI) { return 0, nil }
+func (t *testController) IsValidDoubleSigner(_ uint64, _ []byte) bool             { return true }
+func (t *testController) Syncing() *atomic.Bool                                   { return &atomic.Bool{} }
+func (t *testController) LoadCommitteeData() (*lib.CommitteeData, lib.ErrorI) {
+	return &lib.CommitteeData{}, nil
+}
+func (t *testController) RootChainHeight() uint64 { return 0 }
 func (t *testController) LoadLastProposers(_ uint64) (*lib.Proposers, lib.ErrorI) {
 	return t.proposers, nil
 }
