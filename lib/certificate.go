@@ -628,23 +628,26 @@ func (x *Checkpoint) Equals(y *Checkpoint) bool {
 // Combine() merges the Reward Recipients' Payment Percents of the current Proposal with those of another Proposal
 // such that the Payment Percentages may be equally weighted when performing reward distribution calculations
 // NOTE: percents will exceed 100% over multiple samples, but are normalized using the NumberOfSamples field
-func (x *CommitteeData) Combine(f *CommitteeData) ErrorI {
-	if f == nil {
+func (x *CommitteeData) Combine(data *CommitteeData) ErrorI {
+	// safety check to ensure the data is not null
+	if data == nil {
 		return nil
 	}
-	// for each payment percent,
-	for _, ep := range f.PaymentPercents {
-		x.addPercents(ep.Address, ep.Percent)
+	// for each payment percent
+	for _, p := range data.PaymentPercents {
+		// combine the percents with the existing stubs
+		// percents can/will exceed 100 but are re-normalized using NumberOfSamples later
+		x.addPercents(p.Address, p.Percent)
 	}
 	// new Proposal purposefully overwrites the Block and Meta of the current Proposal
 	// this is to ensure both Proposals have the latest Block and Meta information
 	// in the case where the caller uses a pattern where there may be a stale Block/Meta
 	*x = CommitteeData{
-		PaymentPercents:        x.PaymentPercents,
-		NumberOfSamples:        x.NumberOfSamples + 1,
-		ChainId:                f.ChainId,
-		LastRootHeightUpdated:  f.LastRootHeightUpdated,
-		LastChainHeightUpdated: f.LastChainHeightUpdated,
+		PaymentPercents:        x.PaymentPercents,           // maintain the payment percents
+		NumberOfSamples:        x.NumberOfSamples + 1,       // add to the number of samples
+		ChainId:                data.ChainId,                // (defensively) update the chain id
+		LastRootHeightUpdated:  data.LastRootHeightUpdated,  // update the root height
+		LastChainHeightUpdated: data.LastChainHeightUpdated, // update the chain height
 	}
 	return nil
 }
@@ -652,11 +655,12 @@ func (x *CommitteeData) Combine(f *CommitteeData) ErrorI {
 // addPercents() is a helper function that adds reward distribution percents on behalf of an address
 func (x *CommitteeData) addPercents(address []byte, percent uint64) {
 	// check to see if the address already exists
-	for i, ep := range x.PaymentPercents {
+	for i, p := range x.PaymentPercents {
 		// if already exists
-		if bytes.Equal(address, ep.Address) {
+		if bytes.Equal(address, p.Address) {
 			// simply add the percent to the previous
 			x.PaymentPercents[i].Percent += percent
+			// exit
 			return
 		}
 	}

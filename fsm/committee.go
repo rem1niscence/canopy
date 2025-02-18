@@ -359,13 +359,17 @@ func (s *StateMachine) GetDelegatesPaginated(p lib.PageParams, chainId uint64) (
 	return
 }
 
+// UpdateDelegations() updates the delegate information for an address, first removing the outdated delegation information and then setting the new info
 func (s *StateMachine) UpdateDelegations(address crypto.AddressI, oldValidator *types.Validator, newStakedAmount uint64, newCommittees []uint64) lib.ErrorI {
+	// remove the outdated delegation information
 	if err := s.DeleteDelegations(address, oldValidator.StakedAmount, oldValidator.Committees); err != nil {
 		return err
 	}
+	// set the delegations back into state
 	return s.SetDelegations(address, newStakedAmount, newCommittees)
 }
 
+// SetDelegations() sets the delegate 'membership' for an address, adding to the list and updating the supply pools
 func (s *StateMachine) SetDelegations(address crypto.AddressI, totalStake uint64, committees []uint64) lib.ErrorI {
 	for _, committee := range committees {
 		// actually set the address in the delegate list
@@ -384,6 +388,7 @@ func (s *StateMachine) SetDelegations(address crypto.AddressI, totalStake uint64
 	return nil
 }
 
+// DeleteDelegations() removes the delegate 'membership' for an address, removing from the list and updating the supply pools
 func (s *StateMachine) DeleteDelegations(address crypto.AddressI, totalStake uint64, committees []uint64) lib.ErrorI {
 	for _, committee := range committees {
 		// remove the address from the delegate list
@@ -402,10 +407,12 @@ func (s *StateMachine) DeleteDelegations(address crypto.AddressI, totalStake uin
 	return nil
 }
 
+// SetDelegate() sets a delegate in state using the delegate prefix
 func (s *StateMachine) SetDelegate(address crypto.AddressI, chainId, stakeForCommittee uint64) lib.ErrorI {
 	return s.Set(types.KeyForDelegate(chainId, address, stakeForCommittee), nil)
 }
 
+// DeleteDelegate() removes a delegate from the state using the delegate prefix
 func (s *StateMachine) DeleteDelegate(address crypto.AddressI, chainId, stakeForCommittee uint64) lib.ErrorI {
 	return s.Delete(types.KeyForDelegate(chainId, address, stakeForCommittee))
 }
@@ -421,10 +428,12 @@ func (s *StateMachine) UpsertCommitteeData(new *lib.CommitteeData) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	// check the new committee data is not 'out-dated'
+	// check the new committee data is not 'outdated'
+	// new.ChainHeight must be > state.ChainHeight
 	if new.LastChainHeightUpdated <= targetData.LastChainHeightUpdated {
 		return lib.ErrInvalidQCCommitteeHeight()
 	}
+	// new.RootHeight must be >= state.RootHeight
 	if new.LastRootHeightUpdated < targetData.LastRootHeightUpdated {
 		return lib.ErrInvalidQCRootChainHeight()
 	}
@@ -442,12 +451,12 @@ func (s *StateMachine) UpsertCommitteeData(new *lib.CommitteeData) lib.ErrorI {
 // note: use UpsertCommitteeData for the safe committee upsert
 func (s *StateMachine) OverwriteCommitteeData(d *lib.CommitteeData) lib.ErrorI {
 	// retrieve the committees' data list, the target and index in the list based on the chainId
-	committeesData, targetData, idx, err := s.getCommitteeDataAndList(d.ChainId)
+	committeesData, _, idx, err := s.getCommitteeDataAndList(d.ChainId)
 	if err != nil {
 		return err
 	}
 	// add the target back into the list
-	committeesData.List[idx] = targetData
+	committeesData.List[idx] = d
 	// set the list back into state
 	return s.SetCommitteesData(committeesData)
 }
