@@ -260,8 +260,13 @@ func (s *StateMachine) SetOrderBook(b *lib.OrderBook) lib.ErrorI {
 }
 
 // SetOrderBooks() sets a series of OrderBooks in the state db
-func (s *StateMachine) SetOrderBooks(b *lib.OrderBooks, supply *types.Supply) lib.ErrorI {
-	for _, book := range b.OrderBooks {
+func (s *StateMachine) SetOrderBooks(list *lib.OrderBooks, supply *types.Supply) lib.ErrorI {
+	// ensure the order books object reference is not nil
+	if list == nil {
+		return nil
+	}
+	// for each book in the order books list
+	for _, book := range list.OrderBooks {
 		// convert the order book into bytes
 		orderBookBz, err := lib.Marshal(book)
 		if err != nil {
