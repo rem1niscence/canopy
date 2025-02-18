@@ -856,7 +856,7 @@ type (
 		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
 		// LoadCommittee() loads the ValidatorSet operating under ChainId
 		LoadCommittee(rootHeight uint64) (lib.ValidatorSet, lib.ErrorI)
-		// LoadCommitteeHeightInState() loads the last height a committee member executed a certificate result (reward) transaction
+		// LoadCommitteeHeightInState() loads the committee information from state as updated by the quorum certificates
 		LoadCommitteeData() (*lib.CommitteeData, lib.ErrorI)
 		// LoadLastProposers() loads the last Canopy committee proposers for sortition data
 		LoadLastProposers(rootHeight uint64) (*lib.Proposers, lib.ErrorI)
