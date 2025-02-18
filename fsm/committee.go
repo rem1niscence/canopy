@@ -463,7 +463,7 @@ func (s *StateMachine) OverwriteCommitteeData(d *lib.CommitteeData) lib.ErrorI {
 
 // GetCommitteeData() is a convenience function to retrieve the committee data from the master list
 func (s *StateMachine) GetCommitteeData(targetChainId uint64) (*lib.CommitteeData, lib.ErrorI) {
-	// pass through call
+	// retrieve the committee's data and return it
 	_, targetData, _, err := s.getCommitteeDataAndList(targetChainId)
 	if err != nil {
 		return nil, err
@@ -499,67 +499,84 @@ func (s *StateMachine) getCommitteeDataAndList(targetChainId uint64) (list *lib.
 	}
 	// insert a new committee fund at the end of the list
 	list.List = append(list.List, d)
+	// exit
 	return
 }
 
-// SetCommitteesData() sets a list of List into the state
-func (s *StateMachine) SetCommitteesData(f *lib.CommitteesData) lib.ErrorI {
-	bz, err := lib.Marshal(f)
+// SetCommitteesData() sets a list of committee data in the state
+func (s *StateMachine) SetCommitteesData(list *lib.CommitteesData) lib.ErrorI {
+	// convert the committee data list to bytes
+	bz, err := lib.Marshal(list)
 	if err != nil {
 		return err
 	}
+	// set the list bytes under the 'committees data prefix'
 	return s.Set(types.CommitteesDataPrefix(), bz)
 }
 
 // GetCommitteesData() gets a list of List from the state
-func (s *StateMachine) GetCommitteesData() (f *lib.CommitteesData, err lib.ErrorI) {
+func (s *StateMachine) GetCommitteesData() (list *lib.CommitteesData, err lib.ErrorI) {
+	// get the CommitteesData bytes under 'committees data prefix'
 	bz, err := s.Get(types.CommitteesDataPrefix())
 	if err != nil {
 		return nil, err
 	}
-	f = &lib.CommitteesData{
+	// create a list variable to ensure non-nil results
+	list = &lib.CommitteesData{
 		List: make([]*lib.CommitteeData, 0),
 	}
-	err = lib.Unmarshal(bz, f)
+	// populate the list reference with the CommitteesData bytes
+	err = lib.Unmarshal(bz, list)
+	// exit
 	return
 }
 
 // RetireCommittee marks a committee as non-subsidized for eternity
 // This is a useful mechanism to gracefully 'end' a committee
-func (s *StateMachine) RetireCommittee(id uint64) lib.ErrorI {
-	return s.Set(types.KeyForRetiredCommittee(id), types.RetiredCommitteesPrefix())
+func (s *StateMachine) RetireCommittee(chainId uint64) lib.ErrorI {
+	// set the default value for a chain id using a key for the retired committee prefix key
+	return s.Set(types.KeyForRetiredCommittee(chainId), types.RetiredCommitteesPrefix())
 }
 
 // CommitteeIsRetired checks if a committee is marked as 'retired' which prevents it from being subsidized for eternity
-func (s *StateMachine) CommitteeIsRetired(id uint64) (bool, lib.ErrorI) {
-	bz, err := s.Get(types.KeyForRetiredCommittee(id))
+func (s *StateMachine) CommitteeIsRetired(chainId uint64) (bool, lib.ErrorI) {
+	// retrieve the bytes under the retired key for the chain id
+	bz, err := s.Get(types.KeyForRetiredCommittee(chainId))
 	if err != nil {
 		return false, err
 	}
+	// check if the bytes equal the default value (RetiredCommitteesPrefix)
 	return bytes.Equal(types.RetiredCommitteesPrefix(), bz), nil
 }
 
 // GetRetiredCommittees() returns a list of the retired chainIds
-func (s *StateMachine) GetRetiredCommittees() (result []uint64, err lib.ErrorI) {
+func (s *StateMachine) GetRetiredCommittees() (list []uint64, err lib.ErrorI) {
 	// for each item under the retired committee prefix
 	err = s.IterateAndExecute(types.RetiredCommitteesPrefix(), func(key, _ []byte) (e lib.ErrorI) {
-		// extract the id from the key
-		id, e := types.IdFromKey(key)
+		// extract the chain id from the key
+		chainId, e := types.IdFromKey(key)
 		if e != nil {
 			return
 		}
-		result = append(result, id)
+		// add the chainId to the list of retired committees
+		list = append(list, chainId)
+		// exit inner
 		return
 	})
+	// exit outer
 	return
 }
 
 // SetRetiredCommittees() sets a list of chainIds as retired
-func (s *StateMachine) SetRetiredCommittees(ids []uint64) (err lib.ErrorI) {
-	for _, id := range ids {
+func (s *StateMachine) SetRetiredCommittees(chainIds []uint64) (err lib.ErrorI) {
+	// for each chain id on the list
+	for _, id := range chainIds {
+		// set the committee as retired
 		if err = s.RetireCommittee(id); err != nil {
+			// exit if error
 			return
 		}
 	}
+	// exit
 	return
 }
