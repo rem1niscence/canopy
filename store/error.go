@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+
 	"github.com/canopy-network/canopy/lib"
 )
 
@@ -67,4 +68,16 @@ func ErrInvalidKey() lib.ErrorI {
 
 func ErrReserveKeyWrite(key string) lib.ErrorI {
 	return lib.NewError(lib.CodeReserveKeyWrite, lib.StorageModule, fmt.Sprintf("cannot write a reserve key %s", key))
+}
+
+func ErrInvalidMerkleTree() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidMerkleTree, lib.StorageModule, "merkle tree is invalid")
+}
+
+func ErrInvalidMerkleProofKey() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidMerkleProofKey, lib.StorageModule, "merkle tree proof is invalid: keys do not match")
+}
+
+func ErrInvalidMerkleProofValue() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidMerkleProofValue, lib.StorageModule, "merkle tree proof is invalid: values do not match")
 }

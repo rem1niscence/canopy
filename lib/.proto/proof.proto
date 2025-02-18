@@ -18,22 +18,31 @@ option go_package = "github.com/canopy-network/canopy/lib";
 //_
 //_
 //_
-// MerkleProof represents Canopy's implementation of a Sparse Merkle Tree Proof
-// It is used for membership and non-membership proof functionality
+// MerkleProof represents Canopy's implementation of a Sparse Merkle Tree Proof.
+// It is utilized for both membership and non-membership proof functionalities.
+// For the array of Nodes, the first two nodes represent the initial leaf node siblings
+// required to compute the parent node's hash. The remaining nodes are the intermediate 
+// node siblings necessary to compute the root hash.
 message MerkleProof {
-  // Hashes: an array of sibling node hashes encountered while traversing up to the leaf of the proof
-  repeated bytes Hashes = 1;
-  // HashKeys: an array of keys corresponding to each sibling node hash encountered during traversal
-  repeated bytes HashKeys = 2;
-  // NodeKeys: a byte array of keys for the nodes traversed in the proof
-  repeated bytes NodeKeys = 3;
-  // Bitmask: a byte array indicating whether each node hash is a left or right sibling
-  // 0 represents a left sibling, and 1 represents a right sibling
-  bytes Bitmask = 4;
-  // Value: is the cryptographic hash of the data included in the database, or empty
-  // in the case of proof of non-membership
-  bytes Value = 5;
+  // Nodes: Element in the sparse Merkle tree that are required to compute the root hash, augmented with
+  // the compact key used to traverse the tree
+  repeated ProofNode Nodes = 1;
   // Root: is the cryptographic hash of the root of the Sparse Merkle Tree at the time of 
   // the proof
-  bytes Root = 6;
+  bytes Root = 8;
+}
+
+// ProofNode represents Canopy's implementation a node of the  Sparse Merkle Tree implementation.
+// It is the same as the Node implemented in the store, with the addition of the Key field which
+// stores the compact implmentation of the node's key bit sequences. For more information check the
+// `key` struct in the `store/smt.go` file.
+message ProofNode {
+  // Key: is the node's key, for non leaf nodes, is set in a compact form
+  bytes Key = 1;
+  // Value: is the cryptographic hash of the data included in the database
+  // the ValueHash is included in the parent hash
+  bytes Value = 2;
+  // Bitmask: a byte array indicating whether each hash requires the left or right sibling
+  // 0 represents a left sibling, and 1 represents a right sibling
+  int32 Bitmask = 3;
 }

@@ -35,28 +35,22 @@ const (
 // _
 // _
 // _
-// MerkleProof represents Canopy's implementation of a Sparse Merkle Tree Proof
-// It is used for membership and non-membership proof functionality
+// MerkleProof represents Canopy's implementation of a Sparse Merkle Tree Proof.
+// It is utilized for both membership and non-membership proof functionalities.
+// For the array of Nodes, the first two nodes represent the initial leaf node siblings
+// required to compute the parent node's hash. The remaining nodes are the intermediate
+// node siblings necessary to compute the root hash.
 type MerkleProof struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Hashes: an array of sibling node hashes encountered while traversing up to the leaf of the proof
-	Hashes [][]byte `protobuf:"bytes,1,rep,name=Hashes,proto3" json:"Hashes,omitempty"`
-	// HashKeys: an array of keys corresponding to each sibling node hash encountered during traversal
-	HashKeys [][]byte `protobuf:"bytes,2,rep,name=HashKeys,proto3" json:"HashKeys,omitempty"`
-	// NodeKeys: a byte array of keys for the nodes traversed in the proof
-	NodeKeys [][]byte `protobuf:"bytes,3,rep,name=NodeKeys,proto3" json:"NodeKeys,omitempty"`
-	// Bitmask: a byte array indicating whether each node hash is a left or right sibling
-	// 0 represents a left sibling, and 1 represents a right sibling
-	Bitmask []byte `protobuf:"bytes,4,opt,name=Bitmask,proto3" json:"Bitmask,omitempty"`
-	// Value: is the cryptographic hash of the data included in the database, or empty
-	// in the case of proof of non-membership
-	Value []byte `protobuf:"bytes,5,opt,name=Value,proto3" json:"Value,omitempty"`
+	// Nodes: Element in the sparse Merkle tree that are required to compute the root hash, augmented with
+	// the compact key used to traverse the tree
+	Nodes []*ProofNode `protobuf:"bytes,1,rep,name=Nodes,proto3" json:"Nodes,omitempty"`
 	// Root: is the cryptographic hash of the root of the Sparse Merkle Tree at the time of
 	// the proof
-	Root []byte `protobuf:"bytes,6,opt,name=Root,proto3" json:"Root,omitempty"`
+	Root []byte `protobuf:"bytes,8,opt,name=Root,proto3" json:"Root,omitempty"`
 }
 
 func (x *MerkleProof) Reset() {
@@ -91,37 +85,9 @@ func (*MerkleProof) Descriptor() ([]byte, []int) {
 	return file_proof_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *MerkleProof) GetHashes() [][]byte {
+func (x *MerkleProof) GetNodes() []*ProofNode {
 	if x != nil {
-		return x.Hashes
-	}
-	return nil
-}
-
-func (x *MerkleProof) GetHashKeys() [][]byte {
-	if x != nil {
-		return x.HashKeys
-	}
-	return nil
-}
-
-func (x *MerkleProof) GetNodeKeys() [][]byte {
-	if x != nil {
-		return x.NodeKeys
-	}
-	return nil
-}
-
-func (x *MerkleProof) GetBitmask() []byte {
-	if x != nil {
-		return x.Bitmask
-	}
-	return nil
-}
-
-func (x *MerkleProof) GetValue() []byte {
-	if x != nil {
-		return x.Value
+		return x.Nodes
 	}
 	return nil
 }
@@ -133,24 +99,95 @@ func (x *MerkleProof) GetRoot() []byte {
 	return nil
 }
 
+// ProofNode represents Canopy's implementation a node of the  Sparse Merkle Tree implementation.
+// It is the same as the Node implemented in the store, with the addition of the Key field which
+// stores the compact implmentation of the node's key bit sequences. For more information check the
+// `key` struct in the `store/smt.go` file.
+type ProofNode struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Key: is the node's key, for non leaf nodes, is set in a compact form
+	Key []byte `protobuf:"bytes,1,opt,name=Key,proto3" json:"Key,omitempty"`
+	// Value: is the cryptographic hash of the data included in the database
+	// the ValueHash is included in the parent hash
+	Value []byte `protobuf:"bytes,2,opt,name=Value,proto3" json:"Value,omitempty"`
+	// Bitmask: a byte array indicating whether each hash requires the left or right sibling
+	// 0 represents a left sibling, and 1 represents a right sibling
+	Bitmask int32 `protobuf:"varint,3,opt,name=Bitmask,proto3" json:"Bitmask,omitempty"`
+}
+
+func (x *ProofNode) Reset() {
+	*x = ProofNode{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_proof_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ProofNode) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProofNode) ProtoMessage() {}
+
+func (x *ProofNode) ProtoReflect() protoreflect.Message {
+	mi := &file_proof_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProofNode.ProtoReflect.Descriptor instead.
+func (*ProofNode) Descriptor() ([]byte, []int) {
+	return file_proof_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ProofNode) GetKey() []byte {
+	if x != nil {
+		return x.Key
+	}
+	return nil
+}
+
+func (x *ProofNode) GetValue() []byte {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *ProofNode) GetBitmask() int32 {
+	if x != nil {
+		return x.Bitmask
+	}
+	return 0
+}
+
 var File_proof_proto protoreflect.FileDescriptor
 
 var file_proof_proto_rawDesc = []byte{
 	0x0a, 0x0b, 0x70, 0x72, 0x6f, 0x6f, 0x66, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x05, 0x74,
-	0x79, 0x70, 0x65, 0x73, 0x22, 0xa1, 0x01, 0x0a, 0x0b, 0x4d, 0x65, 0x72, 0x6b, 0x6c, 0x65, 0x50,
-	0x72, 0x6f, 0x6f, 0x66, 0x12, 0x16, 0x0a, 0x06, 0x48, 0x61, 0x73, 0x68, 0x65, 0x73, 0x18, 0x01,
-	0x20, 0x03, 0x28, 0x0c, 0x52, 0x06, 0x48, 0x61, 0x73, 0x68, 0x65, 0x73, 0x12, 0x1a, 0x0a, 0x08,
-	0x48, 0x61, 0x73, 0x68, 0x4b, 0x65, 0x79, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x08,
-	0x48, 0x61, 0x73, 0x68, 0x4b, 0x65, 0x79, 0x73, 0x12, 0x1a, 0x0a, 0x08, 0x4e, 0x6f, 0x64, 0x65,
-	0x4b, 0x65, 0x79, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x0c, 0x52, 0x08, 0x4e, 0x6f, 0x64, 0x65,
-	0x4b, 0x65, 0x79, 0x73, 0x12, 0x18, 0x0a, 0x07, 0x42, 0x69, 0x74, 0x6d, 0x61, 0x73, 0x6b, 0x18,
-	0x04, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x42, 0x69, 0x74, 0x6d, 0x61, 0x73, 0x6b, 0x12, 0x14,
-	0x0a, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x56,
-	0x61, 0x6c, 0x75, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x52, 0x6f, 0x6f, 0x74, 0x18, 0x06, 0x20, 0x01,
-	0x28, 0x0c, 0x52, 0x04, 0x52, 0x6f, 0x6f, 0x74, 0x42, 0x26, 0x5a, 0x24, 0x67, 0x69, 0x74, 0x68,
-	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2d, 0x6e, 0x65,
-	0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2f, 0x6c, 0x69, 0x62,
-	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x79, 0x70, 0x65, 0x73, 0x22, 0x49, 0x0a, 0x0b, 0x4d, 0x65, 0x72, 0x6b, 0x6c, 0x65, 0x50, 0x72,
+	0x6f, 0x6f, 0x66, 0x12, 0x26, 0x0a, 0x05, 0x4e, 0x6f, 0x64, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03,
+	0x28, 0x0b, 0x32, 0x10, 0x2e, 0x74, 0x79, 0x70, 0x65, 0x73, 0x2e, 0x50, 0x72, 0x6f, 0x6f, 0x66,
+	0x4e, 0x6f, 0x64, 0x65, 0x52, 0x05, 0x4e, 0x6f, 0x64, 0x65, 0x73, 0x12, 0x12, 0x0a, 0x04, 0x52,
+	0x6f, 0x6f, 0x74, 0x18, 0x08, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x52, 0x6f, 0x6f, 0x74, 0x22,
+	0x4d, 0x0a, 0x09, 0x50, 0x72, 0x6f, 0x6f, 0x66, 0x4e, 0x6f, 0x64, 0x65, 0x12, 0x10, 0x0a, 0x03,
+	0x4b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x03, 0x4b, 0x65, 0x79, 0x12, 0x14,
+	0x0a, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x05, 0x56,
+	0x61, 0x6c, 0x75, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x42, 0x69, 0x74, 0x6d, 0x61, 0x73, 0x6b, 0x18,
+	0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x07, 0x42, 0x69, 0x74, 0x6d, 0x61, 0x73, 0x6b, 0x42, 0x26,
+	0x5a, 0x24, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x61, 0x6e,
+	0x6f, 0x70, 0x79, 0x2d, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x63, 0x61, 0x6e, 0x6f,
+	0x70, 0x79, 0x2f, 0x6c, 0x69, 0x62, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -165,16 +202,18 @@ func file_proof_proto_rawDescGZIP() []byte {
 	return file_proof_proto_rawDescData
 }
 
-var file_proof_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_proof_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_proof_proto_goTypes = []interface{}{
 	(*MerkleProof)(nil), // 0: types.MerkleProof
+	(*ProofNode)(nil),   // 1: types.ProofNode
 }
 var file_proof_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1, // 0: types.MerkleProof.Nodes:type_name -> types.ProofNode
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_proof_proto_init() }
@@ -195,6 +234,18 @@ func file_proof_proto_init() {
 				return nil
 			}
 		}
+		file_proof_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ProofNode); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -202,7 +253,7 @@ func file_proof_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_proof_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

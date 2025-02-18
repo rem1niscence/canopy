@@ -153,8 +153,12 @@ func (s *SMT) Root() []byte { return bytes.Clone(s.root.Value) }
 
 // Set: insert or update a target
 func (s *SMT) Set(k, v []byte) lib.ErrorI {
+	return s.set(&node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), Node: Node{Value: crypto.Hash(v)}})
+}
+
+func (s *SMT) set(target *node) lib.ErrorI {
 	// calculate the key and value to upsert
-	s.target = &node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), Node: Node{Value: crypto.Hash(v)}}
+	s.target = target
 	// check to make sure the target is valid
 	if err := s.validateTarget(); err != nil {
 		return err
@@ -254,7 +258,7 @@ func (s *SMT) traverse() (err lib.ErrorI) {
 		}
 		// assert current key isn't nil
 		if currentKey == nil {
-			panic("nil current key")
+			return ErrInvalidMerkleTree()
 		}
 		// load the bytes into the key
 		s.current.Key.fromBytes(currentKey)
@@ -436,48 +440,26 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 
 	// generate the proof structure
 	proof := &lib.MerkleProof{
-		Hashes:   make([][]byte, 0),
-		HashKeys: make([][]byte, 0),
-		Bitmask:  make([]byte, 0),
-		Root:     s.Root(),
-		Value:    []byte(nil),
+		Nodes: make([]*lib.ProofNode, 0),
+		Root:  s.Root(),
 	}
 
 	// navigates the tree downward
 	if err := s.traverse(); err != nil {
 		return nil, err
 	}
-	// if gcp != target key then this becomes a proof of non-membership
-	// and the value needs to be temporarily added to the smt to calculate the proof
-	if !s.target.Key.equals(s.gcp) {
-		proof.Value = nil
-		// save the node in the tree temporarily
-		if err := s.Set(key, nil); err != nil {
-			return nil, err
-		}
 
-		// traverse again to get the path to the target
-		if err := s.traverse(); err != nil {
-			return nil, err
-		}
-
-		// remove the node from the tree when done
-		defer func() {
-			if err := s.Delete(key); err != nil {
-				panic("failed to delete temporary node: " + err.Error())
-			}
-		}()
-	}
-
-	// get the target node from the database
 	targetNode, err := s.getNode(s.target.Key.bytes())
 	if err != nil {
 		return nil, err
 	}
-	proof.Value = targetNode.Value
 
-	// Add target to the list of traversed nodes
-	s.traversed.Nodes = append(s.traversed.Nodes, targetNode.copy())
+	if s.target.Key.equals(s.gcp) {
+		// Set the key and value of the proof to the target node
+
+		// Add target to the list of traversed nodes
+		s.traversed.Nodes = append(s.traversed.Nodes, targetNode.copy())
+	}
 
 	// traverse the nodes back up to the root to generate the proof
 	for i := len(s.traversed.Nodes) - 1; i > 0; i-- {
@@ -489,11 +471,25 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 			return nil, err
 		}
 
-		// Add the bitmask, node key, sibling key and sibling hash to the proof
-		proof.Bitmask = append(proof.Bitmask, order)
-		proof.NodeKeys = append(proof.NodeKeys, node.Key.bytes())
-		proof.Hashes = append(proof.Hashes, siblingNode.Value)
-		proof.HashKeys = append(proof.HashKeys, siblingNode.Key.bytes())
+		proof.Nodes = append(proof.Nodes, &lib.ProofNode{
+			Key:     node.Key.bytes(),
+			Value:   node.Value,
+			Bitmask: int32(order),
+		})
+		proof.Nodes = append(proof.Nodes, &lib.ProofNode{
+			Key:     siblingNode.Key.bytes(),
+			Value:   siblingNode.Value,
+			Bitmask: int32(order),
+		})
+
+		// If the proof slice contains only two nodes, it signifies that it includes only
+		// the leaf nodes (or the parents of the leaf in the case of non-membership).
+		// Verify the sibling's position to ascertain whether it is a left or right child.
+		// If it is a left child, the two node positions need to be swapped to construct
+		// the proof accurately.
+		if len(proof.Nodes) == 2 && order == leftChild {
+			proof.Nodes[0], proof.Nodes[1] = proof.Nodes[1], proof.Nodes[0]
+		}
 	}
 
 	return proof, nil
@@ -501,25 +497,94 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 
 // VerifyProof verifies a Sparse Merkle Tree proof for a given value
 // reconstructing the root hash and comparing it against the provided root hash
-func (s *SMT) VerifyProof(key []byte, proof *lib.MerkleProof) bool {
-	n := &node{Key: newNodeKey(crypto.Hash(key), s.keyBitLength), Node: Node{Value: crypto.Hash(proof.Value)}}
-	hash := append(n.Key.bytes(), proof.Value...)
-	for i := 0; i < len(proof.Hashes); i++ {
-		// Get the key of the traversed node, as there's no way to get it from the generated hashes
-		var nodeKey []byte
-		if i > 0 {
-			nodeKey = proof.NodeKeys[i]
-		}
+func (s *SMT) VerifyProof(key []byte, value []byte, proof *lib.MerkleProof) (bool, lib.ErrorI) {
+	// 1. Proof the root as usual from down to up
+	leftLeaf := proof.Nodes[0]
+	rightLeaf := proof.Nodes[1]
 
-		if proof.Bitmask[i] == leftChild {
+	hash := crypto.Hash(append(append(leftLeaf.Key, leftLeaf.Value...),
+		append(rightLeaf.Key, rightLeaf.Value...)...))
+
+	internalNodes := proof.Nodes[2:]
+
+	for i := 0; i < len(internalNodes); i += 2 {
+		if internalNodes[i].Bitmask == leftChild {
 			// left sibling of the given node
-			hash = crypto.Hash(append(append(proof.HashKeys[i], proof.Hashes[i]...), append(nodeKey, hash...)...))
+			hash = crypto.Hash(
+				append(append(internalNodes[i+1].Key, internalNodes[i+1].Value...),
+					append(internalNodes[i].Key, hash...)...),
+			)
 		} else {
 			// right sibling of the given node
-			hash = crypto.Hash(append(append(nodeKey, hash...), append(proof.HashKeys[i], proof.Hashes[i]...)...))
+			hash = crypto.Hash(
+				append(append(internalNodes[i].Key, hash...),
+					append(internalNodes[i+1].Key, internalNodes[i+1].Value...)...),
+			)
 		}
 	}
-	return bytes.Equal(hash, proof.Root)
+
+	if !bytes.Equal(hash, proof.Root) {
+		return false, nil
+	}
+
+	// Rebuild a similar merkle tree using the proof nodes, to be able to traverse it
+	// again and confirm whether the given key and value are part of the tree, to
+	// confirm the proof-of-non-membership as if the key is not part of the tree
+	memStore, err := NewStoreInMemory(lib.NewDefaultLogger())
+	if err != nil {
+		return false, err
+	}
+	smt := NewSMT(RootKey, MaxKeyBitLength, memStore)
+
+	// add the nodes
+	for _, leaf := range proof.Nodes {
+		// Keys are saved "as-is" to preserve the original values of the tree
+		// when the proof was obtained. Some intermediate node keys may have a length
+		// shorter than the MaxKeyBitLength. This pads such keys to ensure they are
+		// saved correctly.
+		key := make([]byte, 32)
+		copy(key, leaf.Key)
+		node := &node{Key: newNodeKey(key, MaxKeyBitLength), Node: Node{Value: leaf.Value}}
+		// Leaf nodes could be one of the two children of the root.
+		s.target = node
+		if err := s.validateTarget(); err != nil {
+			continue
+		}
+
+		if err := smt.set(node); err != nil {
+			return false, err
+		}
+	}
+
+	smt.target = &node{Key: newNodeKey(crypto.Hash(key), smt.keyBitLength)}
+	// make sure the target is valid
+	if err := smt.validateTarget(); err != nil {
+		return false, err
+	}
+	// navigates the tree downward
+	if err := smt.traverse(); err != nil {
+		return false, err
+	}
+
+	// Verify if the key exists in the local Merkle tree.
+	// This confirms the proof-of-non-membership, as the absence of the key in a
+	// Merkle tree with a verified root indicates that the key is not part of the tree.
+	if !smt.target.Key.equals(smt.gcp) {
+		return false, ErrInvalidMerkleProofKey()
+	}
+	targetNode, err := smt.getNode(smt.target.Key.bytes())
+	if err != nil {
+		return false, err
+	}
+	// Verify if the value matches the provided value.
+	// This confirms the proof-of-non-membership as the intermediate nodes are constructed
+	// based on the children's key + values, so a different value indicates
+	// that the Merkle root could not have been constructed using this
+	if !bytes.Equal(targetNode.Value, crypto.Hash(value)) {
+		return false, ErrInvalidMerkleProofValue()
+	}
+
+	return true, nil
 }
 
 // NODE KEY CODE BELOW

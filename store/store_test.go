@@ -169,17 +169,22 @@ func TestStoreProof(t *testing.T) {
 	addRandomValues(t, store)
 
 	key := []byte("key")
-	store.Set(key, []byte("value"))
+	value := []byte("value")
+	store.Set(key, value)
 
 	proof, err := store.sc.GetMerkleProof(key)
 	require.NoError(t, err)
 
-	require.True(t, store.VerifyProof(key, proof))
+	valid, err := store.VerifyProof(key, value, proof)
+	require.NoError(t, err)
+	require.True(t, valid)
 
 	// modify the proof and ensure it fails
-	proof.Hashes[0][0] = byte('x')
+	proof.Nodes[0].Key[0] = byte('x')
 
-	require.False(t, store.VerifyProof(key, proof))
+	valid, err = store.VerifyProof(key, key, proof)
+	require.NoError(t, err)
+	require.False(t, valid)
 }
 
 func addRandomValues(t *testing.T, store *Store) {
