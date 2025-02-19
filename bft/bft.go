@@ -583,8 +583,6 @@ func (b *BFT) NewRound(newHeight bool) {
 	b.ProposerKey = nil
 	b.Block, b.BlockHash, b.Results = nil, nil, nil
 	b.SortitionData = nil
-	b.Votes.NewRound(b.Round)
-	b.Proposals[b.Round] = make(map[string][]*Message)
 }
 
 // NewHeight() initializes / resets consensus variables preparing for the NewHeight
@@ -722,8 +720,10 @@ func (b *BFT) msLeftInRound() int {
 		return int(precommitMs + precommitVoteMs + commitMs)
 	case PrecommitVote:
 		return int(precommitVoteMs + commitMs)
-	default:
+	case Commit:
 		return int(commitMs)
+	default:
+		return 0
 	}
 }
 

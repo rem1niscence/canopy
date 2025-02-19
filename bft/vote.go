@@ -22,15 +22,6 @@ type (
 	}
 )
 
-// NewRound() initializes the VoteSets for
-func (v *VotesForHeight) NewRound(round uint64) {
-	votesByPhase := make(map[string]map[string]*VoteSet)
-	votesByPhase[phaseToString(ElectionVote)] = make(map[string]*VoteSet)
-	votesByPhase[phaseToString(ProposeVote)] = make(map[string]*VoteSet)
-	votesByPhase[phaseToString(PrecommitVote)] = make(map[string]*VoteSet)
-	(*v)[round] = votesByPhase
-}
-
 // GetMajorityVote() returns the Message and AggregateSignature with a VoteSet with a +2/3 majority from the Replicas
 // NOTE: Votes for a specific Height-Round-Phase are organized by `Payload Hash` to ensure that all Replicas are voting on the same proposal
 func (b *BFT) GetMajorityVote() (m *Message, sig *lib.AggregateSignature, err lib.ErrorI) {

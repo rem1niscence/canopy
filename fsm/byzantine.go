@@ -181,7 +181,7 @@ func (s *StateMachine) HandleDoubleSigners(chainId uint64, params *types.Validat
 	for _, doubleSigner := range doubleSigners {
 		// ensure the double signer isn't nil nor the id is nil
 		if doubleSigner == nil || doubleSigner.Id == nil {
-			return lib.ErrInvalidEvidence()
+			return lib.ErrEmptyDoubleSigner()
 		}
 		// ensure there's at least 1 height in the list
 		if len(doubleSigner.Heights) == 0 {

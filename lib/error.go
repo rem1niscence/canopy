@@ -152,6 +152,9 @@ const (
 	CodeInvalidSigner                   ErrorCode = 54
 	CodeMismatchQcBlockHash             ErrorCode = 55
 	CodeMismatchHeaderBlockHash         ErrorCode = 56
+	CodeEmptyDoubleSigner               ErrorCode = 57
+	CodeNonEquivocatingVote             ErrorCode = 58
+	CodeInvalidEvidenceHeights          ErrorCode = 59
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -523,6 +526,18 @@ func ErrEmptyEvidence() ErrorI {
 
 func ErrInvalidEvidence() ErrorI {
 	return NewError(CodeInvalidEvidence, ConsensusModule, "evidence is invalid")
+}
+
+func ErrInvalidEvidenceHeights() ErrorI {
+	return NewError(CodeInvalidEvidenceHeights, ConsensusModule, "evidence heights are invalid")
+}
+
+func ErrNonEquivocatingVote() ErrorI {
+	return NewError(CodeNonEquivocatingVote, ConsensusModule, "non equivocating vote")
+}
+
+func ErrEmptyDoubleSigner() ErrorI {
+	return NewError(CodeEmptyDoubleSigner, ConsensusModule, "double signer is empty")
 }
 
 func ErrEvidenceTooOld() ErrorI {

@@ -402,7 +402,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 			name:          "nil",
 			detail:        "there is 1 invalid double signer, empty",
 			doubleSigners: []*lib.DoubleSigner{nil},
-			error:         lib.ErrInvalidEvidence(),
+			error:         lib.ErrEmptyDoubleSigner(),
 		},
 		{
 			name:   "bad heights",

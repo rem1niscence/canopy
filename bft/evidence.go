@@ -27,7 +27,7 @@ func (b *BFT) ValidateByzantineEvidence(slashRecipients *lib.SlashRecipients, be
 		// this validation ensures that the DoubleSigners is justified, but there may be additional evidence included without any error
 		for _, ds := range slashRecipients.DoubleSigners {
 			if ds == nil {
-				return lib.ErrInvalidEvidence()
+				return lib.ErrEmptyDoubleSigner()
 			}
 			// check if the Double Signer in the Proposal is within our locally generated Double Signers list
 			if !slices.ContainsFunc(doubleSigners, func(signer *lib.DoubleSigner) bool {
@@ -88,7 +88,7 @@ func (b *BFT) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.DoubleSigne
 		}
 		// if the votes are identical - it's not a double sign...
 		if bytes.Equal(x.VoteB.SignBytes(), x.VoteA.SignBytes()) {
-			return nil, lib.ErrInvalidEvidence() // same payloads
+			return nil, lib.ErrNonEquivocatingVote() // same payloads
 		}
 		// take the signatures from the two
 		sig1, sig2 := x.VoteA.Signature, x.VoteB.Signature
@@ -220,10 +220,10 @@ func (x *DoubleSignEvidence) Check(vs lib.ValidatorSet, view *lib.View, minimumE
 	}
 	// ensure it's the same height
 	if !x.VoteA.Header.Equals(x.VoteB.Header) {
-		return lib.ErrInvalidEvidence() // different heights
+		return lib.ErrInvalidEvidenceHeights() // different heights
 	}
 	if bytes.Equal(x.VoteB.SignBytes(), x.VoteA.SignBytes()) {
-		return lib.ErrInvalidEvidence() // same payloads
+		return lib.ErrNonEquivocatingVote() // same payloads
 	}
 	return nil
 }

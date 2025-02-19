@@ -301,6 +301,7 @@ type Stream struct {
 	upNextToSend []byte                       // a buffer holding unsent portions of the next message
 	msgAssembler []byte                       // collects and adds incoming packets until the entire message is received (EOF signal)
 	inbox        chan *lib.MessageAndMetadata // the channel where fully received messages are held for other parts of the app to read
+	logger       lib.LoggerI
 }
 
 // queueSend() schedules the bytes to be sent
@@ -333,6 +334,7 @@ func (s *Stream) hasStuffToSend() bool {
 func (s *Stream) nextPacket() (packet *Packet) {
 	packet = &Packet{StreamId: s.topic}
 	packet.Bytes, packet.Eof = s.chunkNextSend()
+	s.logger.Debugf("Sending packet with length: %d", len(packet.Bytes))
 	return
 }
 
@@ -352,6 +354,7 @@ func (s *Stream) chunkNextSend() (chunk []byte, eof bool) {
 // handlePacket() merge the new packet with the previously received ones until the entire message is complete (EOF signal)
 func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
 	msgAssemblerLen, packetLen := len(s.msgAssembler), len(packet.Bytes)
+	s.logger.Debugf("Received packet with length: %d", packetLen)
 	// if the addition of this new packet pushes the total message size above max
 	if int(maxMessageSize) < msgAssemblerLen+packetLen {
 		s.msgAssembler = s.msgAssembler[:0]
