@@ -2,11 +2,9 @@ package store
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	math2 "math"
-	math "math/rand"
 	"os"
 	"runtime/debug"
 	"testing"
@@ -161,43 +159,6 @@ func TestPrune(t *testing.T) {
 	got, err := readOnly.Get([]byte("key"))
 	require.NoError(t, err)
 	fmt.Println(string(got))
-}
-
-func TestStoreProof(t *testing.T) {
-	store, _, cleanup := testStore(t)
-	defer cleanup()
-	addRandomValues(t, store)
-
-	key := []byte("key")
-	value := []byte("value")
-	store.Set(key, value)
-
-	proof, err := store.sc.GetMerkleProof(key)
-	require.NoError(t, err)
-
-	valid, err := store.VerifyProof(key, value, proof)
-	require.NoError(t, err)
-	require.True(t, valid)
-
-	// modify the proof and ensure it fails
-	proof.Nodes[0].Key[0] = byte('x')
-
-	valid, err = store.VerifyProof(key, key, proof)
-	require.NoError(t, err)
-	require.False(t, valid)
-}
-
-func addRandomValues(t *testing.T, store *Store) {
-	for i := 0; i < math.Intn(1000); i++ {
-		key := make([]byte, 256)
-		_, err := rand.Read(key)
-		require.NoError(t, err)
-		value := make([]byte, 256)
-		_, err = rand.Read(value)
-		require.NoError(t, err)
-		err = store.Set(key, value)
-		require.NoError(t, err)
-	}
 }
 
 func testStore(t *testing.T) (*Store, *badger.DB, func()) {

@@ -455,8 +455,6 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 	}
 
 	if s.target.Key.equals(s.gcp) {
-		// Set the key and value of the proof to the target node
-
 		// Add target to the list of traversed nodes
 		s.traversed.Nodes = append(s.traversed.Nodes, targetNode.copy())
 	}
@@ -546,13 +544,8 @@ func (s *SMT) VerifyProof(key []byte, value []byte, proof *lib.MerkleProof) (boo
 		copy(key, leaf.Key)
 		node := &node{Key: newNodeKey(key, MaxKeyBitLength), Node: Node{Value: leaf.Value}}
 		// Leaf nodes could be one of the two children of the root.
-		s.target = node
-		if err := s.validateTarget(); err != nil {
-			continue
-		}
-
 		if err := smt.set(node); err != nil {
-			return false, err
+			continue
 		}
 	}
 
@@ -878,7 +871,3 @@ var (
 		255, 255, 255, 255, 255, 255, 255, 255,
 	}
 )
-
-// 11
-// 1100
-// 1101

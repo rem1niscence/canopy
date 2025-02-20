@@ -2,11 +2,14 @@ package store
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
+	math "math/rand"
+	"testing"
+
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestSet(t *testing.T) {
@@ -1965,6 +1968,145 @@ func TestBytesToBits(t *testing.T) {
 			k := new(key)
 			got := k.byteToBits(test.byt, test.leadingZeroes)
 			require.Equal(t, test.expected, got, fmt.Sprintf("Expected: %v, Got: %v\n", test.expected, got))
+		})
+	}
+}
+
+func TestStoreProof(t *testing.T) {
+	store, _, cleanup := testStore(t)
+	defer cleanup()
+	addRandomValues(t, store)
+
+	key := []byte("key")
+	value := []byte("value")
+	store.Set(key, value)
+
+	proof, err := store.sc.GetMerkleProof(key)
+	require.NoError(t, err)
+
+	valid, err := store.VerifyProof(key, value, proof)
+	require.NoError(t, err)
+	require.True(t, valid)
+
+	// modify the proof and ensure it fails
+	proof.Nodes[0].Key[0] = byte('x')
+
+	valid, err = store.VerifyProof(key, key, proof)
+	require.NoError(t, err)
+	require.False(t, valid)
+}
+
+func addRandomValues(t *testing.T, store *Store) {
+	for i := 0; i < math.Intn(1000); i++ {
+		key := make([]byte, 256)
+		_, err := rand.Read(key)
+		require.NoError(t, err)
+		value := make([]byte, 256)
+		_, err = rand.Read(value)
+		require.NoError(t, err)
+		err = store.Set(key, value)
+		require.NoError(t, err)
+	}
+}
+
+func TestStoreProof2(t *testing.T) {
+	tests := []struct {
+		name       string
+		detail     string
+		keyBitSize int
+		target     *node
+		preset     *NodeList
+		rootKey    []byte
+		valid      bool
+		err        error
+	}{
+		{
+			name: "valid proof with target at 1110",
+			detail: `Preset:       root
+							  /    \
+						    0000    1
+								  /   \
+								1000   111
+									  /   \
+								   *1110* 1111
+							`,
+			keyBitSize: MaxKeyBitLength,
+			preset: &NodeList{
+				Nodes: []*node{
+					{ // root
+						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
+						Node: Node{
+							LeftChildKey:  []byte{0b0, 3}, // 0000
+							RightChildKey: []byte{0b1, 0}, // 1
+						},
+					},
+					{ // 0000
+						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
+						Node: Node{}, // leaf
+					},
+					{ // 1
+						Key: &key{leastSigBits: []int{1}},
+						Node: Node{
+							LeftChildKey:  []byte{0b1000, 0}, // 1000
+							RightChildKey: []byte{0b111, 0},  // 111
+						},
+					},
+					{ // 1000
+						Key: &key{leastSigBits: []int{1, 0, 0, 0}},
+					},
+					{ // 1110
+						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
+						Node: Node{Value: []byte("some_value")}, // leaf
+					},
+					{ // 111
+						Key: &key{leastSigBits: []int{1, 1, 1}},
+						Node: Node{
+							LeftChildKey:  []byte{0b1110, 0}, // 1110
+							RightChildKey: []byte{0b1111, 0}, // 1111
+						},
+					},
+					{ // 1111
+						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
+						Node: Node{}, // leaf
+					},
+				},
+			},
+			target: &node{Key: &key{leastSigBits: []int{1, 1, 1, 0}}, Node: Node{Value: []byte("some_value")}},
+			valid:  true,
+			err:    nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a new memory store to work with
+			memStore, err := NewStoreInMemory(lib.NewDefaultLogger())
+			require.NoError(t, err)
+			// set root key if set in the test
+			rootKey := RootKey
+			if test.rootKey != nil {
+				rootKey = test.rootKey
+			}
+			// create the smt
+			smt := NewSMT(rootKey, test.keyBitSize, memStore)
+			// preset the nodes
+			if test.preset != nil {
+				for _, n := range test.preset.Nodes {
+					// get the bytes for the node to set in the db
+					require.NoError(t, err)
+					// set the node in the db
+					require.NoError(t, smt.Set(n.Key.bytes(), n.Value))
+				}
+			}
+			// generate the merkle proof
+			proof, err := smt.GetMerkleProof(test.target.Key.bytes())
+			require.NoError(t, err)
+			// verify the proof
+			valid, err := smt.VerifyProof(test.target.Key.bytes(), test.target.Value, proof)
+
+			// validate results
+			require.Equal(t, test.err, err)
+			require.Equal(t, test.valid, valid)
 		})
 	}
 }
