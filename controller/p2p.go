@@ -98,12 +98,9 @@ func (c *Controller) Sync() {
 func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
 	// create a transaction message object using the tx bytes and the chain id
 	msg := &lib.TxMessage{ChainId: c.Config.ChainId, Tx: tx}
-	// send it to self for de-duplication and awareness of self originated transactions
-	if err := c.P2P.SelfSend(c.PublicKey, Tx, msg); err != nil {
-		return err
-	}
-	// gossip to all the peers for the chain
-	return c.P2P.SendToPeers(Tx, msg)
+
+	// send transaction to controller for processing and gossip
+	return c.P2P.SelfSend(c.PublicKey, Tx, msg)
 }
 
 // SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
