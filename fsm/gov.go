@@ -161,12 +161,12 @@ func (s *StateMachine) SetParamsVal(v *types.ValidatorParams) lib.ErrorI {
 	return s.setParams(types.ParamSpaceVal, v)
 }
 
-// SetParamsGov() sets governance params into state
+// SetParamsGov() sets Governance params into state
 func (s *StateMachine) SetParamsGov(g *types.GovernanceParams) lib.ErrorI {
 	return s.setParams(types.ParamSpaceGov, g)
 }
 
-// SetParamsFee() sets fee params into state
+// SetParamsFee() sets Fee params into state
 func (s *StateMachine) SetParamsFee(f *types.FeeParams) lib.ErrorI {
 	return s.setParams(types.ParamSpaceFee, f)
 }
