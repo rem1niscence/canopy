@@ -21,8 +21,8 @@ const (
 	queueSendTimeout    = 10 * time.Second        // how long a message waits to be queued before throwing an error
 	dataFlowRatePerS    = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
 	maxMessageSize      = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
-	maxChanSize         = 100                     // maximum number of items in a channel before blocking
-	maxQueueSize        = 100                     // maximum number of items in a queue before blocking
+	maxChanSize         = 1                       // maximum number of items in a channel before blocking
+	maxQueueSize        = 3                       // maximum number of items in a queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
@@ -141,6 +141,7 @@ func (c *MultiConn) startSendService() {
 				err = c.sendWireBytes(packet, m)
 			}
 		case <-ping.C: // fires every 'pingInterval'
+			c.log.Debugf("Send Ping to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 			// send a ping to the peer
 			if err = c.sendWireBytes(new(Ping), m); err != nil {
 				break
@@ -152,6 +153,7 @@ func (c *MultiConn) startSendService() {
 				}
 			})
 		case <-c.sendPong: // fires when receive service got a 'ping' message
+			c.log.Debugf("Send Pong to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 			// send a pong
 			err = c.sendWireBytes(new(Pong), m)
 		case <-c.receivedPong: // fires when receive service got a 'pong' message
@@ -236,14 +238,14 @@ func (c *MultiConn) waitForAndHandleWireBytes(reader bufio.Reader, m *limiter.Mo
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
-	m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
+	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
 	// read up to maxPacketSize bytes
 	n, er := reader.Read(buffer)
 	if er != nil {
 		return nil, ErrFailedRead(er)
 	}
 	// update the rate limiter with how many bytes were read
-	m.Update(n)
+	//m.Update(n)
 	// unmarshal the buffer
 	if err := lib.Unmarshal(buffer[:n], msg); err != nil {
 		return nil, err
@@ -268,14 +270,14 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) (er
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
-	m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
+	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
 	// write bytes to the wire up to max packet size
-	n, er := c.conn.Write(bz)
+	_, er := c.conn.Write(bz)
 	if er != nil {
 		return ErrFailedWrite(er)
 	}
 	// update the rate limiter with how many bytes were written
-	m.Update(n)
+	//m.Update(n)
 	return
 }
 
@@ -334,7 +336,7 @@ func (s *Stream) hasStuffToSend() bool {
 func (s *Stream) nextPacket() (packet *Packet) {
 	packet = &Packet{StreamId: s.topic}
 	packet.Bytes, packet.Eof = s.chunkNextSend()
-	s.logger.Debugf("Sending packet with length: %d", len(packet.Bytes))
+	s.logger.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 	return
 }
 
@@ -354,7 +356,7 @@ func (s *Stream) chunkNextSend() (chunk []byte, eof bool) {
 // handlePacket() merge the new packet with the previously received ones until the entire message is complete (EOF signal)
 func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
 	msgAssemblerLen, packetLen := len(s.msgAssembler), len(packet.Bytes)
-	s.logger.Debugf("Received packet with length: %d", packetLen)
+	s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 	// if the addition of this new packet pushes the total message size above max
 	if int(maxMessageSize) < msgAssemblerLen+packetLen {
 		s.msgAssembler = s.msgAssembler[:0]

@@ -479,6 +479,8 @@ func (b *BFT) StartCommitProcessPhase() {
 	b.ByzantineEvidence = &ByzantineEvidence{
 		DSE: b.GetLocalDSE(),
 	}
+	// send the block to self for committing
+	b.SelfSendBlock(msg.Qc)
 	// gossip committed block message to peers
 	b.GossipBlock(msg.Qc, b.PublicKey)
 }
@@ -844,6 +846,8 @@ type (
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
 		// GossipBlock() is a P2P call to gossip a completed Quorum Certificate with a Proposal
 		GossipBlock(certificate *lib.QuorumCertificate, sender []byte)
+		// SendToSelf() is a P2P call to directly send  a completed Quorum Certificate to self
+		SelfSendBlock(qc *lib.QuorumCertificate)
 		// SendToReplicas() is a P2P call to directly send a Consensus message to all Replicas
 		SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 		// SendToProposer() is a P2P call to directly send a Consensus message to the Leader
