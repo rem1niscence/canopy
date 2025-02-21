@@ -95,7 +95,7 @@ func (t *Indexer) GetBlockByHeight(height uint64) (*lib.BlockResult, lib.ErrorI)
 // GetBlocks() returns a page of blocks based on the page parameters
 func (t *Indexer) GetBlocks(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 	results, count, page := make(lib.BlockResults, 0), 0, lib.NewPage(p, lib.BlockResultsPageName)
-	err = page.Load(lib.AppendAndLenPrefix(blockHeightPrefix), true, &results, t.db, func(_, b []byte) lib.ErrorI {
+	err = page.Load(lib.JoinLenPrefix(blockHeightPrefix), true, &results, t.db, func(_, b []byte) lib.ErrorI {
 		// get the block from the iterator value
 		block, e := t.getBlock(b)
 		if e != nil {
@@ -249,7 +249,7 @@ func (t *Indexer) IndexDoubleSigner(address []byte, height uint64) lib.ErrorI {
 // GetDoubleSigners() gets all double signers saved in the indexer
 // IMPORTANT NOTE: this returns double signers in the form of <address> -> <heights> NOT <public_key> -> <heights>
 func (t *Indexer) GetDoubleSigners() (ds []*lib.DoubleSigner, err lib.ErrorI) {
-	it, err := t.db.Iterator(lib.AppendAndLenPrefix(doubleSignerPrefix))
+	it, err := t.db.Iterator(lib.JoinLenPrefix(doubleSignerPrefix))
 	if err != nil {
 		return nil, err
 	}
@@ -533,7 +533,7 @@ func (t *Indexer) doubleSignerHeightKey(address []byte, height uint64) []byte {
 }
 
 func (t *Indexer) key(prefix, param1, param2 []byte) []byte {
-	return lib.AppendAndLenPrefix(prefix, param1, param2)
+	return lib.JoinLenPrefix(prefix, param1, param2)
 }
 
 // encodeBigEndian() encodes a number such that default DB order

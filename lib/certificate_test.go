@@ -89,7 +89,7 @@ func TestCertificateCheckBasic(t *testing.T) {
 				Results:     results,
 				ProposerKey: newTestPublicKeyBytes(t),
 			},
-			error: "mismatch block hash",
+			error: "mismatch qc block hash",
 		},
 		{
 			name:   "empty aggregate signature",

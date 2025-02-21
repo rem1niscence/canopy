@@ -1999,7 +1999,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				require.NoError(t, sm.SetSupply(supply))
 				// create an aggregate signature
 				// get the committee members
-				committee, err := sm.GetCommitteeMembers(lib.CanopyChainId+1, true)
+				committee, err := sm.GetCommitteeMembers(lib.CanopyChainId + 1)
 				require.NoError(t, err)
 				// create a copy of the multikey
 				mk := committee.MultiKey.Copy()

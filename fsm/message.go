@@ -385,7 +385,7 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *types.MessageCertifi
 	if err != nil {
 		return err
 	}
-	// block any tx message certificate result for self committee id, as it is stored in the qc
+	// block any tx message certificate result for self chain id, as it is stored in the qc
 	if msg.Qc.Header.ChainId == rootChainId {
 		return types.ErrInvalidCertificateResults()
 	}

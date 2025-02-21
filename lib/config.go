@@ -16,8 +16,8 @@ const (
 	ProposalsFilePath      = "proposals.json"
 	PollsFilePath          = "polls.json"
 	UnknownChainId         = uint64(0)
-	CanopyChainId          = uint64(1) // NOTE: to not break nested-chain recursion, this should not be used except for 'default config/genesis' developer setups
-	DAOPoolID              = math.MaxUint32 + 1
+	CanopyChainId          = uint64(1)            // NOTE: to not break nested-chain recursion, this should not be used except for 'default config/genesis' developer setups
+	DAOPoolID              = 2*math.MaxUint16 + 1 // must be above the MaxUint16 * 2 to ensure no 'overlap' with 'chainId + EscrowAddend'
 	CanopyMainnetNetworkId = 1
 )
 

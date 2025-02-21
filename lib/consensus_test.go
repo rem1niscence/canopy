@@ -715,8 +715,8 @@ func TestViewCheck(t *testing.T) {
 			error:     "wrong network id",
 		},
 		{
-			name:      "the committee id is incorrect",
-			detail:    "the committee ids are different",
+			name:      "the chain id is incorrect",
+			detail:    "the chain ids are different",
 			view:      &View{ChainId: 1},
 			checkView: &View{ChainId: 2},
 			error:     "wrong chain id",
@@ -735,7 +735,7 @@ func TestViewCheck(t *testing.T) {
 			view:           &View{RootHeight: 1},
 			checkView:      &View{RootHeight: 2},
 			enforceHeights: true,
-			error:          "wrong canopy height",
+			error:          "wrong root height",
 		},
 		{
 			name:           "the height is incorrect but not enforcing heights",

@@ -365,7 +365,6 @@ func NewDiscriminant(seed []byte) *big.Int {
 	}
 	// define big ints
 	n, negN, temp := bip.New(), bip.New(), bip.New()
-	defer bip.Recycle(negN, temp)
 	// create entropy by hashing the seed
 	entropy := Hash(seed)
 	// convert entropy (minus the last 2 bytes) to a big integer
@@ -396,7 +395,6 @@ func NewDiscriminant(seed []byte) *big.Int {
 			go func(v Pair) {
 				tmp := bip.New().Set(temp)
 				defer wg.Done()
-				defer bip.Recycle(tmp)
 				// `v.p` is a prime divisor, and `v.q` is the modular inverse of m mod v.p
 				// `i` calculates the starting index for marking multiples of v.p
 				// it represents the smallest integer such that:

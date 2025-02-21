@@ -111,7 +111,7 @@ const (
 	CodeWrongPhase                      ErrorCode = 13
 	CodePartialSignatureEmpty           ErrorCode = 14
 	CodeInvalidPartialSignature         ErrorCode = 15
-	CodeMismatchBlockHash               ErrorCode = 16
+	CodeMismatchConsBlockHash           ErrorCode = 16
 	CodeInvalidProposerPubKey           ErrorCode = 17
 	CodeNoMaj23                         ErrorCode = 18
 	CodeEmptyAggregateSignature         ErrorCode = 19
@@ -148,6 +148,13 @@ const (
 	CodeInvalidVDF                      ErrorCode = 50
 	CodeNoSafeNodeJustification         ErrorCode = 51
 	CodeNoSavedBlockOrResults           ErrorCode = 52
+	CodeInvalidTxHeight                 ErrorCode = 53
+	CodeInvalidSigner                   ErrorCode = 54
+	CodeMismatchQcBlockHash             ErrorCode = 55
+	CodeMismatchHeaderBlockHash         ErrorCode = 56
+	CodeEmptyDoubleSigner               ErrorCode = 57
+	CodeNonEquivocatingVote             ErrorCode = 58
+	CodeInvalidEvidenceHeights          ErrorCode = 59
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -242,6 +249,7 @@ const (
 	CodeMismatchCertResults               ErrorCode = 87
 	CodeInvalidQCRootChainHeight          ErrorCode = 88
 	CodeEmptyCertificateResults           ErrorCode = 89
+	CodeSlashNonValidator                 ErrorCode = 90
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -432,7 +440,7 @@ func ErrWrongHeight() ErrorI {
 }
 
 func ErrWrongRootHeight() ErrorI {
-	return NewError(CodeRootHeight, ConsensusModule, "wrong canopy height")
+	return NewError(CodeRootHeight, ConsensusModule, "wrong root height")
 }
 
 func ErrInvalidQCCommitteeHeight() ErrorI {
@@ -503,6 +511,10 @@ func ErrInvalidBlockTime() ErrorI {
 	return NewError(CodeInvalidBlockTime, ConsensusModule, "invalid block time")
 }
 
+func ErrInvalidTxHeight() ErrorI {
+	return NewError(CodeInvalidTxHeight, ConsensusModule, "invalid tx height")
+}
+
 func ErrInvalidTxTime() ErrorI {
 	return NewError(CodeInvalidTxTime, ConsensusModule, "invalid tx time")
 }
@@ -519,12 +531,28 @@ func ErrInvalidEvidence() ErrorI {
 	return NewError(CodeInvalidEvidence, ConsensusModule, "evidence is invalid")
 }
 
+func ErrInvalidEvidenceHeights() ErrorI {
+	return NewError(CodeInvalidEvidenceHeights, ConsensusModule, "evidence heights are invalid")
+}
+
+func ErrNonEquivocatingVote() ErrorI {
+	return NewError(CodeNonEquivocatingVote, ConsensusModule, "non equivocating vote")
+}
+
+func ErrEmptyDoubleSigner() ErrorI {
+	return NewError(CodeEmptyDoubleSigner, ConsensusModule, "double signer is empty")
+}
+
 func ErrEvidenceTooOld() ErrorI {
 	return NewError(CodeEvidenceTooOld, ConsensusModule, "evidence is too old")
 }
 
-func ErrInvalidProposerPubKey() ErrorI {
-	return NewError(CodeInvalidProposerPubKey, ConsensusModule, "invalid proposer public key")
+func ErrInvalidProposerPubKey(expected []byte) ErrorI {
+	return NewError(CodeInvalidProposerPubKey, ConsensusModule, fmt.Sprintf("invalid proposer public key, expected %s", BytesToTruncatedString(expected)))
+}
+
+func ErrInvalidSigner() ErrorI {
+	return NewError(CodeInvalidSigner, ConsensusModule, "invalid cons message signer")
 }
 
 func ErrMismatchEvidenceAndHeader() ErrorI {
@@ -603,8 +631,16 @@ func ErrMismatchResultsHash() ErrorI {
 	return NewError(CodeMismatchResultsHash, ConsensusModule, "mismatch results hash")
 }
 
-func ErrMismatchBlockHash(s string) ErrorI {
-	return NewError(CodeMismatchBlockHash, ConsensusModule, fmt.Sprintf("mismatch block hash: %s", s))
+func ErrMismatchConsBlockHash() ErrorI {
+	return NewError(CodeMismatchConsBlockHash, ConsensusModule, "mismatch cons block hash")
+}
+
+func ErrMismatchQCBlockHash() ErrorI {
+	return NewError(CodeMismatchQcBlockHash, ConsensusModule, "mismatch qc block hash")
+}
+
+func ErrMismatchHeaderBlockHash() ErrorI {
+	return NewError(CodeMismatchHeaderBlockHash, ConsensusModule, "mismatch header block hash")
 }
 
 func ErrInvalidPercentAllocation() ErrorI {
@@ -620,7 +656,7 @@ func ErrWrongNetworkID() ErrorI {
 }
 
 func ErrEmptyChainId() ErrorI {
-	return NewError(CodeEmptyChainId, StateMachineModule, "empty committee id")
+	return NewError(CodeEmptyChainId, StateMachineModule, "empty chain id")
 }
 
 func ErrWrongChainId() ErrorI {

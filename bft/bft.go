@@ -12,12 +12,12 @@ import (
 
 // BFT is a structure that holds data for a Hotstuff BFT instance
 type BFT struct {
-	*lib.View                            // the current period during which the BFT is occurring (Height/Round/Phase)
+	*lib.View                            // the current period during which the BFT is occurring (CreatedHeight/Round/Phase)
 	Votes         VotesForHeight         // 'votes' received from Replica (non-leader) Validators
 	Proposals     ProposalsForHeight     // 'proposals' received from the Leader Validator(s)
 	ProposerKey   []byte                 // the public key of the proposer
 	ValidatorSet  ValSet                 // the current set of Validators
-	HighQC        *QC                    // the highest PRECOMMIT quorum certificate the node is aware of for this Height
+	HighQC        *QC                    // the highest PRECOMMIT quorum certificate the node is aware of for this CreatedHeight
 	Block         []byte                 // the current Block being voted on (the foundational unit of the blockchain)
 	BlockHash     []byte                 // the current hash of the block being voted on
 	Results       *lib.CertificateResult // the current Result being voted on (reward and slash recipients)
@@ -257,7 +257,7 @@ func (b *BFT) StartElectionVotePhase() {
 			Header:      b.View.Copy(),
 			ProposerKey: b.ProposerKey, // using voting power, authorizes Candidate to act as the 'Leader'
 		},
-		HighQc:                 b.HighQC,                         // forward highest known 'Lock' for this Height, so the new Proposer may satisfy SAFE-NODE-PREDICATE
+		HighQc:                 b.HighQC,                         // forward highest known 'Lock' for this CreatedHeight, so the new Proposer may satisfy SAFE-NODE-PREDICATE
 		LastDoubleSignEvidence: b.ByzantineEvidence.DSE.Evidence, // forward any evidence of DoubleSigning
 		Vdf:                    b.HighVDF,                        // forward local VDF to the candidate
 	})
@@ -266,7 +266,7 @@ func (b *BFT) StartElectionVotePhase() {
 // StartProposePhase() begins the ProposePhase after the ELECTION-VOTE phase timeout
 // PROPOSE PHASE:
 // - Leader reviews the collected vote messages from Replicas
-//   - Determines the highest 'lock' (HighQC) if one exists for this Height
+//   - Determines the highest 'lock' (HighQC) if one exists for this CreatedHeight
 //   - Combines any ByzantineEvidence sent from Replicas into their own
 //   - Aggregates the signatures from the Replicas to form a +2/3 threshold multi-signature
 //
@@ -309,7 +309,7 @@ func (b *BFT) StartProposePhase() {
 // StartProposeVotePhase() begins the ProposeVote after the PROPOSE phase timeout
 // PROPOSE-VOTE PHASE:
 // - Replica reviews the message from the Leader by validating the justification (+2/3 multi-sig) proving that they are in-fact the leader
-// - If the Replica is currently Locked on a previous Proposal for this Height, the new Proposal must pass the SAFE-NODE-PREDICATE
+// - If the Replica is currently Locked on a previous Proposal for this CreatedHeight, the new Proposal must pass the SAFE-NODE-PREDICATE
 // - Replica Validates the proposal using the byzantine evidence and the specific plugin
 // - Replicas send a signed (aggregable) PROPOSE vote to the Leader
 func (b *BFT) StartProposeVotePhase() {
@@ -488,6 +488,7 @@ func (b *BFT) StartCommitProcessPhase() {
 // - Replica sends current View message to other replicas (Pacemaker vote)
 func (b *BFT) RoundInterrupt() {
 	b.log.Warn(b.View.ToString())
+	b.Config.RoundInterruptTimeoutMS = b.msLeftInRound()
 	b.Phase = RoundInterrupt
 	// send pacemaker message
 	b.SendToReplicas(b.ValidatorSet, &Message{
@@ -519,12 +520,13 @@ func (b *BFT) Pacemaker() {
 			continue
 		}
 		totalVotedPower += validator.VotingPower
-		if totalVotedPower >= b.ValidatorSet.MinimumMaj23 {
-			pacemakerRound = vote.Qc.Header.Round // set the highest round where +2/3rds have been
+		// if totalVotePower >= +33%, it's safe to advance to that round
+		if totalVotedPower >= lib.Uint64ReducePercentage(b.ValidatorSet.MinimumMaj23, 50) {
+			pacemakerRound = vote.Qc.Header.Round // set the highest round where +1/3rds have been
 			break
 		}
 	}
-	// if +2/3rd Round is larger than local Round - advance to the +2/3rd Round to better join the Majority
+	// if +1/3rd Round is larger than local Round - advance to the +1/3rd Round to better join the Majority
 	if pacemakerRound > b.Round {
 		b.log.Infof("Pacemaker peers set round: %d", pacemakerRound)
 		b.Round = pacemakerRound
@@ -557,7 +559,7 @@ func (b *BFT) PhaseHas23Maj() bool {
 func (b *BFT) CheckProposerAndProposal(msg *Message) (interrupt bool) {
 	// confirm is expected proposer
 	if !b.IsProposer(msg.Signature.PublicKey) {
-		b.log.Error(lib.ErrInvalidProposerPubKey().Error())
+		b.log.Error(lib.ErrInvalidProposerPubKey(b.ProposerKey).Error())
 		return true
 	}
 
@@ -577,12 +579,10 @@ func (b *BFT) NewRound(newHeight bool) {
 	} else {
 		b.Round++
 	}
-	b.Block = nil
-	b.BlockHash = nil
-	b.Results = nil
+	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
-	b.Votes.NewRound(b.Round)
-	b.Proposals[b.Round] = make(map[string][]*Message)
+	b.Block, b.BlockHash, b.Results = nil, nil, nil
+	b.SortitionData = nil
 }
 
 // NewHeight() initializes / resets consensus variables preparing for the NewHeight
@@ -597,10 +597,6 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.PacemakerMessages = make(PacemakerMessages)
 	// reset PartialQCs
 	b.PartialQCs = make(PartialQCs)
-	// reset ProposerKey, Proposal, and Sortition data
-	b.ProposerKey = nil
-	b.Block, b.BlockHash, b.Results = nil, nil, nil
-	b.SortitionData = nil
 	// initialize Round 0
 	b.NewRound(true)
 	// set phase to Election
@@ -690,7 +686,7 @@ func (b *BFT) WaitTime(phase Phase, round uint64) (waitTime time.Duration) {
 	case RoundInterrupt:
 		waitTime = b.waitTime(b.Config.RoundInterruptTimeoutMS, round)
 	case Pacemaker:
-		waitTime = b.waitTime(b.Config.CommitProcessMS, round)
+		waitTime = b.waitTime(0, round)
 	}
 	return
 }
@@ -698,6 +694,37 @@ func (b *BFT) WaitTime(phase Phase, round uint64) (waitTime time.Duration) {
 // waitTime() calculates the waiting time for a specific sleepTime configuration and Round number (helper)
 func (b *BFT) waitTime(sleepTimeMS int, round uint64) time.Duration {
 	return time.Duration(uint64(sleepTimeMS)*(2*round+1)) * time.Millisecond
+}
+
+// msLeftInRound() calculates the milliseconds left in the round
+func (b *BFT) msLeftInRound() int {
+	// calculate the ms for each phase
+	electionMs := b.WaitTime(Election, b.Round).Milliseconds()
+	electionVoteMs := b.WaitTime(ElectionVote, b.Round).Milliseconds()
+	proposeMs := b.WaitTime(Propose, b.Round).Milliseconds()
+	proposeVoteMs := b.WaitTime(ProposeVote, b.Round).Milliseconds()
+	precommitMs := b.WaitTime(Precommit, b.Round).Milliseconds()
+	precommitVoteMs := b.WaitTime(PrecommitVote, b.Round).Milliseconds()
+	commitMs := b.WaitTime(Commit, b.Round).Milliseconds()
+	// ms left in round = RoundWaitTime - TimeSpentInRound
+	switch b.Phase {
+	case Election:
+		return int(electionMs + electionVoteMs + proposeMs + proposeVoteMs + precommitMs + precommitVoteMs + commitMs)
+	case ElectionVote:
+		return int(electionVoteMs + proposeMs + proposeVoteMs + precommitMs + precommitVoteMs + commitMs)
+	case Propose:
+		return int(proposeMs + proposeVoteMs + precommitMs + precommitVoteMs + commitMs)
+	case ProposeVote:
+		return int(proposeVoteMs + precommitMs + precommitVoteMs + commitMs)
+	case Precommit:
+		return int(precommitMs + precommitVoteMs + commitMs)
+	case PrecommitVote:
+		return int(precommitVoteMs + commitMs)
+	case Commit:
+		return int(commitMs)
+	default:
+		return 0
+	}
 }
 
 // SetWaitTimers() sets the phase and optimistic timers
@@ -829,8 +856,8 @@ type (
 		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
 		// LoadCommittee() loads the ValidatorSet operating under ChainId
 		LoadCommittee(rootHeight uint64) (lib.ValidatorSet, lib.ErrorI)
-		// LoadCommitteeHeightInState() loads the last height a committee member executed a Proposal (reward) transaction
-		LoadCommitteeHeightInState(rootHeight uint64) (uint64, lib.ErrorI)
+		// LoadCommitteeHeightInState() loads the committee information from state as updated by the quorum certificates
+		LoadCommitteeData() (*lib.CommitteeData, lib.ErrorI)
 		// LoadLastProposers() loads the last Canopy committee proposers for sortition data
 		LoadLastProposers(rootHeight uint64) (*lib.Proposers, lib.ErrorI)
 		// LoadMinimumEvidenceHeight() loads the Canopy enforced minimum height for valid Byzantine Evidence

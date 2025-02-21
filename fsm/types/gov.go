@@ -31,9 +31,9 @@ const (
 
 var (
 	// the number of tokens in micro denomination that are initially (before halvenings) minted per block
-	InitialTokensPerBlock = 50 * 1000000 // 50 CNPY
+	InitialTokensPerBlock = 256 * 1000000 // 256 CNPY
 	// the number of blocks between each halvening (block reward is cut in half) event
-	BlocksPerHalvening = 210000
+	BlocksPerHalvening = 1050000
 )
 
 // ParamSpace is a distinct, isolated category within the overarching Params structure
@@ -579,7 +579,7 @@ type StartPoll struct {
 
 // NewStartPollTransaction() isn't an actual transaction type - rather it's a protocol built on top of send transactions to allow simple straw polling on Canopy.
 // This model is plugin specific and does not need to be followed for other chains.
-func NewStartPollTransaction(from crypto.PrivateKeyI, pollJSON json.RawMessage, networkId, chainId, fee uint64) (lib.TransactionI, lib.ErrorI) {
+func NewStartPollTransaction(from crypto.PrivateKeyI, pollJSON json.RawMessage, networkId, chainId, fee, height uint64) (lib.TransactionI, lib.ErrorI) {
 	// extract the params from the pollJSON
 	extract := struct {
 		URL      string `json:"URL"`      // optional
@@ -598,7 +598,7 @@ func NewStartPollTransaction(from crypto.PrivateKeyI, pollJSON json.RawMessage, 
 		return nil, err
 	}
 	// return the transaction object
-	return NewSendTransaction(from, from.PublicKey().Address(), 1, networkId, chainId, fee, string(memoBytes))
+	return NewSendTransaction(from, from.PublicKey().Address(), 1, networkId, chainId, fee, height, string(memoBytes))
 }
 
 // VotePoll represents the structure of a voting action on a poll
@@ -610,7 +610,7 @@ type VotePoll struct {
 
 // NewVotePollTransaction() isn't an actual transaction type - rather it's a protocol built on top of send transactions to allow simple straw polling on Canopy.
 // This model is plugin specific and does not need to be followed for other chains.
-func NewVotePollTransaction(from crypto.PrivateKeyI, pollJSON json.RawMessage, approve bool, networkId, chainId, fee uint64) (lib.TransactionI, lib.ErrorI) {
+func NewVotePollTransaction(from crypto.PrivateKeyI, pollJSON json.RawMessage, approve bool, networkId, chainId, fee, height uint64) (lib.TransactionI, lib.ErrorI) {
 	// encode the structure to the memo
 	memoBytes, err := lib.MarshalJSON(VotePoll{
 		VotePoll: crypto.HashString(pollJSON),
@@ -620,7 +620,7 @@ func NewVotePollTransaction(from crypto.PrivateKeyI, pollJSON json.RawMessage, a
 		return nil, err
 	}
 	// return the transaction object
-	return NewSendTransaction(from, from.PublicKey().Address(), 1, networkId, chainId, fee, string(memoBytes))
+	return NewSendTransaction(from, from.PublicKey().Address(), 1, networkId, chainId, fee, height, string(memoBytes))
 }
 
 // validatePollHash() ensures a poll hash is valid for a poll transaction

@@ -7,6 +7,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+/* On-chain governance: parameter changes and treasury subsidies */
+
 // UpdateParam() updates a governance parameter keyed by space and name
 func (s *StateMachine) UpdateParam(paramSpace, paramName string, value proto.Message) (err lib.ErrorI) {
 	// save the previous parameters to check for updates
@@ -59,8 +61,8 @@ func (s *StateMachine) UpdateParam(paramSpace, paramName string, value proto.Mes
 }
 
 // ConformStateToParamUpdate() ensures the state does not violate the new values of the governance parameters
-// NOTE: at the moment only MaxCommitteeSize & RootChainId requires an adjustment with the exception of MinSellOrderSize which
-// is purposefully allowed to violate new updates
+// - Only MaxCommitteeSize & RootChainId requires an adjustment
+// - MinSellOrderSize is purposefully allowed to violate new updates
 func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) lib.ErrorI {
 	// retrieve the params from state
 	params, err := s.GetParams()
@@ -69,6 +71,7 @@ func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) l
 	}
 	// if root chain id was updated
 	if previousParams.Consensus.RootChainId != params.Consensus.RootChainId {
+		// get the committee for self chain
 		selfCommittee, e := s.GetCommitteeData(s.Config.ChainId)
 		if e != nil {
 			return e
@@ -89,7 +92,7 @@ func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) l
 	// maintain a counter for pseudorandom removal of the 'chain ids'
 	var idx int
 	// for each validator, remove the excess ids in a pseudorandom fashion
-	return s.IterateAndExecute(types.ValidatorPrefix(), func(_, value []byte) lib.ErrorI {
+	return s.IterateAndExecute(types.ValidatorPrefix(), func(key, value []byte) lib.ErrorI {
 		// convert bytes into a validator object
 		v, e := s.unmarshalValidator(value)
 		if e != nil {
@@ -113,10 +116,12 @@ func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) l
 		idx++
 		// update the committees or delegations
 		if !v.Delegate {
+			// update the new committees
 			if err = s.UpdateCommittees(crypto.NewAddress(v.Address), v, v.StakedAmount, newCommittees); err != nil {
 				return err
 			}
 		} else {
+			// update the delegations
 			if err = s.UpdateDelegations(crypto.NewAddress(v.Address), v, v.StakedAmount, newCommittees); err != nil {
 				return err
 			}
@@ -130,15 +135,19 @@ func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) l
 
 // SetParams() writes an entire Params object into state
 func (s *StateMachine) SetParams(p *types.Params) lib.ErrorI {
+	// set the parameters in the consensus 'space'
 	if err := s.SetParamsCons(p.GetConsensus()); err != nil {
 		return err
 	}
+	// set the parameters in the validator 'space'
 	if err := s.SetParamsVal(p.GetValidator()); err != nil {
 		return err
 	}
+	// set the parameters in the fee 'space'
 	if err := s.SetParamsFee(p.GetFee()); err != nil {
 		return err
 	}
+	// set the parameters in the governance 'space'
 	return s.SetParamsGov(p.GetGovernance())
 }
 
@@ -152,12 +161,12 @@ func (s *StateMachine) SetParamsVal(v *types.ValidatorParams) lib.ErrorI {
 	return s.setParams(types.ParamSpaceVal, v)
 }
 
-// SetParamsGov() sets governance params into state
+// SetParamsGov() sets Governance params into state
 func (s *StateMachine) SetParamsGov(g *types.GovernanceParams) lib.ErrorI {
 	return s.setParams(types.ParamSpaceGov, g)
 }
 
-// SetParamsFee() sets fee params into state
+// SetParamsFee() sets Fee params into state
 func (s *StateMachine) SetParamsFee(f *types.FeeParams) lib.ErrorI {
 	return s.setParams(types.ParamSpaceFee, f)
 }
@@ -408,4 +417,14 @@ func (s *StateMachine) GetRootChainId() (uint64, lib.ErrorI) {
 		return 0, err
 	}
 	return consParams.RootChainId, nil
+}
+
+// LoadRootChainId() loads the root chain id from the state at a certain height
+func (s *StateMachine) LoadRootChainId(height uint64) (uint64, lib.ErrorI) {
+	sm, err := s.TimeMachine(height)
+	if err != nil {
+		return 0, err
+	}
+	defer sm.Discard()
+	return sm.GetRootChainId()
 }

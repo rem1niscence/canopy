@@ -128,7 +128,7 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 			}
 			// check the block hash
 			if !bytes.Equal(x.BlockHash, hash) {
-				return ErrMismatchBlockHash("qc.CheckBasic")
+				return ErrMismatchQCBlockHash()
 			}
 			blockSize := len(x.Block)
 			// global max block size enforcement
@@ -138,7 +138,7 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 		}
 	} else { // is QC with proposer key (ELECTION)
 		if len(x.ProposerKey) != crypto.BLS12381PubKeySize {
-			return ErrInvalidProposerPubKey()
+			return ErrInvalidSigner()
 		}
 		if len(x.ResultsHash) != 0 || x.Results != nil {
 			return ErrMismatchResultsHash()
@@ -170,7 +170,7 @@ func (x *QuorumCertificate) Check(vs ValidatorSet, maxBlockSize int, view *View,
 }
 
 // CheckHighQC() performs additional validation on the special `HighQC` (justify unlock QC)
-func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommitteeHeight uint64, vs ValidatorSet) ErrorI {
+func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, lastRootHeightUpdated uint64, vs ValidatorSet) ErrorI {
 	isPartialQC, err := x.Check(vs, maxBlockSize, view, false)
 	if err != nil {
 		return err
@@ -181,7 +181,7 @@ func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommi
 	}
 	// invalid 'historical committee', must be before the last committee height saved in the state
 	// if not, there is a potential for a long range attack
-	if stateCommitteeHeight > x.Header.RootHeight {
+	if lastRootHeightUpdated > x.Header.RootHeight {
 		return ErrWrongRootHeight()
 	}
 	// enforce same target height
@@ -202,7 +202,7 @@ func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, stateCommi
 }
 
 // GetNonSigners() returns the public keys and the percentage (of voting power out of total) of those who did not sign the QC
-func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) (nonSigners [][]byte, nonSignerPercent int, err ErrorI) {
+func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) (nonSignerPubKeys [][]byte, nonSignerPercent int, err ErrorI) {
 	if x == nil || x.Signature == nil {
 		return nil, 0, ErrEmptyQuorumCertificate()
 	}
@@ -628,23 +628,26 @@ func (x *Checkpoint) Equals(y *Checkpoint) bool {
 // Combine() merges the Reward Recipients' Payment Percents of the current Proposal with those of another Proposal
 // such that the Payment Percentages may be equally weighted when performing reward distribution calculations
 // NOTE: percents will exceed 100% over multiple samples, but are normalized using the NumberOfSamples field
-func (x *CommitteeData) Combine(f *CommitteeData) ErrorI {
-	if f == nil {
+func (x *CommitteeData) Combine(data *CommitteeData) ErrorI {
+	// safety check to ensure the data is not null
+	if data == nil {
 		return nil
 	}
-	// for each payment percent,
-	for _, ep := range f.PaymentPercents {
-		x.addPercents(ep.Address, ep.Percent)
+	// for each payment percent
+	for _, p := range data.PaymentPercents {
+		// combine the percents with the existing stubs
+		// percents can/will exceed 100 but are re-normalized using NumberOfSamples later
+		x.addPercents(p.Address, p.Percent)
 	}
 	// new Proposal purposefully overwrites the Block and Meta of the current Proposal
 	// this is to ensure both Proposals have the latest Block and Meta information
 	// in the case where the caller uses a pattern where there may be a stale Block/Meta
 	*x = CommitteeData{
-		PaymentPercents:        x.PaymentPercents,
-		NumberOfSamples:        x.NumberOfSamples + 1,
-		ChainId:                f.ChainId,
-		LastRootHeightUpdated:  f.LastRootHeightUpdated,
-		LastChainHeightUpdated: f.LastChainHeightUpdated,
+		PaymentPercents:        x.PaymentPercents,           // maintain the payment percents
+		NumberOfSamples:        x.NumberOfSamples + 1,       // add to the number of samples
+		ChainId:                data.ChainId,                // (defensively) update the chain id
+		LastRootHeightUpdated:  data.LastRootHeightUpdated,  // update the root height
+		LastChainHeightUpdated: data.LastChainHeightUpdated, // update the chain height
 	}
 	return nil
 }
@@ -652,11 +655,12 @@ func (x *CommitteeData) Combine(f *CommitteeData) ErrorI {
 // addPercents() is a helper function that adds reward distribution percents on behalf of an address
 func (x *CommitteeData) addPercents(address []byte, percent uint64) {
 	// check to see if the address already exists
-	for i, ep := range x.PaymentPercents {
+	for i, p := range x.PaymentPercents {
 		// if already exists
-		if bytes.Equal(address, ep.Address) {
+		if bytes.Equal(address, p.Address) {
 			// simply add the percent to the previous
 			x.PaymentPercents[i].Percent += percent
+			// exit
 			return
 		}
 	}

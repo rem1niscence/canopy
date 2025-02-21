@@ -153,7 +153,7 @@ func (Phase) EnumDescriptor() ([]byte, []int) {
 // certain point in time.
 // A View comprises of:
 //
-// 1) Network ID and Committee ID: These identifiers uniquely define the BFT instance,
+// 1) Network ID and chain id: These identifiers uniquely define the BFT instance,
 // distinguishing different networks and the committees within them
 //
 // 2) Height and Canopy Height: For each BFT instance, the height increases with every new block produced,

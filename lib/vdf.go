@@ -59,6 +59,10 @@ func (vdf *VDFService) Run(seed []byte) {
 	defer vdf.running.Store(false)
 	// track the start time to measure the 'processing time'
 	startTime := time.Now()
+	// ensure no 0 iteration vdf
+	if vdf.Iterations == 0 {
+		vdf.Iterations = 1
+	}
 	// run the VDF generation - if Stop() called, this will exit prematurely with y and proof being nil
 	y, proof := crypto.GenerateVDF(seed, vdf.Iterations, vdf.stopChan)
 	// adjusting variables so must lock for thread safety as the Stop() function may be accessing the `Output`

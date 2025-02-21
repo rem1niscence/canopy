@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import { useEffect, useState, memo } from "react";
 import Truncate from "react-truncate-inside";
 import { getRatio, formatNumber } from "@/components/util";
 import Container from "react-bootstrap/Container";
 import { Button, Card, Carousel, Col, Row, Spinner } from "react-bootstrap";
 import { YAxis, Tooltip, Legend, AreaChart, Area } from "recharts";
+import CanaLog from "@/components/canalog";
 import {PauseIcon, UnpauseIcon} from "@/components/svg_icons";
 import {
   getAdminRPCURL,
@@ -19,7 +19,14 @@ import {
   Resource,
 } from "@/components/api";
 
-const LazyLog = dynamic(() => import("react-lazylog").then((mod) => mod.LazyLog), { ssr: false });
+// Memoized log controller button
+const RenderControlButton = memo(({ state, setState }) => { 
+  return (
+    <div onClick={() => setState({ ...state, pauseLogs: !state.pauseLogs })} className="logs-button-container">
+      {state.pauseLogs ? <UnpauseIcon className="icon-button" /> : <PauseIcon className="icon-button" />}
+    </div>
+  );
+});
 
 // Dashboard() is the main component of this file
 export default function Dashboard() {
@@ -132,7 +139,7 @@ export default function Dashboard() {
         ],
       },
     ];
-
+  
   // renderButtonCarouselItem() generates the button for the carousel
   function renderButtonCarouselItem(props) {
     return (
@@ -193,16 +200,8 @@ export default function Dashboard() {
           ))}
         </Row>
       </Container>
-      <hr id="dashboard-hr" />
-      <div onClick={() => setState({ ...state, pauseLogs: !state.pauseLogs })} className="logs-button-container">
-        <div
-          className="logs-button"
-        >
-          {state.pauseLogs ? UnpauseIcon() : PauseIcon()}
-        </div>
-      </div>
-      <LazyLog enableSearch={true} id="lazy-log" text={state.logs.replace("\n", "")} />
-      <Container id="charts-container">
+      <h2 className="dashboard-label">Performance</h2>
+      <Container id="charts-container" fluid>
         {[
           [
             { yax: "PROCESS", n1: "CPU %", d1: "process.usedCPUPercent", n2: "RAM %", d2: "process.usedMemoryPercent" },
@@ -267,7 +266,13 @@ export default function Dashboard() {
           </Row>
         ))}
       </Container>
-      <div style={{ height: "50px", width: "100%" }} />
+      <h2 className="dashboard-label">Transaction Log</h2>
+      <Container id="log-container" fluid>
+        <div className="logs-button-container">
+          <RenderControlButton state={state} setState={setState} />
+        </div>
+        <CanaLog text={state.logs} />
+      </Container>
     </div>
   );
 }

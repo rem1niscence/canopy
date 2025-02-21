@@ -714,7 +714,7 @@ func TestPacemaker(t *testing.T) {
 		name                   string
 		detail                 string
 		hasPeerPacemakerVotes  bool
-		has23MajAtHigherRound  bool
+		has13MajVote           bool
 		expectedPacemakerRound uint64
 	}{
 		{
@@ -732,16 +732,16 @@ func TestPacemaker(t *testing.T) {
 			name:                   "received peer pacemaker votes which caused a round fast forward",
 			detail:                 "peer pacemaker votes received, highest +2/3 at round 3",
 			hasPeerPacemakerVotes:  true,
-			has23MajAtHigherRound:  true,
+			has13MajVote:           true,
 			expectedPacemakerRound: 3,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// setup
-			numValidators := 3
-			if test.has23MajAtHigherRound {
-				numValidators = 4
+			numValidators := 1
+			if test.has13MajVote {
+				numValidators = 2
 			}
 			c := newTestConsensus(t, Propose, numValidators)
 			if test.hasPeerPacemakerVotes {

@@ -58,6 +58,7 @@ export default function Governance({keygroup, account: accountWithTxs, validator
     const [primaryColor, setPrimaryColor] = useState('');
     const [secondaryColor, setSecondaryColor] = useState('');
     const [buttonVariant, setButtonVariant] = useState('outline-dark');
+    const [JsonViewVariant, setJsonViewVariant] = useState('darkTheme');
 
     // Using a standalone useEffect here to isolate the color states
     useEffect(() => {
@@ -66,8 +67,10 @@ export default function Governance({keygroup, account: accountWithTxs, validator
 
       if (currentTheme === 'dark') {
         setButtonVariant('outline-light');
+        setJsonViewVariant('lightTheme');
       } else {
         setButtonVariant('outline-dark');
+        setJsonViewVariant('darkTheme');
       }
     }, []);
 
@@ -353,7 +356,7 @@ export default function Governance({keygroup, account: accountWithTxs, validator
             </Button>
             <br/>
             <br/>
-            <Modal show={state.showPropModal} size="lg" onHide={handlePropClose}>
+            <Modal show={state.showPropModal} size="lg" onHide={handlePropClose} JsonViewVariant={JsonViewVariant}>
                 <Form onSubmit={onPropSubmit}>
                     <Modal.Header closeButton>
                         <Modal.Title>{state.txPropType === 0 ? "Change Parameter" : "Treasury Subsidy"}</Modal.Title>
@@ -395,7 +398,14 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                             onFieldChange={onFormChange}
                         />
                         {!objEmpty(state.txResult) && (
-                            <JsonView value={state.txResult} shortenTextAfterLength={100} displayDataTypes={false}/>
+                            <JsonView
+                              onCopied={(text) => {
+                                copy(state, setState, text, "copied to keyboard!")
+                              }} value={state.txResult} 
+                              shortenTextAfterLength={100} 
+                              displayDataTypes={false}
+                              theme={JsonViewVariant}
+                            />
                         )}
                     </Modal.Body>
                     <Modal.Footer>

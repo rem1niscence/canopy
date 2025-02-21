@@ -294,12 +294,15 @@ func (x *AggregateSignature) GetSigners(vs ValidatorSet) (signers [][]byte, sign
 }
 
 // GetNonSigners() returns the public keys and corresponding percentage of voting power who are not included in the AggregateSignature
-func (x *AggregateSignature) GetNonSigners(valSet *ConsensusValidators) (nonSigners [][]byte, nonSignerPercent int, err ErrorI) {
+func (x *AggregateSignature) GetNonSigners(valSet *ConsensusValidators) (nonSignerPubKeys [][]byte, nonSignerPercent int, err ErrorI) {
 	vs, err := NewValidatorSet(valSet)
 	if err != nil {
-		return nil, 0, err
+		return
 	}
-	nonSigners, nonSignerPower, err := x.getSigners(vs, true)
+	nonSignerPubKeys, nonSignerPower, err := x.getSigners(vs, true)
+	if err != nil {
+		return
+	}
 	nonSignerPercent = int(Uint64PercentageDiv(nonSignerPower, vs.TotalPower))
 	return
 }
@@ -567,7 +570,7 @@ func (x *View) Less(v *View) bool {
 
 // ToString() returns the log string format of View
 func (x *View) ToString() string {
-	return fmt.Sprintf("(ID: %d H:%d, CH:%d, R:%d, P:%s)", x.ChainId, x.Height, x.RootHeight, x.Round, x.Phase)
+	return fmt.Sprintf("(rH:%d, H:%d, R:%d, P:%s)", x.RootHeight, x.Height, x.Round, x.Phase)
 }
 
 // jsonView represents the json.Marshaller and json.Unmarshaler implementation of View

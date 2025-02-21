@@ -96,14 +96,11 @@ func (c *Controller) Sync() {
 
 // SendTxMsg() gossips a Transaction through the P2P network for a specific chainId
 func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
-	// create a transaction message object using the tx bytes and the committee id
+	// create a transaction message object using the tx bytes and the chain id
 	msg := &lib.TxMessage{ChainId: c.Config.ChainId, Tx: tx}
-	// send it to self for de-duplication and awareness of self originated transactions
-	if err := c.P2P.SelfSend(c.PublicKey, Tx, msg); err != nil {
-		return err
-	}
-	// gossip to all the peers for the chain
-	return c.P2P.SendToPeers(Tx, msg)
+
+	// send transaction to controller for processing and gossip
+	return c.P2P.SelfSend(c.PublicKey, Tx, msg)
 }
 
 // SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
@@ -119,7 +116,7 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 	defer func() { qc.Block = blk }()
 	// it's good practice to omit the block when sending the transaction as it's not relevant to canopy
 	qc.Block = nil
-	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, rootChainId, c.Config.NetworkID, 0, "")
+	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, rootChainId, c.Config.NetworkID, 0, c.RootChainHeight(), "")
 	if err != nil {
 		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
 		return
@@ -342,7 +339,7 @@ func (c *Controller) ListenForConsensus() {
 			if c.isSyncing.Load() {
 				return
 			}
-			// load the committee associated with the committee id at the latest canopy height
+			// load the committee associated with the chain id at the latest canopy height
 			vs, err := c.LoadCommittee(c.RootChainHeight())
 			if err != nil {
 				handleErr(err, 0)

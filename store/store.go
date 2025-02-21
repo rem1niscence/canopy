@@ -12,12 +12,12 @@ import (
 )
 
 const (
-	stateStorePrefix      = "s/"  // prefix designated for the StateStore where the actual blobs of state data are held
-	stateCommitmentPrefix = "c/"  // prefix designated for the StateCommitmentStore (immutable, tree DB) built of hashes of state store data
-	indexerPrefix         = "i/"  // prefix designated for indexer (transactions, blocks, and quorum certificates)
-	stateCommitIDPrefix   = "x/"  // prefix designated for the commit ID (height and state merkle root)
-	lastCommitIDPrefix    = "xl/" // prefix designated for the latest commit ID for easy access (latest height and latest state merkle root)
-	maxKeyBytes           = 256   // maximum size of a key
+	stateStorePrefix      = "s/" // prefix designated for the StateStore where the actual blobs of state data are held
+	stateCommitmentPrefix = "c/" // prefix designated for the StateCommitmentStore (immutable, tree DB) built of hashes of state store data
+	indexerPrefix         = "i/" // prefix designated for indexer (transactions, blocks, and quorum certificates)
+	stateCommitIDPrefix   = "x/" // prefix designated for the commit ID (height and state merkle root)
+	lastCommitIDPrefix    = "a/" // prefix designated for the latest commit ID for easy access (latest height and latest state merkle root)
+	maxKeyBytes           = 256  // maximum size of a key
 )
 
 var _ lib.StoreI = &Store{} // enforce the Store interface

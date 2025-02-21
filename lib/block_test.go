@@ -180,8 +180,8 @@ func TestCheckBlockHeader(t *testing.T) {
 			error: "wrong network id",
 		},
 		{
-			name:      "mismatch committee id",
-			detail:    "the committee id != blockHeader.network_id",
+			name:      "mismatch chain id",
+			detail:    "the chain id != blockHeader.network_id",
 			networkId: 1,
 			chainId:   1,
 			blockHeader: &BlockHeader{
