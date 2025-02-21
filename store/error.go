@@ -74,10 +74,6 @@ func ErrInvalidMerkleTree() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidMerkleTree, lib.StorageModule, "merkle tree is invalid")
 }
 
-func ErrInvalidMerkleProofKey() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidMerkleProofKey, lib.StorageModule, "merkle tree proof is invalid: keys do not match")
-}
-
-func ErrInvalidMerkleProofValue() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidMerkleProofValue, lib.StorageModule, "merkle tree proof is invalid: values do not match")
+func ErrInvalidMerkleTreeProof() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidMerkleTreeProof, lib.StorageModule, "merkle tree proof is invalid")
 }

@@ -449,7 +449,8 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 		return nil, err
 	}
 
-	// Add current to the list of traversed nodes
+	// Add current to the list of traversed nodes (actual node in case of proof of membership),
+	// possible location in the case of proof of non-membership
 	s.traversed.Nodes = append(s.traversed.Nodes, s.current.copy())
 
 	// traverse the nodes back up to the root to generate the proof
@@ -488,8 +489,14 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 
 // VerifyProof verifies a Sparse Merkle Tree proof for a given value
 // reconstructing the root hash and comparing it against the provided root hash
+// depending on the proof type (membership or non-membership)
 func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, proof *lib.MerkleProof) (bool, lib.ErrorI) {
-	// 1. Proof the root as usual from down to up
+	// A valid proof is expected to have at least two nodes (the leaf nodes) in order to build the root
+	if len(proof.Nodes) < 2 {
+		return false, ErrInvalidMerkleTreeProof()
+	}
+
+	// Generate the inital hash from the leaves of the proof
 	leftLeaf := proof.Nodes[0]
 	rightLeaf := proof.Nodes[1]
 
@@ -514,6 +521,7 @@ func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, pro
 		}
 	}
 
+	// compare the calculated root hash against the provided root hash
 	if !bytes.Equal(hash, proof.Root) {
 		return false, nil
 	}
@@ -525,7 +533,7 @@ func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, pro
 	if err != nil {
 		return false, err
 	}
-	smt := NewSMT(RootKey, s.keyBitLength, memStore)
+	smt := NewSMT(s.Root(), s.keyBitLength, memStore)
 
 	// add the nodes
 	for _, leaf := range proof.Nodes {
@@ -552,12 +560,21 @@ func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, pro
 		return false, err
 	}
 
-	// Verify if the key exists in the local Merkle tree.
-	// This confirms the proof-of-non-membership, as the absence of the key in a
-	// Merkle tree with a verified root indicates that the key is not part of the tree.
-	if !smt.target.Key.equals(smt.gcp) {
-		return false, ErrInvalidMerkleProofKey()
+	// Verify whether the key exists in the tree and what kind of proof is being validated
+	// (membership or non-membership).
+	// if the key does not exists in the tree and the proof is for membership or
+	// if the key exists in the tree and the proof is for non-membership, return false.
+	nodeExists := smt.target.Key.equals(smt.gcp)
+	if (!nodeExists && validateMembership) || (nodeExists && !validateMembership) {
+		return false, nil
 	}
+	// if the key does not exists in the tree and the proof is for non-membership, return true.
+	if !nodeExists && !validateMembership {
+		return true, nil
+	}
+
+	// If the key exists in the tree, obtain to value of the target node to verify it against
+	// the provided value.
 	targetNode, err := smt.getNode(smt.target.Key.bytes())
 	if err != nil {
 		return false, err
@@ -567,7 +584,7 @@ func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, pro
 	// based on the children's key + values, so a different value indicates
 	// that the Merkle root could not have been constructed using this
 	if !bytes.Equal(targetNode.Value, crypto.Hash(value)) {
-		return false, ErrInvalidMerkleProofValue()
+		return false, nil
 	}
 
 	return true, nil
