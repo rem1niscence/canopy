@@ -99,8 +99,8 @@ type RStoreI interface {
 
 // ProveStoreI defines an interface
 type ProveStoreI interface {
-	GetProof(key []byte) (proof *MerkleProof, err ErrorI)                       // Get gets the bytes for a compact merkle proof
-	VerifyProof(key, value []byte, proof *MerkleProof) (valid bool, err ErrorI) // VerifyProof validates the merkle proof
+	GetProof(key []byte) (proof *MerkleProof, err ErrorI)                                                // Get gets the bytes for a compact merkle proof
+	VerifyProof(key, value []byte, validateMembership bool, proof *MerkleProof) (valid bool, err ErrorI) // VerifyProof validates the merkle proof
 }
 
 // IteratorI defines an interface for iterating over key-value pairs in a data store

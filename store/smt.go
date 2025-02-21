@@ -449,15 +449,8 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 		return nil, err
 	}
 
-	targetNode, err := s.getNode(s.target.Key.bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	if s.target.Key.equals(s.gcp) {
-		// Add target to the list of traversed nodes
-		s.traversed.Nodes = append(s.traversed.Nodes, targetNode.copy())
-	}
+	// Add current to the list of traversed nodes
+	s.traversed.Nodes = append(s.traversed.Nodes, s.current.copy())
 
 	// traverse the nodes back up to the root to generate the proof
 	for i := len(s.traversed.Nodes) - 1; i > 0; i-- {
@@ -495,7 +488,7 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 
 // VerifyProof verifies a Sparse Merkle Tree proof for a given value
 // reconstructing the root hash and comparing it against the provided root hash
-func (s *SMT) VerifyProof(key []byte, value []byte, proof *lib.MerkleProof) (bool, lib.ErrorI) {
+func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, proof *lib.MerkleProof) (bool, lib.ErrorI) {
 	// 1. Proof the root as usual from down to up
 	leftLeaf := proof.Nodes[0]
 	rightLeaf := proof.Nodes[1]
@@ -532,7 +525,7 @@ func (s *SMT) VerifyProof(key []byte, value []byte, proof *lib.MerkleProof) (boo
 	if err != nil {
 		return false, err
 	}
-	smt := NewSMT(RootKey, MaxKeyBitLength, memStore)
+	smt := NewSMT(RootKey, s.keyBitLength, memStore)
 
 	// add the nodes
 	for _, leaf := range proof.Nodes {
@@ -540,9 +533,9 @@ func (s *SMT) VerifyProof(key []byte, value []byte, proof *lib.MerkleProof) (boo
 		// when the proof was obtained. Some intermediate node keys may have a length
 		// shorter than the MaxKeyBitLength. This pads such keys to ensure they are
 		// saved correctly.
-		key := make([]byte, 32)
+		key := make([]byte, s.keyBitLength/8)
 		copy(key, leaf.Key)
-		node := &node{Key: newNodeKey(key, MaxKeyBitLength), Node: Node{Value: leaf.Value}}
+		node := &node{Key: newNodeKey(key, s.keyBitLength), Node: Node{Value: leaf.Value}}
 		// Leaf nodes could be one of the two children of the root.
 		if err := smt.set(node); err != nil {
 			continue

@@ -195,8 +195,8 @@ func (s *Store) GetProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 
 // VerifyProof() checks the validity of a member or non-member proof from the StateCommitStore
 // by verifying the proof against the provided key, value, and proof data.
-func (s *Store) VerifyProof(key, value []byte, proof *lib.MerkleProof) (bool, lib.ErrorI) {
-	return s.sc.VerifyProof(key, value, proof)
+func (s *Store) VerifyProof(key, value []byte, validateMembership bool, proof *lib.MerkleProof) (bool, lib.ErrorI) {
+	return s.sc.VerifyProof(key, value, validateMembership, proof)
 }
 
 // Iterator() returns an object for scanning the StateStore starting from the provided prefix.
