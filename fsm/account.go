@@ -118,6 +118,10 @@ func (s *StateMachine) AccountDeductFees(address crypto.AddressI, fee uint64) li
 
 // AccountAdd() adds tokens to an Account
 func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd uint64) lib.ErrorI {
+	// ensure no unnecessary database updates
+	if amountToAdd == 0 {
+		return nil
+	}
 	// get the account from state
 	account, err := s.GetAccount(address)
 	if err != nil {
@@ -131,6 +135,10 @@ func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd uint64) l
 
 // AccountSub() removes tokens from an Account
 func (s *StateMachine) AccountSub(address crypto.AddressI, amountToSub uint64) lib.ErrorI {
+	// ensure no unnecessary database updates
+	if amountToSub == 0 {
+		return nil
+	}
 	// get the account from the state
 	account, err := s.GetAccount(address)
 	if err != nil {

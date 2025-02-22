@@ -58,12 +58,15 @@ func (s *StateMachine) HandleMessageSend(msg *types.MessageSend) lib.ErrorI {
 
 // HandleMessageStake() is the proper handler for a `Stake` message (Validator does not yet exist in the state)
 func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
+	// convert the message public key bytes into a public key object the public key must be a BLS public
+	// key to be a validator in order to participate in consensus for efficient signature aggregation
 	publicKey, e := crypto.BytesToBLS12381Public(msg.PublicKey)
 	if e != nil {
 		return types.ErrInvalidPublicKey(e)
 	}
+	// extract the address from the BLS public key
 	address := publicKey.Address()
-	// check if validator exists
+	// check if validator exists in state
 	exists, err := s.GetValidatorExists(address)
 	if err != nil {
 		return err
@@ -72,30 +75,31 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	if exists {
 		return types.ErrValidatorExists()
 	}
-	// subtract from sender
-	if err = s.AccountSub(address, msg.Amount); err != nil {
+	// subtract the tokens being locked from the signer account
+	if err = s.AccountSub(crypto.NewAddress(msg.Signer), msg.Amount); err != nil {
 		return err
 	}
-	// track total staked tokens
+	// add to the 'total staked' tokens count in the state's supply tracker
 	if err = s.AddToStakedSupply(msg.Amount); err != nil {
 		return err
 	}
+	// if the validator is not 'actively participating' it is a delegate
 	if msg.Delegate {
-		// track total delegated tokens
+		// add to the 'delegate only' staked tokens count in the state's supply tracker
 		if err = s.AddToDelegateSupply(msg.Amount); err != nil {
 			return err
 		}
-		// set delegated validator in each committee
+		// set delegated validator in each committee in state
 		if err = s.SetDelegations(address, msg.Amount, msg.Committees); err != nil {
 			return err
 		}
 	} else {
-		// set validator in each committee
+		// set validator in each committee in state
 		if err = s.SetCommittees(address, msg.Amount, msg.Committees); err != nil {
 			return err
 		}
 	}
-	// set validator
+	// set validator in state
 	return s.SetValidator(&types.Validator{
 		Address:      address.Bytes(),
 		PublicKey:    publicKey.Bytes(),
@@ -110,13 +114,14 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 
 // HandleMessageEditStake() is the proper handler for a `Edit-Stake` message (Validator already exists in the state)
 func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.ErrorI {
+	// convert the message bytes from the edit-stake message to an object
 	address := crypto.NewAddressFromBytes(msg.Address)
-	// get the validator
+	// get the validator from state, if not exists error
 	val, err := s.GetValidator(address)
 	if err != nil {
 		return err
 	}
-	// check unstaking
+	// ensure the validator is not currently unstaking
 	if val.UnstakingHeight != 0 {
 		return types.ErrValidatorUnstaking()
 	}
@@ -124,19 +129,24 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 	if !bytes.Equal(val.Output, msg.OutputAddress) && !bytes.Equal(val.Output, msg.Signer) {
 		return types.ErrUnauthorizedTx()
 	}
+	// calculate the amount to add (if any)
 	var amountToAdd uint64
+	// handle the various cases depending on the 'new' stake amount
 	switch {
-	case msg.Amount < val.StakedAmount: // amount less than stake
-		// let it through, but use the old stake amount for to avoid race conditions when combined with auto-compounding
-	case msg.Amount == val.StakedAmount: // amount equals stake
-	case msg.Amount > val.StakedAmount: // amount greater than stake
+	// amount less than stake is allowed to avoid race conditions due to auto-compounding
+	// amount LTE stake
+	case msg.Amount <= val.StakedAmount:
+		amountToAdd = 0
+	// amount greater than stake
+	case msg.Amount > val.StakedAmount:
+		// calculate the amount to add
 		amountToAdd = msg.Amount - val.StakedAmount
 	}
-	// subtract from sender
-	if err = s.AccountSub(address, amountToAdd); err != nil {
+	// subtract from signer account
+	if err = s.AccountSub(crypto.NewAddress(msg.Signer), amountToAdd); err != nil {
 		return err
 	}
-	// update validator stake
+	// update validator the validator's stake
 	return s.UpdateValidatorStake(&types.Validator{
 		Address:         val.Address,
 		PublicKey:       val.PublicKey,
@@ -153,30 +163,35 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 
 // HandleMessageUnstake() is the proper handler for an `Unstake` message
 func (s *StateMachine) HandleMessageUnstake(msg *types.MessageUnstake) lib.ErrorI {
+	// extract an address object from the address bytes in the message
 	address := crypto.NewAddressFromBytes(msg.Address)
-	// get validator
+	// get validator object from state
 	validator, err := s.GetValidator(address)
 	if err != nil {
 		return err
 	}
-	// check if already unstaking
+	// check if the validator is already unstaking
 	if validator.UnstakingHeight != 0 {
 		return types.ErrValidatorUnstaking()
 	}
-	// get params for unstaking blocks
+	// get the governance parameters for 'unstaking blocks'
 	p, err := s.GetParamsVal()
 	if err != nil {
 		return err
 	}
 	// get unstaking blocks parameter
 	var unstakingBlocks uint64
+	// if the validator isn't a delegator
 	if !validator.Delegate {
+		// use UnstakingBlocks for validators
 		unstakingBlocks = p.UnstakingBlocks
 	} else {
+		// use UnstakingBlocks for delegators
 		unstakingBlocks = p.DelegateUnstakingBlocks
 	}
+	// calculate the unstaking height for the validator
 	unstakingHeight := s.Height() + unstakingBlocks
-	// set validator unstaking
+	// set the validator as 'unstaking' in the state
 	return s.SetValidatorUnstaking(address, validator, unstakingHeight)
 }
 
