@@ -8,6 +8,7 @@ if (typeof window !== "undefined") {
     chainId = Number(window.__CONFIG__.chainId);
   }
   rpcURL = rpcURL.replace("localhost", window.location.hostname)
+  adminRPCURL = adminRPCURL.replace("localhost", window.location.hostname)
   console.log(rpcURL)
 } else {
   console.log("config undefined");

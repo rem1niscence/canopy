@@ -321,10 +321,13 @@ func (p *P2P) IsSelf(a *lib.PeerAddress) bool {
 // SelfSend() executes an internal pipe send to self
 func (p *P2P) SelfSend(fromPublicKey []byte, topic lib.Topic, payload proto.Message) lib.ErrorI {
 	p.log.Debugf("Self sending %s message", topic)
-	p.Inbox(topic) <- (&lib.MessageAndMetadata{
-		Message: proto.Clone(payload),
-		Sender:  &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: fromPublicKey}},
-	}).WithHash()
+	// non blocking
+	go func() {
+		p.Inbox(topic) <- (&lib.MessageAndMetadata{
+			Message: proto.Clone(payload),
+			Sender:  &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: fromPublicKey}},
+		}).WithHash()
+	}()
 	return nil
 }
 
