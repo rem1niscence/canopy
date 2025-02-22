@@ -487,7 +487,7 @@ func TestGetFeeForMessage(t *testing.T) {
 				}
 			}()
 			// execute function call
-			got, err := sm.GetFeeForMessage(test.msg)
+			got, err := sm.GetFeeForMessageName(test.msg.Name())
 			// validate the expected error
 			require.NoError(t, err)
 			// compare got vs expected

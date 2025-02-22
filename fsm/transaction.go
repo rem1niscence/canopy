@@ -181,7 +181,7 @@ func (s *StateMachine) CheckMessage(msg *anypb.Any) (message lib.MessageI, err l
 
 // CheckFee() validates the fee amount is sufficient to pay for a transaction
 func (s *StateMachine) CheckFee(fee uint64, msg lib.MessageI) lib.ErrorI {
-	stateLimitFee, err := s.GetFeeForMessage(msg)
+	stateLimitFee, err := s.GetFeeForMessageName(msg.Name())
 	if err != nil {
 		return err
 	}

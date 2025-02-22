@@ -7,8 +7,13 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 )
 
+/* All things related to transaction payloads (Messages) */
+
+// MESSAGE HANDLER CODE BELOW
+
 // HandleMessage() routes the MessageI to the correct `handler` based on its `type`
 func (s *StateMachine) HandleMessage(msg lib.MessageI) lib.ErrorI {
+	// for the message received, route it to the proper handler
 	switch x := msg.(type) {
 	case *types.MessageSend:
 		return s.HandleMessageSend(x)
@@ -38,132 +43,6 @@ func (s *StateMachine) HandleMessage(msg lib.MessageI) lib.ErrorI {
 		return s.HandleMessageDeleteOrder(x)
 	default:
 		return types.ErrUnknownMessage(x)
-	}
-}
-
-// GetFeeForMessage() returns the associated cost for processing a specific type of message
-func (s *StateMachine) GetFeeForMessage(msg lib.MessageI) (fee uint64, err lib.ErrorI) {
-	feeParams, err := s.GetParamsFee()
-	if err != nil {
-		return 0, err
-	}
-	switch x := msg.(type) {
-	case *types.MessageSend:
-		return feeParams.SendFee, nil
-	case *types.MessageStake:
-		return feeParams.StakeFee, nil
-	case *types.MessageEditStake:
-		return feeParams.EditStakeFee, nil
-	case *types.MessageUnstake:
-		return feeParams.UnstakeFee, nil
-	case *types.MessagePause:
-		return feeParams.PauseFee, nil
-	case *types.MessageUnpause:
-		return feeParams.UnpauseFee, nil
-	case *types.MessageChangeParameter:
-		return feeParams.ChangeParameterFee, nil
-	case *types.MessageDAOTransfer:
-		return feeParams.DaoTransferFee, nil
-	case *types.MessageCertificateResults:
-		return feeParams.CertificateResultsFee, nil
-	case *types.MessageSubsidy:
-		return feeParams.SubsidyFee, nil
-	case *types.MessageCreateOrder:
-		return feeParams.CreateOrderFee, nil
-	case *types.MessageEditOrder:
-		return feeParams.EditOrderFee, nil
-	case *types.MessageDeleteOrder:
-		return feeParams.DeleteOrderFee, nil
-	default:
-		return 0, types.ErrUnknownMessage(x)
-	}
-}
-
-// GetFeeForMessageName() returns the associated cost for processing a specific type of message based on the name
-func (s *StateMachine) GetFeeForMessageName(name string) (fee uint64, err lib.ErrorI) {
-	feeParams, err := s.GetParamsFee()
-	if err != nil {
-		return 0, err
-	}
-	switch name {
-	case types.MessageSendName:
-		return feeParams.SendFee, nil
-	case types.MessageStakeName:
-		return feeParams.StakeFee, nil
-	case types.MessageEditStakeName:
-		return feeParams.EditStakeFee, nil
-	case types.MessageUnstakeName:
-		return feeParams.UnstakeFee, nil
-	case types.MessagePauseName:
-		return feeParams.PauseFee, nil
-	case types.MessageUnpauseName:
-		return feeParams.UnpauseFee, nil
-	case types.MessageChangeParameterName:
-		return feeParams.ChangeParameterFee, nil
-	case types.MessageDAOTransferName:
-		return feeParams.DaoTransferFee, nil
-	case types.MessageCertificateResultsName:
-		return feeParams.CertificateResultsFee, nil
-	case types.MessageSubsidyName:
-		return feeParams.SubsidyFee, nil
-	case types.MessageCreateOrderName:
-		return feeParams.CreateOrderFee, nil
-	case types.MessageEditOrderName:
-		return feeParams.EditOrderFee, nil
-	case types.MessageDeleteOrderName:
-		return feeParams.DeleteOrderFee, nil
-	default:
-		return 0, lib.ErrUnknownMessageName(name)
-	}
-}
-
-// GetAuthorizedSignersFor() returns the addresses that are authorized to sign for this message
-func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]byte, err lib.ErrorI) {
-	switch x := msg.(type) {
-	case *types.MessageSend:
-		return [][]byte{x.FromAddress}, nil
-	case *types.MessageStake:
-		address, e := s.validatorPubToAddr(x.PublicKey)
-		if e != nil {
-			return nil, e
-		}
-		return [][]byte{address, x.OutputAddress}, nil
-	case *types.MessageEditStake:
-		return s.GetAuthorizedSignersForValidator(x.Address)
-	case *types.MessageUnstake:
-		return s.GetAuthorizedSignersForValidator(x.Address)
-	case *types.MessagePause:
-		return s.GetAuthorizedSignersForValidator(x.Address)
-	case *types.MessageUnpause:
-		return s.GetAuthorizedSignersForValidator(x.Address)
-	case *types.MessageChangeParameter:
-		return [][]byte{x.Signer}, nil
-	case *types.MessageDAOTransfer:
-		return [][]byte{x.Address}, nil
-	case *types.MessageSubsidy:
-		return [][]byte{x.Address}, nil
-	case *types.MessageCreateOrder:
-		return [][]byte{x.SellersSendAddress}, nil
-	case *types.MessageEditOrder:
-		order, e := s.GetOrder(x.OrderId, x.ChainId)
-		if e != nil {
-			return nil, e
-		}
-		return [][]byte{order.SellersSendAddress}, nil
-	case *types.MessageDeleteOrder:
-		order, e := s.GetOrder(x.OrderId, x.ChainId)
-		if e != nil {
-			return nil, e
-		}
-		return [][]byte{order.SellersSendAddress}, nil
-	case *types.MessageCertificateResults:
-		pub, e := lib.PublicKeyFromBytes(x.Qc.ProposerKey)
-		if e != nil {
-			return nil, e
-		}
-		return [][]byte{pub.Address().Bytes()}, nil
-	default:
-		return nil, types.ErrUnknownMessage(x)
 	}
 }
 
@@ -535,4 +414,95 @@ func (s *StateMachine) HandleMessageDeleteOrder(msg *types.MessageDeleteOrder) (
 	}
 	err = s.DeleteOrder(msg.OrderId, msg.ChainId)
 	return
+}
+
+// GetFeeForMessageName() returns the associated cost for processing a specific type of message based on the name
+func (s *StateMachine) GetFeeForMessageName(name string) (fee uint64, err lib.ErrorI) {
+	// retrieve the fee parameters from the state
+	feeParams, err := s.GetParamsFee()
+	if err != nil {
+		return 0, err
+	}
+	// return the proper fee based on the message name
+	switch name {
+	case types.MessageSendName:
+		return feeParams.SendFee, nil
+	case types.MessageStakeName:
+		return feeParams.StakeFee, nil
+	case types.MessageEditStakeName:
+		return feeParams.EditStakeFee, nil
+	case types.MessageUnstakeName:
+		return feeParams.UnstakeFee, nil
+	case types.MessagePauseName:
+		return feeParams.PauseFee, nil
+	case types.MessageUnpauseName:
+		return feeParams.UnpauseFee, nil
+	case types.MessageChangeParameterName:
+		return feeParams.ChangeParameterFee, nil
+	case types.MessageDAOTransferName:
+		return feeParams.DaoTransferFee, nil
+	case types.MessageCertificateResultsName:
+		return feeParams.CertificateResultsFee, nil
+	case types.MessageSubsidyName:
+		return feeParams.SubsidyFee, nil
+	case types.MessageCreateOrderName:
+		return feeParams.CreateOrderFee, nil
+	case types.MessageEditOrderName:
+		return feeParams.EditOrderFee, nil
+	case types.MessageDeleteOrderName:
+		return feeParams.DeleteOrderFee, nil
+	default:
+		return 0, lib.ErrUnknownMessageName(name)
+	}
+}
+
+// GetAuthorizedSignersFor() returns the addresses that are authorized to sign for this message
+func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]byte, err lib.ErrorI) {
+	// based of the message type, route to the proper authorized signers for each message type
+	switch x := msg.(type) {
+	case *types.MessageSend:
+		return [][]byte{x.FromAddress}, nil
+	case *types.MessageStake:
+		address, e := s.validatorPubToAddr(x.PublicKey)
+		if e != nil {
+			return nil, e
+		}
+		return [][]byte{address, x.OutputAddress}, nil
+	case *types.MessageEditStake:
+		return s.GetAuthorizedSignersForValidator(x.Address)
+	case *types.MessageUnstake:
+		return s.GetAuthorizedSignersForValidator(x.Address)
+	case *types.MessagePause:
+		return s.GetAuthorizedSignersForValidator(x.Address)
+	case *types.MessageUnpause:
+		return s.GetAuthorizedSignersForValidator(x.Address)
+	case *types.MessageChangeParameter:
+		return [][]byte{x.Signer}, nil
+	case *types.MessageDAOTransfer:
+		return [][]byte{x.Address}, nil
+	case *types.MessageSubsidy:
+		return [][]byte{x.Address}, nil
+	case *types.MessageCertificateResults:
+		pub, e := lib.PublicKeyFromBytes(x.Qc.ProposerKey)
+		if e != nil {
+			return nil, e
+		}
+		return [][]byte{pub.Address().Bytes()}, nil
+	case *types.MessageCreateOrder:
+		return [][]byte{x.SellersSendAddress}, nil
+	case *types.MessageEditOrder:
+		order, e := s.GetOrder(x.OrderId, x.ChainId)
+		if e != nil {
+			return nil, e
+		}
+		return [][]byte{order.SellersSendAddress}, nil
+	case *types.MessageDeleteOrder:
+		order, e := s.GetOrder(x.OrderId, x.ChainId)
+		if e != nil {
+			return nil, e
+		}
+		return [][]byte{order.SellersSendAddress}, nil
+	default:
+		return nil, types.ErrUnknownMessage(x)
+	}
 }
