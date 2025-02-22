@@ -173,31 +173,38 @@ func (s *StateMachine) SetParamsFee(f *types.FeeParams) lib.ErrorI {
 
 // setParams() converts the ParamSpace into bytes and sets them in state
 func (s *StateMachine) setParams(space string, p proto.Message) lib.ErrorI {
+	// convert the param object to bytes
 	bz, err := lib.Marshal(p)
 	if err != nil {
 		return err
 	}
+	// set the bytes under the 'space' for the parameters
 	return s.Set(types.KeyForParams(space), bz)
 }
 
 // GetParams() returns the aggregated ParamSpaces in a single Params object
 func (s *StateMachine) GetParams() (*types.Params, lib.ErrorI) {
+	// get the consensus parameters from state
 	cons, err := s.GetParamsCons()
 	if err != nil {
 		return nil, err
 	}
+	// get the validator parameters from state
 	val, err := s.GetParamsVal()
 	if err != nil {
 		return nil, err
 	}
+	// get the fee parameters from state
 	fee, err := s.GetParamsFee()
 	if err != nil {
 		return nil, err
 	}
+	// get the governance parameters from state
 	gov, err := s.GetParamsGov()
 	if err != nil {
 		return nil, err
 	}
+	// return a collective 'parameters' object that holds all the spaces
 	return &types.Params{
 		Consensus:  cons,
 		Validator:  val,
@@ -208,29 +215,41 @@ func (s *StateMachine) GetParams() (*types.Params, lib.ErrorI) {
 
 // GetParamsCons() returns the current state of the governance params in the Consensus space
 func (s *StateMachine) GetParamsCons() (ptr *types.ConsensusParams, err lib.ErrorI) {
+	// create a new object ref for the consensus params to ensure a non-nil result
 	ptr = new(types.ConsensusParams)
+	// get the consensus parameters from state
 	err = s.getParams(types.ParamSpaceCons, ptr, types.ErrEmptyConsParams)
+	// exit
 	return
 }
 
 // GetParamsVal() returns the current state of the governance params in the Validator space
 func (s *StateMachine) GetParamsVal() (ptr *types.ValidatorParams, err lib.ErrorI) {
+	// create a new object ref for the validator params to ensure a non-nil result
 	ptr = new(types.ValidatorParams)
+	// get the validator parameters from state
 	err = s.getParams(types.ParamSpaceVal, ptr, types.ErrEmptyValParams)
+	// exit
 	return
 }
 
 // GetParamsGov() returns the current state of the governance params in the Governance space
 func (s *StateMachine) GetParamsGov() (ptr *types.GovernanceParams, err lib.ErrorI) {
+	// create a new object ref for the governance params to ensure a non-nil result
 	ptr = new(types.GovernanceParams)
+	// get the governance parameters from state
 	err = s.getParams(types.ParamSpaceGov, ptr, types.ErrEmptyGovParams)
+	// exit
 	return
 }
 
 // GetParamsFee() returns the current state of the governance params in the Fee space
 func (s *StateMachine) GetParamsFee() (ptr *types.FeeParams, err lib.ErrorI) {
+	// create a new object ref for the fee params to ensure a non-nil result
 	ptr = new(types.FeeParams)
+	// get the fee parameters from state
 	err = s.getParams(types.ParamSpaceFee, ptr, types.ErrEmptyFeeParams)
+	// exit
 	return
 }
 
@@ -239,12 +258,18 @@ func (s *StateMachine) GetParamsFee() (ptr *types.FeeParams, err lib.ErrorI) {
 // - if APPROVE_ALL set or proposal on the APPROVE_LIST then no error
 // - else return ErrRejectProposal
 func (s *StateMachine) ApproveProposal(msg types.GovProposal) lib.ErrorI {
+	// if height is before start height or height is after end height (both exclusive)
 	if s.Height() < msg.GetStartHeight() || s.Height() > msg.GetEndHeight() {
+		// reject the proposal
 		return types.ErrRejectProposal()
 	}
 	// handle the proposal based on config
 	switch s.proposeVoteConfig {
-	case types.ProposalApproveList: // approve based on list
+	case types.RejectAllProposals: // if rejecting all proposals
+		return types.ErrRejectProposal()
+	default: // if approving all proposals
+		return nil
+	case types.ProposalApproveList: // if on the local approve list
 		// convert the msg into bytes
 		bz, err := lib.Marshal(msg)
 		if err != nil {
@@ -259,10 +284,6 @@ func (s *StateMachine) ApproveProposal(msg types.GovProposal) lib.ErrorI {
 		if value, ok := proposals[crypto.HashString(bz)]; !ok || !value.Approve {
 			return types.ErrRejectProposal()
 		}
-		return nil
-	case types.RejectAllProposals: // reject all
-		return types.ErrRejectProposal()
-	default: // approve all
 		return nil
 	}
 }
