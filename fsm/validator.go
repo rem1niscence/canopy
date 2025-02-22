@@ -270,18 +270,23 @@ func (s *StateMachine) SetValidatorsPaused(chainId uint64, addresses [][]byte) {
 		// get the validator
 		val, err := s.GetValidator(crypto.NewAddress(addr))
 		if err != nil {
+			// log error
 			s.log.Debugf("can't pause validator %s not found", lib.BytesToString(addr))
+			// move on to the next iteration
 			continue
 		}
 		// ensure no unauthorized auto-pauses
 		if !slices.Contains(val.Committees, chainId) {
 			// NOTE: expected - this can happen during a race between edit-stake and pause
-			s.log.Warn(types.ErrInvalidChainId().Error())
+			s.log.Warnf("unauthorized pause from %d, this can happen occasionally", chainId)
+			// exit
 			return
 		}
-		// handle pausing
+		// handle pausing the validator
 		if err = s.HandleMessagePause(&types.MessagePause{Address: addr}); err != nil {
+			// log error
 			s.log.Debugf("can't pause validator %s with err %s", lib.BytesToString(addr), err.Error())
+			// move on to the next iteration
 			continue
 		}
 	}
@@ -289,20 +294,25 @@ func (s *StateMachine) SetValidatorsPaused(chainId uint64, addresses [][]byte) {
 
 // SetValidatorPaused() updates a Validator as 'paused' with a MaxPausedHeight (height at which the Validator is force-unstaked for being paused too long)
 func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *types.Validator, maxPausedHeight uint64) lib.ErrorI {
-	// set an entry in the database to mark this validator as paused, a single byte is used to allow 'get' calls to differentiate between non-existing keys
+	// set an entry in the state to mark this validator as paused, a single byte is used to allow 'get' calls to differentiate between non-existing keys
 	if err := s.Set(types.KeyForPaused(maxPausedHeight, address), []byte{0x0}); err != nil {
 		return err
 	}
+	// update the validator max paused height
 	validator.MaxPausedHeight = maxPausedHeight
+	// set the updated validator in state
 	return s.SetValidator(validator)
 }
 
 // SetValidatorUnpaused() updates a Validator as 'unpaused'
 func (s *StateMachine) SetValidatorUnpaused(address crypto.AddressI, validator *types.Validator) lib.ErrorI {
+	// remove the 'paused' entry in the state to mark this validator as not paused
 	if err := s.Delete(types.KeyForPaused(validator.MaxPausedHeight, address)); err != nil {
 		return err
 	}
+	// update the validator max paused height to 0
 	validator.MaxPausedHeight = 0
+	// set the updated validator in state
 	return s.SetValidator(validator)
 }
 

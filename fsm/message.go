@@ -197,49 +197,55 @@ func (s *StateMachine) HandleMessageUnstake(msg *types.MessageUnstake) lib.Error
 
 // HandleMessagePause() is the proper handler for an `Pause` message
 func (s *StateMachine) HandleMessagePause(msg *types.MessagePause) lib.ErrorI {
+	// extract the address object from the address bytes from the pause message
 	address := crypto.NewAddressFromBytes(msg.Address)
-	// get validator
+	// get the validator from the state
 	validator, err := s.GetValidator(address)
 	if err != nil {
 		return err
 	}
-	// ensure not already paused
+	// ensure the validator is not already paused
 	if validator.MaxPausedHeight != 0 {
 		return types.ErrValidatorPaused()
 	}
+	// ensure the validator is not unstaking
 	if validator.UnstakingHeight != 0 {
 		return types.ErrValidatorUnstaking()
 	}
+	// ensure the validator is not a delegate
 	if validator.Delegate {
 		return types.ErrValidatorIsADelegate()
 	}
-	// get max pause parameter
+	// get validator the parameters from state
 	params, err := s.GetParamsVal()
 	if err != nil {
 		return err
 	}
+	// calculate the max paused height by adding MaxPauseBlocks to current height
 	maxPausedHeight := s.Height() + params.MaxPauseBlocks
-	// set validator paused
+	// set the validator as paused in the state
 	return s.SetValidatorPaused(address, validator, maxPausedHeight)
 }
 
 // HandleMessageUnpause() is the proper handler for an `Unpause` message
 func (s *StateMachine) HandleMessageUnpause(msg *types.MessageUnpause) lib.ErrorI {
+	// extract an address object from the message address bytes
 	address := crypto.NewAddressFromBytes(msg.Address)
-	// get validator
+	// get the validator from the state
 	validator, err := s.GetValidator(address)
 	if err != nil {
 		return err
 	}
-	// ensure already paused
+	// ensure the validator is already paused
 	if validator.MaxPausedHeight == 0 {
 		return types.ErrValidatorNotPaused()
 	}
+	// ensure the validator is not unstaking
 	// theoretically should not happen as an unstaking validator should never be paused
 	if validator.UnstakingHeight != 0 {
 		return types.ErrValidatorUnstaking()
 	}
-	// set validator unpaused
+	// set the validator as unpaused in the state
 	return s.SetValidatorUnpaused(address, validator)
 }
 
