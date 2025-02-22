@@ -1,7 +1,6 @@
 package bft
 
 import (
-	"bytes"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 )
@@ -29,12 +28,6 @@ func (b *BFT) AddProposal(m *Message) lib.ErrorI {
 	// define convenience variables
 	phase := m.Header.Phase
 	phaseProposal := roundProposal[phaseToString(phase)]
-	// ensure no duplicate messages for leader
-	for _, msg := range phaseProposal {
-		if bytes.Equal(msg.Signature.PublicKey, m.Signature.PublicKey) {
-			return ErrDuplicateProposerMessage()
-		}
-	}
 	// if it's an Election Proposal, add to the list (multiple candidates)
 	// else overwrite the Proposal (this is ok because Proposer ID is previously authenticated after the ELECTION phase)
 	if m.Header.Phase == Election {
