@@ -266,7 +266,7 @@ export default function Dashboard() {
           </Row>
         ))}
       </Container>
-      <h2 className="dashboard-label">Transaction Log</h2>
+      <h2 className="dashboard-label">Node Log</h2>
       <Container id="log-container" fluid>
         <div className="logs-button-container">
           <RenderControlButton state={state} setState={setState} />
