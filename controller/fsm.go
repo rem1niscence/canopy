@@ -292,13 +292,13 @@ func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, rootChain
 	} else {
 		c.AddLotteryWinner(results, baseDelegateWinner)
 	}
-	// load the root chain id from state
-	rootChainId, err := c.FSM.GetRootChainId()
+	// check if this chain is its own root
+	chainIsRoot, err := c.FSM.IsOwnRoot()
 	if err != nil {
 		c.log.Warnf("An error occurred getting the root chain id from state: %s", err.Error())
 	}
 	// is isn't root chain
-	if c.Config.ChainId != rootChainId {
+	if chainIsRoot {
 		// sub validator
 		subValidatorWinner, e := c.FSM.LotteryWinner(c.Config.ChainId, true)
 		if e != nil {

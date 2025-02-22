@@ -475,6 +475,17 @@ func (s *StateMachine) IsFeatureEnabled(requiredVersion uint64) bool {
 
 // ROOT CHAIN CODE BELOW
 
+// IsOwnRoot() returns if this chain is its own root (base)
+func (s *StateMachine) IsOwnRoot() (bool, lib.ErrorI) {
+	// get the latest root chain id from the state
+	rootId, err := s.GetRootChainId()
+	if err != nil {
+		return false, err
+	}
+	// return whether self is root
+	return s.Config.ChainId == rootId, nil
+}
+
 // GetRootChainId() gets the latest root chain id from the state
 func (s *StateMachine) GetRootChainId() (uint64, lib.ErrorI) {
 	// get the consensus params from state

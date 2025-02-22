@@ -291,6 +291,7 @@ func newSingleAccountStateMachine(t *testing.T) StateMachine {
 		OutputAddress: keyGroup.Address.Bytes(),
 		Delegate:      false,
 		Compound:      true,
+		Signer:        keyGroup.Address.Bytes(),
 	}))
 	require.NoError(t, sm.SetParams(types.DefaultParams()))
 	return sm

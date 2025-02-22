@@ -65,6 +65,7 @@ func (s *StateMachine) Initialize(db lib.StoreI) (err lib.ErrorI) {
 // - executes `EndBlock`
 // - constructs and returns the block header, and the transaction results
 func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResults []*lib.TxResult, err lib.ErrorI) {
+	// catch incase there's a panic
 	defer func() {
 		if r := recover(); r != nil {
 			s.log.Errorf(string(debug.Stack()))
@@ -72,7 +73,9 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 			err = lib.ErrPanic()
 		}
 	}()
+	// cast the store to a StoreI, as only the writable store main 'apply blocks'
 	store, ok := s.Store().(lib.StoreI)
+	// casting fails, exit with error
 	if !ok {
 		return nil, nil, types.ErrWrongStoreType()
 	}
@@ -89,35 +92,26 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 	if err = s.EndBlock(b.BlockHeader.ProposerAddress); err != nil {
 		return nil, nil, err
 	}
-	// load the last validator set
-	// NOTE: there may be no validators for nested-chains
-	var lastValidatorRoot []byte
+	// load the validator set for the previous height
 	lastValidatorSet, _ := s.LoadCommittee(s.Config.ChainId, s.Height()-1)
-	if lastValidatorSet.NumValidators != 0 {
-		lastValidatorRoot, err = lastValidatorSet.ValidatorSet.Root()
-		if err != nil {
-			return nil, nil, err
-		}
-	} else {
-		s.log.Debug("No committee for LastValidatorRoot - skipping")
+	// calculate the merkle root of the last validators to maintain validator continuity between blocks (if root)
+	lastValidatorRoot, err := lastValidatorSet.ValidatorSet.Root()
+	if err != nil {
+		return nil, nil, err
 	}
-	// load the next validator set
-	// NOTE: there may be no validators for nested-chains
-	var nextValidatorRoot []byte
+	// load the 'next validator set' from the state
 	nextValidatorSet, _ := s.LoadCommittee(s.Config.ChainId, s.Height())
-	if nextValidatorSet.NumValidators != 0 {
-		nextValidatorRoot, err = nextValidatorSet.ValidatorSet.Root()
-		if err != nil {
-			return nil, nil, err
-		}
-	} else {
-		s.log.Debug("No committee for NextValidatorRoot - skipping")
+	// calculate the merkle root of the next validators to maintain validator continuity between blocks (if root)
+	nextValidatorRoot, err := nextValidatorSet.ValidatorSet.Root()
+	if err != nil {
+		return nil, nil, err
 	}
+	// calculate the merkle root of the state database to enable consensus on the result of the state after applying the block
 	stateRoot, err := store.Root()
 	if err != nil {
 		return nil, nil, err
 	}
-	// get the previous block for the header
+	// load the last block from the indexer
 	lastBlock, err := s.LoadBlock(s.height - 1)
 	if err != nil {
 		return nil, nil, err
@@ -144,12 +138,15 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 	if _, err = header.SetHash(); err != nil {
 		return nil, nil, err
 	}
+	// exit
 	return
 }
 
 // ApplyTransactions processes all transactions in the provided block and updates the state accordingly
 func (s *StateMachine) ApplyTransactions(block *lib.Block) (results []*lib.TxResult, root []byte, n int, er lib.ErrorI) {
+	// define a convenience variable to track the bytes of a transaction
 	var txBytes [][]byte
+	// convert the block size to zero
 	blockSize := uint64(0)
 	// use a map to check the block transactions for duplicates (replays)
 	duplicates := make(map[string]struct{})

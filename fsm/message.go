@@ -245,6 +245,11 @@ func (s *StateMachine) HandleMessageUnpause(msg *types.MessageUnpause) lib.Error
 	if validator.UnstakingHeight != 0 {
 		return types.ErrValidatorUnstaking()
 	}
+	// ensure the validator is not a delegate
+	// theoretically should not happen as a delegate should never be paused
+	if validator.Delegate {
+		return types.ErrValidatorIsADelegate()
+	}
 	// set the validator as unpaused in the state
 	return s.SetValidatorUnpaused(address, validator)
 }

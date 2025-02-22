@@ -137,8 +137,11 @@ func (b *BFT) Start() {
 					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
-					// start BFT over after sleeping CommitProcessMS
-					b.SetWaitTimers(0, b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
+					// if this chain is not its own root
+					if !b.Controller.IsOwnRoot() {
+						// start BFT over after sleeping CommitProcessMS
+						b.SetWaitTimers(0, b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
+					}
 				}
 			}()
 		}
@@ -852,6 +855,8 @@ type (
 		SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 		// SendToProposer() is a P2P call to directly send a Consensus message to the Leader
 		SendToProposer(msg lib.Signable)
+		// IsOwnRoot() returns a boolean if self chain is root
+		IsOwnRoot() bool
 		// Syncing() returns true if the plugin is currently syncing
 		Syncing() *atomic.Bool
 

@@ -493,6 +493,10 @@ type testController struct {
 	sendToReplicasChan chan lib.Signable
 }
 
+func (t *testController) IsOwnRoot() bool {
+	return true
+}
+
 func (t *testController) SelfSendBlock(qc *lib.QuorumCertificate) {
 	t.GossipBlock(qc, nil)
 }

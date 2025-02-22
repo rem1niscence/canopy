@@ -105,6 +105,16 @@ func (c *Controller) Stop() {
 	c.P2P.Stop()
 }
 
+// IsOwnRoot() returns if this chain is its own root (base)
+func (c *Controller) IsOwnRoot() (isOwnRoot bool) {
+	// Use the state to check if this chain is the root chain
+	isOwnRoot, err := c.FSM.IsOwnRoot()
+	if err != nil {
+		c.log.Error(err.Error())
+	}
+	return
+}
+
 // UpdateRootChainInfo() receives updates from the root-Chain thread
 func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 	c.Lock()
