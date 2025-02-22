@@ -508,7 +508,7 @@ func TestApproveProposal(t *testing.T) {
 	}
 }
 
-func TestOnOrAfterVersion(t *testing.T) {
+func TestIsFeatureEnabled(t *testing.T) {
 	tests := []struct {
 		name            string
 		detail          string
@@ -567,7 +567,7 @@ func TestOnOrAfterVersion(t *testing.T) {
 			// update the protocol version
 			require.NoError(t, sm.UpdateParam(types.ParamSpaceCons, types.ParamProtocolVersion, &lib.StringWrapper{Value: test.protocolVersion}))
 			// execute the function
-			require.Equal(t, test.expected, sm.OnOrAfterVersion(test.version))
+			require.Equal(t, test.expected, sm.IsFeatureEnabled(test.version))
 		})
 	}
 }
