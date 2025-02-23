@@ -134,7 +134,6 @@ func (c *MultiConn) startSendService() {
 	pongTimer := time.NewTimer(pongTimeoutDuration)
 	defer func() { lib.StopTimer(pongTimer); ping.Stop(); send.Stop(); m.Done() }()
 	for {
-		c.log.Debugf("Send service ready for %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 		// select statement ensures the sequential coordination of the concurrent processes
 		select {
 		case <-send.C: // fires every 'sendInterval'
