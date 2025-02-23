@@ -163,8 +163,8 @@ type jsonTx struct {
 	CreatedHeight uint64          `json:"createdHeight,omitempty"`
 	Fee           uint64          `json:"fee,omitempty"`
 	Memo          string          `json:"memo,omitempty"`
-	NetworkId     uint64          `json:"networkId,omitempty"`
-	ChainId       uint64          `json:"chainId,omitempty"`
+	NetworkId     uint64          `json:"networkID,omitempty"`
+	ChainId       uint64          `json:"chainID,omitempty"`
 }
 
 // nolint:all
@@ -312,7 +312,7 @@ func (x *Signature) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonSignature struct {
-	PublicKey HexBytes `json:"public_key,omitempty"`
+	PublicKey HexBytes `json:"publicKey,omitempty"`
 	Signature HexBytes `json:"signature,omitempty"`
 }
 

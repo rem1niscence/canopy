@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
@@ -86,8 +87,8 @@ func (x *MessageSend) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageSend struct {
-	FromAddress lib.HexBytes `json:"from_address"`
-	ToAddress   lib.HexBytes `json:"to_address"`
+	FromAddress lib.HexBytes `json:"fromAddress"`
+	ToAddress   lib.HexBytes `json:"toAddress"`
 	Amount      uint64       `json:"amount"`
 }
 
