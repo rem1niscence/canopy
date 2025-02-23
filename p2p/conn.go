@@ -22,7 +22,7 @@ const (
 	dataFlowRatePerS    = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
 	maxMessageSize      = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
 	maxChanSize         = 1                       // maximum number of items in a channel before blocking
-	maxQueueSize        = 3                       // maximum number of items in a queue before blocking
+	maxQueueSize        = 1                       // maximum number of items in a queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
@@ -192,6 +192,7 @@ func (c *MultiConn) startReceiveService() {
 			// handle different message types
 			switch x := msg.(type) {
 			case *Packet: // receive packet is a partial or full 'Message' with a Stream Topic designation and an EOF signal
+				c.log.Debug("Received Packet")
 				// load the proper stream
 				stream, found := c.streams[x.StreamId]
 				if !found {
@@ -390,8 +391,7 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		}).WithHash()
 		// add to inbox for other parts of the app to read
 		s.inbox <- m
-		s.logger.Debugf("Forwarded Packet(ID:%s, L:%d, E:%t) to inbox",
-			lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof, lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
+		s.logger.Debugf("Forwarded packet(s) to inbox: %s", lib.Topic_name[int32(packet.StreamId)])
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]
 	}
