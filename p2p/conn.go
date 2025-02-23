@@ -134,10 +134,12 @@ func (c *MultiConn) startSendService() {
 	pongTimer := time.NewTimer(pongTimeoutDuration)
 	defer func() { lib.StopTimer(pongTimer); ping.Stop(); send.Stop(); m.Done() }()
 	for {
+		c.log.Debugf("Send service ready for %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 		// select statement ensures the sequential coordination of the concurrent processes
 		select {
 		case <-send.C: // fires every 'sendInterval'
 			if packet := c.getNextPacket(); packet != nil {
+				c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 				err = c.sendWireBytes(packet, m)
 			}
 		case <-ping.C: // fires every 'pingInterval'
@@ -146,6 +148,8 @@ func (c *MultiConn) startSendService() {
 			if err = c.sendWireBytes(new(Ping), m); err != nil {
 				break
 			}
+			// reset the pong timer
+			lib.StopTimer(pongTimer)
 			// set the pong timer to execute an Error function if the timer expires before receiving a pong
 			pongTimer = time.AfterFunc(pongTimeoutDuration, func() {
 				if e := ErrPongTimeout(); e != nil {
@@ -170,12 +174,14 @@ func (c *MultiConn) startSendService() {
 }
 
 // startReceiveService() starts the main receive service
-// -
+// - reads from the underlying tcp connection and 'routes' the messages to the appropriate streams
+// - manages keep alive protocol by notifying the 'send service' of pings and pongs
 func (c *MultiConn) startReceiveService() {
 	defer lib.CatchPanic(c.log)
 	reader, m := *bufio.NewReaderSize(c.conn, maxPacketSize), limiter.New(0, 0)
 	defer func() { close(c.sendPong); close(c.receivedPong); m.Done() }()
 	for {
+		c.log.Debugf("Receive service ready for %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 		select {
 		default: // fires unless quit was signaled
 			// waits until bytes are received from the conn
@@ -206,8 +212,10 @@ func (c *MultiConn) startReceiveService() {
 					return
 				}
 			case *Ping: // receive ping message notifies the "send" service to respond with a 'pong' message
+				c.log.Debugf("Received ping from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 				c.sendPong <- struct{}{}
 			case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
+				c.log.Debugf("Received pong from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 				c.receivedPong <- struct{}{}
 			default: // unknown type results in slash and exiting the service
 				c.Error(ErrUnknownP2PMsg(x), UnknownMessageSlash)
@@ -336,7 +344,6 @@ func (s *Stream) hasStuffToSend() bool {
 func (s *Stream) nextPacket() (packet *Packet) {
 	packet = &Packet{StreamId: s.topic}
 	packet.Bytes, packet.Eof = s.chunkNextSend()
-	s.logger.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 	return
 }
 
@@ -356,7 +363,8 @@ func (s *Stream) chunkNextSend() (chunk []byte, eof bool) {
 // handlePacket() merge the new packet with the previously received ones until the entire message is complete (EOF signal)
 func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
 	msgAssemblerLen, packetLen := len(s.msgAssembler), len(packet.Bytes)
-	s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
+	s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t) from %s",
+		lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof, lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
 	// if the addition of this new packet pushes the total message size above max
 	if int(maxMessageSize) < msgAssemblerLen+packetLen {
 		s.msgAssembler = s.msgAssembler[:0]
@@ -383,6 +391,8 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		}).WithHash()
 		// add to inbox for other parts of the app to read
 		s.inbox <- m
+		s.logger.Debugf("Forwarded Packet(ID:%s, L:%d, E:%t) to inbox",
+			lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof, lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]
 	}

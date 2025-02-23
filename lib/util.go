@@ -453,10 +453,12 @@ func ResetTimer(t *time.Timer, d time.Duration) {
 
 // StopTimer() stops the existing timer
 func StopTimer(t *time.Timer) {
-	if !t.Stop() {
-		select {
-		case <-t.C:
-		default:
+	if t != nil {
+		if !t.Stop() {
+			select {
+			case <-t.C:
+			default:
+			}
 		}
 	}
 }

@@ -599,7 +599,7 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	// reset VotesForHeight
 	b.Votes = make(VotesForHeight)
 	// reset ProposalsForHeight
-	b.Proposals = make(ProposalsForHeight)
+	b.ProposalsResetForNewCommittee()
 	// reset PacemakerMessages
 	b.PacemakerMessages = make(PacemakerMessages)
 	// initialize Round 0
@@ -619,6 +619,8 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	// - protecting any who may have committed against attacks like malicious proposers from withholding
 	// COMMIT_MSG and sending it after the next block is produces
 	if keepLocks == nil || !keepLocks[0] {
+		// fully reset the proposals
+		b.Proposals = make(ProposalsForHeight)
 		// reset PartialQCs
 		b.PartialQCs = make(PartialQCs)
 		b.HighQC = nil

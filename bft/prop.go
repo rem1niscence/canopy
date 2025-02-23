@@ -1,8 +1,10 @@
 package bft
 
 import (
+	"bytes"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"slices"
 )
 
 // PROPOSALS RECEIVED FROM PROPOSER FOR CURRENT HEIGHT
@@ -31,8 +33,16 @@ func (b *BFT) AddProposal(m *Message) lib.ErrorI {
 	// if it's an Election Proposal, add to the list (multiple candidates)
 	// else overwrite the Proposal (this is ok because Proposer ID is previously authenticated after the ELECTION phase)
 	if m.Header.Phase == Election {
-		// add to the list
-		roundProposal[phaseToString(phase)] = append(phaseProposal, m)
+		// check to see if the candidate is already on the list
+		// this may happen during a NEW_COMMITTEE reset
+		alreadyExists := slices.ContainsFunc(roundProposal[phaseToString(phase)], func(compare *Message) bool {
+			return bytes.Equal(m.Qc.ProposerKey, compare.Qc.ProposerKey)
+		})
+		// if candidate not already on the list
+		if !alreadyExists {
+			// add to the list
+			roundProposal[phaseToString(phase)] = append(phaseProposal, m)
+		}
 	} else {
 		// overwrite the proposal
 		roundProposal[phaseToString(phase)] = []*Message{m}
@@ -40,6 +50,17 @@ func (b *BFT) AddProposal(m *Message) lib.ErrorI {
 	// add to the global list
 	b.Proposals[m.Header.Round] = roundProposal
 	return nil
+}
+
+// ProposalsResetForNewCommittee resets proposals when the root chain sends a 'NewCommittee' reset command
+func (b *BFT) ProposalsResetForNewCommittee() {
+	// initialize a new proposals map for the current height
+	propsForHeight := make(ProposalsForHeight)
+	propsForHeight[0] = make(map[string][]*Message)
+	// preserve R0 election candidates to ensure messages sent before the reset are not lost
+	propsForHeight[0][phaseToString(Election)] = b.Proposals[0][phaseToString(Election)]
+	// replace existing proposals with the new structure
+	b.Proposals = propsForHeight
 }
 
 // GetProposal() retrieves a proposal from the leader at the latest View
