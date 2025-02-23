@@ -36,6 +36,9 @@ func (b *BFT) AddProposal(m *Message) lib.ErrorI {
 		// check to see if the candidate is already on the list
 		// this may happen during a NEW_COMMITTEE reset
 		alreadyExists := slices.ContainsFunc(roundProposal[phaseToString(phase)], func(compare *Message) bool {
+			if compare == nil || compare.Qc == nil || m == nil || m.Qc == nil {
+				return false
+			}
 			return bytes.Equal(m.Qc.ProposerKey, compare.Qc.ProposerKey)
 		})
 		// if candidate not already on the list
