@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/canopy-network/canopy/lib"
 	"math"
 	"math/rand"
 	"os"
@@ -14,6 +13,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/canopy-network/canopy/lib"
 )
 
 const (
@@ -28,8 +29,8 @@ const (
 
 // PeerBook is a persisted structure that maintains information on potential peers
 type PeerBook struct {
-	Book      []*BookPeer  // persisted list of peers
-	BookSize  int          // number of peers in the book
+	Book      []*BookPeer  `json:"book"`     // persisted list of peers
+	BookSize  int          `json:"bookSize"` // number of peers in the book
 	publicKey []byte       // self public key
 	path      string       // path to write the peer book json file to
 	l         sync.RWMutex // thread safety to update the list

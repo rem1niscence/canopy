@@ -2,10 +2,11 @@ package types
 
 import (
 	"encoding/json"
-	"github.com/canopy-network/canopy/lib"
-	"github.com/canopy-network/canopy/lib/crypto"
 	"slices"
 	"time"
+
+	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 )
 
 const (
@@ -54,8 +55,8 @@ type genesisState struct {
 	Validators    []*Validator        `protobuf:"bytes,4,rep,name=validators,proto3" json:"validators,omitempty"`
 	Params        *Params             `protobuf:"bytes,5,opt,name=params,proto3" json:"params,omitempty"`
 	Supply        *Supply             `json:"supply"`
-	OrderBooks    *lib.OrderBooks     `protobuf:"bytes,7,opt,name=order_books,json=orderBooks,proto3" json:"order_books,omitempty"`
-	DoubleSigners []*lib.DoubleSigner `protobuf:"bytes,6,rep,name=double_signers,json=doubleSigners,proto3" json:"double_signers,omitempty"` // only used for export
+	OrderBooks    *lib.OrderBooks     `protobuf:"bytes,7,opt,name=order_books,json=orderBooks,proto3" json:"orderBooks,omitempty"`
+	DoubleSigners []*lib.DoubleSigner `protobuf:"bytes,6,rep,name=double_signers,json=doubleSigners,proto3" json:"doubleSigners,omitempty"` // only used for export
 }
 
 // MarshalJSON() is the json.Marshaller implementation for the GenesisState object
@@ -141,12 +142,12 @@ func (x *Pool) UnmarshalJSON(bz []byte) (err error) {
 // validator is the json.Marshaller and json.Unmarshaler implementation for the Validator object
 type validator struct {
 	Address         *crypto.Address           `json:"address"`
-	PublicKey       *crypto.BLS12381PublicKey `json:"public_key"`
+	PublicKey       *crypto.BLS12381PublicKey `json:"publicKey"`
 	Committees      []uint64                  `json:"committees"`
-	NetAddress      string                    `json:"net_address"`
-	StakedAmount    uint64                    `json:"staked_amount"`
-	MaxPausedHeight uint64                    `json:"max_paused_height"`
-	UnstakingHeight uint64                    `json:"unstaking_height"`
+	NetAddress      string                    `json:"netAddress"`
+	StakedAmount    uint64                    `json:"stakedAmount"`
+	MaxPausedHeight uint64                    `json:"maxPausedHeight"`
+	UnstakingHeight uint64                    `json:"unstakingHeight"`
 	Output          *crypto.Address           `json:"output"`
 	Delegate        bool                      `json:"delegate"`
 	Compound        bool                      `json:"compound"`

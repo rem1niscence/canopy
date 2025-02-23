@@ -1,14 +1,14 @@
 {
-  "ActivePolls": {
+  "activePolls": {
     "50d858e0985ecc7f60418aaf0cc5ab587f42c2570a884095a9e8ccacd0f6545c": {
       "851e90eaef1fa27debaee2c2591503bdeec1d123": true
     }
   },
-  "PollMeta": {
+  "pollMeta": {
     "50d858e0985ecc7f60418aaf0cc5ab587f42c2570a884095a9e8ccacd0f6545c": {
-      "StartPoll": "50d858e0985ecc7f60418aaf0cc5ab587f42c2570a884095a9e8ccacd0f6545c",
-      "URL": "https://forum.cnpy.network/something",
-      "EndHeight": 1000000000000
+      "startPoll": "50d858e0985ecc7f60418aaf0cc5ab587f42c2570a884095a9e8ccacd0f6545c",
+      "url": "https://forum.cnpy.network/something",
+      "endHeight": 1000000000000
     }
   }
 }

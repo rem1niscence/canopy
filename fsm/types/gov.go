@@ -3,12 +3,13 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -503,8 +504,8 @@ const (
 // ActivePolls is the in-memory representation of the polls.json file
 // Contains a list of all active polls
 type ActivePolls struct {
-	Polls    map[string]map[string]bool `json:"ActivePolls"` // [poll_hash] -> [address hex] -> Vote
-	PollMeta map[string]*StartPoll      `json:"PollMeta"`    // [poll_hash] -> StartPoll structure
+	Polls    map[string]map[string]bool `json:"activePolls"` // [poll_hash] -> [address hex] -> Vote
+	PollMeta map[string]*StartPoll      `json:"pollMeta"`    // [poll_hash] -> StartPoll structure
 }
 
 // CheckForPollTransaction() populates the poll.json file from embeds if the embed exists in the memo field
@@ -572,9 +573,9 @@ func (p *ActivePolls) SaveToFile(dataDirPath string) lib.ErrorI {
 // StartPoll represents the structure for initiating a new poll
 // It is used to encode data into JSON format for storing in memo fields
 type StartPoll struct {
-	StartPoll string `json:"StartPoll"`
-	Url       string `json:"URL,omitempty"`
-	EndHeight uint64 `json:"EndHeight"`
+	StartPoll string `json:"startPoll"`
+	Url       string `json:"url,omitempty"`
+	EndHeight uint64 `json:"endHeight"`
 }
 
 // NewStartPollTransaction() isn't an actual transaction type - rather it's a protocol built on top of send transactions to allow simple straw polling on Canopy.
@@ -604,8 +605,8 @@ func NewStartPollTransaction(from crypto.PrivateKeyI, pollJSON json.RawMessage, 
 // VotePoll represents the structure of a voting action on a poll
 // It is used to encode data into JSON format for storing in memo fields
 type VotePoll struct {
-	VotePoll string `json:"VotePoll"`
-	Approve  bool   `json:"Approve"`
+	VotePoll string `json:"votePoll"`
+	Approve  bool   `json:"approve"`
 }
 
 // NewVotePollTransaction() isn't an actual transaction type - rather it's a protocol built on top of send transactions to allow simple straw polling on Canopy.
