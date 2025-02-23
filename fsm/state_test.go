@@ -79,7 +79,7 @@ func TestInitialize(t *testing.T) {
 				validateWithExportedState(t, sm, test.expected)
 			} else {
 				// if not genesis, validate the VDF iterations
-				require.Equal(t, test.presetBlock.BlockHeader.TotalVdfIterations, sm.vdfIterations)
+				require.Equal(t, test.presetBlock.BlockHeader.TotalVdfIterations, sm.totalVDFIterations)
 			}
 		})
 	}
@@ -302,13 +302,13 @@ func newTestStateMachine(t *testing.T) StateMachine {
 	db, err := store.NewStoreInMemory(log)
 	require.NoError(t, err)
 	sm := StateMachine{
-		store:             db,
-		ProtocolVersion:   0,
-		NetworkID:         1,
-		height:            2,
-		vdfIterations:     0,
-		slashTracker:      types.NewSlashTracker(),
-		proposeVoteConfig: types.AcceptAllProposals,
+		store:              db,
+		ProtocolVersion:    0,
+		NetworkID:          1,
+		height:             2,
+		totalVDFIterations: 0,
+		slashTracker:       types.NewSlashTracker(),
+		proposeVoteConfig:  types.AcceptAllProposals,
 		Config: lib.Config{
 			MainConfig: lib.DefaultMainConfig(),
 		},

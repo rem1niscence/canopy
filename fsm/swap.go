@@ -132,18 +132,17 @@ func (s *StateMachine) ParseBuyOrders(b *lib.BlockResult) (buyOrders []*lib.BuyO
 	}
 	// calculate the minimum buy order fee
 	minFee := params.Fee.SendFee * params.Validator.BuyOrderFeeMultiplier
+	deDupeBuyOrders := lib.NewDeDuplicator[uint64]()
 	// for each transaction in the block
 	for _, tx := range b.Transactions {
-		deDupeBuyOrders := make(map[uint64]struct{})
 		// skip over any that doesn't have the minimum fee or isn't the correct type
 		if tx.MessageType != types.MessageSendName && tx.Transaction.Fee < minFee {
 			continue
 		}
 		// parse the transaction for embedded 'buy orders'
 		if buyOrder, ok := s.ParseBuyOrder(tx.Transaction, params.Validator.BuyDeadlineBlocks); ok {
-			if _, found := deDupeBuyOrders[buyOrder.OrderId]; !found {
+			if found := deDupeBuyOrders.Found(buyOrder.OrderId); !found {
 				buyOrders = append(buyOrders, buyOrder)
-				deDupeBuyOrders[buyOrder.OrderId] = struct{}{}
 			}
 		}
 	}

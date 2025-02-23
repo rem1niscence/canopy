@@ -558,6 +558,28 @@ func TruncateSlice[T any](slice []T, max int) []T {
 	return slice
 }
 
+// DeDuplicator is a generic structure that serves as a simple anti-duplication check
+type DeDuplicator[T comparable] struct {
+	m map[T]struct{}
+}
+
+// NewDeDuplicator constructs a new object reference to a DeDuplicator
+func NewDeDuplicator[T comparable]() *DeDuplicator[T] {
+	return &DeDuplicator[T]{m: make(map[T]struct{})}
+}
+
+// Found checks for an existing entry and adds it to the map if it's not present
+func (d *DeDuplicator[T]) Found(k T) bool {
+	// check if the key already exists
+	if _, exists := d.m[k]; exists {
+		return true // It's a duplicate
+	}
+	// add the key to the map
+	d.m[k] = struct{}{}
+	// not a duplicate
+	return false
+}
+
 func PrintStackTrace() {
 	pc := make([]uintptr, 10) // Get at most 10 stack frames
 	n := runtime.Callers(2, pc)
