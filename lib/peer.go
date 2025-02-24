@@ -27,8 +27,7 @@ type MessageAndMetadata struct {
 
 // WithHash() fills the hash field with the cryptographic hash of the message (used for de-duplication)
 func (x *MessageAndMetadata) WithHash() *MessageAndMetadata {
-	x.Hash = nil
-	bz, _ := MarshalJSON(x)
+	bz, _ := MarshalJSON(x.Message)
 	x.Hash = crypto.Hash(bz)
 	return x
 }

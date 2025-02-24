@@ -280,12 +280,10 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) (er
 	// will block the execution until at or below the desired rate of flow
 	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
 	// write bytes to the wire up to max packet size
-	c.log.Debug("about to write")
 	_, er := c.conn.Write(bz)
 	if er != nil {
 		c.log.Error(ErrFailedWrite(er).Error())
 	}
-	c.log.Debug("write finished")
 	// update the rate limiter with how many bytes were written
 	//m.Update(n)
 	return

@@ -147,6 +147,7 @@ func (b *BFT) Start() {
 				}
 			}()
 		}
+		b.log.Debug("Consensus thread sleeping")
 	}
 }
 

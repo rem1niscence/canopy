@@ -447,18 +447,22 @@ func NewTimer() *time.Timer {
 
 // ResetTimer() stops the existing timer, and resets with the new duration
 func ResetTimer(t *time.Timer, d time.Duration) {
+	if t == nil {
+		*t = *time.NewTimer(d)
+	}
 	StopTimer(t)
 	t.Reset(d)
 }
 
 // StopTimer() stops the existing timer
 func StopTimer(t *time.Timer) {
-	if t != nil {
-		if !t.Stop() {
-			select {
-			case <-t.C:
-			default:
-			}
+	if t == nil {
+		return
+	}
+	if !t.Stop() {
+		// drain safely
+		for len(t.C) > 0 {
+			<-t.C
 		}
 	}
 }

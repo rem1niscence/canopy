@@ -41,82 +41,93 @@ func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, chainId uint64) 
 
 // ParseBuyOrder() parses a transaction for an embedded buy order messages in the memo field
 func (s *StateMachine) ParseBuyOrder(tx *lib.Transaction, deadlineBlocks uint64) (bo *lib.BuyOrder, ok bool) {
+	// create a new reference to a 'lock order' object in order to ensure a non-nil result
 	bo = new(lib.BuyOrder)
+	// attempt to unmarshal the transaction memo into a 'lock order'
 	if err := lib.UnmarshalJSON([]byte(tx.Memo), bo); err == nil {
-		if len(bo.BuyerSendAddress) != 0 && len(bo.BuyerSendAddress) != 0 {
+		// sanity check some critical fields of the 'lock order' to ensure the unmarshal was successful
+		if len(bo.BuyerSendAddress) != 0 && len(bo.BuyerReceiveAddress) != 0 {
 			ok = true
 		}
-		// set the buyer deadline
+		// set the 'BuyerChainDeadline' in the 'lock order'
 		bo.BuyerChainDeadline = s.Height() + deadlineBlocks
 	}
+	// exit
 	return
 }
 
-// ProcessRootChainOrderBook() processes the order book from the root-Chain and cross-references
+// ProcessRootChainOrderBook() processes the order book from the root-chain and cross-references blocks on this chain to determine
+// actions that warrant committee level changes to the root-chain order book like: ResetOrder and CloseOrder
 func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.BlockResult) (closeOrders, resetOrders []uint64) {
-	transferred := make(map[string]uint64) // [from+to] -> amount sent
+	// create a variable to track the 'same-block' transfers
+	// map structure is [from+to] -> amount sent
+	transferred := make(map[string]uint64)
 	// get all the 'Send' transactions from the block
 	for _, tx := range b.Transactions {
 		// ignore non-send
 		if tx.MessageType != types.MessageSendName {
 			continue
 		}
-		// parse send
+		// extract the message from the transaction object
 		msg, e := lib.FromAny(tx.Transaction.Msg)
 		if e != nil {
 			s.log.Error(e.Error())
 			continue
 		}
+		// cast the message to send
 		send, ok := msg.(*types.MessageSend)
 		if !ok {
-			s.log.Error("Non-send message with a send message name")
+			s.log.Error("Non-send message with a send message name (should not happen)")
 			continue
 		}
-		// add to total transferred
+		// update the transferred map using the [from + to] as the key and add send.Amount to the value
 		transferred[lib.BytesToString(append(tx.Sender, tx.Recipient...))] += send.Amount
 	}
-	// for each order
+	// for each order in the book
 	for _, order := range book.Orders {
-		// skip buyer-less orders
+		// skip any order that is not currently 'locked'
 		if len(order.BuyerReceiveAddress) == 0 {
 			continue
 		}
-		// extract a key for the totalTransferred map
-		key := lib.BytesToString(append(order.BuyerSendAddress, order.SellerReceiveAddress...))
-		// see if expired
+		// see if the 'locked' order is expired
 		if s.height > order.BuyerChainDeadline {
 			// add to reset orders
 			resetOrders = append(resetOrders, order.Id)
-		} else {
-			// check if the order was closed this block
-			if transferred[key] == order.RequestedAmount {
+			// go to the next order
+			continue
+		}
+		// extract a key that should correspond to the transferred map
+		key := lib.BytesToString(append(order.BuyerSendAddress, order.SellerReceiveAddress...))
+		// check if the order was closed this block
+		if transferred[key] == order.RequestedAmount {
+			// add to the closed order list
+			closeOrders = append(closeOrders, order.Id)
+			// go to the next order
+			continue
+		}
+		// scan the N-10 through N-15 blocks to ensure no orders are lost
+		start, end, n := uint64(0), uint64(0), b.BlockHeader.Height
+		// bounds check
+		if n >= 15 {
+			end = n - 15
+		}
+		// bounds check
+		if n >= 10 {
+			start = n - 10
+		}
+		for i := start; i > end; i-- {
+			// load the certificate (hopefully from cache)
+			qc, err := s.LoadCertificate(i)
+			if err != nil {
+				s.log.Error(err.Error())
+				continue
+			}
+			// check if the 'close order' command was issued previously
+			if qc.Results.Orders != nil && slices.Contains(qc.Results.Orders.CloseOrders, order.Id) {
+				// if so, add it to the close orders
 				closeOrders = append(closeOrders, order.Id)
-				continue // go to the next order
-			}
-			// scan the N-10 through N-15 blocks to ensure no orders are lost
-			start, end, n := uint64(0), uint64(0), b.BlockHeader.Height
-			// bounds check
-			if n >= 15 {
-				end = n - 15
-			}
-			// bounds check
-			if n >= 10 {
-				start = n - 10
-			}
-			for i := start; i > end; i-- {
-				// load the certificate (hopefully from cache)
-				qc, err := s.LoadCertificate(b.BlockHeader.Height)
-				if err != nil {
-					s.log.Error(err.Error())
-					continue
-				}
-				// check if the 'close order' command was issued previously
-				if qc.Results.Orders != nil && slices.Contains(qc.Results.Orders.CloseOrders, order.Id) {
-					// if so, add it to the close orders
-					closeOrders = append(closeOrders, order.Id)
-					// exit the loop
-					break
-				}
+				// exit the loop
+				break
 			}
 		}
 	}
