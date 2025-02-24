@@ -8,7 +8,7 @@ import (
 	"slices"
 )
 
-// COMMITTEES BELOW
+/* This file contains logic for 'committees' or validator sets responsible for 'nestedChain' consensus */
 
 // FundCommitteeRewardPools() mints newly created tokens to protocol subsidized committees
 func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-// GENESIS LOGIC: implements logic to import a json file to create the state at height 0 and export the state at any height
+/* GENESIS LOGIC: implements logic to import a json file to create the state at height 0 and export the state at any height */
 
 // NewFromGenesisFile() creates a new beginning state from a file
 func (s *StateMachine) NewFromGenesisFile() (err lib.ErrorI) {

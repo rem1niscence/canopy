@@ -6,7 +6,7 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 )
 
-// ACCOUNT CODE BELOW
+/* This file defines the account, pool, and supply tracker state interactions */
 
 // GetAccount() returns an Account structure for a specific address
 func (s *StateMachine) GetAccount(address crypto.AddressI) (*types.Account, lib.ErrorI) {

@@ -13,6 +13,8 @@ const (
 	ProtocolVersion = 1
 )
 
+/* This is the 'main' file of the state machine store, with the structure definition and other high level operations */
+
 // StateMachine the core protocol component responsible for maintaining and updating the state of the blockchain as it progresses
 // it represents the collective state of all accounts, validators, and other relevant data stored on the blockchain
 type StateMachine struct {
