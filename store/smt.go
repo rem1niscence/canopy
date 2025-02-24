@@ -95,7 +95,7 @@ type node struct {
 	// Key: the structure that is used to interpret node keys (bytes, fromBytes, etc.)
 	Key *key
 	// Node: is the structure persisted on disk under the above key bytes
-	Node
+	lib.Node
 }
 
 // OpData: data for each operation (set, delete)
@@ -153,7 +153,7 @@ func (s *SMT) Root() []byte { return bytes.Clone(s.root.Value) }
 
 // Set: insert or update a target
 func (s *SMT) Set(k, v []byte) lib.ErrorI {
-	return s.set(&node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), Node: Node{Value: crypto.Hash(v)}})
+	return s.set(&node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), Node: lib.Node{Value: crypto.Hash(v)}})
 }
 
 func (s *SMT) set(target *node) lib.ErrorI {
@@ -301,8 +301,8 @@ func (s *SMT) rehash() lib.ErrorI {
 // this allows the logic to be without root edge cases for insert and delete
 func (s *SMT) initializeTree(rootKey *key) {
 	// create a min and max node, this enables no edge cases for root
-	minNode := &node{Key: newNodeKey(bytes.Repeat([]byte{0}, 20), s.keyBitLength), Node: Node{Value: bytes.Repeat([]byte{0}, 20)}}
-	maxNode := &node{Key: newNodeKey(bytes.Repeat([]byte{255}, 20), s.keyBitLength), Node: Node{Value: bytes.Repeat([]byte{255}, 20)}}
+	minNode := &node{Key: newNodeKey(bytes.Repeat([]byte{0}, 20), s.keyBitLength), Node: lib.Node{Value: bytes.Repeat([]byte{0}, 20)}}
+	maxNode := &node{Key: newNodeKey(bytes.Repeat([]byte{255}, 20), s.keyBitLength), Node: lib.Node{Value: bytes.Repeat([]byte{255}, 20)}}
 	// set min and max node in the database
 	if err := s.setNode(minNode); err != nil {
 		panic(err)
@@ -313,7 +313,7 @@ func (s *SMT) initializeTree(rootKey *key) {
 	// update root
 	s.root = &node{
 		Key: rootKey,
-		Node: Node{
+		Node: lib.Node{
 			LeftChildKey:  minNode.Key.bytes(),
 			RightChildKey: maxNode.Key.bytes(),
 		},
@@ -543,7 +543,7 @@ func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, pro
 		// saved correctly.
 		key := make([]byte, s.keyBitLength/8)
 		copy(key, leaf.Key)
-		node := &node{Key: newNodeKey(key, s.keyBitLength), Node: Node{Value: leaf.Value}}
+		node := &node{Key: newNodeKey(key, s.keyBitLength), Node: lib.Node{Value: leaf.Value}}
 		// Leaf nodes could be one of the two children of the root.
 		if err := smt.set(node); err != nil {
 			continue
@@ -848,7 +848,7 @@ func (x *node) copy() *node {
 			mostSigBytes: append([]byte(nil), x.Key.mostSigBytes...),
 			leastSigBits: append([]int(nil), x.Key.leastSigBits...),
 		},
-		Node: Node{
+		Node: lib.Node{
 			Value:         append([]byte(nil), x.Value...),
 			LeftChildKey:  append([]byte(nil), x.LeftChildKey...),
 			RightChildKey: append([]byte(nil), x.RightChildKey...),

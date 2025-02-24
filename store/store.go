@@ -247,7 +247,7 @@ func (s *Store) commitIDKey(version uint64) []byte {
 }
 
 // getCommitID() retrieves the CommitID value for the specified version from the database
-func (s *Store) getCommitID(version uint64) (id CommitID, err lib.ErrorI) {
+func (s *Store) getCommitID(version uint64) (id lib.CommitID, err lib.ErrorI) {
 	var bz []byte
 	bz, err = NewTxnWrapper(s.writer, s.log, "").Get(s.commitIDKey(version))
 	if err != nil {
@@ -262,7 +262,7 @@ func (s *Store) getCommitID(version uint64) (id CommitID, err lib.ErrorI) {
 // setCommitID() stores the CommitID for the specified version and root in the database
 func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 	w := NewTxnWrapper(s.writer, s.log, "")
-	value, err := lib.Marshal(&CommitID{
+	value, err := lib.Marshal(&lib.CommitID{
 		Height: version,
 		Root:   root,
 	})
@@ -277,10 +277,10 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 }
 
 // getLatestCommitID() retrieves the latest CommitID from the database
-func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *CommitID) {
+func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *lib.CommitID) {
 	tx := NewTxnWrapper(db.NewTransactionAt(math.MaxUint64, false), log, "")
 	defer tx.Close()
-	id = new(CommitID)
+	id = new(lib.CommitID)
 	bz, err := tx.Get([]byte(lastCommitIDPrefix))
 	if err != nil {
 		log.Fatalf("getLatestCommitID() failed with err: %s", err.Error())

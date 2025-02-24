@@ -1,7 +1,7 @@
 syntax = "proto3";
 package types;
 
-option go_package = "github.com/canopy-network/canopy/store";
+option go_package = "github.com/canopy-network/canopy/lib";
 
 // *****************************************************************************************************
 // This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
@@ -37,4 +37,8 @@ message Node {
   bytes LeftChildKey = 2;
   // RightChildKey: is the key for the right child node. Nil means no child
   bytes RightChildKey = 3;
+  // Bitmask: Used for Merkle proof generation and verification. Indicates 
+  // whether each hash requires the left or right sibling, where 0 
+  // represents a left sibling and 1 represents a right sibling
+  int32 Bitmask = 4;
 }
