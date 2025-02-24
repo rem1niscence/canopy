@@ -256,10 +256,6 @@ func (s *SMT) traverse() (err lib.ErrorI) {
 		if err != nil {
 			return
 		}
-		// assert current key isn't nil
-		if currentKey == nil {
-			return ErrInvalidMerkleTree()
-		}
 		// load the bytes into the key
 		s.current.Key.fromBytes(currentKey)
 		// update the greatest common prefix and the bit position based on the new current key
@@ -489,11 +485,12 @@ func (s *SMT) GetMerkleProof(key []byte) ([]*lib.Node, lib.ErrorI) {
 func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, root []byte, proof []*lib.Node) (bool, lib.ErrorI) {
 	// A valid proof is expected to have at least two nodes (the leaf nodes) in order to build the root
 	// and always should include an even number of nodes representing the siblings of the nodes in the tree
-	if len(proof) < 2 && len(proof)%2 != 0 {
+	proofLen := len(proof)
+	if proofLen < 2 || proofLen%2 != 0 {
 		return false, ErrInvalidMerkleTreeProof()
 	}
 
-	// Generate the inital hash from the leaves of the proof
+	// Generate the initial hash from the leaves of the proof
 	leftLeaf := proof[0]
 	rightLeaf := proof[1]
 
@@ -530,7 +527,7 @@ func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, roo
 	if err != nil {
 		return false, err
 	}
-	smt := NewSMT(s.Root(), s.keyBitLength, memStore)
+	smt := NewDefaultSMT(memStore)
 
 	// add the nodes
 	for _, leaf := range proof {
@@ -559,13 +556,13 @@ func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, roo
 
 	// Verify whether the key exists in the tree and what kind of proof is being validated
 	// (membership or non-membership).
-	// if the key does not exists in the tree and the proof is for membership or
+	// if the key does not exist in the tree and the proof is for membership or
 	// if the key exists in the tree and the proof is for non-membership, return false.
 	nodeExists := smt.target.Key.equals(smt.gcp)
 	if (!nodeExists && validateMembership) || (nodeExists && !validateMembership) {
 		return false, nil
 	}
-	// if the key does not exists in the tree and the proof is for non-membership, return true.
+	// if the key does not exist in the tree and the proof is for non-membership, return true.
 	if !nodeExists && !validateMembership {
 		return true, nil
 	}
