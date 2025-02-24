@@ -137,11 +137,17 @@ func (b *BFT) Start() {
 					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
-					// start BFT over after sleeping CommitProcessMS
-					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
+					// if this chain is not its own root
+					if !b.Controller.IsOwnRoot() {
+						// start BFT over after sleeping CommitProcessMS
+						// add poll ms wait here to ensure ample time for all nested chains to be updated
+						// if not the new committee messages will overwrite any candidacy proposals that were received prior to the 'reset'
+						b.SetWaitTimers(time.Duration(b.Config.RootChainPollMS)*time.Millisecond, b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
+					}
 				}
 			}()
 		}
+		b.log.Debug("Consensus thread sleeping")
 	}
 }
 
@@ -479,6 +485,8 @@ func (b *BFT) StartCommitProcessPhase() {
 	b.ByzantineEvidence = &ByzantineEvidence{
 		DSE: b.GetLocalDSE(),
 	}
+	// send the block to self for committing
+	b.SelfSendBlock(msg.Qc)
 	// gossip committed block message to peers
 	b.GossipBlock(msg.Qc, b.PublicKey)
 }
@@ -588,15 +596,13 @@ func (b *BFT) NewRound(newHeight bool) {
 // NewHeight() initializes / resets consensus variables preparing for the NewHeight
 func (b *BFT) NewHeight(keepLocks ...bool) {
 	var err lib.ErrorI
-	b.log.Debugf("NewHeight: %v", keepLocks)
+	b.log.Debugf("NewHeight: KeepLocks: %v", keepLocks)
 	// reset VotesForHeight
 	b.Votes = make(VotesForHeight)
 	// reset ProposalsForHeight
-	b.Proposals = make(ProposalsForHeight)
+	b.ProposalsResetForNewCommittee()
 	// reset PacemakerMessages
 	b.PacemakerMessages = make(PacemakerMessages)
-	// reset PartialQCs
-	b.PartialQCs = make(PartialQCs)
 	// initialize Round 0
 	b.NewRound(true)
 	// set phase to Election
@@ -614,6 +620,10 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	// - protecting any who may have committed against attacks like malicious proposers from withholding
 	// COMMIT_MSG and sending it after the next block is produces
 	if keepLocks == nil || !keepLocks[0] {
+		// fully reset the proposals
+		b.Proposals = make(ProposalsForHeight)
+		// reset PartialQCs
+		b.PartialQCs = make(PartialQCs)
 		b.HighQC = nil
 		if b.SelfIsValidator() {
 			// begin the verifiable delay function for the next height
@@ -844,10 +854,14 @@ type (
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
 		// GossipBlock() is a P2P call to gossip a completed Quorum Certificate with a Proposal
 		GossipBlock(certificate *lib.QuorumCertificate, sender []byte)
+		// SendToSelf() is a P2P call to directly send  a completed Quorum Certificate to self
+		SelfSendBlock(qc *lib.QuorumCertificate)
 		// SendToReplicas() is a P2P call to directly send a Consensus message to all Replicas
 		SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 		// SendToProposer() is a P2P call to directly send a Consensus message to the Leader
 		SendToProposer(msg lib.Signable)
+		// IsOwnRoot() returns a boolean if self chain is root
+		IsOwnRoot() bool
 		// Syncing() returns true if the plugin is currently syncing
 		Syncing() *atomic.Bool
 

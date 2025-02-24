@@ -64,6 +64,9 @@ func TestHandleMessage(t *testing.T) {
 				Committees:    []uint64{lib.CanopyChainId},
 				NetAddress:    "http://example.com",
 				OutputAddress: newTestAddressBytes(t),
+				Delegate:      false,
+				Compound:      false,
+				Signer:        newTestAddressBytes(t),
 			},
 			validate: func(sm StateMachine) {
 				// ensure the sender account was subtracted from
@@ -87,6 +90,7 @@ func TestHandleMessage(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
 					Committees:   []uint64{lib.CanopyChainId},
+					Output:       newTestAddressBytes(t),
 				}
 				// add the validator stake to total supply
 				require.NoError(t, sm.AddToTotalSupply(v.StakedAmount))
@@ -103,6 +107,7 @@ func TestHandleMessage(t *testing.T) {
 				Committees:    []uint64{lib.CanopyChainId},
 				NetAddress:    "http://example.com",
 				OutputAddress: newTestAddressBytes(t),
+				Signer:        newTestAddressBytes(t),
 			},
 			validate: func(sm StateMachine) {
 				// ensure the sender account was subtracted from
@@ -487,7 +492,7 @@ func TestGetFeeForMessage(t *testing.T) {
 				}
 			}()
 			// execute function call
-			got, err := sm.GetFeeForMessage(test.msg)
+			got, err := sm.GetFeeForMessageName(test.msg.Name())
 			// validate the expected error
 			require.NoError(t, err)
 			// compare got vs expected
@@ -738,6 +743,7 @@ func TestHandleMessageStake(t *testing.T) {
 				OutputAddress: newTestAddressBytes(t, 1),
 				Delegate:      false,
 				Compound:      true,
+				Signer:        newTestAddressBytes(t),
 			},
 			expected: &types.Validator{
 				Address:      newTestAddressBytes(t),
@@ -762,6 +768,7 @@ func TestHandleMessageStake(t *testing.T) {
 				OutputAddress: newTestAddressBytes(t, 1),
 				Delegate:      false,
 				Compound:      true,
+				Signer:        newTestAddressBytes(t),
 			},
 			expected: &types.Validator{
 				Address:      newTestAddressBytes(t),
@@ -786,6 +793,7 @@ func TestHandleMessageStake(t *testing.T) {
 				OutputAddress: newTestAddressBytes(t, 1),
 				Delegate:      true,
 				Compound:      true,
+				Signer:        newTestAddressBytes(t),
 			},
 			expected: &types.Validator{
 				Address:      newTestAddressBytes(t),
@@ -810,6 +818,7 @@ func TestHandleMessageStake(t *testing.T) {
 				OutputAddress: newTestAddressBytes(t, 1),
 				Delegate:      true,
 				Compound:      true,
+				Signer:        newTestAddressBytes(t),
 			},
 			expected: &types.Validator{
 				Address:      newTestAddressBytes(t),
@@ -1199,6 +1208,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Address:    newTestAddressBytes(t),
 				Amount:     2,
 				Committees: []uint64{1, 2, 3},
+				Signer:     newTestAddressBytes(t),
 			},
 			expectedValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
@@ -1238,6 +1248,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Address:    newTestAddressBytes(t),
 				Amount:     2,
 				Committees: []uint64{1, 2, 3},
+				Signer:     newTestAddressBytes(t),
 			},
 			expectedValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),

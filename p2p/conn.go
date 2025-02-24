@@ -21,8 +21,8 @@ const (
 	queueSendTimeout    = 10 * time.Second        // how long a message waits to be queued before throwing an error
 	dataFlowRatePerS    = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
 	maxMessageSize      = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
-	maxChanSize         = 100                     // maximum number of items in a channel before blocking
-	maxQueueSize        = 100                     // maximum number of items in a queue before blocking
+	maxChanSize         = 1                       // maximum number of items in a channel before blocking
+	maxQueueSize        = 1                       // maximum number of items in a queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
@@ -138,13 +138,17 @@ func (c *MultiConn) startSendService() {
 		select {
 		case <-send.C: // fires every 'sendInterval'
 			if packet := c.getNextPacket(); packet != nil {
+				c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 				err = c.sendWireBytes(packet, m)
 			}
 		case <-ping.C: // fires every 'pingInterval'
+			c.log.Debugf("Send Ping to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 			// send a ping to the peer
 			if err = c.sendWireBytes(new(Ping), m); err != nil {
 				break
 			}
+			// reset the pong timer
+			lib.StopTimer(pongTimer)
 			// set the pong timer to execute an Error function if the timer expires before receiving a pong
 			pongTimer = time.AfterFunc(pongTimeoutDuration, func() {
 				if e := ErrPongTimeout(); e != nil {
@@ -152,6 +156,7 @@ func (c *MultiConn) startSendService() {
 				}
 			})
 		case <-c.sendPong: // fires when receive service got a 'ping' message
+			c.log.Debugf("Send Pong to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 			// send a pong
 			err = c.sendWireBytes(new(Pong), m)
 		case <-c.receivedPong: // fires when receive service got a 'pong' message
@@ -168,12 +173,14 @@ func (c *MultiConn) startSendService() {
 }
 
 // startReceiveService() starts the main receive service
-// -
+// - reads from the underlying tcp connection and 'routes' the messages to the appropriate streams
+// - manages keep alive protocol by notifying the 'send service' of pings and pongs
 func (c *MultiConn) startReceiveService() {
 	defer lib.CatchPanic(c.log)
 	reader, m := *bufio.NewReaderSize(c.conn, maxPacketSize), limiter.New(0, 0)
 	defer func() { close(c.sendPong); close(c.receivedPong); m.Done() }()
 	for {
+		c.log.Debugf("Receive service ready for %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 		select {
 		default: // fires unless quit was signaled
 			// waits until bytes are received from the conn
@@ -185,6 +192,7 @@ func (c *MultiConn) startReceiveService() {
 			// handle different message types
 			switch x := msg.(type) {
 			case *Packet: // receive packet is a partial or full 'Message' with a Stream Topic designation and an EOF signal
+				c.log.Debug("Received Packet")
 				// load the proper stream
 				stream, found := c.streams[x.StreamId]
 				if !found {
@@ -204,8 +212,10 @@ func (c *MultiConn) startReceiveService() {
 					return
 				}
 			case *Ping: // receive ping message notifies the "send" service to respond with a 'pong' message
+				c.log.Debugf("Received ping from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 				c.sendPong <- struct{}{}
 			case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
+				c.log.Debugf("Received pong from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 				c.receivedPong <- struct{}{}
 			default: // unknown type results in slash and exiting the service
 				c.Error(ErrUnknownP2PMsg(x), UnknownMessageSlash)
@@ -236,14 +246,14 @@ func (c *MultiConn) waitForAndHandleWireBytes(reader bufio.Reader, m *limiter.Mo
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
-	m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
+	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
 	// read up to maxPacketSize bytes
 	n, er := reader.Read(buffer)
 	if er != nil {
 		return nil, ErrFailedRead(er)
 	}
 	// update the rate limiter with how many bytes were read
-	m.Update(n)
+	//m.Update(n)
 	// unmarshal the buffer
 	if err := lib.Unmarshal(buffer[:n], msg); err != nil {
 		return nil, err
@@ -268,14 +278,14 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) (er
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
-	m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
+	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
 	// write bytes to the wire up to max packet size
-	n, er := c.conn.Write(bz)
+	_, er := c.conn.Write(bz)
 	if er != nil {
-		return ErrFailedWrite(er)
+		c.log.Error(ErrFailedWrite(er).Error())
 	}
 	// update the rate limiter with how many bytes were written
-	m.Update(n)
+	//m.Update(n)
 	return
 }
 
@@ -334,7 +344,6 @@ func (s *Stream) hasStuffToSend() bool {
 func (s *Stream) nextPacket() (packet *Packet) {
 	packet = &Packet{StreamId: s.topic}
 	packet.Bytes, packet.Eof = s.chunkNextSend()
-	s.logger.Debugf("Sending packet with length: %d", len(packet.Bytes))
 	return
 }
 
@@ -354,7 +363,8 @@ func (s *Stream) chunkNextSend() (chunk []byte, eof bool) {
 // handlePacket() merge the new packet with the previously received ones until the entire message is complete (EOF signal)
 func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
 	msgAssemblerLen, packetLen := len(s.msgAssembler), len(packet.Bytes)
-	s.logger.Debugf("Received packet with length: %d", packetLen)
+	s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t) from %s",
+		lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof, lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
 	// if the addition of this new packet pushes the total message size above max
 	if int(maxMessageSize) < msgAssemblerLen+packetLen {
 		s.msgAssembler = s.msgAssembler[:0]
@@ -381,6 +391,7 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		}).WithHash()
 		// add to inbox for other parts of the app to read
 		s.inbox <- m
+		s.logger.Debugf("Forwarded packet(s) to inbox: %s", lib.Topic_name[int32(packet.StreamId)])
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]
 	}

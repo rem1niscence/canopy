@@ -780,12 +780,12 @@ func checkStartEndHeight(proposal GovProposal) lib.ErrorI {
 
 func checkOrders(orders *lib.Orders) lib.ErrorI {
 	if orders != nil {
-		deDupe := make(map[uint64]struct{})
+		deDupe := lib.NewDeDuplicator[uint64]()
 		for _, buyOrder := range orders.BuyOrders {
 			if buyOrder == nil {
 				return ErrInvalidBuyOrder()
 			}
-			if _, found := deDupe[buyOrder.OrderId]; found {
+			if found := deDupe.Found(buyOrder.OrderId); found {
 				return ErrDuplicateBuyOrder()
 			}
 			if err := checkAddress(buyOrder.BuyerReceiveAddress); err != nil {
@@ -794,22 +794,18 @@ func checkOrders(orders *lib.Orders) lib.ErrorI {
 			if buyOrder.BuyerChainDeadline == 0 {
 				return ErrInvalidBuyerDeadline()
 			}
-			deDupe[buyOrder.OrderId] = struct{}{}
 		}
-
-		deDupe = make(map[uint64]struct{})
+		deDupe = lib.NewDeDuplicator[uint64]()
 		for _, resetOrder := range orders.ResetOrders {
-			if _, found := deDupe[resetOrder]; found {
+			if found := deDupe.Found(resetOrder); found {
 				return ErrInvalidCloseOrder()
 			}
-			deDupe[resetOrder] = struct{}{}
 		}
-		deDupe = make(map[uint64]struct{})
+		deDupe = lib.NewDeDuplicator[uint64]()
 		for _, closeOrder := range orders.CloseOrders {
-			if _, found := deDupe[closeOrder]; found {
+			if found := deDupe.Found(closeOrder); found {
 				return ErrInvalidCloseOrder()
 			}
-			deDupe[closeOrder] = struct{}{}
 		}
 	}
 	return nil

@@ -105,6 +105,10 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (cr
 	}
 	for _, signer := range signers {
 		if address.Equals(crypto.NewAddressFromBytes(signer)) {
+			// stake is a special case where the signer must be known by the handler
+			if stake, ok := msg.(*types.MessageStake); ok {
+				stake.Signer = signer
+			}
 			// edit stake is a special case where the signer must be known by the handler
 			if editStake, ok := msg.(*types.MessageEditStake); ok {
 				editStake.Signer = signer
@@ -181,7 +185,7 @@ func (s *StateMachine) CheckMessage(msg *anypb.Any) (message lib.MessageI, err l
 
 // CheckFee() validates the fee amount is sufficient to pay for a transaction
 func (s *StateMachine) CheckFee(fee uint64, msg lib.MessageI) lib.ErrorI {
-	stateLimitFee, err := s.GetFeeForMessage(msg)
+	stateLimitFee, err := s.GetFeeForMessageName(msg.Name())
 	if err != nil {
 		return err
 	}

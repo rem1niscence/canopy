@@ -447,16 +447,22 @@ func NewTimer() *time.Timer {
 
 // ResetTimer() stops the existing timer, and resets with the new duration
 func ResetTimer(t *time.Timer, d time.Duration) {
+	if t == nil {
+		*t = *time.NewTimer(d)
+	}
 	StopTimer(t)
 	t.Reset(d)
 }
 
 // StopTimer() stops the existing timer
 func StopTimer(t *time.Timer) {
+	if t == nil {
+		return
+	}
 	if !t.Stop() {
-		select {
-		case <-t.C:
-		default:
+		// drain safely
+		for len(t.C) > 0 {
+			<-t.C
 		}
 	}
 }
@@ -554,6 +560,28 @@ func TruncateSlice[T any](slice []T, max int) []T {
 		return slice[:max]
 	}
 	return slice
+}
+
+// DeDuplicator is a generic structure that serves as a simple anti-duplication check
+type DeDuplicator[T comparable] struct {
+	m map[T]struct{}
+}
+
+// NewDeDuplicator constructs a new object reference to a DeDuplicator
+func NewDeDuplicator[T comparable]() *DeDuplicator[T] {
+	return &DeDuplicator[T]{m: make(map[T]struct{})}
+}
+
+// Found checks for an existing entry and adds it to the map if it's not present
+func (d *DeDuplicator[T]) Found(k T) bool {
+	// check if the key already exists
+	if _, exists := d.m[k]; exists {
+		return true // It's a duplicate
+	}
+	// add the key to the map
+	d.m[k] = struct{}{}
+	// not a duplicate
+	return false
 }
 
 func PrintStackTrace() {

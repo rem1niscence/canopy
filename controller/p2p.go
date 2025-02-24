@@ -144,11 +144,22 @@ func (c *Controller) GossipBlock(qc *lib.QuorumCertificate, senderPubKey []byte)
 	if err := c.P2P.SendToPeers(Block, blockMessage, lib.BytesToString(senderPubKey)); err != nil {
 		c.log.Errorf("unable to gossip block with err: %s", err.Error())
 	}
-	// send to self
-	if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
-		c.log.Errorf("unable to self send block with err: %s", err.Error())
-	}
 	c.log.Debugf("gossiping done")
+}
+
+// SelfSendBlock() gossips a QuorumCertificate (with block) through the P2P network for handling
+func (c *Controller) SelfSendBlock(qc *lib.QuorumCertificate) {
+	// create the block message
+	blockMessage := &lib.BlockMessage{
+		ChainId:             c.Config.ChainId,
+		MaxHeight:           c.FSM.Height(),
+		TotalVdfIterations:  c.FSM.TotalVDFIterations(),
+		BlockAndCertificate: qc,
+	}
+	// gossip the block message to peers
+	if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
+		c.log.Errorf("unable to gossip block with err: %s", err.Error())
+	}
 }
 
 // RequestBlock() sends a QuorumCertificate (block + certificate) request to peer(s) - `heightOnly` is a request for just the peer's max height

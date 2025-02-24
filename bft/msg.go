@@ -55,12 +55,6 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 	if err = x.checkBasic(b.View); err != nil {
 		return false, err
 	}
-	// if we already have an expected 'proposer' for this round - ensure the sender is correct
-	if b.ProposerKey != nil {
-		if !bytes.Equal(b.ProposerKey, x.Signature.PublicKey) {
-			return false, lib.ErrInvalidProposerPubKey(b.ProposerKey)
-		}
-	}
 	if x.Header.Phase == Election { // ELECTION
 		// validate target height
 		if x.Header.Height != b.Height {

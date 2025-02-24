@@ -9,6 +9,52 @@ import (
 
 /* On-chain governance: parameter changes and treasury subsidies */
 
+// PROPOSAL CODE BELOW
+
+// ApproveProposal() validates a 'GovProposal' message (ex. MsgChangeParameter or MsgDAOTransfer)
+// - checks message sent between start height and end height
+// - if APPROVE_ALL set or proposal on the APPROVE_LIST then no error
+// - else return ErrRejectProposal
+func (s *StateMachine) ApproveProposal(msg types.GovProposal) lib.ErrorI {
+	// if height is before start height or height is after end height (both exclusive)
+	if s.Height() < msg.GetStartHeight() || s.Height() > msg.GetEndHeight() {
+		// reject the proposal
+		return types.ErrRejectProposal()
+	}
+	// handle the proposal based on config
+	switch s.proposeVoteConfig {
+	// if approving all proposals
+	default:
+		// proposal passes
+		return nil
+	// if rejecting all proposals
+	case types.RejectAllProposals:
+		// proposal is rejected
+		return types.ErrRejectProposal()
+	// if on the local approve list
+	case types.ProposalApproveList:
+		// convert the governance proposal into bytes
+		bz, err := lib.Marshal(msg)
+		if err != nil {
+			return err
+		}
+		// read the 'approve list' from the data directory
+		proposals := make(types.GovProposals)
+		// get the voted from the local proposals.json file in the data directory
+		if err = proposals.NewFromFile(s.Config.DataDirPath); err != nil {
+			return err
+		}
+		// check on this specific message for explicit rejection or complete omission
+		if value, ok := proposals[crypto.HashString(bz)]; !ok || !value.Approve {
+			return types.ErrRejectProposal()
+		}
+		// proposal passes
+		return nil
+	}
+}
+
+// PARAMETER CODE BELOW
+
 // UpdateParam() updates a governance parameter keyed by space and name
 func (s *StateMachine) UpdateParam(paramSpace, paramName string, value proto.Message) (err lib.ErrorI) {
 	// save the previous parameters to check for updates
@@ -173,31 +219,38 @@ func (s *StateMachine) SetParamsFee(f *types.FeeParams) lib.ErrorI {
 
 // setParams() converts the ParamSpace into bytes and sets them in state
 func (s *StateMachine) setParams(space string, p proto.Message) lib.ErrorI {
+	// convert the param object to bytes
 	bz, err := lib.Marshal(p)
 	if err != nil {
 		return err
 	}
+	// set the bytes under the 'space' for the parameters
 	return s.Set(types.KeyForParams(space), bz)
 }
 
 // GetParams() returns the aggregated ParamSpaces in a single Params object
 func (s *StateMachine) GetParams() (*types.Params, lib.ErrorI) {
+	// get the consensus parameters from state
 	cons, err := s.GetParamsCons()
 	if err != nil {
 		return nil, err
 	}
+	// get the validator parameters from state
 	val, err := s.GetParamsVal()
 	if err != nil {
 		return nil, err
 	}
+	// get the fee parameters from state
 	fee, err := s.GetParamsFee()
 	if err != nil {
 		return nil, err
 	}
+	// get the governance parameters from state
 	gov, err := s.GetParamsGov()
 	if err != nil {
 		return nil, err
 	}
+	// return a collective 'parameters' object that holds all the spaces
 	return &types.Params{
 		Consensus:  cons,
 		Validator:  val,
@@ -208,82 +261,68 @@ func (s *StateMachine) GetParams() (*types.Params, lib.ErrorI) {
 
 // GetParamsCons() returns the current state of the governance params in the Consensus space
 func (s *StateMachine) GetParamsCons() (ptr *types.ConsensusParams, err lib.ErrorI) {
+	// create a new object ref for the consensus params to ensure a non-nil result
 	ptr = new(types.ConsensusParams)
+	// get the consensus parameters from state
 	err = s.getParams(types.ParamSpaceCons, ptr, types.ErrEmptyConsParams)
+	// exit
 	return
 }
 
 // GetParamsVal() returns the current state of the governance params in the Validator space
 func (s *StateMachine) GetParamsVal() (ptr *types.ValidatorParams, err lib.ErrorI) {
+	// create a new object ref for the validator params to ensure a non-nil result
 	ptr = new(types.ValidatorParams)
+	// get the validator parameters from state
 	err = s.getParams(types.ParamSpaceVal, ptr, types.ErrEmptyValParams)
+	// exit
 	return
 }
 
 // GetParamsGov() returns the current state of the governance params in the Governance space
 func (s *StateMachine) GetParamsGov() (ptr *types.GovernanceParams, err lib.ErrorI) {
+	// create a new object ref for the governance params to ensure a non-nil result
 	ptr = new(types.GovernanceParams)
+	// get the governance parameters from state
 	err = s.getParams(types.ParamSpaceGov, ptr, types.ErrEmptyGovParams)
+	// exit
 	return
 }
 
 // GetParamsFee() returns the current state of the governance params in the Fee space
 func (s *StateMachine) GetParamsFee() (ptr *types.FeeParams, err lib.ErrorI) {
+	// create a new object ref for the fee params to ensure a non-nil result
 	ptr = new(types.FeeParams)
+	// get the fee parameters from state
 	err = s.getParams(types.ParamSpaceFee, ptr, types.ErrEmptyFeeParams)
+	// exit
 	return
 }
 
-// ApproveProposal() validates a 'GovProposal' message (ex. MsgChangeParameter or MsgDAOTransfer)
-// - checks message sent between start height and end height
-// - if APPROVE_ALL set or proposal on the APPROVE_LIST then no error
-// - else return ErrRejectProposal
-func (s *StateMachine) ApproveProposal(msg types.GovProposal) lib.ErrorI {
-	if s.Height() < msg.GetStartHeight() || s.Height() > msg.GetEndHeight() {
-		return types.ErrRejectProposal()
-	}
-	// handle the proposal based on config
-	switch s.proposeVoteConfig {
-	case types.ProposalApproveList: // approve based on list
-		// convert the msg into bytes
-		bz, err := lib.Marshal(msg)
-		if err != nil {
-			return err
-		}
-		// read the 'approve list' from the datadirectory
-		proposals := make(types.GovProposals)
-		if err = proposals.NewFromFile(s.Config.DataDirPath); err != nil {
-			return err
-		}
-		// check on this specific message for explicit rejection or complete omission
-		if value, ok := proposals[crypto.HashString(bz)]; !ok || !value.Approve {
-			return types.ErrRejectProposal()
-		}
-		return nil
-	case types.RejectAllProposals: // reject all
-		return types.ErrRejectProposal()
-	default: // approve all
-		return nil
-	}
-}
-
 // getParams() is a generic helper function loads the params for a specific ParamSpace into a ptr object
-func (s *StateMachine) getParams(space string, ptr any, emptyErr func() lib.ErrorI) lib.ErrorI {
+func (s *StateMachine) getParams(space string, ptr any, emptyErr func() lib.ErrorI) (err lib.ErrorI) {
+	// get the parameters bytes using the key for the parameter space
 	bz, err := s.Get(types.KeyForParams(space))
 	if err != nil {
 		return err
 	}
+	// if the bytes are empty, execute and return the  callback error
 	if bz == nil {
 		return emptyErr()
 	}
+	// convert the parameters bytes to the params object reference
 	if err = lib.Unmarshal(bz, ptr); err != nil {
 		return err
 	}
-	return nil
+	// exit
+	return
 }
+
+// POLLING CODE BELOW
 
 // ParsePollTransactions() parses the last valid block for memo commands to execute specialized 'straw polling' functionality
 func (s *StateMachine) ParsePollTransactions(b *lib.BlockResult) {
+	// create a new object reference to ensure non-nil results
 	ap := new(types.ActivePolls)
 	// load the active polls from the json file
 	if err := ap.NewFromFile(s.Config.DataDirPath); err != nil {
@@ -298,22 +337,27 @@ func (s *StateMachine) ParsePollTransactions(b *lib.BlockResult) {
 		}
 		// check for a poll transaction
 		if err := ap.CheckForPollTransaction(pub.Address(), tx.Transaction.Memo, s.Height()); err != nil {
+			// simply log the error
 			s.log.Error(err.Error())
+			// exit
 			return
 		}
 	}
 	// save to file: NOTE: this is non-atomic and can be inconsistent with the database
 	// but this is a non-critical function that won't cause a consensus failure
 	if err := ap.SaveToFile(s.Config.DataDirPath); err != nil {
+		// simply log the error
 		s.log.Error(err.Error())
+		// exit
 		return
 	}
 }
 
 // PollsToResults() coverts the polling objects to a compressed result based on the voting power
 func (s *StateMachine) PollsToResults(polls *types.ActivePolls) (result types.Poll, err lib.ErrorI) {
+	// create a new poll object ref to ensure non-nil results
 	result = make(types.Poll)
-	// create caches to span over multiple
+	// create caches to span over multiple blocks
 	accountCache, valList := map[string]uint64{}, map[string]uint64{} // address -> power (tokens)
 	// get the canopy validator set
 	members, err := s.GetCommitteeMembers(s.Config.ChainId)
@@ -336,42 +380,51 @@ func (s *StateMachine) PollsToResults(polls *types.ActivePolls) (result types.Po
 		public, _ := crypto.NewPublicKeyFromBytes(member.PublicKey)
 		valList[public.Address().String()] = member.VotingPower
 	}
-	// for each poll
+	// for each active poll in list
 	for proposalHash, addresses := range polls.Polls {
+		// initialize the poll result
 		r := types.PollResult{
 			ProposalHash: proposalHash,
 			ProposalURL:  polls.PollMeta[proposalHash].Url,
 			Accounts:     types.VoteStats{TotalTokens: supply.Total - supply.Staked - dao.Amount},
 			Validators:   types.VoteStats{TotalTokens: members.TotalPower},
 		}
-		// for each vote
+		// for each vote in the active poll
 		for address, approve := range addresses {
 			// check if is validator
 			valPower, isValidator := valList[address]
+			// if address is a validator
 			if isValidator {
-				// add validator vote
+				// add validator vote to the validators total voted power
 				r.Validators.TotalVotedTokens += valPower
+				// if the validator approves...
 				if approve {
+					// add to the approved tokens
 					r.Validators.ApproveTokens += valPower
 				} else {
+					// add to the rejected tokens
 					r.Validators.RejectTokens += valPower
 				}
 			}
-			// check account balance
+			// check the account balance
 			accTokens, inCache := accountCache[address]
+			// if the account is not in cache
 			if !inCache {
-				// if not in cache
+				// convert the string into an address object
 				addr, _ := crypto.NewAddressFromString(address)
 				// get the account from the state
 				accTokens, _ = s.GetAccountBalance(addr)
 				// set in cache
 				accountCache[address] = accTokens
 			}
-			// add account vote
+			// add account vote to the accounts total voted power
 			r.Accounts.TotalVotedTokens += accTokens
+			// if the account approves...
 			if approve {
+				// add to the approved tokens
 				r.Accounts.ApproveTokens += accTokens
 			} else {
+				// add to the rejected tokens
 				r.Accounts.RejectTokens += accTokens
 			}
 		}
@@ -389,42 +442,70 @@ func (s *StateMachine) PollsToResults(polls *types.ActivePolls) (result types.Po
 	return
 }
 
-// OnOrAfterVersion() checks if a protocol version is enabled or not
-// based on the current UPGRADE param in state
-func (s *StateMachine) OnOrAfterVersion(version uint64) (isEnabled bool) {
-	params, err := s.GetParamsCons()
+// UPGRADE CODE BELOW
+
+// IsFeatureEnabled() checks if a feature is enabled based on the protocol version
+// stored in the state compared to the required activation version
+func (s *StateMachine) IsFeatureEnabled(requiredVersion uint64) bool {
+	// retrieve the current consensus parameters from the state
+	consensusParams, err := s.GetParamsCons()
 	if err != nil {
-		s.log.Error(err.Error())
+		// simply log the failure
+		s.log.Error("Failed to retrieve consensus parameters: " + err.Error())
+		// return 'feature not enabled'
 		return false
 	}
-	v, err := params.ParseProtocolVersion()
+	// extract the protocol version from the consensus parameters
+	currentProtocol, err := consensusParams.ParseProtocolVersion()
 	if err != nil {
-		s.log.Error(err.Error())
+		// simply log the failure
+		s.log.Error("Failed to parse protocol version: " + err.Error())
+		// return 'feature not enabled'
 		return false
 	}
-	// anytime on a higher protocol version, enable the feature
-	if v.Version > version {
+	// check if the current protocol version is beyond the required activation version
+	if currentProtocol.Version > requiredVersion {
+		// return 'feature is enabled'
 		return true
 	}
-	// if on the version + on or greater than the upgrade height
-	return s.Height() >= v.Height && version == v.Version
+	// if the current protocol version matches the required version,
+	// enable the feature only if the state height is at or beyond the activation height
+	return currentProtocol.Version == requiredVersion && s.Height() >= currentProtocol.Height
+}
+
+// ROOT CHAIN CODE BELOW
+
+// IsOwnRoot() returns if this chain is its own root (base)
+func (s *StateMachine) IsOwnRoot() (bool, lib.ErrorI) {
+	// get the latest root chain id from the state
+	rootId, err := s.GetRootChainId()
+	if err != nil {
+		return false, err
+	}
+	// return whether self is root
+	return s.Config.ChainId == rootId, nil
 }
 
 // GetRootChainId() gets the latest root chain id from the state
 func (s *StateMachine) GetRootChainId() (uint64, lib.ErrorI) {
+	// get the consensus params from state
 	consParams, err := s.GetParamsCons()
 	if err != nil {
 		return 0, err
 	}
+	// return the root chain id from the consensus params
 	return consParams.RootChainId, nil
 }
 
 // LoadRootChainId() loads the root chain id from the state at a certain height
 func (s *StateMachine) LoadRootChainId(height uint64) (uint64, lib.ErrorI) {
+	// create a read-only historical version of the state
 	sm, err := s.TimeMachine(height)
 	if err != nil {
 		return 0, err
 	}
+	// memory cleanup
 	defer sm.Discard()
+	// return the root chain id at that height
 	return sm.GetRootChainId()
 }
