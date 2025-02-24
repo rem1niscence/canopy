@@ -3,11 +3,13 @@ package lib
 import (
 	"container/list"
 	"encoding/json"
-	"github.com/canopy-network/canopy/lib/crypto"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/runtime/protoimpl"
 	"testing"
 	"time"
+
+	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/runtime/protoimpl"
 )
 
 func TestMessageCacheAdd(t *testing.T) {
@@ -369,12 +371,12 @@ func TestPeerInfoJSON(t *testing.T) {
 		Reputation:    1,
 	}
 	// convert structure to json bytes
-	gotBytes, err := json.Marshal(expected)
+	gotBytes, err := protojson.Marshal(expected)
 	require.NoError(t, err)
 	// convert bytes to structure
 	got := new(PeerInfo)
 	// unmarshal into bytes
-	require.NoError(t, json.Unmarshal(gotBytes, got))
+	require.NoError(t, protojson.Unmarshal(gotBytes, got))
 	// compare got vs expected
 	require.EqualExportedValues(t, expected, got)
 }
