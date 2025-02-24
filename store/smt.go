@@ -430,7 +430,7 @@ func (s *SMT) validateTarget() lib.ErrorI {
 
 // GetMerkleProof() returns the merkle proof-of-membership for a given key if it exists,
 // and the proof of non-membership otherwise
-func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
+func (s *SMT) GetMerkleProof(key []byte) ([]*lib.Node, lib.ErrorI) {
 	// calculate the key and value to traverse
 	s.target = &node{Key: newNodeKey(crypto.Hash(key), s.keyBitLength)}
 	// check to make sure the target is valid
@@ -438,11 +438,7 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 		return nil, err
 	}
 
-	// generate the proof structure
-	proof := &lib.MerkleProof{
-		Nodes: make([]*lib.ProofNode, 0),
-		Root:  s.Root(),
-	}
+	proof := make([]*lib.Node, 0)
 
 	// navigates the tree downward
 	if err := s.traverse(); err != nil {
@@ -463,12 +459,12 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 			return nil, err
 		}
 
-		proof.Nodes = append(proof.Nodes, &lib.ProofNode{
+		proof = append(proof, &lib.Node{
 			Key:     node.Key.bytes(),
 			Value:   node.Value,
 			Bitmask: int32(order),
 		})
-		proof.Nodes = append(proof.Nodes, &lib.ProofNode{
+		proof = append(proof, &lib.Node{
 			Key:     siblingNode.Key.bytes(),
 			Value:   siblingNode.Value,
 			Bitmask: int32(order),
@@ -479,8 +475,8 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 		// Verify the sibling's position to ascertain whether it is a left or right child.
 		// If it is a left child, the two node positions need to be swapped to construct
 		// the proof accurately.
-		if len(proof.Nodes) == 2 && order == leftChild {
-			proof.Nodes[0], proof.Nodes[1] = proof.Nodes[1], proof.Nodes[0]
+		if len(proof) == 2 && order == leftChild {
+			proof[0], proof[1] = proof[1], proof[0]
 		}
 	}
 
@@ -490,20 +486,21 @@ func (s *SMT) GetMerkleProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
 // VerifyProof verifies a Sparse Merkle Tree proof for a given value
 // reconstructing the root hash and comparing it against the provided root hash
 // depending on the proof type (membership or non-membership)
-func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, proof *lib.MerkleProof) (bool, lib.ErrorI) {
+func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, root []byte, proof []*lib.Node) (bool, lib.ErrorI) {
 	// A valid proof is expected to have at least two nodes (the leaf nodes) in order to build the root
-	if len(proof.Nodes) < 2 {
+	// and always should include an even number of nodes representing the siblings of the nodes in the tree
+	if len(proof) < 2 && len(proof)%2 != 0 {
 		return false, ErrInvalidMerkleTreeProof()
 	}
 
 	// Generate the inital hash from the leaves of the proof
-	leftLeaf := proof.Nodes[0]
-	rightLeaf := proof.Nodes[1]
+	leftLeaf := proof[0]
+	rightLeaf := proof[1]
 
 	hash := crypto.Hash(append(append(leftLeaf.Key, leftLeaf.Value...),
 		append(rightLeaf.Key, rightLeaf.Value...)...))
 
-	internalNodes := proof.Nodes[2:]
+	internalNodes := proof[2:]
 
 	for i := 0; i < len(internalNodes); i += 2 {
 		if internalNodes[i].Bitmask == leftChild {
@@ -522,7 +519,7 @@ func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, pro
 	}
 
 	// compare the calculated root hash against the provided root hash
-	if !bytes.Equal(hash, proof.Root) {
+	if !bytes.Equal(hash, root) {
 		return false, nil
 	}
 
@@ -536,7 +533,7 @@ func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, pro
 	smt := NewSMT(s.Root(), s.keyBitLength, memStore)
 
 	// add the nodes
-	for _, leaf := range proof.Nodes {
+	for _, leaf := range proof {
 		// Keys are saved "as-is" to preserve the original values of the tree
 		// when the proof was obtained. Some intermediate node keys may have a length
 		// shorter than the MaxKeyBitLength. This pads such keys to ensure they are
@@ -858,7 +855,7 @@ func (x *node) copy() *node {
 
 // NODE LIST CODE BELOW
 
-// NodeList defines a list of nodes, used for traversal and merkle proofs
+// NodeList defines a list of nodes, used for traversal
 type NodeList struct {
 	Nodes []*node
 }

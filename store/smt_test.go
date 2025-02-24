@@ -2169,7 +2169,8 @@ func TestStoreProof(t *testing.T) {
 			proof, err := smt.GetMerkleProof(test.target.Key.bytes())
 			require.NoError(t, err)
 			// verify the proof
-			valid, err := smt.VerifyProof(test.target.Key.bytes(), test.target.Value, test.validateMembership, proof)
+			valid, err := smt.VerifyProof(test.target.Key.bytes(), test.target.Value,
+				test.validateMembership, smt.Root(), proof)
 
 			// validate results
 			require.Equal(t, test.err, err)

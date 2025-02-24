@@ -37,8 +37,11 @@ message Node {
   bytes LeftChildKey = 2;
   // RightChildKey: is the key for the right child node. Nil means no child
   bytes RightChildKey = 3;
+  // Key: used for merkle proof generation and verification. It is the compact
+  // representation of the node's key bit sequences
+  bytes Key = 4;
   // Bitmask: Used for Merkle proof generation and verification. Indicates 
   // whether each hash requires the left or right sibling, where 0 
   // represents a left sibling and 1 represents a right sibling
-  int32 Bitmask = 4;
+  int32 Bitmask = 5;
 }

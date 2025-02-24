@@ -189,14 +189,14 @@ func (s *Store) Delete(k []byte) lib.ErrorI {
 }
 
 // GetProof() uses the StateCommitStore to prove membership and non-membership
-func (s *Store) GetProof(key []byte) (*lib.MerkleProof, lib.ErrorI) {
+func (s *Store) GetProof(key []byte) ([]*lib.Node, lib.ErrorI) {
 	return s.sc.GetMerkleProof(key)
 }
 
 // VerifyProof() checks the validity of a member or non-member proof from the StateCommitStore
 // by verifying the proof against the provided key, value, and proof data.
-func (s *Store) VerifyProof(key, value []byte, validateMembership bool, proof *lib.MerkleProof) (bool, lib.ErrorI) {
-	return s.sc.VerifyProof(key, value, validateMembership, proof)
+func (s *Store) VerifyProof(key, value []byte, validateMembership bool, root []byte, proof []*lib.Node) (bool, lib.ErrorI) {
+	return s.sc.VerifyProof(key, value, validateMembership, root, proof)
 }
 
 // Iterator() returns an object for scanning the StateStore starting from the provided prefix.
