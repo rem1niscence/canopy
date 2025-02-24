@@ -8,96 +8,124 @@ import (
 	"slices"
 )
 
+/* This file implements state actions on Validators and Delegators*/
+
 // GetValidator() gets the validator from the store via the address
 func (s *StateMachine) GetValidator(address crypto.AddressI) (*types.Validator, lib.ErrorI) {
+	// get the bytes from state using the key for a validator at a specific address
 	bz, err := s.Get(types.KeyForValidator(address))
 	if err != nil {
 		return nil, err
 	}
+	// if the bytes are empty, return 'validator doesn't exist'
 	if bz == nil {
 		return nil, types.ErrValidatorNotExists()
 	}
+	// convert the bytes into a validator object reference
 	val, err := s.unmarshalValidator(bz)
 	if err != nil {
 		return nil, err
 	}
+	// update the validator structure address
 	val.Address = address.Bytes()
+	// return the validator
 	return val, nil
 }
 
 // GetValidatorExists() checks if the Validator already exists in the state
 func (s *StateMachine) GetValidatorExists(address crypto.AddressI) (bool, lib.ErrorI) {
+	// get the bytes from state using the key for a validator at a specific address
 	bz, err := s.Get(types.KeyForValidator(address))
 	if err != nil {
 		return false, err
 	}
+	// return true if validator bytes are non-nil
 	return bz != nil, nil
 }
 
 // GetValidators() returns a slice of all validators
-func (s *StateMachine) GetValidators() ([]*types.Validator, lib.ErrorI) {
+func (s *StateMachine) GetValidators() (result []*types.Validator, err lib.ErrorI) {
+	// create an iterator to traverse all keys under the 'ValidatorPrefix'
 	it, err := s.Iterator(types.ValidatorPrefix())
 	if err != nil {
 		return nil, err
 	}
+	// ensure memory cleanup
 	defer it.Close()
-	var result []*types.Validator
+	// for each item of the iterator
 	for ; it.Valid(); it.Next() {
+		// convert the bytes into a validator object reference
 		val, e := s.unmarshalValidator(it.Value())
 		if e != nil {
 			return nil, e
 		}
+		// add it to the list
 		result = append(result, val)
 	}
-	return result, nil
+	// exit
+	return
 }
 
 // GetValidatorsPaginated() returns a page of filtered validators
 func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorFilters) (page *lib.Page, err lib.ErrorI) {
 	// initialize a page and the results slice
 	page, res := lib.NewPage(p, types.ValidatorsPageName), make(types.ValidatorPage, 0)
-	if f.On() { // if request has filters
-		// create a new iterator for the prefix key
-		it, e := s.Iterator(types.ValidatorPrefix())
-		if e != nil {
-			return nil, e
-		}
-		defer it.Close()
-		var filteredVals []*types.Validator
-		// pre-filter the possible candidates
-		for ; it.Valid(); it.Next() {
-			var val *types.Validator
-			val, err = s.unmarshalValidator(it.Value())
-			if err != nil {
-				return nil, err
-			}
-			if val.PassesFilter(f) {
-				filteredVals = append(filteredVals, val)
-			}
-		}
-		// load the array (slice) into the page
-		err = page.LoadArray(filteredVals, &res, func(i any) (e lib.ErrorI) {
-			v, ok := i.(*types.Validator)
-			if !ok {
-				return lib.ErrInvalidArgument()
-			}
-			res = append(res, v)
-			return
-		})
-	} else { // if no filters
-		// validators are stored lexicographically not ordered stake
-		err = page.Load(types.ValidatorPrefix(), false, &res, s.store, func(_, b []byte) (err lib.ErrorI) {
-			val, err := s.unmarshalValidator(b)
+	// if the request has no filters
+	if !f.On() {
+		// populate the page using the validators prefix (validators are stored lexicographically not ordered stake)
+		err = page.Load(types.ValidatorPrefix(), false, &res, s.store, func(_, value []byte) (err lib.ErrorI) {
+			// convert the value into a validator object reference
+			val, err := s.unmarshalValidator(value)
+			// if there's no error
 			if err == nil {
+				// add to the list
 				res = append(res, val)
 			}
+			// exit
 			return
 		})
+		// exit
+		return
 	}
+	// create a new iterator for the prefix key
+	it, e := s.Iterator(types.ValidatorPrefix())
+	if e != nil {
+		return nil, e
+	}
+	// ensure memory cleanup
+	defer it.Close()
+	// create a variable to hold the list of filtered validators
+	var filteredVals []*types.Validator
+	// for each item in the iterator
+	for ; it.Valid(); it.Next() {
+		// convert the bytes into a validator object reference
+		val, er := s.unmarshalValidator(it.Value())
+		if er != nil {
+			return nil, er
+		}
+		// pre-filter the possible candidates
+		if val.PassesFilter(f) {
+			// add to the list
+			filteredVals = append(filteredVals, val)
+		}
+	}
+	// populate the page with the list of filtered validators
+	err = page.LoadArray(filteredVals, &res, func(i any) (e lib.ErrorI) {
+		// cast to validator
+		v, ok := i.(*types.Validator)
+		// ensure the cast was successful
+		if !ok {
+			return lib.ErrInvalidArgument()
+		}
+		// add to the resulting page
+		res = append(res, v)
+		// exit
+		return
+	})
 	return
 }
 
-// SetValidators() upserts multiple Validators into the state and updates the supply
+// SetValidators() upserts multiple Validators into the state and updates the supply tracker
 func (s *StateMachine) SetValidators(validators []*types.Validator, supply *types.Supply) lib.ErrorI {
 	for _, val := range validators {
 		supply.Total += val.StakedAmount
@@ -373,8 +401,8 @@ func (s *StateMachine) LotteryWinner(id uint64, validators ...bool) (lottery *li
 	}, nil
 }
 
-// validatorPubToAddr() is a convenience function that converts a BLS validator key to an address
-func (s *StateMachine) validatorPubToAddr(public []byte) ([]byte, lib.ErrorI) {
+// pubKeyBytesToAddress() is a convenience function that converts a public key to an address
+func (s *StateMachine) pubKeyBytesToAddress(public []byte) ([]byte, lib.ErrorI) {
 	pk, er := crypto.NewPublicKeyFromBytes(public)
 	if er != nil {
 		return nil, types.ErrInvalidPublicKey(er)
