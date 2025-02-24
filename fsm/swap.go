@@ -122,6 +122,11 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 				s.log.Error(err.Error())
 				continue
 			}
+			// sanity check
+			if qc.Results == nil {
+				s.log.Error(lib.ErrNilCertResults().Error())
+				continue
+			}
 			// check if the 'close order' command was issued previously
 			if qc.Results.Orders != nil && slices.Contains(qc.Results.Orders.CloseOrders, order.Id) {
 				// if so, add it to the close orders

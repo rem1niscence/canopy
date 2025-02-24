@@ -563,17 +563,17 @@ export const sanitizeTextInput = (value) => {
 // it also converts the value to a CNPY representation if toCnpy is true.
 // It is meant to be used as an onChange event handler.
 export const sanitizeNumberInput = (value, toCnpy = true) => {
-    let input = value
-        .replace(/[^\d]/g, "") // Removes all non-digit characters
-        .replace(/^0+/, ""); // Removes leading zeros
+    let input = value.replace(/[^\d]/g, ""); // Remove all non-digit characters
+    // Allow a single zero but remove leading zeros once other numbers are added
+    if (input.length > 1) {
+        input = input.replace(/^0+/, "");
+    }
     if (input === "") {
         return "";
     }
-
     if (toCnpy) {
         return formatLocaleNumber(toCNPY(input), 6, 6);
     }
-
     return formatLocaleNumber(Number(input));
 };
 
