@@ -192,7 +192,7 @@ export async function getModalData(query, page) {
     // Block by hash
     if (query.length === 64) {
       const block = await BlockByHash(query);
-      if (block?.block_header?.hash) return { block };
+      if (block?.blockHeader?.hash) return { block };
 
       const tx = await TxByHash(query);
       return tx?.sender ? tx : noResult;
@@ -214,7 +214,7 @@ export async function getModalData(query, page) {
 
   // Handle block by height
   const block = await BlockByHeight(query);
-  return block?.block_header?.hash ? { block } : noResult;
+  return block?.blockHeader?.hash ? { block } : noResult;
 }
 
 // getCardData() executes api calls and prepares the data for the cards

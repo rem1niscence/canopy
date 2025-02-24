@@ -188,7 +188,7 @@ export function convertTx(tx) {
     tx.index = 0;
   }
   tx = JSON.parse(
-    JSON.stringify(tx, ["sender", "recipient", "message_type", "height", "index", "tx_hash", "fee", "sequence"], 4),
+    JSON.stringify(tx, ["sender", "recipient", "messageType", "height", "index", "txHash", "fee", "sequence"], 4),
   );
   return tx;
 }

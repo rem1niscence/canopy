@@ -155,7 +155,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
 
     // getValidatorAmount() returns the formatted staked amount of the validator
     function getValidatorAmount() {
-        return validator.staked_amount == null ? "0.00" : formatNumber(validator.staked_amount);
+        return validator.stakedAmount == null ? "0.00" : formatNumber(validator.stakedAmount);
     }
 
     // getStakedStatus() returns the staking status of the validator
@@ -163,9 +163,9 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
         switch (true) {
             case !validator.address:
                 return "UNSTAKED";
-            case validator.unstaking_height !== 0:
+            case validator.unstakingHeight !== 0:
                 return "UNSTAKING";
-            case validator.max_paused_height !== 0:
+            case validator.maxPausedHeight !== 0:
                 return "PAUSED";
             case validator.delegate:
                 return "DELEGATING";
@@ -687,10 +687,10 @@ function RenderTransactions({account, state, setState}) {
                 {account.combined.slice(0, 5).map((v, i) => (
                     <tr key={i}>
                         <td>{v.height || "N/A"}</td>
-                        <td>{toCNPY(v.transaction.msg.amount) || toCNPY(v.transaction.msg.AmountForSale) || "N/A"}</td>
+                        <td>{toCNPY(v.transaction.msg.amount) || toCNPY(v.transaction.msg.amountForSale) || "N/A"}</td>
                         <AccSumTabCol detail={v.recipient ?? v.sender ?? v.address} i={i} state={state} setState={setState}/>
                         <td>{v.message_type || v.transaction.type}</td>
-                        <AccSumTabCol detail={v.tx_hash} i={i + 1} state={state} setState={setState}/>
+                        <AccSumTabCol detail={v.txHash} i={i + 1} state={state} setState={setState}/>
                         <td>{v.status ?? ""}</td>
                     </tr>
                 ))}

@@ -239,11 +239,11 @@ func (x *TxResult) GetTx() TransactionI { return x.Transaction }
 type jsonTxResult struct {
 	Sender      HexBytes     `json:"sender,omitempty"`
 	Recipient   HexBytes     `json:"recipient,omitempty"`
-	MessageType string       `json:"message_type,omitempty"`
+	MessageType string       `json:"messageType,omitempty"`
 	Height      uint64       `json:"height,omitempty"`
 	Index       uint64       `json:"index,omitempty"`
 	Transaction *Transaction `json:"transaction,omitempty"`
-	TxHash      string       `json:"tx_hash,omitempty"`
+	TxHash      string       `json:"txHash,omitempty"`
 }
 
 // TxResult satisfies the json.Marshaller and json.Unmarshaler interfaces
@@ -321,7 +321,7 @@ type jsonSignature struct {
 // FailedTx contains a failed transaction and its error
 type FailedTx struct {
 	Transaction *Transaction `json:"transaction,omitempty"`
-	Hash        string       `json:"tx_hash,omitempty"`
+	Hash        string       `json:"txHash,omitempty"`
 	Address     string       `json:"address,omitempty"`
 	Error       error        `json:"error,omitempty"`
 }

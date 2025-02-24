@@ -126,10 +126,10 @@ export default function Dashboard() {
           {
             title: "TOTAL PEERS: " + (state.peerInfo.numPeers == null ? "0" : state.peerInfo.numPeers),
             dT: "INBOUND: " + inPeer + ", OUTBOUND: " + ouPeer,
-            d1: "ID: " + state.peerInfo.id.public_key,
+            d1: "ID: " + state.peerInfo.id.publicKey,
             d2:
               "NET ADDR: " +
-              (state.peerInfo.id.net_address ? state.peerInfo.id.net_address : "External Address Not Set"),
+              (state.peerInfo.id.netAddress ? state.peerInfo.id.netAddress : "External Address Not Set"),
             d3: "I / O RATIO " + (ioRatio ? ioRatio : "0:0"),
           },
         ],

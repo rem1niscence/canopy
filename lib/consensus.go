@@ -411,9 +411,9 @@ func (x *ConsensusValidators) Root() ([]byte, ErrorI) {
 // marshalling utility structure for the ConsensusValidator
 // allows easy hex byte marshalling of the public key
 type jsonConsValidator struct {
-	PublicKey   HexBytes `json:"public_key,omitempty"`
-	VotingPower uint64   `json:"voting_power,omitempty"`
-	NetAddress  string   `json:"net_address,omitempty"`
+	PublicKey   HexBytes `json:"publicKey,omitempty"`
+	VotingPower uint64   `json:"votingPower,omitempty"`
+	NetAddress  string   `json:"netAddress,omitempty"`
 }
 
 // MarshalJSON() overrides and implements the json.Marshaller interface

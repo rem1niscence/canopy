@@ -43,9 +43,9 @@ export default function Home() {
           settledValues.push(v.value);
         }
 
-        const consensusDuration = settledValues[2].ElectionTimeoutMS + settledValues[2].ElectionVoteTimeoutMS 
-          + settledValues[2].ProposeTimeoutMS + settledValues[2].ProposeVoteTimeoutMS + settledValues[2].PrecommitTimeoutMS 
-          + settledValues[2].PrecommitVoteTimeoutMS + settledValues[2].CommitTimeoutMS + settledValues[2].CommitProcessMS + settledValues[2].RoundInterruptTimeoutMS;
+        const consensusDuration = settledValues[2].electionTimeoutMS + settledValues[2].electionVoteTimeoutMS 
+          + settledValues[2].proposeTimeoutMS + settledValues[2].proposeVoteTimeoutMS + settledValues[2].precommitTimeoutMS 
+          + settledValues[2].precommitVoteTimeoutMS + settledValues[2].commitTimeoutMS + settledValues[2].commitProcessMS + settledValues[2].roundInterruptTimeoutMS;
 
         if (setLoading) {
           return setState({ ...state, loading: false, tableData: settledValues[0], cardData: settledValues[1], consensusDuration: consensusDuration });
