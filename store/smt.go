@@ -482,7 +482,7 @@ func (s *SMT) GetMerkleProof(key []byte) ([]*lib.Node, lib.ErrorI) {
 // VerifyProof verifies a Sparse Merkle Tree proof for a given value
 // reconstructing the root hash and comparing it against the provided root hash
 // depending on the proof type (membership or non-membership)
-func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, root []byte, proof []*lib.Node) (bool, lib.ErrorI) {
+func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []byte, proof []*lib.Node) (bool, lib.ErrorI) {
 	// A valid proof is expected to have at least two nodes (the leaf nodes) in order to build the root
 	// and always should include an even number of nodes representing the siblings of the nodes in the tree
 	proofLen := len(proof)
@@ -527,24 +527,24 @@ func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, roo
 	if err != nil {
 		return false, err
 	}
-	smt := NewDefaultSMT(memStore)
+	smt := NewSMT(RootKey, s.keyBitLength, memStore)
 
 	// add the nodes
-	for _, leaf := range proof {
+	nodeKey := &key{}
+	for _, intermediateNode := range proof[:2] {
 		// Keys are saved "as-is" to preserve the original values of the tree
 		// when the proof was obtained. Some intermediate node keys may have a length
 		// shorter than the MaxKeyBitLength. This pads such keys to ensure they are
 		// saved correctly.
-		key := make([]byte, s.keyBitLength/8)
-		copy(key, leaf.Key)
-		node := &node{Key: newNodeKey(key, s.keyBitLength), Node: lib.Node{Value: leaf.Value}}
+		nodeKey.fromBytes(intermediateNode.Key)
+		n := &node{Key: nodeKey, Node: lib.Node{Value: intermediateNode.Value}}
 		// Leaf nodes could be one of the two children of the root.
-		if err := smt.set(node); err != nil {
+		if err := smt.set(n); err != nil {
 			continue
 		}
 	}
 
-	smt.target = &node{Key: newNodeKey(crypto.Hash(key), smt.keyBitLength)}
+	smt.target = &node{Key: newNodeKey(crypto.Hash(k), smt.keyBitLength)}
 	// make sure the target is valid
 	if err := smt.validateTarget(); err != nil {
 		return false, err
@@ -577,7 +577,7 @@ func (s *SMT) VerifyProof(key []byte, value []byte, validateMembership bool, roo
 	// This confirms the proof-of-non-membership as the intermediate nodes are constructed
 	// based on the children's key + values, so a different value indicates
 	// that the Merkle root could not have been constructed using this
-	if !bytes.Equal(targetNode.Value, crypto.Hash(value)) {
+	if !bytes.Equal(targetNode.Value, crypto.Hash(v)) {
 		return false, nil
 	}
 
