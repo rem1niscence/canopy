@@ -8,7 +8,6 @@ import (
 
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/runtime/protoimpl"
 )
 
@@ -371,12 +370,12 @@ func TestPeerInfoJSON(t *testing.T) {
 		Reputation:    1,
 	}
 	// convert structure to json bytes
-	gotBytes, err := protojson.Marshal(expected)
+	gotBytes, err := json.Marshal(expected)
 	require.NoError(t, err)
 	// convert bytes to structure
 	got := new(PeerInfo)
 	// unmarshal into bytes
-	require.NoError(t, protojson.Unmarshal(gotBytes, got))
+	require.NoError(t, json.Unmarshal(gotBytes, got))
 	// compare got vs expected
 	require.EqualExportedValues(t, expected, got)
 }

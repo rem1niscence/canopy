@@ -396,7 +396,7 @@ export const placeholders = {
         "2cbb73b8abdacf233f4c9b081991f1692145624a95004f496a95d3cce4d492a4": {
             proposal: {
                 parameterSpace: "cons|fee|val|gov",
-                parameterKey: "protocol_version",
+                parameterKey: "protocolVersion",
                 parameterValue: "example",
                 startHeight: 1,
                 endHeight: 1000000,
@@ -407,17 +407,17 @@ export const placeholders = {
     },
     params: {
         parameterSpace: "consensus",
-        parameterKey: "protocol_version",
+        parameterKey: "protocolVersion",
         parameterValue: "1/150",
         startHeight: 1,
         endHeight: 100,
         signer: "303739303732333263...",
     },
     rawTx: {
-        type: "change_parameter",
+        type: "changeParameter",
         msg: {
             parameterSpace: "cons",
-            parameterKey: "block_size",
+            parameterKey: "blockSize",
             parameterValue: 1000,
             startHeight: 1,
             endHeight: 100,

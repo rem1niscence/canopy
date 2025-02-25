@@ -175,9 +175,9 @@ func (x *PeerAddress) HasChain(id uint64) bool { return x.PeerMeta.ChainId == id
 
 // peerAddressJSON is the json.Marshaller and json.Unmarshaler representation fo the PeerAddress object
 type peerAddressJSON struct {
-	PublicKey  HexBytes  `json:"public_key,omitempty"`
-	NetAddress string    `json:"net_address,omitempty"`
-	PeerMeta   *PeerMeta `json:"peer_meta,omitempty"`
+	PublicKey  HexBytes  `json:"publicKey,omitempty"`
+	NetAddress string    `json:"netAddress,omitempty"`
+	PeerMeta   *PeerMeta `json:"peerMeta,omitempty"`
 }
 
 // MarshalJSON satisfies the json.Marshaller interface for PeerAddress
@@ -258,10 +258,10 @@ func (x PeerInfo) MarshalJSON() ([]byte, error) {
 
 // peerInfoJSON is the json marshaller and unmarshaler representation of PeerInfo
 type peerInfoJSON struct {
-	Address       *PeerAddress `json:"Address"`
-	IsOutbound    bool         `json:"is_outbound"`
-	IsValidator   bool         `json:"is_validator"`
-	IsMustConnect bool         `json:"is_must_connect"`
-	IsTrusted     bool         `json:"is_trusted"`
+	Address       *PeerAddress `json:"address"`
+	IsOutbound    bool         `json:"isOutbound"`
+	IsValidator   bool         `json:"isValidator"`
+	IsMustConnect bool         `json:"isMustConnect"`
+	IsTrusted     bool         `json:"isTrusted"`
 	Reputation    int32        `json:"reputation"`
 }

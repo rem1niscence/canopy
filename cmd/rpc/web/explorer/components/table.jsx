@@ -95,19 +95,19 @@ function convertGovernanceParams(v) {
   if (!v.consensus) return ["0"];
   let value = cpyObj(v);
   let toCNPYParams = [
-    "send_fee",
-    "stake_fee",
-    "edit_stake_fee",
-    "unstake_fee",
-    "pause_fee",
-    "unpause_fee",
-    "change_parameter_fee",
-    "dao_transfer_fee",
-    "subsidy_fee",
-    "create_order_fee",
-    "edit_order_fee",
-    "delete_order_fee",
-    "minimum_order_size",
+    "sendFee",
+    "stakeFee",
+    "editStakeFee",
+    "unstakeFee",
+    "pauseFee",
+    "unpauseFee",
+    "changeParameterFee",
+    "daoTransferFee",
+    "subsidyFee",
+    "createOrderFee",
+    "editOrderFee",
+    "deleteOrderFee",
+    "minimumOrderSize",
   ];
   return ["consensus", "validator", "fee", "governance"].flatMap((space) =>
     Object.entries(value[space] || {}).map(([k, v]) => ({

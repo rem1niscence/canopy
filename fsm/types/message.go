@@ -14,16 +14,16 @@ const (
 	MessageSendName               = "send"
 	MessageStakeName              = "stake"
 	MessageUnstakeName            = "unstake"
-	MessageEditStakeName          = "edit_stake"
+	MessageEditStakeName          = "editStake"
 	MessagePauseName              = "pause"
 	MessageUnpauseName            = "unpause"
-	MessageChangeParameterName    = "change_parameter"
-	MessageDAOTransferName        = "dao_transfer"
-	MessageCertificateResultsName = "certificate_results"
+	MessageChangeParameterName    = "changeParameter"
+	MessageDAOTransferName        = "daoTransfer"
+	MessageCertificateResultsName = "certificateResults"
 	MessageSubsidyName            = "subsidy"
-	MessageCreateOrderName        = "create_order"
-	MessageEditOrderName          = "edit_order"
-	MessageDeleteOrderName        = "delete_order"
+	MessageCreateOrderName        = "createOrder"
+	MessageEditOrderName          = "editOrder"
+	MessageDeleteOrderName        = "deleteOrder"
 )
 
 func init() {
