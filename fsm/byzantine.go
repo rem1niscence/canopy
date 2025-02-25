@@ -7,7 +7,7 @@ import (
 	"slices"
 )
 
-// BYZANTINE EVIDENCE PROCESSING AND SLASHES
+/* This file contains logic regarding byzantine actor handling and bond slashes */
 
 // HandleByzantine() handles the byzantine (faulty/malicious) participants from a QuorumCertificate
 func (s *StateMachine) HandleByzantine(qc *lib.QuorumCertificate, vs *lib.ValidatorSet) (nonSignerPercent int, err lib.ErrorI) {

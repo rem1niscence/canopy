@@ -1078,7 +1078,7 @@ func TransactionBuyOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 		if err := GetFeeFromState(w, ptr, types.MessageSendName, true); err != nil {
 			return nil, err
 		}
-		return types.NewBuyOrderTx(p, lib.BuyOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, conf.NetworkID, conf.ChainId, app.ChainHeight(), ptr.Fee)
+		return types.NewBuyOrderTx(p, lib.BuyOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, conf.NetworkID, conf.ChainId, ptr.Fee, app.ChainHeight())
 	})
 }
 
@@ -1087,7 +1087,7 @@ func TransactionStartPoll(w http.ResponseWriter, r *http.Request, _ httprouter.P
 		if err := GetFeeFromState(w, ptr, types.MessageSendName); err != nil {
 			return nil, err
 		}
-		return types.NewStartPollTransaction(p, ptr.PollJSON, conf.NetworkID, conf.ChainId, app.ChainHeight(), ptr.Fee)
+		return types.NewStartPollTransaction(p, ptr.PollJSON, conf.NetworkID, conf.ChainId, ptr.Fee, app.ChainHeight())
 	})
 }
 
@@ -1096,7 +1096,7 @@ func TransactionVotePoll(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 		if err := GetFeeFromState(w, ptr, types.MessageSendName); err != nil {
 			return nil, err
 		}
-		return types.NewVotePollTransaction(p, ptr.PollJSON, ptr.PollApprove, conf.NetworkID, conf.ChainId, app.ChainHeight(), ptr.Fee)
+		return types.NewVotePollTransaction(p, ptr.PollJSON, ptr.PollApprove, conf.NetworkID, conf.ChainId, ptr.Fee, app.ChainHeight())
 	})
 }
 

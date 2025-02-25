@@ -98,12 +98,9 @@ func (c *Controller) Sync() {
 func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
 	// create a transaction message object using the tx bytes and the chain id
 	msg := &lib.TxMessage{ChainId: c.Config.ChainId, Tx: tx}
-	// send it to self for de-duplication and awareness of self originated transactions
-	if err := c.P2P.SelfSend(c.PublicKey, Tx, msg); err != nil {
-		return err
-	}
-	// gossip to all the peers for the chain
-	return c.P2P.SendToPeers(Tx, msg)
+
+	// send transaction to controller for processing and gossip
+	return c.P2P.SelfSend(c.PublicKey, Tx, msg)
 }
 
 // SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
@@ -147,11 +144,22 @@ func (c *Controller) GossipBlock(qc *lib.QuorumCertificate, senderPubKey []byte)
 	if err := c.P2P.SendToPeers(Block, blockMessage, lib.BytesToString(senderPubKey)); err != nil {
 		c.log.Errorf("unable to gossip block with err: %s", err.Error())
 	}
-	// send to self
-	if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
-		c.log.Errorf("unable to self send block with err: %s", err.Error())
-	}
 	c.log.Debugf("gossiping done")
+}
+
+// SelfSendBlock() gossips a QuorumCertificate (with block) through the P2P network for handling
+func (c *Controller) SelfSendBlock(qc *lib.QuorumCertificate) {
+	// create the block message
+	blockMessage := &lib.BlockMessage{
+		ChainId:             c.Config.ChainId,
+		MaxHeight:           c.FSM.Height(),
+		TotalVdfIterations:  c.FSM.TotalVDFIterations(),
+		BlockAndCertificate: qc,
+	}
+	// gossip the block message to peers
+	if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
+		c.log.Errorf("unable to gossip block with err: %s", err.Error())
+	}
 }
 
 // RequestBlock() sends a QuorumCertificate (block + certificate) request to peer(s) - `heightOnly` is a request for just the peer's max height

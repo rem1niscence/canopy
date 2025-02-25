@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-// GENESIS LOGIC: implements logic to import a json file to create the state at height 0 and export the state at any height
+/* GENESIS LOGIC: implements logic to import a json file to create the state at height 0 and export the state at any height */
 
 // NewFromGenesisFile() creates a new beginning state from a file
 func (s *StateMachine) NewFromGenesisFile() (err lib.ErrorI) {
@@ -115,29 +115,25 @@ func (s *StateMachine) ValidateGenesisState(genesis *types.GenesisState) (err li
 	// if the order books aren't nil
 	if genesis.OrderBooks != nil {
 		// de-duplicate the committee order books
-		deDuplicateCommittees := make(map[uint64]struct{})
+		deDuplicateCommittees := lib.NewDeDuplicator[uint64]()
 		// for each order book in the list
 		for _, orderBook := range genesis.OrderBooks.OrderBooks {
 			// if already found
-			if _, found := deDuplicateCommittees[orderBook.ChainId]; found {
+			if found := deDuplicateCommittees.Found(orderBook.ChainId); found {
 				return types.InvalidSellOrder()
 			}
 			// if the book exists but there's no sell orders
 			if len(orderBook.Orders) == 0 {
 				return types.InvalidSellOrder()
 			}
-			// add to the de-dupe map
-			deDuplicateCommittees[orderBook.ChainId] = struct{}{}
 			// ensure there's no duplicate order-ids within the book
-			deDuplicateIds := make(map[uint64]struct{})
+			deDuplicateIds := lib.NewDeDuplicator[uint64]()
 			// for each order in the book
 			for _, order := range orderBook.Orders {
 				// check if order already found
-				if _, found := deDuplicateIds[order.Id]; found {
+				if found := deDuplicateIds.Found(order.Id); found {
 					return types.InvalidSellOrder()
 				}
-				// add to the de-dupe list
-				deDuplicateIds[order.Id] = struct{}{}
 			}
 		}
 	}

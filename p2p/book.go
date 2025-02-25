@@ -235,7 +235,7 @@ func (p *PeerBook) GetAll() (res []*BookPeer) {
 
 // Add() adds a peer to the book in sorted order by public key
 func (p *PeerBook) Add(peer *BookPeer) {
-	p.log.Debugf("try add book peer %s", lib.BytesToString(peer.Address.PublicKey))
+	p.log.Debugf("Try add book peer %s", lib.BytesToString(peer.Address.PublicKey))
 	// if peer is self, ignore
 	if bytes.Equal(p.publicKey, peer.Address.PublicKey) {
 		return

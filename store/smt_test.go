@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -488,48 +489,33 @@ func TestSet(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// create a new memory store to work with
-			memStore, err := NewStoreInMemory(lib.NewDefaultLogger())
-			require.NoError(t, err)
-			// preset the nodes
-			if test.preset != nil {
-				for _, n := range test.preset.Nodes {
-					// get the bytes for the node to set in the db
-					nodeBytes, e := n.bytes()
-					require.NoError(t, e)
-					// set the node in the db
-					require.NoError(t, memStore.Set(n.Key.bytes(), nodeBytes))
+			func() {
+				smt, memStore := NewTestSMT(t, test.preset, test.keyBitSize)
+				defer memStore.Close()
+				// execute the traversal code
+				require.NoError(t, smt.Set(test.targetKey, test.targetValue))
+				// create an iterator to check out the values of the store
+				it, err := memStore.Iterator(nil)
+				require.NoError(t, err)
+				defer it.Close()
+				// iterate through the database
+				for i := 0; it.Valid(); func() { it.Next(); i++ }() {
+					got := newNode()
+					// convert the value to a node
+					require.NoError(t, lib.Unmarshal(it.Value(), &got.Node))
+					// convert the key to a node key
+					got.Key.fromBytes(it.Key())
+					// compare got vs expected
+					//fmt.Printf("%08b %v\n", got.Key.mostSigBytes, got.Key.leastSigBits)
+					require.Equal(t, test.expected.Nodes[i].Key.bytes(), got.Key.bytes(), fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
+					require.Equal(t, test.expected.Nodes[i].LeftChildKey, got.LeftChildKey, fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
+					require.Equal(t, test.expected.Nodes[i].RightChildKey, got.RightChildKey, fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
+					// check root value (this allows quick verification of the hashing up logic without actually needing to fill in and check every value)
+					if bytes.Equal(got.Key.bytes(), smt.root.Key.bytes()) {
+						require.Equal(t, test.expected.Nodes[i].Value, got.Value)
+					}
 				}
-			}
-			// set root key if set in test
-			rootKey := RootKey
-			if test.rootKey != nil {
-				rootKey = test.rootKey
-			}
-			// create the smt
-			smt := NewSMT(rootKey, test.keyBitSize, memStore)
-			// execute the traversal code
-			require.NoError(t, smt.Set(test.targetKey, test.targetValue))
-			// create an iterator to check out the values of the store
-			it, err := memStore.Iterator(nil)
-			require.NoError(t, err)
-			// iterate through the database
-			for i := 0; it.Valid(); func() { it.Next(); i++ }() {
-				got := newNode()
-				// convert the value to a node
-				require.NoError(t, lib.Unmarshal(it.Value(), &got.Node))
-				// convert the key to a node key
-				got.Key.fromBytes(it.Key())
-				// compare got vs expected
-				//fmt.Printf("%08b %v\n", got.Key.mostSigBytes, got.Key.leastSigBits)
-				require.Equal(t, test.expected.Nodes[i].Key.bytes(), got.Key.bytes(), fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
-				require.Equal(t, test.expected.Nodes[i].LeftChildKey, got.LeftChildKey, fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
-				require.Equal(t, test.expected.Nodes[i].RightChildKey, got.RightChildKey, fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
-				// check root value (this allows quick verification of the hashing up logic without actually needing to fill in and check every value)
-				if bytes.Equal(got.Key.bytes(), smt.root.Key.bytes()) {
-					require.Equal(t, test.expected.Nodes[i].Value, got.Value)
-				}
-			}
+			}()
 		})
 	}
 }
@@ -846,48 +832,33 @@ func TestDelete(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// create a new memory store to work with
-			memStore, err := NewStoreInMemory(lib.NewDefaultLogger())
-			require.NoError(t, err)
-			// preset the nodes
-			if test.preset != nil {
-				for _, n := range test.preset.Nodes {
-					// get the bytes for the node to set in the db
-					nodeBytes, e := n.bytes()
-					require.NoError(t, e)
-					// set the node in the db
-					require.NoError(t, memStore.Set(n.Key.bytes(), nodeBytes))
+			func() {
+				smt, memStore := NewTestSMT(t, test.preset, test.keyBitSize)
+				defer memStore.Close()
+				// execute the traversal code
+				require.NoError(t, smt.Delete(test.targetKey))
+				// create an iterator to check out the values of the store
+				it, err := memStore.Iterator(nil)
+				require.NoError(t, err)
+				defer it.Close()
+				// iterate through the database
+				for i := 0; it.Valid(); func() { it.Next(); i++ }() {
+					got := newNode()
+					// convert the value to a node
+					require.NoError(t, lib.Unmarshal(it.Value(), &got.Node))
+					// convert the key to a node key
+					got.Key.fromBytes(it.Key())
+					// compare got vs expected
+					//fmt.Printf("%08b %v\n", got.Key.mostSigBytes, got.Key.leastSigBits)
+					require.Equal(t, test.expected.Nodes[i].Key.bytes(), got.Key.bytes(), fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
+					require.Equal(t, test.expected.Nodes[i].LeftChildKey, got.LeftChildKey, fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
+					require.Equal(t, test.expected.Nodes[i].RightChildKey, got.RightChildKey, fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
+					// check root value (this allows quick verification of the hashing up logic without actually needing to fill in and check every value)
+					if bytes.Equal(got.Key.bytes(), smt.root.Key.bytes()) {
+						require.Equal(t, test.expected.Nodes[i].Value, got.Value)
+					}
 				}
-			}
-			// set root key if set in test
-			rootKey := RootKey
-			if test.rootKey != nil {
-				rootKey = test.rootKey
-			}
-			// create the smt
-			smt := NewSMT(rootKey, test.keyBitSize, memStore)
-			// execute the traversal code
-			require.NoError(t, smt.Delete(test.targetKey))
-			// create an iterator to check out the values of the store
-			it, err := memStore.Iterator(nil)
-			require.NoError(t, err)
-			// iterate through the database
-			for i := 0; it.Valid(); func() { it.Next(); i++ }() {
-				got := newNode()
-				// convert the value to a node
-				require.NoError(t, lib.Unmarshal(it.Value(), &got.Node))
-				// convert the key to a node key
-				got.Key.fromBytes(it.Key())
-				// compare got vs expected
-				//fmt.Printf("%08b %v\n", got.Key.mostSigBytes, got.Key.leastSigBits)
-				require.Equal(t, test.expected.Nodes[i].Key.bytes(), got.Key.bytes(), fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
-				require.Equal(t, test.expected.Nodes[i].LeftChildKey, got.LeftChildKey, fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
-				require.Equal(t, test.expected.Nodes[i].RightChildKey, got.RightChildKey, fmt.Sprintf("Iteration: %d on node %v", i, got.Key.leastSigBits))
-				// check root value (this allows quick verification of the hashing up logic without actually needing to fill in and check every value)
-				if bytes.Equal(got.Key.bytes(), smt.root.Key.bytes()) {
-					require.Equal(t, test.expected.Nodes[i].Value, got.Value)
-				}
-			}
+			}()
 		})
 	}
 }
@@ -1276,35 +1247,46 @@ func TestTraverse(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// create a new memory store to work with
-			memStore, err := NewStoreInMemory(lib.NewDefaultLogger())
-			require.NoError(t, err)
-			// preset the nodes
-			if test.preset != nil {
-				for _, n := range test.preset.Nodes {
-					// get the bytes for the node to set in the db
-					nodeBytes, e := n.bytes()
-					require.NoError(t, e)
-					// set the node in the db
-					require.NoError(t, memStore.Set(n.Key.bytes(), nodeBytes))
-				}
-			}
-			// set root key if set in test
-			rootKey := RootKey
-			if test.rootKey != nil {
-				rootKey = test.rootKey
-			}
-			// create the smt
-			smt := NewSMT(rootKey, test.keyBitSize, memStore)
-			// set target
-			smt.target = test.target
-			// execute the traversal code
-			require.NoError(t, smt.traverse())
-			// compare got vs expected
-			require.EqualExportedValues(t, test.expectedCurrent, smt.current)
-			require.EqualExportedValues(t, test.expectedTraversal, smt.traversed)
+			func() {
+				smt, memStore := NewTestSMT(t, test.preset, test.keyBitSize)
+				defer memStore.Close()
+				// set target
+				smt.target = test.target
+				// execute the traversal code
+				require.NoError(t, smt.traverse())
+				// compare got vs expected
+				require.EqualExportedValues(t, test.expectedCurrent, smt.current)
+				require.EqualExportedValues(t, test.expectedTraversal, smt.traversed)
+			}()
 		})
 	}
+}
+
+func NewTestSMT(t *testing.T, preset *NodeList, keyBitSize int) (*SMT, *TxnWrapper) {
+	// create a new memory store to work with
+	db, err := badger.OpenManaged(badger.DefaultOptions("").
+		WithInMemory(true).WithLoggingLevel(badger.ERROR))
+	require.NoError(t, err)
+	// make a writable tx that reads from the last height
+	tx := db.NewTransactionAt(1, true)
+	memStore := NewTxnWrapper(tx, lib.NewDefaultLogger(), stateCommitmentPrefix)
+	// if there's no preset - use the default 3 nodes
+	if preset == nil {
+		return NewSMT(RootKey, keyBitSize, memStore), memStore
+	}
+	// create the smt
+	smt := &SMT{
+		store:        memStore,
+		keyBitLength: keyBitSize,
+	}
+	// update root
+	smt.root = preset.Nodes[0]
+	// preset the nodes
+	for _, n := range preset.Nodes {
+		// set the node in the db
+		require.NoError(t, smt.setNode(n))
+	}
+	return smt, memStore
 }
 
 func TestNewSMT(t *testing.T) {

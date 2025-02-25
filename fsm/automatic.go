@@ -5,6 +5,8 @@ import (
 	"github.com/canopy-network/canopy/lib"
 )
 
+/* This file handles 'automatic' (non-transaction-induced) state changes that occur ath the beginning and ending of a block */
+
 // BeginBlock() is code that is executed at the start of `applying` the block
 func (s *StateMachine) BeginBlock() lib.ErrorI {
 	// prevent attempting to load the certificate for height 0

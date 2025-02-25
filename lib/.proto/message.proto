@@ -54,6 +54,8 @@ message MessageStake {
   bool delegate = 6;
   // compound: signals whether the Validator is auto-compounding or not
   bool compound = 7;
+  // signer: auto-populated by the state machine to assign the authorized signer who executed the transaction
+  bytes signer = 8;
 }
 
 // MessageStake is the Validator modification message, it allows an increase locking up a certain amount of tokens,

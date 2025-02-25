@@ -6,7 +6,7 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 )
 
-// ACCOUNT CODE BELOW
+/* This file defines the account, pool, and supply tracker state interactions */
 
 // GetAccount() returns an Account structure for a specific address
 func (s *StateMachine) GetAccount(address crypto.AddressI) (*types.Account, lib.ErrorI) {
@@ -118,6 +118,10 @@ func (s *StateMachine) AccountDeductFees(address crypto.AddressI, fee uint64) li
 
 // AccountAdd() adds tokens to an Account
 func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd uint64) lib.ErrorI {
+	// ensure no unnecessary database updates
+	if amountToAdd == 0 {
+		return nil
+	}
 	// get the account from state
 	account, err := s.GetAccount(address)
 	if err != nil {
@@ -131,6 +135,10 @@ func (s *StateMachine) AccountAdd(address crypto.AddressI, amountToAdd uint64) l
 
 // AccountSub() removes tokens from an Account
 func (s *StateMachine) AccountSub(address crypto.AddressI, amountToSub uint64) lib.ErrorI {
+	// ensure no unnecessary database updates
+	if amountToSub == 0 {
+		return nil
+	}
 	// get the account from the state
 	account, err := s.GetAccount(address)
 	if err != nil {

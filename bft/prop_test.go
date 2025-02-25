@@ -18,29 +18,6 @@ func TestAddProposal(t *testing.T) {
 		error   string
 	}{
 		{
-			name:   "duplicate producer",
-			detail: "a message for this view was already received from this peer",
-			preAdd: []*Message{
-				{
-					Header: &lib.View{
-						Phase: lib.Phase_ELECTION,
-					},
-					Signature: &lib.Signature{
-						PublicKey: keys[0].PublicKey().Bytes(),
-					},
-				},
-			},
-			message: &Message{
-				Header: &lib.View{
-					Phase: lib.Phase_ELECTION,
-				},
-				Signature: &lib.Signature{
-					PublicKey: keys[0].PublicKey().Bytes(),
-				},
-			},
-			error: "duplicate proposer message",
-		},
-		{
 			name:   "same phase",
 			detail: "a message for this view was already received but it was from a different proposer",
 			preAdd: []*Message{
