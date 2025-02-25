@@ -377,13 +377,13 @@ func (s *StateMachine) AddToDelegateSupply(amount uint64) lib.ErrorI {
 	return s.SetSupply(supply)
 }
 
-// AddToCommitteeStakedSupply() adds to the committee staked supply count
-func (s *StateMachine) AddToCommitteeStakedSupply(chainId uint64, amount uint64) lib.ErrorI {
+// AddToCommitteeSupplyForChain() adds to the committee staked supply count
+func (s *StateMachine) AddToCommitteeSupplyForChain(chainId uint64, amount uint64) lib.ErrorI {
 	return s.addToSupplyPool(chainId, amount, types.CommitteesWithDelegations)
 }
 
-// AddToDelegateStakedSupply() adds to the delegate staked supply count
-func (s *StateMachine) AddToDelegateStakedSupply(chainId uint64, amount uint64) lib.ErrorI {
+// AddToDelegateSupplyForChain() adds to the delegate staked supply count
+func (s *StateMachine) AddToDelegateSupplyForChain(chainId uint64, amount uint64) lib.ErrorI {
 	return s.addToSupplyPool(chainId, amount, types.DelegationsOnly)
 }
 
@@ -421,8 +421,8 @@ func (s *StateMachine) SubFromStakedSupply(amount uint64) lib.ErrorI {
 	return s.SetSupply(supply)
 }
 
-// SubFromDelegatedSupply() removes from the delegated supply count
-func (s *StateMachine) SubFromDelegatedSupply(amount uint64) lib.ErrorI {
+// SubFromDelegateSupply() removes from the delegated supply count
+func (s *StateMachine) SubFromDelegateSupply(amount uint64) lib.ErrorI {
 	// get the supply tracker
 	supply, err := s.GetSupply()
 	if err != nil {
@@ -438,23 +438,23 @@ func (s *StateMachine) SubFromDelegatedSupply(amount uint64) lib.ErrorI {
 	return s.SetSupply(supply)
 }
 
-// SubFromCommitteeStakedSupply() removes from the committee staked supply count
-func (s *StateMachine) SubFromCommitteeStakedSupply(chainId uint64, amount uint64) lib.ErrorI {
+// SubFromCommitteeStakedSupplyForChain() removes from the committee staked supply count
+func (s *StateMachine) SubFromCommitteeStakedSupplyForChain(chainId uint64, amount uint64) lib.ErrorI {
 	return s.subFromSupplyPool(chainId, amount, types.CommitteesWithDelegations)
 }
 
-// SubFromDelegateStakedSupply() removes from the delegate committee staked supply count
-func (s *StateMachine) SubFromDelegateStakedSupply(chainId uint64, amount uint64) lib.ErrorI {
+// SubFromDelegateStakedSupplyForChain() removes from the delegate committee staked supply count
+func (s *StateMachine) SubFromDelegateStakedSupplyForChain(chainId uint64, amount uint64) lib.ErrorI {
 	return s.subFromSupplyPool(chainId, amount, types.DelegationsOnly)
 }
 
-// GetCommitteeStakedSupply() retrieves the committee staked supply count
-func (s *StateMachine) GetCommitteeStakedSupply(chainId uint64) (p *types.Pool, err lib.ErrorI) {
+// GetCommitteeStakedSupplyForChain() retrieves the committee staked supply count
+func (s *StateMachine) GetCommitteeStakedSupplyForChain(chainId uint64) (p *types.Pool, err lib.ErrorI) {
 	return s.getSupplyPool(chainId, types.CommitteesWithDelegations)
 }
 
 // GetFromDelegateStakedSupply() retrieves the delegate committee staked supply count
-func (s *StateMachine) GetDelegateStakedSupply(chainId uint64) (p *types.Pool, err lib.ErrorI) {
+func (s *StateMachine) GetDelegateStakedSupplyForChain(chainId uint64) (p *types.Pool, err lib.ErrorI) {
 	return s.getSupplyPool(chainId, types.DelegationsOnly)
 }
 

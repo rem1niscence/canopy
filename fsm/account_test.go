@@ -881,7 +881,7 @@ func TestAddToCommitteeStakedSupply(t *testing.T) {
 				require.NoError(t, sm.SetSupply(supply))
 			}
 			// ensure no error on function call
-			require.NoError(t, sm.AddToCommitteeStakedSupply(test.id, test.amount))
+			require.NoError(t, sm.AddToCommitteeSupplyForChain(test.id, test.amount))
 			// retrieve the supply
 			supply, err := sm.GetSupply()
 			require.NoError(t, err)
@@ -927,7 +927,7 @@ func TestAddToDelegationStakedSupply(t *testing.T) {
 				require.NoError(t, sm.SetSupply(supply))
 			}
 			// ensure no error on function call
-			require.NoError(t, sm.AddToDelegateStakedSupply(test.id, test.amount))
+			require.NoError(t, sm.AddToDelegateSupplyForChain(test.id, test.amount))
 			// retrieve the supply
 			supply, err := sm.GetSupply()
 			require.NoError(t, err)
@@ -1037,7 +1037,7 @@ func TestSubFromCommitteeStakedSupply(t *testing.T) {
 				require.NoError(t, sm.SetSupply(supply))
 			}
 			// check error on function call
-			err := sm.SubFromCommitteeStakedSupply(test.id, test.amount)
+			err := sm.SubFromCommitteeStakedSupplyForChain(test.id, test.amount)
 			require.Equal(t, test.error, err != nil, err)
 			if err != nil {
 				return
@@ -1102,7 +1102,7 @@ func TestSubFromDelegationStakedSupply(t *testing.T) {
 				require.NoError(t, sm.SetSupply(supply))
 			}
 			// check error on function call
-			err := sm.SubFromDelegateStakedSupply(test.id, test.amount)
+			err := sm.SubFromDelegateStakedSupplyForChain(test.id, test.amount)
 			require.Equal(t, test.error, err != nil)
 			if err != nil {
 				return

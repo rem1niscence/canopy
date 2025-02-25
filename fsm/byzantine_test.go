@@ -233,7 +233,7 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 				// add the validator stake to supply
 				require.NoError(t, sm.AddToStakedSupply(stakeAmount))
 				// add the validator stake to supply
-				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyChainId, stakeAmount))
+				require.NoError(t, sm.AddToCommitteeSupplyForChain(lib.CanopyChainId, stakeAmount))
 				// set the non signer as a validator in state
 				require.NoError(t, sm.SetValidator(&types.Validator{
 					Address:      nonSigner.Address,
@@ -499,7 +499,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 				// save the public key for later use in the test
 				pubs = append(pubs, pub)
 				// add to the committee supply
-				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyChainId, stakeAmount))
+				require.NoError(t, sm.AddToCommitteeSupplyForChain(lib.CanopyChainId, stakeAmount))
 				// set the double signer as a validator in state
 				require.NoError(t, sm.SetValidator(&types.Validator{
 					Address:      pub.Address().Bytes(),
@@ -763,7 +763,7 @@ func TestSlash(t *testing.T) {
 				// set the bad proposer as a validator in state
 				require.NoError(t, sm.SetValidator(v))
 				// add to the committee supply
-				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyChainId, stakeAmount))
+				require.NoError(t, sm.AddToCommitteeSupplyForChain(lib.CanopyChainId, stakeAmount))
 			}
 			// execute the slashes
 			for _, s := range test.slashes {

@@ -127,58 +127,76 @@ func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorF
 
 // SetValidators() upserts multiple Validators into the state and updates the supply tracker
 func (s *StateMachine) SetValidators(validators []*types.Validator, supply *types.Supply) lib.ErrorI {
+	// for each validator in the list
 	for _, val := range validators {
+		// if the unstaking height or the max paused height is set
+		if val.UnstakingHeight != 0 {
+			// if the validator is unstaking - update it accordingly in state
+			if err := s.SetValidatorUnstaking(crypto.NewAddress(val.Address), val, val.UnstakingHeight); err != nil {
+				return err
+			}
+		} else if val.MaxPausedHeight != 0 {
+			// if validator is paused - update it accordingly
+			if err := s.SetValidatorPaused(crypto.NewAddress(val.Address), val, val.MaxPausedHeight); err != nil {
+				return err
+			}
+		}
+		// add to 'total supply' in the supply tracker
 		supply.Total += val.StakedAmount
+		// add to 'staked supply' in the supply tracker
 		supply.Staked += val.StakedAmount
+		// set the validator structure in state
 		if err := s.SetValidator(val); err != nil {
 			return err
 		}
-		if val.MaxPausedHeight == 0 && val.UnstakingHeight == 0 {
-			switch val.Delegate {
-			case false:
-				if err := s.SetCommittees(crypto.NewAddressFromBytes(val.Address), val.StakedAmount, val.Committees); err != nil {
-					return err
-				}
-				supplyFromState, err := s.GetSupply()
-				if err != nil {
-					return err
-				}
-				supply.CommitteeStaked = supplyFromState.CommitteeStaked
-			case true:
-				supply.DelegatedOnly += val.StakedAmount
-				if err := s.SetDelegations(crypto.NewAddressFromBytes(val.Address), val.StakedAmount, val.Committees); err != nil {
-					return err
-				}
-				supplyFromState, err := s.GetSupply()
-				if err != nil {
-					return err
-				}
-				supply.CommitteeStaked = supplyFromState.CommitteeStaked
-				supply.CommitteeDelegatedOnly = supplyFromState.CommitteeDelegatedOnly
+		// if the validator is a 'delegate'
+		if val.Delegate {
+			// add to the delegation supply
+			supply.DelegatedOnly += val.StakedAmount
+			// set the delegations in state
+			if err := s.SetDelegations(crypto.NewAddressFromBytes(val.Address), val.StakedAmount, val.Committees); err != nil {
+				return err
+			}
+		} else {
+			if err := s.SetCommittees(crypto.NewAddressFromBytes(val.Address), val.StakedAmount, val.Committees); err != nil {
+				return err
 			}
 		}
 	}
+	//
+	// get the 'supply tracker' from state to update the local 'supply tracker' with the automatically populated committee/delegate staked pool
+	supplyFromState, err := s.GetSupply()
+	if err != nil {
+		return err
+	}
+	// update the committee staked pool
+	supply.CommitteeStaked = supplyFromState.CommitteeStaked
+	// update the delegate staked pool
+	supply.CommitteeDelegatedOnly = supplyFromState.CommitteeDelegatedOnly
 	return nil
 }
 
 // SetValidator() upserts a Validator object into the state
-func (s *StateMachine) SetValidator(validator *types.Validator) lib.ErrorI {
+func (s *StateMachine) SetValidator(validator *types.Validator) (err lib.ErrorI) {
+	// covert the validator object to bytes
 	bz, err := s.marshalValidator(validator)
 	if err != nil {
-		return err
+		return
 	}
+	// set the bytes under a key for validator using a specific 'validator address'
 	if err = s.Set(types.KeyForValidator(crypto.NewAddressFromBytes(validator.Address)), bz); err != nil {
-		return err
+		return
 	}
-	return nil
+	// exit
+	return
 }
 
 // UpdateValidatorStake() updates the stake of the validator object in state - updating the corresponding committees and supply
 // NOTE: new stake amount must be GTE the previous stake amount
 func (s *StateMachine) UpdateValidatorStake(val *types.Validator, newCommittees []uint64, amountToAdd uint64) (err lib.ErrorI) {
-	// create address object
+	// convert the validator address bytes into an object reference
 	address := crypto.NewAddress(val.Address)
-	// update staked supply
+	// update staked supply accordingly (validator stake amount can never go down except for slashing and unstaking)
 	if err = s.AddToStakedSupply(amountToAdd); err != nil {
 		return err
 	}
@@ -186,7 +204,7 @@ func (s *StateMachine) UpdateValidatorStake(val *types.Validator, newCommittees 
 	newStakedAmount := val.StakedAmount + amountToAdd
 	// if the validator is a delegate or not
 	if val.Delegate {
-		// track total delegated tokens
+		// update the new 'total delegated tokens' amount by adding to the staked supply
 		if err = s.AddToDelegateSupply(amountToAdd); err != nil {
 			return err
 		}
@@ -210,25 +228,24 @@ func (s *StateMachine) UpdateValidatorStake(val *types.Validator, newCommittees 
 
 // DeleteValidator() completely removes a validator from the state
 func (s *StateMachine) DeleteValidator(validator *types.Validator) lib.ErrorI {
+	// convert the validator address bytes into an object reference
 	addr := crypto.NewAddress(validator.Address)
+	// subtract from staked supply
+	if err := s.SubFromStakedSupply(validator.StakedAmount); err != nil {
+		return err
+	}
 	// delete the validator committee information
 	if validator.Delegate {
+		// subtract those tokens from the delegate supply count
+		if err := s.SubFromDelegateSupply(validator.StakedAmount); err != nil {
+			return err
+		}
+		// remove the delegations for the validator
 		if err := s.DeleteDelegations(addr, validator.StakedAmount, validator.Committees); err != nil {
 			return err
 		}
 	} else {
 		if err := s.DeleteCommittees(addr, validator.StakedAmount, validator.Committees); err != nil {
-			return err
-		}
-	}
-	// subtract from staked supply
-	if err := s.SubFromStakedSupply(validator.StakedAmount); err != nil {
-		return err
-	}
-	// subtract from delegate supply
-	if validator.Delegate {
-		// subtract those tokens from the delegate supply count
-		if err := s.SubFromDelegatedSupply(validator.StakedAmount); err != nil {
 			return err
 		}
 	}
@@ -243,16 +260,17 @@ func (s *StateMachine) DeleteValidator(validator *types.Validator) lib.ErrorI {
 // funds be returned
 func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, finishUnstakingHeight uint64) lib.ErrorI {
 	// set an entry in the database to mark this validator as unstaking, a single byte is used to allow 'get' calls to differentiate between non-existing keys
-	if err := s.Set(types.KeyForUnstaking(finishUnstakingHeight, address), []byte{0x0}); err != nil {
+	if err := s.Set(types.KeyForUnstaking(finishUnstakingHeight, address), []byte{0x1}); err != nil {
 		return err
 	}
-	// if validator is 'paused' - unpause them
+	// if validator is 'paused' (only happens if validator is max paused)
 	if validator.MaxPausedHeight != 0 {
+		// update the validator as unpaused
 		if err := s.SetValidatorUnpaused(address, validator); err != nil {
 			return err
 		}
 	}
-	// set the height at which the validator finishes unstaking
+	// update the validator structure with the finishUnstakingHeight
 	validator.UnstakingHeight = finishUnstakingHeight
 	// update the validator structure
 	return s.SetValidator(validator)
@@ -260,13 +278,14 @@ func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator 
 
 // DeleteFinishedUnstaking() deletes the Validator structure and unstaking keys for those who have finished unstaking
 func (s *StateMachine) DeleteFinishedUnstaking() lib.ErrorI {
+	// create a variable to maintain a list of the unstaking keys 'to delete'
 	var toDelete [][]byte
 	// for each unstaking key at this height
-	callback := func(key, _ []byte) lib.ErrorI {
+	callback := func(unstakingKey, _ []byte) lib.ErrorI {
 		// add to the 'will delete' list
-		toDelete = append(toDelete, key)
+		toDelete = append(toDelete, unstakingKey)
 		// get the address from the key
-		addr, err := types.AddressFromKey(key)
+		addr, err := types.AddressFromKey(unstakingKey)
 		if err != nil {
 			return err
 		}
@@ -294,6 +313,7 @@ func (s *StateMachine) DeleteFinishedUnstaking() lib.ErrorI {
 
 // SetValidatorsPaused() automatically updates all validators as if they'd submitted a MessagePause
 func (s *StateMachine) SetValidatorsPaused(chainId uint64, addresses [][]byte) {
+	// for each validator in the list
 	for _, addr := range addresses {
 		// get the validator
 		val, err := s.GetValidator(crypto.NewAddress(addr))
@@ -323,7 +343,7 @@ func (s *StateMachine) SetValidatorsPaused(chainId uint64, addresses [][]byte) {
 // SetValidatorPaused() updates a Validator as 'paused' with a MaxPausedHeight (height at which the Validator is force-unstaked for being paused too long)
 func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *types.Validator, maxPausedHeight uint64) lib.ErrorI {
 	// set an entry in the state to mark this validator as paused, a single byte is used to allow 'get' calls to differentiate between non-existing keys
-	if err := s.Set(types.KeyForPaused(maxPausedHeight, address), []byte{0x0}); err != nil {
+	if err := s.Set(types.KeyForPaused(maxPausedHeight, address), []byte{0x1}); err != nil {
 		return err
 	}
 	// update the validator max paused height
@@ -351,10 +371,6 @@ func (s *StateMachine) GetAuthorizedSignersForValidator(address []byte) (signers
 	if err != nil {
 		return nil, err
 	}
-	// ensure not nil
-	if validator == nil {
-		return nil, types.ErrValidatorNotExists()
-	}
 	// return the operator only if custodial
 	if bytes.Equal(validator.Address, validator.Output) {
 		return [][]byte{validator.Address}, nil
@@ -363,63 +379,31 @@ func (s *StateMachine) GetAuthorizedSignersForValidator(address []byte) (signers
 	return [][]byte{validator.Address, validator.Output}, nil
 }
 
-// LotteryWinner() selects a validator/delegate randomly weighted based on their stake within a committee
-// if there's no committee, then fallback to the proposer's address
-func (s *StateMachine) LotteryWinner(id uint64, validators ...bool) (lottery *lib.LotteryWinner, err lib.ErrorI) {
-	var p lib.ValidatorSet
-	// if validators
-	if len(validators) == 1 && validators[0] == true {
-		p, _ = s.GetCommitteeMembers(s.Config.ChainId)
-	} else {
-		// else get the delegates
-		p, _ = s.GetAllDelegates(id)
-	}
-	// get the validator params from state
-	valParams, err := s.GetParamsVal()
-	if err != nil {
-		return nil, err
-	}
-	// if there are no validators in the set - return
-	if p.NumValidators == 0 {
-		return &lib.LotteryWinner{Winner: nil, Cut: valParams.DelegateRewardPercentage}, nil
-	}
-	// get the last proposers
-	lastProposers, err := s.GetLastProposers()
-	if err != nil {
-		return nil, err
-	}
-	// use un-grindable weighted pseudorandom
-	return &lib.LotteryWinner{
-		Winner: lib.WeightedPseudorandom(&lib.PseudorandomParams{
-			SortitionData: &lib.SortitionData{
-				LastProposerAddresses: lastProposers.Addresses,
-				Height:                s.Height(),
-				TotalValidators:       p.NumValidators,
-				TotalPower:            p.TotalPower,
-			}, ValidatorSet: p.ValidatorSet,
-		}).Address().Bytes(), Cut: valParams.DelegateRewardPercentage,
-	}, nil
-}
-
 // pubKeyBytesToAddress() is a convenience function that converts a public key to an address
 func (s *StateMachine) pubKeyBytesToAddress(public []byte) ([]byte, lib.ErrorI) {
-	pk, er := crypto.NewPublicKeyFromBytes(public)
-	if er != nil {
-		return nil, types.ErrInvalidPublicKey(er)
+	// get the public key object ref from the bytes
+	pk, err := crypto.NewPublicKeyFromBytes(public)
+	if err != nil {
+		return nil, types.ErrInvalidPublicKey(err)
 	}
+	// get the address bytes from the public key
 	return pk.Address().Bytes(), nil
 }
 
 // marshalValidator() converts the Validator object to bytes
 func (s *StateMachine) marshalValidator(validator *types.Validator) ([]byte, lib.ErrorI) {
+	// convert the object ref into bytes
 	return lib.Marshal(validator)
 }
 
 // unmarshalValidator() converts bytes into a Validator object
 func (s *StateMachine) unmarshalValidator(bz []byte) (*types.Validator, lib.ErrorI) {
+	// create a new validator object reference to ensure a non-nil result
 	val := new(types.Validator)
+	// populate the object reference with validator bytes
 	if err := lib.Unmarshal(bz, val); err != nil {
 		return nil, err
 	}
+	// return the object ref
 	return val, nil
 }

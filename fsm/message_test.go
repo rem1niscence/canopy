@@ -874,7 +874,7 @@ func TestHandleMessageStake(t *testing.T) {
 			// validate the addition to the committees
 			for _, id := range val.Committees {
 				// get the supply for each committee
-				stakedSupply, e := sm.GetCommitteeStakedSupply(id)
+				stakedSupply, e := sm.GetCommitteeStakedSupplyForChain(id)
 				require.NoError(t, e)
 				require.Equal(t, test.msg.Amount, stakedSupply.Amount)
 			}
@@ -884,7 +884,7 @@ func TestHandleMessageStake(t *testing.T) {
 				// validate the addition to the delegations only
 				for _, id := range val.Committees {
 					// get the supply for each committee
-					stakedSupply, e := sm.GetDelegateStakedSupply(id)
+					stakedSupply, e := sm.GetDelegateStakedSupplyForChain(id)
 					require.NoError(t, e)
 					require.Equal(t, test.msg.Amount, stakedSupply.Amount)
 					// validate the delegate membership
@@ -1574,17 +1574,6 @@ func TestMessageUnpause(t *testing.T) {
 			},
 			msg:   &types.MessageUnpause{Address: newTestAddressBytes(t)},
 			error: "validator not paused",
-		},
-		{
-			name:   "validator unstaking",
-			detail: "validator is unstaking so this operation is invalid",
-			preset: &types.Validator{
-				Address:         newTestAddressBytes(t),
-				MaxPausedHeight: 1,
-				UnstakingHeight: 1,
-			},
-			msg:   &types.MessageUnpause{Address: newTestAddressBytes(t)},
-			error: "validator is unstaking",
 		},
 		{
 			name:   "validator is paused",
