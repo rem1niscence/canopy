@@ -3,6 +3,7 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+
 	"github.com/canopy-network/canopy/lib/crypto"
 )
 
@@ -105,19 +106,19 @@ func (x *BlockHeader) SetHash() ([]byte, ErrorI) {
 type jsonBlockHeader struct {
 	Height                uint64             `json:"height,omitempty"`
 	Hash                  HexBytes           `json:"hash,omitempty"`
-	NetworkId             uint32             `json:"network_id,omitempty"`
+	NetworkId             uint32             `json:"networkID,omitempty"`
 	Time                  uint64             `json:"time,omitempty"`
-	NumTxs                uint64             `json:"num_txs,omitempty"`
-	TotalTxs              uint64             `json:"total_txs,omitempty"`
-	TotalVdfIterations    uint64             `json:"total_vdf_iterations,omitempty"`
-	LastBlockHash         HexBytes           `json:"last_block_hash,omitempty"`
-	StateRoot             HexBytes           `json:"state_root,omitempty"`
-	TransactionRoot       HexBytes           `json:"transaction_root,omitempty"`
-	ValidatorRoot         HexBytes           `json:"validator_root,omitempty"`
-	NextValidatorRoot     HexBytes           `json:"next_validator_root,omitempty"`
-	ProposerAddress       HexBytes           `json:"proposer_address,omitempty"`
+	NumTxs                uint64             `json:"numTxs,omitempty"`
+	TotalTxs              uint64             `json:"totalTxs,omitempty"`
+	TotalVdfIterations    uint64             `json:"totalVDFIterations,omitempty"`
+	LastBlockHash         HexBytes           `json:"lastBlockHash,omitempty"`
+	StateRoot             HexBytes           `json:"stateRoot,omitempty"`
+	TransactionRoot       HexBytes           `json:"transactionRoot,omitempty"`
+	ValidatorRoot         HexBytes           `json:"validatorRoot,omitempty"`
+	NextValidatorRoot     HexBytes           `json:"nextValidatorRoot,omitempty"`
+	ProposerAddress       HexBytes           `json:"proposerAddress,omitempty"`
 	VDF                   *crypto.VDF        `json:"vdf,omitempty"`
-	LastQuorumCertificate *QuorumCertificate `json:"last_quorum_certificate,omitempty"`
+	LastQuorumCertificate *QuorumCertificate `json:"lastQuorumCertificate,omitempty"`
 }
 
 // MarshalJSON() implements the json.Marshaller interface
@@ -207,7 +208,7 @@ func (x *Block) BytesToBlock(blk []byte) (hash []byte, err ErrorI) {
 
 // jsonBlock is the Block implementation of json.Marshaller and json.Unmarshaler
 type jsonBlock struct {
-	BlockHeader  *BlockHeader `json:"block_header,omitempty"`
+	BlockHeader  *BlockHeader `json:"blockHeader,omitempty"`
 	Transactions []HexBytes   `json:"transactions,omitempty"`
 }
 

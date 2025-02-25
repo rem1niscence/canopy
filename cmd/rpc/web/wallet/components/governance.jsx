@@ -309,7 +309,7 @@ export default function Governance({keygroup, account: accountWithTxs, validator
                                         <Truncate text={"#" + key}/>
                                     </div>
                                 </td>
-                                <td>{formatLocaleNumber(value.proposal["end_height"], 0, 0)}</td>
+                                <td>{formatLocaleNumber(value.proposal["endHeight"], 0, 0)}</td>
                             </tr>
                         );
                     }),

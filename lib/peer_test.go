@@ -3,11 +3,12 @@ package lib
 import (
 	"container/list"
 	"encoding/json"
+	"testing"
+	"time"
+
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/runtime/protoimpl"
-	"testing"
-	"time"
 )
 
 func TestMessageCacheAdd(t *testing.T) {

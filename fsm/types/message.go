@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
@@ -13,16 +14,16 @@ const (
 	MessageSendName               = "send"
 	MessageStakeName              = "stake"
 	MessageUnstakeName            = "unstake"
-	MessageEditStakeName          = "edit_stake"
+	MessageEditStakeName          = "editStake"
 	MessagePauseName              = "pause"
 	MessageUnpauseName            = "unpause"
-	MessageChangeParameterName    = "change_parameter"
-	MessageDAOTransferName        = "dao_transfer"
-	MessageCertificateResultsName = "certificate_results"
+	MessageChangeParameterName    = "changeParameter"
+	MessageDAOTransferName        = "daoTransfer"
+	MessageCertificateResultsName = "certificateResults"
 	MessageSubsidyName            = "subsidy"
-	MessageCreateOrderName        = "create_order"
-	MessageEditOrderName          = "edit_order"
-	MessageDeleteOrderName        = "delete_order"
+	MessageCreateOrderName        = "createOrder"
+	MessageEditOrderName          = "editOrder"
+	MessageDeleteOrderName        = "deleteOrder"
 )
 
 func init() {
@@ -86,8 +87,8 @@ func (x *MessageSend) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageSend struct {
-	FromAddress lib.HexBytes `json:"from_address"`
-	ToAddress   lib.HexBytes `json:"to_address"`
+	FromAddress lib.HexBytes `json:"fromAddress"`
+	ToAddress   lib.HexBytes `json:"toAddress"`
 	Amount      uint64       `json:"amount"`
 }
 
@@ -146,11 +147,11 @@ func (x *MessageStake) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageStake struct {
-	PublicKey     lib.HexBytes `json:"public_key"`
+	PublicKey     lib.HexBytes `json:"publickey"`
 	Amount        uint64       `json:"amount"`
 	Committees    []uint64     `json:"committees"`
-	NetAddress    string       `json:"net_address"`
-	OutputAddress lib.HexBytes `json:"output_address"`
+	NetAddress    string       `json:"netAddress"`
+	OutputAddress lib.HexBytes `json:"outputAddress"`
 	Delegate      bool         `json:"delegate"`
 	Compound      bool         `json:"compound"`
 }
@@ -211,8 +212,8 @@ type jsonMessageEditStake struct {
 	Address       lib.HexBytes `json:"address"`
 	Amount        uint64       `json:"amount"`
 	Committees    []uint64     `json:"committees"`
-	NetAddress    string       `json:"net_address"`
-	OutputAddress lib.HexBytes `json:"output_address"`
+	NetAddress    string       `json:"netAddress"`
+	OutputAddress lib.HexBytes `json:"outputAddress"`
 	Compound      bool         `json:"compound"`
 }
 
@@ -366,11 +367,11 @@ func (x *MessageChangeParameter) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageChangeParameter struct {
-	ParameterSpace string       `json:"parameter_space"`
-	ParameterKey   string       `json:"parameter_key"`
-	ParameterValue any          `json:"parameter_value"`
-	StartHeight    uint64       `json:"start_height"`
-	EndHeight      uint64       `json:"end_height"`
+	ParameterSpace string       `json:"parameterSpace"`
+	ParameterKey   string       `json:"parameterKey"`
+	ParameterValue any          `json:"parameterValue"`
+	StartHeight    uint64       `json:"startHeight"`
+	EndHeight      uint64       `json:"endHeight"`
 	Signer         lib.HexBytes `json:"signer"`
 }
 
@@ -423,8 +424,8 @@ func (x *MessageDAOTransfer) UnmarshalJSON(b []byte) (err error) {
 type jsonMessageDaoTransfer struct {
 	Address     lib.HexBytes `json:"address"`
 	Amount      uint64       `json:"amount"`
-	StartHeight uint64       `json:"start_height"`
-	EndHeight   uint64       `json:"end_height"`
+	StartHeight uint64       `json:"startHeight"`
+	EndHeight   uint64       `json:"endHeight"`
 }
 
 var _ lib.MessageI = &MessageCertificateResults{} // interface enforcement
@@ -535,7 +536,7 @@ func (x *MessageSubsidy) UnmarshalJSON(b []byte) (err error) {
 
 type jsonMessageSubsidy struct {
 	Address lib.HexBytes `json:"address"`
-	ChainId uint64       `json:"chain_id"`
+	ChainId uint64       `json:"chainID"`
 	Amount  uint64       `json:"amount"`
 	Opcode  string       `json:"opcode"`
 }
@@ -585,11 +586,11 @@ func (x *MessageCreateOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageCreateOrder struct {
-	ChainId              uint64       `json:"ChainId"`
-	AmountForSale        uint64       `json:"AmountForSale"`
-	RequestedAmount      uint64       `json:"RequestedAmount"`
-	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress"`
-	SellersSellAddress   lib.HexBytes `json:"SellersSendAddress"`
+	ChainId              uint64       `json:"chainId"`
+	AmountForSale        uint64       `json:"amountForSale"`
+	RequestedAmount      uint64       `json:"requestedAmount"`
+	SellerReceiveAddress lib.HexBytes `json:"sellerReceiveAddress"`
+	SellersSellAddress   lib.HexBytes `json:"sellersSendAddress"`
 }
 
 var _ lib.MessageI = &MessageEditOrder{} // interface enforcement
@@ -637,11 +638,11 @@ func (x *MessageEditOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageEditOrder struct {
-	OrderId              uint64       `json:"OrderId"`
-	ChainId              uint64       `json:"ChainId"`
-	AmountForSale        uint64       `json:"AmountForSale"`
-	RequestedAmount      uint64       `json:"RequestedAmount"`
-	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress"`
+	OrderId              uint64       `json:"orderID"`
+	ChainId              uint64       `json:"chainID"`
+	AmountForSale        uint64       `json:"amountForSale"`
+	RequestedAmount      uint64       `json:"requestedAmount"`
+	SellerReceiveAddress lib.HexBytes `json:"sellerReceiveAddress"`
 }
 
 var _ lib.MessageI = &MessageDeleteOrder{} // interface enforcement
@@ -675,8 +676,8 @@ func (x *MessageDeleteOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageDeleteOrder struct {
-	OrderId uint64 `json:"OrderId"`
-	ChainId uint64 `json:"ChainId"`
+	OrderId uint64 `json:"orderID"`
+	ChainId uint64 `json:"chainID"`
 }
 
 // checkAmount() validates the amount sent in the Message
