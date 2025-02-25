@@ -83,15 +83,15 @@ func (x *OrderBook) GetOrder(orderId int) (order *SellOrder, err ErrorI) {
 
 // jsonSellOrder is the json.Marshaller and json.Unmarshaler implementation for the SellOrder object
 type jsonSellOrder struct {
-	Id                   uint64   `json:"Id,omitempty"`                   // the unique identifier of the order
-	Committee            uint64   `json:"Committee,omitempty"`            // the id of the committee that is in-charge of escrow for the swap
-	AmountForSale        uint64   `json:"AmountForSale,omitempty"`        // amount of CNPY for sale
-	RequestedAmount      uint64   `json:"RequestedAmount,omitempty"`      // amount of 'token' to receive
-	SellerReceiveAddress HexBytes `json:"SellerReceiveAddress,omitempty"` // the external chain address to receive the 'token'
-	BuyerSendAddress     HexBytes `json:"BuyerSendAddress,omitempty"`     // the send address from the buyer
-	BuyerReceiveAddress  HexBytes `json:"BuyerReceiveAddress,omitempty"`  // the buyers address to receive the 'coin'
-	BuyerChainDeadline   uint64   `json:"BuyerChainDeadline,omitempty"`   // the external chain height deadline to send the 'tokens' to SellerReceiveAddress
-	SellersSellAddress   HexBytes `json:"SellersSendAddress,omitempty"`   // the address of seller who is selling the 'coin'
+	Id                   uint64   `json:"id,omitempty"`                   // the unique identifier of the order
+	Committee            uint64   `json:"committee,omitempty"`            // the id of the committee that is in-charge of escrow for the swap
+	AmountForSale        uint64   `json:"amountForSale,omitempty"`        // amount of CNPY for sale
+	RequestedAmount      uint64   `json:"requestedAmount,omitempty"`      // amount of 'token' to receive
+	SellerReceiveAddress HexBytes `json:"sellerReceiveAddress,omitempty"` // the external chain address to receive the 'token'
+	BuyerSendAddress     HexBytes `json:"buyerSendAddress,omitempty"`     // the send address from the buyer
+	BuyerReceiveAddress  HexBytes `json:"buyerReceiveAddress,omitempty"`  // the buyers address to receive the 'coin'
+	BuyerChainDeadline   uint64   `json:"buyerChainDeadline,omitempty"`   // the external chain height deadline to send the 'tokens' to SellerReceiveAddress
+	SellersSellAddress   HexBytes `json:"sellersSendAddress,omitempty"`   // the address of seller who is selling the 'coin'
 }
 
 // MarshalJSON() is the json.Marshaller implementation for the SellOrder object

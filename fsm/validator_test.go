@@ -26,7 +26,7 @@ func TestGetValidator(t *testing.T) {
 			error:  "validator does not exist",
 		},
 		{
-			name:   "different valdiator",
+			name:   "different validator",
 			detail: "the validator that was preset doesn't correspond with the tryGet",
 			preset: &types.Validator{
 				Address:      newTestAddressBytes(t),

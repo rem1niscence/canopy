@@ -54,21 +54,21 @@ function getCardHeader(props, idx) {
   }
   switch (idx) {
     case 0:
-      return convertNumber(blks.results[0].block_header.height);
+      return convertNumber(blks.results[0].blockHeader.height);
     case 1:
       return convertNumber(props.supply.total, 1000, true);
     case 2:
-      if (blks.results[0].block_header.num_txs == null) {
+      if (blks.results[0].blockHeader.numTxs == null) {
         return "+0";
       }
-      return "+" + convertNumber(blks.results[0].block_header.num_txs);
+      return "+" + convertNumber(blks.results[0].blockHeader.numTxs);
     case 3:
       let totalStake = 0;
       if (!props.canopyCommittee.results) {
         return 0;
       }
       props.canopyCommittee.results.forEach(function (validator) {
-        totalStake += Number(validator.staked_amount);
+        totalStake += Number(validator.stakedAmount);
       });
       return (
         <>
@@ -87,7 +87,7 @@ function getCardSubHeader(props, consensusDuration, idx) {
   }
   switch (idx) {
     case 0:
-      return convertTime(v.results[0].block_header.time-consensusDuration);
+      return convertTime(v.results[0].blockHeader.time-consensusDuration);
     case 1:
       return convertNumber(Number(props.supply.total) - Number(props.supply.staked), 1000, true) + " liquid";
     case 2:
@@ -112,10 +112,10 @@ function getCardRightAligned(props, idx) {
     case 1:
       return convertNumber(props.supply.staked, 1000, true) + " staked";
     case 2:
-      return "block #" + v.results[0].block_header.height;
+      return "block #" + v.results[0].blockHeader.height;
     case 3:
       return (
-        "stake threshold " + convertNumber(props.params.Validator.stake_percent_for_subsidized_committee, 1000) + "%"
+        "stake threshold " + convertNumber(props.params.validator.stakePercentForSubsidizedCommittee, 1000) + "%"
       );
   }
 }
@@ -128,16 +128,16 @@ function getCardNote(props, idx) {
   }
   switch (idx) {
     case 0:
-      return <Truncate className="d-inline" text={v.results[0].block_header.hash} />;
+      return <Truncate className="d-inline" text={v.results[0].blockHeader.hash} />;
     case 1:
       return "+" + Number(50) + "/blk";
     case 2:
-      return "TOTAL " + convertNumber(v.results[0].block_header.total_txs);
+      return "TOTAL " + convertNumber(v.results[0].blockHeader.totalTxs);
     case 3:
       if (!props.canopyCommittee.results) {
         return "MaxStake: " + 0;
       }
-      return "MaxStake: " + convertNumber(props.canopyCommittee.results[0].staked_amount, 1000, true);
+      return "MaxStake: " + convertNumber(props.canopyCommittee.results[0].stakedAmount, 1000, true);
     default:
       return "?";
   }
@@ -151,7 +151,7 @@ function getCardFooter(props, consensusDuration, idx) {
   }
   switch (idx) {
     case 0:
-      return "Next block: " + addDate(v.results[0].block_header.time, consensusDuration);
+      return "Next block: " + addDate(v.results[0].blockHeader.time, consensusDuration);
     case 1:
       let s = "DAO pool supply: ";
       if (props.pool != null) {
@@ -177,7 +177,7 @@ function getCardFooter(props, consensusDuration, idx) {
         return 0 + "% in validator set";
       }
       props.canopyCommittee.results.forEach(function (validator) {
-        totalStake += Number(validator.staked_amount);
+        totalStake += Number(validator.stakedAmount);
       });
       return ((totalStake / props.supply.staked) * 100).toFixed(1) + "% in validator set";
   }

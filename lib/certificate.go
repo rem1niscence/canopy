@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/alecthomas/units"
-	"github.com/canopy-network/canopy/lib/crypto"
 	"math"
 	"slices"
+
+	"github.com/alecthomas/units"
+	"github.com/canopy-network/canopy/lib/crypto"
 )
 
 const (
@@ -216,8 +217,8 @@ type jsonQC struct {
 	BlockHash    HexBytes            `json:"blockHash,omitempty"`
 	ResultsHash  HexBytes            `json:"resultsHash,omitempty"`
 	Results      *CertificateResult  `json:"results,omitempty"`
-	ProposalHash HexBytes            `json:"block_hash,omitempty"`
-	ProposerKey  HexBytes            `json:"proposer_key,omitempty"`
+	ProposalHash HexBytes            `json:"proposalHash,omitempty"`
+	ProposerKey  HexBytes            `json:"proposerKey,omitempty"`
 	Signature    *AggregateSignature `json:"signature,omitempty"`
 }
 
@@ -387,8 +388,8 @@ func (x *RewardRecipients) Equals(y *RewardRecipients) bool {
 
 // jsonRewardRecipients is the RewardRecipients implementation of json.Marshaller and json.Unmarshaler
 type jsonRewardRecipients struct {
-	PaymentPercents []*PaymentPercents `json:"payment_percents,omitempty"` // recipients of the block reward by percentage
-	NumberOfSamples uint64             `json:"number_of_samples,omitempty"`
+	PaymentPercents []*PaymentPercents `json:"paymentPercents,omitempty"` // recipients of the block reward by percentage
+	NumberOfSamples uint64             `json:"numberOfSamples,omitempty"`
 }
 
 // UnmarshalJSON() satisfies the json.Unmarshaler interface
@@ -476,7 +477,7 @@ func (x *SlashRecipients) Equals(y *SlashRecipients) bool {
 
 // jsonSlashRecipients is the SlashRecipients implementation of json.Marshaller and json.Unmarshaler
 type jsonSlashRecipients struct {
-	DoubleSigners []*DoubleSigner `json:"double_signers,omitempty"` // who did the bft decide was a double signer
+	DoubleSigners []*DoubleSigner `json:"doubleSigners,omitempty"` // who did the bft decide was a double signer
 }
 
 // UnmarshalJSON() satisfies the json.Unmarshaler interface

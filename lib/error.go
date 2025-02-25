@@ -19,9 +19,9 @@ type ErrorCode uint32 // Defines a type for error codes
 type ErrorModule string // Defines a type for error modules
 
 type Error struct {
-	ECode   ErrorCode   `json:"Code"`   // Error code
-	EModule ErrorModule `json:"Module"` // Error module
-	Msg     string      `json:"Msg"`    // Error message
+	ECode   ErrorCode   `json:"code"`   // Error code
+	EModule ErrorModule `json:"module"` // Error module
+	Msg     string      `json:"msg"`    // Error message
 }
 
 func NewError(code ErrorCode, module ErrorModule, msg string) *Error {

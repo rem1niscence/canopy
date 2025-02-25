@@ -18,66 +18,66 @@
   "validators": [
     {
       "address": "851e90eaef1fa27debaee2c2591503bdeec1d123",
-      "public_key": "b88a5928e54cbf0a36e0b98f5bcf02de9a9a1deba6994739f9160181a609f516eb702936a0cbf4c1f2e7e6be5b8272f2",
+      "publicKey": "b88a5928e54cbf0a36e0b98f5bcf02de9a9a1deba6994739f9160181a609f516eb702936a0cbf4c1f2e7e6be5b8272f2",
       "committees": [
         1
       ],
-      "net_address": "tcp://node-1",
-      "staked_amount": 1000000000,
+      "netAddress": "tcp://node-1",
+      "stakedAmount": 1000000000,
       "output": "851e90eaef1fa27debaee2c2591503bdeec1d123"
     },
     {
       "address": "02cd4e5eb53ea665702042a6ed6d31d616054dc5",
-      "public_key": "98d45087a99bcbfde91993502e77dde869d4485c3778fe46513958320da560823d56a0108f4cf3513393f4d561bc489b",
+      "publicKey": "98d45087a99bcbfde91993502e77dde869d4485c3778fe46513958320da560823d56a0108f4cf3513393f4d561bc489b",
       "committees": [
         2
       ],
-      "net_address": "tcp://node-2",
-      "staked_amount": 1000000000,
+      "netAddress": "tcp://node-2",
+      "stakedAmount": 1000000000,
       "output": "02cd4e5eb53ea665702042a6ed6d31d616054dc5"
     }
   ],
   "params": {
-    "Consensus": {
-      "block_size": 1000000,
-      "protocol_version": "1/0",
-      "root_chain_id": 1,
+    "consensus": {
+      "blockSize": 1000000,
+      "protocolVersion": "1/0",
+      "rootChainID": 1,
       "retired": 0
     },
-    "Validator": {
-      "unstaking_blocks": 2,
-      "max_pause_blocks": 4380,
-      "double_sign_slash_percentage": 10,
-      "non_sign_slash_percentage": 1,
-      "max_non_sign": 4,
-      "non_sign_window": 10,
-      "max_committees": 15,
-      "max_committee_size": 100,
-      "early_withdrawal_penalty": 20,
-      "delegate_unstaking_blocks": 2,
-      "minimum_order_size": 1000,
-      "stake_percent_for_subsidized_committee": 33,
-      "max_slash_per_committee": 15,
-      "delegate_reward_percentage": 10,
-      "buy_deadline_blocks": 15,
-      "buy_order_fee_multiplier": 2
+    "validator": {
+      "unstakingBlocks": 2,
+      "maxPauseBlocks": 4380,
+      "doubleSignSlashPercentage": 10,
+      "nonSignSlashPercentage": 1,
+      "maxNonSign": 4,
+      "nonSignWindow": 10,
+      "maxCommittees": 15,
+      "maxCommitteeSize": 100,
+      "earlyWithdrawalPenalty": 20,
+      "delegateUnstakingBlocks": 2,
+      "minimumOrderSize": 1000,
+      "stakePercentForSubsidizedCommittee": 33,
+      "maxSlashPerCommittee": 15,
+      "delegateRewardPercentage": 10,
+      "buyDeadlineBlocks": 15,
+      "buyOrderFeeMultiplier": 2
     },
-    "Fee": {
-      "send_fee": 10000,
-      "stake_fee": 10000,
-      "edit_stake_fee": 10000,
-      "unstake_fee": 10000,
-      "pause_fee": 10000,
-      "unpause_fee": 10000,
-      "change_parameter_fee": 10000,
-      "dao_transfer_fee": 10000,
-      "subsidy_fee": 10000,
-      "create_order_fee": 10000,
-      "edit_order_fee": 10000,
-      "delete_order_fee": 10000
+    "fee": {
+      "sendFee": 10000,
+      "stakeFee": 10000,
+      "editStakeFee": 10000,
+      "unstakeFee": 10000,
+      "pauseFee": 10000,
+      "unpauseFee": 10000,
+      "changeParameterFee": 10000,
+      "daoTransferFee": 10000,
+      "subsidyFee": 10000,
+      "createOrderFee": 10000,
+      "editOrderFee": 10000,
+      "deleteOrderFee": 10000
     },
-    "Governance": {
-      "dao_reward_percentage": 10
+    "governance": {
+      "daoRewardPercentage": 10
     }
   },
   "supply": null

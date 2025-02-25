@@ -2,11 +2,12 @@ package lib
 
 import (
 	"encoding/json"
-	"github.com/alecthomas/units"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/alecthomas/units"
 )
 
 const (
@@ -52,7 +53,7 @@ type MainConfig struct {
 	ChainId    uint64      `json:"chainId"`
 	SleepUntil uint64      `json:"sleepUntil"`
 	RootChain  []RootChain `json:"rootChain"`
-	RunVDF     bool        `json:"RunVDF"`
+	RunVDF     bool        `json:"runVDF"`
 	Headless   bool        `json:"headless"`
 }
 
@@ -85,13 +86,13 @@ func (m *MainConfig) GetLogLevel() int32 {
 // RPC CONFIG BELOW
 
 type RPCConfig struct {
-	WalletPort      string // the port where the web wallet is hosted
-	ExplorerPort    string // the port where the block explorer is hosted
-	RPCPort         string // the port where the rpc server is hosted
-	AdminPort       string // the port where the admin rpc server is hosted
-	RPCUrl          string // the url without port where the rpc server is hosted
-	RootChainPollMS uint64 // how often to poll the base chain in milliseconds
-	TimeoutS        int    // the rpc request timeout in seconds
+	WalletPort      string `json:"walletPort"`      // the port where the web wallet is hosted
+	ExplorerPort    string `json:"explorerPort"`    // the port where the block explorer is hosted
+	RPCPort         string `json:"rpcPort"`         // the port where the rpc server is hosted
+	AdminPort       string `json:"adminPort"`       // the port where the admin rpc server is hosted
+	RPCUrl          string `json:"rpcURL"`          // the url without port where the rpc server is hosted
+	RootChainPollMS uint64 `json:"rootChainPollMS"` // how often to poll the base chain in milliseconds
+	TimeoutS        int    `json:"timeoutS"`        // the rpc request timeout in seconds
 }
 
 type RootChain struct {
@@ -128,15 +129,15 @@ func DefaultStateMachineConfig() StateMachineConfig { return StateMachineConfig{
 // - async faults may lead to extended block time
 // - social consensus dictates BlockTime for the protocol - being too fast or too slow can lead to Non-Signing and Consensus failures
 type ConsensusConfig struct {
-	ElectionTimeoutMS       int // minus VRF creation time (if Candidate), is how long (in milliseconds) the replica sleeps before moving to ELECTION-VOTE phase
-	ElectionVoteTimeoutMS   int // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to PROPOSE phase
-	ProposeTimeoutMS        int // minus Proposal creation time (if Leader), is how long (in milliseconds) the replica sleeps before moving to PROPOSE-VOTE phase
-	ProposeVoteTimeoutMS    int // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to PRECOMMIT phase
-	PrecommitTimeoutMS      int // minus Proposal-QC aggregation time (if Leader), how long (in milliseconds) the replica sleeps before moving to the PRECOMMIT-VOTE phase
-	PrecommitVoteTimeoutMS  int // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to COMMIT phase
-	CommitTimeoutMS         int // minus Precommit-QC aggregation time (if Leader), how long (in milliseconds) the replica sleeps before moving to the COMMIT-PROCESS phase
-	CommitProcessMS         int // minus Commit Proposal time, how long (in milliseconds) the replica sleeps before 'NewHeight' (NOTE: this is the majority of the block time)
-	RoundInterruptTimeoutMS int // minus gossiping current Round time, how long (in milliseconds) the replica sleeps before moving to PACEMAKER phase
+	ElectionTimeoutMS       int `json:"electionTimeoutMS"`       // minus VRF creation time (if Candidate), is how long (in milliseconds) the replica sleeps before moving to ELECTION-VOTE phase
+	ElectionVoteTimeoutMS   int `json:"electionVoteTimeoutMS"`   // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to PROPOSE phase
+	ProposeTimeoutMS        int `json:"proposeTimeoutMS"`        // minus Proposal creation time (if Leader), is how long (in milliseconds) the replica sleeps before moving to PROPOSE-VOTE phase
+	ProposeVoteTimeoutMS    int `json:"proposeVoteTimeoutMS"`    // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to PRECOMMIT phase
+	PrecommitTimeoutMS      int `json:"precommitTimeoutMS"`      // minus Proposal-QC aggregation time (if Leader), how long (in milliseconds) the replica sleeps before moving to the PRECOMMIT-VOTE phase
+	PrecommitVoteTimeoutMS  int `json:"precommitVoteTimeoutMS"`  // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to COMMIT phase
+	CommitTimeoutMS         int `json:"commitTimeoutMS"`         // minus Precommit-QC aggregation time (if Leader), how long (in milliseconds) the replica sleeps before moving to the COMMIT-PROCESS phase
+	CommitProcessMS         int `json:"commitProcessMS"`         // minus Commit Proposal time, how long (in milliseconds) the replica sleeps before 'NewHeight' (NOTE: this is the majority of the block time)
+	RoundInterruptTimeoutMS int `json:"roundInterruptTimeoutMS"` // minus gossiping current Round time, how long (in milliseconds) the replica sleeps before moving to PACEMAKER phase
 }
 
 // DefaultConsensusConfig() configures the block time
@@ -158,15 +159,15 @@ func DefaultConsensusConfig() ConsensusConfig {
 
 // P2PConfig defines peering compatibility and limits as well as actions on specific peering IPs / IDs
 type P2PConfig struct {
-	NetworkID       uint64   // the ID for the peering network
-	ListenAddress   string   // listen for incoming connection
-	ExternalAddress string   // advertise for external dialing
-	MaxInbound      int      // max inbound peers
-	MaxOutbound     int      // max outbound peers
-	TrustedPeerIDs  []string // trusted public keys
-	DialPeers       []string // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
-	BannedPeerIDs   []string // banned public keys
-	BannedIPs       []string // banned IPs
+	NetworkID       uint64   `json:"networkID"`      // the ID for the peering network
+	ListenAddress   string   `json:"listenAdress"`   // listen for incoming connection
+	ExternalAddress string   `json:"externalAdress"` // advertise for external dialing
+	MaxInbound      int      `json:"maxInbound"`     // max inbound peers
+	MaxOutbound     int      `json:"maxOutbound"`    // max outbound peers
+	TrustedPeerIDs  []string `json:"trutedPeersIDs"` // trusted public keys
+	DialPeers       []string `json:"dialPeers"`      // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
+	BannedPeerIDs   []string `json:"bannedPeersIDs"` // banned public keys
+	BannedIPs       []string `json:"bannedIPs"`      // banned IPs
 }
 
 func DefaultP2PConfig() P2PConfig {
@@ -183,9 +184,9 @@ func DefaultP2PConfig() P2PConfig {
 
 // StoreConfig is user configurations for the key value database
 type StoreConfig struct {
-	DataDirPath string // path of the designated folder where the application stores its data
-	DBName      string // name of the database
-	InMemory    bool   // non-disk database, only for testing
+	DataDirPath string `json:"dataDirPath"` // path of the designated folder where the application stores its data
+	DBName      string `json:"dbName"`      // name of the database
+	InMemory    bool   `json:"inMemory"`    // non-disk database, only for testing
 }
 
 // DefaultDataDirPath() is $USERHOME/.canopy
@@ -207,10 +208,10 @@ func DefaultStoreConfig() StoreConfig {
 
 // MempoolConfig is the user configuration of the unconfirmed transaction pool
 type MempoolConfig struct {
-	MaxTotalBytes       uint64 // maximum collective bytes in the pool
-	MaxTransactionCount uint32 // max number of Transactions
-	IndividualMaxTxSize uint32 // max bytes of a single Transaction
-	DropPercentage      int    // percentage that is dropped from the bottom of the queue if limits are reached
+	MaxTotalBytes       uint64 `json:"maxTotalBytes"`       // maximum collective bytes in the pool
+	MaxTransactionCount uint32 `json:"maxTransactionCount"` // max number of Transactions
+	IndividualMaxTxSize uint32 `json:"individualMaxTxSize"` // max bytes of a single Transaction
+	DropPercentage      int    `json:"dropPercentage"`      // percentage that is dropped from the bottom of the queue if limits are reached
 }
 
 // DefaultMempoolConfig() returns the developer created Mempool options

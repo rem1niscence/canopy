@@ -8,7 +8,7 @@ import (
 	"slices"
 )
 
-// COMMITTEES BELOW
+/* This file contains logic for 'committees' or validator sets responsible for 'nestedChain' consensus */
 
 // FundCommitteeRewardPools() mints newly created tokens to protocol subsidized committees
 func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
@@ -173,6 +173,49 @@ func (s *StateMachine) DistributeCommitteeReward(stub *lib.PaymentPercents, rewa
 	return earlyWithdrawalReward, s.AccountAdd(crypto.NewAddress(validator.Output), earlyWithdrawalReward)
 }
 
+// LotteryWinner() selects a validator/delegate randomly weighted based on their stake within a committee
+func (s *StateMachine) LotteryWinner(id uint64, validators ...bool) (lottery *lib.LotteryWinner, err lib.ErrorI) {
+	// create a variable to hold the 'members' of the committee
+	var p lib.ValidatorSet
+	// if validators
+	if len(validators) == 1 && validators[0] == true {
+		p, _ = s.GetCommitteeMembers(s.Config.ChainId)
+	} else {
+		// else get the delegates
+		p, _ = s.GetAllDelegates(id)
+	}
+	// get the validator params from state
+	valParams, err := s.GetParamsVal()
+	if err != nil {
+		return nil, err
+	}
+	// define a convenience variable for the 'cut' of the lottery winner
+	winnerCut := valParams.DelegateRewardPercentage
+	// if there are no validators in the set - return
+	if p.NumValidators == 0 {
+		return &lib.LotteryWinner{Winner: nil, Cut: winnerCut}, nil
+	}
+	// get the last proposers
+	lastProposers, err := s.GetLastProposers()
+	if err != nil {
+		return
+	}
+	// use un-grindable weighted pseudorandom to select a winner
+	winner := lib.WeightedPseudorandom(&lib.PseudorandomParams{
+		SortitionData: &lib.SortitionData{
+			LastProposerAddresses: lastProposers.Addresses,
+			Height:                s.Height(),
+			TotalValidators:       p.NumValidators,
+			TotalPower:            p.TotalPower,
+		}, ValidatorSet: p.ValidatorSet,
+	})
+	// return the lottery winner and cut
+	return &lib.LotteryWinner{
+		Winner: winner.Address().Bytes(),
+		Cut:    winnerCut,
+	}, nil
+}
+
 // GetCommitteeMembers() retrieves the ValidatorSet that is responsible for the 'chainId'
 func (s *StateMachine) GetCommitteeMembers(chainId uint64) (vs lib.ValidatorSet, err lib.ErrorI) {
 	// get the validator params
@@ -261,7 +304,7 @@ func (s *StateMachine) SetCommittees(address crypto.AddressI, totalStake uint64,
 			return
 		}
 		// add to the committee staked supply
-		if err = s.AddToCommitteeStakedSupply(committee, totalStake); err != nil {
+		if err = s.AddToCommitteeSupplyForChain(committee, totalStake); err != nil {
 			return
 		}
 	}
@@ -277,7 +320,7 @@ func (s *StateMachine) DeleteCommittees(address crypto.AddressI, totalStake uint
 			return
 		}
 		// subtract from the committee staked supply
-		if err = s.SubFromCommitteeStakedSupply(committee, totalStake); err != nil {
+		if err = s.SubFromCommitteeStakedSupplyForChain(committee, totalStake); err != nil {
 			return
 		}
 	}
@@ -377,11 +420,11 @@ func (s *StateMachine) SetDelegations(address crypto.AddressI, totalStake uint64
 			return err
 		}
 		// add to the delegate supply (used for tracking amounts)
-		if err := s.AddToDelegateStakedSupply(committee, totalStake); err != nil {
+		if err := s.AddToDelegateSupplyForChain(committee, totalStake); err != nil {
 			return err
 		}
 		// add to the committee supply as well (used for tracking amounts)
-		if err := s.AddToCommitteeStakedSupply(committee, totalStake); err != nil {
+		if err := s.AddToCommitteeSupplyForChain(committee, totalStake); err != nil {
 			return err
 		}
 	}
@@ -396,11 +439,11 @@ func (s *StateMachine) DeleteDelegations(address crypto.AddressI, totalStake uin
 			return err
 		}
 		// remove from the delegate supply (used for tracking amounts)
-		if err := s.SubFromDelegateStakedSupply(committee, totalStake); err != nil {
+		if err := s.SubFromDelegateStakedSupplyForChain(committee, totalStake); err != nil {
 			return err
 		}
 		// remove from the committee supply as well (used for tracking amounts)
-		if err := s.SubFromCommitteeStakedSupply(committee, totalStake); err != nil {
+		if err := s.SubFromCommitteeStakedSupplyForChain(committee, totalStake); err != nil {
 			return err
 		}
 	}

@@ -489,7 +489,7 @@ func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]by
 	case *types.MessageSend:
 		return [][]byte{x.FromAddress}, nil
 	case *types.MessageStake:
-		address, e := s.validatorPubToAddr(x.PublicKey)
+		address, e := s.pubKeyBytesToAddress(x.PublicKey)
 		if e != nil {
 			return nil, e
 		}
@@ -509,11 +509,11 @@ func (s *StateMachine) GetAuthorizedSignersFor(msg lib.MessageI) (signers [][]by
 	case *types.MessageSubsidy:
 		return [][]byte{x.Address}, nil
 	case *types.MessageCertificateResults:
-		pub, e := lib.PublicKeyFromBytes(x.Qc.ProposerKey)
+		address, e := s.pubKeyBytesToAddress(x.Qc.ProposerKey)
 		if e != nil {
 			return nil, e
 		}
-		return [][]byte{pub.Address().Bytes()}, nil
+		return [][]byte{address}, nil
 	case *types.MessageCreateOrder:
 		return [][]byte{x.SellersSendAddress}, nil
 	case *types.MessageEditOrder:

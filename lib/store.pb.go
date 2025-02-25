@@ -103,9 +103,9 @@ type Node struct {
 
 	// Value: is the cryptographic hash of the data included in the database
 	// the ValueHash is included in the parent hash
-	Value []byte `protobuf:"bytes,1,opt,name=Value,proto3" json:"Value,omitempty"`
+	Value []byte `protobuf:"bytes,1,opt,name=Value,proto3" json:"value"` // @gotags: json:"value"
 	// LeftChildKey: is the key for the left child node. Nil means no child
-	LeftChildKey []byte `protobuf:"bytes,2,opt,name=LeftChildKey,proto3" json:"LeftChildKey,omitempty"`
+	LeftChildKey []byte `protobuf:"bytes,2,opt,name=LeftChildKey,proto3" json:"leftChildKey"` // @gotags: json:"leftChildKey"
 	// RightChildKey: is the key for the right child node. Nil means no child
 	RightChildKey []byte `protobuf:"bytes,3,opt,name=RightChildKey,proto3" json:"RightChildKey,omitempty"`
 	// Key: used for merkle proof generation and verification. It is the compact

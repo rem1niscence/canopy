@@ -25,16 +25,16 @@ function convertCardData(state, v) {
   }
   return value.block
     ? {
-      height: value.block.block_header.height,
-      hash: value.block.block_header.hash,
-      proposer: value.block.block_header.proposer_address,
+      height: value.block.blockHeader.height,
+      hash: value.block.blockHeader.hash,
+      proposer: value.block.blockHeader.proposerAddress,
     }
     : value.validator && !state.modalState.accOnly
       ? {
           address: value.validator.address,
-          public_key: value.validator.public_key,
-          net_address: value.validator.net_address,
-          output_address: value.validator.output,
+          publicKey: value.validator.publicKey,
+          netAddress: value.validator.netAddress,
+          outputAddress: value.validator.output,
         }
       : value.account;
 }
@@ -58,14 +58,14 @@ export function convertTransactions(txs) {
 // convertBlock() converts a block item into a display object for rendering
 export function convertBlock(blk) {
   let {
-    last_quorum_certificate,
-    next_validator_root,
-    state_root,
-    transaction_root,
-    validator_root,
+    lastQuorumCertificate,
+    nextValidatorRoot,
+    stateRoot,
+    transactionRoot,
+    validatorRoot,
     vdf,
     ...value
-  } = blk.block.block_header;
+  } = blk.block.blockHeader;
   return value;
 }
 
@@ -97,7 +97,7 @@ function convertTabData(state, v, tab) {
         if ("qc" in v.transaction.msg) return convertCertificateResults(v.transaction.msg.qc);
         return v.transaction.msg;
       case 1:
-        return { hash: v.tx_hash, time: v.transaction.time, sender: v.sender, type: v.message_type };
+        return { hash: v.txHash, time: v.transaction.time, sender: v.sender, type: v.messageType };
       default:
         return v;
     }
@@ -207,7 +207,7 @@ export default function DetailModal({ state, setState }) {
       end = ms.page === 0 || ms.page === 1 ? 10 : ms.page * 10;
       start = end - 10;
       page = blk.transactions || page;
-      d = { pageNumber: ms.Page, perPage: 10, totalPages: Math.ceil(blk.block_header.num_txs / 10), ...d };
+      d = { pageNumber: ms.Page, perPage: 10, totalPages: Math.ceil(blk.blockHeader.num_txs / 10), ...d };
     } else if ("account" in d) {
       page =
         tab === 1 ? convertTransactions(d.sent_transactions.results) : convertTransactions(d.rec_transactions.results);
@@ -262,7 +262,7 @@ export default function DetailModal({ state, setState }) {
     );
   }
 
-  let toCNPYFields = ["amount", "staked_amount"];
+  let toCNPYFields = ["amount", "stakedAmount"];
 
   // return the Modal
   return (

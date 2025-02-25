@@ -792,7 +792,7 @@ func TestSetGetCommittees(t *testing.T) {
 				got, err := sm.GetCommitteeMembers(id)
 				require.NoError(t, err)
 				// get the committee pool from the supply object
-				p, err := sm.GetCommitteeStakedSupply(id)
+				p, err := sm.GetCommitteeStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// compare got total power vs expected total power
 				require.Equal(t, test.expectedTotalPower[id], got.TotalPower)
@@ -934,7 +934,7 @@ func TestUpdateCommittees(t *testing.T) {
 				// compare got num validators vs num validators
 				require.EqualValues(t, len(test.expected[id]), got.NumValidators)
 				// get the committee pool from the supply object
-				p, err := sm.GetCommitteeStakedSupply(id)
+				p, err := sm.GetCommitteeStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// for each expected public key
 				for i, expectedPublicKey := range publicKeys {
@@ -1011,7 +1011,7 @@ func TestDeleteCommittees(t *testing.T) {
 				// compare got num validators vs num validators
 				require.EqualValues(t, len(test.expected[id]), got.NumValidators)
 				// get the committee pool from the supply object
-				p, err := sm.GetCommitteeStakedSupply(id)
+				p, err := sm.GetCommitteeStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// for each expected public key
 				for i, expectedPublicKey := range publicKeys {
@@ -1260,10 +1260,10 @@ func TestUpdateDelegates(t *testing.T) {
 				got, ok := page.Results.(*types.ValidatorPage)
 				require.True(t, ok)
 				// get the committee pool from the supply object
-				committeePool, err := sm.GetCommitteeStakedSupply(id)
+				committeePool, err := sm.GetCommitteeStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// get the delegates pool from the supply object
-				delegatePool, err := sm.GetDelegateStakedSupply(id)
+				delegatePool, err := sm.GetDelegateStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// for each expected public key
 				for i, expectedPublicKey := range publicKeys {
@@ -1346,9 +1346,9 @@ func TestDeleteDelegates(t *testing.T) {
 				got, ok := page.Results.(*types.ValidatorPage)
 				require.True(t, ok)
 				// get the committee pool from the supply object
-				committeePool, err := sm.GetCommitteeStakedSupply(id)
+				committeePool, err := sm.GetCommitteeStakedSupplyForChain(id)
 				// get the committee pool from the supply object
-				delegatePool, err := sm.GetDelegateStakedSupply(id)
+				delegatePool, err := sm.GetDelegateStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// for each expected public key
 				for i, expectedPublicKey := range publicKeys {

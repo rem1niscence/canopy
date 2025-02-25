@@ -32,9 +32,9 @@ message CommitID {
 message Node {
   // Value: is the cryptographic hash of the data included in the database
   // the ValueHash is included in the parent hash
-  bytes Value = 1;
+  bytes Value = 1; // @gotags: json:"value"
   // LeftChildKey: is the key for the left child node. Nil means no child
-  bytes LeftChildKey = 2;
+  bytes LeftChildKey = 2; // @gotags: json:"leftChildKey"
   // RightChildKey: is the key for the right child node. Nil means no child
   bytes RightChildKey = 3;
   // Key: used for merkle proof generation and verification. It is the compact

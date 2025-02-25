@@ -3,12 +3,13 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -106,10 +107,10 @@ func (x *Params) Check() lib.ErrorI {
 // consensus param space
 
 const (
-	ParamBlockSize       = "block_size"       // size of the block - header
-	ParamProtocolVersion = "protocol_version" // current protocol version (upgrade enforcement)
-	ParamRetired         = "retired"          // if the chain is marking itself as 'retired' to the root-Chain making it forever un-subsidized
-	ParamRootChainId     = "root_chain_id"    // the chain id of the root chain (source of the validator set)
+	ParamBlockSize       = "blockSize"       // size of the block - header
+	ParamProtocolVersion = "protocolVersion" // current protocol version (upgrade enforcement)
+	ParamRetired         = "retired"         // if the chain is marking itself as 'retired' to the root-Chain making it forever un-subsidized
+	ParamRootChainId     = "rootChainID"     // the chain id of the root chain (source of the validator set)
 )
 
 var _ ParamSpace = &ConsensusParams{}
@@ -212,22 +213,22 @@ func FormatParamSpace(paramSpace string) string {
 var _ ParamSpace = &ValidatorParams{}
 
 const (
-	ParamUnstakingBlocks                    = "unstaking_blocks"                       // number of blocks a committee member must be 'unstaking' for
-	ParamMaxPauseBlocks                     = "max_pause_blocks"                       // maximum blocks a validator may be paused for before force-unstaking
-	ParamNonSignSlashPercentage             = "non_sign_slash_percentage"              // how much a non-signer is slashed if exceeds threshold in window (% of stake)
-	ParamMaxNonSign                         = "max_non_sign"                           // how much a committee member can not sign before being slashed
-	ParamNonSignWindow                      = "non_sign_window"                        // how frequently the non-sign-count is reset
-	ParamDoubleSignSlashPercentage          = "double_sign_slash_percentage"           // how much a double signer is slashed (% of stake)
-	ParamMaxCommittees                      = "max_committees"                         // maximum number of committees a single validator may participate in
-	ParamMaxCommitteeSize                   = "max_committee_size"                     // maximum number of members a committee may have
-	ParamEarlyWithdrawalPenalty             = "early_withdrawal_penalty"               // reduction percentage of non-compounded rewards
-	ParamDelegateUnstakingBlocks            = "delegate_unstaking_blocks"              // number of blocks a delegator must be 'unstaking' for
-	ParamMinimumOrderSize                   = "minimum_order_size"                     // minimum sell tokens in a sell order
-	ParamStakePercentForSubsidizedCommittee = "stake_percent_for_subsidized_committee" // the minimum percentage of total stake needed to be a 'paid committee'
-	ParamMaxSlashPerCommittee               = "max_slash_per_committee"                // the maximum validator slash per committee per block
-	ParamDelegateRewardPercentage           = "delegate_reward_percentage"             // the percentage of the block reward that is awarded to the delegates
-	ParamBuyDeadlineBlocks                  = "buy_deadline_blocks"                    // the amount of blocks a 'buyer' has to complete an order they reserved
-	ParamBuyOrderFeeMultiplier              = "buy_order_fee_multiplier"               // the fee multiplier of the 'send' fee that is required to execute a buy order
+	ParamUnstakingBlocks                    = "unstakingBlocks"                    // number of blocks a committee member must be 'unstaking' for
+	ParamMaxPauseBlocks                     = "maxPauseBlocks"                     // maximum blocks a validator may be paused for before force-unstaking
+	ParamNonSignSlashPercentage             = "nonSignSlashPercentage"             // how much a non-signer is slashed if exceeds threshold in window (% of stake)
+	ParamMaxNonSign                         = "maxNonSign"                         // how much a committee member can not sign before being slashed
+	ParamNonSignWindow                      = "nonSignWindow"                      // how frequently the non-sign-count is reset
+	ParamDoubleSignSlashPercentage          = "doubleSignSlashPercentage"          // how much a double signer is slashed (% of stake)
+	ParamMaxCommittees                      = "maxCommittees"                      // maximum number of committees a single validator may participate in
+	ParamMaxCommitteeSize                   = "maxCommitteeSize"                   // maximum number of members a committee may have
+	ParamEarlyWithdrawalPenalty             = "earlyWithdrawalPenalty"             // reduction percentage of non-compounded rewards
+	ParamDelegateUnstakingBlocks            = "delegateUnstakingBlocks"            // number of blocks a delegator must be 'unstaking' for
+	ParamMinimumOrderSize                   = "minimumOrderSize"                   // minimum sell tokens in a sell order
+	ParamStakePercentForSubsidizedCommittee = "stakePercentForSubsidizedCommittee" // the minimum percentage of total stake needed to be a 'paid committee'
+	ParamMaxSlashPerCommittee               = "maxSlashPerCommittee"               // the maximum validator slash per committee per block
+	ParamDelegateRewardPercentage           = "delegateRewardPercentage"           // the percentage of the block reward that is awarded to the delegates
+	ParamBuyDeadlineBlocks                  = "buyDeadlineBlocks"                  // the amount of blocks a 'buyer' has to complete an order they reserved
+	ParamBuyOrderFeeMultiplier              = "buyOrderFeeMultiplier"              // the fee multiplier of the 'send' fee that is required to execute a buy order
 )
 
 // Check() validates the Validator params
@@ -331,19 +332,19 @@ func (x *ValidatorParams) SetString(_ string, _ string) lib.ErrorI {
 var _ ParamSpace = &FeeParams{}
 
 const (
-	ParamSendFee               = "send_fee"                // transaction fee for MessageSend
-	ParamStakeFee              = "stake_fee"               // transaction fee for MessageStake
-	ParamEditStakeFee          = "edit_stake_fee"          // transaction fee for MessageEditStake
-	ParamUnstakeFee            = "unstake_fee"             // transaction fee for MessageUnstake
-	ParamPauseFee              = "pause_fee"               // transaction fee for MessagePause
-	ParamUnpauseFee            = "unpause_fee"             // transaction fee for MessageUnpause
-	ParamChangeParameterFee    = "change_parameter_fee"    // transaction fee for MessageChangeParameter
-	ParamDAOTransferFee        = "dao_transfer_fee"        // transaction fee for MessageDAOTransfer
-	ParamCertificateResultsFee = "certificate_results_fee" // transaction fee for MessageCertificateResults
-	ParamSubsidyFee            = "subsidy_fee"             // transaction fee for MessageSubsidy
-	ParamCreateOrderFee        = "create_order_fee"        // transaction fee for MessageCreateOrder
-	ParamEditOrderFee          = "edit_order_fee"          // transaction fee for MessageEditOrder
-	ParamDeleteOrderFee        = "delete_order_fee"        // transaction fee for MessageDeleteOrder
+	ParamSendFee               = "sendFee"               // transaction fee for MessageSend
+	ParamStakeFee              = "stakeFee"              // transaction fee for MessageStake
+	ParamEditStakeFee          = "editStakeFee"          // transaction fee for MessageEditStake
+	ParamUnstakeFee            = "unstakeFee"            // transaction fee for MessageUnstake
+	ParamPauseFee              = "pauseFee"              // transaction fee for MessagePause
+	ParamUnpauseFee            = "unpauseFee"            // transaction fee for MessageUnpause
+	ParamChangeParameterFee    = "changeParameterFee"    // transaction fee for MessageChangeParameter
+	ParamDAOTransferFee        = "daoTransferFee"        // transaction fee for MessageDAOTransfer
+	ParamCertificateResultsFee = "certificateResultsFee" // transaction fee for MessageCertificateResults
+	ParamSubsidyFee            = "subsidyFee"            // transaction fee for MessageSubsidy
+	ParamCreateOrderFee        = "createOrderFee"        // transaction fee for MessageCreateOrder
+	ParamEditOrderFee          = "editOrderFee"          // transaction fee for MessageEditOrder
+	ParamDeleteOrderFee        = "deleteOrderFee"        // transaction fee for MessageDeleteOrder
 )
 
 // Check() validates the Fee params
@@ -430,7 +431,7 @@ func (x *FeeParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 // governance param space
 
 const (
-	ParamDAORewardPercentage = "dao_reward_percentage" // percent of rewards the DAO fund receives
+	ParamDAORewardPercentage = "daoRewardPercentage" // percent of rewards the DAO fund receives
 )
 
 var _ ParamSpace = &GovernanceParams{}
@@ -503,8 +504,8 @@ const (
 // ActivePolls is the in-memory representation of the polls.json file
 // Contains a list of all active polls
 type ActivePolls struct {
-	Polls    map[string]map[string]bool `json:"ActivePolls"` // [poll_hash] -> [address hex] -> Vote
-	PollMeta map[string]*StartPoll      `json:"PollMeta"`    // [poll_hash] -> StartPoll structure
+	Polls    map[string]map[string]bool `json:"activePolls"` // [poll_hash] -> [address hex] -> Vote
+	PollMeta map[string]*StartPoll      `json:"pollMeta"`    // [poll_hash] -> StartPoll structure
 }
 
 // CheckForPollTransaction() populates the poll.json file from embeds if the embed exists in the memo field
@@ -572,9 +573,9 @@ func (p *ActivePolls) SaveToFile(dataDirPath string) lib.ErrorI {
 // StartPoll represents the structure for initiating a new poll
 // It is used to encode data into JSON format for storing in memo fields
 type StartPoll struct {
-	StartPoll string `json:"StartPoll"`
-	Url       string `json:"URL,omitempty"`
-	EndHeight uint64 `json:"EndHeight"`
+	StartPoll string `json:"startPoll"`
+	Url       string `json:"url,omitempty"`
+	EndHeight uint64 `json:"endHeight"`
 }
 
 // NewStartPollTransaction() isn't an actual transaction type - rather it's a protocol built on top of send transactions to allow simple straw polling on Canopy.
@@ -604,8 +605,8 @@ func NewStartPollTransaction(from crypto.PrivateKeyI, pollJSON json.RawMessage, 
 // VotePoll represents the structure of a voting action on a poll
 // It is used to encode data into JSON format for storing in memo fields
 type VotePoll struct {
-	VotePoll string `json:"VotePoll"`
-	Approve  bool   `json:"Approve"`
+	VotePoll string `json:"votePoll"`
+	Approve  bool   `json:"approve"`
 }
 
 // NewVotePollTransaction() isn't an actual transaction type - rather it's a protocol built on top of send transactions to allow simple straw polling on Canopy.

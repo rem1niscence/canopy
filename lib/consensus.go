@@ -5,9 +5,10 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"slices"
+
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/drand/kyber"
-	"slices"
 )
 
 // ValidatorSet represents a collection of validators responsible for consensus
@@ -80,12 +81,12 @@ func (vs *ValidatorSet) GetValidatorAndIdx(publicKey []byte) (val *ConsensusVali
 // RootChainInfo maintains root-Chain data needed for consensus
 type RootChainInfo struct {
 	Height                 uint64         `json:"height"`
-	ValidatorSet           ValidatorSet   `json:"validator_set"`
-	LastValidatorSet       ValidatorSet   `json:"last_validator_set"`
-	LastProposers          *Proposers     `json:"last_proposers"`
-	MinimumEvidenceHeight  uint64         `json:"minimum_evidence_height"`
-	LastChainHeightUpdated uint64         `json:"last_root_height_updated"`
-	LotteryWinner          *LotteryWinner `json:"lottery_winner"`
+	ValidatorSet           ValidatorSet   `json:"validatorSet"`
+	LastValidatorSet       ValidatorSet   `json:"lastValidatorSet"`
+	LastProposers          *Proposers     `json:"lastProposers"`
+	MinimumEvidenceHeight  uint64         `json:"minimumEvidenceHeight"`
+	LastChainHeightUpdated uint64         `json:"lastRootHeightUpdated"`
+	LotteryWinner          *LotteryWinner `json:"lotteryWinner"`
 	Orders                 *OrderBook     `json:"orders"`
 	RemoteCallbacks        *RemoteCallbacks
 	Log                    LoggerI
@@ -410,9 +411,9 @@ func (x *ConsensusValidators) Root() ([]byte, ErrorI) {
 // marshalling utility structure for the ConsensusValidator
 // allows easy hex byte marshalling of the public key
 type jsonConsValidator struct {
-	PublicKey   HexBytes `json:"public_key,omitempty"`
-	VotingPower uint64   `json:"voting_power,omitempty"`
-	NetAddress  string   `json:"net_address,omitempty"`
+	PublicKey   HexBytes `json:"publicKey,omitempty"`
+	VotingPower uint64   `json:"votingPower,omitempty"`
+	NetAddress  string   `json:"netAddress,omitempty"`
 }
 
 // MarshalJSON() overrides and implements the json.Marshaller interface
