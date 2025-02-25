@@ -532,10 +532,6 @@ func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []by
 	// add the nodes
 	nodeKey := &key{}
 	for _, intermediateNode := range proof[:2] {
-		// Keys are saved "as-is" to preserve the original values of the tree
-		// when the proof was obtained. Some intermediate node keys may have a length
-		// shorter than the MaxKeyBitLength. This pads such keys to ensure they are
-		// saved correctly.
 		nodeKey.fromBytes(intermediateNode.Key)
 		n := &node{Key: nodeKey, Node: lib.Node{Value: intermediateNode.Value}}
 		// Leaf nodes could be one of the two children of the root.
