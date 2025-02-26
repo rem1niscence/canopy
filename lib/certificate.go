@@ -603,19 +603,20 @@ func (x *Checkpoint) Equals(y *Checkpoint) bool {
 
 // Combine() merges the Reward Recipients' Payment Percents of the current Proposal with those of another Proposal
 // such that the Payment Percentages may be equally weighted when performing reward distribution calculations
-// NOTE: percents will exceed 100% over multiple samples, but are normalized using the NumberOfSamples field
-func (x *CommitteeData) Combine(data *CommitteeData) ErrorI {
+// NOTE: merging percents will exceed 100% over multiple samples, but are normalized using the NumberOfSamples field
+// NOTE: if the 'chainId' designation doesn't match the 'self' chainId, the payment percent is ignored
+func (x *CommitteeData) Combine(data *CommitteeData, chainId uint64) ErrorI {
 	// safety check to ensure the data is not null
 	if data == nil {
 		return nil
 	}
 	// for each payment percent
 	for _, p := range data.PaymentPercents {
-		// our chain id
-		if p.ChainId == x.ChainId {
+		// ignore any payment percent not designated for our chain id
+		if p.ChainId == chainId {
 			// combine the percents with the existing stubs
 			// percents can/will exceed 100 but are re-normalized using NumberOfSamples later
-			x.addPercents(p.Address, p.Percent)
+			x.addPercents(p.Address, p.Percent, chainId)
 		}
 	}
 	// new Proposal purposefully overwrites the Block and Meta of the current Proposal
@@ -632,7 +633,7 @@ func (x *CommitteeData) Combine(data *CommitteeData) ErrorI {
 }
 
 // addPercents() is a helper function that adds reward distribution percents on behalf of an address
-func (x *CommitteeData) addPercents(address []byte, percent uint64) {
+func (x *CommitteeData) addPercents(address []byte, percent, chainId uint64) {
 	// check to see if the address already exists
 	for i, p := range x.PaymentPercents {
 		// if already exists
@@ -647,7 +648,7 @@ func (x *CommitteeData) addPercents(address []byte, percent uint64) {
 	x.PaymentPercents = append(x.PaymentPercents, &PaymentPercents{
 		Address: address,
 		Percent: percent,
-		ChainId: x.ChainId,
+		ChainId: chainId,
 	})
 }
 

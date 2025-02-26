@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -1396,7 +1397,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
-							ChainId: 2,
+							ChainId: 1,
 							Percent: 2,
 						},
 					},
@@ -1424,11 +1425,63 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
-							ChainId: 2,
+							ChainId: 1,
 							Percent: 2,
 						},
 					},
 					NumberOfSamples: 1,
+				},
+			},
+		},
+		{
+			name:   "inserts but ignore 1 payment percent",
+			detail: "2 inserts but only 1 payment percent is used due to chainId",
+			upsert: []*lib.CommitteeData{
+				{
+					ChainId:                1,
+					LastRootHeightUpdated:  1,
+					LastChainHeightUpdated: 1,
+					PaymentPercents: []*lib.PaymentPercents{
+						{
+							Address: newTestAddressBytes(t),
+							ChainId: 1,
+							Percent: 1,
+						},
+						{
+							Address: newTestAddressBytes(t),
+							ChainId: 2,
+							Percent: 1,
+						},
+					},
+					NumberOfSamples: 2, // can't overwrite number of samples
+				},
+				{
+					ChainId:                1,
+					LastRootHeightUpdated:  2,
+					LastChainHeightUpdated: 2,
+					PaymentPercents: []*lib.PaymentPercents{
+						{
+							Address: newTestAddressBytes(t, 1),
+							ChainId: 2,
+							Percent: 2,
+						},
+					},
+					NumberOfSamples: 2, // can't overwrite number of samples
+				},
+			},
+			expected: []*lib.CommitteeData{
+				{
+					ChainId:                1,
+					LastRootHeightUpdated:  2,
+					LastChainHeightUpdated: 2,
+					PaymentPercents: []*lib.PaymentPercents{
+						{
+							Address: newTestAddressBytes(t),
+							ChainId: 1,
+							Percent: 1,
+						},
+					},
+					NumberOfSamples: 2,
 				},
 			},
 		},
@@ -1573,7 +1626,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 				require.Equal(t, expected.NumberOfSamples, got.NumberOfSamples)
 				// check chain heights
 				require.Equal(t, expected.LastChainHeightUpdated, got.LastChainHeightUpdated)
-				// check payment percents
+				// check payment percents length
+				require.Equal(t, len(expected.PaymentPercents), len(got.PaymentPercents), fmt.Sprintf("%v, %v", expected.PaymentPercents, got.PaymentPercents))
+				// check actualy payment percents
 				for i, expectedPP := range expected.PaymentPercents {
 					require.EqualExportedValues(t, expectedPP, got.PaymentPercents[i])
 				}

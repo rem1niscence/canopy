@@ -284,8 +284,9 @@ func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, rootChain
 		RewardRecipients: &lib.RewardRecipients{},
 		SlashRecipients:  new(lib.SlashRecipients),
 	}
-	// TODO check logic when using the proposer address, specifically for ensuring the 100% logic applies to individual chainids - also implement the payment logic to skip non 'chain-ids'
-	var delegate, subVal, subDel *lib.LotteryWinner
+	// create variables to hold potential 'reward recipients'
+	var delegate, nValidator, nDelegate *lib.LotteryWinner
+	// start the proposer with a 100% allocation
 	proposer := &lib.LotteryWinner{Winner: proposerAddress, Cut: 100}
 	// get the delegate and their cut from the state machine
 	delegate, err = c.GetRootChainLotteryWinner(rootChainHeight)
@@ -293,33 +294,40 @@ func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, rootChain
 		c.log.Warnf("An error occurred choosing a root-Chain delegate lottery winner: %s", err.Error())
 		// continue
 	}
-	// add delegate
-	c.AddLotteryWinner(proposer, delegate, results, isOwnRoot, rootChainId)
-	// is isn't root chain
+	// add the delegate as a reward recipient, subtracting share away from the proposer
+	c.AddRewardRecipient(proposer, delegate, results, isOwnRoot, rootChainId)
+	// if this chain isn't root chain
 	if !isOwnRoot {
-		// sub validator
-		subVal, err = c.FSM.LotteryWinner(c.Config.ChainId, true)
+		// get the nested-validator lottery winner for the 'self chain' (if self is not root)
+		nValidator, err = c.FSM.LotteryWinner(c.Config.ChainId, true)
 		if err != nil {
-			c.log.Warnf("An error occurred choosing a sub-validator lottery winner: %s", err.Error())
+			c.log.Warnf("An error occurred choosing a nested-validator lottery winner: %s", err.Error())
 			// continue
 		}
-		c.AddLotteryWinner(proposer, subVal, results, isOwnRoot, rootChainId)
-		// sub delegate
-		subDel, err = c.FSM.LotteryWinner(c.Config.ChainId)
+		// add the nested validator as a reward recipient, subtracting share away from the proposer
+		c.AddRewardRecipient(proposer, nValidator, results, isOwnRoot, rootChainId)
+		// get the nested-delegate lottery winner for the 'self chain' (if self is not root)
+		nDelegate, err = c.FSM.LotteryWinner(c.Config.ChainId)
 		if err != nil {
-			c.log.Warnf("An error occurred choosing a sub-delegate lottery winner: %s", err.Error())
+			c.log.Warnf("An error occurred choosing a nested-delegate lottery winner: %s", err.Error())
 			// continue
 		}
-		c.AddLotteryWinner(proposer, subDel, results, isOwnRoot, rootChainId)
+		// add the nested delegate as a reward recipient, subtracting share away from the proposer
+		c.AddRewardRecipient(proposer, nDelegate, results, isOwnRoot, rootChainId)
 	}
 	// finally add the proposer at the end after ensuring their proper percent
 	c.AddPaymentPercent(proposer, results, isOwnRoot, rootChainId)
 	return
 }
 
-// AddLotteryWinner() adds a lottery winner (delegate, sub-delegate, or sub-validator) to the reward recipients
-func (c *Controller) AddLotteryWinner(proposer, toAdd *lib.LotteryWinner, results *lib.CertificateResult, isOwnRoot bool, rootChainId uint64) {
-	// normalize the rewards for each participant
+// AddRewardRecipient() adds a reward recipient to the list of reward recipients in the certificate result
+func (c *Controller) AddRewardRecipient(proposer, toAdd *lib.LotteryWinner, results *lib.CertificateResult, isOwnRoot bool, rootChainId uint64) {
+	// skip any nil recipient
+	if toAdd == nil {
+		// exit
+		return
+	}
+	// ensure the new recipient's cut doesn't underflow the proposers cut
 	if proposer.Cut < toAdd.Cut {
 		c.log.Warnf("Not enough proposer cut for winner")
 		// exit
@@ -327,24 +335,28 @@ func (c *Controller) AddLotteryWinner(proposer, toAdd *lib.LotteryWinner, result
 	}
 	// calculate new proposer cut
 	proposer.Cut -= toAdd.Cut
-	// add winner to the reward recipients for root
+	// add the payment percent for the recipient
 	c.AddPaymentPercent(toAdd, results, isOwnRoot, rootChainId)
 }
 
+// AddPaymentPercent() adds a payment percent to the certificate result
 func (c *Controller) AddPaymentPercent(toAdd *lib.LotteryWinner, results *lib.CertificateResult, isOwnRoot bool, rootChainId uint64) {
-	// add winner to the reward recipients for root
-	results.RewardRecipients.PaymentPercents = append(results.RewardRecipients.PaymentPercents, &lib.PaymentPercents{
-		Address: toAdd.Winner,
-		Percent: toAdd.Cut,
-		ChainId: rootChainId,
-	})
-	if !isOwnRoot {
-		// add winner to the reward recipients for self (nested)
-		results.RewardRecipients.PaymentPercents = append(results.RewardRecipients.PaymentPercents, &lib.PaymentPercents{
+	// add winner to the reward recipients for the root chain
+	results.RewardRecipients.PaymentPercents = append(results.RewardRecipients.PaymentPercents,
+		&lib.PaymentPercents{
 			Address: toAdd.Winner,
 			Percent: toAdd.Cut,
-			ChainId: c.Config.ChainId,
+			ChainId: rootChainId,
 		})
+	// if this chain is not its own Root
+	if !isOwnRoot {
+		// add winner to the reward recipients for self (nested) chain
+		results.RewardRecipients.PaymentPercents = append(results.RewardRecipients.PaymentPercents,
+			&lib.PaymentPercents{
+				Address: toAdd.Winner,
+				Percent: toAdd.Cut,
+				ChainId: c.Config.ChainId,
+			})
 	}
 }
 

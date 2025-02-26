@@ -480,8 +480,8 @@ func (s *StateMachine) UpsertCommitteeData(new *lib.CommitteeData) lib.ErrorI {
 	if new.LastRootHeightUpdated < targetData.LastRootHeightUpdated {
 		return lib.ErrInvalidQCRootChainHeight()
 	}
-	// combine the new data with the target
-	if err = targetData.Combine(new); err != nil {
+	// combine the new data with the target, only capturing payment percents for self chainId
+	if err = targetData.Combine(new, s.Config.ChainId); err != nil {
 		return err
 	}
 	// add the target back into the list
