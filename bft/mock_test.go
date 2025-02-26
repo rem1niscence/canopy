@@ -511,6 +511,7 @@ func (t *testController) ProduceProposal(_ *ByzantineEvidence, _ *crypto.VDF) (b
 		RewardRecipients: &lib.RewardRecipients{
 			PaymentPercents: []*lib.PaymentPercents{{
 				Address: crypto.Hash([]byte("mock"))[:20],
+				ChainId: lib.CanopyChainId,
 				Percent: 100,
 			}},
 		},

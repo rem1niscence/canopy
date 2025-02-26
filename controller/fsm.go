@@ -272,51 +272,80 @@ func (c *Controller) ApplyAndValidateBlock(b *lib.Block, commit bool) (*lib.Bloc
 
 // CalculateRewardRecipients() calculates the block reward recipients of the proposal
 func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, rootChainHeight uint64) (results *lib.CertificateResult) {
-	// set block reward recipients
-	results = &lib.CertificateResult{
-		RewardRecipients: &lib.RewardRecipients{
-			PaymentPercents: []*lib.PaymentPercents{
-				{
-					Address: proposerAddress, // root-Chain proposer reward
-					Percent: 100,             // proposer gets what's left after the delegate's cut
-				},
-			},
-		},
-		SlashRecipients: new(lib.SlashRecipients),
-	}
-	// get the delegate and their cut from the state machine
-	baseDelegateWinner, err := c.GetRootChainLotteryWinner(rootChainHeight)
-	if err != nil {
-		c.log.Warnf("An error occurred choosing a root-Chain delegate lottery winner: %s", err.Error())
-		// continue
-	} else {
-		c.AddLotteryWinner(results, baseDelegateWinner)
-	}
-	// check if this chain is its own root
-	chainIsRoot, err := c.FSM.IsOwnRoot()
+	// get the root chain id
+	rootChainId, err := c.FSM.GetRootChainId()
 	if err != nil {
 		c.log.Warnf("An error occurred getting the root chain id from state: %s", err.Error())
 	}
+	// if own root
+	isOwnRoot := rootChainId == c.Config.ChainId
+	// set block reward recipients
+	results = &lib.CertificateResult{
+		RewardRecipients: &lib.RewardRecipients{},
+		SlashRecipients:  new(lib.SlashRecipients),
+	}
+	// TODO check logic when using the proposer address, specifically for ensuring the 100% logic applies to individual chainids - also implement the payment logic to skip non 'chain-ids'
+	var delegate, subVal, subDel *lib.LotteryWinner
+	proposer := &lib.LotteryWinner{Winner: proposerAddress, Cut: 100}
+	// get the delegate and their cut from the state machine
+	delegate, err = c.GetRootChainLotteryWinner(rootChainHeight)
+	if err != nil {
+		c.log.Warnf("An error occurred choosing a root-Chain delegate lottery winner: %s", err.Error())
+		// continue
+	}
+	// add delegate
+	c.AddLotteryWinner(proposer, delegate, results, isOwnRoot, rootChainId)
 	// is isn't root chain
-	if chainIsRoot {
+	if !isOwnRoot {
 		// sub validator
-		subValidatorWinner, e := c.FSM.LotteryWinner(c.Config.ChainId, true)
-		if e != nil {
+		subVal, err = c.FSM.LotteryWinner(c.Config.ChainId, true)
+		if err != nil {
 			c.log.Warnf("An error occurred choosing a sub-validator lottery winner: %s", err.Error())
 			// continue
-		} else {
-			c.AddLotteryWinner(results, subValidatorWinner)
 		}
+		c.AddLotteryWinner(proposer, subVal, results, isOwnRoot, rootChainId)
 		// sub delegate
-		subDelegateWinner, e := c.FSM.LotteryWinner(c.Config.ChainId)
-		if e != nil {
+		subDel, err = c.FSM.LotteryWinner(c.Config.ChainId)
+		if err != nil {
 			c.log.Warnf("An error occurred choosing a sub-delegate lottery winner: %s", err.Error())
 			// continue
-		} else {
-			c.AddLotteryWinner(results, subDelegateWinner)
 		}
+		c.AddLotteryWinner(proposer, subDel, results, isOwnRoot, rootChainId)
 	}
+	// finally add the proposer at the end after ensuring their proper percent
+	c.AddPaymentPercent(proposer, results, isOwnRoot, rootChainId)
 	return
+}
+
+// AddLotteryWinner() adds a lottery winner (delegate, sub-delegate, or sub-validator) to the reward recipients
+func (c *Controller) AddLotteryWinner(proposer, toAdd *lib.LotteryWinner, results *lib.CertificateResult, isOwnRoot bool, rootChainId uint64) {
+	// normalize the rewards for each participant
+	if proposer.Cut < toAdd.Cut {
+		c.log.Warnf("Not enough proposer cut for winner")
+		// exit
+		return
+	}
+	// calculate new proposer cut
+	proposer.Cut -= toAdd.Cut
+	// add winner to the reward recipients for root
+	c.AddPaymentPercent(toAdd, results, isOwnRoot, rootChainId)
+}
+
+func (c *Controller) AddPaymentPercent(toAdd *lib.LotteryWinner, results *lib.CertificateResult, isOwnRoot bool, rootChainId uint64) {
+	// add winner to the reward recipients for root
+	results.RewardRecipients.PaymentPercents = append(results.RewardRecipients.PaymentPercents, &lib.PaymentPercents{
+		Address: toAdd.Winner,
+		Percent: toAdd.Cut,
+		ChainId: rootChainId,
+	})
+	if !isOwnRoot {
+		// add winner to the reward recipients for self (nested)
+		results.RewardRecipients.PaymentPercents = append(results.RewardRecipients.PaymentPercents, &lib.PaymentPercents{
+			Address: toAdd.Winner,
+			Percent: toAdd.Cut,
+			ChainId: c.Config.ChainId,
+		})
+	}
 }
 
 // HandleSwaps() handles the 'buy' side of the sell orders
@@ -377,23 +406,6 @@ func (c *Controller) HandleRetired(results *lib.CertificateResult) {
 		return
 	}
 	results.Retired = cons.Retired != 0
-}
-
-// AddLotteryWinner() adds a lottery winner (delegate, sub-delegate, or sub-validator) to the reward recipients
-func (c *Controller) AddLotteryWinner(results *lib.CertificateResult, lotteryWinner *lib.LotteryWinner) {
-	if len(lotteryWinner.Winner) == 0 {
-		c.log.Debug("Nil lottery winner (no delegates in set)")
-		return
-	}
-	if results.RewardRecipients.PaymentPercents[0].Percent <= lotteryWinner.Cut {
-		c.log.Warn("No cut left for block proposer, skipping lottery winner (ensure root-Chain-lottery-cut + 2 x nested-chain-lottery-cut < 100%)")
-		return
-	}
-	results.RewardRecipients.PaymentPercents[0].Percent -= lotteryWinner.Cut
-	results.RewardRecipients.PaymentPercents = append(results.RewardRecipients.PaymentPercents, &lib.PaymentPercents{
-		Address: lotteryWinner.Winner,
-		Percent: lotteryWinner.Cut,
-	})
 }
 
 // CompareBlockHeaders() compares two block headers for equality and validates the last quorum certificate and block time

@@ -300,32 +300,6 @@ func (x *CertificateResult) Hash() []byte {
 	return crypto.Hash(bz)
 }
 
-// AwardPercents() adds reward distribution PaymentPercent samples to the CertificateResult structure
-// NOTE: percents should not exceed 100% in a single sample
-func (x *CertificateResult) AwardPercents(percents []*PaymentPercents) ErrorI {
-	x.RewardRecipients.NumberOfSamples++
-	for _, ep := range percents {
-		x.addPercents(ep.Address, ep.Percent)
-	}
-	return nil
-}
-
-// addPercents() is a helper function that adds reward distribution percents on behalf of an address
-func (x *CertificateResult) addPercents(address []byte, percent uint64) {
-	// check to see if the address already has samples
-	for i, ep := range x.RewardRecipients.PaymentPercents {
-		if bytes.Equal(address, ep.Address) {
-			x.RewardRecipients.PaymentPercents[i].Percent += ep.Percent
-			return
-		}
-	}
-	// if not, append a sample to PaymentPercents
-	x.RewardRecipients.PaymentPercents = append(x.RewardRecipients.PaymentPercents, &PaymentPercents{
-		Address: address,
-		Percent: percent,
-	})
-}
-
 // REWARD RECIPIENT CODE BELOW
 
 // CheckBasic() performs a basic 'sanity check' on the structure
@@ -335,29 +309,30 @@ func (x *RewardRecipients) CheckBasic() (err ErrorI) {
 	}
 	// validate the number of recipients
 	paymentRecipientCount := len(x.PaymentPercents)
-	// ensure not zero or bigger than 25
-	if paymentRecipientCount == 0 || paymentRecipientCount > 25 {
+	// ensure not zero or bigger than 100
+	if paymentRecipientCount == 0 || paymentRecipientCount > 100 {
 		return ErrPaymentRecipientsCount()
 	}
-	// validate the percents add up to 100 (or less)
-	totalPercent := uint64(0)
+	// create a map to ensure the payment percents don't exceed 100% per chain
+	chainMap := make(map[uint64]uint64)
+	// for each payment percent
 	for _, pp := range x.PaymentPercents {
 		// ensure each percent isn't nil
 		if pp == nil {
 			return ErrInvalidPercentAllocation()
 		}
+		// ensure the payment percent chain id is valid
+		if pp.ChainId == 0 {
+			return ErrEmptyChainId()
+		}
 		// ensure each percent address is the right size
 		if len(pp.Address) != crypto.AddressSize {
 			return ErrInvalidAddress()
 		}
-		// ensure each percent isn't 0
-		if pp.Percent == 0 {
-			return ErrInvalidPercentAllocation()
-		}
-		// add to total
-		totalPercent += pp.Percent
+		// add to total percent
+		chainMap[pp.ChainId] += pp.Percent
 		// ensure the percent doesn't exceed 100
-		if totalPercent > 100 {
+		if chainMap[pp.ChainId] > 100 {
 			return ErrInvalidPercentAllocation()
 		}
 	}
@@ -636,9 +611,12 @@ func (x *CommitteeData) Combine(data *CommitteeData) ErrorI {
 	}
 	// for each payment percent
 	for _, p := range data.PaymentPercents {
-		// combine the percents with the existing stubs
-		// percents can/will exceed 100 but are re-normalized using NumberOfSamples later
-		x.addPercents(p.Address, p.Percent)
+		// our chain id
+		if p.ChainId == x.ChainId {
+			// combine the percents with the existing stubs
+			// percents can/will exceed 100 but are re-normalized using NumberOfSamples later
+			x.addPercents(p.Address, p.Percent)
+		}
 	}
 	// new Proposal purposefully overwrites the Block and Meta of the current Proposal
 	// this is to ensure both Proposals have the latest Block and Meta information
@@ -669,6 +647,7 @@ func (x *CommitteeData) addPercents(address []byte, percent uint64) {
 	x.PaymentPercents = append(x.PaymentPercents, &PaymentPercents{
 		Address: address,
 		Percent: percent,
+		ChainId: x.ChainId,
 	})
 }
 

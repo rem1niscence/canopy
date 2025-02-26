@@ -1864,7 +1864,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 	// pre-define a quorum certificate to insert into the message change certificate results
 	certificateResults := &lib.CertificateResult{
 		RewardRecipients: &lib.RewardRecipients{
-			PaymentPercents: []*lib.PaymentPercents{{Address: newTestAddressBytes(t), Percent: 100}},
+			PaymentPercents: []*lib.PaymentPercents{{Address: newTestAddressBytes(t), Percent: 100, ChainId: 2}},
 		},
 		SlashRecipients: &lib.SlashRecipients{
 			DoubleSigners: []*lib.DoubleSigner{

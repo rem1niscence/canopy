@@ -804,6 +804,7 @@ func TestCheckProposerAndBlock(t *testing.T) {
 					PaymentPercents: []*lib.PaymentPercents{{
 						Address: crypto.Hash([]byte("some address"))[:20],
 						Percent: 100,
+						ChainId: lib.CanopyChainId,
 					}},
 				},
 			}

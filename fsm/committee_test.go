@@ -1383,6 +1383,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
+							ChainId: 1,
 							Percent: 1,
 						},
 					},
@@ -1395,6 +1396,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
+							ChainId: 2,
 							Percent: 2,
 						},
 					},
@@ -1409,6 +1411,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
+							ChainId: 1,
 							Percent: 1,
 						},
 					},
@@ -1421,6 +1424,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
+							ChainId: 2,
 							Percent: 2,
 						},
 					},
@@ -1440,6 +1444,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t),
 							Percent: 1,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 2, // can't overwrite number of samples
@@ -1452,6 +1457,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t, 1),
 							Percent: 2,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 3, // can't overwrite number of samples
@@ -1466,10 +1472,12 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t),
 							Percent: 1,
+							ChainId: 1,
 						},
 						{
 							Address: newTestAddressBytes(t, 1),
 							Percent: 2,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 2,
@@ -1488,6 +1496,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t),
 							Percent: 1,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 2, // can't overwrite number of samples
@@ -1500,6 +1509,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t, 1),
 							Percent: 2,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 3, // can't overwrite number of samples
@@ -1519,6 +1529,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t),
 							Percent: 1,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 2, // can't overwrite number of samples
@@ -1531,6 +1542,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t, 1),
 							Percent: 2,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 3, // can't overwrite number of samples
