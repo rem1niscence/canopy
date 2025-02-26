@@ -1956,7 +1956,7 @@ func TestBytesToBits(t *testing.T) {
 }
 
 func TestStoreProof(t *testing.T) {
-	leaf11101111preset := &NodeList{
+	threeLeavesPreset := &NodeList{
 		Nodes: []*node{
 			{ // 1000
 				Key:  &key{leastSigBits: []int{1, 0, 0, 0}}, // leaf
@@ -1975,7 +1975,7 @@ func TestStoreProof(t *testing.T) {
 		},
 	}
 
-	leaf00011111preset := &NodeList{
+	fourLeavesPreset := &NodeList{
 		Nodes: []*node{
 			{ // 0001
 				Key: &key{leastSigBits: []int{0, 0, 0, 1}}, // leaf
@@ -2009,24 +2009,23 @@ func TestStoreProof(t *testing.T) {
 		rootKey            []byte
 		valid              bool
 		validateMembership bool
-		err                error
+		proofErr           error
 	}{
 		{
 			name: "valid proof of membership with target at 1110",
 			detail: `Preset:      root
 		                         /    \
-                               0000    1
+							   0000    1
 		                         /      \
 		                       1000     111
 		                                /   \
 		                            *1110*  1111
 							`,
 			keyBitSize:         4,
-			preset:             leaf11101111preset,
+			preset:             threeLeavesPreset,
 			target:             &node{Key: &key{leastSigBits: []int{1, 1, 1, 0}}, Node: lib.Node{Value: []byte("some_value")}},
 			validateMembership: true,
 			valid:              true,
-			err:                nil,
 			rootKey:            []byte("a_random_root_key"),
 		},
 		{
@@ -2040,11 +2039,10 @@ func TestStoreProof(t *testing.T) {
 		                             1110  1111
 							`,
 			keyBitSize:         4,
-			preset:             leaf11101111preset,
+			preset:             threeLeavesPreset,
 			target:             &node{Key: &key{leastSigBits: []int{2, 1, 0, 1}}, Node: lib.Node{Value: []byte("some_value")}},
 			validateMembership: false,
 			valid:              true,
-			err:                nil,
 			rootKey:            []byte("a_random_root_key"),
 		},
 		{
@@ -2058,11 +2056,10 @@ func TestStoreProof(t *testing.T) {
 		                             1110  *1111*
 							`,
 			keyBitSize:         4,
-			preset:             leaf11101111preset,
+			preset:             threeLeavesPreset,
 			target:             &node{Key: &key{leastSigBits: []int{1, 1, 1, 1}}, Node: lib.Node{Value: []byte("some_value")}},
 			validateMembership: true,
 			valid:              false,
-			err:                nil,
 			rootKey:            []byte("a_random_root_key"),
 		},
 		{
@@ -2074,11 +2071,10 @@ func TestStoreProof(t *testing.T) {
 		                   0001 0010    1110  1111
 							`,
 			keyBitSize:         4,
-			preset:             leaf00011111preset,
+			preset:             fourLeavesPreset,
 			target:             &node{Key: &key{leastSigBits: []int{1, 1, 1, 1}}, Node: lib.Node{Value: []byte("some_value")}},
 			validateMembership: false,
 			valid:              false,
-			err:                nil,
 			rootKey:            []byte("a_random_root_key"),
 		},
 		{
@@ -2090,11 +2086,10 @@ func TestStoreProof(t *testing.T) {
 		                   0001 0010    1110  1111
 							`,
 			keyBitSize:         4,
-			preset:             leaf00011111preset,
+			preset:             fourLeavesPreset,
 			target:             &node{Key: &key{leastSigBits: []int{0, 0, 0, 1}}, Node: lib.Node{Value: []byte("some_value")}},
 			validateMembership: true,
 			valid:              true,
-			err:                nil,
 			rootKey:            []byte("a_random_root_key"),
 		},
 		{
@@ -2106,11 +2101,10 @@ func TestStoreProof(t *testing.T) {
 		                   0001 0010    1110  1111
 							`,
 			keyBitSize:         4,
-			preset:             leaf00011111preset,
+			preset:             fourLeavesPreset,
 			target:             &node{Key: &key{leastSigBits: []int{0, 0, 0, 1}}, Node: lib.Node{Value: []byte("some_value1")}},
 			validateMembership: true,
 			valid:              false,
-			err:                nil,
 			rootKey:            []byte("a_random_root_key"),
 		},
 		{
@@ -2123,7 +2117,6 @@ func TestStoreProof(t *testing.T) {
 			target:             &node{Key: newNodeKey(bytes.Clone(RootKey), MaxKeyBitLength), Node: lib.Node{}},
 			validateMembership: true,
 			valid:              false,
-			err:                nil,
 			rootKey:            []byte("a_random_root_key"),
 		},
 		{
@@ -2132,12 +2125,24 @@ func TestStoreProof(t *testing.T) {
 		                         /        \
 		                       min          *max*
 							`,
-			keyBitSize:         4,
+			keyBitSize:         MaxKeyBitLength,
 			target:             &node{Key: newNodeKey(bytes.Repeat([]byte{255}, 20), MaxKeyBitLength), Node: lib.Node{}},
 			validateMembership: true,
 			valid:              false,
-			err:                nil,
-			rootKey:            []byte("a_random_root_key"),
+			rootKey:            nil,
+		},
+		{
+			name: "Attempt to verify the root key on the default tree",
+			detail: `Preset:        root
+		                         /        \
+		                       min          max
+							`,
+			keyBitSize:         4,
+			target:             &node{Key: &key{leastSigBits: []int{1, 1, 1, 0}}, Node: lib.Node{Value: []byte("some_value1")}},
+			validateMembership: true,
+			valid:              false,
+			proofErr:           ErrReserveKeyWrite("root"),
+			rootKey:            nil,
 		},
 	}
 
@@ -2147,7 +2152,11 @@ func TestStoreProof(t *testing.T) {
 			// VerifyProof uses the same default root for the in-memory store, so we
 			//  are setting the test root key as the global RootKey to use the same
 			// root for the test
-			RootKey = test.rootKey
+			if test.rootKey != nil {
+				tempRootKey := RootKey
+				RootKey = test.rootKey
+				defer func() { RootKey = tempRootKey }()
+			}
 
 			// create the smt
 			smt, memStore := NewTestSMT(t, nil, test.rootKey, test.keyBitSize)
@@ -2163,13 +2172,20 @@ func TestStoreProof(t *testing.T) {
 
 			// generate the merkle proof
 			proof, err := smt.GetMerkleProof(test.target.Key.bytes())
+
+			// validate proof results
+			if test.proofErr != nil {
+				require.Equal(t, test.proofErr, err)
+				return
+			}
+
 			require.NoError(t, err)
 			// verify the proof
 			valid, err := smt.VerifyProof(test.target.Key.bytes(), test.target.Value,
 				test.validateMembership, smt.Root(), proof)
 
 			// validate results
-			require.Equal(t, test.err, err)
+			require.NoError(t, err)
 			require.Equal(t, test.valid, valid)
 		})
 	}

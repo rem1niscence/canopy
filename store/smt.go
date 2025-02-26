@@ -529,7 +529,7 @@ func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []by
 	}
 	smt := NewSMT(RootKey, s.keyBitLength, memStore)
 
-	// add the nodes
+	// add the leaf nodes
 	nodeKey := &key{}
 	for _, intermediateNode := range proof[:2] {
 		nodeKey.fromBytes(intermediateNode.Key)
