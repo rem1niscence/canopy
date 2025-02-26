@@ -27,9 +27,9 @@ var RegisteredPageables = make(map[string]Pageable)
 // Page is a pagination wrapper over a slice of data
 type Page struct {
 	PageParams          // the input parameters for the page
-	Results    Pageable `json:"results"`    // the actual returned array of items
-	Type       string   `json:"type"`       // the type of the page
-	Count      int      `json:"count"`      // count of items included in the page
+	Results    Pageable `json:"results"` // the actual returned array of items
+	Type       string   `json:"type"` // the type of the page
+	Count      int      `json:"count"` // count of items included in the page
 	TotalPages int      `json:"totalPages"` // number of pages that exist based on these page parameters
 	TotalCount int      `json:"totalCount"` // count of items that exist
 }
@@ -447,22 +447,18 @@ func NewTimer() *time.Timer {
 
 // ResetTimer() stops the existing timer, and resets with the new duration
 func ResetTimer(t *time.Timer, d time.Duration) {
-	if t == nil {
-		*t = *time.NewTimer(d)
-	}
 	StopTimer(t)
 	t.Reset(d)
 }
 
 // StopTimer() stops the existing timer
 func StopTimer(t *time.Timer) {
-	if t == nil {
-		return
-	}
-	if !t.Stop() {
-		// drain safely
-		for len(t.C) > 0 {
-			<-t.C
+	if t != nil {
+		if !t.Stop() {
+			select {
+			case <-t.C:
+			default:
+			}
 		}
 	}
 }
