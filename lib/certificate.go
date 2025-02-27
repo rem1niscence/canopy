@@ -390,27 +390,29 @@ func (x *RewardRecipients) MarshalJSON() ([]byte, error) {
 
 // PAYMENT PERCENTS CODE BELOW
 
-// paymentPercents is the PaymentPercents implementation of json.Marshaller and json.Unmarshaler
-type paymentPercents struct {
+// jsonPaymentPercents is the PaymentPercents implementation of json.Marshaller and json.Unmarshaler
+type jsonPaymentPercents struct {
 	Address  HexBytes `json:"address"`
 	Percents uint64   `json:"percents"`
+	ChainId  uint64   `json:"chainId"`
 }
 
 // MarshalJSON() satisfies the json.Marshaller interface
 func (x *PaymentPercents) MarshalJSON() ([]byte, error) {
-	return json.Marshal(paymentPercents{
+	return json.Marshal(jsonPaymentPercents{
 		Address:  x.Address,
 		Percents: x.Percent,
+		ChainId:  x.ChainId,
 	})
 }
 
 // UnmarshalJSON() satisfies the json.Unmarshaler interface
 func (x *PaymentPercents) UnmarshalJSON(b []byte) error {
-	var ep paymentPercents
-	if err := json.Unmarshal(b, &ep); err != nil {
+	var pp jsonPaymentPercents
+	if err := json.Unmarshal(b, &pp); err != nil {
 		return err
 	}
-	x.Address, x.Percent = ep.Address, ep.Percents
+	x.Address, x.Percent, x.ChainId = pp.Address, pp.Percents, pp.ChainId
 	return nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math"
 	"math/rand"
+	"slices"
 	"time"
 
 	"github.com/canopy-network/canopy/bft"
@@ -291,7 +292,7 @@ func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, rootChain
 	// get the delegate and their cut from the state machine
 	delegate, err = c.GetRootChainLotteryWinner(rootChainHeight)
 	if err != nil {
-		c.log.Warnf("An error occurred choosing a root-Chain delegate lottery winner: %s", err.Error())
+		c.log.Warnf("An error occurred choosing a root chain delegate lottery winner: %s", err.Error())
 		// continue
 	}
 	// add the delegate as a reward recipient, subtracting share away from the proposer
@@ -341,21 +342,33 @@ func (c *Controller) AddRewardRecipient(proposer, toAdd *lib.LotteryWinner, resu
 
 // AddPaymentPercent() adds a payment percent to the certificate result
 func (c *Controller) AddPaymentPercent(toAdd *lib.LotteryWinner, results *lib.CertificateResult, isOwnRoot bool, rootChainId uint64) {
-	// add winner to the reward recipients for the root chain
-	results.RewardRecipients.PaymentPercents = append(results.RewardRecipients.PaymentPercents,
-		&lib.PaymentPercents{
-			Address: toAdd.Winner,
-			Percent: toAdd.Cut,
-			ChainId: rootChainId,
-		})
-	// if this chain is not its own Root
+	c.addPaymentPercent(toAdd, results, rootChainId)
+	// if this chain is not its own root (nested chain)
 	if !isOwnRoot {
-		// add winner to the reward recipients for self (nested) chain
+		c.addPaymentPercent(toAdd, results, c.Config.ChainId)
+	}
+}
+
+// addPaymentPercent() is a helper function to add a payment percent to the certificate result
+func (c *Controller) addPaymentPercent(toAdd *lib.LotteryWinner, results *lib.CertificateResult, chainId uint64) {
+	// check if the winner's address is already in the reward recipients list for the root chain
+	// if found, update their reward percentage - else add them as a new recipient
+	if !slices.ContainsFunc(results.RewardRecipients.PaymentPercents, func(pp *lib.PaymentPercents) (has bool) {
+		// if the address matches and belongs to the root chain
+		if bytes.Equal(pp.Address, toAdd.Winner) && pp.ChainId == chainId {
+			// mark as found
+			has = true
+			// increase their reward percentage by 'cut'
+			pp.Percent += toAdd.Cut
+		}
+		return
+	}) {
+		// if the winner is not found in the list, add them as a new recipient
 		results.RewardRecipients.PaymentPercents = append(results.RewardRecipients.PaymentPercents,
 			&lib.PaymentPercents{
 				Address: toAdd.Winner,
 				Percent: toAdd.Cut,
-				ChainId: c.Config.ChainId,
+				ChainId: chainId,
 			})
 	}
 }
