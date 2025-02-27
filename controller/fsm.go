@@ -323,7 +323,7 @@ func (c *Controller) CalculateRewardRecipients(proposerAddress []byte, rootChain
 // AddRewardRecipient() adds a reward recipient to the list of reward recipients in the certificate result
 func (c *Controller) AddRewardRecipient(proposer, toAdd *lib.LotteryWinner, results *lib.CertificateResult, isOwnRoot bool, rootChainId uint64) {
 	// skip any nil recipient
-	if toAdd == nil {
+	if toAdd == nil || len(toAdd.Winner) == 0 {
 		// exit
 		return
 	}
