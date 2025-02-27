@@ -30,9 +30,9 @@ func TestStartElectionPhase(t *testing.T) {
 		},
 		{
 			name:            "self is not leader",
-			detail:          `deterministic key set ensures 'self' is an not election candidate with a set of 4 Validators`,
+			detail:          `deterministic key set ensures 'self' is an not election candidate with a set of 5 Validators`,
 			selfIsValidator: true,
-			numValidators:   4,
+			numValidators:   5,
 			isCandidate:     false,
 		},
 		{
@@ -100,7 +100,7 @@ func TestStartElectionVotePhase(t *testing.T) {
 	}{
 		{
 			name:                "self is election candidate",
-			detail:              `deterministic key set ensures 'self' is an election candidate with a set of 3 Validators`,
+			detail:              `deterministic key set ensures 'self' is an election candidate with a set of 2 Validators`,
 			numValidators:       3,
 			isElectionCandidate: true,
 		},
@@ -160,7 +160,7 @@ func TestStartElectionVotePhase(t *testing.T) {
 				if test.isElectionCandidate || test.noElectionCandidates {
 					require.Equal(t, msg.Qc.ProposerKey, pub.Bytes())
 				} else {
-					require.Equal(t, msg.Qc.ProposerKey, c.valKeys[2].PublicKey().Bytes())
+					require.Equal(t, msg.Qc.ProposerKey, c.valKeys[3].PublicKey().Bytes())
 				}
 				if test.hasBE {
 					require.NotNil(t, msg.LastDoubleSignEvidence)
