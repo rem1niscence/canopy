@@ -159,15 +159,15 @@ func DefaultConsensusConfig() ConsensusConfig {
 
 // P2PConfig defines peering compatibility and limits as well as actions on specific peering IPs / IDs
 type P2PConfig struct {
-	NetworkID       uint64   `json:"networkID"`      // the ID for the peering network
-	ListenAddress   string   `json:"listenAdress"`   // listen for incoming connection
-	ExternalAddress string   `json:"externalAdress"` // advertise for external dialing
-	MaxInbound      int      `json:"maxInbound"`     // max inbound peers
-	MaxOutbound     int      `json:"maxOutbound"`    // max outbound peers
-	TrustedPeerIDs  []string `json:"trutedPeersIDs"` // trusted public keys
-	DialPeers       []string `json:"dialPeers"`      // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
-	BannedPeerIDs   []string `json:"bannedPeersIDs"` // banned public keys
-	BannedIPs       []string `json:"bannedIPs"`      // banned IPs
+	NetworkID       uint64   `json:"networkID"`       // the ID for the peering network
+	ListenAddress   string   `json:"listenAddress"`   // listen for incoming connection
+	ExternalAddress string   `json:"externalAddress"` // advertise for external dialing
+	MaxInbound      int      `json:"maxInbound"`      // max inbound peers
+	MaxOutbound     int      `json:"maxOutbound"`     // max outbound peers
+	TrustedPeerIDs  []string `json:"trutedPeersIDs"`  // trusted public keys
+	DialPeers       []string `json:"dialPeers"`       // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
+	BannedPeerIDs   []string `json:"bannedPeersIDs"`  // banned public keys
+	BannedIPs       []string `json:"bannedIPs"`       // banned IPs
 }
 
 func DefaultP2PConfig() P2PConfig {
