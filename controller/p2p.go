@@ -611,7 +611,7 @@ func (c *Controller) checkPeerQC(maxBlockSize int, view *lib.View, v lib.Validat
 		return lib.ErrWrongHeight()
 	}
 	// use checkpoints to protect against long-range attacks
-	if qc.Header.Height%c.GetCheckpointFrequency() == 0 {
+	if qc.Header.Height%CheckpointFrequency == 0 {
 		// get the checkpoint from the base chain (or file if independent)
 		checkpoint, e := c.RootChainInfo.GetCheckpoint(qc.Header.Height, c.Config.ChainId)
 		if e != nil {

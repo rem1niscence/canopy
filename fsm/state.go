@@ -248,6 +248,10 @@ func (s *StateMachine) LoadCertificate(height uint64) (*lib.QuorumCertificate, l
 
 // LoadCertificateHashesOnly() loads a quorum certificate but nullifies the block
 func (s *StateMachine) LoadCertificateHashesOnly(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
+	// ensure the 'load height' is not genesis
+	if height <= 1 {
+		height = 1
+	}
 	// load the quorum certificate at a specific height
 	qc, err := s.LoadCertificate(height)
 	if err != nil {
