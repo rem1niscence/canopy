@@ -12,7 +12,9 @@ import (
 	"time"
 )
 
-// Sync() attempts to sync the blockchain for a specific ChainId
+/* This file contains the high level functionality of the continued agreement on the blocks of the chain */
+
+// Sync() downloads the blockchain from peers until 'synced' to the latest 'height'
 // 1) Get the height and begin block params from the state_machine
 // 2) Get peer max_height from P2P
 // 3) Ask peers for a block at a time
@@ -21,75 +23,88 @@ import (
 // 5) Do this until reach the max-peer-height
 // 6) Stay on top by listening to incoming cert messages
 func (c *Controller) Sync() {
+	// log the initialization of the syncing process
 	c.log.Infof("Sync started 🔄 for committee %d", c.Config.ChainId)
-	// set isSyncing
+	// set the Controller as 'syncing'
 	c.isSyncing.Store(true)
-	// initialize tracking variables
-	reqRecipient, maxHeight, minVDFIterations, syncingPeers := make([]byte, 0), uint64(0), uint64(0), make([]string, 0)
-	// initialize a callback for `pollMaxHeight`
-	pollMaxHeight := func() { maxHeight, minVDFIterations, syncingPeers = c.pollMaxHeight(1) }
-	// check if node is alone in the committee
+	// check if node is alone in the validator set
 	if c.singleNodeNetwork() {
+		// complete syncing
 		c.finishSyncing()
+		// exit
 		return
 	}
 	// poll max height of all peers
-	pollMaxHeight()
-	for {
-		if c.syncingDone(maxHeight, minVDFIterations) {
-			c.log.Info("Synced to top ✅")
-			c.finishSyncing()
-			return
-		}
-		// get a random peer to send to
-		reqRecipient, _ = lib.StringToBytes(syncingPeers[rand.Intn(len(syncingPeers))])
-		c.log.Infof("Syncing height %d 🔄 from %s", c.FSM.Height(), lib.BytesToTruncatedString(reqRecipient))
-		// send the request
-		c.RequestBlock(false, reqRecipient)
+	maxHeight, minVDFIterations, syncingPeers := c.pollMaxHeight(1)
+	// while still below the latest height
+	for !c.syncingDone(maxHeight, minVDFIterations) {
+		// get a random peer to send a 'block request' to
+		requested, _ := lib.StringToBytes(syncingPeers[rand.Intn(len(syncingPeers))])
+		// log the initialization of the block request
+		c.log.Infof("Syncing height %d 🔄 from %s", c.FSM.Height(), lib.BytesToTruncatedString(requested))
+		// send the request to the
+		c.RequestBlock(false, requested)
+		// block until one of the two cases happens
 		select {
-		case msg := <-c.P2P.Inbox(Block): // got a response
+		// a) got a block in the inbox
+		case msg := <-c.P2P.Inbox(Block):
 			// if the responder does not equal the requester
 			responder := msg.Sender.Address.PublicKey
+			// log the receipt of a 'block response'
 			c.log.Debugf("Received a block response msg from %s", lib.BytesToTruncatedString(responder))
-			if !bytes.Equal(responder, reqRecipient) {
+			// check to see if the 'responder' is who was 'requested'
+			if !bytes.Equal(responder, requested) {
+				// slash the reputation of the unexpected responder
 				c.P2P.ChangeReputation(responder, p2p.UnexpectedBlockRep)
-				// poll max height of all peers
-				pollMaxHeight()
-				continue
+				// exit the select to re-poll
+				break
 			}
-			blkResponseMsg, ok := msg.Message.(*lib.BlockMessage)
+			// cast the message to a block message
+			blockMessage, ok := msg.Message.(*lib.BlockMessage)
+			// if the cast fails
 			if !ok {
+				// log this unexpected behavior
 				c.log.Warn("Not a block response msg")
+				// slash the reputation of the peer
 				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
-				// poll max height of all peers
-				pollMaxHeight()
-				return
+				// exit the select to re-poll
+				break
 			}
-			c.log.Debugf("Handling peer block response msg")
-			// process the quorum certificate received from the peer
-			if _, err := c.HandlePeerBlock(blkResponseMsg, true); err != nil {
-				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
+			// process the block message received from the peer
+			if _, err := c.HandlePeerBlock(blockMessage, true); err != nil {
+				// log this unexpected behavior
 				c.log.Warnf("Syncing peer block invalid:\n%s", err.Error())
-				// poll max height of all peers
-				pollMaxHeight()
-				continue
+				// slash the reputation of the peer
+				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
+				// exit the select to re-poll
+				break
 			}
-			// each peer is individually polled with each request as well
-			// if that poll max height has grown, we accept that as
-			// the new max height
-			if blkResponseMsg.MaxHeight > maxHeight && blkResponseMsg.TotalVdfIterations >= minVDFIterations {
-				maxHeight, minVDFIterations = blkResponseMsg.MaxHeight, blkResponseMsg.TotalVdfIterations
+			// each peer is individually polled for 'max height' in each request
+			// if the max height has grown, we accept that as the new max height
+			if blockMessage.MaxHeight > maxHeight && blockMessage.TotalVdfIterations >= minVDFIterations {
+				// log the update
 				c.log.Debugf("Updated chain %d with max height: %d and iterations %d\n%s", c.Config.ChainId, maxHeight, minVDFIterations)
+				// update the max height and vdf iterations
+				maxHeight, minVDFIterations = blockMessage.MaxHeight, blockMessage.TotalVdfIterations
 			}
+			// success, increase the peer reputation
 			c.P2P.ChangeReputation(responder, p2p.GoodBlockRep)
-		case <-time.After(p2p.SyncTimeoutS * time.Second): // timeout
-			c.log.Warnf("Timeout waiting for sync block")
-			c.P2P.ChangeReputation(reqRecipient, p2p.TimeoutRep)
-			// poll max height of all peers
-			pollMaxHeight()
+			// execute another iteration without polling peers
 			continue
+		// b) a timeout occurred before a block landed in the inbox
+		case <-time.After(p2p.SyncTimeoutS * time.Second):
+			// log the timeout
+			c.log.Warnf("Timeout waiting for sync block")
+			// slash the peer reputation
+			c.P2P.ChangeReputation(requested, p2p.TimeoutRep)
 		}
+		// update the syncing peers and poll the peers for their max height + minimum vdf iterations
+		maxHeight, minVDFIterations, syncingPeers = c.pollMaxHeight(1)
 	}
+	// log 'sync complete'
+	c.log.Info("Synced to top ✅")
+	// signal that the node is synced to top
+	c.finishSyncing()
 }
 
 // SUBSCRIBERS BELOW
@@ -202,36 +217,6 @@ func (c *Controller) ListenForBlockRequests() {
 
 // PUBLISHERS BELOW
 
-// RequestBlock() sends a QuorumCertificate (block + certificate) request to peer(s) - `heightOnly` is a request for just the peer's max height
-func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
-	height := c.FSM.Height()
-	// if the optional 'recipients' is specified
-	if len(recipients) != 0 {
-		// for each 'recipient'
-		for _, pk := range recipients {
-			c.log.Debugf("Requesting block %d for chain %d from %s", height, c.Config.ChainId, lib.BytesToTruncatedString(pk))
-			// send it to exactly who was specified in the function call
-			if err := c.P2P.SendTo(pk, BlockRequest, &lib.BlockRequestMessage{
-				ChainId:    c.Config.ChainId,
-				Height:     height,
-				HeightOnly: heightOnly,
-			}); err != nil {
-				c.log.Error(err.Error())
-			}
-		}
-	} else {
-		c.log.Debugf("Requesting block %d for chain %d from all", height, c.Config.ChainId)
-		// send it to the peers
-		if err := c.P2P.SendToPeers(BlockRequest, &lib.BlockRequestMessage{
-			ChainId:    c.Config.ChainId,
-			Height:     height,
-			HeightOnly: heightOnly,
-		}); err != nil {
-			c.log.Error(err.Error())
-		}
-	}
-}
-
 // SendToReplicas() sends a bft message to a specific ValidatorSet (the Committee)
 func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable) {
 	c.log.Debugf("Sending to %d replicas", replicas.NumValidators)
@@ -277,6 +262,36 @@ func (c *Controller) SendToProposer(msg lib.Signable) {
 		if err = c.P2P.SendTo(c.Consensus.ProposerKey, Cons, message); err != nil {
 			c.log.Error(err.Error())
 			return
+		}
+	}
+}
+
+// RequestBlock() sends a QuorumCertificate (block + certificate) request to peer(s) - `heightOnly` is a request for just the peer's max height
+func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
+	height := c.FSM.Height()
+	// if the optional 'recipients' is specified
+	if len(recipients) != 0 {
+		// for each 'recipient'
+		for _, pk := range recipients {
+			c.log.Debugf("Requesting block %d for chain %d from %s", height, c.Config.ChainId, lib.BytesToTruncatedString(pk))
+			// send it to exactly who was specified in the function call
+			if err := c.P2P.SendTo(pk, BlockRequest, &lib.BlockRequestMessage{
+				ChainId:    c.Config.ChainId,
+				Height:     height,
+				HeightOnly: heightOnly,
+			}); err != nil {
+				c.log.Error(err.Error())
+			}
+		}
+	} else {
+		c.log.Debugf("Requesting block %d for chain %d from all", height, c.Config.ChainId)
+		// send it to the peers
+		if err := c.P2P.SendToPeers(BlockRequest, &lib.BlockRequestMessage{
+			ChainId:    c.Config.ChainId,
+			Height:     height,
+			HeightOnly: heightOnly,
+		}); err != nil {
+			c.log.Error(err.Error())
 		}
 	}
 }
