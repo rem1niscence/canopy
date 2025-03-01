@@ -113,50 +113,46 @@ func (c *Controller) Sync() {
 func (c *Controller) ListenForConsensus() {
 	// wait and execute for each consensus message received
 	for msg := range c.P2P.Inbox(Cons) {
-		// define an error handling function for convenience
-		handleErr := func(e error, delta int32) {
-			c.log.Error(e.Error())
-			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, delta)
+		// if the node is syncing
+		if c.isSyncing.Load() {
+			// disregard the consensus message
+			continue
 		}
-		func() {
+		// execute in a sub-function to unify error handling and enable 'defer' functionality
+		if err := func() (err lib.ErrorI) {
 			// lock the controller for thread safety
 			c.Lock()
-			defer func() { c.Unlock(); c.log.Debug("Done handling inbound consensus message") }()
+			// once the handler completes, unlock
+			defer c.Unlock()
+			// log the initialization of the consensus message handler
 			c.log.Debug("Handling inbound consensus message")
-			// try to cast the p2p message to a 'consensus message'
-			consMsg, ok := msg.Message.(*lib.ConsensusMessage)
+			// try to cast the message to a 'consensus message'
+			consensusMessage, ok := msg.Message.(*lib.ConsensusMessage)
 			// if cast unsuccessful
 			if !ok {
-				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidMsgRep)
+				// exit with error
 				return
 			}
-			// if the chain is syncing, return
-			if c.isSyncing.Load() {
-				return
-			}
-			// load the committee associated with the chain id at the latest canopy height
-			vs, err := c.LoadCommittee(c.RootChainHeight())
-			if err != nil {
-				handleErr(err, 0)
-				return
-			}
-			// ensure the sender is a validator
-			if _, err = vs.GetValidator(msg.Sender.Address.PublicKey); err != nil {
-				handleErr(err, p2p.NotValRep)
-				return
-			}
-			// convert the bytes to a bft.Message object
+			// create a new bft message object reference to ensure non nil results
 			bftMsg := new(bft.Message)
-			if err = lib.Unmarshal(consMsg.Message, bftMsg); err != nil {
-				handleErr(err, p2p.InvalidMsgRep)
+			// populate the object reference with the payload bytes of the message
+			if err = lib.Unmarshal(consensusMessage.Message, bftMsg); err != nil {
+				// exit with error
 				return
 			}
 			// route the message to the consensus module
 			if err = c.Consensus.HandleMessage(bftMsg); err != nil {
-				handleErr(err, p2p.InvalidMsgRep)
+				// exit with error
 				return
 			}
-		}()
+			// exit
+			return
+		}(); err != nil {
+			// log the error
+			c.log.Errorf("Handling consensus message failed with err: %s", err.Error())
+			// slash the reputation of the peer
+			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidMsgRep)
+		}
 	}
 }
 

@@ -91,6 +91,7 @@ const (
 	CodeNoValidators                ErrorCode = 29
 	CodeInvalidResultsHash          ErrorCode = 30
 	CodeNonNilBlock                 ErrorCode = 31
+	CodeMessageCastFailed           ErrorCode = 32
 
 	// Consensus Module
 	ConsensusModule ErrorModule = "consensus"
@@ -670,6 +671,10 @@ func ErrMaxTxSize() ErrorI {
 
 func ErrInvalidArgument() ErrorI {
 	return NewError(CodeInvalidArgument, MainModule, "the argument is invalid")
+}
+
+func ErrInvalidMessageCast() ErrorI {
+	return NewError(CodeInvalidArgument, MainModule, "the message cast failed")
 }
 
 func ErrExpectedMaxBlockSize() ErrorI {
