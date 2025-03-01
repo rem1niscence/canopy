@@ -160,13 +160,17 @@ func (c *Controller) ListenForConsensus() {
 func (c *Controller) ListenForBlockRequests() {
 	// initialize a rate limiter for the inbound syncing messages
 	l := lib.NewLimiter(p2p.MaxBlockReqPerWindow, c.P2P.MaxPossiblePeers()*p2p.MaxBlockReqPerWindow, p2p.BlockReqWindowS)
+	// for the lifetime of the Controller
 	for {
+		// select one of the following cases
 		select {
 		// wait and execute for each inbound block request
 		case msg := <-c.P2P.Inbox(BlockRequest):
+			// wrap in a sub-function to enable 'defer' functionality
 			func() {
 				// lock the controller for thread safety
 				c.Lock()
+				// unlock once the message handling completes
 				defer c.Unlock()
 				// create a convenience variable for the sender of the block request
 				senderID := msg.Sender.Address.PublicKey
@@ -176,36 +180,52 @@ func (c *Controller) ListenForBlockRequests() {
 				if blocked || allBlocked {
 					// if only this specific peer is blocked, slash the reputation
 					if blocked {
+						// log a warning about this peer that had to be rate-limited
 						c.log.Warnf("Rate-limit hit for peer %s", lib.BytesToTruncatedString(senderID))
+						// slash the peer's reputation
 						c.P2P.ChangeReputation(senderID, p2p.BlockReqExceededRep)
 					}
+					// exit this iteration
 					return
 				}
 				// try to cast the p2p msg to a block request message
 				request, ok := msg.Message.(*lib.BlockRequestMessage)
+				// if the cast fails
 				if !ok {
+					// log a warning about the failed cast
 					c.log.Warnf("Invalid block-request msg from peer %s", lib.BytesToTruncatedString(senderID))
+					// slash the peer's reputation
 					c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
+					// exit
 					return
 				}
-				c.log.Debugf("Received a block request from %s", lib.BytesToString(senderID[:20]))
-				// create an empty QC that will be populated if the request is more than 'height only'
-				var certificate *lib.QuorumCertificate
-				var err error
+				// log the receipt of a block request from a peer
+				c.log.Debugf("Received a block request from %s", lib.BytesToTruncatedString(senderID))
+				// create variables that will be populated if the request is more than 'height only'
+				var (
+					certificate *lib.QuorumCertificate
+					err         error
+				)
 				// if the requesting more than just the height
 				if !request.HeightOnly {
-					// load the actual certificate and populate the variable
+					// load the actual certificate (with block) and populate the variable
 					certificate, err = c.LoadCertificate(request.Height)
+					// if an error occurred
 					if err != nil {
+						// log the error
 						c.log.Error(err.Error())
+						// exit the iteration
 						return
 					}
 				}
+				// log to mark the response initialization
 				c.log.Debugf("Responding to a block request from %s, heightOnly=%t", lib.BytesToString(senderID[:20]), request.HeightOnly)
 				// send the block back to the requester
 				c.SendBlock(c.FSM.Height(), c.FSM.TotalVDFIterations(), certificate, senderID)
 			}()
+		// limiter is ready to be reset
 		case <-l.TimeToReset():
+			// reset the limiter
 			l.Reset()
 		}
 	}
@@ -213,26 +233,31 @@ func (c *Controller) ListenForBlockRequests() {
 
 // PUBLISHERS BELOW
 
-// SendToReplicas() sends a bft message to a specific ValidatorSet (the Committee)
+// SendToReplicas() directly send a bft message to each validator in a set (committee)
 func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable) {
+	// log the initialization of the send process
 	c.log.Debugf("Sending to %d replicas", replicas.NumValidators)
-	// handle the signable message
-	message, err := c.signableToConsensusMessage(msg)
+	// sign the consensus message
+	signedMessage, err := c.signConsensusMessage(msg)
 	if err != nil {
+		// log the error
 		c.log.Error(err.Error())
+		// exit
 		return
 	}
-	// for each replica
+	// for each replica (validator) in the set
 	for _, replica := range replicas.ValidatorSet.ValidatorSet {
 		// check if replica is self
 		if bytes.Equal(replica.PublicKey, c.PublicKey) {
-			// send to self
-			if err = c.P2P.SelfSend(c.PublicKey, Cons, message); err != nil {
+			// send the message to self using internal routing
+			if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
+				// log the error
 				c.log.Error(err.Error())
 			}
 		} else {
-			// send to peer
-			if err = c.P2P.SendTo(replica.PublicKey, Cons, message); err != nil {
+			// if not self, send directly to peer using P2P
+			if err = c.P2P.SendTo(replica.PublicKey, Cons, signedMessage); err != nil {
+				// log the error (warning is used in case 'some' replicas are not reachable)
 				c.log.Warn(err.Error())
 			}
 		}
@@ -241,34 +266,39 @@ func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 
 // SendToProposer() sends a bft message to the leader of the Consensus round
 func (c *Controller) SendToProposer(msg lib.Signable) {
-	// handle the signable message
-	message, err := c.signableToConsensusMessage(msg)
+	// sign the consensus message
+	signedMessage, err := c.signConsensusMessage(msg)
 	if err != nil {
+		// log the error
 		c.log.Error(err.Error())
+		// exit
 		return
 	}
-	// check if sending to self or peer
+	// check if sending to 'self' or peer
 	if c.Consensus.SelfIsProposer() {
-		// handle self send
-		if err = c.P2P.SelfSend(c.PublicKey, Cons, message); err != nil {
+		// send using internal routing
+		if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
+			// log the error
 			c.log.Error(err.Error())
 		}
 	} else {
 		// handle peer send
-		if err = c.P2P.SendTo(c.Consensus.ProposerKey, Cons, message); err != nil {
+		if err = c.P2P.SendTo(c.Consensus.ProposerKey, Cons, signedMessage); err != nil {
+			// log the error
 			c.log.Error(err.Error())
-			return
 		}
 	}
 }
 
-// RequestBlock() sends a QuorumCertificate (block + certificate) request to peer(s) - `heightOnly` is a request for just the peer's max height
+// RequestBlock() sends a block request to peer(s) - `heightOnly` is a request for just the peer's max height
 func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
+	// define a convenience variable for the current height
 	height := c.FSM.Height()
 	// if the optional 'recipients' is specified
 	if len(recipients) != 0 {
-		// for each 'recipient'
+		// for each 'recipient' specified
 		for _, pk := range recipients {
+			// log the block request
 			c.log.Debugf("Requesting block %d for chain %d from %s", height, c.Config.ChainId, lib.BytesToTruncatedString(pk))
 			// send it to exactly who was specified in the function call
 			if err := c.P2P.SendTo(pk, BlockRequest, &lib.BlockRequestMessage{
@@ -276,10 +306,12 @@ func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
 				Height:     height,
 				HeightOnly: heightOnly,
 			}); err != nil {
+				// log error
 				c.log.Error(err.Error())
 			}
 		}
 	} else {
+		// log the block request
 		c.log.Debugf("Requesting block %d for chain %d from all", height, c.Config.ChainId)
 		// send it to the peers
 		if err := c.P2P.SendToPeers(BlockRequest, &lib.BlockRequestMessage{
@@ -287,6 +319,7 @@ func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
 			Height:     height,
 			HeightOnly: heightOnly,
 		}); err != nil {
+			// log error
 			c.log.Error(err.Error())
 		}
 	}
@@ -301,6 +334,7 @@ func (c *Controller) SendBlock(maxHeight, vdfIterations uint64, blockAndCert *li
 		TotalVdfIterations:  vdfIterations,
 		BlockAndCertificate: blockAndCert,
 	}); err != nil {
+		// log error
 		c.log.Error(err.Error())
 	}
 }
@@ -309,98 +343,109 @@ func (c *Controller) SendBlock(maxHeight, vdfIterations uint64, blockAndCert *li
 
 // UpdateP2PMustConnect() tells the P2P module which nodes are *required* to be connected to (usually fellow committee members or none if not in committee)
 func (c *Controller) UpdateP2PMustConnect() {
-	// define a list
-	noDuplicates := make(map[string]*lib.PeerAddress)
+	// resolve the port to append based on the 'chain id'
 	port, err := lib.ResolvePort(c.Config.ChainId)
+	// if an error occurred
 	if err != nil {
-		if err != nil {
-			c.log.Error(err.Error())
-			return
-		}
+		// log the error
+		c.log.Error(err.Error())
+		// exit
+		return
 	}
-	// ensure self is a validator
-	var selfIsValidator bool
 	// handle empty validator set
 	if c.RootChainInfo.ValidatorSet.ValidatorSet == nil {
+		// exit
 		return
 	}
+	// define tracking variables for the 'must connect' peer list and if 'self' is a validator
+	mustConnects, selfIsValidator := make([]*lib.PeerAddress, 0), false
 	// for each member of the committee
 	for _, member := range c.RootChainInfo.ValidatorSet.ValidatorSet.ValidatorSet {
+		// if self is a validator
 		if bytes.Equal(member.PublicKey, c.PublicKey) {
+			// update the variable
 			selfIsValidator = true
 		}
-		// convert the public key to a string
-		pkString := lib.BytesToString(member.PublicKey)
-		// check the de-duplication map to see if the peer object already exists
-		p, found := noDuplicates[pkString]
-		// if the peer object doesn't exist on the list
-		if !found {
-			// create the peer object
-			p = &lib.PeerAddress{
-				PublicKey:  member.PublicKey,
-				NetAddress: strings.ReplaceAll(member.NetAddress, "tcp://", "") + port,
-				PeerMeta:   &lib.PeerMeta{ChainId: c.Config.ChainId},
-			}
-		}
-		// add to the de-duplication map to ensure we don't doubly create peer objects
-		noDuplicates[pkString] = p
+		// create the peer object and add it to the list
+		mustConnects = append(mustConnects, &lib.PeerAddress{
+			PublicKey:  member.PublicKey,
+			NetAddress: strings.ReplaceAll(member.NetAddress, "tcp://", "") + port,
+			PeerMeta:   &lib.PeerMeta{ChainId: c.Config.ChainId},
+		})
 	}
-	// if self isn't a validator - don't force P2P to connect to other validators
-	if !selfIsValidator {
-		c.log.Warnf("Self not a validator so not connecting to %d validators", len(noDuplicates))
-		return
+	// if this node 'is validator'
+	if selfIsValidator {
+		// log the must connect update
+		c.log.Infof("Updating must connects with %d validators", len(mustConnects))
+		// send the list to the p2p module
+		c.P2P.MustConnectsReceiver <- mustConnects
 	}
-	// create a slice to send to the p2p module
-	var arr []*lib.PeerAddress
-	// iterate through the map and add it to the slice
-	for _, peerAddr := range noDuplicates {
-		arr = append(arr, peerAddr)
-	}
-	c.log.Infof("Updating must connects with %d validators", len(arr))
-	// send the slice to the p2p module
-	c.P2P.MustConnectsReceiver <- arr
 }
 
 // pollMaxHeight() polls all peers for their local MaxHeight and totalVDFIterations for a specific chainId
 // NOTE: unlike other P2P transmissions - RequestBlock enforces a minimum reputation on `mustConnects`
 // to ensure a byzantine validator cannot cause syncing issues above max_height
-func (c *Controller) pollMaxHeight(backoff int) (max, minVDFIterations uint64, syncingPeers []string) {
+func (c *Controller) pollMaxHeight(backoff int) (max, minVDF uint64, syncingPeerList []string) {
+	// initialize max height and minimumVDFIterations to -1
 	maxHeight, minimumVDFIterations := -1, -1
 	// empty inbox to start fresh
 	c.emptyInbox(Block)
-	// ask all peers
+	// log the initialization
 	c.log.Infof("Polling chain peers for max height")
-	syncingPeers = make([]string, 0)
-	// ask only for MaxHeight not the actual QC
+	// initialize the syncing peers list
+	syncingPeerList = make([]string, 0)
+	// ask only for 'max height' from all peers
 	c.RequestBlock(true)
+	// debug log the current status
+	c.log.Debug("Waiting for peer max heights")
+	// loop until timeout case
 	for {
-		c.log.Debug("Waiting for peer max heights")
+		// block until one of the cases is satisfied
 		select {
+		// handle the inbound message
 		case m := <-c.P2P.Inbox(Block):
-			response, ok := m.Message.(*lib.BlockMessage)
+			// cast the inbound message payload as a block message
+			blockMessage, ok := m.Message.(*lib.BlockMessage)
+			// if the cast fails
 			if !ok {
+				// log the unexpected behavior
 				c.log.Warnf("Invalid block message response from %s", lib.BytesToTruncatedString(m.Sender.Address.PublicKey))
+				// slash the peer reputation
 				c.P2P.ChangeReputation(m.Sender.Address.PublicKey, p2p.InvalidMsgRep)
+				// reset loop
 				continue
 			}
+			// log the receipt of the block message
 			c.log.Debugf("Received a block response from peer %s with max height at %d", lib.BytesToTruncatedString(m.Sender.Address.PublicKey), maxHeight)
 			// don't listen to any peers below the minimumVDFIterations
-			if int(response.TotalVdfIterations) < minimumVDFIterations {
-				c.log.Error("Ignoring below minimumVDFIterations")
+			if int(blockMessage.TotalVdfIterations) < minimumVDFIterations {
+				// log the status
+				c.log.Error("Ignoring below the minimum vdf iterations")
+				// reset loop
 				continue
 			}
-			// reset syncing variables if peer exceeds the previous minimumVDFIterations
-			maxHeight, minimumVDFIterations = int(response.MaxHeight), int(response.TotalVdfIterations)
-			syncingPeers = make([]string, 0)
+			// update the minimum vdf iterations
+			minimumVDFIterations = int(blockMessage.TotalVdfIterations)
 			// add to syncing peer list
-			syncingPeers = append(syncingPeers, lib.BytesToString(m.Sender.Address.PublicKey))
+			syncingPeerList = append(syncingPeerList, lib.BytesToString(m.Sender.Address.PublicKey))
+			// if the maximum height is exceeded, update the max height
+			if int(blockMessage.MaxHeight) > maxHeight {
+				// reset syncing variables if peer exceeds the previous minimum vdf iterations
+				maxHeight = int(blockMessage.MaxHeight)
+			}
+		// if a timeout occurred
 		case <-time.After(p2p.PollMaxHeightTimeoutS * time.Second * time.Duration(backoff)):
+			// if the maximum height or vdf iterations remains unset
 			if maxHeight == -1 || minimumVDFIterations == -1 {
-				c.log.Warn("no heights received from peers. Trying again")
+				// log the status of no heights received
+				c.log.Warn("No heights received from peers. Trying again")
+				// try again with greater backoff
 				return c.pollMaxHeight(backoff + 1)
 			}
+			// log the max height among the peers
 			c.log.Debugf("Peer max height is %d 🔝", maxHeight)
-			return uint64(maxHeight), uint64(minimumVDFIterations), syncingPeers
+			// return the max height, minimum vdf iterations, and list of syncing peers
+			return uint64(maxHeight), uint64(minimumVDFIterations), syncingPeerList
 		}
 	}
 }
@@ -418,17 +463,21 @@ func (c *Controller) syncingDone(maxHeight, minVDFIterations uint64) bool {
 	if c.FSM.Height() >= maxHeight {
 		// ensure node did not lie about VDF iterations in their chain
 		if c.FSM.TotalVDFIterations() < minVDFIterations {
-			c.log.Fatalf("VDFIterations error: localVDFIterations: %d, minimumVDFIterations: %d", c.FSM.TotalVDFIterations(), minVDFIterations)
+			// if the node lied, on unsafe fork - exit application immediately for safety
+			c.log.Fatalf("Unsafe fork detected - VDFIterations error: localVDFIterations: %d, minimumVDFIterations: %d", c.FSM.TotalVDFIterations(), minVDFIterations)
 		}
+		// exit with syncing done
 		return true
 	}
+	// exit with syncing not done
 	return false
 }
 
 // finishSyncing() is called when the syncing loop is completed for a specific chainId
 func (c *Controller) finishSyncing() {
-	// lock the controller
+	// lock the controller for thread safety
 	c.Lock()
+	// when function completes, unlock
 	defer c.Unlock()
 	// signal a reset of bft for the chain
 	c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(c.LoadLastCommitTime(c.FSM.Height()))}
@@ -438,8 +487,8 @@ func (c *Controller) finishSyncing() {
 	go c.ListenForBlock()
 }
 
-// signableToConsensusMessage() signs, encodes, and wraps a consensus message in preparation for sending
-func (c *Controller) signableToConsensusMessage(msg lib.Signable) (*lib.ConsensusMessage, lib.ErrorI) {
+// signConsensusMessage() signs, encodes, and wraps a consensus message in preparation for sending
+func (c *Controller) signConsensusMessage(msg lib.Signable) (*lib.ConsensusMessage, lib.ErrorI) {
 	// sign the message
 	if err := msg.Sign(c.PrivateKey); err != nil {
 		return nil, err
@@ -483,8 +532,9 @@ func (c *Controller) ConsensusSummary() ([]byte, lib.ErrorI) {
 	if c.Consensus.Results != nil {
 		consensusSummary.ResultsHash = c.Consensus.Results.Hash()
 	}
+	// if high qc exists, populate the block hash and results hash
 	if c.Consensus.HighQC != nil {
-		consensusSummary.BlockHash = c.Consensus.HighQC.BlockHash
+		consensusSummary.BlockHash = c.Consensus.BlockHash
 		consensusSummary.ResultsHash = c.Consensus.HighQC.ResultsHash
 	}
 	// if exists, populate the proposer address
