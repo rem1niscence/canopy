@@ -97,8 +97,6 @@ func (c *Controller) GossipBlock(certificate *lib.QuorumCertificate, senderPubTo
 	// create the block message to gossip
 	blockMessage := &lib.BlockMessage{
 		ChainId:             c.Config.ChainId,
-		MaxHeight:           c.FSM.Height(),
-		TotalVdfIterations:  c.FSM.TotalVDFIterations(),
 		BlockAndCertificate: certificate,
 	}
 	// send the block message to all peers excluding the sender (gossip)
@@ -112,8 +110,6 @@ func (c *Controller) SelfSendBlock(certificate *lib.QuorumCertificate) {
 	// create the block message
 	blockMessage := &lib.BlockMessage{
 		ChainId:             c.Config.ChainId,
-		MaxHeight:           c.FSM.Height(),
-		TotalVdfIterations:  c.FSM.TotalVDFIterations(),
 		BlockAndCertificate: certificate,
 	}
 	// internally route the block to the 'block inbox'
@@ -291,7 +287,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 
 // INTERNAL HELPERS BELOW
 
-// ApplyAndValidateBlock() plays the block against the state machine and compares the block header against a results from the state machine
+// ApplyAndValidateBlock() plays the block against the state machine which returns a result that is compared against the candidate block header
 func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *lib.BlockResult, err lib.ErrorI) {
 	// define convenience variables for the block header, hash, and height
 	candidate, candidateHash, candidateHeight := block.BlockHeader, lib.BytesToString(block.BlockHeader.Hash), block.BlockHeader.Height
@@ -319,7 +315,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 		return nil, lib.ErrUnequalBlockHash()
 	}
 	// validate VDF if committing randomly since this randomness is pseudo-non-deterministic (among nodes)
-	if commit && candidate.Vdf != nil {
+	if commit && compare.Height > 1 && candidate.Vdf != nil {
 		// this design has similar security guarantees but lowers the computational requirements at a per-node basis
 		if rand.Intn(100) == 0 {
 			// validate the VDF included in the block
@@ -335,79 +331,87 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 	return &lib.BlockResult{BlockHeader: candidate, Transactions: txResults}, nil
 }
 
-// HandlePeerBlock() validates and handles inbound Quorum Certificates from remote peers
-func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (qc *lib.QuorumCertificate, err lib.ErrorI) {
+// HandlePeerBlock() validates and handles an inbound certificate (with a block) from a remote peer
+func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.QuorumCertificate, lib.ErrorI) {
+	// log the start of 'peer block handling'
 	c.log.Info("Handling peer block")
-	// define a convenience variable for certificate
-	qc = msg.BlockAndCertificate
+	// define a convenience variable for the certificate
+	qc := msg.BlockAndCertificate
 	// do a basic validation on the QC before loading the committee
-	if err = qc.CheckBasic(); err != nil {
-		return
-	}
-	// load the committee using the canopy height from the root-Chain
-	// upon independence, this check for the validator set will be ignored
-	// and checkpoints will be used instead
-	v, err := c.Consensus.LoadCommittee(qc.Header.RootHeight)
-	if err != nil {
-		return
-	}
-	// validate the quorum certificate
-	isPartialQC, err := qc.Check(v, c.LoadMaxBlockSize(), &lib.View{NetworkId: c.Config.NetworkID, ChainId: c.Config.ChainId}, false)
-	if err != nil {
+	if err := qc.CheckBasic(); err != nil {
+		// exit with error
 		return nil, err
 	}
-	// if the quorum certificate doesn't have a +2/3rds majority
-	if isPartialQC {
-		return nil, lib.ErrNoMaj23()
+	// if syncing the blockchain
+	if syncing {
+		// use checkpoints to protect against long-range attacks
+		if qc.Header.Height%CheckpointFrequency == 0 {
+			// get the checkpoint from the base chain (or file if independent)
+			checkpoint, err := c.RootChainInfo.GetCheckpoint(qc.Header.Height, c.Config.ChainId)
+			// if getting the checkpoint failed
+			if err != nil {
+				// warn of the inability to get the checkpoint
+				c.log.Warnf(err.Error())
+			}
+			// if checkpoint fails
+			if len(checkpoint) != 0 && !bytes.Equal(qc.BlockHash, checkpoint) {
+				// log and kill program
+				c.log.Fatalf("Invalid checkpoint %s vs %s at height %d", lib.BytesToString(qc.BlockHash), checkpoint, qc.Header.Height)
+			}
+		}
+	} else {
+		// load the committee from the root chain using the root height embedded in the certificate message
+		v, err := c.Consensus.LoadCommittee(qc.Header.RootHeight)
+		if err != nil {
+			// exit with error
+			return nil, err
+		}
+		// validate the quorum certificate
+		isPartialQC, err := qc.Check(v, c.LoadMaxBlockSize(), &lib.View{NetworkId: c.Config.NetworkID, ChainId: c.Config.ChainId}, false)
+		if err != nil {
+			// exit with error
+			return nil, err
+		}
+		// if the quorum certificate doesn't have a +2/3rds majority
+		if isPartialQC {
+			// exit with error
+			return nil, lib.ErrNoMaj23()
+		}
 	}
 	// ensure the proposal inside the quorum certificate is valid at a stateless level
 	block, err := qc.CheckProposalBasic(c.FSM.Height(), c.Config.NetworkID, c.Config.ChainId)
 	if err != nil {
-		// exit with err
-		return
+		// exit with error
+		return nil, err
 	}
 	// if this certificate isn't finalized
 	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
+		// exit with error
 		return nil, lib.ErrWrongPhase()
 	}
-	// use checkpoints to protect against long-range attacks
-	if qc.Header.Height%CheckpointFrequency == 0 {
-		// get the checkpoint from the base chain (or file if independent)
-		checkpoint, e := c.RootChainInfo.GetCheckpoint(qc.Header.Height, c.Config.ChainId)
-		if e != nil {
-			c.log.Warnf(e.Error())
-			// continue
-		}
-		// if checkpoint fails
-		if len(checkpoint) != 0 && !bytes.Equal(qc.BlockHash, checkpoint) {
-			c.log.Fatalf("Invalid checkpoint %s vs %s at height %d", lib.BytesToString(qc.BlockHash), checkpoint, qc.Header.Height)
-		}
-	}
-	// don't accept any blocks greater than 'max height'
-	if block.BlockHeader.Height > msg.MaxHeight {
-		err = lib.ErrWrongMaxHeight()
-		return
-	}
+	// check if the node has fallen out of sync
 	if !syncing && c.FSM.Height() != block.BlockHeader.Height {
-		err = lib.ErrOutOfSync()
-		return
+		// exit with error
+		return nil, lib.ErrOutOfSync()
 	}
 	// attempts to commit the QC to persistence of chain by playing it against the state machine
 	if err = c.CommitCertificate(qc, block); err != nil {
-		return
+		// exit with error
+		return nil, err
 	}
-	// if self was he proposer
+	// if self was the proposer
 	if bytes.Equal(qc.ProposerKey, c.PublicKey) && !c.isSyncing.Load() {
-		// send the proposal (reward) transaction
+		// send the certificate results transaction on behalf of the quorum
 		c.SendCertificateResultsTx(qc)
 	}
-	return
+	// exit
+	return qc, nil
 }
 
 // CheckAndSetLastCertificate() validates the last quorum certificate included in the block and sets it in the ephemeral indexer
 // NOTE: This must come before ApplyBlock in order to have the proposers 'lastCertificate' which is used for distributing rewards
 func (c *Controller) CheckAndSetLastCertificate(candidate *lib.BlockHeader) lib.ErrorI {
-	if candidate.Height > 2 {
+	if candidate.Height > 1 {
 		// load the last quorum certificate from state
 		lastCertificate, err := c.FSM.LoadCertificateHashesOnly(candidate.Height - 1)
 		// if an error occurred
@@ -441,11 +445,11 @@ func (c *Controller) CheckAndSetLastCertificate(candidate *lib.BlockHeader) lib.
 		if isPartialQC {
 			return lib.ErrNoMaj23()
 		}
-	}
-	// update the LastQuorumCertificate in the ephemeral store to ensure deterministic last-COMMIT-QC (multiple valid versions can exist)
-	if err := c.FSM.Store().(lib.StoreI).IndexQC(candidate.LastQuorumCertificate); err != nil {
-		// exit with error
-		return err
+		// update the LastQuorumCertificate in the ephemeral store to ensure deterministic last-COMMIT-QC (multiple valid versions can exist)
+		if err = c.FSM.Store().(lib.StoreI).IndexQC(candidate.LastQuorumCertificate); err != nil {
+			// exit with error
+			return err
+		}
 	}
 	// exit
 	return nil
