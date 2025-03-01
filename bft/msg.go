@@ -55,7 +55,8 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 	if err = x.checkBasic(b.View); err != nil {
 		return false, err
 	}
-	if x.Header.Phase == Election { // ELECTION
+	// ELECTION
+	if x.Header.Phase == Election {
 		// validate target height
 		if x.Header.Height != b.Height {
 			return false, lib.ErrWrongHeight()
@@ -69,68 +70,68 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 			return false, ErrMismatchPublicKeys()
 		}
 		return
-	} else { // PROPOSE, PRECOMMIT, COMMIT
-		var vals ValSet
-		// any message from the Leader after the ELECTION phase contains a justification (Quorum Certificate)
-		// sanity check the Quorum Certificate
-		if err = x.Qc.CheckBasic(); err != nil {
-			return
-		}
-		// load the proper committee
-		vals, err = b.LoadCommittee(x.Qc.Header.RootHeight) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
-		if err != nil {
-			return false, err
-		}
-		// validate the Quorum Certificate
-		isPartialQC, err = x.Qc.Check(vals, lib.GlobalMaxBlockSize, b.View, false)
-		if err != nil {
-			return
-		}
-		// if it doesn't have +2/3 majority
-		if isPartialQC {
-			return
-		}
-		// validate header height, qc height, and committee height
-		// NOTE: these height checks are correct even when sending a highQC as the header is updated when using a highQC
-		if x.Header.Height != b.Height {
-			return false, lib.ErrWrongHeight()
-		}
-		// load committee data from state
-		data, e := b.LoadCommitteeData()
-		if e != nil {
-			return false, e
-		}
-		if x.Qc.Header.Height < data.LastChainHeightUpdated {
-			return false, lib.ErrWrongHeight()
-		}
-		if x.Header.Phase == Propose {
-			// ensure the sender is justified as the proposer
-			if !bytes.Equal(x.Qc.ProposerKey, x.Signature.PublicKey) {
-				return false, lib.ErrInvalidSigner()
-			}
-			// ensure the block isn't nil
-			if x.Qc.Block == nil {
-				return false, lib.ErrNilBlock()
-			}
-			// ensure the results aren't nil
-			if x.Qc.Results == nil {
-				return false, lib.ErrNilCertResults()
-			}
-		} else {
-			// in PRECOMMIT or COMMIT phase
-			if b.Block == nil || b.Results == nil {
-				return false, lib.ErrNoSavedBlockOrResults()
-			}
-			// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
-			if !bytes.Equal(x.Qc.BlockHash, b.GetBlockHash()) {
-				return false, lib.ErrMismatchConsBlockHash()
-			}
-			if !bytes.Equal(x.Qc.ResultsHash, b.Results.Hash()) {
-				return false, lib.ErrMismatchResultsHash()
-			}
-		}
+	}
+	// PROPOSE, PRECOMMIT, COMMIT
+	var vals ValSet
+	// any message from the Leader after the ELECTION phase contains a justification (Quorum Certificate)
+	// sanity check the Quorum Certificate
+	if err = x.Qc.CheckBasic(); err != nil {
 		return
 	}
+	// load the proper committee
+	vals, err = b.LoadCommittee(x.Qc.Header.RootHeight) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
+	if err != nil {
+		return false, err
+	}
+	// validate the Quorum Certificate
+	isPartialQC, err = x.Qc.Check(vals, lib.GlobalMaxBlockSize, b.View, false)
+	if err != nil {
+		return
+	}
+	// if it doesn't have +2/3 majority
+	if isPartialQC {
+		return
+	}
+	// validate header height, qc height, and committee height
+	// NOTE: these height checks are correct even when sending a highQC as the header is updated when using a highQC
+	if x.Header.Height != b.Height {
+		return false, lib.ErrWrongHeight()
+	}
+	// load committee data from state
+	data, e := b.LoadCommitteeData()
+	if e != nil {
+		return false, e
+	}
+	if x.Qc.Header.Height < data.LastChainHeightUpdated {
+		return false, lib.ErrWrongHeight()
+	}
+	if x.Header.Phase == Propose {
+		// ensure the sender is justified as the proposer
+		if !bytes.Equal(x.Qc.ProposerKey, x.Signature.PublicKey) {
+			return false, lib.ErrInvalidSigner()
+		}
+		// ensure the block isn't nil
+		if x.Qc.Block == nil {
+			return false, lib.ErrNilBlock()
+		}
+		// ensure the results aren't nil
+		if x.Qc.Results == nil {
+			return false, lib.ErrNilCertResults()
+		}
+	} else {
+		// in PRECOMMIT or COMMIT phase
+		if b.Block == nil || b.Results == nil {
+			return false, lib.ErrNoSavedBlockOrResults()
+		}
+		// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
+		if !bytes.Equal(x.Qc.BlockHash, b.GetBlockHash()) {
+			return false, lib.ErrMismatchConsBlockHash()
+		}
+		if !bytes.Equal(x.Qc.ResultsHash, b.Results.Hash()) {
+			return false, lib.ErrMismatchResultsHash()
+		}
+	}
+	return
 }
 
 // CheckReplicaMessage() validates an inbound message from a Replica Validator

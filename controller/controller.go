@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"bytes"
-	"fmt"
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
@@ -90,6 +88,18 @@ func (c *Controller) Start() {
 		go c.Sync()
 		go c.Consensus.Start()
 	}()
+}
+
+// StartListeners() runs all listeners on separate threads
+func (c *Controller) StartListeners() {
+	c.log.Debug("Listening for inbound txs, block requests, and consensus messages")
+	// listen for syncing peers
+	go c.ListenForBlockRequests()
+	// listen for inbound consensus messages
+	go c.ListenForConsensus()
+	// listen for inbound
+	go c.ListenForTx()
+	// ListenForBlock() is called once syncing finished
 }
 
 // Stop() terminates the Controller service
@@ -220,78 +230,18 @@ func (c *Controller) RootChainHeight() uint64 { return c.RootChainInfo.GetHeight
 // ChainHeight() returns the height of this target chain
 func (c *Controller) ChainHeight() uint64 { return c.FSM.Height() }
 
-// ConsensusSummary() for the RPC - returns the summary json object of the bft for a specific chainID
-func (c *Controller) ConsensusSummary() ([]byte, lib.ErrorI) {
-	// lock for thread safety
-	c.Lock()
-	defer c.Unlock()
-	// convert self public key from bytes into an object
-	selfKey, _ := crypto.NewPublicKeyFromBytes(c.PublicKey)
-	// create the consensus summary object
-	consensusSummary := &ConsensusSummary{
-		Syncing:              c.isSyncing.Load(),
-		View:                 c.Consensus.View,
-		Locked:               c.Consensus.HighQC != nil,
-		Address:              selfKey.Address().Bytes(),
-		PublicKey:            c.PublicKey,
-		Proposer:             c.Consensus.ProposerKey,
-		Proposals:            c.Consensus.Proposals,
-		PartialQCs:           c.Consensus.PartialQCs,
-		PacemakerVotes:       c.Consensus.PacemakerMessages,
-		MinimumPowerFor23Maj: c.Consensus.ValidatorSet.MinimumMaj23,
-		Votes:                c.Consensus.Votes,
-		Status:               "",
+// emptyInbox() discards all unread messages for a specific topic
+func (c *Controller) emptyInbox(topic lib.Topic) {
+	// clear the inbox
+	for len(c.P2P.Inbox(topic)) > 0 {
+		<-c.P2P.Inbox(topic)
 	}
-	consensusSummary.BlockHash = c.Consensus.BlockHash
-	// if exists, populate the proposal hash
-	if c.Consensus.Results != nil {
-		consensusSummary.ResultsHash = c.Consensus.Results.Hash()
-	}
-	if c.Consensus.HighQC != nil {
-		consensusSummary.BlockHash = c.Consensus.HighQC.BlockHash
-		consensusSummary.ResultsHash = c.Consensus.HighQC.ResultsHash
-	}
-	// if exists, populate the proposer address
-	if c.Consensus.ProposerKey != nil {
-		propKey, _ := crypto.NewPublicKeyFromBytes(c.Consensus.ProposerKey)
-		consensusSummary.ProposerAddress = propKey.Address().Bytes()
-	}
-	// create a status string
-	switch c.Consensus.View.Phase {
-	case bft.Election, bft.Propose, bft.Precommit, bft.Commit:
-		proposal := c.Consensus.GetProposal()
-		if proposal == nil {
-			consensusSummary.Status = "waiting for proposal"
-		} else {
-			consensusSummary.Status = "received proposal"
-		}
-	case bft.ElectionVote, bft.ProposeVote, bft.CommitProcess:
-		if bytes.Equal(c.Consensus.ProposerKey, c.PublicKey) {
-			_, _, votedPercentage := c.Consensus.GetLeadingVote()
-			consensusSummary.Status = fmt.Sprintf("received %d%% of votes", votedPercentage)
-		} else {
-			consensusSummary.Status = "voting on proposal"
-		}
-	}
-	// convert the object into json
-	return lib.MarshalJSONIndent(&consensusSummary)
 }
 
-// ConsensusSummary is simply a json informational structure about the local status of the BFT
-type ConsensusSummary struct {
-	Syncing              bool                   `json:"isSyncing"`
-	View                 *lib.View              `json:"view"`
-	BlockHash            lib.HexBytes           `json:"blockHash"`
-	ResultsHash          lib.HexBytes           `json:"resultsHash"`
-	Locked               bool                   `json:"locked"`
-	Address              lib.HexBytes           `json:"address"`
-	PublicKey            lib.HexBytes           `json:"publicKey"`
-	ProposerAddress      lib.HexBytes           `json:"proposerAddress"`
-	Proposer             lib.HexBytes           `json:"proposer"`
-	Proposals            bft.ProposalsForHeight `json:"proposals"`
-	PartialQCs           bft.PartialQCs         `json:"partialQCs"`
-	PacemakerVotes       bft.PacemakerMessages  `json:"pacemakerVotes"`
-	MinimumPowerFor23Maj uint64                 `json:"minimumPowerFor23Maj"`
-	Votes                bft.VotesForHeight     `json:"votes"`
-	Status               string                 `json:"status"`
-}
+// convenience aliases that reference the library package
+const (
+	BlockRequest = lib.Topic_BLOCK_REQUEST
+	Block        = lib.Topic_BLOCK
+	Tx           = lib.Topic_TX
+	Cons         = lib.Topic_CONSENSUS
+)

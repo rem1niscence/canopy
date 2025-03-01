@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"github.com/canopy-network/canopy/bft"
+	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"slices"
 )
@@ -20,6 +21,33 @@ func (c *Controller) NewCertificateResults(block *lib.Block, blockResult *lib.Bl
 	c.HandleRetired(results)
 	// exit
 	return
+}
+
+// SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
+func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
+	// get the root chain id from the state
+	rootChainId, err := c.FSM.GetRootChainId()
+	if c.Config.ChainId == rootChainId {
+		return // root-Chain doesn't send this
+	}
+	c.log.Debugf("Sending certificate results txn for: %s", lib.BytesToString(qc.ResultsHash))
+	// save the block to set it back to the object after this function completes
+	blk := qc.Block
+	defer func() { qc.Block = blk }()
+	// it's good practice to omit the block when sending the transaction as it's not relevant to canopy
+	qc.Block = nil
+	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, rootChainId, c.Config.NetworkID, 0, c.RootChainHeight(), "")
+	if err != nil {
+		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
+		return
+	}
+	// handle the transaction on the root-Chain
+	hash, err := c.RootChainInfo.RemoteCallbacks.Transaction(tx)
+	if err != nil {
+		c.log.Errorf("Submitting auto-certificate-results-txn failed with err: %s", err.Error())
+		return
+	}
+	c.log.Infof("Successfully submitted the certificate-results-txn with hash %s", *hash)
 }
 
 // CalculateRewardRecipients() calculates the block reward recipients of the proposal

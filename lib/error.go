@@ -107,7 +107,7 @@ const (
 	CodeUnknownConsensusMessage         ErrorCode = 9
 	CodeValidatorNotInSet               ErrorCode = 10
 	CodeWrongHeight                     ErrorCode = 11
-	CodeWrongRound                      ErrorCode = 12
+	CodeOutOfSync                       ErrorCode = 12
 	CodeWrongPhase                      ErrorCode = 13
 	CodePartialSignatureEmpty           ErrorCode = 14
 	CodeInvalidPartialSignature         ErrorCode = 15
@@ -456,8 +456,8 @@ func ErrEmptyView() ErrorI {
 	return NewError(CodeEmptyView, ConsensusModule, "empty view")
 }
 
-func ErrWrongRound() ErrorI {
-	return NewError(CodeWrongRound, ConsensusModule, "wrong round")
+func ErrOutOfSync() ErrorI {
+	return NewError(CodeOutOfSync, ConsensusModule, "out of sync")
 }
 
 func ErrWrongPhase() ErrorI {

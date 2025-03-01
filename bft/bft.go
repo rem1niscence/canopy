@@ -846,9 +846,9 @@ type (
 		ChainHeight() uint64
 		// RootChainHeight returns the height of the root-Chain
 		RootChainHeight() uint64
-		// ProduceProposal() is a plugin call to produce a Proposal object as a Leader
+		// ProduceProposal() as a Leader, create a Proposal in the form of a block and certificate results
 		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
-		// ValidateCertificate() is a plugin call to validate a Certificate object as a Replica
+		// ValidateCertificate() as a Replica, validates the leader proposal
 		ValidateProposal(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
 		// LoadCertificate() gets the Quorum Certificate from the chainId-> plugin at a certain height
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
@@ -865,7 +865,8 @@ type (
 		// Syncing() returns true if the plugin is currently syncing
 		Syncing() *atomic.Bool
 
-		/* Root-ChainId Functionality Below*/
+		/* Root-Chain Functionality Below*/
+
 		// SendCertificateResultsTx() is a P2P call that allows a Leader to submit their CertificateResults (reward) transaction
 		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
 		// LoadCommittee() loads the ValidatorSet operating under ChainId

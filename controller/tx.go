@@ -1,12 +1,78 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/p2p"
 	"math"
 )
+
+// SendTxMsg() gossips a Transaction through the P2P network for a specific chainId
+func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
+	// create a transaction message object using the tx bytes and the chain id
+	msg := &lib.TxMessage{ChainId: c.Config.ChainId, Tx: tx}
+
+	// send transaction to controller for processing and gossip
+	return c.P2P.SelfSend(c.PublicKey, Tx, msg)
+}
+
+// ListenForTx() listen for inbound tx messages, internally route them, and gossip them to peers
+func (c *Controller) ListenForTx() {
+	// create a new message cache to filter out duplicate transaction messages
+	cache := lib.NewMessageCache()
+	// wait and execute for each inbound transaction message
+	for msg := range c.P2P.Inbox(Tx) {
+		func() {
+			// lock the controller for thread safety
+			c.Lock()
+			defer c.Unlock()
+			// check and add the message to the cache to prevent duplicates
+			if ok := cache.Add(msg); !ok {
+				return
+			}
+			// create a convenience variable for the identity of the sender
+			senderID := msg.Sender.Address.PublicKey
+			// try to cast the p2p message as a tx message
+			txMsg, ok := msg.Message.(*lib.TxMessage)
+			// if the cast failed
+			if !ok {
+				c.log.Warnf("Non-Tx message from %s", lib.BytesToTruncatedString(senderID))
+				c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
+				return
+			}
+			// if the message is empty
+			if txMsg == nil {
+				c.log.Warnf("Empty tx message from %s", lib.BytesToTruncatedString(senderID))
+				c.P2P.ChangeReputation(senderID, p2p.InvalidMsgRep)
+				return
+			}
+			// if the chain is syncing, just return without handling
+			if c.isSyncing.Load() {
+				return
+			}
+			// handle the transaction under the plugin
+			if err := c.HandleTransaction(txMsg.Tx); err != nil {
+				if err.Error() == lib.ErrTxFoundInMempool(crypto.HashString(txMsg.Tx)).Error() {
+					return
+				}
+				c.log.Warnf("Handle tx from %s failed with err: %s", lib.BytesToTruncatedString(senderID), err.Error())
+				c.P2P.ChangeReputation(senderID, p2p.InvalidTxRep)
+				return
+			}
+			c.log.Infof("Received valid transaction %s from %s for chain %d", crypto.ShortHashString(txMsg.Tx), lib.BytesToString(senderID)[:20], txMsg.ChainId)
+			// bump peer reputation positively
+			c.P2P.ChangeReputation(senderID, p2p.GoodTxRep)
+			// gossip the transaction to peers
+			if err := c.P2P.SendToPeers(Tx, msg.Message, lib.BytesToString(senderID)); err != nil {
+				c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
+			}
+		}()
+
+	}
+}
 
 // HandleTransaction() accepts or rejects inbound txs based on the mempool state
 // - pass through call checking indexer and mempool for duplicate

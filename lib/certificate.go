@@ -170,6 +170,54 @@ func (x *QuorumCertificate) Check(vs ValidatorSet, maxBlockSize int, view *View,
 	return x.Signature.Check(x, vs)
 }
 
+// CheckProposalBasic() does a basic validity check on the proposal inside the QC and returns the block structure
+func (x *QuorumCertificate) CheckProposalBasic(height, networkId, chainId uint64) (block *Block, err ErrorI) {
+	// ensure the block is not empty
+	if x.Block == nil {
+		return nil, ErrNilBlock()
+	}
+	// create a new block object reference to ensure a non nil result
+	block = new(Block)
+	// populate the block obj ref with the block bytes in the qc
+	if err = Unmarshal(x.Block, block); err != nil {
+		return
+	}
+	// perform stateless checks on the block
+	if err = block.Check(networkId, chainId); err != nil {
+		return
+	}
+	// enforce the target height
+	if x.Header.Height != height || x.Header.Height != block.BlockHeader.Height {
+		return nil, ErrWrongHeight()
+	}
+	// don't accept any blocks below the local height
+	if height > block.BlockHeader.Height {
+		return nil, ErrWrongHeight()
+	}
+	// ensure the Proposal.BlockHash corresponds to the actual hash of the block
+	blockHash, err := block.Hash()
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(x.BlockHash, blockHash) {
+		return nil, ErrMismatchHeaderBlockHash()
+	}
+	// ensure the results aren't empty
+	if x.Results == nil && x.Results.RewardRecipients != nil {
+		return nil, ErrNilCertResults()
+	}
+	// exit
+	return
+}
+
+// EqualPayloads() checks to ensure a comparable certificate has the same height, block hash and result hash
+func (x *QuorumCertificate) EqualPayloads(compare *QuorumCertificate) bool {
+	return x != nil && x.Header != nil &&
+		x.Header.Height == compare.Header.Height &&
+		bytes.Equal(x.BlockHash, compare.BlockHash) &&
+		bytes.Equal(x.ResultsHash, compare.ResultsHash)
+}
+
 // CheckHighQC() performs additional validation on the special `HighQC` (justify unlock QC)
 func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, lastRootHeightUpdated uint64, vs ValidatorSet) ErrorI {
 	isPartialQC, err := x.Check(vs, maxBlockSize, view, false)

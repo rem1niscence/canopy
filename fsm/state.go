@@ -72,7 +72,7 @@ func (s *StateMachine) Initialize(store lib.StoreI) (err lib.ErrorI) {
 // - executes `EndBlock`
 // - constructs and returns the block header, and the transaction results
 func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResults []*lib.TxResult, err lib.ErrorI) {
-	// catch incase there's a panic
+	// catch in case there's a panic
 	defer func() {
 		if r := recover(); r != nil {
 			s.log.Errorf(string(debug.Stack()))

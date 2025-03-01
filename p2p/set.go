@@ -99,7 +99,9 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 	ps.mustConnect = mustConnect
 	for _, peer := range ps.m {
 		peer.IsMustConnect = false
-		ps.changeIOCount(false, peer.IsOutbound)
+		if peer.IsMustConnect {
+			ps.changeIOCount(true, peer.IsOutbound)
+		}
 	}
 	// for each must connect
 	for _, peer := range mustConnect {
@@ -111,7 +113,7 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 		// if has peer, just update metadata
 		if p, found := ps.m[publicKey]; found {
 			ps.m[publicKey].IsMustConnect = true
-			ps.changeIOCount(true, p.IsOutbound)
+			ps.changeIOCount(false, p.IsOutbound)
 		} else { // else add to 'ToDial' list
 			toDial = append(toDial, peer)
 		}

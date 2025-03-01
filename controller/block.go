@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bytes"
+	"github.com/canopy-network/canopy/p2p"
 	"math/rand"
 	"time"
 
@@ -12,54 +13,164 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 )
 
-// ProduceProposal() uses the associated `plugin` to create a Proposal with the candidate block and the `bft` to populate the byzantine evidence
-func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypto.VDF) (blk []byte, results *lib.CertificateResult, err lib.ErrorI) {
+/* This file contains the high level functionality of block / proposal processing */
+
+// ListenForBlock() listens for inbound block messages, internally routes them, and gossips them to peers
+func (c *Controller) ListenForBlock() {
+	// log the beginning of the 'block listener' service
+	c.log.Debug("Listening for inbound blocks")
+	// initialize a cache that prevents duplicate messages
+	cache := lib.NewMessageCache()
+	// wait and execute for each inbound message received
+	for msg := range c.P2P.Inbox(Block) {
+		// create a variable to signal a 'stop loop'
+		var quit bool
+		// wrap in a function call to use 'defer' functionality
+		func() {
+			// lock the controller to prevent multi-thread conflicts
+			c.Lock()
+			// when iteration completes, unlock
+			defer c.Unlock()
+			// check and add the message to the cache to prevent duplicates
+			if ok := cache.Add(msg); !ok {
+				// if duplicate, exit iteration
+				return
+			}
+			// add a convenience variable to track the sender
+			sender := msg.Sender.Address.PublicKey
+			// log the receipt of the block message
+			c.log.Infof("Received new block from %s ✉️", lib.BytesToTruncatedString(sender))
+			// try to cast the message to a block message
+			blockMessage, ok := msg.Message.(*lib.BlockMessage)
+			// if cast fails (not a block message)
+			if !ok {
+				// log the error
+				c.log.Debug("Invalid Peer Block Message")
+				// slash the peer's reputation
+				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
+				// exit iteration
+				return
+			}
+			// track processing time for consensus module
+			startTime := time.Now()
+			// 'handle' the peer block and certificate appropriately
+			qc, err := c.HandlePeerBlock(blockMessage, false)
+			// ensure no error
+			if err != nil {
+				// if the node has fallen 'out of sync' with the chain
+				if err == lib.ErrOutOfSync() {
+					// log the 'out of sync' message
+					c.log.Warnf("Node fell out of sync for chainId: %d", blockMessage.ChainId)
+					// revert to syncing mode
+					go c.Sync()
+					// signal exit the out loop
+					quit = true
+					// exit iteration
+					return
+				}
+				// log the error
+				c.log.Warnf("Peer block invalid:\n%s", err.Error())
+				// slash the peer's reputation
+				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
+				// exit iteration
+				return
+			}
+			// gossip the block to our peers
+			c.GossipBlock(qc, sender)
+			// signal a reset to the bft module
+			c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
+		}()
+		// if quit signaled
+		if quit {
+			// exit the loop
+			return
+		}
+	}
+}
+
+// PUBLISHERS BELOW
+
+// GossipBlockMsg() gossips a certificate (with block) through the P2P network for a specific chainId
+func (c *Controller) GossipBlock(certificate *lib.QuorumCertificate, senderPubToExclude []byte) {
+	// log the start of the gossip block function
+	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(certificate.ResultsHash))
+	// create the block message to gossip
+	blockMessage := &lib.BlockMessage{
+		ChainId:             c.Config.ChainId,
+		MaxHeight:           c.FSM.Height(),
+		TotalVdfIterations:  c.FSM.TotalVDFIterations(),
+		BlockAndCertificate: certificate,
+	}
+	// send the block message to all peers excluding the sender (gossip)
+	if err := c.P2P.SendToPeers(Block, blockMessage, lib.BytesToString(senderPubToExclude)); err != nil {
+		c.log.Errorf("unable to gossip block with err: %s", err.Error())
+	}
+}
+
+// SelfSendBlock() gossips a QuorumCertificate (with block) through the P2P network for handling
+func (c *Controller) SelfSendBlock(certificate *lib.QuorumCertificate) {
+	// create the block message
+	blockMessage := &lib.BlockMessage{
+		ChainId:             c.Config.ChainId,
+		MaxHeight:           c.FSM.Height(),
+		TotalVdfIterations:  c.FSM.TotalVDFIterations(),
+		BlockAndCertificate: certificate,
+	}
+	// internally route the block to the 'block inbox'
+	if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
+		c.log.Errorf("unable to gossip block with err: %s", err.Error())
+	}
+}
+
+// BFT FUNCTIONS BELOW
+
+// ProduceProposal() create a proposal in the form of a `block` and `certificate result` for the bft process
+func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypto.VDF) (blockBytes []byte, results *lib.CertificateResult, err lib.ErrorI) {
+	c.log.Debugf("Producing proposal as leader")
 	// configure the FSM in 'consensus mode' for validator proposals
 	resetProposalConfig := c.SetFSMInConsensusModeForProposals()
 	// once done proposing, 'reset' the proposal mode back to default to 'accept all'
 	defer func() { resetProposalConfig(); c.FSM.Reset() }()
 	// load the previous quorum height quorum certificate from the indexer
-	lastQC, err := c.FSM.LoadCertificateHashesOnly(c.FSM.Height() - 1)
+	lastCertificate, err := c.FSM.LoadCertificateHashesOnly(c.FSM.Height() - 1)
 	if err != nil {
 		return
 	}
-	// re-validate all transactions in the mempool as a 'double check' to ensure all transactions being proposed are valid
-	c.Mempool.checkMempool()
-	// get the maximum possible size of the block as defined by the governance parameters of the state machine
-	maxBlockSize, err := c.FSM.GetMaxBlockSize()
-	if err != nil {
-		// return error
-		return
-	}
-	// get the maximum amount of transactions allowed or available in the mempool
-	transactions, _ := c.Mempool.GetTransactions(maxBlockSize - lib.MaxBlockHeaderSize)
 	// validate the verifiable delay function from the bft module
 	if vdf != nil {
 		// if the verifiable delay function is NOT valid for using the last block hash
-		if !crypto.VerifyVDF(lastQC.BlockHash, vdf.Output, vdf.Proof, int(vdf.Iterations)) {
+		if !crypto.VerifyVDF(lastCertificate.BlockHash, vdf.Output, vdf.Proof, int(vdf.Iterations)) {
 			// nullify the bad VDF
 			vdf = nil
 			// log the issue but still continue with the proposal
 			c.log.Error(lib.ErrInvalidVDF().Error())
 		}
 	}
-	// create the actual block structure
+	// re-validate all transactions in the mempool as a 'double check' to ensure all transactions being proposed are valid
+	c.Mempool.checkMempool()
+	// get the maximum possible size of the block as defined by the governance parameters of the state machine
+	maxBlockSize, err := c.FSM.GetMaxBlockSize()
+	if err != nil {
+		// exit with error
+		return
+	}
+	// create the actual block structure with the maximum amount of transactions allowed or available in the mempool
 	block := &lib.Block{
-		BlockHeader:  &lib.BlockHeader{Time: uint64(time.Now().UnixMicro()), ProposerAddress: c.Address, LastQuorumCertificate: lastQC, Vdf: vdf},
-		Transactions: transactions,
+		BlockHeader:  &lib.BlockHeader{Time: uint64(time.Now().UnixMicro()), ProposerAddress: c.Address, LastQuorumCertificate: lastCertificate, Vdf: vdf},
+		Transactions: c.Mempool.GetTransactions(maxBlockSize - lib.MaxBlockHeaderSize),
 	}
 	// capture the tentative block result using a new object reference
 	blockResult := new(lib.BlockResult)
 	// apply the block against the state machine and populate the resulting merkle `roots` in the block header
 	block.BlockHeader, blockResult.Transactions, err = c.FSM.ApplyBlock(block)
 	if err != nil {
-		// return error
+		// exit with error
 		return
 	}
 	// convert the block reference to bytes
-	blk, err = lib.Marshal(block)
+	blockBytes, err = lib.Marshal(block)
 	if err != nil {
-		// return error
+		// exit with error
 		return
 	}
 	// update the 'block results' with the newly created header
@@ -70,182 +181,260 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 	return
 }
 
-// ValidateProposal() fully validates the proposal and resets back to begin block state
+// ValidateProposal() fully validates a proposal in the form of a quorum certificate and resets back to begin block state
 func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (err lib.ErrorI) {
-	// the base chain has specific logic to approve or reject proposals
-	reset := c.SetFSMInConsensusModeForProposals()
-	defer func() { reset(); c.FSM.Reset() }()
-	// load the store (db) object
-	storeI := c.FSM.Store().(lib.StoreI)
-	// perform stateless validations on the block and evidence
-	block, err := c.ValidateProposalBasic(qc, evidence)
+	// log the beginning of proposal validation
+	c.log.Debugf("Validating proposal from leader")
+	// configure the FSM in 'consensus mode' for validator proposals
+	resetProposalConfig := c.SetFSMInConsensusModeForProposals()
+	// once done proposing, 'reset' the proposal mode back to default to 'accept all'
+	defer func() { resetProposalConfig(); c.FSM.Reset() }()
+	// ensure the proposal inside the quorum certificate is valid at a stateless level
+	block, err := qc.CheckProposalBasic(c.FSM.Height(), c.Config.NetworkID, c.Config.ChainId)
 	if err != nil {
-		return err
+		// exit with error
+		return
 	}
-	// update the LastQuorumCertificate in the store
-	//- this is to ensure that each node has the same COMMIT QC for the last block as multiple valid versions (a few less signatures) of the same QC could exist
-	// NOTE: this should come before ApplyAndValidateBlock in order to have the proposers 'LastQc' which is used for distributing rewards
-	if block.BlockHeader.Height != 1 {
-		c.log.Debugf("Indexing last quorum certificate for height %d", block.BlockHeader.LastQuorumCertificate.Header.Height)
-		if err = storeI.IndexQC(block.BlockHeader.LastQuorumCertificate); err != nil {
-			return err
-		}
+	// validate the byzantine evidence portion of the proposal (bft is canopy controlled)
+	if err = c.Consensus.ValidateByzantineEvidence(qc.Results.SlashRecipients, evidence); err != nil {
+		// exit with error
+		return
 	}
-	// play the block against the state machine
+	// play the block against the state machine to generate a block result
 	blockResult, err := c.ApplyAndValidateBlock(block, false)
 	if err != nil {
+		// exit with error
 		return
 	}
 	// create a comparable certificate results (includes reward recipients, slash recipients, swap commands, etc)
 	compareResults := c.NewCertificateResults(block, blockResult, evidence)
 	// ensure generated the same results
 	if !qc.Results.Equals(compareResults) {
+		// exit with error
 		return types.ErrMismatchCertResults()
 	}
+	// exit
 	return
 }
 
-// CommitCertificate used after consensus decides on a block
+// CommitCertificate() is executed after the quorum agrees on a block
 // - applies block against the fsm
 // - indexes the block and its transactions
 // - removes block transactions from mempool
 // - re-checks all transactions in mempool
 // - atomically writes all to the underlying db
-// - sets up the app for the next height
-func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate) lib.ErrorI {
-	// reset the store once this code finishes
-	// NOTE: if code execution gets to `store.Commit()` - this will effectively be a noop
+// - sets up the controller for the next height
+func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block) (err lib.ErrorI) {
+	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
 	defer func() { c.FSM.Reset() }()
+	// log the beginning of the commit
 	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.ResultsHash))
-	// load the store (db) object
+	// cast the store to ensure the proper store type to complete this operation
 	storeI := c.FSM.Store().(lib.StoreI)
-	// convert the proposal.block (bytes) into Block structure
-	blk := new(lib.Block)
-	if err := lib.Unmarshal(qc.Block, blk); err != nil {
-		return err
-	}
-	// update the LastQuorumCertificate in the store
-	//- this is to ensure that each node has the same COMMIT QC for the last block as multiple valid versions (a few less signatures) of the same QC could exist
-	// NOTE: this should come before ApplyAndValidateBlock in order to have the proposers 'LastQc' which is used for distributing rewards
-	if blk.BlockHeader.Height != 1 {
-		c.log.Debugf("Indexing last quorum certificate for height %d", blk.BlockHeader.LastQuorumCertificate.Header.Height)
-		if err := storeI.IndexQC(blk.BlockHeader.LastQuorumCertificate); err != nil {
-			return err
-		}
-	}
 	// apply the block against the state machine
-	blockResult, err := c.ApplyAndValidateBlock(blk, true)
+	blockResult, err := c.ApplyAndValidateBlock(block, true)
 	if err != nil {
-		return err
+		// exit with error
+		return
 	}
+	// log indexing the quorum certificate
+	c.log.Debugf("Indexing certificate for height %d", qc.Header.Height)
 	// index the quorum certificate in the store
-	c.log.Debugf("Indexing quorum certificate for height %d", qc.Header.Height)
 	if err = storeI.IndexQC(qc); err != nil {
-		return err
+		// exit with error
+		return
 	}
+	// log indexing the block
+	c.log.Debugf("Indexing block %d", block.BlockHeader.Height)
 	// index the block in the store
-	c.log.Debugf("Indexing block %d", blk.BlockHeader.Height)
 	if err = storeI.IndexBlock(blockResult); err != nil {
-		return err
+		// exit with error
+		return
 	}
-	// delete the block transactions in the mempool
-	for _, tx := range blk.Transactions {
-		c.log.Debugf("Tx %s was included in a block so removing from mempool", crypto.HashString(tx))
+	// for each transaction included in the block
+	for _, tx := range block.Transactions {
+		// delete each transaction from the mempool
 		c.Mempool.DeleteTransaction(tx)
 	}
 	// rescan mempool to ensure validity of all transactions
-	c.log.Debug("Checking mempool for newly invalid transactions")
 	c.Mempool.checkMempool()
 	// parse committed block for straw polls
 	c.FSM.ParsePollTransactions(blockResult)
-	// atomically write this to the store
+	// log the start of the commit
 	c.log.Debug("Committing to store")
+	// atomically write all from the ephemeral database batch to the actual database
 	if _, err = storeI.Commit(); err != nil {
-		return err
+		// exit with error
+		return
 	}
-	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToString(qc.ResultsHash), blk.BlockHeader.Height)
-	c.log.Debug("Setting up FSM for next height")
+	// log to signal finishing the commit
+	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToString(qc.ResultsHash), block.BlockHeader.Height)
+	// set up the finite state machine for the next height
 	c.FSM, err = fsm.New(c.Config, storeI, c.log)
 	if err != nil {
-		return err
+		// exit with error
+		return
 	}
-	c.log.Debug("Setting up Mempool for next height")
+	// set up the mempool for the next height
 	if c.Mempool.FSM, err = c.FSM.Copy(); err != nil {
-		return err
+		// exit with error
+		return
 	}
+	// execute 'begin block' on mempool FSM to play the inbound transactions at the proper phase of the lifecycle
 	if err = c.Mempool.FSM.BeginBlock(); err != nil {
-		return err
+		// exit with error
+		return
 	}
-	c.log.Debug("Commit done")
-	return nil
+	// exit
+	return
 }
 
-// ApplyAndValidateBlock() plays the block against the State Machine and
-// compares the block header against a results from the state machine
-func (c *Controller) ApplyAndValidateBlock(b *lib.Block, commit bool) (*lib.BlockResult, lib.ErrorI) {
-	// basic structural checks on the block
-	if err := b.Check(c.Config.NetworkID, c.Config.ChainId); err != nil {
-		return nil, err
+// INTERNAL HELPERS BELOW
+
+// ApplyAndValidateBlock() plays the block against the state machine and compares the block header against a results from the state machine
+func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *lib.BlockResult, err lib.ErrorI) {
+	// define convenience variables for the block header, hash, and height
+	candidate, candidateHash, candidateHeight := block.BlockHeader, lib.BytesToString(block.BlockHeader.Hash), block.BlockHeader.Height
+	// check the last qc in the candidate and set it in the ephemeral indexer to prepare for block application
+	if err = c.CheckAndSetLastCertificate(candidate); err != nil {
+		// exit with error
+		return
 	}
-	// define convenience variables
-	blockHash, blockHeight := lib.BytesToString(b.BlockHeader.Hash), b.BlockHeader.Height
+	// log the start of 'apply block'
+	c.log.Debugf("Applying block %s for height %d", candidateHash, candidateHeight)
 	// apply the block against the state machine
-	c.log.Debugf("Applying block %s for height %d", blockHash, blockHeight)
-	header, txResults, err := c.FSM.ApplyBlock(b)
+	compare, txResults, err := c.FSM.ApplyBlock(block)
+	if err != nil {
+		// exit with error
+		return
+	}
+	// compare the block headers for equality
+	compareHash, err := compare.SetHash()
+	if err != nil {
+		// exit with error
+		return
+	}
+	// use the hash to compare two block headers for equality
+	if !bytes.Equal(compareHash, candidate.Hash) {
+		return nil, lib.ErrUnequalBlockHash()
+	}
+	// validate VDF if committing randomly since this randomness is pseudo-non-deterministic (among nodes)
+	if commit && candidate.Vdf != nil {
+		// this design has similar security guarantees but lowers the computational requirements at a per-node basis
+		if rand.Intn(100) == 0 {
+			// validate the VDF included in the block
+			if !crypto.VerifyVDF(candidate.LastBlockHash, candidate.Vdf.Output, candidate.Vdf.Proof, int(candidate.Vdf.Iterations)) {
+				// exit with vdf error
+				return nil, lib.ErrInvalidVDF()
+			}
+		}
+	}
+	// log that the proposal is valid
+	c.log.Infof("Block %s with %d txs is valid for height %d ✅ ", candidateHash, len(block.Transactions), candidateHeight)
+	// exit with the valid results
+	return &lib.BlockResult{BlockHeader: candidate, Transactions: txResults}, nil
+}
+
+// HandlePeerBlock() validates and handles inbound Quorum Certificates from remote peers
+func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (qc *lib.QuorumCertificate, err lib.ErrorI) {
+	c.log.Info("Handling peer block")
+	// define a convenience variable for certificate
+	qc = msg.BlockAndCertificate
+	// do a basic validation on the QC before loading the committee
+	if err = qc.CheckBasic(); err != nil {
+		return
+	}
+	// load the committee using the canopy height from the root-Chain
+	// upon independence, this check for the validator set will be ignored
+	// and checkpoints will be used instead
+	v, err := c.Consensus.LoadCommittee(qc.Header.RootHeight)
+	if err != nil {
+		return
+	}
+	// validate the quorum certificate
+	isPartialQC, err := qc.Check(v, c.LoadMaxBlockSize(), &lib.View{NetworkId: c.Config.NetworkID, ChainId: c.Config.ChainId}, false)
 	if err != nil {
 		return nil, err
 	}
-	// compare the resulting header against the block header (should be identical)
-	c.log.Debugf("Validating block header %s for height %d", blockHash, blockHeight)
-	if err = c.CompareBlockHeaders(b.BlockHeader, header, commit); err != nil {
-		return nil, err
+	// if the quorum certificate doesn't have a +2/3rds majority
+	if isPartialQC {
+		return nil, lib.ErrNoMaj23()
 	}
-	// return a valid block result
-	c.log.Infof("Block %s with %d txs is valid for height %d ✅ ", blockHash, len(b.Transactions), blockHeight)
-	return &lib.BlockResult{
-		BlockHeader:  b.BlockHeader,
-		Transactions: txResults,
-	}, nil
+	// ensure the proposal inside the quorum certificate is valid at a stateless level
+	block, err := qc.CheckProposalBasic(c.FSM.Height(), c.Config.NetworkID, c.Config.ChainId)
+	if err != nil {
+		// exit with err
+		return
+	}
+	// if this certificate isn't finalized
+	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
+		return nil, lib.ErrWrongPhase()
+	}
+	// use checkpoints to protect against long-range attacks
+	if qc.Header.Height%CheckpointFrequency == 0 {
+		// get the checkpoint from the base chain (or file if independent)
+		checkpoint, e := c.RootChainInfo.GetCheckpoint(qc.Header.Height, c.Config.ChainId)
+		if e != nil {
+			c.log.Warnf(e.Error())
+			// continue
+		}
+		// if checkpoint fails
+		if len(checkpoint) != 0 && !bytes.Equal(qc.BlockHash, checkpoint) {
+			c.log.Fatalf("Invalid checkpoint %s vs %s at height %d", lib.BytesToString(qc.BlockHash), checkpoint, qc.Header.Height)
+		}
+	}
+	// don't accept any blocks greater than 'max height'
+	if block.BlockHeader.Height > msg.MaxHeight {
+		err = lib.ErrWrongMaxHeight()
+		return
+	}
+	if !syncing && c.FSM.Height() != block.BlockHeader.Height {
+		err = lib.ErrOutOfSync()
+		return
+	}
+	// attempts to commit the QC to persistence of chain by playing it against the state machine
+	if err = c.CommitCertificate(qc, block); err != nil {
+		return
+	}
+	// if self was he proposer
+	if bytes.Equal(qc.ProposerKey, c.PublicKey) && !c.isSyncing.Load() {
+		// send the proposal (reward) transaction
+		c.SendCertificateResultsTx(qc)
+	}
+	return
 }
 
-// CompareBlockHeaders() compares two block headers for equality and validates the last quorum certificate and block time
-func (c *Controller) CompareBlockHeaders(candidate *lib.BlockHeader, compare *lib.BlockHeader, commit bool) lib.ErrorI {
-	// compare the block headers for equality
-	hash, e := compare.SetHash()
-	if e != nil {
-		return e
-	}
-	if !bytes.Equal(hash, candidate.Hash) {
-		return lib.ErrUnequalBlockHash()
-	}
-	// validate the last quorum certificate of the block header
-	// by using the historical committee
+// CheckAndSetLastCertificate() validates the last quorum certificate included in the block and sets it in the ephemeral indexer
+// NOTE: This must come before ApplyBlock in order to have the proposers 'lastCertificate' which is used for distributing rewards
+func (c *Controller) CheckAndSetLastCertificate(candidate *lib.BlockHeader) lib.ErrorI {
 	if candidate.Height > 2 {
+		// load the last quorum certificate from state
 		lastCertificate, err := c.FSM.LoadCertificateHashesOnly(candidate.Height - 1)
+		// if an error occurred
 		if err != nil {
+			// exit with error
 			return err
 		}
-		// validate the expected QC hash
-		if candidate.LastQuorumCertificate == nil ||
-			candidate.LastQuorumCertificate.Header == nil ||
-			!bytes.Equal(candidate.LastQuorumCertificate.BlockHash, lastCertificate.BlockHash) ||
-			!bytes.Equal(candidate.LastQuorumCertificate.ResultsHash, lastCertificate.ResultsHash) {
+		// ensure the candidate 'last certificate' is for the same block and result as the expected
+		if !candidate.LastQuorumCertificate.EqualPayloads(lastCertificate) {
+			// exit with error
 			return lib.ErrInvalidLastQuorumCertificate()
 		}
-		// load the committee for the last qc
-		committeeHeight := candidate.LastQuorumCertificate.Header.RootHeight
-		vs, err := c.LoadCommittee(committeeHeight)
+		// define a convenience variable for the 'root height'
+		rHeight := candidate.LastQuorumCertificate.Header.RootHeight
+		// get the committee from the 'root chain'
+		vs, err := c.LoadCommittee(rHeight)
 		if err != nil {
+			// exit with error
 			return err
 		}
-		// check the last QC
+		// ensure the last quorum certificate is valid
 		isPartialQC, err := candidate.LastQuorumCertificate.Check(vs, 0, &lib.View{
-			Height:     candidate.Height - 1,
-			RootHeight: committeeHeight,
-			NetworkId:  c.Config.NetworkID,
-			ChainId:    c.Config.ChainId,
+			Height: candidate.Height - 1, RootHeight: rHeight, NetworkId: c.Config.NetworkID, ChainId: c.Config.ChainId,
 		}, true)
+		// if the check failed
 		if err != nil {
+			// exit with error
 			return err
 		}
 		// ensure is a full +2/3rd maj QC
@@ -253,89 +442,13 @@ func (c *Controller) CompareBlockHeaders(candidate *lib.BlockHeader, compare *li
 			return lib.ErrNoMaj23()
 		}
 	}
-	// validate VDF
-	if candidate.Vdf != nil {
-		// if syncing or committing - only verify the vdf randomly since this randomness is pseudo-non-deterministic (among nodes) this holds
-		// similar security guarantees but lowers the computational requirements at a per-node basis
-		if !commit || rand.Intn(100) == 0 {
-			if !crypto.VerifyVDF(candidate.LastQuorumCertificate.BlockHash, candidate.Vdf.Output, candidate.Vdf.Proof, int(candidate.Vdf.Iterations)) {
-				return lib.ErrInvalidVDF()
-			}
-		}
+	// update the LastQuorumCertificate in the ephemeral store to ensure deterministic last-COMMIT-QC (multiple valid versions can exist)
+	if err := c.FSM.Store().(lib.StoreI).IndexQC(candidate.LastQuorumCertificate); err != nil {
+		// exit with error
+		return err
 	}
+	// exit
 	return nil
-}
-
-// ValidateProposalBasic() performs basic structural validates the proposal and resets back to begin block state
-func (c *Controller) ValidateProposalBasic(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (blk *lib.Block, err lib.ErrorI) {
-	// validate the byzantine evidence portion of the proposal (bft is canopy controlled)
-	if err = c.Consensus.ValidateByzantineEvidence(qc.Results.SlashRecipients, evidence); err != nil {
-		return nil, err
-	}
-	// ensure the block is not empty
-	if qc.Block == nil {
-		return nil, lib.ErrNilBlock()
-	}
-	// ensure the results aren't empty
-	if qc.Results == nil && qc.Results.RewardRecipients != nil {
-		return nil, lib.ErrNilCertResults()
-	}
-	// convert the block bytes into a Canopy block structure
-	blk = new(lib.Block)
-	if err = lib.Unmarshal(qc.Block, blk); err != nil {
-		return
-	}
-	// basic structural validations of the block
-	if err = blk.Check(c.Config.NetworkID, c.Config.ChainId); err != nil {
-		return
-	}
-	// ensure the Proposal.BlockHash corresponds to the actual hash of the block
-	blockHash, e := blk.Hash()
-	if e != nil {
-		return nil, e
-	}
-	if !bytes.Equal(qc.BlockHash, blockHash) {
-		return nil, lib.ErrMismatchHeaderBlockHash()
-	}
-	return
-}
-
-// CheckPeerQc() performs a basic checks on a block received from a peer and returns if the self is out of sync
-func (c *Controller) CheckPeerQC(maxHeight uint64, qc *lib.QuorumCertificate) (stillCatchingUp bool, err lib.ErrorI) {
-	// convert the proposal block bytes into a block structure
-	blk := new(lib.Block)
-	if err = lib.Unmarshal(qc.Block, blk); err != nil {
-		return
-	}
-	// ensure the unmarshalled block is not nil
-	if blk == nil || blk.BlockHeader == nil {
-		return false, lib.ErrNilBlock()
-	}
-	// get the hash from the block
-	hash, err := blk.Hash()
-	if err != nil {
-		return false, err
-	}
-	// ensure the Proposal.BlockHash corresponds to the actual hash of the block
-	if !bytes.Equal(qc.BlockHash, hash) {
-		err = lib.ErrMismatchQCBlockHash()
-		return
-	}
-	// check the height of the block
-	h := c.FSM.Height()
-	// don't accept any blocks below the local height
-	if h > blk.BlockHeader.Height {
-		err = lib.ErrWrongMaxHeight()
-		return
-	}
-	// don't accept any blocks greater than 'max height'
-	if blk.BlockHeader.Height > maxHeight {
-		err = lib.ErrWrongMaxHeight()
-		return
-	}
-	// height of this block is not local height, the node is still catching up
-	stillCatchingUp = h != blk.BlockHeader.Height
-	return
 }
 
 // SetFSMInConsensusModeForProposals() is how the Validator is configured for `base chain` specific parameter upgrades
