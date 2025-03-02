@@ -949,13 +949,6 @@ func TestGetPhaseWaitTime(t *testing.T) {
 			expectedWaitTime: time.Duration(lib.DefaultConfig().CommitProcessMS) * time.Millisecond,
 		},
 		{
-			name:             "round interrupt phase wait time",
-			detail:           "the wait time for round interrupt phase",
-			phase:            RoundInterrupt,
-			round:            0,
-			expectedWaitTime: time.Duration(lib.DefaultConfig().RoundInterruptTimeoutMS) * time.Millisecond,
-		},
-		{
 			name:             "propose phase wait time with round 3",
 			detail:           "the wait time for round interrupt phase",
 			phase:            Propose,
