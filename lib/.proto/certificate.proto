@@ -121,6 +121,8 @@ message PaymentPercents {
   bytes address = 1;
   // percent: the dilutable share of the committee treasury pool
   uint64 percent = 2;
+  // chain_id: the chain_id where the payment is distributed
+  uint64 chain_id = 3;
 }
 
 // DoubleSigner identifies a validator who has been caught double signing and should be slashed

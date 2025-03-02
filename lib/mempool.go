@@ -14,7 +14,7 @@ type Mempool interface {
 	Contains(hash string) bool                                       // whether the mempool has this transaction already (de-duplicated by hash)
 	AddTransaction(tx []byte, fee uint64) (recheck bool, err ErrorI) // insert new unconfirmed transaction
 	DeleteTransaction(tx []byte)                                     // delete unconfirmed transaction
-	GetTransactions(maxBytes uint64) ([][]byte, int)                 // retrieve transactions from the highest fee to lowest
+	GetTransactions(maxBytes uint64) [][]byte                        // retrieve transactions from the highest fee to lowest
 
 	Clear()              // reset the entire store
 	TxCount() int        // number of Transactions in the pool
@@ -102,7 +102,7 @@ func (f *FeeMempool) AddTransaction(tx []byte, fee uint64) (recheck bool, err Er
 }
 
 // GetTransactions() returns a list of the Transactions from the pool up to 'max collective Transaction bytes'
-func (f *FeeMempool) GetTransactions(maxBytes uint64) (txs [][]byte, count int) {
+func (f *FeeMempool) GetTransactions(maxBytes uint64) (txs [][]byte) {
 	totalBytes := uint64(0)
 	for _, tx := range f.pool.s {
 		txBytes := len(tx.Tx)
@@ -114,7 +114,6 @@ func (f *FeeMempool) GetTransactions(maxBytes uint64) (txs [][]byte, count int) 
 		}
 		// add the tx to the list and increment totalTxs
 		txs = append(txs, tx.Tx)
-		count++
 	}
 	return
 }

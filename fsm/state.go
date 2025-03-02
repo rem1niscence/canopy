@@ -72,7 +72,7 @@ func (s *StateMachine) Initialize(store lib.StoreI) (err lib.ErrorI) {
 // - executes `EndBlock`
 // - constructs and returns the block header, and the transaction results
 func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResults []*lib.TxResult, err lib.ErrorI) {
-	// catch incase there's a panic
+	// catch in case there's a panic
 	defer func() {
 		if r := recover(); r != nil {
 			s.log.Errorf(string(debug.Stack()))
@@ -248,6 +248,10 @@ func (s *StateMachine) LoadCertificate(height uint64) (*lib.QuorumCertificate, l
 
 // LoadCertificateHashesOnly() loads a quorum certificate but nullifies the block
 func (s *StateMachine) LoadCertificateHashesOnly(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
+	// ensure the 'load height' is not genesis
+	if height <= 1 {
+		height = 1
+	}
 	// load the quorum certificate at a specific height
 	qc, err := s.LoadCertificate(height)
 	if err != nil {

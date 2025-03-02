@@ -51,7 +51,7 @@ func newTestValSet(t *testing.T, numValidators int) (valSet ValSet, valKeys []cr
 		consensusValidators lib.ConsensusValidators
 		// DETERMINISTIC / HARDCODED KEYS USED FOR TESTING - MODIFICATION MAY BREAK TESTS
 		keys = []string{
-			"01553a101301cd7019b78ffa1186842dd93923e563b8ae22e2ab33ae889b23ee",
+			"00453a101301cd7019b78ffa1186842dd93923e563b8ae22e2ab33ae889b23ee",
 			"1b6b244fbdf614acb5f0d00a2b56ffcbe2aa23dabd66365dffcd3f06491ae50a",
 			"2ee868f74134032eacba191ca529115c64aa849ac121b75ca79b37420a623036",
 			"3e3ab94c10159d63a12cb26aca4b0e76070a987d49dd10fc5f526031e05801da",
@@ -511,6 +511,7 @@ func (t *testController) ProduceProposal(_ *ByzantineEvidence, _ *crypto.VDF) (b
 		RewardRecipients: &lib.RewardRecipients{
 			PaymentPercents: []*lib.PaymentPercents{{
 				Address: crypto.Hash([]byte("mock"))[:20],
+				ChainId: lib.CanopyChainId,
 				Percent: 100,
 			}},
 		},

@@ -170,6 +170,54 @@ func (x *QuorumCertificate) Check(vs ValidatorSet, maxBlockSize int, view *View,
 	return x.Signature.Check(x, vs)
 }
 
+// CheckProposalBasic() does a basic validity check on the proposal inside the QC and returns the block structure
+func (x *QuorumCertificate) CheckProposalBasic(height, networkId, chainId uint64) (block *Block, err ErrorI) {
+	// ensure the block is not empty
+	if x.Block == nil {
+		return nil, ErrNilBlock()
+	}
+	// create a new block object reference to ensure a non nil result
+	block = new(Block)
+	// populate the block obj ref with the block bytes in the qc
+	if err = Unmarshal(x.Block, block); err != nil {
+		return
+	}
+	// perform stateless checks on the block
+	if err = block.Check(networkId, chainId); err != nil {
+		return
+	}
+	// enforce the target height
+	if x.Header.Height != height || x.Header.Height != block.BlockHeader.Height {
+		return nil, ErrWrongHeight()
+	}
+	// don't accept any blocks below the local height
+	if height > block.BlockHeader.Height {
+		return nil, ErrWrongHeight()
+	}
+	// ensure the Proposal.BlockHash corresponds to the actual hash of the block
+	blockHash, err := block.Hash()
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(x.BlockHash, blockHash) {
+		return nil, ErrMismatchHeaderBlockHash()
+	}
+	// ensure the results aren't empty
+	if x.Results == nil && x.Results.RewardRecipients != nil {
+		return nil, ErrNilCertResults()
+	}
+	// exit
+	return
+}
+
+// EqualPayloads() checks to ensure a comparable certificate has the same height, block hash and result hash
+func (x *QuorumCertificate) EqualPayloads(compare *QuorumCertificate) bool {
+	return x != nil && x.Header != nil &&
+		x.Header.Height == compare.Header.Height &&
+		bytes.Equal(x.BlockHash, compare.BlockHash) &&
+		bytes.Equal(x.ResultsHash, compare.ResultsHash)
+}
+
 // CheckHighQC() performs additional validation on the special `HighQC` (justify unlock QC)
 func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, lastRootHeightUpdated uint64, vs ValidatorSet) ErrorI {
 	isPartialQC, err := x.Check(vs, maxBlockSize, view, false)
@@ -300,32 +348,6 @@ func (x *CertificateResult) Hash() []byte {
 	return crypto.Hash(bz)
 }
 
-// AwardPercents() adds reward distribution PaymentPercent samples to the CertificateResult structure
-// NOTE: percents should not exceed 100% in a single sample
-func (x *CertificateResult) AwardPercents(percents []*PaymentPercents) ErrorI {
-	x.RewardRecipients.NumberOfSamples++
-	for _, ep := range percents {
-		x.addPercents(ep.Address, ep.Percent)
-	}
-	return nil
-}
-
-// addPercents() is a helper function that adds reward distribution percents on behalf of an address
-func (x *CertificateResult) addPercents(address []byte, percent uint64) {
-	// check to see if the address already has samples
-	for i, ep := range x.RewardRecipients.PaymentPercents {
-		if bytes.Equal(address, ep.Address) {
-			x.RewardRecipients.PaymentPercents[i].Percent += ep.Percent
-			return
-		}
-	}
-	// if not, append a sample to PaymentPercents
-	x.RewardRecipients.PaymentPercents = append(x.RewardRecipients.PaymentPercents, &PaymentPercents{
-		Address: address,
-		Percent: percent,
-	})
-}
-
 // REWARD RECIPIENT CODE BELOW
 
 // CheckBasic() performs a basic 'sanity check' on the structure
@@ -335,29 +357,30 @@ func (x *RewardRecipients) CheckBasic() (err ErrorI) {
 	}
 	// validate the number of recipients
 	paymentRecipientCount := len(x.PaymentPercents)
-	// ensure not zero or bigger than 25
-	if paymentRecipientCount == 0 || paymentRecipientCount > 25 {
+	// ensure not zero or bigger than 100
+	if paymentRecipientCount == 0 || paymentRecipientCount > 100 {
 		return ErrPaymentRecipientsCount()
 	}
-	// validate the percents add up to 100 (or less)
-	totalPercent := uint64(0)
+	// create a map to ensure the payment percents don't exceed 100% per chain
+	chainMap := make(map[uint64]uint64)
+	// for each payment percent
 	for _, pp := range x.PaymentPercents {
 		// ensure each percent isn't nil
 		if pp == nil {
 			return ErrInvalidPercentAllocation()
 		}
+		// ensure the payment percent chain id is valid
+		if pp.ChainId == 0 {
+			return ErrEmptyChainId()
+		}
 		// ensure each percent address is the right size
 		if len(pp.Address) != crypto.AddressSize {
 			return ErrInvalidAddress()
 		}
-		// ensure each percent isn't 0
-		if pp.Percent == 0 {
-			return ErrInvalidPercentAllocation()
-		}
-		// add to total
-		totalPercent += pp.Percent
+		// add to total percent
+		chainMap[pp.ChainId] += pp.Percent
 		// ensure the percent doesn't exceed 100
-		if totalPercent > 100 {
+		if chainMap[pp.ChainId] > 100 {
 			return ErrInvalidPercentAllocation()
 		}
 	}
@@ -415,27 +438,29 @@ func (x *RewardRecipients) MarshalJSON() ([]byte, error) {
 
 // PAYMENT PERCENTS CODE BELOW
 
-// paymentPercents is the PaymentPercents implementation of json.Marshaller and json.Unmarshaler
-type paymentPercents struct {
+// jsonPaymentPercents is the PaymentPercents implementation of json.Marshaller and json.Unmarshaler
+type jsonPaymentPercents struct {
 	Address  HexBytes `json:"address"`
 	Percents uint64   `json:"percents"`
+	ChainId  uint64   `json:"chainId"`
 }
 
 // MarshalJSON() satisfies the json.Marshaller interface
 func (x *PaymentPercents) MarshalJSON() ([]byte, error) {
-	return json.Marshal(paymentPercents{
+	return json.Marshal(jsonPaymentPercents{
 		Address:  x.Address,
 		Percents: x.Percent,
+		ChainId:  x.ChainId,
 	})
 }
 
 // UnmarshalJSON() satisfies the json.Unmarshaler interface
 func (x *PaymentPercents) UnmarshalJSON(b []byte) error {
-	var ep paymentPercents
-	if err := json.Unmarshal(b, &ep); err != nil {
+	var pp jsonPaymentPercents
+	if err := json.Unmarshal(b, &pp); err != nil {
 		return err
 	}
-	x.Address, x.Percent = ep.Address, ep.Percents
+	x.Address, x.Percent, x.ChainId = pp.Address, pp.Percents, pp.ChainId
 	return nil
 }
 
@@ -628,17 +653,21 @@ func (x *Checkpoint) Equals(y *Checkpoint) bool {
 
 // Combine() merges the Reward Recipients' Payment Percents of the current Proposal with those of another Proposal
 // such that the Payment Percentages may be equally weighted when performing reward distribution calculations
-// NOTE: percents will exceed 100% over multiple samples, but are normalized using the NumberOfSamples field
-func (x *CommitteeData) Combine(data *CommitteeData) ErrorI {
+// NOTE: merging percents will exceed 100% over multiple samples, but are normalized using the NumberOfSamples field
+// NOTE: if the 'chainId' designation doesn't match the 'self' chainId, the payment percent is ignored
+func (x *CommitteeData) Combine(data *CommitteeData, chainId uint64) ErrorI {
 	// safety check to ensure the data is not null
 	if data == nil {
 		return nil
 	}
 	// for each payment percent
 	for _, p := range data.PaymentPercents {
-		// combine the percents with the existing stubs
-		// percents can/will exceed 100 but are re-normalized using NumberOfSamples later
-		x.addPercents(p.Address, p.Percent)
+		// ignore any payment percent not designated for our chain id
+		if p.ChainId == chainId {
+			// combine the percents with the existing stubs
+			// percents can/will exceed 100 but are re-normalized using NumberOfSamples later
+			x.addPercents(p.Address, p.Percent, chainId)
+		}
 	}
 	// new Proposal purposefully overwrites the Block and Meta of the current Proposal
 	// this is to ensure both Proposals have the latest Block and Meta information
@@ -654,7 +683,7 @@ func (x *CommitteeData) Combine(data *CommitteeData) ErrorI {
 }
 
 // addPercents() is a helper function that adds reward distribution percents on behalf of an address
-func (x *CommitteeData) addPercents(address []byte, percent uint64) {
+func (x *CommitteeData) addPercents(address []byte, percent, chainId uint64) {
 	// check to see if the address already exists
 	for i, p := range x.PaymentPercents {
 		// if already exists
@@ -669,6 +698,7 @@ func (x *CommitteeData) addPercents(address []byte, percent uint64) {
 	x.PaymentPercents = append(x.PaymentPercents, &PaymentPercents{
 		Address: address,
 		Percent: percent,
+		ChainId: chainId,
 	})
 }
 

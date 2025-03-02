@@ -109,7 +109,7 @@ func (p *P2P) ListenForInboundPeers(listenAddress *lib.PeerAddress) {
 	if er != nil {
 		p.log.Fatal(ErrFailedListen(er).Error())
 	}
-	p.log.Debugf("Starting net.Listener on tcp://%s", listenAddress.NetAddress)
+	p.log.Infof("Starting net.Listener on tcp://%s", listenAddress.NetAddress)
 	p.listener = netutil.LimitListener(ln, p.MaxPossibleInbound())
 	// continuous service until program exit
 	for {

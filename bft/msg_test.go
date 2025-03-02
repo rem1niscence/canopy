@@ -60,7 +60,7 @@ func TestSignBytes(t *testing.T) {
 			pub := c.valKeys[0].PublicKey().Bytes()
 			results := &lib.CertificateResult{
 				RewardRecipients: &lib.RewardRecipients{
-					PaymentPercents: []*lib.PaymentPercents{{Address: []byte("some address"), Percent: 100}},
+					PaymentPercents: []*lib.PaymentPercents{{Address: []byte("some address"), Percent: 100, ChainId: lib.CanopyChainId}},
 					NumberOfSamples: 0,
 				},
 			}

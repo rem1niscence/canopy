@@ -102,7 +102,7 @@ func SelectProposerFromCandidates(candidates []VRFCandidate, data *lib.Sortition
 	// find the smallest VRF out among all candidates
 	var smallest *big.Int
 	for _, c := range candidates {
-		candidate := new(big.Int).SetBytes(c.Out)
+		candidate := new(big.Int).SetBytes(crypto.Hash(c.Out))
 		if smallest == nil || lib.BigLess(candidate, smallest) {
 			proposerPubKey = c.PublicKey.Bytes()
 			smallest = candidate

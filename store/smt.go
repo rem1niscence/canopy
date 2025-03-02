@@ -929,3 +929,36 @@ var (
 		255, 255, 255, 255, 255, 255, 255, 255,
 	}
 )
+
+//			Prover Tree        root
+//							  /     \
+//						    0        11
+//		                   /  \     /  \
+//		                 00 *010* 110  111
+//		                /  \
+//		              000   001
+
+//         Proof        {00, 010, 11, root}
+
+//       Verifier:
+//       Step 1) Build tree from proof -> {00, 010, 11, root}
+//               Result: {00, 010, 0, 11, root}
+//       0 Node: LChildKey='00' RChildKey='010'
+//       root: LChildKey='0' RChild='11'
+//      (compare built rHash against provided rootHash)
+
+//       Step 2) Insert tree into SMT (using setNode)
+//		  Verifier Tree       root
+//							 /     \
+//						    0       11
+//		                   /  \
+//		                 00 *010*
+
+//       Step 3) Verify Proof of 'Inclusion / non-inclusion'
+//       By 'traversing/finding node (*010*)' in the trie
+//
+//		  Verifier Tree       root
+//							 /     \
+//						    0       11
+//		                   /  \
+//		                 00 *010*

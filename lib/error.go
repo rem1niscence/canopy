@@ -91,6 +91,7 @@ const (
 	CodeNoValidators                ErrorCode = 29
 	CodeInvalidResultsHash          ErrorCode = 30
 	CodeNonNilBlock                 ErrorCode = 31
+	CodeMessageCastFailed           ErrorCode = 32
 
 	// Consensus Module
 	ConsensusModule ErrorModule = "consensus"
@@ -107,7 +108,7 @@ const (
 	CodeUnknownConsensusMessage         ErrorCode = 9
 	CodeValidatorNotInSet               ErrorCode = 10
 	CodeWrongHeight                     ErrorCode = 11
-	CodeWrongRound                      ErrorCode = 12
+	CodeOutOfSync                       ErrorCode = 12
 	CodeWrongPhase                      ErrorCode = 13
 	CodePartialSignatureEmpty           ErrorCode = 14
 	CodeInvalidPartialSignature         ErrorCode = 15
@@ -458,8 +459,8 @@ func ErrEmptyView() ErrorI {
 	return NewError(CodeEmptyView, ConsensusModule, "empty view")
 }
 
-func ErrWrongRound() ErrorI {
-	return NewError(CodeWrongRound, ConsensusModule, "wrong round")
+func ErrOutOfSync() ErrorI {
+	return NewError(CodeOutOfSync, ConsensusModule, "out of sync")
 }
 
 func ErrWrongPhase() ErrorI {
@@ -672,6 +673,10 @@ func ErrMaxTxSize() ErrorI {
 
 func ErrInvalidArgument() ErrorI {
 	return NewError(CodeInvalidArgument, MainModule, "the argument is invalid")
+}
+
+func ErrInvalidMessageCast() ErrorI {
+	return NewError(CodeInvalidArgument, MainModule, "the message cast failed")
 }
 
 func ErrExpectedMaxBlockSize() ErrorI {

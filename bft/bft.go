@@ -33,8 +33,7 @@ type BFT struct {
 	ResetBFT   chan ResetBFT // trigger that resets the BFT due to a new Target block or a new Canopy block
 	syncing    *atomic.Bool  // if chain for this committee is currently catching up to latest height
 
-	PhaseTimer      *time.Timer // ensures the node waits for a configured duration (Round x phaseTimeout) to allow for full voter participation
-	OptimisticTimer *time.Timer // enables 'Optimistic Responsiveness Mode' starting from Round 10, allowing faster consensus while sacrificing voter participation
+	PhaseTimer *time.Timer // ensures the node waits for a configured duration (Round x phaseTimeout) to allow for full voter participation
 
 	PublicKey  []byte             // self consensus public key
 	PrivateKey crypto.PrivateKeyI // self consensus private key
@@ -74,7 +73,6 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, rootHeight, height uint64,
 		ResetBFT:          make(chan ResetBFT, 1),
 		syncing:           con.Syncing(),
 		PhaseTimer:        lib.NewTimer(),
-		OptimisticTimer:   lib.NewTimer(),
 		VDFService:        vdf,
 		HighVDF:           new(crypto.VDF),
 	}, nil
@@ -82,7 +80,6 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, rootHeight, height uint64,
 
 // Start() initiates the HotStuff BFT service.
 // - Phase Timeout ensures the node waits for a configured duration (Round x phaseTimeout) to allow for full voter participation
-// - Optimistic Timeout enables 'Optimistic Responsiveness Mode' starting from Round 10, allowing faster consensus
 // This design balances synchronization speed during adverse conditions with maximizing voter participation under normal conditions
 // - ResetBFT occurs upon receipt of a Quorum Certificate
 //   - (a) Canopy chainId <committeeSet changed, reset but keep locks to prevent conflicting validator sets between peers during a view change>
@@ -105,22 +102,6 @@ func (b *BFT) Start() {
 				b.HandlePhase()
 			}()
 
-		// OPTIMISTIC TIMEOUT
-		// - This triggers when Round 10 phase sleep has expired, this functionality only works well after Round 10
-		// - Allows an intermittent 'Optimistic' check to see if node can move on before PhaseTimer actually triggers
-		case <-b.OptimisticTimer.C:
-			func() {
-				b.Controller.Lock()
-				defer b.Controller.Unlock()
-				// if self doesn't have +2/3rds (or leader msg) already, reset the timer and sleep again
-				if !b.PhaseHas23Maj() {
-					lib.ResetTimer(b.OptimisticTimer, b.WaitTime(b.Phase, 10))
-					return
-				}
-				// if self has +2/3 (or leader msg) already, move forward Optimistically
-				b.HandlePhase()
-			}()
-
 		// RESET BFT
 		// - This triggers when receiving a new Commit Block (QC) from either Root-ChainId (a) or the Target-ChainId (b)
 		case resetBFT := <-b.ResetBFT:
@@ -134,7 +115,7 @@ func (b *BFT) Start() {
 				if !resetBFT.IsRootChainUpdate {
 					b.log.Info("Reset BFT (NEW_HEIGHT)")
 					// start BFT over after sleeping CommitProcessMS
-					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
+					b.SetWaitTimers(b.WaitTime(CommitProcess, 0), resetBFT.ProcessTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
 					// if this chain is not its own root
@@ -142,7 +123,7 @@ func (b *BFT) Start() {
 						// start BFT over after sleeping CommitProcessMS
 						// add poll ms wait here to ensure ample time for all nested chains to be updated
 						// if not the new committee messages will overwrite any candidacy proposals that were received prior to the 'reset'
-						b.SetWaitTimers(time.Duration(b.Config.RootChainPollMS)*time.Millisecond, b.WaitTime(CommitProcess, 10), resetBFT.ProcessTime)
+						b.SetWaitTimers(time.Duration(b.Config.RootChainPollMS)*time.Millisecond, resetBFT.ProcessTime)
 					}
 				}
 			}()
@@ -153,7 +134,7 @@ func (b *BFT) Start() {
 
 // HandlePhase() is the main BFT Phase stepping loop
 func (b *BFT) HandlePhase() {
-	stopTimers := func() { b.PhaseTimer.Stop(); b.OptimisticTimer.Stop() }
+	stopTimers := func() { b.PhaseTimer.Stop() }
 	// if currently catching up to latest height, pause the BFT loop
 	if isSyncing := b.syncing.Load(); isSyncing {
 		b.log.Info("Paused BFT loop as currently syncing")
@@ -495,8 +476,8 @@ func (b *BFT) StartCommitProcessPhase() {
 // ROUND-INTERRUPT:
 // - Replica sends current View message to other replicas (Pacemaker vote)
 func (b *BFT) RoundInterrupt() {
-	b.log.Warn(b.View.ToString())
 	b.Config.RoundInterruptTimeoutMS = b.msLeftInRound()
+	b.log.Warnf("Starting next round ~ %s", time.Now().Add(time.Duration(b.Config.RoundInterruptTimeoutMS)*time.Millisecond))
 	b.Phase = RoundInterrupt
 	// send pacemaker message
 	b.SendToReplicas(b.ValidatorSet, &Message{
@@ -660,9 +641,9 @@ func (b *BFT) SafeNode(msg *Message) lib.ErrorI {
 	return ErrFailedSafeNodePredicate()
 }
 
-// SetTimerForNextPhase() calculates the wait time for a specific phase/Round, resets the Phase and Optimistic timers
+// SetTimerForNextPhase() calculates the wait time for a specific phase/Round, resets the Phase wait timer
 func (b *BFT) SetTimerForNextPhase(processTime time.Duration) {
-	waitTime, optimisticTime := b.WaitTime(b.Phase, b.Round), b.WaitTime(b.Phase, 10)
+	waitTime := b.WaitTime(b.Phase, b.Round)
 	switch b.Phase {
 	default:
 		b.Phase++
@@ -671,7 +652,7 @@ func (b *BFT) SetTimerForNextPhase(processTime time.Duration) {
 	case Pacemaker:
 		b.Phase = Election
 	}
-	b.SetWaitTimers(waitTime, optimisticTime, processTime)
+	b.SetWaitTimers(waitTime, processTime)
 }
 
 // WaitTime() returns the wait time (wait and receive consensus messages) for a specific Phase.Round
@@ -694,9 +675,10 @@ func (b *BFT) WaitTime(phase Phase, round uint64) (waitTime time.Duration) {
 	case CommitProcess:
 		waitTime = b.waitTime(b.Config.CommitProcessMS, round)
 	case RoundInterrupt:
-		waitTime = b.waitTime(b.Config.RoundInterruptTimeoutMS, round)
+		// don't pass again through 'wait time' as it's already calculated at the msLeftInRound()
+		waitTime = time.Duration(b.Config.RoundInterruptTimeoutMS) * time.Millisecond
 	case Pacemaker:
-		waitTime = b.waitTime(0, round)
+		waitTime = 0
 	}
 	return
 }
@@ -737,11 +719,10 @@ func (b *BFT) msLeftInRound() int {
 	}
 }
 
-// SetWaitTimers() sets the phase and optimistic timers
+// SetWaitTimers() sets the phase wait timer
 // - Phase Timeout ensures the node waits for a configured duration (Round x phaseTimeout) to allow for full voter participation
-// - Optimistic Timeout enables 'Optimistic Responsiveness Mode' starting from Round 10, allowing faster consensus
 // This design balances synchronization speed during adverse conditions with maximizing voter participation under normal conditions
-func (b *BFT) SetWaitTimers(phaseWaitTime, optimisticWaitTIme, processTime time.Duration) {
+func (b *BFT) SetWaitTimers(phaseWaitTime, processTime time.Duration) {
 	b.log.Debugf("Process time: %.2fs, Wait time: %.2fs", processTime.Seconds(), phaseWaitTime.Seconds())
 	subtract := func(wt, pt time.Duration) (t time.Duration) {
 		if pt > 24*time.Hour {
@@ -752,12 +733,11 @@ func (b *BFT) SetWaitTimers(phaseWaitTime, optimisticWaitTIme, processTime time.
 		}
 		return wt - pt
 	}
-	// calculate the phase timer and the optimistic timer by subtracting the process time
-	phaseWaitTime, optimisticWaitTime := subtract(phaseWaitTime, processTime), subtract(optimisticWaitTIme, processTime)
-	b.log.Debugf("Setting consensus timer: %f sec", phaseWaitTime.Seconds())
-	// set Phase and Optimistic timers to go off in their respective timeouts
+	// calculate the phase timer by subtracting the process time
+	phaseWaitTime = subtract(phaseWaitTime, processTime)
+	b.log.Infof("Setting consensus timer: %.2f sec", phaseWaitTime.Seconds())
+	// set Phase timers to go off in their respective timeouts
 	lib.ResetTimer(b.PhaseTimer, phaseWaitTime)
-	lib.ResetTimer(b.OptimisticTimer, optimisticWaitTime)
 }
 
 // SelfIsPropose() returns true if this node is the Leader
@@ -846,9 +826,9 @@ type (
 		ChainHeight() uint64
 		// RootChainHeight returns the height of the root-Chain
 		RootChainHeight() uint64
-		// ProduceProposal() is a plugin call to produce a Proposal object as a Leader
+		// ProduceProposal() as a Leader, create a Proposal in the form of a block and certificate results
 		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
-		// ValidateCertificate() is a plugin call to validate a Certificate object as a Replica
+		// ValidateCertificate() as a Replica, validates the leader proposal
 		ValidateProposal(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
 		// LoadCertificate() gets the Quorum Certificate from the chainId-> plugin at a certain height
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
@@ -865,7 +845,8 @@ type (
 		// Syncing() returns true if the plugin is currently syncing
 		Syncing() *atomic.Bool
 
-		/* Root-ChainId Functionality Below*/
+		/* Root-Chain Functionality Below*/
+
 		// SendCertificateResultsTx() is a P2P call that allows a Leader to submit their CertificateResults (reward) transaction
 		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
 		// LoadCommittee() loads the ValidatorSet operating under ChainId

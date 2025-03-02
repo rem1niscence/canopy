@@ -447,22 +447,18 @@ func NewTimer() *time.Timer {
 
 // ResetTimer() stops the existing timer, and resets with the new duration
 func ResetTimer(t *time.Timer, d time.Duration) {
-	if t == nil {
-		*t = *time.NewTimer(d)
-	}
 	StopTimer(t)
 	t.Reset(d)
 }
 
 // StopTimer() stops the existing timer
 func StopTimer(t *time.Timer) {
-	if t == nil {
-		return
-	}
-	if !t.Stop() {
-		// drain safely
-		for len(t.C) > 0 {
-			<-t.C
+	if t != nil {
+		if !t.Stop() {
+			select {
+			case <-t.C:
+			default:
+			}
 		}
 	}
 }
@@ -582,6 +578,11 @@ func (d *DeDuplicator[T]) Found(k T) bool {
 	d.m[k] = struct{}{}
 	// not a duplicate
 	return false
+}
+
+// Map() returns the underlying map to the de-duplicator
+func (d *DeDuplicator[T]) Map() map[T]struct{} {
+	return d.m
 }
 
 func PrintStackTrace() {

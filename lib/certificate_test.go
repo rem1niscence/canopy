@@ -19,6 +19,7 @@ func TestCertificateCheckBasic(t *testing.T) {
 			PaymentPercents: []*PaymentPercents{
 				{
 					Address: newTestAddressBytes(t),
+					ChainId: CanopyChainId,
 					Percent: 100,
 				},
 			},
@@ -184,6 +185,7 @@ func TestCertificateSignBytes(t *testing.T) {
 			PaymentPercents: []*PaymentPercents{
 				{
 					Address: newTestAddressBytes(t),
+					ChainId: CanopyChainId,
 					Percent: 100,
 				},
 			},
@@ -254,12 +256,29 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 			error: "invalid payment recipients count",
 		},
 		{
+			name:   "empty chain id",
+			detail: "the chain id cannot be empty",
+			result: &CertificateResult{
+				RewardRecipients: &RewardRecipients{
+					PaymentPercents: []*PaymentPercents{{
+						Address: newTestAddressBytes(t),
+						Percent: 100,
+					}},
+				},
+				SlashRecipients: &SlashRecipients{
+					DoubleSigners: []*DoubleSigner{nil},
+				},
+			},
+			error: "empty chain id",
+		},
+		{
 			name:   "invalid double signer",
 			detail: "a double signer can't be nil",
 			result: &CertificateResult{
 				RewardRecipients: &RewardRecipients{
 					PaymentPercents: []*PaymentPercents{{
 						Address: newTestAddressBytes(t),
+						ChainId: CanopyChainId,
 						Percent: 100,
 					}},
 				},
@@ -276,6 +295,7 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 				RewardRecipients: &RewardRecipients{
 					PaymentPercents: []*PaymentPercents{{
 						Address: newTestAddressBytes(t),
+						ChainId: CanopyChainId,
 						Percent: 100,
 					}},
 				},
@@ -294,6 +314,7 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 				RewardRecipients: &RewardRecipients{
 					PaymentPercents: []*PaymentPercents{{
 						Address: newTestAddressBytes(t),
+						ChainId: CanopyChainId,
 						Percent: 100,
 					}},
 				},
@@ -316,6 +337,7 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 				RewardRecipients: &RewardRecipients{
 					PaymentPercents: []*PaymentPercents{{
 						Address: newTestAddressBytes(t),
+						ChainId: CanopyChainId,
 						Percent: 100,
 					}},
 				},

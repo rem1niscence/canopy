@@ -176,9 +176,8 @@ func TestAddTransaction(t *testing.T) {
 			require.Equal(t, test.recheck, gotRecheck)
 			require.Equal(t, test.count, test.mempool.count)
 			// call get transaction
-			gotTxs, totalTxs := test.mempool.GetTransactions(math.MaxUint64)
+			gotTxs := test.mempool.GetTransactions(math.MaxUint64)
 			require.Equal(t, test.transactions, gotTxs)
-			require.Equal(t, test.count, totalTxs)
 			// test mempool.Contains
 			for _, txn := range test.transactions {
 				require.True(t, test.mempool.Contains(crypto.HashString(txn)))
@@ -299,9 +298,9 @@ func TestGetAndContainsTransaction(t *testing.T) {
 				require.NoError(t, err)
 			}
 			// get the transactions
-			got, count := test.mempool.GetTransactions(test.maxBytes)
+			got := test.mempool.GetTransactions(test.maxBytes)
 			// ensure the count is correct
-			require.EqualValues(t, test.expectedCount, count)
+			require.EqualValues(t, test.expectedCount, len(got))
 			require.Equal(t, len(test.expectedTxs), len(got))
 			// compare got vs expected
 			for i := 0; i < len(got); i++ {
@@ -425,9 +424,9 @@ func TestDeleteTransaction(t *testing.T) {
 				test.mempool.DeleteTransaction(toDelete)
 			}
 			// get the transactions left
-			got, count := test.mempool.GetTransactions(math.MaxUint64)
+			got := test.mempool.GetTransactions(math.MaxUint64)
 			// ensure the count is correct
-			require.EqualValues(t, test.expectedCount, count)
+			require.EqualValues(t, test.expectedCount, len(got))
 			require.Equal(t, len(test.expectedTxs), len(got))
 			// compare got vs expected
 			for i := 0; i < len(got); i++ {
