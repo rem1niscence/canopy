@@ -34,24 +34,23 @@ type Controller struct {
 }
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
-func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (*Controller, lib.ErrorI) {
+func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (controller *Controller, err lib.ErrorI) {
 	// load the maximum validators param to set limits on P2P
 	maxMembersPerCommittee, err := fsm.GetMaxValidators()
+	// if an error occurred when retrieving the max validators
 	if err != nil {
-		return nil, err
-	}
-	// create a copy of the finite state machine for the mempool to use to validate incoming transactions
-	mempoolFSM, err := fsm.Copy()
-	if err != nil {
-		return nil, err
+		// exit with error
+		return
 	}
 	// initialize the mempool using the FSM copy and the mempool config
-	mempool, err := NewMempool(mempoolFSM, c.MempoolConfig, l)
+	mempool, err := NewMempool(fsm, c.MempoolConfig, l)
+	// if an error occurred when creating a new mempool
 	if err != nil {
-		return nil, err
+		// exit with error
+		return
 	}
 	// create the controller
-	controller := &Controller{
+	controller = &Controller{
 		FSM:        fsm,
 		Mempool:    mempool,
 		isSyncing:  &atomic.Bool{},
@@ -65,11 +64,13 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.L
 	}
 	// initialize the consensus in the controller, passing a reference to itself
 	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, true, l)
+	// if an error occurred initializing the bft module
 	if err != nil {
-		return nil, err
+		// exit with error
+		return
 	}
-	// return the controller
-	return controller, nil
+	// exit
+	return
 }
 
 // Start() begins the Controller service
@@ -145,12 +146,15 @@ func (c *Controller) IsOwnRoot() (isOwnRoot bool) {
 func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 	// lock the controller for thread safety
 	c.Lock()
-	// unlock
+	// unlock when the function completes
 	defer c.Unlock()
+	// use the 'remote callbacks' from the controller
 	info.RemoteCallbacks = c.RootChainInfo.RemoteCallbacks
+	// use the logger from the controller
 	info.Log = c.log
-	// update the root-Chain info
+	// update the root chain info
 	c.RootChainInfo = *info
+	// if the last validator set is empty
 	if info.LastValidatorSet.NumValidators == 0 {
 		// signal to reset consensus and start a new height
 		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: false}
@@ -189,20 +193,29 @@ func (c *Controller) GetRootChainLotteryWinner(rootHeight uint64) (winner *lib.L
 
 // IsValidDoubleSigner() Canopy checks if the double signer is valid at a certain height
 func (c *Controller) IsValidDoubleSigner(height uint64, address []byte) bool {
+	// do a remote call to the root chain to see if the double signer is valid
 	isValidDoubleSigner, err := c.RootChainInfo.IsValidDoubleSigner(height, lib.BytesToString(address))
+	// if an error occurred during the remote call
 	if err != nil {
+		// log the error
 		c.log.Errorf("IsValidDoubleSigner failed with error: %s", err.Error())
+		// return is not a valid double signer for safety
 		return false
 	}
+	// return the result from the remote call
 	return *isValidDoubleSigner
 }
 
 // LoadMaxBlockSize() gets the max block size from the state
 func (c *Controller) LoadMaxBlockSize() int {
+	// load the maximum block size from the nested chain FSM
 	params, _ := c.FSM.GetParamsCons()
+	// if the parameters are empty
 	if params == nil {
+		// return 0 as the 'max'
 		return 0
 	}
+	// return the max block size as set by the governance param
 	return int(params.BlockSize)
 }
 
@@ -241,14 +254,9 @@ func (c *Controller) LoadLastProposers(height uint64) (*lib.Proposers, lib.Error
 }
 
 // LoadCommitteeData() returns the state metadata for the 'self chain'
-func (c *Controller) LoadCommitteeData() (*lib.CommitteeData, lib.ErrorI) {
+func (c *Controller) LoadCommitteeData() (data *lib.CommitteeData, err lib.ErrorI) {
 	// get the committee data from the FSM
-	data, err := c.FSM.GetCommitteeData(c.Config.ChainId)
-	if err != nil {
-		return nil, err
-	}
-	// return the data and exit
-	return data, nil
+	return c.FSM.GetCommitteeData(c.Config.ChainId)
 }
 
 // Syncing() returns if any of the supported chains are currently syncing
