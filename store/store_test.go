@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	math2 "math"
+	"math"
 	"os"
 	"runtime/debug"
 	"testing"
@@ -19,7 +19,7 @@ import (
 func TestMaxTransaction(t *testing.T) {
 	t.Skip()
 	db, err := badger.OpenManaged(badger.DefaultOptions("test_temp.db").WithMemTableSize(2 * int64(units.GB)).
-		WithNumVersionsToKeep(math2.MaxInt).WithLoggingLevel(badger.ERROR))
+		WithNumVersionsToKeep(math.MaxInt).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
 	defer func() { db.Close(); os.RemoveAll("test_temp.db") }()
 	tx := db.NewTransactionAt(1, true)

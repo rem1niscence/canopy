@@ -256,6 +256,9 @@ func (s *SMT) traverse() (err lib.ErrorI) {
 		if err != nil {
 			return
 		}
+		if s.current == nil {
+			return ErrInvalidMerkleTree()
+		}
 		// load the bytes into the key
 		s.current.Key.fromBytes(currentKey)
 		// update the greatest common prefix and the bit position based on the new current key

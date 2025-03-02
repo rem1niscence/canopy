@@ -290,25 +290,17 @@ const (
 	CodeIncompatiblePeer        ErrorCode = 32
 	CodeInvalidNetAddress       ErrorCode = 33
 
-	StorageModule              ErrorModule = "store"
-	CodeOpenDB                 ErrorCode   = 1
-	CodeCloseDB                ErrorCode   = 2
-	CodeStoreSet               ErrorCode   = 3
-	CodeStoreGet               ErrorCode   = 4
-	CodeStoreDelete            ErrorCode   = 5
-	CodeStoreIter              ErrorCode   = 6
-	CodeStoreRevIter           ErrorCode   = 7
-	CodeCopyStore              ErrorCode   = 8
-	CodeWriteTxn               ErrorCode   = 9
-	CodeDecompactProof         ErrorCode   = 10
-	CodeCommitDB               ErrorCode   = 11
-	CodeCommitTree             ErrorCode   = 12
-	CodeProve                  ErrorCode   = 13
-	CodeCompactProof           ErrorCode   = 14
-	CodeInvalidKey             ErrorCode   = 15
-	CodeReserveKeyWrite        ErrorCode   = 16
-	CodeInvalidMerkleTree      ErrorCode   = 17
-	CodeInvalidMerkleTreeProof ErrorCode   = 18
+	StorageModule         ErrorModule = "store"
+	CodeOpenDB            ErrorCode   = 1
+	CodeCloseDB           ErrorCode   = 2
+	CodeStoreSet          ErrorCode   = 3
+	CodeStoreGet          ErrorCode   = 4
+	CodeStoreDelete       ErrorCode   = 5
+	CodeCommitDB          ErrorCode   = 6
+	CodeCompactProof      ErrorCode   = 7
+	CodeInvalidKey        ErrorCode   = 8
+	CodeReserveKeyWrite   ErrorCode   = 9
+	CodeInvalidMerkleTree ErrorCode   = 10
 
 	RPCModule             ErrorModule = "rpc"
 	CodeRPCTimeout        ErrorCode   = 1
