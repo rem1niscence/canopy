@@ -694,7 +694,8 @@ func (b *BFT) WaitTime(phase Phase, round uint64) (waitTime time.Duration) {
 	case CommitProcess:
 		waitTime = b.waitTime(b.Config.CommitProcessMS, round)
 	case RoundInterrupt:
-		waitTime = b.waitTime(b.Config.RoundInterruptTimeoutMS, round)
+		// don't pass again through 'wait time' as it's already calculated at the msLeftInRound()
+		waitTime = time.Duration(b.Config.RoundInterruptTimeoutMS)
 	case Pacemaker:
 		waitTime = b.waitTime(0, round)
 	}
