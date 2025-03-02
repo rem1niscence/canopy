@@ -34,7 +34,7 @@ var (
 	// the number of tokens in micro denomination that are initially (before halvenings) minted per block
 	InitialTokensPerBlock = 256 * 1000000 // 256 CNPY
 	// the number of blocks between each halvening (block reward is cut in half) event
-	BlocksPerHalvening = 1050000
+	BlocksPerHalvening = 3150000 // ~ 2 years - 20 second blocks
 )
 
 // ParamSpace is a distinct, isolated category within the overarching Params structure

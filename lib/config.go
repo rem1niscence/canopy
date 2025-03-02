@@ -143,15 +143,14 @@ type ConsensusConfig struct {
 // DefaultConsensusConfig() configures the block time
 func DefaultConsensusConfig() ConsensusConfig {
 	return ConsensusConfig{
-		ElectionTimeoutMS:       5000,
-		ElectionVoteTimeoutMS:   2000,
-		ProposeTimeoutMS:        2000,
-		ProposeVoteTimeoutMS:    2000,
-		PrecommitTimeoutMS:      2000,
-		PrecommitVoteTimeoutMS:  2000,
-		CommitTimeoutMS:         2000,
-		CommitProcessMS:         5000,
-		RoundInterruptTimeoutMS: 5000,
+		ElectionTimeoutMS:      2000,
+		ElectionVoteTimeoutMS:  2000,
+		ProposeTimeoutMS:       3000,
+		ProposeVoteTimeoutMS:   3000,
+		PrecommitTimeoutMS:     2000,
+		PrecommitVoteTimeoutMS: 2000,
+		CommitTimeoutMS:        2000,
+		CommitProcessMS:        3000,
 	}
 }
 
