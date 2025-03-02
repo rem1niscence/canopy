@@ -477,7 +477,7 @@ func (b *BFT) StartCommitProcessPhase() {
 // - Replica sends current View message to other replicas (Pacemaker vote)
 func (b *BFT) RoundInterrupt() {
 	b.Config.RoundInterruptTimeoutMS = b.msLeftInRound()
-	b.log.Warnf("Starting next round ~ %s", time.Now().Add(time.Duration(b.Config.RoundInterruptTimeoutMS)*time.Millisecond))
+	b.log.Warnf("Starting next round ~ %s", time.Now().Add(time.Duration(b.Config.RoundInterruptTimeoutMS)*time.Millisecond).Format(time.TimeOnly))
 	b.Phase = RoundInterrupt
 	// send pacemaker message
 	b.SendToReplicas(b.ValidatorSet, &Message{

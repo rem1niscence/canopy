@@ -143,7 +143,7 @@ func (x *QuorumCertificate) GetSignature() *AggregateSignature {
 	return nil
 }
 
-// CertificateResult contains the outcome of a Quorum Certificate as it pertains to Canopy's base chain
+// CertificateResult contains the outcome of a certificate produced by a quorum in consensus
 type CertificateResult struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

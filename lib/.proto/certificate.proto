@@ -42,7 +42,7 @@ message QuorumCertificate {
   AggregateSignature signature = 7; // aggregate signature from the current proposer message
 }
 
-// CertificateResult contains the outcome of a Quorum Certificate as it pertains to Canopy's base chain
+// CertificateResult contains the outcome of a certificate produced by a quorum in consensus
 message CertificateResult {
   // reward_recipients: the recipients who are rewarded based on the quorum certificate
   // specifically who the committee agreed to reward from the committee treasury

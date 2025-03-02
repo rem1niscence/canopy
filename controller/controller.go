@@ -11,46 +11,49 @@ import (
 	"time"
 )
 
+/* This file contains the 'Controller' implementation which acts as a bus between the bft, p2p, fsm, and store modules to create the node */
+
 var _ bft.Controller = new(Controller)
 
 // Controller acts as the 'manager' of the modules of the application
 type Controller struct {
-	FSM           *fsm.StateMachine
-	RootChainInfo lib.RootChainInfo
-	Mempool       *Mempool
-	Consensus     *bft.BFT           // the async consensus process between the committee members for the chain
-	isSyncing     *atomic.Bool       // is the chain currently being downloaded from peers
-	P2P           *p2p.P2P           // the P2P module the node uses to connect to the network
-	Address       []byte             // self address
-	PublicKey     []byte             // self public key
-	PrivateKey    crypto.PrivateKeyI // self private key
-	Config        lib.Config         // node configuration
-	log           lib.LoggerI        // object for logging
-	sync.Mutex                       // mutex for thread safety
+	Address    []byte             // self address
+	PublicKey  []byte             // self public key
+	PrivateKey crypto.PrivateKeyI // self private key
+	Config     lib.Config         // node configuration
+
+	FSM       *fsm.StateMachine // the core protocol component responsible for maintaining and updating the state of the blockchain
+	Mempool   *Mempool          // the in memory list of pending transactions
+	Consensus *bft.BFT          // the async consensus process between the committee members for the chain
+	P2P       *p2p.P2P          // the P2P module the node uses to connect to the network
+
+	RootChainInfo lib.RootChainInfo // the latest information from the 'root chain'
+	isSyncing     *atomic.Bool      // is the chain currently being downloaded from peers
+	log           lib.LoggerI       // object for logging
+	sync.Mutex                      // mutex for thread safety
 }
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
 func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (*Controller, lib.ErrorI) {
-	// make a convenience variable for the 'height' of the state machine
-	height := fsm.Height()
-	// load maxMembersPerCommittee param to set limits on P2P
+	// load the maximum validators param to set limits on P2P
 	maxMembersPerCommittee, err := fsm.GetMaxValidators()
 	if err != nil {
 		return nil, err
 	}
+	// create a copy of the finite state machine for the mempool to use to validate incoming transactions
 	mempoolFSM, err := fsm.Copy()
 	if err != nil {
 		return nil, err
 	}
+	// initialize the mempool using the FSM copy and the mempool config
 	mempool, err := NewMempool(mempoolFSM, c.MempoolConfig, l)
 	if err != nil {
 		return nil, err
 	}
-	// create a controller structure
+	// create the controller
 	controller := &Controller{
 		FSM:        fsm,
 		Mempool:    mempool,
-		Consensus:  nil,
 		isSyncing:  &atomic.Bool{},
 		P2P:        p2p.New(valKey, maxMembersPerCommittee, c, l),
 		Address:    valKey.PublicKey().Address().Bytes(),
@@ -60,11 +63,13 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.L
 		log:        l,
 		Mutex:      sync.Mutex{},
 	}
-	controller.Consensus, err = bft.New(c, valKey, height, height-1, controller, true, l)
+	// initialize the consensus in the controller, passing a reference to itself
+	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, true, l)
 	if err != nil {
 		return nil, err
 	}
-	return controller, err
+	// return the controller
+	return controller, nil
 }
 
 // Start() begins the Controller service
@@ -73,19 +78,26 @@ func (c *Controller) Start() {
 	c.P2P.Start()
 	// start internal Controller listeners for P2P
 	c.StartListeners()
+	// in a non-blocking sub-function
 	go func() {
+		// log the beginning of the root-chain API connection
 		c.log.Warnf("Attempting to connect to the root-Chain")
+		// set a timer to go off once per second
 		t := time.NewTicker(time.Second)
+		// once function completes, stop the timer
 		defer t.Stop()
+		// each time the timer fires
 		for range t.C {
+			// if the root chain height is updated
 			if c.RootChainInfo.GetHeight() != 0 {
 				break
 			}
 		}
 		// start internal Controller listeners for P2P
 		c.StartListeners()
-		// sync and start each bft module
+		// start the syncing process (if not synced to top)
 		go c.Sync()
+		// start the bft consensus (if synced to top)
 		go c.Consensus.Start()
 	}()
 }
@@ -106,6 +118,7 @@ func (c *Controller) StartListeners() {
 func (c *Controller) Stop() {
 	// lock the controller
 	c.Lock()
+	// unlock when the function completes
 	defer c.Unlock()
 	// stop the store module
 	if err := c.FSM.Store().(lib.StoreI).Close(); err != nil {
@@ -117,17 +130,22 @@ func (c *Controller) Stop() {
 
 // IsOwnRoot() returns if this chain is its own root (base)
 func (c *Controller) IsOwnRoot() (isOwnRoot bool) {
-	// Use the state to check if this chain is the root chain
+	// use the state machine to check if this chain is the root chain
 	isOwnRoot, err := c.FSM.IsOwnRoot()
+	// if an error occurred
 	if err != nil {
+		// log the error
 		c.log.Error(err.Error())
 	}
+	// exit
 	return
 }
 
 // UpdateRootChainInfo() receives updates from the root-Chain thread
 func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
+	// lock the controller for thread safety
 	c.Lock()
+	// unlock
 	defer c.Unlock()
 	info.RemoteCallbacks = c.RootChainInfo.RemoteCallbacks
 	info.Log = c.log
@@ -190,19 +208,29 @@ func (c *Controller) LoadMaxBlockSize() int {
 
 // LoadLastCommitTime() gets a timestamp from the most recent Quorum Block
 func (c *Controller) LoadLastCommitTime(height uint64) time.Time {
+	// load the certificate (and block) from the indexer
 	cert, err := c.FSM.LoadCertificate(height)
 	if err != nil {
 		c.log.Error(err.Error())
 		return time.Time{}
 	}
+	// create a new object reference (to ensure a non-nil result)
 	block := new(lib.Block)
+	// populate the object reference with bytes
 	if err = lib.Unmarshal(cert.Block, block); err != nil {
+		// log the error
 		c.log.Error(err.Error())
+		// exit with empty time
 		return time.Time{}
 	}
+	// ensure the block isn't nil
 	if block.BlockHeader == nil {
+		// log the error
+		c.log.Error("Last block synced is nil")
+		// exit with empty time
 		return time.Time{}
 	}
+	// return the last block time
 	return time.UnixMicro(int64(block.BlockHeader.Time))
 }
 
@@ -214,10 +242,12 @@ func (c *Controller) LoadLastProposers(height uint64) (*lib.Proposers, lib.Error
 
 // LoadCommitteeData() returns the state metadata for the 'self chain'
 func (c *Controller) LoadCommitteeData() (*lib.CommitteeData, lib.ErrorI) {
+	// get the committee data from the FSM
 	data, err := c.FSM.GetCommitteeData(c.Config.ChainId)
 	if err != nil {
 		return nil, err
 	}
+	// return the data and exit
 	return data, nil
 }
 
@@ -232,8 +262,9 @@ func (c *Controller) ChainHeight() uint64 { return c.FSM.Height() }
 
 // emptyInbox() discards all unread messages for a specific topic
 func (c *Controller) emptyInbox(topic lib.Topic) {
-	// clear the inbox
+	// for each message in the inbox
 	for len(c.P2P.Inbox(topic)) > 0 {
+		// discard the message
 		<-c.P2P.Inbox(topic)
 	}
 }
