@@ -491,8 +491,10 @@ func (s *SMT) GetMerkleProof(k []byte) ([]*lib.Node, lib.ErrorI) {
 // reconstructing the root hash and comparing it against the provided root hash
 // depending on the proof type (membership or non-membership)
 func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []byte, proof []*lib.Node) (bool, lib.ErrorI) {
+	// shorthand for the length of the proof slice
+	proofLen := len(proof)
 	// the proof slice must contain at least two nodes: the leaf node and its sibling
-	if len(proof) < 2 {
+	if proofLen < 2 {
 		return false, ErrInvalidMerkleTreeProof()
 	}
 	// nodeIdx is the index of the leaf node in the proof slice. For membership
@@ -507,45 +509,60 @@ func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []by
 	// calculate the parent node's key by finding the greatest common prefix (GCP)
 	// of the current node's and its sibling's keys
 	currentKey := new(key).fromBytes(proof[nodeIdx].Key)
-	// newNodeProof is a slice that will contain the nodes of the rebuilt tree,
-	// this new tree will only contain the nodes from the proof slice that when
-	// traversed will lead to the node being proven or disproven
-	newNodeProof := make([]*lib.Node, 0)
-	// add the leaf node to the new proof slice
-	newNodeProof = append(newNodeProof, proof[nodeIdx])
-
-	for i := 0; i < len(proof); i++ {
+	// create a new in-memory store to reconstruct the tree
+	memStore, err := NewStoreInMemory(lib.NewDefaultLogger())
+	if err != nil {
+		return false, err
+	}
+	// Reconstruct a similar Merkle tree using the proof nodes. This allows to traverse
+	// the tree again to verify if the given key and value are included in the tree or
+	// to confirm proof-of-non-membership if the key is absent.
+	smt := NewSMT(RootKey, s.keyBitLength, memStore)
+	// set the node being proven in the new tree
+	if err := smt.setNode(&node{
+		Node: lib.Node{
+			Value: proof[nodeIdx].Value,
+			Key:   currentKey.bytes(),
+		},
+		Key: currentKey,
+	}); err != nil {
+		return false, err
+	}
+	// reconstruct the tree from the bottom up using the proof slice
+	for i := 0; i < proofLen; i++ {
 		// skip the node being proven as it is used for the initial values of the hash
 		// and the current key
 		if i == nodeIdx {
 			continue
 		}
-		// add the sibling node to the new proof slice
-		newNodeProof = append(newNodeProof, proof[i])
 		// parentNode will be calculated based on the current node and its sibling
-		var parentNode *lib.Node
+		var parentNode *node
 		// calculate the hash of the parent node based on the bitmask of the sibling
 		if proof[i].Bitmask == leftChild {
-			// built the parent node hash based on the left sibling of the given node
+			// build the parent node hash based on the left sibling of the given node
 			hash = crypto.Hash(
 				append(append(proof[i].Key, proof[i].Value...),
 					append(currentKey.bytes(), hash...)...),
 			)
 			// set the parent node's children
-			parentNode = &lib.Node{
-				LeftChildKey:  proof[i].Key,
-				RightChildKey: currentKey.bytes(),
+			parentNode = &node{
+				Node: lib.Node{
+					LeftChildKey:  proof[i].Key,
+					RightChildKey: currentKey.bytes(),
+				},
 			}
 		} else {
-			// built the parent node hash based on the right sibling of the given node
+			// build the parent node hash based on the right sibling of the given node
 			hash = crypto.Hash(
 				append(append(currentKey.bytes(), hash...),
 					append(proof[i].Key, proof[i].Value...)...),
 			)
 			// set the parent node's children
-			parentNode = &lib.Node{
-				LeftChildKey:  currentKey.bytes(),
-				RightChildKey: proof[i].Key,
+			parentNode = &node{
+				Node: lib.Node{
+					LeftChildKey:  currentKey.bytes(),
+					RightChildKey: proof[i].Key,
+				},
 			}
 		}
 		// calculate the key of the parent node by finding the greatest common prefix
@@ -564,47 +581,20 @@ func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []by
 		// set the parent node's value, which is the hash of its children
 		parentNode.Value = hash
 		// set the parent node's key, which is the gcp of its children
-		parentNode.Key = currentKey.bytes()
-		// add the parent node to the new proof slice
-		newNodeProof = append(newNodeProof, parentNode)
-	}
-	// compare the calculated root hash against the provided root hash
-	if !bytes.Equal(hash, root) {
-		return false, nil
-	}
-	// create a new in-memory store to reconstruct the tree
-	memStore, err := NewStoreInMemory(lib.NewDefaultLogger())
-	if err != nil {
-		return false, err
-	}
-	// Reconstruct a similar Merkle tree using the proof nodes. This allows to traverse
-	// the tree again to verify if the given key and value are included in the tree or
-	// to confirm proof-of-non-membership if the key is absent.
-	smt := NewSMT(RootKey, s.keyBitLength, memStore)
-	// iterate through the new proof slice to set the nodes in the new tree
-	for i, n := range newNodeProof {
-		// create a new node key from the key bytes
-		k := new(key).fromBytes(n.Key)
-		// create the node for the new tree
-		newNode := &node{
-			Node: lib.Node{
-				Value:         n.Value,
-				LeftChildKey:  n.LeftChildKey,
-				RightChildKey: n.RightChildKey,
-				Key:           k.bytes(),
-				Bitmask:       n.Bitmask,
-			},
-			Key: k,
-		}
-		// set the node in the new tree
-		if err := smt.setNode(newNode); err != nil {
+		parentNode.Key = currentKey
+		// add the parent node to the new tree
+		if err := smt.setNode(parentNode); err != nil {
 			return false, err
 		}
 		// set the root of the new tree, as the tree is being reconstructed from
 		// the bottom up, the last node in the proof slice will be the root
-		if i == len(newNodeProof)-1 {
-			smt.root = newNode
+		if i == proofLen-1 {
+			smt.root = parentNode
 		}
+	}
+	// compare the calculated root hash against the provided root hash
+	if !bytes.Equal(hash, root) {
+		return false, nil
 	}
 	// calculate the key to traverse the tree
 	smt.target = &node{Key: newNodeKey(crypto.Hash(k), smt.keyBitLength)}
