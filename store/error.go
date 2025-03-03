@@ -45,3 +45,7 @@ func ErrReserveKeyWrite(key string) lib.ErrorI {
 func ErrInvalidMerkleTree() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidMerkleTree, lib.StorageModule, "merkle tree is invalid")
 }
+
+func ErrInvalidMerkleTreeProof() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidMerkleTreeProof, lib.StorageModule, "merkle tree proof is invalid")
+}
