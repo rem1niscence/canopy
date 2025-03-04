@@ -799,7 +799,7 @@ func (b *BFT) GetBlockHash() (hash []byte) {
 // BlockToHash() converts block bytes into a hash
 func (b *BFT) BlockToHash(blk []byte) (hash []byte) {
 	block := new(lib.Block)
-	hash, err := block.BytesToBlock(blk)
+	hash, err := block.BytesToBlockHash(blk)
 	if err != nil {
 		b.log.Errorf("bft.BlockToHash failed: %s", err.Error())
 	}

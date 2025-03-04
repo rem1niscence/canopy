@@ -159,7 +159,7 @@ func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 		for _, evidence := range vote.LastDoubleSignEvidence {
 			b.log.Infof("Replica %s submitted double sign evidence", lib.BytesToTruncatedString(vote.Signature.PublicKey))
 			if err := b.AddDSE(&b.ByzantineEvidence.DSE, evidence); err != nil {
-				b.log.Warnf("Replica %s evidence invalid", lib.BytesToTruncatedString(vote.Signature.PublicKey))
+				b.log.Warnf("Replica %s evidence invalid: %s", lib.BytesToTruncatedString(vote.Signature.PublicKey), err.Error())
 			}
 		}
 	}

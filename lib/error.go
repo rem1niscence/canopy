@@ -156,6 +156,9 @@ const (
 	CodeEmptyDoubleSigner               ErrorCode = 57
 	CodeNonEquivocatingVote             ErrorCode = 58
 	CodeInvalidEvidenceHeights          ErrorCode = 59
+	CodeInvalidBuyerSendAddress         ErrorCode = 60
+	CodeDuplicateCloseOrder             ErrorCode = 61
+	CodeDuplicateResetOrder             ErrorCode = 62
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -691,6 +694,18 @@ func ErrNilBuyOrder() ErrorI {
 
 func ErrInvalidBuyerReceiveAddress() ErrorI {
 	return NewError(CodeInvalidBuyerReceiveAddress, MainModule, "invalid buyer receive address")
+}
+
+func ErrInvalidBuyerSendAddress() ErrorI {
+	return NewError(CodeInvalidBuyerSendAddress, MainModule, "invalid buyer send address")
+}
+
+func ErrDuplicateResetOrder() ErrorI {
+	return NewError(CodeDuplicateResetOrder, MainModule, "duplicate reset order")
+}
+
+func ErrDuplicateCloseOrder() ErrorI {
+	return NewError(CodeDuplicateCloseOrder, MainModule, "duplicate close order")
 }
 
 func ErrNilCertResults() ErrorI {

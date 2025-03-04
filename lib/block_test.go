@@ -194,7 +194,7 @@ func TestCheckBlockHeader(t *testing.T) {
 				NextValidatorRoot: crypto.Hash([]byte("hash")),
 				LastBlockHash:     crypto.Hash([]byte("hash")),
 				LastQuorumCertificate: &QuorumCertificate{
-					Header:      &View{},
+					Header:      &View{NetworkId: 1},
 					ResultsHash: crypto.Hash([]byte("hash")),
 					BlockHash:   crypto.Hash([]byte("hash")),
 					ProposerKey: newTestAddressBytes(t),
@@ -205,7 +205,7 @@ func TestCheckBlockHeader(t *testing.T) {
 				},
 				NetworkId: 1,
 			},
-			error: "wrong network id",
+			error: "wrong chain id",
 		},
 		{
 			name:   "empty block time",
@@ -220,6 +220,7 @@ func TestCheckBlockHeader(t *testing.T) {
 				LastBlockHash:     crypto.Hash([]byte("hash")),
 				LastQuorumCertificate: &QuorumCertificate{
 					Header:      &View{},
+					Results:     &CertificateResult{},
 					ResultsHash: crypto.Hash([]byte("hash")),
 					BlockHash:   crypto.Hash([]byte("hash")),
 					ProposerKey: newTestAddressBytes(t),

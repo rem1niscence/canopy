@@ -11,100 +11,44 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 )
 
+/* This file has logic to certify the next block and result decided by a bft quorum */
+
 const (
-	GlobalMaxBlockSize         = int(32 * units.MB)
-	ExpectedMaxBlockHeaderSize = 1640 // ensures developers are aware of a change to the header size (which is a consensus breaking change)
+	// the max possible block size without checking the governance parameter in state
+	GlobalMaxBlockSize = int(32 * units.MB)
+	// ensures developers are aware of a change to the header size (which is a consensus breaking change)
+	ExpectedMaxBlockHeaderSize = 1652
 )
 
+// MaxBlockHeaderSize is a consensus breaking change because it affects how the state machine
+// checks if a block is above the MaxBlockSize as the State Machine is only aware of the txs.
 var MaxBlockHeaderSize uint64
-
-func init() {
-	maxBlockHeader, err := Marshal(&BlockHeader{
-		Height:             math.MaxUint64,
-		Hash:               crypto.MaxHash,
-		NetworkId:          math.MaxInt8,
-		Time:               math.MaxUint32,
-		NumTxs:             math.MaxUint64,
-		TotalTxs:           math.MaxUint64,
-		TotalVdfIterations: math.MaxUint64,
-		LastBlockHash:      crypto.MaxHash,
-		StateRoot:          crypto.MaxHash[:20],
-		TransactionRoot:    crypto.MaxHash,
-		ValidatorRoot:      crypto.MaxHash,
-		NextValidatorRoot:  crypto.MaxHash,
-		ProposerAddress:    crypto.MaxHash,
-		Vdf: &crypto.VDF{
-			Proof:      bytes.Repeat([]byte("F"), 528),
-			Output:     bytes.Repeat([]byte("F"), 528),
-			Iterations: math.MaxUint64,
-		},
-		LastQuorumCertificate: &QuorumCertificate{
-			Header: &View{
-				NetworkId:  math.MaxInt8,
-				ChainId:    math.MaxUint64,
-				Height:     math.MaxUint64,
-				RootHeight: math.MaxUint64,
-				Round:      math.MaxUint64,
-				Phase:      math.MaxInt8,
-			},
-			ResultsHash: crypto.MaxHash,
-			BlockHash:   crypto.MaxHash,
-			ProposerKey: bytes.Repeat([]byte("F"), crypto.BLS12381PubKeySize),
-			Signature: &AggregateSignature{
-				Signature: bytes.Repeat([]byte("F"), crypto.BLS12381SignatureSize),
-				Bitmap:    bytes.Repeat([]byte("F"), crypto.MaxBitmapSize(100)),
-			},
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
-	MaxBlockHeaderSize = uint64(len(maxBlockHeader))
-	if MaxBlockHeaderSize != ExpectedMaxBlockHeaderSize {
-		panic(fmt.Sprintf("Max_Header_Size changed from %d to %d; This is a consensus breaking change", ExpectedMaxBlockHeaderSize, MaxBlockHeaderSize))
-	}
-}
 
 // QUORUM CERTIFICATE CODE BELOW
 
-// SignBytes() returns the canonical byte representation used to digitally sign the bytes of the structure
-func (x *QuorumCertificate) SignBytes() (signBytes []byte) {
-	if x.Header != nil && x.Header.Phase == Phase_ELECTION_VOTE {
-		bz, _ := Marshal(&QuorumCertificate{Header: x.Header, ProposerKey: x.ProposerKey})
-		return bz
-	}
-	// temp variables to save values
-	results, block, aggregateSignature := x.Results, x.Block, x.Signature
-	// remove the values from the struct
-	x.Results, x.Block, x.Signature = nil, nil, nil
-	// convert the structure into the sign bytes
-	signBytes, _ = Marshal(x)
-	// add back the removed values
-	x.Results, x.Block, x.Signature = results, block, aggregateSignature
-	return
-}
-
 // CheckBasic() performs 'sanity' checks on the Quorum Certificate structure
-// height may be optionally passed for View checking
 func (x *QuorumCertificate) CheckBasic() ErrorI {
-	// a valid QC must have either the proposal hash or the proposer key set
+	// a valid QC must have either the results hash or the proposer key set
 	if x == nil || (x.ResultsHash == nil && x.ProposerKey == nil) {
+		// exit with empty qc error
 		return ErrEmptyQuorumCertificate()
 	}
 	// sanity check the view of the QC
 	if err := x.Header.CheckBasic(); err != nil {
+		// exit with error
 		return err
 	}
 	// is QC with result (AFTER ELECTION)
 	if x.ResultsHash != nil {
-		// sanity check the hashes
+		// check the block hash for the proper size
 		if len(x.BlockHash) != crypto.HashSize {
 			return ErrInvalidBlockHash()
 		}
+		// check the result hash for the proper size
 		if len(x.ResultsHash) != crypto.HashSize {
 			return ErrInvalidResultsHash()
 		}
-		// results may be omitted in certain cases like for integrated blockchain block storage
+		// results may be omitted in certain cases like double sign evidence
 		if x.Results != nil {
 			if err := x.Results.CheckBasic(); err != nil {
 				return err
@@ -121,29 +65,37 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 		}
 		// block may be omitted in certain cases like the 'reward transaction'
 		if x.Block != nil {
-			blk := new(Block)
-			// convert the block bytes into a block
-			hash, err := blk.BytesToBlock(x.Block)
-			if err != nil {
-				return err
+			// create a new block object reference to ensure a non nil result
+			block := new(Block)
+			// populate the block structure with the block bytes in the certificate
+			hash, e := block.BytesToBlockHash(x.Block)
+			// if an error occurred during this conversion
+			if e != nil {
+				// exit with the error
+				return e
 			}
 			// check the block hash
 			if !bytes.Equal(x.BlockHash, hash) {
 				return ErrMismatchQCBlockHash()
 			}
+			// ensure the number of bytes in the block doesn't exceed the global max block size
 			blockSize := len(x.Block)
 			// global max block size enforcement
 			if blockSize > GlobalMaxBlockSize {
 				return ErrExpectedMaxBlockSize()
 			}
 		}
-	} else { // is QC with proposer key (ELECTION)
+		// is QC with proposer key (ELECTION)
+	} else {
+		// ensure the proposer key is the proper size
 		if len(x.ProposerKey) != crypto.BLS12381PubKeySize {
 			return ErrInvalidSigner()
 		}
+		// ensure the results and result hash are empty
 		if len(x.ResultsHash) != 0 || x.Results != nil {
 			return ErrMismatchResultsHash()
 		}
+		// ensure the block and block hash are empty
 		if len(x.BlockHash) != 0 || len(x.Block) != 0 {
 			return ErrNonNilBlock()
 		}
@@ -155,18 +107,22 @@ func (x *QuorumCertificate) CheckBasic() ErrorI {
 // Check() validates the QC by cross-checking the aggregate signature against the ValidatorSet
 // isPartialQC means a valid aggregate signature, but not enough signers for +2/3 majority
 func (x *QuorumCertificate) Check(vs ValidatorSet, maxBlockSize int, view *View, enforceHeights bool) (isPartialQC bool, error ErrorI) {
+	// do basic sanity checks on the certificate
 	if err := x.CheckBasic(); err != nil {
+		// exit with error
 		return false, err
 	}
+	// check the header
 	if err := x.Header.Check(view, enforceHeights); err != nil {
+		// exit with error
 		return false, err
 	}
-	if x.Block != nil {
-		// max block size enforcement
-		if len(x.Block) > maxBlockSize {
-			return false, ErrExpectedMaxBlockSize()
-		}
+	// enforce 'max block size'
+	if len(x.Block) > maxBlockSize {
+		// exit with error
+		return false, ErrExpectedMaxBlockSize()
 	}
+	// verify the aggregate signature in the certificate
 	return x.Signature.Check(x, vs)
 }
 
@@ -174,6 +130,7 @@ func (x *QuorumCertificate) Check(vs ValidatorSet, maxBlockSize int, view *View,
 func (x *QuorumCertificate) CheckProposalBasic(height, networkId, chainId uint64) (block *Block, err ErrorI) {
 	// ensure the block is not empty
 	if x.Block == nil {
+		// exit with nil block error
 		return nil, ErrNilBlock()
 	}
 	// create a new block object reference to ensure a non nil result
@@ -210,51 +167,80 @@ func (x *QuorumCertificate) CheckProposalBasic(height, networkId, chainId uint64
 	return
 }
 
-// EqualPayloads() checks to ensure a comparable certificate has the same height, block hash and result hash
+// CheckHighQC() performs validation on the special `HighQC` (justify unlock QC)
+func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, lastRootHeightUpdated uint64, vs ValidatorSet) ErrorI {
+	// validate the certificate and check the aggregate signature
+	isPartialQC, err := x.Check(vs, maxBlockSize, view, false)
+	// if an error occurred
+	if err != nil {
+		// exit with error
+		return err
+	}
+	// `highQCs` can't justify an unlock without +2/3 majority
+	if isPartialQC {
+		// exit with no +2/3
+		return ErrNoMaj23()
+	}
+	// invalid 'historical committee', if the root height of the committee is before that saved in state
+	if lastRootHeightUpdated > x.Header.RootHeight {
+		// exit with wrong root height error
+		return ErrWrongRootHeight()
+	}
+	// enforce same target height
+	if x.Header.Height != view.Height {
+		// exit with wrong height error
+		return ErrWrongHeight()
+	}
+	// a valid HighQC has the phase PRECOMMIT_VOTE as that's the phase where replicas 'Lock'
+	if x.Header.Phase != Phase_PROPOSE_VOTE {
+		// exit with wrong phase error
+		return ErrWrongPhase()
+	}
+	// exit
+	return nil
+}
+
+// SignBytes() returns the canonical byte representation used to digitally sign the bytes of the structure
+func (x *QuorumCertificate) SignBytes() (signBytes []byte) {
+	// if the certificate is for the phase 'election vote'
+	if x.Header != nil && x.Header.Phase == Phase_ELECTION_VOTE {
+		// create a simplified version of the qc
+		minified := &QuorumCertificate{Header: x.Header, ProposerKey: x.ProposerKey}
+		// convert the minified version to bytes
+		signBytes, _ = Marshal(minified)
+		// exit with the bytes
+		return
+	}
+	// create temp variables to save values
+	results, block, aggregateSignature := x.Results, x.Block, x.Signature
+	// remove the values from the struct
+	x.Results, x.Block, x.Signature = nil, nil, nil
+	// convert the structure into the sign bytes
+	signBytes, _ = Marshal(x)
+	// add back the removed values
+	x.Results, x.Block, x.Signature = results, block, aggregateSignature
+	// exit with the bytes
+	return
+}
+
+// EqualPayloads() compares the payloads only of two certs (can have different signatures)
 func (x *QuorumCertificate) EqualPayloads(compare *QuorumCertificate) bool {
+	// returns if both certificates have the same height, proposer key, block hash and result hash
 	return x != nil && x.Header != nil &&
+		bytes.Equal(x.ProposerKey, compare.ProposerKey) &&
 		x.Header.Height == compare.Header.Height &&
 		bytes.Equal(x.BlockHash, compare.BlockHash) &&
 		bytes.Equal(x.ResultsHash, compare.ResultsHash)
 }
 
-// CheckHighQC() performs additional validation on the special `HighQC` (justify unlock QC)
-func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, lastRootHeightUpdated uint64, vs ValidatorSet) ErrorI {
-	isPartialQC, err := x.Check(vs, maxBlockSize, view, false)
-	if err != nil {
-		return err
-	}
-	// `highQCs` can't justify an unlock without +2/3 majority
-	if isPartialQC {
-		return ErrNoMaj23()
-	}
-	// invalid 'historical committee', must be before the last committee height saved in the state
-	// if not, there is a potential for a long range attack
-	if lastRootHeightUpdated > x.Header.RootHeight {
-		return ErrWrongRootHeight()
-	}
-	// enforce same target height
-	if x.Header.Height != view.Height {
-		return ErrWrongHeight()
-	}
-	// a valid HighQC must have the phase must be PRECOMMIT_VOTE
-	// as that's the phase where replicas 'Lock'
-	if x.Header.Phase != Phase_PROPOSE_VOTE {
-		return ErrWrongPhase()
-	}
-	// the block hash nor results hash cannot be nil for a HighQC
-	// as it's after the election phase
-	if x.BlockHash == nil || x.ResultsHash == nil {
-		return ErrNilBlock()
-	}
-	return nil
-}
-
 // GetNonSigners() returns the public keys and the percentage (of voting power out of total) of those who did not sign the QC
 func (x *QuorumCertificate) GetNonSigners(vs *ConsensusValidators) (nonSignerPubKeys [][]byte, nonSignerPercent int, err ErrorI) {
+	// ensure both the certificate and the signature are non-nil
 	if x == nil || x.Signature == nil {
+		// exit with empty qc error
 		return nil, 0, ErrEmptyQuorumCertificate()
 	}
+	// retrieve the non-signers from the signature using teh validator set
 	return x.Signature.GetNonSigners(vs)
 }
 
@@ -272,6 +258,7 @@ type jsonQC struct {
 
 // MarshalJSON() implements the json.Marshaller interface
 func (x QuorumCertificate) MarshalJSON() ([]byte, error) {
+	// convert the quorum certificate to json bytes
 	return json.Marshal(jsonQC{
 		Header:      x.Header,
 		Results:     x.Results,
@@ -284,11 +271,15 @@ func (x QuorumCertificate) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON() implements the json.Unmarshaler interface
-func (x *QuorumCertificate) UnmarshalJSON(b []byte) (err error) {
-	var j jsonQC
-	if err = json.Unmarshal(b, &j); err != nil {
+func (x *QuorumCertificate) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new jsonQC object reference to ensure a non-nil result
+	j := new(jsonQC)
+	// populate the jsonQC with json bytes
+	if err = json.Unmarshal(jsonBytes, &j); err != nil {
+		// exit with error
 		return
 	}
+	// set the underlying object using the json qc values
 	*x = QuorumCertificate{
 		Header:      j.Header,
 		Results:     j.Results,
@@ -298,53 +289,76 @@ func (x *QuorumCertificate) UnmarshalJSON(b []byte) (err error) {
 		ProposerKey: j.ProposerKey,
 		Signature:   j.Signature,
 	}
-	return nil
+	// exit
+	return
 }
 
-// 	A CertificateResult contains Canopy information for what happens to stakeholders as a result of the BFT
+// A CertificateResult contains actions on stakeholders as determined by the consensus process
 
 // CERTIFICATE RESULT CODE BELOW
 
 // CheckBasic() provides basic 'sanity' checks on the CertificateResult structure
-func (x *CertificateResult) CheckBasic() ErrorI {
+func (x *CertificateResult) CheckBasic() (err ErrorI) {
+	// ensure the certificate result is not nil
 	if x == nil {
+		// exit with empty certificate results error
 		return ErrNilCertResults()
 	}
-	if err := x.RewardRecipients.CheckBasic(); err != nil {
-		return err
+	// do basic sanity checks on the reward recipients
+	if err = x.RewardRecipients.CheckBasic(); err != nil {
+		// exit with error
+		return
 	}
-	if err := x.SlashRecipients.CheckBasic(); err != nil {
-		return err
+	// do basic sanity checks on the slash recipients
+	if err = x.SlashRecipients.CheckBasic(); err != nil {
+		// exit with error
+		return
 	}
-	if err := x.Orders.CheckBasic(); err != nil {
-		return err
+	// do basic sanity checks on the swaps
+	if err = x.Orders.CheckBasic(); err != nil {
+		// exit with error
+		return
 	}
+	// do basic sanity check on the 'checkpoint'
 	return x.Checkpoint.CheckBasic()
 }
 
 // Equals() compares two certificate results to ensure equality
 func (x *CertificateResult) Equals(y *CertificateResult) bool {
+	// if either of the certificate results are nil
 	if x == nil || y == nil {
+		// return unequal
 		return false
 	}
+	// if the reward recipients aren't equal
 	if !x.RewardRecipients.Equals(y.RewardRecipients) {
+		// return unequal
 		return false
 	}
+	// if the slash recipients aren't equal
 	if !x.SlashRecipients.Equals(y.SlashRecipients) {
+		// return unequal
 		return false
 	}
+	// if the swaps aren't equal
 	if !x.Orders.Equals(y.Orders) {
+		// return unequal
 		return false
 	}
+	// if checkpoints aren't equal
 	if !x.Checkpoint.Equals(y.Checkpoint) {
+		// return unequal
 		return false
 	}
+	// return equality based on the final field
 	return x.Retired == y.Retired
 }
 
 // Hash() returns the cryptographic hash of the canonical Sign Bytes of the CertificateResult
 func (x *CertificateResult) Hash() []byte {
+	// convert the certificate results to proto bytes
 	bz, _ := Marshal(x)
+	// return the hash of the bytes
 	return crypto.Hash(bz)
 }
 
@@ -352,13 +366,16 @@ func (x *CertificateResult) Hash() []byte {
 
 // CheckBasic() performs a basic 'sanity check' on the structure
 func (x *RewardRecipients) CheckBasic() (err ErrorI) {
+	// ensure the reward recipients aren't null
 	if x == nil {
+		// exit with null error
 		return ErrNilRewardRecipients()
 	}
 	// validate the number of recipients
 	paymentRecipientCount := len(x.PaymentPercents)
-	// ensure not zero or bigger than 100
+	// ensure the count is not zero nor is bigger than 100
 	if paymentRecipientCount == 0 || paymentRecipientCount > 100 {
+		// exit with invalid payment recipients count
 		return ErrPaymentRecipientsCount()
 	}
 	// create a map to ensure the payment percents don't exceed 100% per chain
@@ -367,73 +384,103 @@ func (x *RewardRecipients) CheckBasic() (err ErrorI) {
 	for _, pp := range x.PaymentPercents {
 		// ensure each percent isn't nil
 		if pp == nil {
+			// exit with an invalid payment percent allocation
 			return ErrInvalidPercentAllocation()
 		}
-		// ensure the payment percent chain id is valid
+		// ensure the chain id isn't 0
 		if pp.ChainId == 0 {
+			// exit with empty chain id
 			return ErrEmptyChainId()
 		}
 		// ensure each percent address is the right size
 		if len(pp.Address) != crypto.AddressSize {
+			// exit with invalid recipient
 			return ErrInvalidAddress()
 		}
 		// add to total percent
 		chainMap[pp.ChainId] += pp.Percent
 		// ensure the percent doesn't exceed 100
 		if chainMap[pp.ChainId] > 100 {
+			// exit with allocation error
 			return ErrInvalidPercentAllocation()
 		}
 	}
+	// exit
 	return
 }
 
 // Equals() compares two RewardRecipients for equality
 func (x *RewardRecipients) Equals(y *RewardRecipients) bool {
+	// if both of the reward recipients are empty
 	if x == nil && y == nil {
+		// exit with 'equal'
 		return true
 	}
+	// if either of the reward recipients are empty
 	if x == nil || y == nil {
+		// exit with 'unequal'
 		return false
 	}
+	// if the payment percents sizes differ
 	if len(x.PaymentPercents) != len(y.PaymentPercents) {
+		// exit with 'unequal'
 		return false
 	}
+	// for each payment percent
 	for i, pp := range x.PaymentPercents {
-		if !bytes.Equal(pp.Address, y.PaymentPercents[i].Address) {
+		// if the address differs in the payment percent
+		if pp.ChainId != y.PaymentPercents[i].ChainId {
+			// exit with 'unequal'
 			return false
 		}
+		// if the address differs in the payment percent
+		if !bytes.Equal(pp.Address, y.PaymentPercents[i].Address) {
+			// exit with 'unequal'
+			return false
+		}
+		// if the percent allocation differs
 		if pp.Percent != y.PaymentPercents[i].Percent {
+			// exit with 'unequal'
 			return false
 		}
 	}
+	// exit with an equality check on the final field
 	return x.NumberOfSamples == y.NumberOfSamples
 }
 
 // jsonRewardRecipients is the RewardRecipients implementation of json.Marshaller and json.Unmarshaler
 type jsonRewardRecipients struct {
-	PaymentPercents []*PaymentPercents `json:"paymentPercents,omitempty"` // recipients of the block reward by percentage
-	NumberOfSamples uint64             `json:"numberOfSamples,omitempty"`
-}
-
-// UnmarshalJSON() satisfies the json.Unmarshaler interface
-func (x *RewardRecipients) UnmarshalJSON(i []byte) error {
-	j := new(jsonRewardRecipients)
-	if err := json.Unmarshal(i, j); err != nil {
-		return err
-	}
-	*x = RewardRecipients{
-		PaymentPercents: j.PaymentPercents,
-		NumberOfSamples: j.NumberOfSamples,
-	}
-	return nil
+	// recipients of the block reward by percentage
+	PaymentPercents []*PaymentPercents `json:"paymentPercents,omitempty"`
+	// number of samples combined (only applicable at state machine level)
+	NumberOfSamples uint64 `json:"numberOfSamples,omitempty"`
 }
 
 // MarshalJSON() satisfies the json.Marshaller interface
-func (x *RewardRecipients) MarshalJSON() ([]byte, error) {
+func (x RewardRecipients) MarshalJSON() ([]byte, error) {
+	// convert the reward recipients to json bytes using the json structure
 	return json.Marshal(jsonRewardRecipients{
 		PaymentPercents: x.PaymentPercents,
 		NumberOfSamples: x.NumberOfSamples,
 	})
+}
+
+// UnmarshalJSON() satisfies the json.Unmarshaler interface
+func (x *RewardRecipients) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// initialize a new reward recipients object reference to ensure a non-nil result
+	j := new(jsonRewardRecipients)
+	// populate the object reference using the json object reference
+	if err = json.Unmarshal(jsonBytes, j); err != nil {
+		// exit with error
+		return
+	}
+	// populate the underlying object using the json object reference
+	*x = RewardRecipients{
+		PaymentPercents: j.PaymentPercents,
+		NumberOfSamples: j.NumberOfSamples,
+	}
+	// exit
+	return
 }
 
 // PAYMENT PERCENTS CODE BELOW
@@ -446,7 +493,8 @@ type jsonPaymentPercents struct {
 }
 
 // MarshalJSON() satisfies the json.Marshaller interface
-func (x *PaymentPercents) MarshalJSON() ([]byte, error) {
+func (x PaymentPercents) MarshalJSON() ([]byte, error) {
+	// convert the payment percents to json bytes using the json object
 	return json.Marshal(jsonPaymentPercents{
 		Address:  x.Address,
 		Percents: x.Percent,
@@ -455,134 +503,221 @@ func (x *PaymentPercents) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON() satisfies the json.Unmarshaler interface
-func (x *PaymentPercents) UnmarshalJSON(b []byte) error {
-	var pp jsonPaymentPercents
-	if err := json.Unmarshal(b, &pp); err != nil {
-		return err
+func (x *PaymentPercents) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new object reference for payment percents
+	pp := new(jsonPaymentPercents)
+	// populate the object using the json bytes
+	if err = json.Unmarshal(jsonBytes, &pp); err != nil {
+		// exit with error
+		return
 	}
+	// populate the underlying object using the json object ref
 	x.Address, x.Percent, x.ChainId = pp.Address, pp.Percents, pp.ChainId
-	return nil
+	// exit
+	return
 }
 
 // SLASH RECIPIENTS CODE BELOW
 
 // CheckBasic() validates the ProposalMeta structure
-func (x *SlashRecipients) CheckBasic() ErrorI {
-	if x != nil {
-		for _, r := range x.DoubleSigners {
-			if r == nil {
-				return ErrInvalidDoubleSigner()
-			}
+func (x *SlashRecipients) CheckBasic() (err ErrorI) {
+	// if the slash recipients are nil
+	if x == nil {
+		// exit without error
+		return
+	}
+	// for each double signer
+	for _, r := range x.DoubleSigners {
+		// if the double signer is nil
+		if r == nil || r.Heights == nil || r.Id == nil {
+			// exit with error
+			return ErrInvalidDoubleSigner()
 		}
 	}
-	return nil
+	// exit
+	return
 }
 
 // Equals() compares two SlashRecipients for equality
 func (x *SlashRecipients) Equals(y *SlashRecipients) bool {
+	// if the slash recipients are both empty
 	if x == nil && y == nil {
+		// exit with 'equal'
 		return true
 	}
+	// if either of the slash recipients are not empty
 	if x == nil || y == nil {
+		// exit with 'unequal'
 		return false
 	}
+	// if the double signers differ in length
 	if len(x.DoubleSigners) != len(y.DoubleSigners) {
+		// exit with 'unequal'
 		return false
 	}
+	// for each double signer
 	for i, ds := range x.DoubleSigners {
+		// if the id is not equal
 		if !bytes.Equal(ds.Id, y.DoubleSigners[i].Id) {
+			// exit with 'unequal'
 			return false
 		}
+		// if the heights are not equal
 		if !slices.Equal(ds.Heights, y.DoubleSigners[i].Heights) {
+			// exit with 'unequal'
 			return false
 		}
 	}
+	// exit with 'equal'
 	return true
 }
 
 // jsonSlashRecipients is the SlashRecipients implementation of json.Marshaller and json.Unmarshaler
 type jsonSlashRecipients struct {
-	DoubleSigners []*DoubleSigner `json:"doubleSigners,omitempty"` // who did the bft decide was a double signer
-}
-
-// UnmarshalJSON() satisfies the json.Unmarshaler interface
-func (x *SlashRecipients) UnmarshalJSON(i []byte) error {
-	j := new(jsonSlashRecipients)
-	if err := json.Unmarshal(i, j); err != nil {
-		return err
-	}
-	*x = SlashRecipients{
-		DoubleSigners: j.DoubleSigners,
-	}
-	return nil
+	// the actors the bft quorum agreed were double signers
+	DoubleSigners []*DoubleSigner `json:"doubleSigners,omitempty"`
 }
 
 // MarshalJSON() satisfies the json.Marshaller interface
-func (x *SlashRecipients) MarshalJSON() ([]byte, error) {
+func (x SlashRecipients) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonSlashRecipients{DoubleSigners: x.DoubleSigners})
+}
+
+// UnmarshalJSON() satisfies the json.Unmarshaler interface
+func (x *SlashRecipients) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new object reference
+	j := new(jsonSlashRecipients)
+	// populate the object reference using the json bytes
+	if err = json.Unmarshal(jsonBytes, j); err != nil {
+		// exit with error
+		return
+	}
+	// set the underlying object using the json obj ref
+	*x = SlashRecipients{
+		DoubleSigners: j.DoubleSigners,
+	}
+	// exit
+	return
 }
 
 // ORDERS CODE BELOW
 
 // CheckBasic() performs stateless validation on an Orders object
-func (x *Orders) CheckBasic() ErrorI {
+func (x *Orders) CheckBasic() (err ErrorI) {
+	// if the orders are empty
 	if x == nil {
-		return nil
+		// exit with no error
+		return
 	}
-	// check the buy orders
+	// for each buy order
 	for _, buy := range x.BuyOrders {
+		// if the buy order is empty
 		if buy == nil {
+			// exit with empty error
 			return ErrNilBuyOrder()
 		}
-		if buy.BuyerReceiveAddress == nil {
+		// ensure the sending address actually has some bytes
+		if len(buy.BuyerSendAddress) == 0 {
+			// exit with address error
+			return ErrInvalidBuyerSendAddress()
+		}
+		// ensure the receive address is exactly 20 bytes
+		if len(buy.BuyerReceiveAddress) != crypto.AddressSize {
+			// exit with address error
 			return ErrInvalidBuyerReceiveAddress()
 		}
 	}
-	return nil
+	// ensure no duplicates in the resets
+	deDuplicator := NewDeDuplicator[uint64]()
+	// for each reset order
+	for _, reset := range x.ResetOrders {
+		// if a duplicate found
+		if deDuplicator.Found(reset) {
+			// exit with the duplicate reset order
+			return ErrDuplicateResetOrder()
+		}
+	}
+	// ensure no duplicates in the closes
+	deDuplicator = NewDeDuplicator[uint64]()
+	// for each close order
+	for _, reset := range x.CloseOrders {
+		// if a duplicate found
+		if deDuplicator.Found(reset) {
+			// exit with the duplicate close order
+			return ErrDuplicateCloseOrder()
+		}
+	}
+	// exit
+	return
 }
 
 // Equals() compares two Orders for equality
 func (x *Orders) Equals(y *Orders) bool {
+	// if both of the orders are empty
 	if x == nil && y == nil {
+		// exit with 'equal'
 		return true
 	}
+	// if either of the orders are empty
 	if x == nil || y == nil {
+		// exit with 'unequal'
 		return false
 	}
+	// if the close orders lists are not equal
 	if !slices.Equal(x.CloseOrders, y.CloseOrders) {
+		// exit with 'unequal'
 		return false
 	}
+	// if the reset orders lists are not equal
 	if !slices.Equal(x.ResetOrders, y.ResetOrders) {
+		// exit with 'unequal'
 		return false
 	}
+	// if the buy orders lists are not equal size
 	if len(x.BuyOrders) != len(y.BuyOrders) {
+		// exit with 'unequal'
 		return false
 	}
-	for i, o := range x.BuyOrders {
-		if !o.Equals(y.BuyOrders[i]) {
+	// for each buy order
+	for i, buyOrder := range x.BuyOrders {
+		// if the individual buy orders are unequal
+		if !buyOrder.Equals(y.BuyOrders[i]) {
+			// exit with 'unequal'
 			return false
 		}
 	}
+	// exit with 'equal'
 	return true
 }
 
 // Equals() compares two BuyOrders for equality
 func (x *BuyOrder) Equals(y *BuyOrder) bool {
+	// if both the buy orders are empty
 	if x == nil && y == nil {
+		// exit with 'equal'
 		return true
 	}
+	// if either of the buy orders are empty
 	if x == nil || y == nil {
+		// exit with 'unequal'
 		return false
 	}
+	// if the order buyers receive addresses are not the same
 	if !bytes.Equal(x.BuyerReceiveAddress, y.BuyerReceiveAddress) {
+		// exit with 'unequal'
 		return false
 	}
+	// if the order buyers send addresses are not the same
 	if !bytes.Equal(x.BuyerSendAddress, y.BuyerSendAddress) {
+		// exit with 'unequal'
 		return false
 	}
+	// if the order ids are not the same
 	if x.OrderId != y.OrderId {
+		// exit with 'unequal'
 		return false
 	}
+	// exit with the final equality check
 	return x.BuyerChainDeadline == y.BuyerChainDeadline
 }
 
@@ -601,6 +736,7 @@ type buyOrderJSON struct {
 
 // MarshalJSON() implements the json.Marshaller interface for BuyOrder
 func (x BuyOrder) MarshalJSON() ([]byte, error) {
+	// convert the buy order to json bytes using the json object
 	return json.Marshal(&buyOrderJSON{
 		OrderId:             x.OrderId,
 		BuyersSendAddress:   x.BuyerSendAddress,
@@ -610,44 +746,61 @@ func (x BuyOrder) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON() implements the json.Unmarshaler interface for BuyOrder
-func (x *BuyOrder) UnmarshalJSON(b []byte) (err error) {
+func (x *BuyOrder) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new json object reference to ensure a non nil result
 	j := new(buyOrderJSON)
-	if err = json.Unmarshal(b, j); err != nil {
+	// populate the json object ref with json bytes
+	if err = json.Unmarshal(jsonBytes, j); err != nil {
+		// exit with error
 		return
 	}
+	// populate the underlying structure using the json object
 	*x = BuyOrder{
 		OrderId:             j.OrderId,
 		BuyerReceiveAddress: j.BuyerReceiveAddress,
 		BuyerSendAddress:    j.BuyersSendAddress,
 		BuyerChainDeadline:  j.BuyerChainDeadline,
 	}
+	// exit
 	return
 }
 
 // CHECKPOINT CODE BELOW
 
 // CheckBasic() performs stateless validation on a Checkpoint object
-func (x *Checkpoint) CheckBasic() ErrorI {
+func (x *Checkpoint) CheckBasic() (err ErrorI) {
+	// if the checkpoint is empty
 	if x == nil {
-		return nil
+		// exit without error
+		return
 	}
+	// if the block hash size is larger than 100
 	if len(x.BlockHash) > 100 {
+		// exit with error
 		return ErrInvalidBlockHash()
 	}
-	return nil
+	// exit
+	return
 }
 
 // Equals() compares two Checkpoints for equality
 func (x *Checkpoint) Equals(y *Checkpoint) bool {
+	// if both of the checkpoints are empty
 	if x == nil && y == nil {
+		// exit with 'equal'
 		return true
 	}
+	// if either of the checkpoints are empty
 	if x == nil || y == nil {
+		// exit with 'unequal'
 		return false
 	}
+	// if the block hashes are not equal
 	if !bytes.Equal(x.BlockHash, y.BlockHash) {
+		// exit with 'unequal'
 		return false
 	}
+	// exit with the final equality check
 	return x.Height == y.Height
 }
 
@@ -655,10 +808,11 @@ func (x *Checkpoint) Equals(y *Checkpoint) bool {
 // such that the Payment Percentages may be equally weighted when performing reward distribution calculations
 // NOTE: merging percents will exceed 100% over multiple samples, but are normalized using the NumberOfSamples field
 // NOTE: if the 'chainId' designation doesn't match the 'self' chainId, the payment percent is ignored
-func (x *CommitteeData) Combine(data *CommitteeData, chainId uint64) ErrorI {
+func (x *CommitteeData) Combine(data *CommitteeData, chainId uint64) (err ErrorI) {
 	// safety check to ensure the data is not null
 	if data == nil {
-		return nil
+		// exit without error
+		return
 	}
 	// for each payment percent
 	for _, p := range data.PaymentPercents {
@@ -679,7 +833,8 @@ func (x *CommitteeData) Combine(data *CommitteeData, chainId uint64) ErrorI {
 		LastRootHeightUpdated:  data.LastRootHeightUpdated,  // update the root height
 		LastChainHeightUpdated: data.LastChainHeightUpdated, // update the chain height
 	}
-	return nil
+	// exit
+	return
 }
 
 // addPercents() is a helper function that adds reward distribution percents on behalf of an address
@@ -712,15 +867,73 @@ type jsonDoubleSigner struct {
 
 // MarshalJSON() implements the json.Marshaller interface for double signers
 func (x DoubleSigner) MarshalJSON() ([]byte, error) {
+	// convert the double signers to json bytes using a json object
 	return MarshalJSON(jsonDoubleSigner{Id: x.Id, Heights: x.Heights})
 }
 
 // MarshalJSON() implements the json.Unmarshaler interface for double signers
-func (x *DoubleSigner) UnmarshalJSON(bz []byte) (err error) {
+func (x *DoubleSigner) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new json object reference to ensure a non nil result
 	j := new(jsonDoubleSigner)
-	if err = json.Unmarshal(bz, j); err != nil {
+	// populate the object ref using json bytes
+	if err = json.Unmarshal(jsonBytes, j); err != nil {
 		return
 	}
+	// populate the underlying struct using the json object
 	*x = DoubleSigner{Id: j.Id, Heights: j.Heights}
+	// exit
 	return
+}
+
+func init() {
+	// calculate the MaxBlockHeader programmatically
+	maxBlockHeader, err := Marshal(&BlockHeader{
+		Height:             math.MaxUint64,
+		Hash:               crypto.MaxHash,
+		NetworkId:          math.MaxInt8,
+		Time:               math.MaxUint32,
+		NumTxs:             math.MaxUint64,
+		TotalTxs:           math.MaxUint64,
+		TotalVdfIterations: math.MaxUint64,
+		LastBlockHash:      crypto.MaxHash,
+		StateRoot:          crypto.MaxHash,
+		TransactionRoot:    crypto.MaxHash,
+		ValidatorRoot:      crypto.MaxHash,
+		NextValidatorRoot:  crypto.MaxHash,
+		ProposerAddress:    crypto.MaxHash,
+		Vdf: &crypto.VDF{
+			Proof:      bytes.Repeat([]byte("F"), 528),
+			Output:     bytes.Repeat([]byte("F"), 528),
+			Iterations: math.MaxUint64,
+		},
+		LastQuorumCertificate: &QuorumCertificate{
+			Header: &View{
+				NetworkId:  math.MaxInt8,
+				ChainId:    math.MaxUint64,
+				Height:     math.MaxUint64,
+				RootHeight: math.MaxUint64,
+				Round:      math.MaxUint64,
+				Phase:      math.MaxInt8,
+			},
+			ResultsHash: crypto.MaxHash,
+			BlockHash:   crypto.MaxHash,
+			ProposerKey: bytes.Repeat([]byte("F"), crypto.BLS12381PubKeySize),
+			Signature: &AggregateSignature{
+				Signature: bytes.Repeat([]byte("F"), crypto.BLS12381SignatureSize),
+				Bitmap:    bytes.Repeat([]byte("F"), crypto.MaxBitmapSize(100)),
+			},
+		},
+	})
+	// if an error occurred during the byte conversion or calculation
+	if err != nil {
+		// fatal exit program
+		panic(err)
+	}
+	// set the max block header
+	MaxBlockHeaderSize = uint64(len(maxBlockHeader))
+	// do a sanity check of the expected size to make developers aware if something changed
+	if MaxBlockHeaderSize != ExpectedMaxBlockHeaderSize {
+		// fatal exit and descriptive warning
+		panic(fmt.Sprintf("Max_Header_Size changed from %d to %d; This is a consensus breaking change", ExpectedMaxBlockHeaderSize, MaxBlockHeaderSize))
+	}
 }

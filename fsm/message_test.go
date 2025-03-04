@@ -1874,6 +1874,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 		Orders: &lib.Orders{
 			BuyOrders: []*lib.BuyOrder{{
 				OrderId:             0,
+				BuyerSendAddress:    newTestAddressBytes(t),
 				BuyerReceiveAddress: newTestAddressBytes(t),
 				BuyerChainDeadline:  100,
 			}},

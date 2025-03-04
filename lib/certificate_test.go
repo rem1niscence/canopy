@@ -309,6 +309,30 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 		},
 		{
 			name:   "invalid buy order",
+			detail: "a buy order send address is invalid",
+			result: &CertificateResult{
+				RewardRecipients: &RewardRecipients{
+					PaymentPercents: []*PaymentPercents{{
+						Address: newTestAddressBytes(t),
+						ChainId: CanopyChainId,
+						Percent: 100,
+					}},
+				},
+				Orders: &Orders{
+					BuyOrders: []*BuyOrder{
+						{
+							OrderId:             0,
+							BuyerSendAddress:    nil,
+							BuyerReceiveAddress: nil,
+							BuyerChainDeadline:  0,
+						},
+					},
+				},
+			},
+			error: "invalid buyer send address",
+		},
+		{
+			name:   "invalid buy order",
 			detail: "a buy order receive address is invalid",
 			result: &CertificateResult{
 				RewardRecipients: &RewardRecipients{
@@ -322,6 +346,7 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 					BuyOrders: []*BuyOrder{
 						{
 							OrderId:             0,
+							BuyerSendAddress:    newTestAddressBytes(t),
 							BuyerReceiveAddress: nil,
 							BuyerChainDeadline:  0,
 						},

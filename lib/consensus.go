@@ -248,15 +248,22 @@ type LotteryWinner struct {
 
 // CheckBasic() validates the basic structure and length of the AggregateSignature
 func (x *AggregateSignature) CheckBasic() ErrorI {
+	// ensure the aggregate signature is not nil
 	if x == nil {
+		// exit with empty error
 		return ErrEmptyAggregateSignature()
 	}
+	// ensure the signature bytes are the proper size
 	if len(x.Signature) != crypto.BLS12381SignatureSize {
+		// exit with signature size error
 		return ErrInvalidAggrSignatureLength()
 	}
+	// ensure the bitmap is not empty
 	if len(x.Bitmap) == 0 {
+		// exit with empty bitmap error
 		return ErrEmptySignerBitmap()
 	}
+	// exit
 	return nil
 }
 
@@ -464,33 +471,46 @@ const (
 
 // VIEW CODE BELOW
 
-func (x *View) CheckBasic() ErrorI {
+func (x *View) CheckBasic() (err ErrorI) {
+	// check if the view is empty
 	if x == nil {
+		// exit with empty error
 		return ErrEmptyView()
 	}
 	// round and phase are not further checked,
 	// because peers may be sending valid messages
 	// asynchronously from different views
-	return nil
+	return
 }
 
 // Check() checks the validity of the view and optionally enforce *heights* (plugin height and committee height)
 func (x *View) Check(view *View, enforceHeights bool) ErrorI {
+	// do a basic sanity check on the view
 	if err := x.CheckBasic(); err != nil {
+		// exit with err
 		return err
 	}
+	// ensure the network id in the view matches expected
 	if view.NetworkId != x.NetworkId {
+		// exit with network id error
 		return ErrWrongNetworkID()
 	}
+	// ensure the chain id in the view matches expected
 	if view.ChainId != x.ChainId {
+		// exit with chain id error
 		return ErrWrongChainId()
 	}
+	// if enforcing heights, ensure the chain height is correct
 	if enforceHeights && x.Height != view.Height {
+		// exit with wrong height error
 		return ErrWrongHeight()
 	}
+	// if enforcing heights, ensure root height is correct
 	if enforceHeights && x.RootHeight != view.RootHeight {
+		// exit with wrong root height error
 		return ErrWrongRootHeight()
 	}
+	// exit
 	return nil
 }
 
