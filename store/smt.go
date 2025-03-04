@@ -442,6 +442,11 @@ func (s *SMT) GetMerkleProof(k []byte) ([]*lib.Node, lib.ErrorI) {
 	if err := s.traverse(); err != nil {
 		return nil, err
 	}
+	// add the target node as the initial value of the proof
+	proof = append(proof, &lib.Node{
+		Key:   s.current.Key.bytes(),
+		Value: s.current.Value,
+	})
 	// Add current to the list of traversed nodes until the actual node
 	// in case of proof of membership. for proof of non membembershio, the
 	// possible location of the node is added instead
@@ -464,26 +469,8 @@ func (s *SMT) GetMerkleProof(k []byte) ([]*lib.Node, lib.ErrorI) {
 			Value:   siblingNode.Value,
 			Bitmask: int32(order),
 		})
-		// If the proof slice contains only a single node, it signifies that it includes
-		// only the leaf node. Verify the sibling's position to ascertain whether
-		// it is a left or right child.
-		if len(proof) == 1 {
-			proof = append(proof, &lib.Node{
-				Key:   node.Key.bytes(),
-				Value: node.Value,
-				// This bitmask is used to determine the position of the sibling leaf in
-				// the proof slice.
-				Bitmask: int32(order),
-			})
-			// If it is a left child, swap the node and its sibling to ensure that
-			// the left sibling is always the first element in the proof slice and the
-			// right sibling is the second element.
-			if order == leftChild {
-				proof[0], proof[1] = proof[1], proof[0]
-			}
-		}
 	}
-
+	// return the proof
 	return proof, nil
 }
 
@@ -497,18 +484,15 @@ func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []by
 	if proofLen < 2 {
 		return false, ErrInvalidMerkleTreeProof()
 	}
-	// nodeIdx is the index of the leaf node in the proof slice. For membership
-	// proofs, it represents the actual value being proven. For non-membership proofs,
-	// it indicates the potential location of the node. Since the bitmask can only
-	// be 0 or 1, and the left sibling is always the first element in the proof slice,
-	// the node index can be determined by checking the bitmask of the first element.
-	nodeIdx := int(proof[0].Bitmask)
-	// built the initial root hash using the node idx
-	hash := proof[nodeIdx].Value
+	// The target is always the first value in the proof. For membership
+	// proofs, it represents the actual value being verified. For non-membership proofs,
+	// it indicates the potential location of the node. The initial root hash
+	// can be constructed using this value.
+	hash := proof[0].Value
 	// currentKey is the key of the sibling node at any given height, it is used to
 	// calculate the parent node's key by finding the greatest common prefix (GCP)
 	// of the current node's and its sibling's keys
-	currentKey := new(key).fromBytes(proof[nodeIdx].Key)
+	currentKey := new(key).fromBytes(proof[0].Key)
 	// create a new in-memory store to reconstruct the tree
 	memStore, err := NewStoreInMemory(lib.NewDefaultLogger())
 	if err != nil {
@@ -521,7 +505,7 @@ func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []by
 	// set the node being proven in the new tree
 	if err := smt.setNode(&node{
 		Node: lib.Node{
-			Value: proof[nodeIdx].Value,
+			Value: proof[0].Value,
 			Key:   currentKey.bytes(),
 		},
 		Key: currentKey,
@@ -529,12 +513,7 @@ func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []by
 		return false, err
 	}
 	// reconstruct the tree from the bottom up using the proof slice
-	for i := 0; i < proofLen; i++ {
-		// skip the node being proven as it is used for the initial values of the hash
-		// and the current key
-		if i == nodeIdx {
-			continue
-		}
+	for i := 1; i < proofLen; i++ {
 		// parentNode will be calculated based on the current node and its sibling
 		var parentNode *node
 		// calculate the hash of the parent node based on the bitmask of the sibling
@@ -622,7 +601,7 @@ func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []by
 	// proof-of-non-membership, as the intermediate nodes are built using the
 	// children's keys and values. A mismatch in values indicates that the Merkle
 	// root could not have been derived from this data.
-	return bytes.Equal(proof[nodeIdx].Value, crypto.Hash(v)), nil
+	return bytes.Equal(proof[0].Value, crypto.Hash(v)), nil
 }
 
 // NODE KEY CODE BELOW
