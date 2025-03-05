@@ -51,7 +51,7 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 		// exit
 		return
 	}
-	// handle the transaction on the root-Chain
+	// handle the transaction on the root-chain
 	hash, err := c.RootChainInfo.RemoteCallbacks.Transaction(tx)
 	// if an error occurred during the tx submission
 	if err != nil {
@@ -176,7 +176,7 @@ func (c *Controller) addPaymentPercent(toAdd *lib.LotteryWinner, results *lib.Ce
 func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.CertificateResult, rootChainHeight uint64) {
 	// parse the last block for 'lock orders'
 	lockOrders := c.FSM.ParseLockOrders(blockResult)
-	// get orders from the root-Chain
+	// get orders from the root-chain
 	orders, err := c.LoadRootChainOrderBook(rootChainHeight)
 	// if an error occurred while loading the orders
 	if err != nil {
@@ -193,7 +193,7 @@ func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.Cert
 	}
 }
 
-// CalculateSlashRecipients() calculates the addresses who receive slashes on the root-Chain
+// CalculateSlashRecipients() calculates the addresses who receive slashes on the root-chain
 func (c *Controller) CalculateSlashRecipients(results *lib.CertificateResult, be *bft.ByzantineEvidence) {
 	// define an error variable to be able to populate the Double signers directly
 	var err lib.ErrorI

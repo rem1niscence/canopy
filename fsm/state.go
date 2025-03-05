@@ -223,12 +223,14 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 // LoadCommittee() loads the committee validators for a particular committee at a particular height
 func (s *StateMachine) LoadCommittee(chainId uint64, height uint64) (lib.ValidatorSet, lib.ErrorI) {
 	// get the historical state at the height
-	fsm, err := s.TimeMachine(height)
+	historicalFSM, err := s.TimeMachine(height)
 	if err != nil {
 		return lib.ValidatorSet{}, err
 	}
+	// memory management for the historical FSM call
+	defer historicalFSM.Discard()
 	// return the 'committee members' (validator set) for that height
-	return fsm.GetCommitteeMembers(chainId)
+	return historicalFSM.GetCommitteeMembers(chainId)
 }
 
 // LoadCertificate() loads a quorum certificate (block, results + 2/3rd committee signatures)

@@ -103,12 +103,12 @@ func (b *BFT) Start() {
 			}()
 
 		// RESET BFT
-		// - This triggers when receiving a new Commit Block (QC) from either Root-ChainId (a) or the Target-ChainId (b)
+		// - This triggers when receiving a new Commit Block (QC) from either root-chainId (a) or the Target-ChainId (b)
 		case resetBFT := <-b.ResetBFT:
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
-				// if is a root-Chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
+				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
 				// else increment the height and don't maintain locks
 				b.NewHeight(resetBFT.IsRootChainUpdate)
 				// if not a base chain update, reset the timers
@@ -824,7 +824,7 @@ type (
 		Unlock()
 		// ChainHeight returns the height of the target-chain
 		ChainHeight() uint64
-		// RootChainHeight returns the height of the root-Chain
+		// RootChainHeight returns the height of the root-chain
 		RootChainHeight() uint64
 		// ProduceProposal() as a Leader, create a Proposal in the form of a block and certificate results
 		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
@@ -845,7 +845,7 @@ type (
 		// Syncing() returns true if the plugin is currently syncing
 		Syncing() *atomic.Bool
 
-		/* Root-Chain Functionality Below*/
+		/* root-chain Functionality Below*/
 
 		// SendCertificateResultsTx() is a P2P call that allows a Leader to submit their CertificateResults (reward) transaction
 		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
@@ -856,7 +856,7 @@ type (
 		// LoadLastProposers() loads the last Canopy committee proposers for sortition data
 		LoadLastProposers(rootHeight uint64) (*lib.Proposers, lib.ErrorI)
 		// LoadMinimumEvidenceHeight() loads the Canopy enforced minimum height for valid Byzantine Evidence
-		LoadMinimumEvidenceHeight(rootHeight uint64) (uint64, lib.ErrorI)
+		LoadMinimumEvidenceHeight() (uint64, lib.ErrorI)
 		// IsValidDoubleSigner() checks to see if the double signer is valid for this specific height
 		IsValidDoubleSigner(height uint64, address []byte) bool
 	}

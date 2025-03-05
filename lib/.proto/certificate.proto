@@ -55,7 +55,7 @@ message CertificateResult {
   Orders orders = 3;
   // checkpoint: contains information from the 3rd party chain in order for Canopy to provide Checkpoint-as-a-Service
   Checkpoint checkpoint = 4;
-  // retired: signals if the committee wants to shut down and mark itself as 'forever unsubsidized' on the root-Chain
+  // retired: signals if the committee wants to shut down and mark itself as 'forever unsubsidized' on the root-chain
   bool retired = 5;
 }
 

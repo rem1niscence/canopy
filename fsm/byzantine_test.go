@@ -465,9 +465,9 @@ func TestHandleDoubleSigners(t *testing.T) {
 			require.NoError(t, e)
 			valParams.DoubleSignSlashPercentage = 1
 			require.NoError(t, sm.SetParamsVal(valParams))
+			s := sm.Store().(lib.StoreI)
 			// preset the double signers
 			for _, doubleSigner := range test.preset {
-				s := sm.Store().(lib.StoreI)
 				// get the address of the double signer
 				pub, err := crypto.NewPublicKeyFromBytes(doubleSigner.Id)
 				require.NoError(t, err)
@@ -476,11 +476,15 @@ func TestHandleDoubleSigners(t *testing.T) {
 					// generate address
 					addr := pub.Address().Bytes()
 					// ensure is a valid double signer
-					require.True(t, sm.IsValidDoubleSigner(h, addr))
+					ok, er := s.IsValidDoubleSigner(addr, h)
+					require.NoError(t, er)
+					require.True(t, ok)
 					// index the double signer
 					require.NoError(t, s.IndexDoubleSigner(addr, h))
 					// ensure no longer is a valid double signer
-					require.False(t, sm.IsValidDoubleSigner(h, addr))
+					ok, er = s.IsValidDoubleSigner(addr, h)
+					require.NoError(t, er)
+					require.False(t, ok)
 				}
 			}
 			// preset the validators
@@ -527,7 +531,9 @@ func TestHandleDoubleSigners(t *testing.T) {
 				expected := stakeAmount
 				for _, height := range doubleSigner.Heights {
 					// ensure no longer is a valid double signer
-					require.False(t, sm.IsValidDoubleSigner(height, validator.Address))
+					ok, er := s.IsValidDoubleSigner(validator.Address, height)
+					require.NoError(t, er)
+					require.False(t, ok)
 					// re-calculate the expected
 					expected = lib.Uint64ReducePercentage(expected, valParams.DoubleSignSlashPercentage)
 				}

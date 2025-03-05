@@ -139,7 +139,7 @@ const (
 	CodeNonNilCertResults               ErrorCode = 40
 	CodeInvalidMemo                     ErrorCode = 41
 	CodeNilCertResult                   ErrorCode = 42
-	CodeNilLockOrder                     ErrorCode = 43
+	CodeNilLockOrder                    ErrorCode = 43
 	CodeInvalidBuyerReceiveAddress      ErrorCode = 44
 	CodeEmptyTransaction                ErrorCode = 45
 	CodeHashSize                        ErrorCode = 46
@@ -241,8 +241,8 @@ const (
 	CodeUnauthorizedOrderChange           ErrorCode = 75
 	CodeMinimumOrderSize                  ErrorCode = 76
 	CodeOrderAlreadyAccepted              ErrorCode = 77
-	CodeInvalidLockOrder                   ErrorCode = 78
-	CodeDuplicateLockOrder                 ErrorCode = 79
+	CodeInvalidLockOrder                  ErrorCode = 78
+	CodeDuplicateLockOrder                ErrorCode = 79
 	CodeInvalidBuyerDeadline              ErrorCode = 80
 	CodeInvalidCloseOrder                 ErrorCode = 81
 	CodeInvalidResetOrder                 ErrorCode = 82
@@ -254,6 +254,7 @@ const (
 	CodeInvalidQCRootChainHeight          ErrorCode = 88
 	CodeEmptyCertificateResults           ErrorCode = 89
 	CodeSlashNonValidator                 ErrorCode = 90
+	CodeEmptyOrderBook                    ErrorCode = 91
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -444,7 +445,7 @@ func ErrInvalidQCCommitteeHeight() ErrorI {
 }
 
 func ErrInvalidQCRootChainHeight() ErrorI {
-	return NewError(CodeInvalidQCRootChainHeight, ConsensusModule, "invalid certificate root-Chain height")
+	return NewError(CodeInvalidQCRootChainHeight, ConsensusModule, "invalid certificate root-chain height")
 }
 
 func ErrWrongMaxHeight() ErrorI {
@@ -653,6 +654,10 @@ func ErrWrongNetworkID() ErrorI {
 
 func ErrEmptyChainId() ErrorI {
 	return NewError(CodeEmptyChainId, StateMachineModule, "empty chain id")
+}
+
+func ErrEmptyOrderBook() ErrorI {
+	return NewError(CodeEmptyOrderBook, StateMachineModule, "empty order book")
 }
 
 func ErrWrongChainId() ErrorI {

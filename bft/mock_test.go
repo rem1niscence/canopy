@@ -545,9 +545,9 @@ func (t *testController) SendToProposer(msg lib.Signable) {
 	t.sendToProposerChan <- msg
 }
 
-func (t *testController) LoadMinimumEvidenceHeight(_ uint64) (uint64, lib.ErrorI) { return 0, nil }
-func (t *testController) IsValidDoubleSigner(_ uint64, _ []byte) bool             { return true }
-func (t *testController) Syncing() *atomic.Bool                                   { return &atomic.Bool{} }
+func (t *testController) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) { return 0, nil }
+func (t *testController) IsValidDoubleSigner(_ uint64, _ []byte) bool     { return true }
+func (t *testController) Syncing() *atomic.Bool                           { return &atomic.Bool{} }
 func (t *testController) LoadCommitteeData() (*lib.CommitteeData, lib.ErrorI) {
 	return &lib.CommitteeData{}, nil
 }

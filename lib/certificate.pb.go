@@ -160,7 +160,7 @@ type CertificateResult struct {
 	Orders *Orders `protobuf:"bytes,3,opt,name=orders,proto3" json:"orders,omitempty"`
 	// checkpoint: contains information from the 3rd party chain in order for Canopy to provide Checkpoint-as-a-Service
 	Checkpoint *Checkpoint `protobuf:"bytes,4,opt,name=checkpoint,proto3" json:"checkpoint,omitempty"`
-	// retired: signals if the committee wants to shut down and mark itself as 'forever unsubsidized' on the root-Chain
+	// retired: signals if the committee wants to shut down and mark itself as 'forever unsubsidized' on the root-chain
 	Retired bool `protobuf:"varint,5,opt,name=retired,proto3" json:"retired,omitempty"`
 }
 

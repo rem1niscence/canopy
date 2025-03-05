@@ -90,7 +90,7 @@ const (
 	DoubleSignersRouteName         = "double-signers"
 	MinimumEvidenceHeightRouteName = "minimum-evidence-height"
 	LotteryRouteName               = "lottery"
-	RootChainInfoRouteName         = "root-Chain-info"
+	RootChainInfoRouteName         = "root-chain-info"
 	ValidatorSetRouteName          = "validator-set"
 	CheckpointRouteName            = "checkpoint"
 	// debug
@@ -117,7 +117,7 @@ const (
 	TxCreateOrderRouteName     = "tx-create-order"
 	TxEditOrderRouteName       = "tx-edit-order"
 	TxDeleteOrderRouteName     = "tx-delete-order"
-	TxLockOrderRouteName        = "tx-lock-order"
+	TxLockOrderRouteName       = "tx-lock-order"
 	TxStartPollRouteName       = "tx-start-poll"
 	TxVotePollRouteName        = "tx-vote-poll"
 	ResourceUsageRouteName     = "resource-usage"
@@ -182,7 +182,7 @@ var (
 		FailedTxRouteName:              {Method: http.MethodPost, Path: "/v1/query/failed-txs", HandlerFunc: FailedTxs},
 		ProposalsRouteName:             {Method: http.MethodGet, Path: "/v1/gov/proposals", HandlerFunc: Proposals},
 		PollRouteName:                  {Method: http.MethodGet, Path: "/v1/gov/poll", HandlerFunc: Poll},
-		RootChainInfoRouteName:         {Method: http.MethodPost, Path: "/v1/query/root-Chain-info", HandlerFunc: RootChainInfo},
+		RootChainInfoRouteName:         {Method: http.MethodPost, Path: "/v1/query/root-chain-info", HandlerFunc: RootChainInfo},
 		ValidatorSetRouteName:          {Method: http.MethodPost, Path: "/v1/query/validator-set", HandlerFunc: ValidatorSet},
 		CheckpointRouteName:            {Method: http.MethodPost, Path: "/v1/query/checkpoint", HandlerFunc: Checkpoint},
 		// debug
@@ -208,7 +208,7 @@ var (
 		TxCreateOrderRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-create-order", HandlerFunc: TransactionCreateOrder, AdminOnly: true},
 		TxEditOrderRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-edit-order", HandlerFunc: TransactionEditOrder, AdminOnly: true},
 		TxDeleteOrderRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-delete-order", HandlerFunc: TransactionDeleteOrder, AdminOnly: true},
-		TxLockOrderRouteName:        {Method: http.MethodPost, Path: "/v1/admin/tx-lock-order", HandlerFunc: TransactionLockOrder, AdminOnly: true},
+		TxLockOrderRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-lock-order", HandlerFunc: TransactionLockOrder, AdminOnly: true},
 		TxSubsidyRouteName:         {Method: http.MethodPost, Path: "/v1/admin/subsidy", HandlerFunc: TransactionSubsidy, AdminOnly: true},
 		TxStartPollRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-start-poll", HandlerFunc: TransactionStartPoll, AdminOnly: true},
 		TxVotePollRouteName:        {Method: http.MethodPost, Path: "/v1/admin/tx-vote-poll", HandlerFunc: TransactionVotePoll, AdminOnly: true},
@@ -280,7 +280,7 @@ func StartRPC(a *controller.Controller, c lib.Config, l lib.LoggerI) {
 	}
 }
 
-// PollRootChainInfo() retrieves the information from the root-Chain required for consensus
+// PollRootChainInfo() retrieves the information from the root-chain required for consensus
 func PollRootChainInfo() {
 	var rootChainHeight uint64
 	// execute the loop every conf.RootChainPollMS duration
@@ -313,15 +313,12 @@ func PollRootChainInfo() {
 			rpcClient := NewClient(rootChainUrl, "", "")
 			// set the apps callbacks
 			app.RootChainInfo.RemoteCallbacks = &lib.RemoteCallbacks{
-				Checkpoint:            rpcClient.Checkpoint,
-				ValidatorSet:          rpcClient.ValidatorSet,
-				IsValidDoubleSigner:   rpcClient.IsValidDoubleSigner,
-				Transaction:           rpcClient.Transaction,
-				LastProposers:         rpcClient.LastProposers,
-				MinimumEvidenceHeight: rpcClient.MinimumEvidenceHeight,
-				CommitteeData:         rpcClient.CommitteeData,
-				Lottery:               rpcClient.Lottery,
-				Orders:                rpcClient.Orders,
+				ValidatorSet:        rpcClient.ValidatorSet,
+				IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
+				Lottery:             rpcClient.Lottery,
+				Orders:              rpcClient.Orders,
+				Checkpoint:          rpcClient.Checkpoint,
+				Transaction:         rpcClient.Transaction,
 			}
 			// query the base chain height
 			height, err := rpcClient.Height()
@@ -339,21 +336,20 @@ func PollRootChainInfo() {
 			logger.Infof("New RootChain height %d detected!", rootChainHeight)
 			// execute the requests to get the base chain information
 			for retry := lib.NewRetry(conf.RootChainPollMS, 3); retry.WaitAndDoRetry(); {
-				// retrieve the root-Chain info
+				// retrieve the root-chain info
 				rootChainInfo, e := rpcClient.RootChainInfo(rootChainHeight, conf.ChainId)
 				if e == nil {
-					// update the controller with new root-Chain info
+					// update the controller with new root-chain info
 					app.UpdateRootChainInfo(rootChainInfo)
 					logger.Info("Updated RootChain information")
 					break
 				}
 				logger.Errorf("GetRootChainInfo failed with err %s", e.Error())
-				// update with empty root-Chain info to stop consensus
+				// update with empty root-chain info to stop consensus
 				app.UpdateRootChainInfo(&lib.RootChainInfo{
 					Height:           rootChainHeight,
 					ValidatorSet:     lib.ValidatorSet{},
 					LastValidatorSet: lib.ValidatorSet{},
-					LastProposers:    &lib.Proposers{},
 					LotteryWinner:    &lib.LotteryWinner{},
 					Orders:           &lib.OrderBook{},
 				})
@@ -589,21 +585,6 @@ func RootChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		// get the previous committee
 		// allow an error here to have size 0 validator sets
 		lastValidatorSet, _ := lastSM.GetCommitteeMembers(id)
-		// get the last proposers
-		lastProposers, err := s.GetLastProposers()
-		if err != nil {
-			return nil, err
-		}
-		// get the minimum evidence height
-		minimumEvidenceHeight, err := s.LoadMinimumEvidenceHeight()
-		if err != nil {
-			return nil, err
-		}
-		// get the committee data
-		committeeData, err := s.GetCommitteeData(id)
-		if err != nil {
-			return nil, err
-		}
 		// get the delegate lottery winner
 		lotteryWinner, err := s.LotteryWinner(id)
 		if err != nil {
@@ -615,14 +596,11 @@ func RootChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 			return nil, err
 		}
 		return &lib.RootChainInfo{
-			Height:                 s.Height(),
-			ValidatorSet:           validatorSet,
-			LastValidatorSet:       lastValidatorSet,
-			LastProposers:          lastProposers,
-			MinimumEvidenceHeight:  minimumEvidenceHeight,
-			LastChainHeightUpdated: committeeData.LastChainHeightUpdated,
-			LotteryWinner:          lotteryWinner,
-			Orders:                 orders,
+			Height:           s.Height(),
+			ValidatorSet:     validatorSet,
+			LastValidatorSet: lastValidatorSet,
+			LotteryWinner:    lotteryWinner,
+			Orders:           orders,
 		}, nil
 	})
 }

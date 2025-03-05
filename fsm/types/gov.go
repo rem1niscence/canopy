@@ -69,7 +69,7 @@ func DefaultParams() *Params {
 			MaxSlashPerCommittee:               15,
 			DelegateRewardPercentage:           10,
 			BuyDeadlineBlocks:                  15,
-			LockOrderFeeMultiplier:              2,
+			LockOrderFeeMultiplier:             2,
 		},
 		Fee: &FeeParams{
 			SendFee:               10000,
@@ -109,7 +109,7 @@ func (x *Params) Check() lib.ErrorI {
 const (
 	ParamBlockSize       = "blockSize"       // size of the block - header
 	ParamProtocolVersion = "protocolVersion" // current protocol version (upgrade enforcement)
-	ParamRetired         = "retired"         // if the chain is marking itself as 'retired' to the root-Chain making it forever un-subsidized
+	ParamRetired         = "retired"         // if the chain is marking itself as 'retired' to the root-chain making it forever un-subsidized
 	ParamRootChainId     = "rootChainID"     // the chain id of the root chain (source of the validator set)
 )
 
@@ -228,7 +228,7 @@ const (
 	ParamMaxSlashPerCommittee               = "maxSlashPerCommittee"               // the maximum validator slash per committee per block
 	ParamDelegateRewardPercentage           = "delegateRewardPercentage"           // the percentage of the block reward that is awarded to the delegates
 	ParamBuyDeadlineBlocks                  = "buyDeadlineBlocks"                  // the amount of blocks a 'buyer' has to complete an order they reserved
-	ParamLockOrderFeeMultiplier              = "lockOrderFeeMultiplier"              // the fee multiplier of the 'send' fee that is required to execute a lock order
+	ParamLockOrderFeeMultiplier             = "lockOrderFeeMultiplier"             // the fee multiplier of the 'send' fee that is required to execute a lock order
 )
 
 // Check() validates the Validator params

@@ -78,7 +78,7 @@ func (b *BFT) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.DoubleSigne
 			return nil, err
 		}
 		// ensure the evidence isn't expired
-		minEvidenceHeight, err := b.LoadMinimumEvidenceHeight(committeeHeight)
+		minEvidenceHeight, err := b.LoadMinimumEvidenceHeight()
 		if err != nil {
 			return nil, err
 		}

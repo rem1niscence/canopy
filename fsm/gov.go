@@ -500,12 +500,14 @@ func (s *StateMachine) GetRootChainId() (uint64, lib.ErrorI) {
 // LoadRootChainId() loads the root chain id from the state at a certain height
 func (s *StateMachine) LoadRootChainId(height uint64) (uint64, lib.ErrorI) {
 	// create a read-only historical version of the state
-	sm, err := s.TimeMachine(height)
+	historicalFSM, err := s.TimeMachine(height)
+	// if an error occurred when loading the historical state machine
 	if err != nil {
+		// exit with error
 		return 0, err
 	}
 	// memory cleanup
-	defer sm.Discard()
+	defer historicalFSM.Discard()
 	// return the root chain id at that height
-	return sm.GetRootChainId()
+	return historicalFSM.GetRootChainId()
 }

@@ -217,13 +217,6 @@ func (s *StateMachine) HandleDoubleSigners(chainId uint64, params *types.Validat
 	return s.SlashDoubleSigners(chainId, params, slashList)
 }
 
-// IsValidDoubleSigner() checks if the double signer was already slashed for this height
-// this prevents evidence re-use
-func (s *StateMachine) IsValidDoubleSigner(height uint64, address []byte) bool {
-	isValid, _ := s.Store().(lib.StoreI).IsValidDoubleSigner(address, height)
-	return isValid
-}
-
 // SlashNonSigners() burns the staked tokens of non-quorum-certificate-signers
 func (s *StateMachine) SlashNonSigners(chainId uint64, params *types.ValidatorParams, nonSignerAddrs [][]byte) lib.ErrorI {
 	return s.SlashValidators(nonSignerAddrs, chainId, params.NonSignSlashPercentage, params)

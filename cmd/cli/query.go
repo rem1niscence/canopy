@@ -373,9 +373,9 @@ var (
 	}
 
 	rootChainInfoCmd = &cobra.Command{
-		Use:   "root-Chain-info <chain-id> --height=1",
+		Use:   "root-chain-info <chain-id> --height=1",
 		Short: "query the base chain information needed to complete consensus",
-		Long:  "query the base chain information needed to complete consensus: this is a local call so will only work if self is the root-Chain",
+		Long:  "query the base chain information needed to complete consensus: this is a local call so will only work if self is the root-chain",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			writeToConsole(client.RootChainInfo(height, uint64(argToInt(args[0]))))
