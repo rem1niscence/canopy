@@ -62,16 +62,6 @@ func TestAddTransaction(t *testing.T) {
 		error        string
 	}{
 		{
-			name:   "already exists",
-			detail: "transaction not added because it already exists",
-			mempool: FeeMempool{
-				l:       sync.RWMutex{},
-				hashMap: map[string]struct{}{crypto.HashString(transaction.Tx): {}},
-			},
-			toAdd: transaction,
-			error: "already found in mempool",
-		},
-		{
 			name:   "max tx size",
 			detail: "the tx size exceeds max (config)",
 			mempool: FeeMempool{
@@ -79,6 +69,22 @@ func TestAddTransaction(t *testing.T) {
 			},
 			toAdd: transaction,
 			error: "max tx size",
+		},
+		{
+			name:   "already exists",
+			detail: "transaction not added because it already exists",
+			mempool: FeeMempool{
+				l:       sync.RWMutex{},
+				hashMap: map[string]struct{}{crypto.HashString(transaction.Tx): {}},
+				config: MempoolConfig{
+					MaxTotalBytes:       math.MaxUint64,
+					MaxTransactionCount: 0,
+					IndividualMaxTxSize: math.MaxUint32,
+					DropPercentage:      10,
+				},
+			},
+			toAdd: transaction,
+			error: "already found in mempool",
 		},
 		{
 			name:   "recheck max tx count",
