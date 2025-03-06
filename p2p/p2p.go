@@ -147,19 +147,25 @@ func (p *P2P) ListenForInboundPeers(listenAddress *lib.PeerAddress) {
 
 // DialForOutboundPeers() uses the config and peer book to try to max out the outbound peer connections
 func (p *P2P) DialForOutboundPeers() {
+	// create a tracking variable to ensure not 'over dialing'
 	dialing := 0
 	// Try to connect to the DialPeers in the config
 	for _, peerString := range p.config.DialPeers {
-		peer := &lib.PeerAddress{PeerMeta: &lib.PeerMeta{NetworkId: p.meta.NetworkId, ChainId: p.meta.ChainId}}
-		if err := peer.FromString(peerString); err != nil {
+		// start a peer address structure using the basic configurations
+		peerAddress := &lib.PeerAddress{PeerMeta: &lib.PeerMeta{NetworkId: p.meta.NetworkId, ChainId: p.meta.ChainId}}
+		// try to populate the peer address using the peer string from the config
+		if err := peerAddress.FromString(peerString); err != nil {
+			// log the invalid format
 			p.log.Errorf("invalid dial peer %s: %s", peerString, err.Error())
+			// continue with the next
 			continue
 		}
+		// dial in a non-blocking fashion
 		go func() {
 			// increment dialing
 			dialing++
 			// dial the peer with exponential backoff
-			p.DialWithBackoff(peer)
+			p.DialWithBackoff(peerAddress)
 		}()
 	}
 	// Continuous service until program exit, dial timeout loop frequency for resource break

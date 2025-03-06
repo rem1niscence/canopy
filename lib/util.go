@@ -568,7 +568,7 @@ func NewDeDuplicator[T comparable]() *DeDuplicator[T] {
 	return &DeDuplicator[T]{m: make(map[T]struct{})}
 }
 
-// Found checks for an existing entry and adds it to the map if it's not present
+// Found() checks for an existing entry and adds it to the map if it's not present
 func (d *DeDuplicator[T]) Found(k T) bool {
 	// check if the key already exists
 	if _, exists := d.m[k]; exists {
@@ -578,6 +578,11 @@ func (d *DeDuplicator[T]) Found(k T) bool {
 	d.m[k] = struct{}{}
 	// not a duplicate
 	return false
+}
+
+// Delete() removes the key from the de-duplicator map
+func (d *DeDuplicator[T]) Delete(k T) {
+	delete(d.m, k)
 }
 
 // Map() returns the underlying map to the de-duplicator

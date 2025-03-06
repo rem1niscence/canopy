@@ -40,7 +40,7 @@ func TestAddTransactionFeeOrdering(t *testing.T) {
 	for ; it.Valid(); it.Next() {
 		result += string(it.Key())
 	}
-	// copmare got vs expected
+	// compare got vs expected
 	require.Equal(t, "abcde", result)
 }
 
