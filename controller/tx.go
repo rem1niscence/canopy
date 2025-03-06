@@ -319,7 +319,7 @@ func (c *Controller) GetFailedTxsPage(address string, p lib.PageParams) (page *l
 		return
 	}
 	// populate the page using the 'failed cache'
-	err = page.LoadArray(c.Mempool.cachedFailedTxs.GetAddr(address), &failedTxs, callback)
+	err = page.LoadArray(c.Mempool.cachedFailedTxs.GetFailedForAddress(address), &failedTxs, callback)
 	// exit
 	return
 }

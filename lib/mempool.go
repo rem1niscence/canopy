@@ -3,8 +3,10 @@ package lib
 import (
 	"bytes"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"slices"
 	"sort"
 	"sync"
+	"time"
 )
 
 /* This file defines and implements a mempool that maintains an ordered list of 'valid, pending to be included' transactions in memory */
@@ -328,3 +330,156 @@ func (t *MempoolTxs) copy() *MempoolTxs {
 		s:     dst,
 	}
 }
+
+// FAILED TX CACHE CODE BELOW
+
+// FailedTxCache is a cache of failed transactions that is used to inform the user of the failure
+type FailedTxCache struct {
+	cache                  map[string]*FailedTx // map tx hashes to errors
+	disallowedMessageTypes []string             // reject all transactions that are of these types
+	l                      sync.Mutex           // a lock for thread safety
+}
+
+// NewFailedTxCache returns a new FailedTxCache
+func NewFailedTxCache(disallowedMessageTypes ...string) (cache *FailedTxCache) {
+	// initialize the failed transactions cache
+	cache = &FailedTxCache{
+		cache:                  map[string]*FailedTx{},
+		l:                      sync.Mutex{},
+		disallowedMessageTypes: disallowedMessageTypes,
+	}
+	// start the cleaning service
+	go cache.StartCleanService()
+	// exit with the cache
+	return
+}
+
+// Add() adds a failed transaction with its error to the cache
+func (f *FailedTxCache) Add(txBytes []byte, hash string, txErr error) (added bool) {
+	// lock for thread safety
+	f.l.Lock()
+	// unlock when the function completes
+	defer f.l.Unlock()
+	// create a new transaction object reference to ensure a non nil result
+	tx := new(Transaction)
+	// populate the new object reference using the transaction bytes
+	if err := Unmarshal(txBytes, tx); err != nil {
+		// exit with 'not added'
+		return
+	}
+	// if the message is on the 'disallowed' list
+	if slices.Contains(f.disallowedMessageTypes, tx.MessageType) {
+		// exit with 'not added'
+		return
+	}
+	// if the signature is empty
+	if tx.Signature == nil {
+		// exit with 'not added'
+		return
+	}
+	// get the public key object from the bytes of the signature
+	pubKey, err := crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey)
+	// if an error occurred during the conversion
+	if err != nil {
+		// exit with 'not added'
+		return
+	}
+	// add a new 'failed tx' type to the cache
+	f.cache[hash] = &FailedTx{
+		Transaction: tx,
+		Hash:        hash,
+		Address:     pubKey.Address().String(),
+		Error:       txErr,
+		timestamp:   time.Now(),
+	}
+	// exit with 'added'
+	return true
+}
+
+// Get() returns the failed transaction associated with its hash
+func (f *FailedTxCache) Get(txHash string) (failedTx *FailedTx, found bool) {
+	// lock for thread safety
+	f.l.Lock()
+	// unlock when the function completes
+	defer f.l.Unlock()
+	// get the failed tx from the cache
+	failedTx, found = f.cache[txHash]
+	// if not found in the cache
+	if !found {
+		// exit with not found
+		return
+	}
+	// exit
+	return
+}
+
+// GetFailedForAddress() returns all the failed transactions in the cache for a given address
+func (f *FailedTxCache) GetFailedForAddress(address string) (failedTxs []*FailedTx) {
+	// lock for thread safety
+	f.l.Lock()
+	// unlock when the function completes
+	defer f.l.Unlock()
+	// for each failed transaction in the cache
+	for _, failed := range f.cache {
+		// if the address matches
+		if failed.Address == address {
+			// add to the list
+			failedTxs = append(failedTxs, failed)
+		}
+	}
+	// exit
+	return
+}
+
+// Remove() removes a transaction hash from the cache
+func (f *FailedTxCache) Remove(txHashes ...string) {
+	// lock for thread safety
+	f.l.Lock()
+	// unlock when function completes
+	defer f.l.Unlock()
+	// for each transaction hash
+	for _, hash := range txHashes {
+		// remove it from the memory cache
+		delete(f.cache, hash)
+	}
+}
+
+// StartCleanService() periodically removes transactions from the cache that are older than 5 minutes
+func (f *FailedTxCache) StartCleanService() {
+	// every minute until app stops
+	for range time.Tick(time.Minute) {
+		// wrap in a function to use 'defer'
+		func() {
+			// lock for thread safety
+			f.l.Lock()
+			// unlock when iteration completes
+			defer f.l.Unlock()
+			// for each in the cache
+			for hash, tx := range f.cache {
+				// if the 'time since' is greater than 5 minutes
+				if time.Since(tx.timestamp) >= 5*time.Minute {
+					// remove it from the cache
+					delete(f.cache, hash)
+				}
+			}
+		}()
+	}
+}
+
+// FailedTx contains a failed transaction and its error
+type FailedTx struct {
+	Transaction *Transaction `json:"transaction,omitempty"` // the transaction object that failed
+	Hash        string       `json:"txHash,omitempty"`      // the hash of the transaction object
+	Address     string       `json:"address,omitempty"`     // the address that sent the transaction
+	Error       error        `json:"error,omitempty"`       // the error that occurred
+	timestamp   time.Time    // the time when the failure was recorded
+}
+
+type FailedTxs []*FailedTx // a list of failed transactions
+
+// ensure failed txs implements the pageable interface
+var _ Pageable = &FailedTxs{}
+
+// implement pageable interface
+func (t *FailedTxs) Len() int      { return len(*t) }
+func (t *FailedTxs) New() Pageable { return &FailedTxs{} }

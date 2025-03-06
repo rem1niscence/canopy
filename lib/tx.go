@@ -4,15 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"slices"
-	sync "sync"
-	"time"
-
 	"github.com/canopy-network/canopy/lib/crypto"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
+
+/* This file creates and implements interfaces for blockchain transactions */
 
 var (
 	_ TransactionI = &Transaction{} // TransactionI interface enforcement of the Transaction struct
@@ -85,43 +83,66 @@ type MessageI interface {
 
 // CheckBasic() is a stateless validation function for a Transaction object
 func (x *Transaction) CheckBasic() ErrorI {
+	// if the transaction is empty
 	if x == nil {
+		// exit with empty error
 		return ErrEmptyTransaction()
 	}
+	// if the payload is empty
 	if x.Msg == nil {
+		// exit with empty payload error
 		return ErrEmptyMessage()
 	}
+	// if the message type is empty
 	if x.MessageType == "" {
+		// exit with empty payload name error
 		return ErrUnknownMessageName(x.MessageType)
 	}
+	// if any parts of the signature is empty
 	if x.Signature == nil || x.Signature.Signature == nil || x.Signature.PublicKey == nil {
+		// exit with empty signature error
 		return ErrEmptySignature()
 	}
+	// if the created height is empty
 	if x.CreatedHeight == 0 {
+		// exit with created height error
 		return ErrInvalidTxHeight()
 	}
+	// if the time is empty
 	if x.Time == 0 {
+		// exit with invalid time error
 		return ErrInvalidTxTime()
 	}
+	// if the memo is too long
 	if len(x.Memo) > 200 {
+		// exit with 'memo too long' error
 		return ErrInvalidMemo()
 	}
+	// if the network id is empty
 	if x.NetworkId == 0 {
+		// exit with empty network id error
 		return ErrNilNetworkID()
 	}
+	// if the chain id is empty
 	if x.ChainId == 0 {
+		// exit with empty chain id error
 		return ErrEmptyChainId()
 	}
+	// exit with no error
 	return nil
 }
 
 // GetHash() returns the cryptographic hash of the Transaction
 func (x *Transaction) GetHash() ([]byte, ErrorI) {
-	bz, err := Marshal(x)
+	// convert the transaction into proto bytes
+	protoBytes, err := Marshal(x)
+	// if an error occurred during the conversion
 	if err != nil {
+		// exit with error
 		return nil, err
 	}
-	return crypto.Hash(bz), nil
+	// exit with the hash of the proto bytes
+	return crypto.Hash(protoBytes), nil
 }
 
 // GetSig() accessor for signature field (do not delete: needed to satisfy TransactionI)
@@ -129,6 +150,7 @@ func (x *Transaction) GetSig() SignatureI { return x.Signature }
 
 // GetSignBytes() returns the canonical byte representation of the Transaction for signing and signature verification
 func (x *Transaction) GetSignBytes() ([]byte, ErrorI) {
+	// exit with proto bytes but omit the signature
 	return Marshal(&Transaction{
 		MessageType:   x.MessageType,
 		Msg:           x.Msg,
@@ -143,18 +165,24 @@ func (x *Transaction) GetSignBytes() ([]byte, ErrorI) {
 }
 
 // Sign() executes a digital signature on the transaction
-func (x *Transaction) Sign(pk crypto.PrivateKeyI) ErrorI {
-	bz, err := x.GetSignBytes()
+func (x *Transaction) Sign(pk crypto.PrivateKeyI) (err ErrorI) {
+	// get the sign bytes for the transaction
+	signBytes, err := x.GetSignBytes()
+	// if an error occurred during the conversion
 	if err != nil {
-		return err
+		// exit with error
+		return
 	}
+	// populate the signature field
 	x.Signature = &Signature{
 		PublicKey: pk.PublicKey().Bytes(),
-		Signature: pk.Sign(bz),
+		Signature: pk.Sign(signBytes),
 	}
-	return nil
+	// exit
+	return
 }
 
+// jsonTx implements the json.Marshaller and json.Unmarshaler interface for the Transaction type
 type jsonTx struct {
 	Type          string          `json:"type,omitempty"`
 	Msg           json.RawMessage `json:"msg,omitempty"`
@@ -167,23 +195,33 @@ type jsonTx struct {
 	ChainId       uint64          `json:"chainID,omitempty"`
 }
 
-// nolint:all
-func (x Transaction) MarshalJSON() ([]byte, error) {
-	a, err := FromAny(x.Msg)
+// MarshalJSON() implements the json.Marshaller interface for the Transaction type
+func (x Transaction) MarshalJSON() (jsonBytes []byte, err error) {
+	// convert the payload from a proto.Any to a proto.Message
+	payload, err := FromAny(x.Msg)
+	// if an error occurred during the conversion
 	if err != nil {
-		return nil, err
+		// exit with error
+		return
 	}
-	msg, ok := a.(MessageI)
-	if !ok {
-		return nil, fmt.Errorf("couldn't convert %T to type MessageI", a)
+	// cast the payload to a Message interface type
+	msg, castSucceeded := payload.(MessageI)
+	// if the cast failed
+	if !castSucceeded {
+		// exit with conversion error
+		return nil, fmt.Errorf("couldn't convert %T to type MessageI", payload)
 	}
-	bz, err := MarshalJSON(msg)
+	// convert the message to json bytes
+	messageRawJSON, err := MarshalJSON(msg)
+	// if an error occurred during the conversion
 	if err != nil {
-		return nil, err
+		// exit with error
+		return
 	}
+	// exit by converting a new json object into json bytes
 	return json.Marshal(jsonTx{
 		Type:          x.MessageType,
-		Msg:           bz,
+		Msg:           messageRawJSON,
 		Signature:     x.Signature,
 		Time:          x.Time,
 		CreatedHeight: x.CreatedHeight,
@@ -194,24 +232,36 @@ func (x Transaction) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (x *Transaction) UnmarshalJSON(b []byte) error {
-	var j jsonTx
-	if err := json.Unmarshal(b, &j); err != nil {
+// MarshalJSON() implements the json.Unmarshaler interface for the Transaction type
+func (x *Transaction) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new json object reference to ensure a non nil result
+	j := new(jsonTx)
+	// populate the json object with json bytes
+	if err = json.Unmarshal(jsonBytes, j); err != nil {
 		return err
 	}
-	var msg MessageI
-	m, ok := RegisteredMessages[j.Type]
-	if !ok {
+	// get the type of the message payload based on the 'message types' that were globally registered upon app start
+	m, found := RegisteredMessages[j.Type]
+	// if the message type is not found among the registered messages
+	if !found {
+		// exit with error
 		return ErrUnknownMessageName(j.Type)
 	}
-	msg = m.New()
-	if err := json.Unmarshal(j.Msg, msg); err != nil {
-		return err
+	// create a new instance of the message
+	msg := m.New()
+	// populate the new message using the json bytes in the json object
+	if err = json.Unmarshal(j.Msg, msg); err != nil {
+		// exit with error
+		return
 	}
+	// convert the message to a proto.Any
 	a, err := NewAny(msg)
+	// if an error occurred during the conversion
 	if err != nil {
-		return err
+		// exit with error
+		return
 	}
+	// populate the underlying transaction object
 	*x = Transaction{
 		MessageType:   j.Type,
 		Msg:           a,
@@ -223,7 +273,8 @@ func (x *Transaction) UnmarshalJSON(b []byte) error {
 		NetworkId:     j.NetworkId,
 		ChainId:       j.ChainId,
 	}
-	return nil
+	// exit
+	return
 }
 
 // TRANSACTION RESULT CODE BELOW
@@ -236,6 +287,7 @@ func (t *TxResults) New() Pageable { return &TxResults{} }
 // GetTx() is an accessor for the Transaction field
 func (x *TxResult) GetTx() TransactionI { return x.Transaction }
 
+// jsonTxResult implements the json.Marshaller and json.Unmarshaler interfaces for TxResult
 type jsonTxResult struct {
 	Sender      HexBytes     `json:"sender,omitempty"`
 	Recipient   HexBytes     `json:"recipient,omitempty"`
@@ -246,9 +298,7 @@ type jsonTxResult struct {
 	TxHash      string       `json:"txHash,omitempty"`
 }
 
-// TxResult satisfies the json.Marshaller and json.Unmarshaler interfaces
-
-// nolint:all
+// MarshalJSON() satisfies the json.Marshaller interface
 func (x TxResult) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonTxResult{
 		Sender:      x.Sender,
@@ -261,11 +311,16 @@ func (x TxResult) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (x *TxResult) UnmarshalJSON(b []byte) error {
-	var j jsonTxResult
-	if err := json.Unmarshal(b, &j); err != nil {
-		return err
+// UnmarshalJSON() satisfies the json.Unmarshaler interface
+func (x *TxResult) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new json tx result object to ensure a non-nil result
+	j := new(jsonTxResult)
+	// populate the object using the json bytes
+	if err = json.Unmarshal(jsonBytes, j); err != nil {
+		// exit with error
+		return
 	}
+	// populate the underlying tx result object using the json object
 	*x = TxResult{
 		Sender:      j.Sender,
 		Recipient:   j.Recipient,
@@ -275,20 +330,24 @@ func (x *TxResult) UnmarshalJSON(b []byte) error {
 		Transaction: j.Transaction,
 		TxHash:      j.TxHash,
 	}
-	return nil
+	// exit
+	return
 }
 
 // SIGNATURE CODE BELOW
 
+// Signable is a proto.Message that can be signed using a crypto.PrivateKey
 type Signable interface {
 	proto.Message
 	Sign(p crypto.PrivateKeyI) ErrorI
 }
 
+// SignByte is a object that returns canonical bytes to sign
 type SignByte interface{ SignBytes() []byte }
 
-// Copy() returns a clone of the Signature object
+// Copy() returns a deep clone of the Signature object
 func (x *Signature) Copy() *Signature {
+	// return a deep copy of the signature
 	return &Signature{
 		PublicKey: bytes.Clone(x.PublicKey),
 		Signature: bytes.Clone(x.Signature),
@@ -297,148 +356,28 @@ func (x *Signature) Copy() *Signature {
 
 // Signature satisfies the json.Marshaller and json.Unmarshaler interfaces
 
-// nolint:all
+// MarshalJSON() satisfies the json.Marshaller interface
 func (x Signature) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonSignature{x.PublicKey, x.Signature})
 }
 
-func (x *Signature) UnmarshalJSON(b []byte) (err error) {
-	var j jsonSignature
-	if err = json.Unmarshal(b, &j); err != nil {
-		return err
+// UnmarshalJSON() satisfies the json.Unmarshaler interface
+func (x *Signature) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new json object reference to ensure a non-nil result
+	j := new(jsonSignature)
+	// populate the new json object reference with json bytes
+	if err = json.Unmarshal(jsonBytes, j); err != nil {
+		// exit with error
+		return
 	}
+	// populate the underlying Signature object using the json object
 	x.PublicKey, x.Signature = j.PublicKey, j.Signature
+	// exit
 	return
 }
 
+// jsonSignature satisfies the json.Marshaller and json.Unmarshaler interfaces for Signature
 type jsonSignature struct {
 	PublicKey HexBytes `json:"publicKey,omitempty"`
 	Signature HexBytes `json:"signature,omitempty"`
-}
-
-// FAILED TX CACHE CODE BELOW
-
-// FailedTx contains a failed transaction and its error
-type FailedTx struct {
-	Transaction *Transaction `json:"transaction,omitempty"`
-	Hash        string       `json:"txHash,omitempty"`
-	Address     string       `json:"address,omitempty"`
-	Error       error        `json:"error,omitempty"`
-}
-
-type FailedTxs []*FailedTx
-
-func (t *FailedTxs) Len() int      { return len(*t) }
-func (t *FailedTxs) New() Pageable { return &FailedTxs{} }
-
-type failedTx struct {
-	tx        *FailedTx
-	timestamp time.Time
-}
-
-// FailedTxCache is a cache of failed transactions that is used to inform
-// the user of the failure
-type FailedTxCache struct {
-	// map tx hashes to errors
-	cache map[string]failedTx
-	// reject all transactions that are of these types
-	disallowedMessageTypes []string
-	m                      sync.Mutex
-}
-
-// NewFailedTxCache returns a new FailedTxCache
-func NewFailedTxCache(disallowedMessageTypes ...string) *FailedTxCache {
-	cache := &FailedTxCache{
-		cache:                  map[string]failedTx{},
-		m:                      sync.Mutex{},
-		disallowedMessageTypes: disallowedMessageTypes,
-	}
-	go cache.clean()
-	return cache
-}
-
-// Add adds a failed transaction with its error to the cache
-func (f *FailedTxCache) Add(tx []byte, hash string, txErr error) bool {
-	f.m.Lock()
-	defer f.m.Unlock()
-
-	rawTx := new(Transaction)
-	if err := Unmarshal(tx, rawTx); err != nil {
-		return false
-	}
-
-	if slices.Contains(f.disallowedMessageTypes, rawTx.MessageType) {
-		return false
-	}
-
-	if rawTx.Signature == nil {
-		return false
-	}
-
-	pubKey, err := crypto.NewPublicKeyFromBytes(rawTx.Signature.PublicKey)
-	if err != nil {
-		return false
-	}
-
-	f.cache[hash] = failedTx{
-		tx: &FailedTx{
-			Transaction: rawTx,
-			Hash:        hash,
-			Address:     pubKey.Address().String(),
-			Error:       txErr,
-		},
-		timestamp: time.Now(),
-	}
-	return true
-}
-
-// Get returns the failed transaction associated with its hash
-func (f *FailedTxCache) Get(txHash string) (*FailedTx, bool) {
-	f.m.Lock()
-	defer f.m.Unlock()
-
-	failedTx, ok := f.cache[txHash]
-
-	if !ok {
-		return nil, ok
-	}
-	return failedTx.tx, ok
-}
-
-// GetAddr returns all the failed transactions in the cache for a given address
-func (f *FailedTxCache) GetAddr(address string) []*FailedTx {
-	f.m.Lock()
-	defer f.m.Unlock()
-
-	failedTxs := make([]*FailedTx, 0)
-	for _, failedTx := range f.cache {
-		if failedTx.tx.Address == address {
-			failedTxs = append(failedTxs, failedTx.tx)
-		}
-	}
-
-	return failedTxs
-}
-
-// Remove removes a transaction hash from the cache
-func (f *FailedTxCache) Remove(txHashes ...string) {
-	f.m.Lock()
-	defer f.m.Unlock()
-	for _, hash := range txHashes {
-		delete(f.cache, hash)
-	}
-}
-
-// clean periodically removes transactions from the cache that are older than 5 minutes
-func (f *FailedTxCache) clean() {
-	ticker := time.NewTicker(2 * time.Minute)
-	for range ticker.C {
-		f.m.Lock()
-		for hash, tx := range f.cache {
-			if time.Since(tx.timestamp) >= 5*time.Minute {
-				delete(f.cache, hash)
-			}
-		}
-		f.m.Unlock()
-	}
 }
