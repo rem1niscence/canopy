@@ -2190,3 +2190,73 @@ func TestStoreProof(t *testing.T) {
 		})
 	}
 }
+
+func FuzzBytestToBits(f *testing.F) {
+	// seed corpus
+	tests := []struct {
+		byt           byte
+		leadingZeroes int
+	}{
+		// seed input comes from TestBytesToBits
+		{0, 0},
+		{byte(0b1), 3},
+		{byte(0b1011), 1},
+		{byte(0b00100100), 2},
+		{byte(0b00000000), 7},
+	}
+	for _, test := range tests {
+		// add the seed to the fuzz test
+		f.Add(test.byt, test.leadingZeroes)
+	}
+	f.Fuzz(func(t *testing.T, byt byte, leadingZeroes int) {
+		// as the values are appended, negative values are not allowed
+		if leadingZeroes < 0 {
+			t.Skip("Skipping test: leadingZeroes must be positive")
+		}
+		// create a new key to perform the conversion
+		k := new(key)
+		// convert the byt to bits with leading zeroes
+		bits := k.byteToBits(byt, leadingZeroes)
+		// convert it back again using the previous result as the input
+		keyBites := k.bitsToByte(bits)
+		// Create a bitmask to clear the first N bits
+		// For example, if n = 3, the mask will be 0b11111000
+		// This is to imitate the leading zeroes append of byteToBits
+		mask := byte(0xFF >> leadingZeroes) // 0xFF is 11111111 in binary
+		// Apply the mask to the byte
+		mask = byt & mask
+		// compare the original masked byte against the key bytes
+		require.Equal(t, mask, keyBites)
+	})
+}
+
+func FuzzKeyDecodeEncode(f *testing.F) {
+	// seed corpus
+	tests := []struct {
+		data []byte
+	}{
+		// seed input comes from TestKeyEncode
+		{[]byte{0, 0}},
+		{[]byte{1, 0}},
+		{[]byte{0, 1}},
+		{[]byte{0, 0, 0}},
+		{[]byte{0, 1, 0, 1, 0, 1}},
+		{[]byte{5, 255, 5, 0}},
+	}
+	for _, test := range tests {
+		// add the seed to the fuzz test
+		f.Add(test.data)
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		// skip invalid test
+		if len(data) < 2 {
+			t.Skip("Skipping test: key encode requires a minimum of two bytes")
+		}
+		// create a new key from the fuzz data
+		newKey := new(key).fromBytes(data)
+		// convert the new key back to bytes
+		bytesFromKey := newKey.bytes()
+		// compare the resulting bytes against the fuzz data
+		require.Equal(t, bytesFromKey, data)
+	})
+}

@@ -17,6 +17,12 @@ deps:
 test:
 	go test ./... -p=1
 
+# Golang currently does not support multiple fuzz targets, so each need to be called individually
+# For more information check the open issue: https://github.com/golang/go/issues/46312
+fuzz-test:
+	go test -fuzz=FuzzKeyDecodeEncode ./store -fuzztime=5s
+	go test -fuzz=FuzzBytestToBits ./store -fuzztime=5s
+
 build-wallet:
 	cd $(WALLET_DIR) && npm install && npm run build
 
