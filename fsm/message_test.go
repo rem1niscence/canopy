@@ -2312,7 +2312,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			error: "not found",
 		},
 		{
-			name:   "order already accepted",
+			name:   "order locked",
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
 			preset: &lib.SellOrder{
 				Id:                   0,
@@ -2331,7 +2331,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
-			error: "order already accepted",
+			error: "order locked",
 		},
 		{
 			name:             "minimum order size",
@@ -2527,7 +2527,7 @@ func TestHandleMessageDelete(t *testing.T) {
 			error: "not found",
 		},
 		{
-			name:   "order already accepted",
+			name:   "order locked",
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
 			preset: &lib.SellOrder{
 				Id:                   0,
@@ -2543,7 +2543,7 @@ func TestHandleMessageDelete(t *testing.T) {
 				OrderId: 0,
 				ChainId: lib.CanopyChainId,
 			},
-			error: "order already accepted",
+			error: "order locked",
 		},
 		{
 			name:   "successful delete",

@@ -240,7 +240,7 @@ const (
 	CodeOrderNotFound                     ErrorCode = 74
 	CodeUnauthorizedOrderChange           ErrorCode = 75
 	CodeMinimumOrderSize                  ErrorCode = 76
-	CodeOrderAlreadyAccepted              ErrorCode = 77
+	CodeOrderLocked                       ErrorCode = 77
 	CodeInvalidLockOrder                  ErrorCode = 78
 	CodeDuplicateLockOrder                ErrorCode = 79
 	CodeInvalidBuyerDeadline              ErrorCode = 80
@@ -720,8 +720,8 @@ func ErrMaxPort() ErrorI {
 	return NewError(CodeMaxPort, MainModule, "max port exceeded")
 }
 
-func ErrOrderAlreadyAccepted() ErrorI {
-	return NewError(CodeOrderAlreadyAccepted, StateMachineModule, "order already accepted")
+func ErrOrderLocked() ErrorI {
+	return NewError(CodeOrderLocked, StateMachineModule, "order locked")
 }
 
 func ErrOrderNotFound(id int) ErrorI {

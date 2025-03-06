@@ -19,7 +19,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 		notFound        bool
 	}{
 		{
-			name:   "lock order already accepted",
+			name:   "lock order locked",
 			detail: "the lock order cannot be claimed as its already reserved",
 			preset: []*lib.SellOrder{
 				{
@@ -367,7 +367,7 @@ func TestLockOrder(t *testing.T) {
 			error: "not found",
 		},
 		{
-			name:   "lock order already accepted",
+			name:   "lock order locked",
 			detail: "the lock order cannot be claimed as its already reserved",
 			preset: &lib.SellOrder{
 				Committee:           lib.CanopyChainId,
@@ -382,7 +382,7 @@ func TestLockOrder(t *testing.T) {
 				BuyerReceiveAddress: newTestAddressBytes(t, 1),
 				BuyerChainDeadline:  100,
 			},
-			error: "order already accepted",
+			error: "order locked",
 		},
 		{
 			name:   "lock order",

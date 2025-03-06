@@ -87,7 +87,7 @@ func TestLockOrder(t *testing.T) {
 			buyersReceiveAddress:     []byte("buyer_receive"),
 			buyersSendAddress:        []byte("buyer_send"),
 			buyerChainDeadlineHeight: 200,
-			error:                    "order already accepted",
+			error:                    "order locked",
 			expectedOrder: &SellOrder{
 				Id:                  0,
 				BuyerReceiveAddress: []byte("existing_receive"),
