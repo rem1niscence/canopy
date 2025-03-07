@@ -206,6 +206,11 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 	if height == 0 || height > s.height {
 		height = s.height
 	}
+	// don't try to create a NewReadOnly with height 0 as it'll panic
+	if height == 0 {
+		// return the original state machine
+		return s, nil
+	}
 	// ensure the store is the proper type to allow historical views
 	store, ok := s.store.(lib.StoreI)
 	if !ok {
