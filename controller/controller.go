@@ -34,7 +34,7 @@ type Controller struct {
 }
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
-func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, getRemoteCallbacks lib.GetRemoteCallbacks, l lib.LoggerI) (controller *Controller, err lib.ErrorI) {
+func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (controller *Controller, err lib.ErrorI) {
 	// load the maximum validators param to set limits on P2P
 	maxMembersPerCommittee, err := fsm.GetMaxValidators()
 	// if an error occurred when retrieving the max validators
@@ -51,20 +51,17 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, getRemo
 	}
 	// create the controller
 	controller = &Controller{
-		FSM:        fsm,
-		Mempool:    mempool,
-		isSyncing:  &atomic.Bool{},
-		P2P:        p2p.New(valKey, maxMembersPerCommittee, c, l),
-		Address:    valKey.PublicKey().Address().Bytes(),
-		PublicKey:  valKey.PublicKey().Bytes(),
-		PrivateKey: valKey,
-		Config:     c,
-		log:        l,
-		RootChainInfo: lib.RootChainInfo{
-			GetRemoteCallbacks: getRemoteCallbacks,
-			Log:                l,
-		},
-		Mutex: sync.Mutex{},
+		FSM:           fsm,
+		Mempool:       mempool,
+		isSyncing:     &atomic.Bool{},
+		P2P:           p2p.New(valKey, maxMembersPerCommittee, c, l),
+		Address:       valKey.PublicKey().Address().Bytes(),
+		PublicKey:     valKey.PublicKey().Bytes(),
+		PrivateKey:    valKey,
+		Config:        c,
+		log:           l,
+		RootChainInfo: lib.RootChainInfo{Log: l},
+		Mutex:         sync.Mutex{},
 	}
 	// initialize the consensus in the controller, passing a reference to itself
 	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, true, l)
