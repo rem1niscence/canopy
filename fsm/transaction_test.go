@@ -316,8 +316,11 @@ func TestCheckSignature(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
+			// get the hash for the transaction
+			hash, err := test.transaction.GetHash()
+			require.NoError(t, err)
 			// execute the function call
-			signer, err := sm.CheckSignature(test.msg, test.transaction)
+			signer, err := sm.CheckSignature(test.msg, test.transaction, lib.BytesToString(hash))
 			// validate the expected error
 			require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {

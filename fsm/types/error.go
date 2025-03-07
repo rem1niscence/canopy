@@ -80,6 +80,10 @@ func ErrParamValueEmpty() lib.ErrorI {
 	return lib.NewError(lib.CodeParamValEmpty, lib.StateMachineModule, "the parameter value is empty")
 }
 
+func ErrInvalidProposalHash() lib.ErrorI {
+	return lib.NewError(lib.CodeInvalidProposalHash, lib.StateMachineModule, "the parameter value is empty")
+}
+
 func ErrUnknownMessage(x lib.MessageI) lib.ErrorI {
 	return lib.NewError(lib.CodeUnknownMsg, lib.StateMachineModule, fmt.Sprintf("message %T is unknown", x))
 }
@@ -246,10 +250,6 @@ func ErrInvalidSubisdy() lib.ErrorI {
 
 func ErrInvalidOpcode() lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidOpcode, lib.StateMachineModule, "invalid opcode")
-}
-
-func ErrInvalidResultsHash() lib.ErrorI {
-	return lib.NewError(lib.CodeInvalidProposalHash, lib.StateMachineModule, "invalid results hash")
 }
 
 func ErrNonSubsidizedCommittee() lib.ErrorI {

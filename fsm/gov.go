@@ -33,19 +33,14 @@ func (s *StateMachine) ApproveProposal(msg types.GovProposal) lib.ErrorI {
 		return types.ErrRejectProposal()
 	// if on the local approve list
 	case types.ProposalApproveList:
-		// convert the governance proposal into bytes
-		bz, err := lib.Marshal(msg)
-		if err != nil {
-			return err
-		}
 		// read the 'approve list' from the data directory
 		proposals := make(types.GovProposals)
 		// get the voted from the local proposals.json file in the data directory
-		if err = proposals.NewFromFile(s.Config.DataDirPath); err != nil {
+		if err := proposals.NewFromFile(s.Config.DataDirPath); err != nil {
 			return err
 		}
 		// check on this specific message for explicit rejection or complete omission
-		if value, ok := proposals[crypto.HashString(bz)]; !ok || !value.Approve {
+		if value, ok := proposals[msg.GetProposalHash()]; !ok || !value.Approve {
 			return types.ErrRejectProposal()
 		}
 		// proposal passes

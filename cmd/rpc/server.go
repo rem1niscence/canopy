@@ -449,16 +449,11 @@ func AddVote(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if !unmarshal(w, r, j) {
 		return
 	}
-	prop, err := types.NewProposalFromBytes(j.Proposal)
-	if err != nil || prop.GetEndHeight() == 0 {
-		write(w, err, http.StatusBadRequest)
-		return
-	}
-	if err = proposals.Add(prop, j.Approve); err != nil {
+	if err := proposals.Add(j.Proposal, j.Approve); err != nil {
 		write(w, err, http.StatusInternalServerError)
 		return
 	}
-	if err = proposals.SaveToFile(conf.DataDirPath); err != nil {
+	if err := proposals.SaveToFile(conf.DataDirPath); err != nil {
 		write(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -475,13 +470,8 @@ func DelVote(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if !unmarshal(w, r, j) {
 		return
 	}
-	prop, err := types.NewProposalFromBytes(j.Proposal)
-	if err != nil {
-		write(w, err, http.StatusBadRequest)
-		return
-	}
-	proposals.Del(prop)
-	if err = proposals.SaveToFile(conf.DataDirPath); err != nil {
+	proposals.Del(j.Proposal)
+	if err := proposals.SaveToFile(conf.DataDirPath); err != nil {
 		write(w, err, http.StatusInternalServerError)
 		return
 	}

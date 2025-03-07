@@ -58,7 +58,7 @@ func (s *StateMachine) CheckTx(transaction []byte, txHash string) (result *Check
 		return
 	}
 	// validate the signature of the transaction
-	sender, err := s.CheckSignature(msg, tx)
+	sender, err := s.CheckSignature(msg, tx, txHash)
 	if err != nil {
 		return
 	}
@@ -82,7 +82,7 @@ type CheckTxResult struct {
 }
 
 // CheckSignature() validates the signer and the digital signature associated with the transaction object
-func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (crypto.AddressI, lib.ErrorI) {
+func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction, txHash string) (crypto.AddressI, lib.ErrorI) {
 	// validate the actual signature bytes
 	if tx.Signature == nil || len(tx.Signature.Signature) == 0 {
 		return nil, types.ErrEmptySignature()
@@ -119,6 +119,14 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (cr
 			// populate the signer field for edit-stake
 			if editStake, ok := msg.(*types.MessageEditStake); ok {
 				editStake.Signer = authorized
+			}
+			// populate the proposal hash for change parameter
+			if changeParam, ok := msg.(*types.MessageChangeParameter); ok {
+				changeParam.ProposalHash = txHash
+			}
+			// populate the proposal hash for dao transfer
+			if daoTransfer, ok := msg.(*types.MessageDAOTransfer); ok {
+				daoTransfer.ProposalHash = txHash
 			}
 			// return the signer address
 			return address, nil
