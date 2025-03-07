@@ -121,8 +121,8 @@ func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 			}, false); err != nil {
 				return err
 			}
-			// ensure the highQC has a valid Quorum Certificate
-			vs, err := b.Controller.LoadCommittee(vote.HighQc.Header.RootHeight)
+			// ensure the highQC has a valid Quorum Certificate using the n-1 height because state machine heights are 'end state' once committed
+			vs, err := b.Controller.LoadCommittee(b.LoadRootChainId(vote.HighQc.Header.Height), vote.HighQc.Header.RootHeight)
 			if err != nil {
 				return err
 			}

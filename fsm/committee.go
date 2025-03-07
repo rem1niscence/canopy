@@ -504,6 +504,19 @@ func (s *StateMachine) OverwriteCommitteeData(d *lib.CommitteeData) lib.ErrorI {
 	return s.SetCommitteesData(committeesData)
 }
 
+// LoadCommitteeData() loads a historical (or clean latest) committee data from the master list
+func (s *StateMachine) LoadCommitteeData(height, targetChainId uint64) (*lib.CommitteeData, lib.ErrorI) {
+	// get a historical FSM (or clean latest)
+	historicalFSM, err := s.TimeMachine(height)
+	if err != nil {
+		return nil, err
+	}
+	// ensure the historical fsm is discarded for memory management
+	defer historicalFSM.Discard()
+	// exit
+	return historicalFSM.GetCommitteeData(targetChainId)
+}
+
 // GetCommitteeData() is a convenience function to retrieve the committee data from the master list
 func (s *StateMachine) GetCommitteeData(targetChainId uint64) (*lib.CommitteeData, lib.ErrorI) {
 	// retrieve the committee's data and return it

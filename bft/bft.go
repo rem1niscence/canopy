@@ -87,7 +87,7 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, rootHeight, height uint64,
 func (b *BFT) Start() {
 	var err lib.ErrorI
 	// load the committee from the base chain
-	b.ValidatorSet, err = b.Controller.LoadCommittee(b.Controller.RootChainHeight())
+	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.ChainHeight()), b.Controller.RootChainHeight())
 	if err != nil {
 		b.log.Warn(err.Error())
 	}
@@ -119,7 +119,7 @@ func (b *BFT) Start() {
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
 					// if this chain is not its own root
-					if !b.Controller.IsOwnRoot() {
+					if !b.Controller.LoadIsOwnRoot() {
 						// start BFT over after sleeping CommitProcessMS
 						// add poll ms wait here to ensure ample time for all nested chains to be updated
 						// if not the new committee messages will overwrite any candidacy proposals that were received prior to the 'reset'
@@ -477,7 +477,7 @@ func (b *BFT) StartCommitProcessPhase() {
 // - Replica sends current View message to other replicas (Pacemaker vote)
 func (b *BFT) RoundInterrupt() {
 	b.Config.RoundInterruptTimeoutMS = b.msLeftInRound()
-	b.log.Warnf("Starting next round ~ %s", time.Now().Add(time.Duration(b.Config.RoundInterruptTimeoutMS)*time.Millisecond).Format(time.TimeOnly))
+	b.log.Warnf("Starting next round in %.2f secs", (time.Duration(b.Config.RoundInterruptTimeoutMS) * time.Millisecond).Seconds())
 	b.Phase = RoundInterrupt
 	// send pacemaker message
 	b.SendToReplicas(b.ValidatorSet, &Message{
@@ -593,7 +593,7 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	// update canopy height
 	b.RootHeight = b.Controller.RootChainHeight()
 	// update the validator set
-	b.ValidatorSet, err = b.Controller.LoadCommittee(b.RootHeight)
+	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.Height), b.RootHeight)
 	if err != nil {
 		b.log.Errorf("LoadCommittee() failed with err: %s", err.Error())
 	}
@@ -840,8 +840,10 @@ type (
 		SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 		// SendToProposer() is a P2P call to directly send a Consensus message to the Leader
 		SendToProposer(msg lib.Signable)
+		// LoadRootChainId() returns the unique identifier of the root chain
+		LoadRootChainId(height uint64) (rootChainId uint64)
 		// IsOwnRoot() returns a boolean if self chain is root
-		IsOwnRoot() bool
+		LoadIsOwnRoot() bool
 		// Syncing() returns true if the plugin is currently syncing
 		Syncing() *atomic.Bool
 
@@ -850,7 +852,7 @@ type (
 		// SendCertificateResultsTx() is a P2P call that allows a Leader to submit their CertificateResults (reward) transaction
 		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
 		// LoadCommittee() loads the ValidatorSet operating under ChainId
-		LoadCommittee(rootHeight uint64) (lib.ValidatorSet, lib.ErrorI)
+		LoadCommittee(rootChainId, rootHeight uint64) (lib.ValidatorSet, lib.ErrorI)
 		// LoadCommitteeHeightInState() loads the committee information from state as updated by the quorum certificates
 		LoadCommitteeData() (*lib.CommitteeData, lib.ErrorI)
 		// LoadLastProposers() loads the last Canopy committee proposers for sortition data
