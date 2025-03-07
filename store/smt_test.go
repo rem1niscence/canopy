@@ -65,10 +65,10 @@ func TestSet(t *testing.T) {
 						func() []byte {
 							// NOTE: the tree values on the right side are nulled, so the inputs for the right side are incomplete
 							// grandchildren
-							input000, input010 := []byte{0b0, 2}, append([]byte{0b10, 1}, crypto.Hash([]byte("some_value"))...)
+							input000, input010 := keyBytesFromStr("000"), append(keyBytesFromStr("010"), crypto.Hash([]byte("some_value"))...)
 							// children
-							input0 := append([]byte{0, 0}, crypto.Hash(append(input000, input010...))...)
-							input1 := append([]byte{1, 0}, []byte{}...)
+							input0 := append(keyBytesFromStr("0"), crypto.Hash(append(input000, input010...))...)
+							input1 := append(keyBytesFromStr("1"), []byte{}...)
 							// root value
 							return crypto.Hash(append(input0, input1...))
 						}(),
@@ -77,6 +77,127 @@ func TestSet(t *testing.T) {
 					),
 					newTestNode("101", nil, "", ""),
 					newTestNode("111", nil, "", ""),
+				},
+			},
+		},
+		{
+			name: "insert and target at 000010000",
+			detail: `BEFORE:   root
+							  /    \
+						    0000    1
+								  /   \
+								1000   111
+									  /   \
+								    1110  1111
+
+					AFTER:     root
+							  /    \
+						    0000    1
+								  /   \
+								1000 *11*
+		                             /  \
+							      *1101* 111
+                                        /   \
+								      1110  1111
+							`,
+			keyBitSize:  4,
+			rootKey:     []byte{0b10010000},
+			targetKey:   []byte{2}, // hashes to [1 1 0 1]
+			targetValue: []byte("some_value"),
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("1001", nil, "0000", "1"),
+					newTestNode("0000", nil, "", ""), // leaf
+					newTestNode("1", nil, "1000", "111"),
+					newTestNode("1000", nil, "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1110", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
+				},
+			},
+			expected: &NodeList{
+				Nodes: []*node{
+					newTestNode("0000", nil, "", ""), // leaf
+					newTestNode("1", nil, "1000", "11"),
+					// new parent
+					newTestNode("11", nil, "1101", "111"),
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1000", nil, "", ""), // leaf
+					newTestNode("1001", func() []byte {
+						// great-grandchildren
+						input1101, input111 := append(
+							keyBytesFromStr("1101"),
+							crypto.Hash([]byte("some_value"))...),
+							append(keyBytesFromStr("111"), []byte{}...)
+						// grandchildren
+						input1000, input11 := keyBytesFromStr("1000"),
+							append(keyBytesFromStr("11"), crypto.Hash(append(input1101, input111...))...)
+						// children
+						input0000, input1 := keyBytesFromStr("0000"),
+							append(keyBytesFromStr("1"), crypto.Hash(append(input1000, input11...))...)
+						// root value
+						return crypto.Hash(append(input0000, input1...))
+					}(),
+						"0000",
+						"1"),
+					newTestNode("1101", nil, "", ""), // leaf
+					newTestNode("1110", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
+				},
+			},
+		},
+		{
+			name: "insert and target at 0 1 1 0",
+			detail: `BEFORE:   root
+							  /    \
+						    0000    1
+								  /   \
+								1000   111
+									  /   \
+								    1110  1111
+
+					AFTER:     root
+							  /     \
+                          *01*       1
+                           / \      /  \
+                       0000 *0110* 1000  111
+									   /  \
+								     1110   1111
+							`,
+			keyBitSize:  4,
+			rootKey:     []byte{0b10010000},
+			targetKey:   []byte{6}, // hashes to [0 1 1 0]
+			targetValue: []byte("some_value"),
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("1001", nil, "0000", "1"),
+					newTestNode("0000", nil, "", ""), // leaf
+					newTestNode("1", nil, "1000", "111"),
+					newTestNode("1000", nil, "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1110", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
+				},
+			},
+			expected: &NodeList{
+				Nodes: []*node{
+					newTestNode("0", nil, "0000", "0110"), // new parent
+					newTestNode("0000", nil, "", ""),      // leaf
+					newTestNode("1", nil, "1000", "111"),
+					newTestNode("0110", nil, "", ""), // inserted
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1000", nil, "", ""), // leaf
+					newTestNode("1001", // root
+						func() []byte {
+							// grandchildren
+							input0000, input0110 := keyBytesFromStr("0000"), append(keyBytesFromStr("0110"), crypto.Hash([]byte("some_value"))...)
+							// children
+							input0, input1 := append(keyBytesFromStr("0"), crypto.Hash(append(input0000, input0110...))...), keyBytesFromStr("1")
+							// root value
+							return crypto.Hash(append(input0, input1...))
+						}(), "0", "1"),
+					newTestNode("1110", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
 				},
 			},
 		},
@@ -182,258 +303,6 @@ func TestSet(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "insert and target at 000010000",
-			detail: `BEFORE:   root
-							  /    \
-						    0000    1
-								  /   \
-								1000   111
-									  /   \
-								    1110  1111
-
-					AFTER:     root
-							  /    \
-						    0000    1
-								  /   \
-								1000 *11*
-		                             /  \
-							      *1101* 111
-                                        /   \
-								      1110  1111
-							`,
-			keyBitSize:  4,
-			rootKey:     []byte{0b10010000},
-			targetKey:   []byte{2}, // hashes to [1 1 0 1]
-			targetValue: []byte("some_value"),
-			preset: &NodeList{
-				Nodes: []*node{
-					{ // root
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 0000
-						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1000, 0}, // 1000
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
-					{ // 1000
-						Key:  &key{leastSigBits: []int{1, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
-					{ // 1110
-						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1111
-						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
-				},
-			},
-			expected: &NodeList{
-				Nodes: []*node{
-					{ // 0000
-						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1000, 0}, // 1000
-							RightChildKey: []byte{0b11, 0},   // 11
-						},
-					},
-					{ // 11 (new parent)
-						Key: &key{leastSigBits: []int{1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1101, 0}, // 1101
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
-					{ // 1000
-						Key:  &key{leastSigBits: []int{1, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1001 (root)
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							Value: func() []byte {
-								// great-grandchildren
-								input1101, input111 := append([]byte{0b1101, 0}, crypto.Hash([]byte("some_value"))...), append([]byte{0b111, 0})
-								// grandchildren
-								input1000, input11 := []byte{0b1000, 0}, append([]byte{0b11, 0}, crypto.Hash(append(input1101, input111...))...)
-								// children
-								input0000, input1 := []byte{0b0000, 3}, append([]byte{0b1, 0}, crypto.Hash(append(input1000, input11...))...)
-								// root value
-								return crypto.Hash(append(input0000, input1...))
-							}(),
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 1101 (inserted)
-						Key:  &key{leastSigBits: []int{1, 1, 0, 1}},
-						Node: lib.Node{},
-					},
-					{ // 1110
-						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1111
-						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
-				},
-			},
-		},
-		{
-			name: "insert and target at 0 1 1 0",
-			detail: `BEFORE:   root
-							  /    \
-						    0000    1
-								  /   \
-								1000   111
-									  /   \
-								    1110  1111
-
-					AFTER:     root
-							  /     \
-                          *01*       1
-                           / \      /  \
-                       0000 *0110* 1000  111
-									   /  \
-								     1110   1111
-							`,
-			keyBitSize:  4,
-			rootKey:     []byte{0b10010000},
-			targetKey:   []byte{6}, // hashes to [0 1 1 0]
-			targetValue: []byte("some_value"),
-			preset: &NodeList{
-				Nodes: []*node{
-					{ // root
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 0000
-						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1000, 0}, // 1000
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
-					{ // 1000
-						Key:  &key{leastSigBits: []int{1, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
-					{ // 1110
-						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1111
-						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
-				},
-			},
-			expected: &NodeList{
-				Nodes: []*node{
-					{ // 0 (new parent)
-						Key: &key{leastSigBits: []int{0}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3},   // 0000
-							RightChildKey: []byte{0b110, 1}, // 0110
-						},
-					},
-					{ // 0000
-						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1000, 0}, // 1000
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
-					{ // 0110 (inserted)
-						Key:  &key{leastSigBits: []int{0, 1, 1, 0}},
-						Node: lib.Node{},
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
-					{ // 1000
-						Key:  &key{leastSigBits: []int{1, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1001 (root)
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							Value: func() []byte {
-								// grandchildren
-								input0000, input0110 := []byte{0b0, 3}, append([]byte{0b110, 1}, crypto.Hash([]byte("some_value"))...)
-								// children
-								input0, input1 := append([]byte{0b0, 0}, crypto.Hash(append(input0000, input0110...))...), []byte{0b1, 0}
-								// root value
-								return crypto.Hash(append(input0, input1...))
-							}(),
-							LeftChildKey:  []byte{0b0, 0}, // 0
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 1110
-						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1111
-						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
-				},
-			},
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -455,8 +324,6 @@ func TestSet(t *testing.T) {
 					got.Key.fromBytes(it.Key())
 					// compare got vs expected
 					//fmt.Printf("%08b %v\n", got.Key.mostSigBytes, got.Key.leastSigBits)
-					fmt.Printf("---\niter\nk: %v\nlk: %v\nrk: %v\n", got.Key.bytes(), got.LeftChildKey, got.RightChildKey)
-					fmt.Printf("---\nexpected\nk: %v\nlk: %v\nrk: %v\n", test.expected.Nodes[i].Key.bytes(), test.expected.Nodes[i].LeftChildKey, test.expected.Nodes[i].RightChildKey)
 					require.Equal(t, test.expected.Nodes[i].Key.bytes(), got.Key.bytes(), fmt.Sprintf("Key Iteration: %d on node %v", i, got.Key.bytes()))
 					require.Equal(t, test.expected.Nodes[i].LeftChildKey, got.LeftChildKey, fmt.Sprintf("Left Child Key Iteration: %d on node %v", i, got.Key.leastSigBits))
 					require.Equal(t, test.expected.Nodes[i].RightChildKey, got.RightChildKey, fmt.Sprintf("Right Child Key Iteration: %d on node %v", i, got.Key.leastSigBits))
@@ -499,81 +366,30 @@ func TestDelete(t *testing.T) {
 			targetKey:  []byte{1},          // hashes to [010]
 			preset: &NodeList{
 				Nodes: []*node{
-					{ // root
-						Key: &key{leastSigBits: []int{1, 0, 0}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 0}, // 0
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 0
-						Key: &key{leastSigBits: []int{0}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 2},  // 000
-							RightChildKey: []byte{0b10, 1}, // 010
-						},
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b111, 0}, // 111
-							RightChildKey: []byte{0b101, 0}, // 101
-						},
-					},
-					{ // 000
-						Key:  &key{leastSigBits: []int{0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 010
-						Key:  &key{leastSigBits: []int{0, 1, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 111
-						Key:  &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 101
-						Key:  &key{leastSigBits: []int{1, 0, 1}},
-						Node: lib.Node{}, // leaf
-					},
+					newTestNode("100", nil, "0", "1"), // root
+					newTestNode("0", nil, "000", "010"),
+					newTestNode("1", nil, "111", "101"),
+					newTestNode("000", nil, "", ""), // leaf
+					newTestNode("010", nil, "", ""), // leaf
+					newTestNode("111", nil, "", ""), // leaf
+					newTestNode("101", nil, "", ""), // leaf
 				},
 			},
 			expected: &NodeList{
 				Nodes: []*node{
-					{ // 000
-						Key:  &key{leastSigBits: []int{0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b111, 0}, // 111
-							RightChildKey: []byte{0b101, 0}, // 101
-						},
-					},
-					{ // 100 root
-						Key: &key{leastSigBits: []int{1, 0, 0}}, // arbitrary
-						Node: lib.Node{
-							Value: func() []byte {
-								// NOTE: the tree values on the right side are nulled, so the inputs for the right side are incomplete
-								// children
-								input000 := append([]byte{0b0, 2})
-								input1 := append([]byte{0b1, 0})
-								// root value
-								return crypto.Hash(append(input000, input1...))
-							}(),
-							LeftChildKey:  []byte{0b0, 2}, // 000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 101
-						Key:  &key{leastSigBits: []int{1, 0, 1}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 111
-						Key:  &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
+					newTestNode("000", nil, "", ""),     // leaf
+					newTestNode("1", nil, "111", "101"), // leaf
+					newTestNode("100",
+						func() []byte { // root
+							// NOTE: the tree values on the right side are nulled, so the inputs for the right side are incomplete
+							// children
+							input000 := append(keyBytesFromStr("000"), []byte{}...)
+							input1 := append(keyBytesFromStr("1"), []byte{}...)
+							// root value
+							return crypto.Hash(append(input000, input1...))
+						}(), "000", "1"),
+					newTestNode("101", nil, "", ""), // leaf
+					newTestNode("111", nil, "", ""), // leaf
 				},
 			},
 		},
@@ -598,80 +414,29 @@ func TestDelete(t *testing.T) {
 			targetKey:  []byte{8}, // hashes to [1 0 1 1]
 			preset: &NodeList{
 				Nodes: []*node{
-					{ // root
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 0000
-						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1011, 0}, // 1011
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
-					{ // 1011
-						Key:  &key{leastSigBits: []int{1, 0, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
-					{ // 1110
-						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1111
-						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
+					newTestNode("1001", nil, "0000", "1"),
+					newTestNode("0000", nil, "", ""), // leaf
+					newTestNode("1", nil, "1011", "111"),
+					newTestNode("1011", nil, "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1110", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
 				},
 			},
 			expected: &NodeList{
 				Nodes: []*node{
-					{ // 0000
-						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
-					{ // 1001 (root)
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							Value: func() []byte {
-								// NOTE: 111 hash not updated, so use key only as there's no value preset
-								// children
-								in0000, in111 := []byte{0, 3}, []byte{0b111, 0}
-								// root value
-								return crypto.Hash(append(in0000, in111...))
-							}(),
-							LeftChildKey:  []byte{0b0, 3},   // 0000
-							RightChildKey: []byte{0b111, 0}, // 111
-						},
-					},
-					{ // 1110
-						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1111
-						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
+					newTestNode("0000", nil, "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1001", // root
+						func() []byte {
+							// NOTE: 111 hash not updated, so use key only as there's no value preset
+							// children
+							in0000, in111 := keyBytesFromStr("0000"), keyBytesFromStr("111")
+							// root value
+							return crypto.Hash(append(in0000, in111...))
+						}(), "0000", "111"),
+					newTestNode("1110", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
 				},
 			},
 		},
@@ -698,84 +463,24 @@ func TestDelete(t *testing.T) {
 			targetKey:  []byte{2}, // hashes to [1 1 0 1]
 			preset: &NodeList{
 				Nodes: []*node{
-					{ // root
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 0000
-						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1000, 0}, // 1000
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
-					{ // 1000
-						Key:  &key{leastSigBits: []int{1, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
-					{ // 1110
-						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1111
-						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
+					newTestNode("1001", nil, "0000", "1"),
+					newTestNode("0000", nil, "", ""), // leaf
+					newTestNode("1", nil, "1000", "111"),
+					newTestNode("1000", nil, "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1110", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
 				},
 			},
 			expected: &NodeList{
 				Nodes: []*node{
-					{ // 0000
-						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1000, 0}, // 1000
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
-					{ // 1000
-						Key:  &key{leastSigBits: []int{1, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1001 (root)
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 1110
-						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1111
-						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
+					newTestNode("0000", nil, "", ""), // leaf
+					newTestNode("1", nil, "1000", "111"),
+					newTestNode("111", nil, "1110", "1111"), // leaf
+					newTestNode("1000", nil, "", ""),        // leaf
+					newTestNode("1001", nil, "0000", "1"),   // root
+					newTestNode("1110", nil, "", ""),        // leaf
+					newTestNode("1111", nil, "", ""),        // leaf
 				},
 			},
 		},
@@ -833,30 +538,17 @@ func TestTraverse(t *testing.T) {
 			keyBitSize: 3,
 			target:     &node{Key: &key{leastSigBits: []int{0, 0, 0}}},
 			expectedTraversal: &NodeList{Nodes: []*node{
-				{
-					Key: &key{
-						leastSigBits: []int{1, 1, 1},
-					},
-					Node: lib.Node{
-						Value: func() []byte {
-							// left child key + value
-							leftInput := append([]byte{0, 2}, bytes.Repeat([]byte{0}, 20)...)
-							// right child key + value
-							rightInput := append([]byte{7, 0}, bytes.Repeat([]byte{255}, 20)...)
-							// hash ( left + right )
-							return crypto.Hash(append(leftInput, rightInput...))
-						}(),
-						LeftChildKey:  []byte{0, 2},
-						RightChildKey: []byte{7, 0},
-					},
-				},
+				newTestNode("111", func() []byte { // root
+					// left child key + value
+					leftInput := append(keyBytesFromStr("000"), bytes.Repeat([]byte{0}, 20)...)
+					// right child key + value
+					rightInput := append(keyBytesFromStr("111"), bytes.Repeat([]byte{255}, 20)...)
+					// hash ( left + right )
+					return crypto.Hash(append(leftInput, rightInput...))
+				}(),
+					"000", "111"),
 			}},
-			expectedCurrent: &node{
-				Key: &key{
-					leastSigBits: []int{0, 0, 0},
-				},
-				Node: lib.Node{Value: bytes.Repeat([]byte{0}, 20)},
-			},
+			expectedCurrent: newTestNode("000", bytes.Repeat([]byte{0}, 20), "", ""),
 		},
 		{
 			name: "basic traversal, no preset (Right - 3bit)",
@@ -867,30 +559,16 @@ func TestTraverse(t *testing.T) {
 			keyBitSize: 3,
 			target:     &node{Key: &key{leastSigBits: []int{1, 1, 1}}},
 			expectedTraversal: &NodeList{Nodes: []*node{
-				{
-					Key: &key{
-						leastSigBits: []int{1, 1, 1},
-					},
-					Node: lib.Node{
-						Value: func() []byte {
-							// left child key + value
-							leftInput := append([]byte{0, 2}, bytes.Repeat([]byte{0}, 20)...)
-							// right child key + value
-							rightInput := append([]byte{7, 0}, bytes.Repeat([]byte{255}, 20)...)
-							// hash ( left + right )
-							return crypto.Hash(append(leftInput, rightInput...))
-						}(),
-						LeftChildKey:  []byte{0, 2},
-						RightChildKey: []byte{7, 0},
-					},
-				},
+				newTestNode("111", func() []byte {
+					// left child key + value
+					leftInput := append(keyBytesFromStr("000"), bytes.Repeat([]byte{0}, 20)...)
+					// right child key + value
+					rightInput := append(keyBytesFromStr("111"), bytes.Repeat([]byte{255}, 20)...)
+					// hash ( left + right )
+					return crypto.Hash(append(leftInput, rightInput...))
+				}(), "000", "111"),
 			}},
-			expectedCurrent: &node{
-				Key: &key{
-					leastSigBits: []int{1, 1, 1},
-				},
-				Node: lib.Node{Value: bytes.Repeat([]byte{255}, 20)},
-			},
+			expectedCurrent: newTestNode("111", bytes.Repeat([]byte{255}, 20), "", ""),
 		},
 		{
 			name: "basic traversal, no preset (Left - 4bit)",
@@ -901,30 +579,17 @@ func TestTraverse(t *testing.T) {
 			keyBitSize: 4,
 			target:     &node{Key: &key{leastSigBits: []int{0, 0, 0, 0}}},
 			expectedTraversal: &NodeList{Nodes: []*node{
-				{
-					Key: &key{
-						leastSigBits: []int{1, 1, 1, 1},
-					},
-					Node: lib.Node{
-						Value: func() []byte {
-							// left child key + value
-							leftInput := append([]byte{0, 3}, bytes.Repeat([]byte{0}, 20)...)
-							// right child key + value
-							rightInput := append([]byte{15, 0}, bytes.Repeat([]byte{255}, 20)...)
-							// hash ( left + right )
-							return crypto.Hash(append(leftInput, rightInput...))
-						}(),
-						LeftChildKey:  []byte{0, 3},
-						RightChildKey: []byte{15, 0},
-					},
-				},
+				newTestNode("1111",
+					func() []byte {
+						// left child key + value
+						leftInput := append(keyBytesFromStr("0000"), bytes.Repeat([]byte{0}, 20)...)
+						// right child key + value
+						rightInput := append(keyBytesFromStr("1111"), bytes.Repeat([]byte{255}, 20)...)
+						// hash ( left + right )
+						return crypto.Hash(append(leftInput, rightInput...))
+					}(), "0000", "1111"),
 			}},
-			expectedCurrent: &node{
-				Key: &key{
-					leastSigBits: []int{0, 0, 0, 0},
-				},
-				Node: lib.Node{Value: bytes.Repeat([]byte{0}, 20)},
-			},
+			expectedCurrent: newTestNode("0000", bytes.Repeat([]byte{0}, 20), "", ""),
 		},
 		{
 			name: "basic traversal, no preset (Right - 5bit)",
@@ -935,30 +600,17 @@ func TestTraverse(t *testing.T) {
 			keyBitSize: 5,
 			target:     &node{Key: &key{leastSigBits: []int{1, 1, 1, 1, 1}}},
 			expectedTraversal: &NodeList{Nodes: []*node{
-				{
-					Key: &key{
-						leastSigBits: []int{1, 1, 1, 1, 1},
-					},
-					Node: lib.Node{
-						Value: func() []byte {
-							// left child key + value
-							leftInput := append([]byte{0, 4}, bytes.Repeat([]byte{0}, 20)...)
-							// right child key + value
-							rightInput := append([]byte{31, 0}, bytes.Repeat([]byte{255}, 20)...)
-							// hash ( left + right )
-							return crypto.Hash(append(leftInput, rightInput...))
-						}(),
-						LeftChildKey:  []byte{0, 4},
-						RightChildKey: []byte{31, 0},
-					},
-				},
+				newTestNode("11111",
+					func() []byte {
+						// left child key + value
+						leftInput := append([]byte{0, 4}, bytes.Repeat([]byte{0}, 20)...)
+						// right child key + value
+						rightInput := append([]byte{31, 0}, bytes.Repeat([]byte{255}, 20)...)
+						// hash ( left + right )
+						return crypto.Hash(append(leftInput, rightInput...))
+					}(), "00000", "11111"),
 			}},
-			expectedCurrent: &node{
-				Key: &key{
-					leastSigBits: []int{1, 1, 1, 1, 1},
-				},
-				Node: lib.Node{Value: bytes.Repeat([]byte{255}, 20)},
-			},
+			expectedCurrent: newTestNode("11111", bytes.Repeat([]byte{255}, 20), "", ""),
 		},
 		{
 			name: "traversal with preset and target at 1110",
@@ -1015,34 +667,13 @@ func TestTraverse(t *testing.T) {
 			},
 			expectedTraversal: &NodeList{
 				Nodes: []*node{
-					{ // root
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1000, 0}, // 1000
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
+					newTestNode("1001", nil, "0000", "1"), // root
+					newTestNode("1", nil, "1000", "111"),
+					newTestNode("111", nil, "1110", "1111"),
 				},
 			},
-			expectedCurrent: &node{ // 1110
-				Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-				Node: lib.Node{Value: []byte("some_value")}, // leaf
-			},
-			rootKey: []byte{0b10010000},
+			expectedCurrent: newTestNode("1110", []byte("some_value"), "", ""),
+			rootKey:         []byte{0b10010000},
 		},
 		{
 			name: "traversal with preset and target at 1100",
@@ -1058,71 +689,23 @@ func TestTraverse(t *testing.T) {
 			target:     &node{Key: &key{leastSigBits: []int{1, 1, 0, 0}}},
 			preset: &NodeList{
 				Nodes: []*node{
-					{ // root
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 0000
-						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1000, 0}, // 1000
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
-					{ // 1000
-						Key:  &key{leastSigBits: []int{1, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
-					{ // 1110
-						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1111
-						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
+					newTestNode("1001", nil, "0000", "1"), // root
+					newTestNode("0000", nil, "", ""),      // leaf
+					newTestNode("1", nil, "1000", "111"),
+					newTestNode("1000", nil, "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1110", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
 				},
 			},
 			expectedTraversal: &NodeList{
 				Nodes: []*node{
-					{ // root
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1000, 0}, // 1000
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
+					newTestNode("1001", nil, "0000", "1"), // root
+					newTestNode("1", nil, "1000", "111"),
 				},
 			},
-			expectedCurrent: &node{ // 111
-				Key: &key{leastSigBits: []int{1, 1, 1}},
-				Node: lib.Node{
-					LeftChildKey:  []byte{0b1110, 0}, // 1110
-					RightChildKey: []byte{0b1111, 0}, // 1111
-				},
-			},
-			rootKey: []byte{0b10010000},
+			expectedCurrent: newTestNode("111", nil, "1110", "1111"),
+			rootKey:         []byte{0b10010000},
 		},
 		{
 			name: "traversal with preset and target at 0001",
@@ -1138,61 +721,22 @@ func TestTraverse(t *testing.T) {
 			target:     &node{Key: &key{leastSigBits: []int{0, 0, 0, 1}}},
 			preset: &NodeList{
 				Nodes: []*node{
-					{ // root
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 0000
-						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-						Node: lib.Node{Value: []byte("some_value")}, // leaf
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1000, 0}, // 1000
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
-					{ // 1000
-						Key:  &key{leastSigBits: []int{1, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
-					{ // 1110
-						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1111
-						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
+					newTestNode("1001", nil, "0000", "1"),             // root
+					newTestNode("0000", []byte("some_value"), "", ""), // leaf
+					newTestNode("1", nil, "1000", "111"),
+					newTestNode("1000", nil, "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1110", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
 				},
 			},
 			expectedTraversal: &NodeList{
 				Nodes: []*node{
-					{ // root
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
+					newTestNode("1001", nil, "0000", "1"), // root
 				},
 			},
-			expectedCurrent: &node{ // 0000
-				Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-				Node: lib.Node{Value: []byte("some_value")}, // leaf
-			},
-			rootKey: []byte{0b10010000},
+			expectedCurrent: newTestNode("0000", []byte("some_value"), "", ""),
+			rootKey:         []byte{0b10010000},
 		},
 	}
 	for _, test := range tests {
@@ -1209,95 +753,6 @@ func TestTraverse(t *testing.T) {
 				require.EqualExportedValues(t, test.expectedTraversal, smt.traversed)
 			}()
 		})
-	}
-}
-
-func NewTestSMT(t *testing.T, preset *NodeList, root []byte, keyBitSize int) (*SMT, *TxnWrapper) {
-	// create a new memory store to work with
-	db, err := badger.OpenManaged(badger.DefaultOptions("").
-		WithInMemory(true).WithLoggingLevel(badger.ERROR))
-	require.NoError(t, err)
-	// make a writable tx that reads from the last height
-	tx := db.NewTransactionAt(1, true)
-	memStore := NewTxnWrapper(tx, lib.NewDefaultLogger(), stateCommitmentPrefix)
-	// if there's no preset - use the default 3 nodes
-	if preset == nil {
-		if root != nil {
-			return NewSMT(root, keyBitSize, memStore), memStore
-		}
-		return NewSMT(RootKey, keyBitSize, memStore), memStore
-	}
-	// create the smt
-	smt := &SMT{
-		store:        memStore,
-		keyBitLength: keyBitSize,
-	}
-	// update root
-	smt.root = preset.Nodes[0]
-	// preset the nodes
-	for _, n := range preset.Nodes {
-		// set the node in the dbz
-		fmt.Printf("----\npreset\nk:%v\nlk:%v\nrk:%v\n", n.Key.bytes(), n.LeftChildKey, n.RightChildKey)
-		require.NoError(t, smt.setNode(n))
-	}
-	return smt, memStore
-}
-
-func newTestNode(k string, value []byte, leftChildKey, rightChildKey string) *node {
-	intKey := make([]int, 0, len(k))
-	for _, ch := range k {
-		digit, err := strconv.Atoi(string(ch))
-		if err != nil {
-			panic(err)
-		}
-		intKey = append(intKey, digit)
-	}
-
-	leftChildKeyBytes := make([]byte, 0, len(leftChildKey))
-	rightChildKeyBytes := make([]byte, 0, len(rightChildKey))
-
-	for _, ch := range leftChildKey {
-		digit, err := strconv.Atoi(string(ch))
-		if err != nil {
-			panic(err)
-		}
-		leftChildKeyBytes = append(leftChildKeyBytes, byte(digit))
-	}
-
-	for _, ch := range rightChildKey {
-		digit, err := strconv.Atoi(string(ch))
-		if err != nil {
-			panic(err)
-		}
-		rightChildKeyBytes = append(rightChildKeyBytes, byte(digit))
-	}
-
-	leftBits := make([]int, 0)
-	rightBits := make([]int, 0)
-	for _, l := range leftChildKeyBytes {
-		leftBits = append(leftBits, new(key).byteToBits(l, 0)[0])
-	}
-	for _, r := range rightChildKeyBytes {
-		rightBits = append(rightBits, new(key).byteToBits(r, 0)[0])
-	}
-
-	var leftKey []byte
-	if leftChildKey != "" {
-		leftKey = (&key{leastSigBits: leftBits}).bytes()
-	}
-
-	var rightKey []byte
-	if rightChildKey != "" {
-		rightKey = (&key{leastSigBits: rightBits}).bytes()
-	}
-
-	return &node{
-		Key: &key{leastSigBits: intKey},
-		Node: lib.Node{
-			Value:         value,
-			LeftChildKey:  leftKey,
-			RightChildKey: rightKey,
-		},
 	}
 }
 
@@ -2267,4 +1722,95 @@ func FuzzKeyDecodeEncode(f *testing.F) {
 		// compare the resulting bytes against the fuzz data
 		require.Equal(t, bytesFromKey, data)
 	})
+}
+
+func NewTestSMT(t *testing.T, preset *NodeList, root []byte, keyBitSize int) (*SMT, *TxnWrapper) {
+	// create a new memory store to work with
+	db, err := badger.OpenManaged(badger.DefaultOptions("").
+		WithInMemory(true).WithLoggingLevel(badger.ERROR))
+	require.NoError(t, err)
+	// make a writable tx that reads from the last height
+	tx := db.NewTransactionAt(1, true)
+	memStore := NewTxnWrapper(tx, lib.NewDefaultLogger(), stateCommitmentPrefix)
+	// if there's no preset - use the default 3 nodes
+	if preset == nil {
+		if root != nil {
+			return NewSMT(root, keyBitSize, memStore), memStore
+		}
+		return NewSMT(RootKey, keyBitSize, memStore), memStore
+	}
+	// create the smt
+	smt := &SMT{
+		store:        memStore,
+		keyBitLength: keyBitSize,
+	}
+	// update root
+	smt.root = preset.Nodes[0]
+	// preset the nodes
+	for _, n := range preset.Nodes {
+		// set the node in the dbz
+		require.NoError(t, smt.setNode(n))
+	}
+	return smt, memStore
+}
+
+// newTestNode creates a new node with the given key, value, left and right child keys
+func newTestNode(k string, value []byte, leftChildKey, rightChildKey string) *node {
+	leftKey := keyFromByteStr(leftChildKey)
+	rightKey := keyFromByteStr(rightChildKey)
+	return &node{
+		Key: new(key).fromBytes(keyBytesFromStr(k)),
+		Node: lib.Node{
+			Value:         value,
+			LeftChildKey:  leftKey,
+			RightChildKey: rightKey,
+		},
+	}
+}
+
+// keyFromByteStr converts a string of binary bits to a byte slice
+func keyFromByteStr(k string) []byte {
+	keyBytes := bytesFromStr(k)
+	leftBits := make([]int, 0)
+	for _, l := range keyBytes {
+		leftBits = append(leftBits, new(key).byteToBits(l, 0)[0])
+	}
+	var bytes []byte
+	if k != "" {
+		bytes = (&key{leastSigBits: leftBits}).bytes()
+	}
+	return bytes
+}
+
+// keyBitsFromString converts a string of binary bits to an int slice
+func keyBitsFromString(k string) []int {
+	bits := make([]int, 0, len(k))
+	for _, ch := range k {
+		digit, err := strconv.Atoi(string(ch))
+		if err != nil {
+			panic(err)
+		}
+		bits = append(bits, digit)
+	}
+	return bits
+}
+
+// keyBytesFromStr converts a string of binary bits to a byte slice from
+// the key's least significant bits
+func keyBytesFromStr(bits string) []byte {
+	k := &key{leastSigBits: keyBitsFromString(bits)}
+	return k.bytes()
+}
+
+// bytesFromStr converts a string of binary bits to a byte slice
+func bytesFromStr(k string) []byte {
+	bytes := make([]byte, 0, len(k))
+	for _, ch := range k {
+		digit, err := strconv.Atoi(string(ch))
+		if err != nil {
+			panic(err)
+		}
+		bytes = append(bytes, byte(digit))
+	}
+	return bytes
 }
