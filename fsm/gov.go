@@ -470,10 +470,10 @@ func (s *StateMachine) IsFeatureEnabled(requiredVersion uint64) bool {
 
 // ROOT CHAIN CODE BELOW
 
-// IsOwnRoot() returns if this chain is its own root (base)
-func (s *StateMachine) IsOwnRoot() (bool, lib.ErrorI) {
+// LoadIsOwnRoot() returns if this chain is its own root (base)
+func (s *StateMachine) LoadIsOwnRoot() (bool, lib.ErrorI) {
 	// get the latest root chain id from the state
-	rootId, err := s.GetRootChainId()
+	rootId, err := s.LoadRootChainId(s.Height())
 	if err != nil {
 		return false, err
 	}

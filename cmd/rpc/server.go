@@ -181,38 +181,18 @@ func (s *Server) pollRootChainInfo() {
 			if err != nil {
 				return
 			}
-
 			// Safely close state machine
 			defer state.Discard()
-
 			// get the consensus params from the app
 			consParams, err := state.GetParamsCons()
 			if err != nil {
 				return
 			}
-
-			// get the url for the root chain as set by the state
-			var rootChainUrl string
-			for _, chain := range s.config.RootChain {
-				if chain.ChainId == consParams.RootChainId {
-					rootChainUrl = chain.Url
-				}
-			}
-			// check if root chain url isn't empty
-			if rootChainUrl == "" {
-				s.logger.Errorf("Config.JSON missing RootChainID=%d failed with", consParams.RootChainId)
-				return lib.ErrEmptyChainId()
-			}
-			// create a rpc client
-			rpcClient := NewClient(rootChainUrl, "", "")
-			// set the apps callbacks
-			s.controller.RootChainInfo.RemoteCallbacks = &lib.RemoteCallbacks{
-				Checkpoint:          rpcClient.Checkpoint,
-				ValidatorSet:        rpcClient.ValidatorSet,
-				IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
-				Transaction:         rpcClient.Transaction,
-				Lottery:             rpcClient.Lottery,
-				Orders:              rpcClient.Orders,
+			// get the remote callbacks for the root chain id
+			rpcClient, err := s.RemoteCallbacks(consParams.RootChainId)
+			if err != nil {
+				s.logger.Errorf("callbacks failed with err: %s")
+				return err
 			}
 			// query the base chain height
 			height, err := rpcClient.Height()
@@ -224,7 +204,7 @@ func (s *Server) pollRootChainInfo() {
 			if *height <= rootChainHeight {
 				return
 			}
-			// update the base chain height
+			// update the root chain height
 			rootChainHeight = *height
 			// if a new height received
 			s.logger.Infof("New RootChain height %d detected!", rootChainHeight)
@@ -239,8 +219,9 @@ func (s *Server) pollRootChainInfo() {
 					break
 				}
 				s.logger.Errorf("GetRootChainInfo failed with err %s", e.Error())
-				// update with empty root-Chain info to stop consensus
+				// update with empty root-chain info to stop consensus
 				s.controller.UpdateRootChainInfo(&lib.RootChainInfo{
+					RootChainId:      consParams.RootChainId,
 					Height:           rootChainHeight,
 					ValidatorSet:     lib.ValidatorSet{},
 					LastValidatorSet: lib.ValidatorSet{},
@@ -253,6 +234,38 @@ func (s *Server) pollRootChainInfo() {
 			s.logger.Warnf(err.Error())
 		}
 	}
+}
+
+// RemoteCallbacks() enables the retrieval of remote RPC API calls for a certain root chain id
+func (s *Server) RemoteCallbacks(rootChainId uint64) (*lib.RemoteCallbacks, lib.ErrorI) {
+	// get the url for the root chain as set by the state
+	var rootChainUrl string
+	// for each item in the root chain config
+	for _, chain := range s.config.RootChain {
+		// if the chain id matches
+		if chain.ChainId == rootChainId {
+			// use that root chain url
+			rootChainUrl = chain.Url
+		}
+	}
+	// check if root chain url isn't empty
+	if rootChainUrl == "" {
+		s.logger.Errorf("Config.JSON missing RootChainID=%d failed with", rootChainId)
+		return nil, lib.ErrEmptyChainId()
+	}
+	// create a rpc client
+	rpcClient := NewClient(rootChainUrl, "", "")
+	// set the remote callbacks
+	return &lib.RemoteCallbacks{
+		Height:              rpcClient.Height,
+		RootChainInfo:       rpcClient.RootChainInfo,
+		ValidatorSet:        rpcClient.ValidatorSet,
+		IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
+		Lottery:             rpcClient.Lottery,
+		Orders:              rpcClient.Orders,
+		Checkpoint:          rpcClient.Checkpoint,
+		Transaction:         rpcClient.Transaction,
+	}, nil
 }
 
 // startStaticFileServers starts a file server for the wallet and explorer

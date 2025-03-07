@@ -30,7 +30,7 @@ func (c *Controller) NewCertificateResults(block *lib.Block, blockResult *lib.Bl
 // SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
 func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 	// get the root chain id from the state
-	rootChainId, err := c.FSM.GetRootChainId()
+	rootChainId := c.LoadRootChainId(c.ChainHeight())
 	// if the chain is its own root, don't send a transaction
 	if c.Config.ChainId == rootChainId {
 		// exit
@@ -51,8 +51,17 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 		// exit
 		return
 	}
+	// get a rpc client for the root chain id
+	rpcClient, err := c.RootChainInfo.GetRemoteCallbacks(rootChainId)
+	// if an error occurred getting the callback
+	if err != nil {
+		// log the error
+		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
+		// exit
+		return
+	}
 	// handle the transaction on the root-chain
-	hash, err := c.RootChainInfo.RemoteCallbacks.Transaction(tx)
+	hash, err := rpcClient.Transaction(tx)
 	// if an error occurred during the tx submission
 	if err != nil {
 		// log the error
