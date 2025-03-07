@@ -2,13 +2,16 @@ package p2p
 
 import (
 	"bufio"
-	"github.com/alecthomas/units"
-	"github.com/canopy-network/canopy/lib"
-	limiter "github.com/mxk/go-flowrate/flowrate"
-	"google.golang.org/protobuf/proto"
+	"context"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/alecthomas/units"
+	"github.com/canopy-network/canopy/lib"
+	limiter "github.com/mxk/go-flowrate/flowrate"
+	"golang.org/x/sync/semaphore"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -23,6 +26,8 @@ const (
 	maxMessageSize      = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
 	maxChanSize         = 1                       // maximum number of items in a channel before blocking
 	maxQueueSize        = 1                       // maximum number of items in a queue before blocking
+	maxConcurrency      = 50                      // max concurrency of packet send
+	maxSendQueue        = 100                     // max send queue of packet size
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
@@ -61,6 +66,8 @@ type MultiConn struct {
 	quitReceiving chan struct{}               // signal to quit
 	sendPong      chan struct{}               // signal to send keep alive message
 	receivedPong  chan struct{}               // signal that received keep alive message
+	sendQueue     chan struct{}               // queue for packets to be sent
+	sendErrChan   chan lib.ErrorI             // signal of an error in concurrent send processes
 	onError       func(error, []byte, string) // callback to call if peer errors
 	error         sync.Once                   // thread safety to ensure MultiConn.onError is only called once
 	p2p           *P2P                        // a pointer reference to the P2P module
@@ -78,10 +85,12 @@ func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
 		conn:          eConn,
 		Address:       eConn.Address,
 		streams:       p.NewStreams(),
+		sendQueue:     make(chan struct{}, maxSendQueue),
 		quitSending:   make(chan struct{}, maxChanSize),
 		quitReceiving: make(chan struct{}, maxChanSize),
 		sendPong:      make(chan struct{}, maxChanSize),
 		receivedPong:  make(chan struct{}, maxChanSize),
+		sendErrChan:   make(chan lib.ErrorI, maxChanSize),
 		onError:       p.OnPeerError,
 		error:         sync.Once{},
 		p2p:           p,
@@ -121,7 +130,27 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 		return false
 	}
 	ok = stream.queueSend(bz)
-	return
+	select {
+	case c.sendQueue <- struct{}{}:
+		return true
+	case <-time.After(queueSendTimeout):
+		return false
+	}
+}
+
+// sendPacket sends the packet to peers, this function is intended to use concurrently
+func (c *MultiConn) sendPacket(ctx context.Context, packet *Packet, sem *semaphore.Weighted, m *limiter.Monitor) {
+	sem.Acquire(context.Background(), 1)
+	defer sem.Release(1)
+	select {
+	case <-ctx.Done(): // Exit immediately if the context is canceled (quit signal)
+	default:
+		c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
+		err := c.sendWireBytes(packet, m)
+		if err != nil {
+			c.sendErrChan <- err
+		}
+	}
 }
 
 // startSendService() starts the main send service
@@ -129,17 +158,18 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 // - manages the keep alive protocol by sending pings and monitoring the receipt of the corresponding pong
 func (c *MultiConn) startSendService() {
 	defer lib.CatchPanic(c.log)
-	send, m := time.NewTicker(sendInterval), limiter.New(0, 0)
+	m := limiter.New(0, 0)
 	ping, err := time.NewTicker(pingInterval), lib.ErrorI(nil)
 	pongTimer := time.NewTimer(pongTimeoutDuration)
-	defer func() { lib.StopTimer(pongTimer); ping.Stop(); send.Stop(); m.Done() }()
+	sem := semaphore.NewWeighted(maxConcurrency)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() { lib.StopTimer(pongTimer); ping.Stop(); m.Done(); cancel() }()
 	for {
 		// select statement ensures the sequential coordination of the concurrent processes
 		select {
-		case <-send.C: // fires every 'sendInterval'
+		case <-c.sendQueue: // triggered each time a packet is sent to the queue, concurrency controlled by semaphore
 			if packet := c.getNextPacket(); packet != nil {
-				c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
-				err = c.sendWireBytes(packet, m)
+				go c.sendPacket(ctx, packet, sem, m)
 			}
 		case <-ping.C: // fires every 'pingInterval'
 			c.log.Debugf("Send Ping to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
@@ -164,6 +194,7 @@ func (c *MultiConn) startSendService() {
 			lib.StopTimer(pongTimer)
 		case <-c.quitSending: // fires when Stop() is called
 			return
+		case err = <-c.sendErrChan: // set error to sendErrChan sent value
 		}
 		if err != nil {
 			c.Error(err)
