@@ -57,6 +57,28 @@ const (
 	MaxMessageExceededSlash = -10 // slash for sending a 'Message (sum of Packets)' above the allowed maximum size
 )
 
+// sendNotifier: holds channels for send notifications of concurrent processes
+type sendNotifier struct {
+	notifySendQueue chan struct{} // queue for packets to be sent
+
+}
+
+// newSendNotifier creates a new instance of sendNotifier with constant config default values
+func newSendNotifier() *sendNotifier {
+	return &sendNotifier{
+		notifySendQueue: make(chan struct{}, maxSendQueue),
+	}
+}
+
+func (n *sendNotifier) notifySend() bool {
+	select {
+	case n.notifySendQueue <- struct{}{}:
+		return true
+	case <-time.After(queueSendTimeout):
+		return false
+	}
+}
+
 // MultiConn: A rate-limited, multiplexed connection that utilizes a series streams with varying priority for sending and receiving
 type MultiConn struct {
 	conn          net.Conn                    // underlying connection
@@ -66,12 +88,40 @@ type MultiConn struct {
 	quitReceiving chan struct{}               // signal to quit
 	sendPong      chan struct{}               // signal to send keep alive message
 	receivedPong  chan struct{}               // signal that received keep alive message
-	sendQueue     chan struct{}               // queue for packets to be sent
 	sendErrChan   chan lib.ErrorI             // signal of an error in concurrent send processes
+	writeCh       chan []byte                 // channel to ensure c.conn.Write is not called concurrently
+	sendNotifier  *sendNotifier               // notifier structure for concurrent sends
 	onError       func(error, []byte, string) // callback to call if peer errors
 	error         sync.Once                   // thread safety to ensure MultiConn.onError is only called once
 	p2p           *P2P                        // a pointer reference to the P2P module
 	log           lib.LoggerI                 // logging
+}
+
+// Stream: an independent, bidirectional communication channel that is scoped to a single topic.
+// In a multiplexed connection there is typically more than one stream per connection
+type Stream struct {
+	topic            lib.Topic                    // the subject and priority of the stream
+	sendQueue        chan []byte                  // a queue of unsent messages
+	upNextToSend     []byte                       // a buffer holding unsent portions of the next message
+	msgAssembler     []byte                       // collects and adds incoming packets until the entire message is received (EOF signal)
+	inbox            chan *lib.MessageAndMetadata // the channel where fully received messages are held for other parts of the app to read
+	maxDataChunkSize int                          // maximum size of the chunk of bytes in a packet
+	sendNotifier     *sendNotifier                // notifier structure for concurrent sends
+	logger           lib.LoggerI
+}
+
+// chunkNextSend() returns the next unsent chunk of bytes and if it's the final bytes of the msg
+func (s *Stream) chunkNextSend() (chunk []byte, eof bool) {
+	// If the remaining unsent bytes will fit in a single chunk
+	if len(s.upNextToSend) <= s.maxDataChunkSize {
+		chunk = s.upNextToSend          // set the chunk to the last bytes
+		eof, s.upNextToSend = true, nil // signal message end and empty the upNext buffer
+	} else {
+		chunk = s.upNextToSend[:s.maxDataChunkSize]          // chunk the max number of bytes
+		s.upNextToSend = s.upNextToSend[s.maxDataChunkSize:] // remove those bytes from upNext
+		s.sendNotifier.notifySend()                          // notify new packet to general send
+	}
+	return
 }
 
 // NewConnection() creates and starts a new instance of a MultiConn
@@ -81,16 +131,18 @@ func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
 	if err != nil {
 		return nil, err
 	}
+	n := newSendNotifier()
 	c := &MultiConn{
 		conn:          eConn,
 		Address:       eConn.Address,
-		streams:       p.NewStreams(),
-		sendQueue:     make(chan struct{}, maxSendQueue),
+		streams:       p.NewStreams(n),
 		quitSending:   make(chan struct{}, maxChanSize),
 		quitReceiving: make(chan struct{}, maxChanSize),
 		sendPong:      make(chan struct{}, maxChanSize),
 		receivedPong:  make(chan struct{}, maxChanSize),
 		sendErrChan:   make(chan lib.ErrorI, maxChanSize),
+		writeCh:       make(chan []byte), // needs to be unbuffered so it doesn't call net.Conn concurrently
+		sendNotifier:  n,
 		onError:       p.OnPeerError,
 		error:         sync.Once{},
 		p2p:           p,
@@ -105,6 +157,7 @@ func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
 
 // Start() begins send and receive services for a MultiConn
 func (c *MultiConn) Start() {
+	go c.startWriteChannel()
 	go c.startSendService()
 	go c.startReceiveService()
 }
@@ -130,17 +183,16 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 		return false
 	}
 	ok = stream.queueSend(bz)
-	select {
-	case c.sendQueue <- struct{}{}:
-		return true
-	case <-time.After(queueSendTimeout):
-		return false
-	}
+	ok = c.sendNotifier.notifySend()
+	return
 }
 
 // sendPacket sends the packet to peers, this function is intended to use concurrently
 func (c *MultiConn) sendPacket(ctx context.Context, packet *Packet, sem *semaphore.Weighted, m *limiter.Monitor) {
-	sem.Acquire(context.Background(), 1)
+	sErr := sem.Acquire(context.Background(), 1)
+	if sErr != nil {
+		c.sendErrChan <- ErrSemaphoreFailed(sErr, packet)
+	}
 	defer sem.Release(1)
 	select {
 	case <-ctx.Done(): // Exit immediately if the context is canceled (quit signal)
@@ -150,6 +202,26 @@ func (c *MultiConn) sendPacket(ctx context.Context, packet *Packet, sem *semapho
 		if err != nil {
 			c.sendErrChan <- err
 		}
+	}
+}
+
+func (c *MultiConn) startWriteChannel() {
+	defer lib.CatchPanic(c.log)
+	for data := range c.writeCh {
+		_, err := c.conn.Write(data)
+		if err != nil {
+			c.log.Error(ErrFailedWrite(err).Error())
+			c.sendErrChan <- ErrFailedWrite(err)
+		}
+	}
+}
+
+func (c *MultiConn) queueWrite(b []byte) bool {
+	select {
+	case c.writeCh <- b: // enqueue to the back of the line
+		return true
+	case <-time.After(queueSendTimeout): // may timeout if queue remains full
+		return false
 	}
 }
 
@@ -167,7 +239,7 @@ func (c *MultiConn) startSendService() {
 	for {
 		// select statement ensures the sequential coordination of the concurrent processes
 		select {
-		case <-c.sendQueue: // triggered each time a packet is sent to the queue, concurrency controlled by semaphore
+		case <-c.sendNotifier.notifySendQueue: // triggered each time a packet is sent to the queue, concurrency controlled by semaphore
 			if packet := c.getNextPacket(); packet != nil {
 				go c.sendPacket(ctx, packet, sem, m)
 			}
@@ -311,10 +383,7 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) (er
 	// will block the execution until at or below the desired rate of flow
 	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
 	// write bytes to the wire up to max packet size
-	_, er := c.conn.Write(bz)
-	if er != nil {
-		c.log.Error(ErrFailedWrite(er).Error())
-	}
+	c.queueWrite(bz)
 	// update the rate limiter with how many bytes were written
 	//m.Update(n)
 	return
@@ -332,17 +401,6 @@ func (c *MultiConn) getNextPacket() *Packet {
 		}
 	}
 	return nil
-}
-
-// Stream: an independent, bidirectional communication channel that is scoped to a single topic.
-// In a multiplexed connection there is typically more than one stream per connection
-type Stream struct {
-	topic        lib.Topic                    // the subject and priority of the stream
-	sendQueue    chan []byte                  // a queue of unsent messages
-	upNextToSend []byte                       // a buffer holding unsent portions of the next message
-	msgAssembler []byte                       // collects and adds incoming packets until the entire message is received (EOF signal)
-	inbox        chan *lib.MessageAndMetadata // the channel where fully received messages are held for other parts of the app to read
-	logger       lib.LoggerI
 }
 
 // queueSend() schedules the bytes to be sent
@@ -375,19 +433,6 @@ func (s *Stream) hasStuffToSend() bool {
 func (s *Stream) nextPacket() (packet *Packet) {
 	packet = &Packet{StreamId: s.topic}
 	packet.Bytes, packet.Eof = s.chunkNextSend()
-	return
-}
-
-// chunkNextSend() returns the next unsent chunk of bytes and if it's the final bytes of the msg
-func (s *Stream) chunkNextSend() (chunk []byte, eof bool) {
-	// If the remaining unsent bytes will fit in a single chunk
-	if len(s.upNextToSend) <= maxDataChunkSize {
-		chunk = s.upNextToSend          // set the chunk to the last bytes
-		eof, s.upNextToSend = true, nil // signal message end and empty the upNext buffer
-	} else {
-		chunk = s.upNextToSend[:maxDataChunkSize]          // chunk the max number of bytes
-		s.upNextToSend = s.upNextToSend[maxDataChunkSize:] // remove those bytes from upNext
-	}
 	return
 }
 

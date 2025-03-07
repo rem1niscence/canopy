@@ -2,11 +2,12 @@
 package p2p
 
 import (
-	"github.com/canopy-network/canopy/lib"
-	"github.com/stretchr/testify/require"
 	"net"
 	"sync"
 	"testing"
+
+	"github.com/canopy-network/canopy/lib"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPeerSetAddGetDel(t *testing.T) {
@@ -113,7 +114,7 @@ func newTestMultiConnMock(_ *testing.T, peerPubKey []byte, conn net.Conn, p *P2P
 				ChainId: 1,
 			},
 		},
-		streams:       p.NewStreams(),
+		streams:       p.NewStreams(newSendNotifier()),
 		quitSending:   make(chan struct{}, maxChanSize),
 		quitReceiving: make(chan struct{}, maxChanSize),
 		sendPong:      make(chan struct{}, maxChanSize),
