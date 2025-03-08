@@ -406,12 +406,21 @@ export const placeholders = {
         },
     },
     params: {
-        parameterSpace: "consensus",
-        parameterKey: "protocolVersion",
-        parameterValue: "1/150",
-        startHeight: 1,
-        endHeight: 100,
-        signer: "303739303732333263...",
+        type: "changeParameter",
+        msg: {
+            parameterSpace: "cons",
+            parameterKey: "blockSize",
+            parameterValue: 1000,
+            startHeight: 1,
+            endHeight: 100,
+            signer: "1fe1e32edc41d688...",
+        },
+        signature: {
+            publicKey: "a88b9c0c7b77e7f8ac...",
+            signature: "8f6d016d04e350...",
+        },
+        memo: "",
+        fee: 10000,
     },
     rawTx: {
         type: "changeParameter",

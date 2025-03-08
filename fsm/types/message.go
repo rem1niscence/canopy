@@ -306,6 +306,9 @@ func (x *MessageChangeParameter) Check() lib.ErrorI {
 	if err := checkStartEndHeight(x); err != nil {
 		return err
 	}
+	if x.ProposalHash != "" {
+		return ErrInvalidProposalHash()
+	}
 	return nil
 }
 
@@ -331,6 +334,7 @@ func (x MessageChangeParameter) MarshalJSON() ([]byte, error) {
 		StartHeight:    x.StartHeight,
 		EndHeight:      x.EndHeight,
 		Signer:         x.Signer,
+		ProposalHash:   x.ProposalHash,
 	})
 }
 
@@ -362,6 +366,7 @@ func (x *MessageChangeParameter) UnmarshalJSON(b []byte) (err error) {
 		StartHeight:    j.StartHeight,
 		EndHeight:      j.EndHeight,
 		Signer:         j.Signer,
+		ProposalHash:   j.ProposalHash,
 	}
 	return
 }
@@ -373,6 +378,7 @@ type jsonMessageChangeParameter struct {
 	StartHeight    uint64       `json:"startHeight"`
 	EndHeight      uint64       `json:"endHeight"`
 	Signer         lib.HexBytes `json:"signer"`
+	ProposalHash   string       `json:"proposalHash,omitempty"`
 }
 
 func (x *MessageChangeParameter) Name() string      { return MessageChangeParameterName }
@@ -389,6 +395,9 @@ func (x *MessageDAOTransfer) Check() lib.ErrorI {
 	if err := checkStartEndHeight(x); err != nil {
 		return err
 	}
+	if x.ProposalHash != "" {
+		return ErrInvalidProposalHash()
+	}
 	return checkAmount(x.Amount)
 }
 
@@ -399,10 +408,11 @@ func (x *MessageDAOTransfer) Recipient() []byte { return nil }
 // MarshalJSON() is the json.Marshaller implementation for MessageDAOTransfer
 func (x MessageDAOTransfer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageDaoTransfer{
-		Address:     x.Address,
-		Amount:      x.Amount,
-		StartHeight: x.StartHeight,
-		EndHeight:   x.EndHeight,
+		Address:      x.Address,
+		Amount:       x.Amount,
+		StartHeight:  x.StartHeight,
+		EndHeight:    x.EndHeight,
+		ProposalHash: x.ProposalHash,
 	})
 }
 
@@ -413,19 +423,21 @@ func (x *MessageDAOTransfer) UnmarshalJSON(b []byte) (err error) {
 		return
 	}
 	*x = MessageDAOTransfer{
-		Address:     j.Address,
-		Amount:      j.Amount,
-		StartHeight: j.StartHeight,
-		EndHeight:   j.EndHeight,
+		Address:      j.Address,
+		Amount:       j.Amount,
+		StartHeight:  j.StartHeight,
+		EndHeight:    j.EndHeight,
+		ProposalHash: j.ProposalHash,
 	}
 	return
 }
 
 type jsonMessageDaoTransfer struct {
-	Address     lib.HexBytes `json:"address"`
-	Amount      uint64       `json:"amount"`
-	StartHeight uint64       `json:"startHeight"`
-	EndHeight   uint64       `json:"endHeight"`
+	Address      lib.HexBytes `json:"address"`
+	Amount       uint64       `json:"amount"`
+	StartHeight  uint64       `json:"startHeight"`
+	EndHeight    uint64       `json:"endHeight"`
+	ProposalHash string       `json:"proposalHash,omitempty"`
 }
 
 var _ lib.MessageI = &MessageCertificateResults{} // interface enforcement
@@ -810,4 +822,61 @@ func checkOrders(orders *lib.Orders) lib.ErrorI {
 		}
 	}
 	return nil
+}
+
+// messageFromTxJSON() extracts a lib.MessageI from a transaction json
+func messageFromTxJSON(txJSONBytes []byte) (message lib.MessageI, tx *lib.Transaction, err lib.ErrorI) {
+	// create a new transaction object reference to ensure a non-nil transaction
+	tx = new(lib.Transaction)
+	// populate the object ref with the bytes of the transaction
+	if err = lib.UnmarshalJSON(txJSONBytes, tx); err != nil {
+		// exit with error
+		return
+	}
+	// perform basic validations against the tx object
+	if err = tx.CheckBasic(); err != nil {
+		// exit with error
+		return
+	}
+	// extract the message from a protobuf any
+	p, err := lib.FromAny(tx.Msg)
+	// if an error occurred during the conversion
+	if err != nil {
+		// exit with error
+		return
+	}
+	// cast the proto message to a Message interface that may be interpreted
+	message, castOk := p.(lib.MessageI)
+	// if cast fails, throw an error
+	if !castOk {
+		// exit with invalid cast
+		return nil, nil, ErrInvalidTxMessage()
+	}
+	// do stateless checks on the message
+	if err = message.Check(); err != nil {
+		// exit with error
+		return
+	}
+	// exit
+	return
+}
+
+// TxHashFromJSON converts the json transaction into a proto tx hash
+func TxHashFromJSON(transactionJSON json.RawMessage) (txHash string, err lib.ErrorI) {
+	// extract the message from the transaction
+	_, tx, err := messageFromTxJSON(transactionJSON)
+	// if an error occurred during the extraction
+	if err != nil {
+		// exit with error
+		return
+	}
+	// convert into proto bytes
+	protoBytes, err := lib.Marshal(tx)
+	// if an error occurred during the encoding
+	if err != nil {
+		// exit with error
+		return
+	}
+	// exit with hash
+	return crypto.HashString(protoBytes), nil
 }

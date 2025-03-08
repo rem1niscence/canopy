@@ -297,31 +297,14 @@ func PollRootChainInfo() {
 			if err != nil {
 				return
 			}
-			// get the url for the root chain as set by the state
-			var rootChainUrl string
-			for _, chain := range conf.RootChain {
-				if chain.ChainId == consParams.RootChainId {
-					rootChainUrl = chain.Url
-				}
-			}
-			// check if root chain url isn't empty
-			if rootChainUrl == "" {
-				logger.Errorf("Config.JSON missing RootChainID=%d failed with", consParams.RootChainId)
-				return lib.ErrEmptyChainId()
-			}
-			// create a rpc client
-			rpcClient := NewClient(rootChainUrl, "", "")
-			// set the apps callbacks
-			app.RootChainInfo.RemoteCallbacks = &lib.RemoteCallbacks{
-				ValidatorSet:        rpcClient.ValidatorSet,
-				IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
-				Lottery:             rpcClient.Lottery,
-				Orders:              rpcClient.Orders,
-				Checkpoint:          rpcClient.Checkpoint,
-				Transaction:         rpcClient.Transaction,
+			// get the remote callbacks for the root chain id
+			callbacks, err := RemoteCallbacks(consParams.RootChainId)
+			if err != nil {
+				logger.Errorf("callbacks failed with err: %s")
+				return err
 			}
 			// query the base chain height
-			height, err := rpcClient.Height()
+			height, err := callbacks.Height()
 			if err != nil {
 				logger.Errorf("GetRootChainHeight failed with err")
 				return err
@@ -330,14 +313,14 @@ func PollRootChainInfo() {
 			if *height <= rootChainHeight {
 				return
 			}
-			// update the base chain height
+			// update the root chain height
 			rootChainHeight = *height
 			// if a new height received
 			logger.Infof("New RootChain height %d detected!", rootChainHeight)
 			// execute the requests to get the base chain information
 			for retry := lib.NewRetry(conf.RootChainPollMS, 3); retry.WaitAndDoRetry(); {
 				// retrieve the root-chain info
-				rootChainInfo, e := rpcClient.RootChainInfo(rootChainHeight, conf.ChainId)
+				rootChainInfo, e := callbacks.RootChainInfo(rootChainHeight, conf.ChainId)
 				if e == nil {
 					// update the controller with new root-chain info
 					app.UpdateRootChainInfo(rootChainInfo)
@@ -347,6 +330,7 @@ func PollRootChainInfo() {
 				logger.Errorf("GetRootChainInfo failed with err %s", e.Error())
 				// update with empty root-chain info to stop consensus
 				app.UpdateRootChainInfo(&lib.RootChainInfo{
+					RootChainId:      consParams.RootChainId,
 					Height:           rootChainHeight,
 					ValidatorSet:     lib.ValidatorSet{},
 					LastValidatorSet: lib.ValidatorSet{},
@@ -356,9 +340,38 @@ func PollRootChainInfo() {
 			}
 			return
 		}(); err != nil {
-			logger.Warnf(err.Error())
+			logger.Error(err.Error())
 		}
 	}
+}
+
+// RemoteCallbacks() enables the retrieval of remote RPC API calls for a certain root chain id
+func RemoteCallbacks(rootChainId uint64) (*lib.RemoteCallbacks, lib.ErrorI) {
+	// get the url for the root chain as set by the state
+	var rootChainUrl string
+	for _, chain := range conf.RootChain {
+		if chain.ChainId == rootChainId {
+			rootChainUrl = chain.Url
+		}
+	}
+	// check if root chain url isn't empty
+	if rootChainUrl == "" {
+		logger.Errorf("Config.JSON missing RootChainID=%d failed with", rootChainId)
+		return nil, lib.ErrEmptyChainId()
+	}
+	// create a rpc client
+	rpcClient := NewClient(rootChainUrl, "", "")
+	// set the remote callbacks
+	return &lib.RemoteCallbacks{
+		Height:              rpcClient.Height,
+		RootChainInfo:       rpcClient.RootChainInfo,
+		ValidatorSet:        rpcClient.ValidatorSet,
+		IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
+		Lottery:             rpcClient.Lottery,
+		Orders:              rpcClient.Orders,
+		Checkpoint:          rpcClient.Checkpoint,
+		Transaction:         rpcClient.Transaction,
+	}, nil
 }
 
 func Version(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -449,16 +462,11 @@ func AddVote(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if !unmarshal(w, r, j) {
 		return
 	}
-	prop, err := types.NewProposalFromBytes(j.Proposal)
-	if err != nil || prop.GetEndHeight() == 0 {
-		write(w, err, http.StatusBadRequest)
-		return
-	}
-	if err = proposals.Add(prop, j.Approve); err != nil {
+	if err := proposals.Add(j.Proposal, j.Approve); err != nil {
 		write(w, err, http.StatusInternalServerError)
 		return
 	}
-	if err = proposals.SaveToFile(conf.DataDirPath); err != nil {
+	if err := proposals.SaveToFile(conf.DataDirPath); err != nil {
 		write(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -475,13 +483,8 @@ func DelVote(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if !unmarshal(w, r, j) {
 		return
 	}
-	prop, err := types.NewProposalFromBytes(j.Proposal)
-	if err != nil {
-		write(w, err, http.StatusBadRequest)
-		return
-	}
-	proposals.Del(prop)
-	if err = proposals.SaveToFile(conf.DataDirPath); err != nil {
+	proposals.Del(j.Proposal)
+	if err := proposals.SaveToFile(conf.DataDirPath); err != nil {
 		write(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -596,6 +599,7 @@ func RootChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 			return nil, err
 		}
 		return &lib.RootChainInfo{
+			RootChainId:      conf.ChainId,
 			Height:           s.Height(),
 			ValidatorSet:     validatorSet,
 			LastValidatorSet: lastValidatorSet,
@@ -1308,13 +1312,18 @@ func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey 
 	if len(signer) == 0 {
 		signer = ptr.Address
 	}
-	privateKey, err := keystore.GetKey(signer, ptr.Password)
+	signerPrivateKey, err := keystore.GetKey(signer, ptr.Password)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
-	ptr.PubKey = privateKey.PublicKey().String()
-	p, err := callback(privateKey, ptr)
+	operatorPrivateKey, err := keystore.GetKey(ptr.Address, ptr.Password)
+	if err != nil {
+		write(w, err, http.StatusBadRequest)
+		return
+	}
+	ptr.PubKey = operatorPrivateKey.PublicKey().String()
+	p, err := callback(signerPrivateKey, ptr)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return

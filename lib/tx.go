@@ -30,9 +30,6 @@ var RegisteredMessages map[string]MessageI
 
 func init() {
 	RegisteredMessages = make(map[string]MessageI)
-	RegisteredPageables[TxResultsPageName] = new(TxResults)      // preregister the page type for unmarshalling
-	RegisteredPageables[PendingResultsPageName] = new(TxResults) // preregister the page type for unmarshalling
-	RegisteredPageables[FailedTxsPageName] = new(FailedTxs)      // preregister the page type for unmarshalling
 }
 
 // TRANSACTION INTERFACES BELOW

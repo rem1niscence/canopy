@@ -100,17 +100,23 @@ func (vs *ValidatorSet) GetValidatorAndIdx(targetPublicKey []byte) (val *Consens
 
 // RootChainInfo maintains root-chain data needed for consensus
 type RootChainInfo struct {
-	Height           uint64           `json:"height"`           // the height of the root chain
-	ValidatorSet     ValidatorSet     `json:"validatorSet"`     // the validator set for this 'nested chain' as determined by the 'root chain'
-	LastValidatorSet ValidatorSet     `json:"lastValidatorSet"` // the previous validator set for this 'nested chain' as previously determined by the 'root chain'
-	LotteryWinner    *LotteryWinner   `json:"lotteryWinner"`    // the 'delegate' lottery winner who may be a 'reward recipient' in the certificate result
-	Orders           *OrderBook       `json:"orders"`           // the swap order book from the 'root chain' for the 'nested chain'
-	RemoteCallbacks  *RemoteCallbacks `json:"remoteCallbacks"`  // the rpc callbacks for the remote chain
-	Log              LoggerI          `json:"log"`              // the stout logger
+	RootChainId        uint64             `json:"rootChainId"`      // the id of the root chain
+	Height             uint64             `json:"height"`           // the height of the root chain
+	ValidatorSet       ValidatorSet       `json:"validatorSet"`     // the validator set for this 'nested chain' as determined by the 'root chain'
+	LastValidatorSet   ValidatorSet       `json:"lastValidatorSet"` // the previous validator set for this 'nested chain' as previously determined by the 'root chain'
+	LotteryWinner      *LotteryWinner     `json:"lotteryWinner"`    // the 'delegate' lottery winner who may be a 'reward recipient' in the certificate result
+	Orders             *OrderBook         `json:"orders"`           // the swap order book from the 'root chain' for the 'nested chain'
+	GetRemoteCallbacks GetRemoteCallbacks `json:"remoteCallbacks"`  // the rpc callbacks for the remote chain
+	Log                LoggerI            `json:"log"`              // the stout logger
 }
+
+// GetRemoteCallbacks is a callback to get the 'rpc client' for the root chain id
+type GetRemoteCallbacks func(rootChainId uint64) (*RemoteCallbacks, ErrorI)
 
 // RemoteCallbacks are fallback rpc callbacks to the root-chain
 type RemoteCallbacks struct {
+	Height              func() (*uint64, ErrorI)                                  // retrieve the height of the root chain
+	RootChainInfo       func(height, chainId uint64) (*RootChainInfo, ErrorI)     // retrieve the root chain info in 1 call
 	ValidatorSet        func(height, id uint64) (ValidatorSet, ErrorI)            // get the validator set for a chain id using the RPC API
 	Lottery             func(height, id uint64) (p *LotteryWinner, err ErrorI)    // get the delegate 'lottery winner' for a chain id
 	Orders              func(height, chainId uint64) (p *OrderBooks, err ErrorI)  // get the order book for a specific 'chain id'
@@ -123,34 +129,54 @@ type RemoteCallbacks struct {
 func (b *RootChainInfo) GetHeight() uint64 { return b.Height }
 
 // GetValidatorSet() returns the validator set from the root-chain
-func (b *RootChainInfo) GetValidatorSet(id, rootHeight uint64) (ValidatorSet, ErrorI) {
-	// if rootHeight is the same as the RootChainInfo height
-	if rootHeight == b.Height {
-		// exit with a copy the validator set
-		return NewValidatorSet(b.ValidatorSet.ValidatorSet)
-	}
-	// if rootHeight is 1 before the RootChainInfo height
-	if rootHeight == b.Height-1 {
-		// exit with a copy of the previous validator set
-		return NewValidatorSet(b.LastValidatorSet.ValidatorSet)
+func (b *RootChainInfo) GetValidatorSet(rootChainId, id, rootHeight uint64) (ValidatorSet, ErrorI) {
+	// if the root chain id is the same as the info
+	if rootChainId == b.RootChainId {
+		// if rootHeight is the same as the RootChainInfo height
+		if rootHeight == b.Height {
+			// exit with a copy the validator set
+			return NewValidatorSet(b.ValidatorSet.ValidatorSet)
+		}
+		// if rootHeight is 1 before the RootChainInfo height
+		if rootHeight == b.Height-1 {
+			// exit with a copy of the previous validator set
+			return NewValidatorSet(b.LastValidatorSet.ValidatorSet)
+		}
 	}
 	// warn of the remote RPC call to the root chain API
-	b.Log.Warnf("Executing remote GetValidatorSet call with requested height %d", rootHeight)
+	b.Log.Warnf("Executing remote GetValidatorSet call with requested height=%d for rootChainId=%d", rootHeight, rootChainId)
+	// get a rpc client for the root chain id
+	rpcClient, err := b.GetRemoteCallbacks(rootChainId)
+	// if the rpc client retrieval fails
+	if err != nil {
+		// exit with error
+		return ValidatorSet{}, err
+	}
 	// execute the remote RPC call to the root chain API
-	return b.RemoteCallbacks.ValidatorSet(rootHeight, id)
+	return rpcClient.ValidatorSet(rootHeight, id)
 }
 
 // GetOrders() returns the order book from the root-chain
-func (b *RootChainInfo) GetOrders(rootHeight, id uint64) (*OrderBook, ErrorI) {
-	// if rootHeight is the same as the RootChainInfo height
-	if rootHeight == b.Height {
-		// exit with the order books from memory
-		return b.Orders, nil
+func (b *RootChainInfo) GetOrders(rootChainId, rootHeight, id uint64) (*OrderBook, ErrorI) {
+	// if the root chain id is the same as the info
+	if rootChainId == b.RootChainId {
+		// if rootHeight is the same as the RootChainInfo height
+		if rootHeight == b.Height {
+			// exit with the order books from memory
+			return b.Orders, nil
+		}
 	}
 	// warn of the remote RPC call to the root chain API
-	b.Log.Warnf("Executing remote GetOrders call with requested height %d", rootHeight)
+	b.Log.Warnf("Executing remote GetOrders call with requested height=%d for rootChainId=%d", rootHeight, rootChainId)
+	// get a rpc client for the root chain id
+	rpcClient, err := b.GetRemoteCallbacks(rootChainId)
+	// if the rpc client retrieval fails
+	if err != nil {
+		// exit with error
+		return nil, err
+	}
 	// execute the remote call
-	books, err := b.RemoteCallbacks.Orders(rootHeight, id)
+	books, err := rpcClient.Orders(rootHeight, id)
 	// if an error occurred during the remote call
 	if err != nil {
 		// exit with error
@@ -166,37 +192,62 @@ func (b *RootChainInfo) GetOrders(rootHeight, id uint64) (*OrderBook, ErrorI) {
 }
 
 // IsValidDoubleSigner() returns if an address is a valid double signer for a specific 'double sign height'
-func (b *RootChainInfo) IsValidDoubleSigner(height uint64, address string) (*bool, ErrorI) {
+func (b *RootChainInfo) IsValidDoubleSigner(rootChainId, height uint64, address string) (*bool, ErrorI) {
 	// warn of the remote RPC call to the API of the 'root chain'
-	b.Log.Warnf("Executing remote IsValidDoubleSigner call for address %s at double sign height %d", address, height)
+	b.Log.Warnf("Executing remote IsValidDoubleSigner call for address=%s at double sign height=%d and rootChainId=%d", address, height, rootChainId)
+	// get a rpc client for the root chain id
+	rpcClient, err := b.GetRemoteCallbacks(rootChainId)
+	// if the rpc client retrieval fails
+	if err != nil {
+		// exit with error
+		return nil, err
+	}
 	// exit with the results of the remote RPC call to the API of the 'root chain'
-	return b.RemoteCallbacks.IsValidDoubleSigner(height, address)
+	return rpcClient.IsValidDoubleSigner(height, address)
 }
 
 // GetCheckpoint() returns the checkpoint if any for a specific chain height
 // TODO should be able to get these from the file or the root-chain upon independence
-func (b *RootChainInfo) GetCheckpoint(height, chainId uint64) (blockHash HexBytes, err ErrorI) {
+func (b *RootChainInfo) GetCheckpoint(rootChainId, height, chainId uint64) (blockHash HexBytes, err ErrorI) {
 	// warn of the remote RPC call to the API of the 'root chain'
-	b.Log.Warnf("Executing remote GetCheckpoint call for height %d and chain id %d", height, chainId)
+	b.Log.Warnf("Executing remote GetCheckpoint call for height=%d and chainId=%d and rootChainId=%d", height, chainId, rootChainId)
+	// get a rpc client for the root chain id
+	rpcClient, err := b.GetRemoteCallbacks(rootChainId)
+	// if the rpc client retrieval fails
+	if err != nil {
+		// exit with error
+		return nil, err
+	}
 	// exit with the results of the remote RPC call to the API of the 'root chain'
-	return b.RemoteCallbacks.Checkpoint(height, chainId)
+	return rpcClient.Checkpoint(height, chainId)
 }
 
 // GetLotteryWinner() returns the winner of the delegate lottery from the root-chain
-func (b *RootChainInfo) GetLotteryWinner(height, id uint64) (*LotteryWinner, ErrorI) {
-	// if rootHeight is the same as the RootChainInfo height
-	if height == b.Height {
-		// exit with the lottery winner
-		return b.LotteryWinner, nil
+func (b *RootChainInfo) GetLotteryWinner(rootChainId, height, id uint64) (*LotteryWinner, ErrorI) {
+	// if the root chain id is the same as the info
+	if rootChainId == b.RootChainId {
+		// if rootHeight is the same as the RootChainInfo height
+		if height == b.Height {
+			// exit with the lottery winner
+			return b.LotteryWinner, nil
+		}
 	}
 	// warn of the remote RPC call to the API of the 'root chain'
-	b.Log.Warnf("Executing remote Lottery call with requested height %d", height)
+	b.Log.Warnf("Executing remote Lottery call with requested height=%d and rootChainId=%d", height, rootChainId)
+	// get a rpc client for the root chain id
+	rpcClient, err := b.GetRemoteCallbacks(rootChainId)
+	// if the rpc client retrieval fails
+	if err != nil {
+		// exit with error
+		return nil, err
+	}
 	// exit with the results of the remote RPC call to the API of the 'root chain'
-	return b.RemoteCallbacks.Lottery(height, id)
+	return rpcClient.Lottery(height, id)
 }
 
 // rootChainInfoJSON is the encoding structure used for json for RootChainInfo
 type rootChainInfoJSON struct {
+	RootChainId   uint64               `json:"rootChainId"`
 	Height        uint64               `json:"height"`
 	Committee     *ConsensusValidators `json:"committee"`
 	LastCommittee *ConsensusValidators `json:"last_committee"`
@@ -207,6 +258,7 @@ type rootChainInfoJSON struct {
 // MarshalJSON() implements the json.Marshaller for RootChainInfo
 func (b RootChainInfo) MarshalJSON() ([]byte, error) {
 	return json.Marshal(rootChainInfoJSON{
+		RootChainId:   b.RootChainId,
 		Height:        b.Height,
 		Committee:     b.ValidatorSet.ValidatorSet,
 		LastCommittee: b.LastValidatorSet.ValidatorSet,
@@ -235,11 +287,14 @@ func (b *RootChainInfo) UnmarshalJSON(jsonBytes []byte) (err error) {
 	lastValidatorSet, _ := NewValidatorSet(j.LastCommittee)
 	// set the underlying object
 	*b = RootChainInfo{
-		Height:           j.Height,
-		ValidatorSet:     validatorSet,
-		LastValidatorSet: lastValidatorSet,
-		LotteryWinner:    j.LotteryWinner,
-		Orders:           j.Orders,
+		RootChainId:        j.RootChainId,
+		Height:             j.Height,
+		ValidatorSet:       validatorSet,
+		LastValidatorSet:   lastValidatorSet,
+		LotteryWinner:      j.LotteryWinner,
+		Orders:             j.Orders,
+		GetRemoteCallbacks: nil,
+		Log:                nil,
 	}
 	// exit
 	return

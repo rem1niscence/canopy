@@ -203,8 +203,13 @@ func (s *StateMachine) ApplyTransactions(block *lib.Block) (txResultsList []*lib
 // TimeMachine() creates a new StateMachine instance representing the blockchain state at a specified block height, allowing for a read-only view of the past state
 func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 	// if height is zero, use the 'latest' height
-	if height == 0 {
+	if height == 0 || height > s.height {
 		height = s.height
+	}
+	// don't try to create a NewReadOnly with height 0 as it'll panic
+	if height == 0 {
+		// return the original state machine
+		return s, nil
 	}
 	// ensure the store is the proper type to allow historical views
 	store, ok := s.store.(lib.StoreI)
