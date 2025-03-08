@@ -2,13 +2,16 @@ package p2p
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/binary"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib"
+	"github.com/google/uuid"
 	limiter "github.com/mxk/go-flowrate/flowrate"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
@@ -17,7 +20,7 @@ import (
 const (
 	maxDataChunkSize    = 1024 - packetHeaderSize // maximum size of the chunk of bytes in a packet
 	maxPacketSize       = 1024                    // maximum size of the full packet
-	packetHeaderSize    = 47                      // the overhead of the protobuf packet header
+	packetHeaderSize    = 103                     // the overhead of the protobuf packet header
 	pingInterval        = 30 * time.Second        // how often a ping is to be sent
 	sendInterval        = 100 * time.Millisecond  // the minimum time between sends
 	pongTimeoutDuration = 20 * time.Second        // how long the sender of a ping waits for a pong before throwing an error
@@ -57,71 +60,22 @@ const (
 	MaxMessageExceededSlash = -10 // slash for sending a 'Message (sum of Packets)' above the allowed maximum size
 )
 
-// sendNotifier: holds channels for send notifications of concurrent processes
-type sendNotifier struct {
-	notifySendQueue chan struct{} // queue for packets to be sent
-
-}
-
-// newSendNotifier creates a new instance of sendNotifier with constant config default values
-func newSendNotifier() *sendNotifier {
-	return &sendNotifier{
-		notifySendQueue: make(chan struct{}, maxSendQueue),
-	}
-}
-
-func (n *sendNotifier) notifySend() bool {
-	select {
-	case n.notifySendQueue <- struct{}{}:
-		return true
-	case <-time.After(queueSendTimeout):
-		return false
-	}
-}
-
 // MultiConn: A rate-limited, multiplexed connection that utilizes a series streams with varying priority for sending and receiving
 type MultiConn struct {
-	conn          net.Conn                    // underlying connection
-	Address       *lib.PeerAddress            // authenticated peer information
-	streams       map[lib.Topic]*Stream       // multiple independent bi-directional communication channels
-	quitSending   chan struct{}               // signal to quit
-	quitReceiving chan struct{}               // signal to quit
-	sendPong      chan struct{}               // signal to send keep alive message
-	receivedPong  chan struct{}               // signal that received keep alive message
-	sendErrChan   chan lib.ErrorI             // signal of an error in concurrent send processes
-	writeCh       chan []byte                 // channel to ensure c.conn.Write is not called concurrently
-	sendNotifier  *sendNotifier               // notifier structure for concurrent sends
-	onError       func(error, []byte, string) // callback to call if peer errors
-	error         sync.Once                   // thread safety to ensure MultiConn.onError is only called once
-	p2p           *P2P                        // a pointer reference to the P2P module
-	log           lib.LoggerI                 // logging
-}
-
-// Stream: an independent, bidirectional communication channel that is scoped to a single topic.
-// In a multiplexed connection there is typically more than one stream per connection
-type Stream struct {
-	topic            lib.Topic                    // the subject and priority of the stream
-	sendQueue        chan []byte                  // a queue of unsent messages
-	upNextToSend     []byte                       // a buffer holding unsent portions of the next message
-	msgAssembler     []byte                       // collects and adds incoming packets until the entire message is received (EOF signal)
-	inbox            chan *lib.MessageAndMetadata // the channel where fully received messages are held for other parts of the app to read
-	maxDataChunkSize int                          // maximum size of the chunk of bytes in a packet
-	sendNotifier     *sendNotifier                // notifier structure for concurrent sends
-	logger           lib.LoggerI
-}
-
-// chunkNextSend() returns the next unsent chunk of bytes and if it's the final bytes of the msg
-func (s *Stream) chunkNextSend() (chunk []byte, eof bool) {
-	// If the remaining unsent bytes will fit in a single chunk
-	if len(s.upNextToSend) <= s.maxDataChunkSize {
-		chunk = s.upNextToSend          // set the chunk to the last bytes
-		eof, s.upNextToSend = true, nil // signal message end and empty the upNext buffer
-	} else {
-		chunk = s.upNextToSend[:s.maxDataChunkSize]          // chunk the max number of bytes
-		s.upNextToSend = s.upNextToSend[s.maxDataChunkSize:] // remove those bytes from upNext
-		s.sendNotifier.notifySend()                          // notify new packet to general send
-	}
-	return
+	conn            net.Conn                    // underlying connection
+	Address         *lib.PeerAddress            // authenticated peer information
+	streams         map[lib.Topic]*Stream       // multiple independent bi-directional communication channels
+	quitSending     chan struct{}               // signal to quit
+	quitReceiving   chan struct{}               // signal to quit
+	sendPong        chan struct{}               // signal to send keep alive message
+	receivedPong    chan struct{}               // signal that received keep alive message
+	sendErrChan     chan lib.ErrorI             // signal of an error in concurrent send processes
+	writeCh         chan []byte                 // channel to ensure c.conn.Write is not called concurrently
+	notifySendQueue chan struct{}               // queue for notifying packets to be sent
+	onError         func(error, []byte, string) // callback to call if peer errors
+	error           sync.Once                   // thread safety to ensure MultiConn.onError is only called once
+	p2p             *P2P                        // a pointer reference to the P2P module
+	log             lib.LoggerI                 // logging
 }
 
 // NewConnection() creates and starts a new instance of a MultiConn
@@ -131,22 +85,21 @@ func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
 	if err != nil {
 		return nil, err
 	}
-	n := newSendNotifier()
 	c := &MultiConn{
-		conn:          eConn,
-		Address:       eConn.Address,
-		streams:       p.NewStreams(n),
-		quitSending:   make(chan struct{}, maxChanSize),
-		quitReceiving: make(chan struct{}, maxChanSize),
-		sendPong:      make(chan struct{}, maxChanSize),
-		receivedPong:  make(chan struct{}, maxChanSize),
-		sendErrChan:   make(chan lib.ErrorI, maxChanSize),
-		writeCh:       make(chan []byte), // needs to be unbuffered so it doesn't call net.Conn concurrently
-		sendNotifier:  n,
-		onError:       p.OnPeerError,
-		error:         sync.Once{},
-		p2p:           p,
-		log:           p.log,
+		conn:            eConn,
+		Address:         eConn.Address,
+		streams:         p.NewStreams(),
+		quitSending:     make(chan struct{}, maxChanSize),
+		quitReceiving:   make(chan struct{}, maxChanSize),
+		sendPong:        make(chan struct{}, maxChanSize),
+		receivedPong:    make(chan struct{}, maxChanSize),
+		sendErrChan:     make(chan lib.ErrorI, maxChanSize),
+		writeCh:         make(chan []byte), // needs to be unbuffered so it doesn't call net.Conn concurrently
+		notifySendQueue: make(chan struct{}, maxSendQueue),
+		onError:         p.OnPeerError,
+		error:           sync.Once{},
+		p2p:             p,
+		log:             p.log,
 	}
 	_ = c.conn.SetReadDeadline(time.Time{})
 	_ = c.conn.SetWriteDeadline(time.Time{})
@@ -178,27 +131,71 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 	if !ok {
 		return
 	}
+
 	bz, err := lib.Marshal(msg)
 	if err != nil {
 		return false
 	}
-	ok = stream.queueSend(bz)
-	ok = c.sendNotifier.notifySend()
+
+	chunks := split(bz, maxDataChunkSize)
+	tPackets, er := uint64ToBytes(uint64(len(chunks)))
+	if er != nil {
+		return false
+	}
+	messageID := generateMessageID()
+	for i, chunk := range chunks {
+		pIndex, err := uint64ToBytes(uint64(i))
+		if err != nil {
+			return false
+		}
+		packet := &Packet{
+			StreamId:     topic,
+			MessageId:    messageID,
+			PacketIndex:  pIndex,
+			TotalPackets: tPackets,
+			Bytes:        chunk,
+		}
+
+		ok = stream.queueSend(packet)
+		ok = c.notifySend()
+	}
+
+	c.log.Debugf("Message ID: %s with %d packets queued", messageID, len(chunks))
+
 	return
 }
 
+// split returns bytes splited to size up to the lim param
+func split(buf []byte, lim int) [][]byte {
+	var chunk []byte
+	chunks := make([][]byte, 0, len(buf)/lim+1)
+	for len(buf) >= lim {
+		chunk, buf = buf[:lim], buf[lim:]
+		chunks = append(chunks, chunk)
+	}
+	if len(buf) > 0 {
+		chunks = append(chunks, buf[:])
+	}
+	return chunks
+}
+
+// generateMessageID generates a message ID with the UUID standard
+func generateMessageID() string {
+	return uuid.New().String()
+}
+
 // sendPacket sends the packet to peers, this function is intended to use concurrently
-func (c *MultiConn) sendPacket(ctx context.Context, packet *Packet, sem *semaphore.Weighted, m *limiter.Monitor) {
+func (c *MultiConn) sendPacket(ctx context.Context, p *Packet, sem *semaphore.Weighted, m *limiter.Monitor) {
 	sErr := sem.Acquire(context.Background(), 1)
 	if sErr != nil {
-		c.sendErrChan <- ErrSemaphoreFailed(sErr, packet)
+		c.sendErrChan <- ErrSemaphoreFailed(sErr, p)
 	}
 	defer sem.Release(1)
 	select {
 	case <-ctx.Done(): // Exit immediately if the context is canceled (quit signal)
 	default:
-		c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
-		err := c.sendWireBytes(packet, m)
+		c.log.Debugf("Send Packet(ID:%s, L:%d, MID:%s)", lib.Topic_name[int32(p.StreamId)], len(p.Bytes), p.MessageId)
+		err := c.sendWireBytes(p, m)
 		if err != nil {
 			c.sendErrChan <- err
 		}
@@ -239,7 +236,7 @@ func (c *MultiConn) startSendService() {
 	for {
 		// select statement ensures the sequential coordination of the concurrent processes
 		select {
-		case <-c.sendNotifier.notifySendQueue: // triggered each time a packet is sent to the queue, concurrency controlled by semaphore
+		case <-c.notifySendQueue: // triggered each time a packet is sent to the queue, concurrency controlled by semaphore
 			if packet := c.getNextPacket(); packet != nil {
 				go c.sendPacket(ctx, packet, sem, m)
 			}
@@ -396,63 +393,87 @@ func (c *MultiConn) getNextPacket() *Packet {
 	// a problem as each stream has a unique receiving buffer
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
 		stream := c.streams[i]
-		if stream.hasStuffToSend() {
-			return stream.nextPacket()
+		select {
+		case pkt := <-stream.sendQueue:
+			return pkt
+		default:
+			continue // No packet available, try next stream
 		}
 	}
 	return nil
 }
 
-// queueSend() schedules the bytes to be sent
-// NOTE: at this phase these bytes are the entire message, not just a chunk/packet
-func (s *Stream) queueSend(b []byte) bool {
+// Stream: an independent, bidirectional communication channel that is scoped to a single topic.
+// In a multiplexed connection there is typically more than one stream per connection
+type Stream struct {
+	topic        lib.Topic    // the subject and priority of the stream
+	sendQueue    chan *Packet // a queue of unsent messages
+	mu           sync.Mutex
+	msgAssembler map[string]map[int][]byte    // collects and adds incoming packets until the entire message is received (total packets arrived) messageID -> packetIndex -> payload
+	inbox        chan *lib.MessageAndMetadata // the channel where fully received messages are held for other parts of the app to read
+	logger       lib.LoggerI
+}
+
+// queueSend() schedules the packet to be sent
+func (s *Stream) queueSend(p *Packet) bool {
 	select {
-	case s.sendQueue <- b: // enqueue to the back of the line
+	case s.sendQueue <- p: // enqueue to the back of the line
 		return true
 	case <-time.After(queueSendTimeout): // may timeout if queue remains full
 		return false
 	}
 }
 
-// hasStuffToSend() checks the stream to see if there's anything in the outbox
-func (s *Stream) hasStuffToSend() bool {
-	// if there's unsent parts of the next message
-	if len(s.upNextToSend) != 0 {
+// notifySend notifies Multiconn of a new packet added
+func (c *MultiConn) notifySend() bool {
+	select {
+	case c.notifySendQueue <- struct{}{}:
 		return true
+	case <-time.After(queueSendTimeout):
+		return false
 	}
-	// if there's unsent messages in the queue
-	if len(s.sendQueue) != 0 {
-		s.upNextToSend = <-s.sendQueue
-		return true
-	}
-	// nothing to send
-	return false
-}
-
-// nextPacket() creates a new packet from the next unsent chunk
-func (s *Stream) nextPacket() (packet *Packet) {
-	packet = &Packet{StreamId: s.topic}
-	packet.Bytes, packet.Eof = s.chunkNextSend()
-	return
 }
 
 // handlePacket() merge the new packet with the previously received ones until the entire message is complete (EOF signal)
-func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
-	msgAssemblerLen, packetLen := len(s.msgAssembler), len(packet.Bytes)
-	s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t) from %s",
-		lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof, lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
-	// if the addition of this new packet pushes the total message size above max
-	if int(maxMessageSize) < msgAssemblerLen+packetLen {
-		s.msgAssembler = s.msgAssembler[:0]
-		return MaxMessageExceededSlash, ErrMaxMessageSize()
+func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, p *Packet) (int32, lib.ErrorI) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.logger.Debugf("Received Packet(ID:%s, L:%d) from %s",
+		lib.Topic_name[int32(p.StreamId)], len(p.Bytes), p.MessageId, lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
+
+	// need to convert from bytes to uint64 to fill the msgAssembler map
+	tPackets, er := bytesToUint64(p.TotalPackets)
+	if er != nil {
+		return 0, ErrParseBytesFailed(er)
 	}
-	// combine this packet with the previously received ones
-	s.msgAssembler = append(s.msgAssembler, packet.Bytes...)
-	// if the packet is signalling message end
-	if packet.Eof {
+	pIndex, er := bytesToUint64(p.PacketIndex)
+	if er != nil {
+		return 0, ErrParseBytesFailed(er)
+	}
+
+	// create map of given message ID if it is the first one and saved it afterwards
+	_, ok := s.msgAssembler[p.MessageId]
+	if !ok {
+		s.msgAssembler[p.MessageId] = make(map[int][]byte, tPackets)
+	}
+	s.msgAssembler[p.MessageId][int(pIndex)] = p.Bytes
+
+	// if a message has all the packets do the process
+	if len(s.msgAssembler[p.MessageId]) == int(tPackets) {
+		// after the message is processed it should be deleted from the assembler
+		defer delete(s.msgAssembler, p.MessageId)
+		// build bytes to unmarshal
+		var allBytes []byte
+		for i := 0; i < int(tPackets); i++ {
+			allBytes = append(allBytes, s.msgAssembler[p.MessageId][i]...)
+		}
+		// if the addition of this new packet pushes the total message size above max
+		if int(maxMessageSize) < len(allBytes) {
+			return MaxMessageExceededSlash, ErrMaxMessageSize()
+		}
 		// unmarshall all the bytes into the universal wrapper
 		var msg Envelope
-		if err := lib.Unmarshal(s.msgAssembler, &msg); err != nil {
+		if err := lib.Unmarshal(allBytes, &msg); err != nil {
 			return BadPacketSlash, err
 		}
 		// read the payload into a proto.Message
@@ -467,9 +488,30 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		}).WithHash()
 		// add to inbox for other parts of the app to read
 		s.inbox <- m
-		s.logger.Debugf("Forwarded packet(s) to inbox: %s", lib.Topic_name[int32(packet.StreamId)])
-		// reset receiving buffer
-		s.msgAssembler = s.msgAssembler[:0]
+		s.logger.Debugf("Forwarded packet(s) to inbox: %s", lib.Topic_name[int32(p.StreamId)])
 	}
 	return 0, nil
+}
+
+// uint64ToBytes is a function to convert uint64 to bytes, needed for Packets header
+func uint64ToBytes(n uint64) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	// Convert the uint64 to bytes in little-endian byte order
+	err := binary.Write(buf, binary.LittleEndian, n)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// bytesToUint64 is a function to convert bytes back to uint64, needed for Packets header
+func bytesToUint64(b []byte) (uint64, error) {
+	buf := bytes.NewReader(b)
+	var n uint64
+	// Read the bytes into the uint64 variable in little-endian byte order
+	err := binary.Read(buf, binary.LittleEndian, &n)
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
 }

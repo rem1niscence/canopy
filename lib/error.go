@@ -294,6 +294,7 @@ const (
 	CodeIncompatiblePeer        ErrorCode = 32
 	CodeInvalidNetAddress       ErrorCode = 33
 	CodeSemaphoreFailed         ErrorCode = 34
+	CodeParseBytesFailed        ErrorCode = 35
 
 	StorageModule              ErrorModule = "store"
 	CodeOpenDB                 ErrorCode   = 1

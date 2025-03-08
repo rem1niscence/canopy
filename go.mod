@@ -12,7 +12,7 @@ require (
 	github.com/drand/kyber-bls12381 v0.3.1
 	github.com/ethereum/go-ethereum v1.14.8
 	github.com/fatih/color v1.17.0
-	github.com/harmony-one/vdf v1.0.1-0.20190924175951-620379da8849
+	github.com/google/uuid v1.3.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/libp2p/go-buffer-pool v0.1.0
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f

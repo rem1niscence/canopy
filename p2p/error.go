@@ -149,6 +149,10 @@ func ErrMaxInbound() lib.ErrorI {
 	return lib.NewError(lib.CodeMaxInbound, lib.P2PModule, "max inbound peers")
 }
 
-func ErrSemaphoreFailed(err error, packet *Packet) lib.ErrorI {
-	return lib.NewError(lib.CodeSemaphoreFailed, lib.P2PModule, fmt.Sprintf("semaphore for Packet(ID:%s, L:%d, E:%t) failed with error: %v", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof, err.Error()))
+func ErrSemaphoreFailed(err error, p *Packet) lib.ErrorI {
+	return lib.NewError(lib.CodeSemaphoreFailed, lib.P2PModule, fmt.Sprintf("semaphore for Packet(ID:%s, L:%d, MID:%s) failed with error: %v", lib.Topic_name[int32(p.StreamId)], len(p.Bytes), p.MessageId, err.Error()))
+}
+
+func ErrParseBytesFailed(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeParseBytesFailed, lib.P2PModule, err.Error())
 }

@@ -28,14 +28,18 @@ message Envelope {
   google.protobuf.Any payload = 1;
 }
 
-// A Packet is a part of a message (or the entire message) that is associated with a specific stream topic and includes an EOF signal
+// A Packet is a part of a message (or the entire message) that is associated with a specific stream topic and includes packet index and total packets
 message Packet {
   // stream_id: the identifier of the stream/topic that this packet belongs to, used for multiplexing
   Topic stream_id = 1; // @gotags: json:"streamID"
-  // eof: indicates whether this is the last packet of the message (EOF = true) or if more packets will follow (EOF = false)
-  bool eof = 2;
+  // message_id: the identifier of the mother messag the packet belongs
+  string message_id = 2; // @gotags: json:"messageID"
+  // packet_index: index (0 based) of the packet inside the message, saved as bytes so it always takes the same space
+  bytes packet_index = 3; // @gotags: json:"packetIndex"
+  // total_packets: total number of packets in the message, saved as bytes so it always takes the same space
+  bytes total_packets = 4; // @gotags: json:"totalPackets"
   // bytes: the actual message data transferred in this packet. It could represent the entire message or just a part of it
-  bytes bytes = 3;
+  bytes bytes = 5;
 }
 
 // Ping is a message sent by a node to check the availability or responsiveness of another peer

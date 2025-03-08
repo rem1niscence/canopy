@@ -126,9 +126,9 @@ func TestSendToPeersChunkedPacket(t *testing.T) {
 		Address: &lib.PeerAddress{
 			PublicKey:  n1.pub,
 			NetAddress: "pipe",
-			// PeerMeta: &lib.PeerMeta{
-			// 	Signature: bytes.Repeat([]byte("F"), maxDataChunkSize),
-			// },
+			PeerMeta: &lib.PeerMeta{
+				Signature: bytes.Repeat([]byte("F"), maxDataChunkSize*5),
+			},
 		},
 		ConsecutiveFailedDial: 1,
 	}
@@ -307,7 +307,7 @@ func TestOnPeerError(t *testing.T) {
 func TestNewStreams(t *testing.T) {
 	n1, n2, cleanup := newTestP2PPair(t)
 	defer cleanup()
-	streams := n1.NewStreams(newSendNotifier())
+	streams := n1.NewStreams()
 	peer, err := n1.PeerSet.get(n2.pub)
 	require.NoError(t, err)
 	for i, s := range streams {
@@ -337,10 +337,13 @@ func TestID(t *testing.T) {
 }
 
 func TestMaxPacketSize(t *testing.T) {
+	bestNumber, _ := uint64ToBytes(21)
 	a, err := lib.NewAny(&Packet{
-		StreamId: lib.Topic_INVALID,
-		Eof:      true,
-		Bytes:    bytes.Repeat([]byte("F"), maxDataChunkSize),
+		StreamId:     lib.Topic_INVALID,
+		MessageId:    generateMessageID(),
+		PacketIndex:  bestNumber,
+		TotalPackets: bestNumber,
+		Bytes:        bytes.Repeat([]byte("F"), maxDataChunkSize),
 	})
 	require.NoError(t, err)
 	envelope := &Envelope{Payload: a}

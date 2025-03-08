@@ -306,18 +306,15 @@ func (p *P2P) OnPeerError(err error, publicKey []byte, remoteAddr string) {
 }
 
 // NewStreams() creates map of streams for the multiplexing architecture
-// saves pointer of sendNotifier for notifying chunked sends
-func (p *P2P) NewStreams(n *sendNotifier) (streams map[lib.Topic]*Stream) {
+func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 	streams = make(map[lib.Topic]*Stream)
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
 		streams[i] = &Stream{
-			topic:            i,
-			msgAssembler:     make([]byte, 0, maxMessageSize),
-			sendQueue:        make(chan []byte, maxQueueSize),
-			inbox:            p.Inbox(i),
-			logger:           p.log,
-			maxDataChunkSize: maxDataChunkSize,
-			sendNotifier:     n,
+			topic:        i,
+			msgAssembler: make(map[string]map[int][]byte),
+			sendQueue:    make(chan *Packet, maxSendQueue),
+			inbox:        p.Inbox(i),
+			logger:       p.log,
 		}
 	}
 	return
