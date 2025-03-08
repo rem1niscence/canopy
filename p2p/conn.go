@@ -180,7 +180,6 @@ func (c *MultiConn) startReceiveService() {
 	reader, m := *bufio.NewReaderSize(c.conn, maxPacketSize), limiter.New(0, 0)
 	defer func() { close(c.sendPong); close(c.receivedPong); m.Done() }()
 	for {
-		c.log.Debugf("Receive service ready for %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 		select {
 		default: // fires unless quit was signaled
 			// waits until bytes are received from the conn
@@ -192,7 +191,6 @@ func (c *MultiConn) startReceiveService() {
 			// handle different message types
 			switch x := msg.(type) {
 			case *Packet: // receive packet is a partial or full 'Message' with a Stream Topic designation and an EOF signal
-				c.log.Debug("Received Packet")
 				// load the proper stream
 				stream, found := c.streams[x.StreamId]
 				if !found {
@@ -391,7 +389,7 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		}).WithHash()
 		// add to inbox for other parts of the app to read
 		s.inbox <- m
-		s.logger.Debugf("Forwarded packet(s) to inbox: %s", lib.Topic_name[int32(packet.StreamId)])
+		s.logger.Debugf("Forwarded message to inbox: %s", lib.Topic_name[int32(packet.StreamId)])
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]
 	}
