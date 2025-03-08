@@ -64,6 +64,10 @@ func (s *StateMachine) HandleMessageStake(msg *types.MessageStake) lib.ErrorI {
 	if e != nil {
 		return types.ErrInvalidPublicKey(e)
 	}
+	// check the net address of the message
+	if err := types.CheckNetAddress(msg.NetAddress, msg.Delegate); err != nil {
+		return err
+	}
 	// extract the address from the BLS public key
 	address := publicKey.Address()
 	// check if validator exists in state
@@ -119,6 +123,10 @@ func (s *StateMachine) HandleMessageEditStake(msg *types.MessageEditStake) lib.E
 	// get the validator from state, if not exists error
 	val, err := s.GetValidator(address)
 	if err != nil {
+		return err
+	}
+	// check the net address of the message
+	if err = types.CheckNetAddress(msg.NetAddress, val.Delegate); err != nil {
 		return err
 	}
 	// ensure the validator is not currently unstaking

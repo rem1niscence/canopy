@@ -287,7 +287,7 @@ func newSingleAccountStateMachine(t *testing.T) StateMachine {
 		PublicKey:     keyGroup.PublicKey.Bytes(),
 		Amount:        1000000,
 		Committees:    []uint64{lib.CanopyChainId},
-		NetAddress:    "http://localhost:80",
+		NetAddress:    "tcp://localhost",
 		OutputAddress: keyGroup.Address.Bytes(),
 		Delegate:      false,
 		Compound:      true,
