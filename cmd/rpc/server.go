@@ -331,21 +331,7 @@ func (s *Server) readOnlyStateFromHeightParams(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Create a new TimeMachine at specified height
-	state, err := s.controller.FSM.TimeMachine(ptr.GetHeight())
-	if err != nil {
-		return lib.ErrTimeMachine(err)
-	}
-
-	// Discard state, ensuring proper cleanup is performed
-	defer state.Discard()
-
-	// Execute the provided callback function with the read-only state
-	err = callback(state)
-	if err != nil {
-		return err
-	}
-	return nil
+	return s.readOnlyState(ptr.GetHeight(), callback)
 }
 
 // readOnlyState is a helper function to safely wrap TimeMachine access
