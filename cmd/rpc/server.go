@@ -1312,13 +1312,18 @@ func txHandler(w http.ResponseWriter, r *http.Request, callback func(privateKey 
 	if len(signer) == 0 {
 		signer = ptr.Address
 	}
-	privateKey, err := keystore.GetKey(signer, ptr.Password)
+	signerPrivateKey, err := keystore.GetKey(signer, ptr.Password)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
-	ptr.PubKey = privateKey.PublicKey().String()
-	p, err := callback(privateKey, ptr)
+	operatorPrivateKey, err := keystore.GetKey(ptr.Address, ptr.Password)
+	if err != nil {
+		write(w, err, http.StatusBadRequest)
+		return
+	}
+	ptr.PubKey = operatorPrivateKey.PublicKey().String()
+	p, err := callback(signerPrivateKey, ptr)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return

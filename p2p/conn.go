@@ -155,11 +155,26 @@ func (c *MultiConn) startSendService() {
 					c.Error(e, NoPongSlash)
 				}
 			})
-		case <-c.sendPong: // fires when receive service got a 'ping' message
+		case _, open := <-c.sendPong: // fires when receive service got a 'ping' message
+			// if the channel was closed
+			if !open {
+				// log the close
+				c.log.Debugf("Pong channel closed, stopping")
+				// exit
+				return
+			}
+			// log the pong sending
 			c.log.Debugf("Send Pong to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 			// send a pong
 			err = c.sendWireBytes(new(Pong), m)
-		case <-c.receivedPong: // fires when receive service got a 'pong' message
+		case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
+			// if the channel was closed
+			if !open {
+				// log the close
+				c.log.Debugf("Receive pong channel closed, stopping")
+				// exit
+				return
+			}
 			// reset the pong timer
 			lib.StopTimer(pongTimer)
 		case <-c.quitSending: // fires when Stop() is called
@@ -280,7 +295,8 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) (er
 	// write bytes to the wire up to max packet size
 	_, er := c.conn.Write(bz)
 	if er != nil {
-		c.log.Error(ErrFailedWrite(er).Error())
+		err = ErrFailedWrite(er)
+		c.log.Error(err.Error())
 	}
 	// update the rate limiter with how many bytes were written
 	//m.Update(n)
