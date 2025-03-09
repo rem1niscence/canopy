@@ -358,6 +358,7 @@ func createAdminRouter(s *Server) *httprouter.Router {
 		TxEditOrderRouteName:       s.TransactionEditOrder,
 		TxDeleteOrderRouteName:     s.TransactionDeleteOrder,
 		TxLockOrderRouteName:       s.TransactionLockOrder,
+		TxCloseOrderRouteName:      s.TransactionCloseOrder,
 		TxSubsidyRouteName:         s.TransactionSubsidy,
 		TxStartPollRouteName:       s.TransactionStartPoll,
 		TxVotePollRouteName:        s.TransactionVotePoll,

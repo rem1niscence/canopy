@@ -348,7 +348,7 @@ func (s *Server) TransactionLockOrder(w http.ResponseWriter, r *http.Request, _ 
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewLockOrderTx(p, lib.LockOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, s.config.NetworkID, s.config.ChainId, s.controller.ChainHeight(), ptr.Fee)
+		return types.NewLockOrderTx(p, lib.LockOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
 	})
 }
 
@@ -366,6 +366,9 @@ func (s *Server) TransactionCloseOrder(w http.ResponseWriter, r *http.Request, _
 		order, err := s.remoteCallbacks.Order(0, ptr.OrderId, s.config.ChainId)
 		if err != nil {
 			return nil, err
+		}
+		if !bytes.Equal(order.BuyerSendAddress, ptr.Address) {
+			return nil, fmt.Errorf("not buyer")
 		}
 		// Don't allow an order to pass that is less than 10 blocks of the lock deadline
 		if int64(order.BuyerChainDeadline)-int64(s.controller.ChainHeight()) < 10 {
@@ -387,7 +390,7 @@ func (s *Server) TransactionStartPoll(w http.ResponseWriter, r *http.Request, _ 
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewStartPollTransaction(p, ptr.PollJSON, s.config.NetworkID, s.config.ChainId, s.controller.ChainHeight(), ptr.Fee)
+		return types.NewStartPollTransaction(p, ptr.PollJSON, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
 	})
 }
 
@@ -400,7 +403,7 @@ func (s *Server) TransactionVotePoll(w http.ResponseWriter, r *http.Request, _ h
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewVotePollTransaction(p, ptr.PollJSON, ptr.PollApprove, s.config.NetworkID, s.config.ChainId, s.controller.ChainHeight(), ptr.Fee)
+		return types.NewVotePollTransaction(p, ptr.PollJSON, ptr.PollApprove, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
 	})
 }
 
