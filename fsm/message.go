@@ -359,7 +359,7 @@ func (s *StateMachine) HandleMessageCreateOrder(msg *types.MessageCreateOrder) (
 		return
 	}
 	// ensure order isn't below the minimum size
-	if msg.RequestedAmount < valParams.MinimumOrderSize {
+	if msg.AmountForSale < valParams.MinimumOrderSize {
 		return types.ErrMinimumOrderSize()
 	}
 	// subtract from account balance
@@ -396,7 +396,7 @@ func (s *StateMachine) HandleMessageEditOrder(msg *types.MessageEditOrder) (err 
 		return
 	}
 	// ensure order isn't below the minimum size
-	if msg.RequestedAmount < valParams.MinimumOrderSize {
+	if msg.AmountForSale < valParams.MinimumOrderSize {
 		return types.ErrMinimumOrderSize()
 	}
 	difference, address := int(msg.AmountForSale-order.AmountForSale), crypto.NewAddress(order.SellersSendAddress)

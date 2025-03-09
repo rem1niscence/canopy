@@ -87,7 +87,7 @@ func (x *OrderBook) UpdateOrder(orderId int, order *SellOrder) (err ErrorI) {
 		// continue shrinking the slice if nil entries are at the end
 		for i := maxIdx - 1; i >= 0; i-- {
 			// if the order slot is not empty
-			if x.Orders[i] != nil {
+			if x.Orders[i] != nil && len(x.Orders[i].SellersSendAddress) != 0 {
 				// exit the loop
 				break
 			}

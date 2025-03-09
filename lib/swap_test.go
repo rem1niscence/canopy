@@ -228,69 +228,70 @@ func TestUpdateOrder(t *testing.T) {
 		{
 			name: "Update an existing order",
 			initialOrders: []*SellOrder{
-				{Id: 0, AmountForSale: 100},
-				{Id: 1, AmountForSale: 200},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 100},
+				{Id: 1, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 200},
 			},
 			orderId: 1,
 			newOrder: &SellOrder{
-				Id:            1,
-				AmountForSale: 300,
+				Id:                 1,
+				SellersSendAddress: newTestAddressBytes(t),
+				AmountForSale:      300,
 			},
 			expectedOrders: []*SellOrder{
-				{Id: 0, AmountForSale: 100},
-				{Id: 1, AmountForSale: 300},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 100},
+				{Id: 1, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 300},
 			},
 		},
 		{
 			name: "Delete an order from the middle",
 			initialOrders: []*SellOrder{
-				{Id: 0, AmountForSale: 100},
-				{Id: 1, AmountForSale: 200},
-				{Id: 2, AmountForSale: 300},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 100},
+				{Id: 1, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 200},
+				{Id: 2, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 300},
 			},
 			orderId:  1,
 			newOrder: nil,
 			expectedOrders: []*SellOrder{
-				{Id: 0, AmountForSale: 100},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 100},
 				nil,
-				{Id: 2, AmountForSale: 300},
+				{Id: 2, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 300},
 			},
 		},
 		{
 			name: "Delete the last order and shrink slice",
 			initialOrders: []*SellOrder{
-				{Id: 0, AmountForSale: 100},
-				{Id: 1, AmountForSale: 200},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 100},
+				{Id: 1, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 200},
 			},
 			orderId:  1,
 			newOrder: nil,
 			expectedOrders: []*SellOrder{
-				{Id: 0, AmountForSale: 100},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 100},
 			},
 		},
 		{
 			name: "Order not found",
 			initialOrders: []*SellOrder{
-				{Id: 0, AmountForSale: 100},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 100},
 			},
 			orderId:  2,
-			newOrder: &SellOrder{Id: 2, AmountForSale: 400},
+			newOrder: &SellOrder{Id: 2, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 400},
 			error:    ErrOrderNotFound(2),
 			expectedOrders: []*SellOrder{
-				{Id: 0, AmountForSale: 100},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 100},
 			},
 		},
 		{
 			name: "Shrink slice with trailing nils",
 			initialOrders: []*SellOrder{
-				{Id: 0, AmountForSale: 100},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 100},
 				nil,
 				nil,
 			},
 			orderId:  2,
 			newOrder: nil,
 			expectedOrders: []*SellOrder{
-				{Id: 0, AmountForSale: 100},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t), AmountForSale: 100},
 			},
 		},
 	}
