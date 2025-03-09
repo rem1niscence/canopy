@@ -120,7 +120,7 @@ function convertGovernanceParams(v) {
 
 // convertOrder() transforms order details into a table-compatible convert
 function convertOrder(v) {
-  const exchangeRate = v.RequestedAmount / v.AmountForSale;
+  const exchangeRate = v.requestedAmount / v.amountForSale;
   return {
     Id: v.id ?? 0,
     Chain: v.committee,
