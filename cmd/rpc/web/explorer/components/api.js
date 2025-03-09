@@ -123,7 +123,7 @@ export function Committee(page, chain_id) {
 }
 
 export function DAO(height, _) {
-  return POST(rpcURL, heightAndIDRequest(height, 4294967296), poolPath);
+  return POST(rpcURL, heightAndIDRequest(height, 131071), poolPath);
 }
 
 export function Account(height, address) {
