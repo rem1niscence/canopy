@@ -163,7 +163,7 @@ const (
 	TxCreateOrderRouteName     = "tx-create-order"
 	TxEditOrderRouteName       = "tx-edit-order"
 	TxDeleteOrderRouteName     = "tx-delete-order"
-	TxLockOrderRouteName       = "tx-buy-order"
+	TxLockOrderRouteName       = "tx-lock-order"
 	TxCloseOrderRouteName      = "tx-close-order"
 	TxStartPollRouteName       = "tx-start-poll"
 	TxVotePollRouteName        = "tx-vote-poll"
@@ -357,7 +357,7 @@ func createAdminRouter(s *Server) *httprouter.Router {
 		TxCreateOrderRouteName:     s.TransactionCreateOrder,
 		TxEditOrderRouteName:       s.TransactionEditOrder,
 		TxDeleteOrderRouteName:     s.TransactionDeleteOrder,
-		TxLockOrderRouteName:       s.TransactionBuyOrder,
+		TxLockOrderRouteName:       s.TransactionLockOrder,
 		TxSubsidyRouteName:         s.TransactionSubsidy,
 		TxStartPollRouteName:       s.TransactionStartPoll,
 		TxVotePollRouteName:        s.TransactionVotePoll,
