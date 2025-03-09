@@ -3,6 +3,7 @@ package rpc
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -348,6 +349,32 @@ func (s *Server) TransactionLockOrder(w http.ResponseWriter, r *http.Request, _ 
 		}
 		// Create and return the transaction to be sent
 		return types.NewLockOrderTx(p, lib.LockOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, s.config.NetworkID, s.config.ChainId, s.controller.ChainHeight(), ptr.Fee)
+	})
+}
+
+func (s *Server) TransactionCloseOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	s.txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		// Retrieve the fee required for this type of transaction
+		if err := s.getFeeFromState(w, ptr, types.MessageSendName, true); err != nil {
+			return nil, err
+		}
+		// If the remote callbacks not yet set
+		if s.remoteCallbacks == nil {
+			return nil, lib.ErrServerTimeout()
+		}
+		// Execute rpc call to the root chain
+		order, err := s.remoteCallbacks.Order(0, ptr.OrderId, s.config.ChainId)
+		if err != nil {
+			return nil, err
+		}
+		// Don't allow an order to pass that is less than 10 blocks of the lock deadline
+		if int64(order.BuyerChainDeadline)-int64(s.controller.ChainHeight()) < 10 {
+			return nil, fmt.Errorf("too close to buyer chain deadline")
+		}
+		// Create the close order structure
+		co := lib.CloseOrder{OrderId: ptr.OrderId, CloseOrder: true}
+		// Exit with the new CloseOrderTx
+		return types.NewCloseOrderTx(p, co, crypto.NewAddress(order.SellerReceiveAddress), order.RequestedAmount, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
 	})
 }
 

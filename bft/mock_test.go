@@ -493,7 +493,11 @@ type testController struct {
 	sendToReplicasChan chan lib.Signable
 }
 
-func (t *testController) IsOwnRoot() bool {
+func (t *testController) LoadRootChainId(height uint64) (rootChainId uint64) {
+	return lib.CanopyChainId
+}
+
+func (t *testController) LoadIsOwnRoot() bool {
 	return true
 }
 
@@ -526,7 +530,7 @@ func (t *testController) ValidateProposal(qc *lib.QuorumCertificate, _ *Byzantin
 	return ErrEmptyMessage()
 }
 
-func (t *testController) LoadCommittee(rootHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
+func (t *testController) LoadCommittee(rootChainId, rootHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
 	return t.valSet[rootHeight], nil
 }
 func (t *testController) LoadCertificate(_ uint64) (*lib.QuorumCertificate, lib.ErrorI) {

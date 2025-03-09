@@ -11,7 +11,7 @@ func (x *OrderBook) AddOrder(order *SellOrder) (id uint64) {
 	// if there's an empty slot, fill it with the sell order
 	for i, slot := range x.Orders {
 		// if a slot is empty
-		if slot == nil {
+		if slot.Empty() {
 			// set the order id to index
 			id = uint64(i)
 			// set the structure order id to 'id'
@@ -87,7 +87,7 @@ func (x *OrderBook) UpdateOrder(orderId int, order *SellOrder) (err ErrorI) {
 		// continue shrinking the slice if nil entries are at the end
 		for i := maxIdx - 1; i >= 0; i-- {
 			// if the order slot is not empty
-			if x.Orders[i] != nil {
+			if !x.Orders[i].Empty() {
 				// exit the loop
 				break
 			}
@@ -108,7 +108,7 @@ func (x *OrderBook) GetOrder(orderId int) (order *SellOrder, err ErrorI) {
 	// create a variable to track the 'max index' of order slots
 	maxIdx := len(x.Orders) - 1
 	// if the order id exceeds the max index
-	if orderId > maxIdx || x.Orders[orderId] == nil {
+	if orderId > maxIdx || x.Orders[orderId].Empty() {
 		// exit with 'not found' error
 		return nil, ErrOrderNotFound(orderId)
 	}
@@ -116,6 +116,11 @@ func (x *OrderBook) GetOrder(orderId int) (order *SellOrder, err ErrorI) {
 	order = x.Orders[orderId]
 	// exit
 	return
+}
+
+// Empty() indicates whether the sell order is null
+func (x *SellOrder) Empty() bool {
+	return x == nil || x.SellersSendAddress == nil
 }
 
 // jsonSellOrder is the json.Marshaller and json.Unmarshaler implementation for the SellOrder object

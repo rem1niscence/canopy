@@ -103,6 +103,14 @@ message LockOrder {
   uint64 buyer_chain_deadline = 4; // @gotags: json:"buyerChainDeadline"
 }
 
+// CloseOrder is a buyer completing the purchase of an order, often referred to as 'buying' the order
+message CloseOrder {
+  // close_order: is the tag to represent the intent to embed a close order
+  bool close_order = 1; //@gotags: json:"closeOrder"
+  // order_id: is the number id that is unique to this committee to identify the order
+  uint64 order_id = 2; // @gotags: json:"orderID"
+}
+
 // Checkpoint is 3rd party chain information that allows Canopy to provide Checkpointing-as-a-Service for the 3rd party
 // checkpointing is important to prevent `long-range-attacks` in proof of stake blockchains and is currently the
 // secure standard

@@ -155,11 +155,26 @@ func (c *MultiConn) startSendService() {
 					c.Error(e, NoPongSlash)
 				}
 			})
-		case <-c.sendPong: // fires when receive service got a 'ping' message
+		case _, open := <-c.sendPong: // fires when receive service got a 'ping' message
+			// if the channel was closed
+			if !open {
+				// log the close
+				c.log.Debugf("Pong channel closed, stopping")
+				// exit
+				return
+			}
+			// log the pong sending
 			c.log.Debugf("Send Pong to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 			// send a pong
 			err = c.sendWireBytes(new(Pong), m)
-		case <-c.receivedPong: // fires when receive service got a 'pong' message
+		case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
+			// if the channel was closed
+			if !open {
+				// log the close
+				c.log.Debugf("Receive pong channel closed, stopping")
+				// exit
+				return
+			}
 			// reset the pong timer
 			lib.StopTimer(pongTimer)
 		case <-c.quitSending: // fires when Stop() is called
@@ -180,7 +195,6 @@ func (c *MultiConn) startReceiveService() {
 	reader, m := *bufio.NewReaderSize(c.conn, maxPacketSize), limiter.New(0, 0)
 	defer func() { close(c.sendPong); close(c.receivedPong); m.Done() }()
 	for {
-		c.log.Debugf("Receive service ready for %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 		select {
 		default: // fires unless quit was signaled
 			// waits until bytes are received from the conn
@@ -192,7 +206,6 @@ func (c *MultiConn) startReceiveService() {
 			// handle different message types
 			switch x := msg.(type) {
 			case *Packet: // receive packet is a partial or full 'Message' with a Stream Topic designation and an EOF signal
-				c.log.Debug("Received Packet")
 				// load the proper stream
 				stream, found := c.streams[x.StreamId]
 				if !found {
@@ -282,7 +295,8 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) (er
 	// write bytes to the wire up to max packet size
 	_, er := c.conn.Write(bz)
 	if er != nil {
-		c.log.Error(ErrFailedWrite(er).Error())
+		err = ErrFailedWrite(er)
+		c.log.Error(err.Error())
 	}
 	// update the rate limiter with how many bytes were written
 	//m.Update(n)
@@ -391,7 +405,7 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		}).WithHash()
 		// add to inbox for other parts of the app to read
 		s.inbox <- m
-		s.logger.Debugf("Forwarded packet(s) to inbox: %s", lib.Topic_name[int32(packet.StreamId)])
+		s.logger.Debugf("Forwarded message to inbox: %s", lib.Topic_name[int32(packet.StreamId)])
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]
 	}

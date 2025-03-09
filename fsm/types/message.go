@@ -99,9 +99,6 @@ func (x *MessageStake) Check() lib.ErrorI {
 	if err := checkOutputAddress(x.OutputAddress); err != nil {
 		return err
 	}
-	if err := checkNetAddress(x.NetAddress); err != nil {
-		return err
-	}
 	if err := checkPubKey(x.PublicKey); err != nil {
 		return err
 	}
@@ -164,9 +161,6 @@ func (x *MessageEditStake) Check() lib.ErrorI {
 		return err
 	}
 	if err := checkOutputAddress(x.OutputAddress); err != nil {
-		return err
-	}
-	if err := checkNetAddress(x.NetAddress); err != nil {
 		return err
 	}
 	if err := checkCommittees(x.Committees); err != nil {
@@ -720,9 +714,15 @@ func checkExternalAddress(address []byte) lib.ErrorI {
 	return nil
 }
 
-// checkNetAddress() validates the p2p address in the Message
-func checkNetAddress(netAddress string) lib.ErrorI {
+// CheckNetAddress() validates the p2p address in the Message
+func CheckNetAddress(netAddress string, isDelegate bool) lib.ErrorI {
 	netAddressLen := len(netAddress)
+	if isDelegate {
+		if netAddressLen != 0 {
+			return ErrInvalidNetAddressLen()
+		}
+		return nil
+	}
 	if netAddressLen < 1 || netAddressLen > 50 {
 		return ErrInvalidNetAddressLen()
 	}

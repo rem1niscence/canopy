@@ -337,13 +337,22 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, chainId, perce
 
 // LoadMinimumEvidenceHeight() loads the minimum height the evidence must be to still be usable
 func (s *StateMachine) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) {
+	// use the time machine to ensure a clean database transaction
+	historicalFSM, err := s.TimeMachine(s.Height())
+	// if an error occurred
+	if err != nil {
+		// exit with error
+		return 0, err
+	}
+	// once function completes, discard it
+	defer historicalFSM.Discard()
 	// get the validator params from state
-	valParams, err := s.GetParamsVal()
+	valParams, err := historicalFSM.GetParamsVal()
 	if err != nil {
 		return 0, err
 	}
 	// define convenience variables
-	height, unstakingBlocks := s.Height(), valParams.GetUnstakingBlocks()
+	height, unstakingBlocks := historicalFSM.Height(), valParams.GetUnstakingBlocks()
 	// if height is less than staking blocks, use *genesis* as the minimum evidence height
 	if height < unstakingBlocks {
 		return 0, nil

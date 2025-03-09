@@ -1029,6 +1029,7 @@ func TestLoadMinimumEvidenceHeight(t *testing.T) {
 			valParams.UnstakingBlocks = test.unstakingBlocks
 			// set the params
 			require.NoError(t, sm.SetParamsVal(valParams))
+			sm.Store().(lib.StoreI).Commit()
 			// run the function call with no errors
 			got, err := sm.LoadMinimumEvidenceHeight()
 			require.NoError(t, err)

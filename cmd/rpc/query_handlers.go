@@ -194,6 +194,7 @@ func (s *Server) RootChainInfo(w http.ResponseWriter, r *http.Request, _ httprou
 			return nil, err
 		}
 		return &lib.RootChainInfo{
+			RootChainId:      s.Config.ChainId,
 			Height:           s.Height(),
 			ValidatorSet:     validatorSet,
 			LastValidatorSet: lastValidatorSet,

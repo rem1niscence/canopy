@@ -51,16 +51,17 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.L
 	}
 	// create the controller
 	controller = &Controller{
-		FSM:        fsm,
-		Mempool:    mempool,
-		isSyncing:  &atomic.Bool{},
-		P2P:        p2p.New(valKey, maxMembersPerCommittee, c, l),
-		Address:    valKey.PublicKey().Address().Bytes(),
-		PublicKey:  valKey.PublicKey().Bytes(),
-		PrivateKey: valKey,
-		Config:     c,
-		log:        l,
-		Mutex:      sync.Mutex{},
+		FSM:           fsm,
+		Mempool:       mempool,
+		isSyncing:     &atomic.Bool{},
+		P2P:           p2p.New(valKey, maxMembersPerCommittee, c, l),
+		Address:       valKey.PublicKey().Address().Bytes(),
+		PublicKey:     valKey.PublicKey().Bytes(),
+		PrivateKey:    valKey,
+		Config:        c,
+		log:           l,
+		RootChainInfo: lib.RootChainInfo{Log: l},
+		Mutex:         sync.Mutex{},
 	}
 	// initialize the consensus in the controller, passing a reference to itself
 	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, true, l)
@@ -137,10 +138,10 @@ func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 	c.Lock()
 	// unlock when the function completes
 	defer c.Unlock()
-	// use the 'remote callbacks' from the controller
-	info.RemoteCallbacks = c.RootChainInfo.RemoteCallbacks
 	// use the logger from the controller
-	info.Log = c.log
+	info.Log = c.RootChainInfo.Log
+	// use the get remote callback 'callback' from the controller
+	info.GetRemoteCallbacks = c.RootChainInfo.GetRemoteCallbacks
 	// update the root chain info
 	c.RootChainInfo = *info
 	// if the last validator set is empty
@@ -156,24 +157,32 @@ func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 }
 
 // LoadCommittee() gets the ValidatorSet that is authorized to come to Consensus agreement on the Proposal for a specific height/chainId
-func (c *Controller) LoadCommittee(rootHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
-	return c.RootChainInfo.GetValidatorSet(c.Config.ChainId, rootHeight)
+func (c *Controller) LoadCommittee(rootChainId, rootHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
+	return c.RootChainInfo.GetValidatorSet(rootChainId, c.Config.ChainId, rootHeight)
 }
 
 // LoadRootChainOrderBook() gets the order book from the root-chain
 func (c *Controller) LoadRootChainOrderBook(rootHeight uint64) (*lib.OrderBook, lib.ErrorI) {
-	return c.RootChainInfo.GetOrders(rootHeight, c.Config.ChainId)
+	return c.RootChainInfo.GetOrders(c.LoadRootChainId(c.ChainHeight()), rootHeight, c.Config.ChainId)
 }
 
 // GetRootChainLotteryWinner() gets the pseudorandomly selected delegate to reward and their cut
 func (c *Controller) GetRootChainLotteryWinner(rootHeight uint64) (winner *lib.LotteryWinner, err lib.ErrorI) {
-	return c.RootChainInfo.GetLotteryWinner(rootHeight, c.Config.ChainId)
+	// get the root chain id from the state machine
+	rootChainId, err := c.FSM.LoadRootChainId(c.ChainHeight())
+	// if an error occurred retrieving the id
+	if err != nil {
+		// exit with error
+		return nil, err
+	}
+	// execute the remote call
+	return c.RootChainInfo.GetLotteryWinner(rootChainId, rootHeight, c.Config.ChainId)
 }
 
 // IsValidDoubleSigner() checks if the double signer is valid at a certain double sign height
 func (c *Controller) IsValidDoubleSigner(rootHeight uint64, address []byte) bool {
 	// do a remote call to the root chain to see if the double signer is valid
-	isValidDoubleSigner, err := c.RootChainInfo.IsValidDoubleSigner(rootHeight, lib.BytesToString(address))
+	isValidDoubleSigner, err := c.RootChainInfo.IsValidDoubleSigner(c.LoadRootChainId(c.ChainHeight()), rootHeight, lib.BytesToString(address))
 	// if an error occurred during the remote call
 	if err != nil {
 		// log the error
@@ -187,10 +196,23 @@ func (c *Controller) IsValidDoubleSigner(rootHeight uint64, address []byte) bool
 
 // INTERNAL CALLS BELOW
 
-// IsOwnRoot() returns if this chain is its own root (base)
-func (c *Controller) IsOwnRoot() (isOwnRoot bool) {
+// LoadIsOwnRoot() returns if this chain is its own root (base)
+func (c *Controller) LoadIsOwnRoot() (isOwnRoot bool) {
 	// use the state machine to check if this chain is the root chain
-	isOwnRoot, err := c.FSM.IsOwnRoot()
+	isOwnRoot, err := c.FSM.LoadIsOwnRoot()
+	// if an error occurred
+	if err != nil {
+		// log the error
+		c.log.Error(err.Error())
+	}
+	// exit
+	return
+}
+
+// RootChainId() returns the root chain id according to the FSM
+func (c *Controller) LoadRootChainId(height uint64) (rootChainId uint64) {
+	// use the state machine to get the root chain id
+	rootChainId, err := c.FSM.LoadRootChainId(height)
 	// if an error occurred
 	if err != nil {
 		// log the error
@@ -260,7 +282,7 @@ func (c *Controller) LoadLastProposers(height uint64) (*lib.Proposers, lib.Error
 // LoadCommitteeData() returns the state metadata for the 'self chain'
 func (c *Controller) LoadCommitteeData() (data *lib.CommitteeData, err lib.ErrorI) {
 	// get the committee data from the FSM
-	return c.FSM.GetCommitteeData(c.Config.ChainId)
+	return c.FSM.LoadCommitteeData(c.ChainHeight(), c.Config.ChainId)
 }
 
 // Syncing() returns if any of the supported chains are currently syncing

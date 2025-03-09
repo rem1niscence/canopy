@@ -3,6 +3,7 @@ import {
     KeystoreImport,
     KeystoreNew,
     TxLockOrder,
+    TxCloseOrder,
     TxCreateOrder,
     TxDeleteOrder,
     TxEditOrder,
@@ -28,7 +29,7 @@ import {
     toUCNPY,
     withTooltip,
 } from "@/components/util";
-import { KeystoreContext } from "@/pages";
+import {KeystoreContext} from "@/pages";
 import {
     LockIcon,
     CopyIcon,
@@ -40,11 +41,11 @@ import {
     SendIcon,
     StakeIcon,
     SwapIcon,
-    UnstakeIcon,
+    UnstakeIcon, CloseIcon,
 } from "@/components/svg_icons";
-import { useContext, useEffect, useRef, useState } from "react";
+import {useContext, useEffect, useRef, useState} from "react";
 import JsonView from "@uiw/react-json-view";
-import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
+import {Button, Card, Col, Form, Modal, Row, Spinner, Table} from "react-bootstrap";
 import Alert from "react-bootstrap/Alert";
 import Truncate from "react-truncate-inside";
 
@@ -55,20 +56,21 @@ function Keystore() {
 
 // transactionButtons defines the icons for the transactions
 const transactionButtons = [
-    { title: "SEND", name: "send", src: SendIcon },
-    { title: "STAKE", name: "stake", src: StakeIcon },
-    { title: "EDIT", name: "edit-stake", src: EditStakeIcon },
-    { title: "UNSTAKE", name: "unstake", src: UnstakeIcon },
-    { title: "PAUSE", name: "pause", src: PauseIcon },
-    { title: "PLAY", name: "unpause", src: UnpauseIcon },
-    { title: "SWAP", name: "create_order", src: SwapIcon },
-    { title: "LOCK", name: "lock_order", src: LockIcon },
-    { title: "REPRICE", name: "edit_order", src: EditOrderIcon },
-    { title: "VOID", name: "delete_order", src: DeleteOrderIcon },
+    {title: "SEND", name: "send", src: SendIcon},
+    {title: "STAKE", name: "stake", src: StakeIcon},
+    {title: "EDIT", name: "edit-stake", src: EditStakeIcon},
+    {title: "UNSTAKE", name: "unstake", src: UnstakeIcon},
+    {title: "PAUSE", name: "pause", src: PauseIcon},
+    {title: "PLAY", name: "unpause", src: UnpauseIcon},
+    {title: "SWAP", name: "create_order", src: SwapIcon},
+    {title: "LOCK", name: "lock_order", src: LockIcon},
+    {title: "CLOSE", name: "close_order", src: CloseIcon},
+    {title: "REPRICE", name: "edit_order", src: EditOrderIcon},
+    {title: "VOID", name: "delete_order", src: DeleteOrderIcon},
 ];
 
 // Accounts() returns the main component of this file
-export default function Accounts({ keygroup, account, validator, setActiveKey }) {
+export default function Accounts({keygroup, account, validator, setActiveKey}) {
     const ks = Keystore();
     const ksRef = useRef(ks);
 
@@ -148,7 +150,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
 
     // showModal() makes the modal visible
     function showModal(t) {
-        setState({ ...state, showModal: true, txType: t });
+        setState({...state, showModal: true, txType: t});
     }
 
     // getAccountType() returns the type of validator account (custodial / non-custodial)
@@ -182,7 +184,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
     // setActivePrivateKey() sets the active key to the newly added privte key if it is successfully imported
     function setActivePrivateKey(nickname, closeModal) {
         const resetState = () =>
-            setState({ ...stateRef.current, showSpinner: false, ...(closeModal && { [closeModal]: false }) });
+            setState({...stateRef.current, showSpinner: false, ...(closeModal && {[closeModal]: false})});
 
         retryWithDelay(
             () => {
@@ -205,7 +207,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
     function onPKFormSubmit(e) {
         onFormSubmit(state, e, ks, (r) =>
             KeystoreGet(r.sender, r.password, r.nickname).then((r) => {
-                setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
+                setState({...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r});
             }),
         );
     }
@@ -214,7 +216,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
     function onNewPKFormSubmit(e) {
         onFormSubmit(state, e, ks, (r) =>
             KeystoreNew(r.password, r.nickname).then((r) => {
-                setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
+                setState({...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r});
                 setActivePrivateKey(r.nickname);
             }),
         );
@@ -225,12 +227,12 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
         onFormSubmit(state, e, ks, (r) => {
             if (r.private_key) {
                 void KeystoreImport(r.private_key, r.password, r.nickname).then((_) => {
-                    setState({ ...state, showSpinner: true });
+                    setState({...state, showSpinner: true});
                     setActivePrivateKey(r.nickname, "showPKImportModal");
                 });
             } else {
                 void KeystoreNew(r.password, r.nickname).then((_) => {
-                    setState({ ...state, showSpinner: true });
+                    setState({...state, showSpinner: true});
                     setActivePrivateKey(r.nickname, "showPKImportModal");
                 });
             }
@@ -294,6 +296,8 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
                         r.password,
                         submit,
                     ),
+                close_order: () =>
+                    TxCloseOrder(r.sender, numberFromCommas(r.orderId), fee, r.password, submit),
                 lock_order: () =>
                     TxLockOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), fee, r.password, submit),
                 edit_order: () =>
@@ -314,10 +318,10 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
 
             const txFunction = txMap[state.txType];
             if (txFunction) {
-                setState({ ...state, showAlert: false });
+                setState({...state, showAlert: false});
                 txFunction()
                     .then((result) => {
-                        setState({ ...state, showSubmit: !submit, txResult: result, showAlert: false });
+                        setState({...state, showSubmit: !submit, txResult: result, showAlert: false});
                     })
                     .catch((e) => {
                         setState({
@@ -356,12 +360,12 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
     return (
         <div className="content-container">
             <span id="balance">{formatNumber(acc.amount)}</span>
-            <span style={{ fontFamily: "var(--font-heading)", fontWeight: "500", color: state.primaryColor }}>
+            <span style={{fontFamily: "var(--font-heading)", fontWeight: "500", color: state.primaryColor}}>
                 {" CNPY"}
             </span>
-            <br />
-            <hr />
-            <br />
+            <br/>
+            <hr/>
+            <br/>
             <RenderModal
                 show={state.showModal}
                 title={state.txType}
@@ -381,28 +385,28 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
                 onFormFieldChange={onFormFieldChange}
             />
             {transactionButtons.map((v, i) => (
-                <RenderActionButton key={i} v={v} i={i} showModal={showModal} />
+                <RenderActionButton key={i} v={v} i={i} showModal={showModal}/>
             ))}
             <Row className="account-summary-container">
                 {[
-                    { title: "Account Type", info: getAccountType() },
-                    { title: "Stake Amount", info: getValidatorAmount(), after: " cnpy" },
-                    { title: "Staked Status", info: getStakedStatus() },
+                    {title: "Account Type", info: getAccountType()},
+                    {title: "Stake Amount", info: getValidatorAmount(), after: " cnpy"},
+                    {title: "Staked Status", info: getStakedStatus()},
                 ].map((v, i) => (
-                    <RenderAccountInfo key={i} v={v} i={i} color={state.primaryColor} />
+                    <RenderAccountInfo key={i} v={v} i={i} color={state.primaryColor}/>
                 ))}
             </Row>
-            <br />
-            <br />
+            <br/>
+            <br/>
             {[
-                { title: "Nickname", info: keygroup.keyNickname },
-                { title: "Address", info: keygroup.keyAddress },
-                { title: "Public Key", info: keygroup.publicKey },
+                {title: "Nickname", info: keygroup.keyNickname},
+                {title: "Address", info: keygroup.keyAddress},
+                {title: "Public Key", info: keygroup.publicKey},
             ].map((v, i) => (
-                <KeyDetail key={i} title={v.title} info={v.info} state={state} setState={setState} />
+                <KeyDetail key={i} title={v.title} info={v.info} state={state} setState={setState}/>
             ))}
-            <br />
-            <RenderTransactions account={account} state={state} setState={setState} />
+            <br/>
+            <RenderTransactions account={account} state={state} setState={setState}/>
             {renderToast(state, setState)}
             <RenderModal
                 show={state.showPKModal}
@@ -455,21 +459,21 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
             <Button
                 id="pk-button"
                 variant="outline-secondary"
-                onClick={() => setState({ ...state, showNewModal: true })}
+                onClick={() => setState({...state, showNewModal: true})}
             >
                 New Private Key
             </Button>
             <Button
                 id="import-pk-button"
                 variant="outline-secondary"
-                onClick={() => setState({ ...state, showPKImportModal: true })}
+                onClick={() => setState({...state, showPKImportModal: true})}
             >
                 Import Private Key
             </Button>
             <Button
                 id="reveal-pk-button"
                 variant="outline-danger"
-                onClick={() => setState({ ...state, showPKModal: true })}
+                onClick={() => setState({...state, showPKModal: true})}
             >
                 Reveal Private Key
             </Button>
@@ -487,22 +491,22 @@ export default function Accounts({ keygroup, account, validator, setActiveKey })
 }
 
 // renderKeyDetail() creates a clickable summary info box with a copy functionality
-function KeyDetail({ i, title, info, state, setState }) {
+function KeyDetail({i, title, info, state, setState}) {
     return (
         <div key={i} className="account-summary-info" onClick={() => copy(state, setState, info)}>
             <span className="account-summary-info-title">{title}</span>
             <div className="account-summary-info-content-container">
                 <div className="account-summary-info-content">
-                    <Truncate text={info} />
+                    <Truncate text={info}/>
                 </div>
-                <CopyIcon />
+                <CopyIcon/>
             </div>
         </div>
     );
 }
 
 // JSONViewer() returns a raw JSON viewer based on the state of pk and txResult
-function JSONViewer({ state, setState, JsonViewVariant }) {
+function JSONViewer({state, setState, JsonViewVariant}) {
     const isEmptyPK = objEmpty(state.pk);
     const isEmptyTxRes = objEmpty(state.txResult);
 
@@ -512,7 +516,7 @@ function JSONViewer({ state, setState, JsonViewVariant }) {
             onCopied={(text) => {
                 copy(state, setState, text, "copied to keyboard!");
             }}
-            value={isEmptyPK ? { result: state.txResult } : { result: state.pk }}
+            value={isEmptyPK ? {result: state.txResult} : {result: state.pk}}
             shortenTextAfterLength={100}
             displayDataTypes={false}
             theme={JsonViewVariant}
@@ -521,12 +525,12 @@ function JSONViewer({ state, setState, JsonViewVariant }) {
 }
 
 // AccSumTabCol() returns an account summary table column
-function AccSumTabCol({ detail, i, state, setState }) {
+function AccSumTabCol({detail, i, state, setState}) {
     return withTooltip(
         <td onClick={() => copy(state, setState, detail)}>
-            <CopyIcon />
+            <CopyIcon/>
             <div className="account-summary-info-table-column">
-                <Truncate text={detail} />
+                <Truncate text={detail}/>
             </div>
         </td>,
         detail,
@@ -536,7 +540,7 @@ function AccSumTabCol({ detail, i, state, setState }) {
 }
 
 // SubmitBtn() renders a transaction submit button with customizable text, variant, and id
-function SubmitBtn({ text, variant = "outline-secondary", id = "pk-button" }) {
+function SubmitBtn({text, variant = "outline-secondary", id = "pk-button"}) {
     return (
         <Button id={id} variant={variant} type="submit">
             {text}
@@ -545,7 +549,7 @@ function SubmitBtn({ text, variant = "outline-secondary", id = "pk-button" }) {
 }
 
 // CloseBtn() renders a modal close button with a default onClick function
-function CloseBtn({ onClick }) {
+function CloseBtn({onClick}) {
     return (
         <Button variant="secondary" onClick={onClick}>
             Close
@@ -554,45 +558,45 @@ function CloseBtn({ onClick }) {
 }
 
 // RenderButtons() returns buttons based on the specified type
-function RenderButtons({ type, state, closeOnClick }) {
+function RenderButtons({type, state, closeOnClick}) {
     switch (type) {
         case "import-or-generate":
-            return <SubmitBtn text="Import or Generate Key" />;
+            return <SubmitBtn text="Import or Generate Key"/>;
         case "import-pk":
             return (
                 <>
-                    <SubmitBtn text="Import Key" variant="outline-danger" />
-                    <CloseBtn onClick={closeOnClick} />
+                    <SubmitBtn text="Import Key" variant="outline-danger"/>
+                    <CloseBtn onClick={closeOnClick}/>
                 </>
             );
         case "new-pk":
             return (
                 <>
-                    <SubmitBtn text="Generate New Key" />
-                    <CloseBtn onClick={closeOnClick} />
+                    <SubmitBtn text="Generate New Key"/>
+                    <CloseBtn onClick={closeOnClick}/>
                 </>
             );
         case "reveal-pk":
             return (
                 <>
-                    <SubmitBtn text="Get Private Key" variant="outline-danger" />
-                    <CloseBtn onClick={closeOnClick} />
+                    <SubmitBtn text="Get Private Key" variant="outline-danger"/>
+                    <CloseBtn onClick={closeOnClick}/>
                 </>
             );
         default:
             if (Object.keys(state.txResult).length === 0) {
                 return (
                     <>
-                        <SubmitBtn text={"Generate Transaction"} />
-                        <CloseBtn onClick={closeOnClick} />
+                        <SubmitBtn text={"Generate Transaction"}/>
+                        <CloseBtn onClick={closeOnClick}/>
                     </>
                 );
             } else {
-                const s = state.showSubmit ? <SubmitBtn text="Submit Transaction" variant="outline-danger" /> : <></>;
+                const s = state.showSubmit ? <SubmitBtn text="Submit Transaction" variant="outline-danger"/> : <></>;
                 return (
                     <>
                         {s}
-                        {<CloseBtn onClick={closeOnClick} />}
+                        {<CloseBtn onClick={closeOnClick}/>}
                     </>
                 );
             }
@@ -601,24 +605,24 @@ function RenderButtons({ type, state, closeOnClick }) {
 
 // RenderModal() returns the transaction modal
 function RenderModal({
-    show,
-    title,
-    txType,
-    onFormSub,
-    keyGroup,
-    account,
-    validator,
-    onHide,
-    btnType,
-    setState,
-    state,
-    closeOnClick,
-    keystore,
-    showAlert = false,
-    alertMsg,
-    JsonViewVariant,
-    onFormFieldChange,
-}) {
+                         show,
+                         title,
+                         txType,
+                         onFormSub,
+                         keyGroup,
+                         account,
+                         validator,
+                         onHide,
+                         btnType,
+                         setState,
+                         state,
+                         closeOnClick,
+                         keystore,
+                         showAlert = false,
+                         alertMsg,
+                         JsonViewVariant,
+                         onFormFieldChange,
+                     }) {
     return (
         <Modal show={show} size="lg" onHide={onHide}>
             <Form onSubmit={onFormSub}>
@@ -645,12 +649,12 @@ function RenderModal({
                         onFieldChange={onFormFieldChange}
                     />
                     {showAlert && <Alert variant={"danger"}>{alertMsg}</Alert>}
-                    <JSONViewer state={state} setState={setState} JsonViewVariant={JsonViewVariant} />
-                    <Spinner style={{ display: state.showSpinner ? "block" : "none", margin: "0 auto" }} />
+                    <JSONViewer state={state} setState={setState} JsonViewVariant={JsonViewVariant}/>
+                    <Spinner style={{display: state.showSpinner ? "block" : "none", margin: "0 auto"}}/>
                 </Modal.Body>
 
                 <Modal.Footer>
-                    <RenderButtons type={btnType} state={state} closeOnClick={closeOnClick} />
+                    <RenderButtons type={btnType} state={state} closeOnClick={closeOnClick}/>
                 </Modal.Footer>
             </Form>
         </Modal>
@@ -658,7 +662,7 @@ function RenderModal({
 }
 
 // RenderActionButton() creates a button with an SVG and title, triggering a modal on click
-function RenderActionButton({ v, i, showModal }) {
+function RenderActionButton({v, i, showModal}) {
     const IconComponent = v.src;
 
     if (!IconComponent) {
@@ -667,23 +671,23 @@ function RenderActionButton({ v, i, showModal }) {
 
     return (
         <div key={i} className="send-receive-button-container" onClick={() => showModal(v.name)}>
-            <IconComponent className="icon-button" />
-            <br />
+            <IconComponent className="icon-button"/>
+            <br/>
             <span className="action-button-title">{v.title}</span>
         </div>
     );
 }
 
 // RenderAccountInfo() generates a card displaying account summary details
-function RenderAccountInfo({ v, i }, color) {
+function RenderAccountInfo({v, i}, color) {
     return (
         <Col key={i}>
             <Card className="account-summary-container-card">
-                <Card.Header style={{ fontWeight: "100" }}>{v.title}</Card.Header>
-                <Card.Body style={{ padding: "10px" }}>
-                    <Card.Title style={{ fontWeight: "500", fontSize: "14px" }}>
+                <Card.Header style={{fontWeight: "100"}}>{v.title}</Card.Header>
+                <Card.Body style={{padding: "10px"}}>
+                    <Card.Title style={{fontWeight: "500", fontSize: "14px"}}>
                         {v.info}
-                        <span style={{ fontSize: "10px", color: color }}>{v.after}</span>
+                        <span style={{fontSize: "10px", color: color}}>{v.after}</span>
                     </Card.Title>
                 </Card.Body>
             </Card>
@@ -692,36 +696,36 @@ function RenderAccountInfo({ v, i }, color) {
 }
 
 // RenderTransactions() displays a table of recent transactions based on account data
-function RenderTransactions({ account, state, setState }) {
+function RenderTransactions({account, state, setState}) {
     return account.combined.length === 0 ? null : (
         <div className="recent-transactions-table">
             <span class="table-label">RECENT TRANSACTIONS</span>
-            <Table className="table-fixed" bordered hover style={{ marginTop: "10px" }}>
+            <Table className="table-fixed" bordered hover style={{marginTop: "10px"}}>
                 <thead>
-                    <tr>
-                        {["Height", "Amount", "Recipient", "Type", "Hash", "Status"].map((k, i) => (
-                            <th key={i}>{k}</th>
-                        ))}
-                    </tr>
+                <tr>
+                    {["Height", "Amount", "Recipient", "Type", "Hash", "Status"].map((k, i) => (
+                        <th key={i}>{k}</th>
+                    ))}
+                </tr>
                 </thead>
                 <tbody>
-                    {account.combined.slice(0, 5).map((v, i) => (
-                        <tr key={i}>
-                            <td>{v.height || "N/A"}</td>
-                            <td>
-                                {toCNPY(v.transaction.msg.amount) || toCNPY(v.transaction.msg.amountForSale) || "N/A"}
-                            </td>
-                            <AccSumTabCol
-                                detail={v.recipient ?? v.sender ?? v.address}
-                                i={i}
-                                state={state}
-                                setState={setState}
-                            />
-                            <td>{v.messageType || v.transaction.type}</td>
-                            <AccSumTabCol detail={v.txHash} i={i + 1} state={state} setState={setState} />
-                            <td>{v.status ?? ""}</td>
-                        </tr>
-                    ))}
+                {account.combined.slice(0, 5).map((v, i) => (
+                    <tr key={i}>
+                        <td>{v.height || "N/A"}</td>
+                        <td>
+                            {toCNPY(v.transaction.msg.amount) || toCNPY(v.transaction.msg.amountForSale) || "N/A"}
+                        </td>
+                        <AccSumTabCol
+                            detail={v.recipient ?? v.sender ?? v.address}
+                            i={i}
+                            state={state}
+                            setState={setState}
+                        />
+                        <td>{v.messageType || v.transaction.type}</td>
+                        <AccSumTabCol detail={v.txHash} i={i + 1} state={state} setState={setState}/>
+                        <td>{v.status ?? ""}</td>
+                    </tr>
+                ))}
                 </tbody>
             </Table>
         </div>

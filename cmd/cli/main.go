@@ -90,13 +90,14 @@ func Start() {
 	if err != nil {
 		l.Fatal(err.Error())
 	}
+	// initialize the rpc server
+	rpcServer := rpc.NewServer(app, config, l)
+	// set the remote callbacks
+	app.RootChainInfo.GetRemoteCallbacks = rpcServer.RemoteCallbacks
 	// start the application
 	app.Start()
-
 	// start the rpc server
-	rpcServer := rpc.NewServer(app, config, l)
 	rpcServer.Start()
-
 	// block until a kill signal is received
 	waitForKill()
 	// gracefully stop the app

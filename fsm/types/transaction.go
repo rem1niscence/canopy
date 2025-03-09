@@ -151,6 +151,15 @@ func NewLockOrderTx(from crypto.PrivateKeyI, order lib.LockOrder, networkId, cha
 	return NewSendTransaction(from, from.PublicKey().Address(), 1, networkId, chainId, fee, height, string(jsonBytes))
 }
 
+// NewCloseOrderTx() completes the purchase of a sell order using a send-tx and the memo field
+func NewCloseOrderTx(from crypto.PrivateKeyI, order lib.CloseOrder, buyersReceiveAddress crypto.AddressI, amount, networkId, chainId, fee, height uint64) (lib.TransactionI, lib.ErrorI) {
+	jsonBytes, err := lib.MarshalJSON(order)
+	if err != nil {
+		return nil, err
+	}
+	return NewSendTransaction(from, buyersReceiveAddress, amount, networkId, chainId, fee, height, string(jsonBytes))
+}
+
 // NewTransaction() creates a Transaction object from a message in the interface form of TransactionI
 func NewTransaction(pk crypto.PrivateKeyI, msg lib.MessageI, networkId, chainId, fee, height uint64, memo string) (lib.TransactionI, lib.ErrorI) {
 	a, err := lib.NewAny(msg)
