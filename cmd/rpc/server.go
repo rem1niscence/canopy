@@ -118,6 +118,7 @@ const (
 	TxEditOrderRouteName       = "tx-edit-order"
 	TxDeleteOrderRouteName     = "tx-delete-order"
 	TxLockOrderRouteName       = "tx-lock-order"
+	TxCloseOrderRouteName      = "tx-close-order"
 	TxStartPollRouteName       = "tx-start-poll"
 	TxVotePollRouteName        = "tx-vote-poll"
 	ResourceUsageRouteName     = "resource-usage"
@@ -133,10 +134,11 @@ const (
 const SoftwareVersion = "0.0.0-alpha"
 
 var (
-	app    *controller.Controller
-	db     *badger.DB
-	conf   lib.Config
-	logger lib.LoggerI
+	app             *controller.Controller
+	remoteCallbacks *lib.RemoteCallbacks
+	db              *badger.DB
+	conf            lib.Config
+	logger          lib.LoggerI
 
 	router = routes{
 		VersionRouteName:               {Method: http.MethodGet, Path: "/v1/", HandlerFunc: Version},
@@ -209,6 +211,7 @@ var (
 		TxEditOrderRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-edit-order", HandlerFunc: TransactionEditOrder, AdminOnly: true},
 		TxDeleteOrderRouteName:     {Method: http.MethodPost, Path: "/v1/admin/tx-delete-order", HandlerFunc: TransactionDeleteOrder, AdminOnly: true},
 		TxLockOrderRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-lock-order", HandlerFunc: TransactionLockOrder, AdminOnly: true},
+		TxCloseOrderRouteName:      {Method: http.MethodPost, Path: "/v1/admin/tx-close-order", HandlerFunc: TransactionCloseOrder, AdminOnly: true},
 		TxSubsidyRouteName:         {Method: http.MethodPost, Path: "/v1/admin/subsidy", HandlerFunc: TransactionSubsidy, AdminOnly: true},
 		TxStartPollRouteName:       {Method: http.MethodPost, Path: "/v1/admin/tx-start-poll", HandlerFunc: TransactionStartPoll, AdminOnly: true},
 		TxVotePollRouteName:        {Method: http.MethodPost, Path: "/v1/admin/tx-vote-poll", HandlerFunc: TransactionVotePoll, AdminOnly: true},
@@ -298,13 +301,13 @@ func PollRootChainInfo() {
 				return
 			}
 			// get the remote callbacks for the root chain id
-			callbacks, err := RemoteCallbacks(consParams.RootChainId)
+			remoteCallbacks, err = RemoteCallbacks(consParams.RootChainId)
 			if err != nil {
 				logger.Errorf("callbacks failed with err: %s")
 				return err
 			}
 			// query the base chain height
-			height, err := callbacks.Height()
+			height, err := remoteCallbacks.Height()
 			if err != nil {
 				logger.Errorf("GetRootChainHeight failed with err")
 				return err
@@ -320,7 +323,7 @@ func PollRootChainInfo() {
 			// execute the requests to get the base chain information
 			for retry := lib.NewRetry(conf.RootChainPollMS, 3); retry.WaitAndDoRetry(); {
 				// retrieve the root-chain info
-				rootChainInfo, e := callbacks.RootChainInfo(rootChainHeight, conf.ChainId)
+				rootChainInfo, e := remoteCallbacks.RootChainInfo(rootChainHeight, conf.ChainId)
 				if e == nil {
 					// update the controller with new root-chain info
 					app.UpdateRootChainInfo(rootChainInfo)
@@ -369,6 +372,7 @@ func RemoteCallbacks(rootChainId uint64) (*lib.RemoteCallbacks, lib.ErrorI) {
 		IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
 		Lottery:             rpcClient.Lottery,
 		Orders:              rpcClient.Orders,
+		Order:               rpcClient.Order,
 		Checkpoint:          rpcClient.Checkpoint,
 		Transaction:         rpcClient.Transaction,
 	}, nil
@@ -1061,6 +1065,32 @@ func TransactionLockOrder(w http.ResponseWriter, r *http.Request, _ httprouter.P
 			return nil, err
 		}
 		return types.NewLockOrderTx(p, lib.LockOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, conf.NetworkID, conf.ChainId, ptr.Fee, app.ChainHeight())
+	})
+}
+
+func TransactionCloseOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
+		if err := GetFeeFromState(w, ptr, types.MessageSendName); err != nil {
+			return nil, err
+		}
+		state, ok := getStateMachineWithHeight(0, w)
+		if !ok {
+			return nil, ErrTimeMachine(fmt.Errorf("getStateMachineWithHeight failed"))
+		}
+		defer state.Discard()
+		if remoteCallbacks == nil {
+			return nil, ErrServerTimeout()
+		}
+		order, err := remoteCallbacks.Order(0, ptr.OrderId, conf.ChainId)
+		if err != nil {
+			return nil, err
+		}
+		// don't allow an order to pass that is less than 10 blocks of the lock deadline
+		if int64(order.BuyerChainDeadline)-int64(state.Height()) < 10 {
+			return nil, fmt.Errorf("too close to buyer chain deadline")
+		}
+		co := lib.CloseOrder{OrderId: ptr.OrderId, CloseOrder: true}
+		return types.NewCloseOrderTx(p, co, crypto.NewAddress(order.SellerReceiveAddress), order.RequestedAmount, conf.NetworkID, conf.ChainId, ptr.Fee, app.ChainHeight())
 	})
 }
 

@@ -115,14 +115,15 @@ type GetRemoteCallbacks func(rootChainId uint64) (*RemoteCallbacks, ErrorI)
 
 // RemoteCallbacks are fallback rpc callbacks to the root-chain
 type RemoteCallbacks struct {
-	Height              func() (*uint64, ErrorI)                                  // retrieve the height of the root chain
-	RootChainInfo       func(height, chainId uint64) (*RootChainInfo, ErrorI)     // retrieve the root chain info in 1 call
-	ValidatorSet        func(height, id uint64) (ValidatorSet, ErrorI)            // get the validator set for a chain id using the RPC API
-	Lottery             func(height, id uint64) (p *LotteryWinner, err ErrorI)    // get the delegate 'lottery winner' for a chain id
-	Orders              func(height, chainId uint64) (p *OrderBooks, err ErrorI)  // get the order book for a specific 'chain id'
-	IsValidDoubleSigner func(height uint64, address string) (p *bool, err ErrorI) // check if a double signer is valid for an address for a specific 'double sign height'
-	Checkpoint          func(height, id uint64) (blockHash HexBytes, i ErrorI)    // get a checkpoint at a height and chain id combination
-	Transaction         func(tx TransactionI) (hash *string, err ErrorI)          // submit a transaction to the 'root chain'
+	Height              func() (*uint64, ErrorI)                                   // retrieve the height of the root chain
+	RootChainInfo       func(height, chainId uint64) (*RootChainInfo, ErrorI)      // retrieve the root chain info in 1 call
+	ValidatorSet        func(height, id uint64) (ValidatorSet, ErrorI)             // get the validator set for a chain id using the RPC API
+	Lottery             func(height, id uint64) (p *LotteryWinner, err ErrorI)     // get the delegate 'lottery winner' for a chain id
+	Orders              func(height, chainId uint64) (p *OrderBooks, err ErrorI)   // get the order book for a specific 'chain id'
+	Order               func(height, orderId, chainId uint64) (*SellOrder, ErrorI) // get a specific order from the order book
+	IsValidDoubleSigner func(height uint64, address string) (p *bool, err ErrorI)  // check if a double signer is valid for an address for a specific 'double sign height'
+	Checkpoint          func(height, id uint64) (blockHash HexBytes, i ErrorI)     // get a checkpoint at a height and chain id combination
+	Transaction         func(tx TransactionI) (hash *string, err ErrorI)           // submit a transaction to the 'root chain'
 }
 
 // GetHeight() returns the height from the root-chain

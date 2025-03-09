@@ -25,30 +25,30 @@ func TestAddOrder(t *testing.T) {
 		{
 			name: "Add to OrderBook with empty slot",
 			initialOrders: []*SellOrder{
-				{Id: 0},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t)},
 				nil,
-				{Id: 2},
+				{Id: 2, SellersSendAddress: newTestAddressBytes(t)},
 			},
-			newOrder:   &SellOrder{},
+			newOrder:   &SellOrder{SellersSendAddress: newTestAddressBytes(t)},
 			expectedID: 1,
 			expectedOrders: []*SellOrder{
-				{Id: 0},
-				{Id: 1},
-				{Id: 2},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t)},
+				{Id: 1, SellersSendAddress: newTestAddressBytes(t)},
+				{Id: 2, SellersSendAddress: newTestAddressBytes(t)},
 			},
 		},
 		{
 			name: "Add to OrderBook with no empty slots",
 			initialOrders: []*SellOrder{
-				{Id: 0},
-				{Id: 1},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t)},
+				{Id: 1, SellersSendAddress: newTestAddressBytes(t)},
 			},
-			newOrder:   &SellOrder{},
+			newOrder:   &SellOrder{SellersSendAddress: newTestAddressBytes(t)},
 			expectedID: 2,
 			expectedOrders: []*SellOrder{
-				{Id: 0},
-				{Id: 1},
-				{Id: 2},
+				{Id: 0, SellersSendAddress: newTestAddressBytes(t)},
+				{Id: 1, SellersSendAddress: newTestAddressBytes(t)},
+				{Id: 2, SellersSendAddress: newTestAddressBytes(t)},
 			},
 		},
 	}
@@ -80,6 +80,7 @@ func TestLockOrder(t *testing.T) {
 			initialOrders: []*SellOrder{
 				{
 					Id:                  0,
+					SellersSendAddress:  newTestAddressBytes(t),
 					BuyerReceiveAddress: []byte("existing_receive"),
 				},
 			},
@@ -90,12 +91,13 @@ func TestLockOrder(t *testing.T) {
 			error:                    "order locked",
 			expectedOrder: &SellOrder{
 				Id:                  0,
+				SellersSendAddress:  newTestAddressBytes(t),
 				BuyerReceiveAddress: []byte("existing_receive"),
 			},
 		},
 		{
 			name:                     "Order not found",
-			initialOrders:            []*SellOrder{{Id: 0}},
+			initialOrders:            []*SellOrder{{Id: 0, SellersSendAddress: newTestAddressBytes(t)}},
 			orderId:                  99,
 			buyersReceiveAddress:     []byte("buyer_receive"),
 			buyersSendAddress:        []byte("buyer_send"),
@@ -105,13 +107,14 @@ func TestLockOrder(t *testing.T) {
 		},
 		{
 			name:                     "Successful order claim",
-			initialOrders:            []*SellOrder{{Id: 0, BuyerReceiveAddress: nil}},
+			initialOrders:            []*SellOrder{{Id: 0, SellersSendAddress: newTestAddressBytes(t), BuyerReceiveAddress: nil}},
 			orderId:                  0,
 			buyersReceiveAddress:     []byte("buyer_receive"),
 			buyersSendAddress:        []byte("buyer_send"),
 			buyerChainDeadlineHeight: 100,
 			expectedOrder: &SellOrder{
 				Id:                  0,
+				SellersSendAddress:  newTestAddressBytes(t),
 				BuyerReceiveAddress: []byte("buyer_receive"),
 				BuyerSendAddress:    []byte("buyer_send"),
 				BuyerChainDeadline:  100,
@@ -155,6 +158,7 @@ func TestResetOrder(t *testing.T) {
 			initialOrders: []*SellOrder{
 				{
 					Id:                  1,
+					SellersSendAddress:  newTestAddressBytes(t),
 					BuyerReceiveAddress: []byte("buyer_receive"),
 					BuyerChainDeadline:  200,
 				},
@@ -168,6 +172,7 @@ func TestResetOrder(t *testing.T) {
 			initialOrders: []*SellOrder{
 				{
 					Id:                  0,
+					SellersSendAddress:  newTestAddressBytes(t),
 					BuyerReceiveAddress: nil,
 					BuyerChainDeadline:  0,
 				},
@@ -175,6 +180,7 @@ func TestResetOrder(t *testing.T) {
 			orderId: 0,
 			expectedOrder: &SellOrder{
 				Id:                  0,
+				SellersSendAddress:  newTestAddressBytes(t),
 				BuyerReceiveAddress: nil,
 				BuyerChainDeadline:  0,
 			},
@@ -184,6 +190,7 @@ func TestResetOrder(t *testing.T) {
 			initialOrders: []*SellOrder{
 				{
 					Id:                  0,
+					SellersSendAddress:  newTestAddressBytes(t),
 					BuyerReceiveAddress: []byte("buyer_receive"),
 					BuyerChainDeadline:  100,
 				},
@@ -192,6 +199,7 @@ func TestResetOrder(t *testing.T) {
 			expectedOrder: &SellOrder{
 				Id:                  0,
 				BuyerReceiveAddress: nil,
+				SellersSendAddress:  newTestAddressBytes(t),
 				BuyerChainDeadline:  0,
 			},
 		},

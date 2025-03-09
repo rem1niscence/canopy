@@ -649,6 +649,20 @@ func (c *Client) TxLockOrder(from AddrOrNickname, receiveAddress string, orderId
 	return c.transactionRequest(TxLockOrderRouteName, txReq)
 }
 
+func (c *Client) TxCloseOrder(from AddrOrNickname, orderId uint64, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	txReq := txRequest{
+		Fee:             optFee,
+		Submit:          submit,
+		OrderId:         orderId,
+		passwordRequest: passwordRequest{Password: pwd},
+	}
+	txReq, err := setFrom(from, txReq)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxCloseOrderRouteName, txReq)
+}
+
 func (c *Client) TxStartPoll(from AddrOrNickname, pollJSON json.RawMessage,
 	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	txReq := txRequest{

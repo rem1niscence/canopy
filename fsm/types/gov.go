@@ -32,7 +32,7 @@ const (
 
 var (
 	// the number of tokens in micro denomination that are initially (before halvenings) minted per block
-	InitialTokensPerBlock = 256 * 1000000 // 256 CNPY
+	InitialTokensPerBlock = 80 * 1000000 // 80 CNPY
 	// the number of blocks between each halvening (block reward is cut in half) event
 	BlocksPerHalvening = 3150000 // ~ 2 years - 20 second blocks
 )
@@ -68,7 +68,7 @@ func DefaultParams() *Params {
 			StakePercentForSubsidizedCommittee: 33,
 			MaxSlashPerCommittee:               15,
 			DelegateRewardPercentage:           10,
-			BuyDeadlineBlocks:                  15,
+			BuyDeadlineBlocks:                  60,
 			LockOrderFeeMultiplier:             2,
 		},
 		Fee: &FeeParams{
