@@ -78,6 +78,7 @@ const (
 	TxEditOrderRoutePath       = "/v1/admin/tx-edit-order"
 	TxDeleteOrderRoutePath     = "/v1/admin/tx-delete-order"
 	TxLockOrderRoutePath       = "/v1/admin/tx-buy-order"
+	TxCloseOrderRoutePath      = "/v1/admin/tx-close-order"
 	TxSubsidyRoutePath         = "/v1/admin/subsidy"
 	TxStartPollRoutePath       = "/v1/admin/tx-start-poll"
 	TxVotePollRoutePath        = "/v1/admin/tx-vote-poll"
@@ -163,6 +164,7 @@ const (
 	TxEditOrderRouteName       = "tx-edit-order"
 	TxDeleteOrderRouteName     = "tx-delete-order"
 	TxLockOrderRouteName       = "tx-buy-order"
+	TxCloseOrderRouteName      = "tx-close-order"
 	TxStartPollRouteName       = "tx-start-poll"
 	TxVotePollRouteName        = "tx-vote-poll"
 	ResourceUsageRouteName     = "resource-usage"
@@ -253,6 +255,7 @@ var routePaths = routes{
 	TxEditOrderRouteName:       {Method: http.MethodPost, Path: TxEditStakeRoutePath},
 	TxDeleteOrderRouteName:     {Method: http.MethodPost, Path: TxDeleteOrderRoutePath},
 	TxLockOrderRouteName:       {Method: http.MethodPost, Path: TxLockOrderRoutePath},
+	TxCloseOrderRouteName:      {Method: http.MethodPost, Path: TxCloseOrderRoutePath},
 	TxSubsidyRouteName:         {Method: http.MethodPost, Path: TxSubsidyRoutePath},
 	TxStartPollRouteName:       {Method: http.MethodPost, Path: TxStartPollRoutePath},
 	TxVotePollRouteName:        {Method: http.MethodPost, Path: TxVotePollRoutePath},

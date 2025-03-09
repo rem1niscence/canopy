@@ -55,12 +55,14 @@ type Server struct {
 	// Mutex for Poll handler
 	pollMux *sync.RWMutex
 
+	// RemoteCallbacks to the root chain rpc
+	remoteCallbacks *lib.RemoteCallbacks
+
 	logger lib.LoggerI
 }
 
 // NewServer constructs and returns a new Canopy RPC server
 func NewServer(controller *controller.Controller, config lib.Config, logger lib.LoggerI) *Server {
-
 	return &Server{
 		controller: controller,
 		config:     config,
@@ -168,7 +170,6 @@ func (s *Server) updatePollResults() {
 
 // pollRootChainInfo() retrieves information from the root-Chain required for consensus
 func (s *Server) pollRootChainInfo() {
-
 	// Track the root chain height
 	var rootChainHeight uint64
 
@@ -189,13 +190,13 @@ func (s *Server) pollRootChainInfo() {
 				return
 			}
 			// get the remote callbacks for the root chain id
-			rpcClient, err := s.RemoteCallbacks(consParams.RootChainId)
+			s.remoteCallbacks, err = s.RemoteCallbacks(consParams.RootChainId)
 			if err != nil {
 				s.logger.Errorf("callbacks failed with err: %s")
 				return err
 			}
 			// query the base chain height
-			height, err := rpcClient.Height()
+			height, err := s.remoteCallbacks.Height()
 			if err != nil {
 				s.logger.Errorf("GetRootChainHeight failed with err")
 				return err
@@ -211,7 +212,7 @@ func (s *Server) pollRootChainInfo() {
 			// execute the requests to get the base chain information
 			for retry := lib.NewRetry(s.config.RootChainPollMS, 3); retry.WaitAndDoRetry(); {
 				// retrieve the root-Chain info
-				rootChainInfo, e := rpcClient.RootChainInfo(rootChainHeight, s.config.ChainId)
+				rootChainInfo, e := s.remoteCallbacks.RootChainInfo(rootChainHeight, s.config.ChainId)
 				if e == nil {
 					// update the controller with new root-Chain info
 					s.controller.UpdateRootChainInfo(rootChainInfo)
@@ -263,6 +264,7 @@ func (s *Server) RemoteCallbacks(rootChainId uint64) (*lib.RemoteCallbacks, lib.
 		IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
 		Lottery:             rpcClient.Lottery,
 		Orders:              rpcClient.Orders,
+		Order:               rpcClient.Order,
 		Checkpoint:          rpcClient.Checkpoint,
 		Transaction:         rpcClient.Transaction,
 	}, nil
@@ -324,8 +326,8 @@ func (s *Server) getFeeFromState(w http.ResponseWriter, ptr *txRequest, messageN
 		return err
 	}
 	// Apply the fee multiplier for buy orders
-	isLockorder := len(lockorder) == 1 && lockorder[0]
-	if isLockorder {
+	isLockOrder := len(lockorder) == 1 && lockorder[0]
+	if isLockOrder {
 		// Get governance params
 		params, e := state.GetParamsVal()
 		if e != nil {

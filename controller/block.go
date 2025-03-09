@@ -270,7 +270,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		return
 	}
 	// log to signal finishing the commit
-	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToString(qc.ResultsHash), block.BlockHeader.Height)
+	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToTruncatedString(qc.BlockHash), block.BlockHeader.Height)
 	// set up the finite state machine for the next height
 	c.FSM, err = fsm.New(c.Config, storeI, c.log)
 	if err != nil {
@@ -304,7 +304,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 		return
 	}
 	// log the start of 'apply block'
-	c.log.Debugf("Applying block %s for height %d", candidateHash, candidateHeight)
+	c.log.Debugf("Applying block %s for height %d", candidateHash[:20], candidateHeight)
 	// apply the block against the state machine
 	compare, txResults, err := c.FSM.ApplyBlock(block)
 	if err != nil {
@@ -333,7 +333,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 		}
 	}
 	// log that the proposal is valid
-	c.log.Infof("Block %s with %d txs is valid for height %d ✅ ", candidateHash, len(block.Transactions), candidateHeight)
+	c.log.Infof("Block %s with %d txs is valid for height %d ✅ ", candidateHash[:20], len(block.Transactions), candidateHeight)
 	// exit with the valid results
 	return &lib.BlockResult{BlockHeader: candidate, Transactions: txResults}, nil
 }

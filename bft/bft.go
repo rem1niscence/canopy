@@ -128,7 +128,6 @@ func (b *BFT) Start() {
 				}
 			}()
 		}
-		b.log.Debug("Consensus thread sleeping")
 	}
 }
 
@@ -735,7 +734,7 @@ func (b *BFT) SetWaitTimers(phaseWaitTime, processTime time.Duration) {
 	}
 	// calculate the phase timer by subtracting the process time
 	phaseWaitTime = subtract(phaseWaitTime, processTime)
-	b.log.Infof("Setting consensus timer: %.2f sec", phaseWaitTime.Seconds())
+	b.log.Debugf("Setting consensus timer: %.2f sec", phaseWaitTime.Seconds())
 	// set Phase timers to go off in their respective timeouts
 	lib.ResetTimer(b.PhaseTimer, phaseWaitTime)
 }

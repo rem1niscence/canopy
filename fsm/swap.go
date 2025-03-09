@@ -1,6 +1,8 @@
 package fsm
 
 import (
+	"bytes"
+	"encoding/json"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -44,6 +46,10 @@ func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, chainId uint64) 
 
 // ParseLockOrder() parses a transaction for an embedded lock order messages in the memo field
 func (s *StateMachine) ParseLockOrder(tx *lib.Transaction, deadlineBlocks uint64) (bo *lib.LockOrder, ok bool) {
+	// check for valid json
+	if !json.Valid([]byte(tx.Memo)) {
+		return nil, false
+	}
 	// create a new reference to a 'lock order' object in order to ensure a non-nil result
 	bo = new(lib.LockOrder)
 	// attempt to unmarshal the transaction memo into a 'lock order'
@@ -59,16 +65,28 @@ func (s *StateMachine) ParseLockOrder(tx *lib.Transaction, deadlineBlocks uint64
 	return
 }
 
+// ParseCloseOrder() parses a transaction for an embedded close order messages in the memo field
+func (s *StateMachine) ParseCloseOrder(tx *lib.Transaction) (co *lib.CloseOrder, ok bool) {
+	// create a new reference to a 'close order' object in order to ensure a non-nil result
+	co = new(lib.CloseOrder)
+	// attempt to parse the close order from the memo
+	if err := lib.UnmarshalJSON([]byte(tx.Memo), co); err != nil {
+		return nil, false
+	}
+	// exit
+	return co, co.CloseOrder // signals if this is a 'close order' or not
+}
+
 // ProcessRootChainOrderBook() processes the order book from the root-chain and cross-references blocks on this chain to determine
 // actions that warrant committee level changes to the root-chain order book like: ResetOrder and CloseOrder
 func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.BlockResult) (closeOrders, resetOrders []uint64) {
-	// create a variable to track the 'same-block' transfers
-	// map structure is [from+to] -> amount sent
-	transferred := make(map[string]uint64)
+	// create a variable to track the 'close orders'
+	// map structure is [orderId] -> amount sent
+	transferred := make(map[uint64]uint64)
 	// get all the 'Send' transactions from the block
 	for _, tx := range b.Transactions {
-		// ignore non-send
-		if tx.MessageType != types.MessageSendName {
+		// ignore non-send, memo-less, or no valid json embedded
+		if tx.MessageType != types.MessageSendName || tx.Transaction.Memo == "" || !json.Valid([]byte(tx.Transaction.Memo)) {
 			continue
 		}
 		// extract the message from the transaction object
@@ -83,8 +101,25 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 			s.log.Error("Non-send message with a send message name (should not happen)")
 			continue
 		}
-		// update the transferred map using the [from + to] as the key and add send.Amount to the value
-		transferred[lib.BytesToString(append(tx.Sender, tx.Recipient...))] += send.Amount
+		// try parse close orders
+		closeOrder, isCloseOrder := s.ParseCloseOrder(tx.Transaction)
+		// if not a 'close order'
+		if !isCloseOrder {
+			// not a close order
+			continue
+		}
+		// try to get the close order
+		order, err := book.GetOrder(int(closeOrder.OrderId))
+		// if an error occurred during the retrieval
+		if err != nil {
+			s.log.Warnf("An error occurred during the close order retrieval: %s", err.Error())
+			continue
+		}
+		// if the 'sent amount' is the same as the order amount
+		if bytes.Equal(send.ToAddress, order.SellerReceiveAddress) && order.RequestedAmount == send.Amount {
+			// update the transferred map using the [order_id] as the key and add send.Amount to the value
+			transferred[closeOrder.OrderId] += send.Amount
+		}
 	}
 	// for each order in the book
 	for _, order := range book.Orders {
@@ -99,31 +134,22 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 			// go to the next order
 			continue
 		}
-		// extract a key that should correspond to the transferred map
-		key := lib.BytesToString(append(order.BuyerSendAddress, order.SellerReceiveAddress...))
 		// check if the order was closed this block
-		if transferred[key] == order.RequestedAmount {
+		if sent := transferred[order.Id]; sent == order.RequestedAmount { // double check on amount for sanity
 			// add to the closed order list
 			closeOrders = append(closeOrders, order.Id)
 			// go to the next order
 			continue
 		}
-		// scan the N-10 through N-15 blocks to ensure no orders are lost
-		start, end, n := uint64(0), uint64(0), b.BlockHeader.Height
-		// bounds check
-		if n >= 15 {
-			end = n - 15
-		}
-		// bounds check
-		if n >= 10 {
-			start = n - 10
-		}
-		// don't begin doing this check until after block 15
-		if start == 0 || end == 0 {
+		// don't do historical checking before block 16
+		if b.BlockHeader.Height < 16 {
+			// go to the next order
 			continue
 		}
-		// from blocks N-10 to N-15
-		for i := start; i > end; i-- {
+		// calculate hte bounds of the loop (N-15 to N-10)
+		start, end := b.BlockHeader.Height-15, b.BlockHeader.Height-10
+		// from blocks N-15 to N-10
+		for i := start; i < end; i++ {
 			// load the certificate (hopefully from cache)
 			qc, err := s.LoadCertificate(i)
 			if err != nil {
@@ -137,8 +163,11 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 			}
 			// check if the 'close order' command was issued previously
 			if qc.Results.Orders != nil && slices.Contains(qc.Results.Orders.CloseOrders, order.Id) {
-				// if so, add it to the close orders
-				closeOrders = append(closeOrders, order.Id)
+				// ensure no already added to close order
+				if !slices.Contains(closeOrders, order.Id) {
+					// if so, add it to the close orders
+					closeOrders = append(closeOrders, order.Id)
+				}
 				// exit the loop
 				break
 			}
@@ -163,7 +192,7 @@ func (s *StateMachine) ParseLockOrders(b *lib.BlockResult) (lockOrders []*lib.Lo
 	// for each transaction in the block
 	for _, tx := range b.Transactions {
 		// skip over any that doesn't have the minimum fee or isn't the correct type
-		if tx.MessageType != types.MessageSendName && tx.Transaction.Fee < minFee {
+		if tx.MessageType != types.MessageSendName || tx.Transaction.Memo == "" || tx.Transaction.Fee < minFee {
 			continue
 		}
 		// parse the transaction for embedded 'lock orders'
