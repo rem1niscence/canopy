@@ -171,9 +171,9 @@ type Supply struct {
 	// delegated_only: the total locked tokens that are delegated only
 	DelegatedOnly uint64 `protobuf:"varint,3,opt,name=delegated_only,json=delegatedOnly,proto3" json:"delegatedOnly"` // @gotags: json:"delegatedOnly"
 	// committee_staked: a list of committees and their 'committed (staked + delegated)' tokens, sorted by stake
-	CommitteeStaked []*Pool `protobuf:"bytes,4,rep,name=committee_staked,json=committeeStaked,proto3" json:"comiteeStaked"` // @gotags: json:"comiteeStaked"
+	CommitteeStaked []*Pool `protobuf:"bytes,4,rep,name=committee_staked,json=committeeStaked,proto3" json:"committeeStaked"` // @gotags: json:"committeeStaked"
 	// committee_delegated_only: a list of committees and their 'delegated only' tokens, sorted by stake
-	CommitteeDelegatedOnly []*Pool `protobuf:"bytes,5,rep,name=committee_delegated_only,json=committeeDelegatedOnly,proto3" json:"comiteeDelegatedOnly"` // @gotags: json:"comiteeDelegatedOnly"
+	CommitteeDelegatedOnly []*Pool `protobuf:"bytes,5,rep,name=committee_delegated_only,json=committeeDelegatedOnly,proto3" json:"committeeDelegatedOnly"` // @gotags: json:"committeeDelegatedOnly"
 }
 
 func (x *Supply) Reset() {

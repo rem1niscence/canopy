@@ -162,7 +162,7 @@ function getHeader(v) {
 function getTableBody(v) {
   let empty = [{ Results: "null" }];
   if ("consensus" in v) return convertGovernanceParams(v);
-  if ("committeeStaked" in v) return v.committee_staked.map((item) => convertCommitteeSupply(item, v.staked));
+  if ("committeeStaked" in v) return v.committeeStaked.map((item) => convertCommitteeSupply(item, v.staked));
   if (!v.hasOwnProperty("type")) return v[0]?.orders?.map(convertOrder) || empty;
   if (v.results === null) return empty;
   const converters = {
