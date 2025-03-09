@@ -302,7 +302,7 @@ export async function AccountWithTxs(height, address, nickname, page) {
 
     result.failed_transactions = await FailedTransactions(page, address);
     result.failed_transactions.results?.forEach((tx) => {
-        tx.status = "failure: ".concat(tx.error.Msg);
+        tx.status = "failure: ".concat(tx.error.msg);
     });
 
     result.combined = (result.rec_transactions.results || [])
