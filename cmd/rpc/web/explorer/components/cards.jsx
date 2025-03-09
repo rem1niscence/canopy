@@ -154,7 +154,6 @@ function getCardFooter(props, consensusDuration, idx) {
       return "Next block: " + addDate(v.results[0].blockHeader.time, consensusDuration);
     case 1:
       let s = "DAO pool supply: ";
-      console.log(props)
       if (props.pool != null) {
         return s + convertNumber(props.pool.amount, 1000, true);
       }

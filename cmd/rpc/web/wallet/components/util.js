@@ -46,7 +46,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
             tooltip: "comma separated list of committee chain IDs to stake for",
             label: "committees",
             inputText: "committees",
-            feedback: "please input atleast 1 committee",
+            feedback: "please input at least 1 committee",
             required: true,
             type: "text",
             minLength: 1,
