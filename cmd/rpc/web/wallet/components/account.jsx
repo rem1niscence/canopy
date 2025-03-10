@@ -44,10 +44,10 @@ import {
     UnstakeIcon, CloseIcon,
 } from "@/components/svg_icons";
 import {useContext, useEffect, useRef, useState} from "react";
-import JsonView from "@uiw/react-json-view";
 import {Button, Card, Col, Form, Modal, Row, Spinner, Table} from "react-bootstrap";
 import Alert from "react-bootstrap/Alert";
 import Truncate from "react-truncate-inside";
+import CanaJSON from "@/components/canaJSON";
 
 function Keystore() {
     const keystore = useContext(KeystoreContext);
@@ -92,40 +92,40 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
         }),
         acc = account.account;
 
-    const stateRef = useRef(state);
-    const [_, setButtonVariant] = useState("outline-dark");
-    const [JsonViewVariant, setJsonViewVariant] = useState("darkTheme");
+  const stateRef = useRef(state);
+  const [buttonVariant, setButtonVariant] = useState('outline-dark');
+  const [JsonViewVariant, setJsonViewVariant] = useState('json-dark');
 
-    // Using a standalone useEffect here to isolate the color states
-    useEffect(() => {
-        // Check data-bs-theme on mount
-        const currentTheme = document.documentElement.getAttribute("data-bs-theme");
+  // Using a standalone useEffect here to isolate the color states 
+  useEffect(() => {
+    // Check data-bs-theme on mount
+    const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+    
+    if (currentTheme === 'dark') {
+      setButtonVariant('outline-light');
+      setJsonViewVariant('json-dark');
+    } else {
+      setButtonVariant('outline-dark');
+      setJsonViewVariant('json-light');
+    }
+  }, [document.documentElement.getAttribute('data-bs-theme')]);
 
-        if (currentTheme === "dark") {
-            setButtonVariant("outline-light");
-            setJsonViewVariant("lightTheme");
-        } else {
-            setButtonVariant("outline-dark");
-            setJsonViewVariant("darkTheme");
-        }
-    }, []);
+  useEffect(() => {
+    // Ensure document is available
+    const rootStyles = getComputedStyle(document.documentElement);
+    const primaryColor = rootStyles.getPropertyValue("--primary-color").trim();
+    const greyColor = rootStyles.getPropertyValue("--grey-color").trim();
 
-    useEffect(() => {
-        // Ensure document is available
-        const rootStyles = getComputedStyle(document.documentElement);
-        const primaryColor = rootStyles.getPropertyValue("--primary-color").trim();
-        const greyColor = rootStyles.getPropertyValue("--grey-color").trim();
+    ksRef.current = ks;
+    stateRef.current = state;
 
-        ksRef.current = ks;
-        stateRef.current = state;
-
-        // Update state with colors
-        setState((prevState) => ({
-            ...prevState,
-            primaryColor,
-            greyColor,
-        }));
-    }, []);
+    // Update state with colors
+    setState((prevState) => ({
+      ...prevState,
+      primaryColor,
+      greyColor,
+    }));
+  }, []);
 
     // resetState() resets the state back to its initial
     function resetState() {
@@ -505,38 +505,19 @@ function KeyDetail({i, title, info, state, setState}) {
     );
 }
 
-// JSONViewer() returns a raw JSON viewer based on the state of pk and txResult
-function JSONViewer({state, setState, JsonViewVariant}) {
-    const isEmptyPK = objEmpty(state.pk);
-    const isEmptyTxRes = objEmpty(state.txResult);
-
-    if (isEmptyPK && isEmptyTxRes) return <></>;
-    return (
-        <JsonView
-            onCopied={(text) => {
-                copy(state, setState, text, "copied to keyboard!");
-            }}
-            value={isEmptyPK ? {result: state.txResult} : {result: state.pk}}
-            shortenTextAfterLength={100}
-            displayDataTypes={false}
-            theme={JsonViewVariant}
-        />
-    );
-}
-
 // AccSumTabCol() returns an account summary table column
 function AccSumTabCol({detail, i, state, setState}) {
-    return withTooltip(
-        <td onClick={() => copy(state, setState, detail)}>
-            <CopyIcon/>
-            <div className="account-summary-info-table-column">
-                <Truncate text={detail}/>
-            </div>
-        </td>,
-        detail,
-        i,
-        "top",
-    );
+  return withTooltip(
+    <td onClick={() => copy(state, setState, detail)}>
+      <CopyIcon/>
+      <div className="account-summary-info-table-column">
+        <Truncate text={detail}/>
+      </div>
+    </td>,
+    detail,
+    i,
+    "top",
+  );
 }
 
 // SubmitBtn() renders a transaction submit button with customizable text, variant, and id
@@ -592,7 +573,7 @@ function RenderButtons({type, state, closeOnClick}) {
                     </>
                 );
             } else {
-                const s = state.showSubmit ? <SubmitBtn text="Submit Transaction" variant="outline-danger"/> : <></>;
+                const s = state.showSubmit ? <SubmitBtn text="Submit Transaction" variant="outline-secondary"/> : <></>;
                 return (
                     <>
                         {s}
@@ -605,60 +586,60 @@ function RenderButtons({type, state, closeOnClick}) {
 
 // RenderModal() returns the transaction modal
 function RenderModal({
-                         show,
-                         title,
-                         txType,
-                         onFormSub,
-                         keyGroup,
-                         account,
-                         validator,
-                         onHide,
-                         btnType,
-                         setState,
-                         state,
-                         closeOnClick,
-                         keystore,
-                         showAlert = false,
-                         alertMsg,
-                         JsonViewVariant,
-                         onFormFieldChange,
-                     }) {
-    return (
-        <Modal show={show} size="lg" onHide={onHide}>
-            <Form onSubmit={onFormSub}>
-                <Modal.Header>
-                    <Modal.Title className="modal-title">{title}</Modal.Title>
-                </Modal.Header>
-                <Modal.Body className="modal-body">
-                    <FormInputs
-                        keygroup={keyGroup}
-                        fields={getFormInputs(txType, keyGroup, account, validator, keystore).map((formInput) => {
-                            let input = Object.assign({}, formInput);
-                            if (input.label === "sender") {
-                                input.options.sort((a, b) => {
-                                    if (a === account.nickname) return -1;
-                                    if (b === account.nickname) return 1;
-                                    return 0;
-                                });
-                            }
-                            return input;
-                        })}
-                        account={account}
-                        show={show}
-                        validator={validator}
-                        onFieldChange={onFormFieldChange}
-                    />
-                    {showAlert && <Alert variant={"danger"}>{alertMsg}</Alert>}
-                    <JSONViewer state={state} setState={setState} JsonViewVariant={JsonViewVariant}/>
-                    <Spinner style={{display: state.showSpinner ? "block" : "none", margin: "0 auto"}}/>
-                </Modal.Body>
+  show,
+  title,
+  txType,
+  onFormSub,
+  keyGroup,
+  account,
+  validator,
+  onHide,
+  btnType,
+  setState,
+  state,
+  closeOnClick,
+  keystore,
+  showAlert = false,
+  alertMsg,
+  JsonViewVariant,
+  onFormFieldChange,
+}) {
+  return (
+    <Modal show={show} size="lg" onHide={onHide}>
+      <Form onSubmit={onFormSub}>
+        <Modal.Header>
+          <Modal.Title className="modal-title">{title}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="modal-body">
+          <FormInputs
+            keygroup={keyGroup}
+            fields={getFormInputs(txType, keyGroup, account, validator, keystore).map((formInput) => {
+              let input = Object.assign({}, formInput);
+              if (input.label === "sender") {
+                input.options.sort((a, b) => {
+                  if (a === account.nickname) return -1;
+                  if (b === account.nickname) return 1;
+                  return 0;
+                });
+              }
+              return input;
+            })}
+            account={account}
+            show={show}
+            validator={validator}
+            onFieldChange={onFormFieldChange}
+          />
+          {showAlert && <Alert variant={"danger"}>{alertMsg}</Alert>}
+          <CanaJSON state={state} setState={setState} JsonViewVariant={JsonViewVariant} />
+          <Spinner style={{ display: state.showSpinner ? "block" : "none", margin: "0 auto" }} />
+        </Modal.Body>
 
-                <Modal.Footer>
-                    <RenderButtons type={btnType} state={state} closeOnClick={closeOnClick}/>
-                </Modal.Footer>
-            </Form>
-        </Modal>
-    );
+        <Modal.Footer>
+          <RenderButtons type={btnType} state={state} closeOnClick={closeOnClick} />
+        </Modal.Footer>
+      </Form>
+    </Modal>
+  );
 }
 
 // RenderActionButton() creates a button with an SVG and title, triggering a modal on click
