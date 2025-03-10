@@ -3,6 +3,7 @@ package p2p
 import (
 	"bufio"
 	"net"
+	reflect "reflect"
 	"sync"
 	"time"
 
@@ -55,18 +56,17 @@ const (
 
 // MultiConn: A rate-limited, multiplexed connection that utilizes a series streams with varying priority for sending and receiving
 type MultiConn struct {
-	conn            net.Conn                    // underlying connection
-	Address         *lib.PeerAddress            // authenticated peer information
-	streams         map[lib.Topic]*Stream       // multiple independent bi-directional communication channels
-	quitSending     chan struct{}               // signal to quit
-	quitReceiving   chan struct{}               // signal to quit
-	sendPong        chan struct{}               // signal to send keep alive message
-	receivedPong    chan struct{}               // signal that received keep alive message
-	notifySendQueue chan struct{}               // queue for notifying packets to be sent
-	onError         func(error, []byte, string) // callback to call if peer errors
-	error           sync.Once                   // thread safety to ensure MultiConn.onError is only called once
-	p2p             *P2P                        // a pointer reference to the P2P module
-	log             lib.LoggerI                 // logging
+	conn          net.Conn                    // underlying connection
+	Address       *lib.PeerAddress            // authenticated peer information
+	streams       map[lib.Topic]*Stream       // multiple independent bi-directional communication channels
+	quitSending   chan struct{}               // signal to quit
+	quitReceiving chan struct{}               // signal to quit
+	sendPong      chan struct{}               // signal to send keep alive message
+	receivedPong  chan struct{}               // signal that received keep alive message
+	onError       func(error, []byte, string) // callback to call if peer errors
+	error         sync.Once                   // thread safety to ensure MultiConn.onError is only called once
+	p2p           *P2P                        // a pointer reference to the P2P module
+	log           lib.LoggerI                 // logging
 }
 
 // NewConnection() creates and starts a new instance of a MultiConn
@@ -77,18 +77,17 @@ func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
 		return nil, err
 	}
 	c := &MultiConn{
-		conn:            eConn,
-		Address:         eConn.Address,
-		streams:         p.NewStreams(),
-		quitSending:     make(chan struct{}, maxChanSize),
-		quitReceiving:   make(chan struct{}, maxChanSize),
-		sendPong:        make(chan struct{}, maxChanSize),
-		receivedPong:    make(chan struct{}, maxChanSize),
-		notifySendQueue: make(chan struct{}, maxQueueSize),
-		onError:         p.OnPeerError,
-		error:           sync.Once{},
-		p2p:             p,
-		log:             p.log,
+		conn:          eConn,
+		Address:       eConn.Address,
+		streams:       p.NewStreams(),
+		quitSending:   make(chan struct{}, maxChanSize),
+		quitReceiving: make(chan struct{}, maxChanSize),
+		sendPong:      make(chan struct{}, maxChanSize),
+		receivedPong:  make(chan struct{}, maxChanSize),
+		onError:       p.OnPeerError,
+		error:         sync.Once{},
+		p2p:           p,
+		log:           p.log,
 	}
 	_ = c.conn.SetReadDeadline(time.Time{})
 	_ = c.conn.SetWriteDeadline(time.Time{})
@@ -134,7 +133,7 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 		}
 
 		ok = stream.queueSend(packet)
-		ok = c.notifySend()
+		// ok = c.notifySend()
 		c.log.Debugf("Packet(ID:%s, L:%d, E:%t) packet queued", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 	}
 
@@ -165,52 +164,73 @@ func (c *MultiConn) startSendService() {
 	pongTimer := time.NewTimer(pongTimeoutDuration)
 	defer func() { lib.StopTimer(pongTimer); ping.Stop(); m.Done() }()
 	for {
-		// select statement ensures the sequential coordination of the concurrent processes
-		select {
-		case <-c.notifySendQueue: // triggered each time a packet is sent to the queue, concurrency controlled by semaphore
-			if packet := c.getNextPacket(); packet != nil {
-				c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
-				err = c.sendWireBytes(packet, m)
-			}
-		case <-ping.C: // fires every 'pingInterval'
-			c.log.Debugf("Send Ping to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
-			// send a ping to the peer
-			if err = c.sendWireBytes(new(Ping), m); err != nil {
-				break
-			}
-			// reset the pong timer
-			lib.StopTimer(pongTimer)
-			// set the pong timer to execute an Error function if the timer expires before receiving a pong
-			pongTimer = time.AfterFunc(pongTimeoutDuration, func() {
-				if e := ErrPongTimeout(); e != nil {
-					c.Error(e, NoPongSlash)
-				}
+		sent := false
+		// 1️⃣ **Prioritize sending packets first**
+		// reflect is needed because it is the only way to ensure all channels in the stream map are checked right when a packet gets sent
+		var sendCases []reflect.SelectCase
+		streamTopics := make([]lib.Topic, 0)
+
+		for topic, stream := range c.streams {
+			sendCases = append(sendCases, reflect.SelectCase{
+				Dir:  reflect.SelectRecv,
+				Chan: reflect.ValueOf(stream.sendQueue),
 			})
-		case _, open := <-c.sendPong: // fires when receive service got a 'ping' message
-			// if the channel was closed
-			if !open {
-				// log the close
-				c.log.Debugf("Pong channel closed, stopping")
-				// exit
-				return
-			}
-			// log the pong sending
-			c.log.Debugf("Send Pong to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
-			// send a pong
-			err = c.sendWireBytes(new(Pong), m)
-		case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
-			// if the channel was closed
-			if !open {
-				// log the close
-				c.log.Debugf("Receive pong channel closed, stopping")
-				// exit
-				return
-			}
-			// reset the pong timer
-			lib.StopTimer(pongTimer)
-		case <-c.quitSending: // fires when Stop() is called
-			return
+			streamTopics = append(streamTopics, topic)
 		}
+
+		_, value, ok := reflect.Select(sendCases)
+		if ok {
+			packet, _ := value.Interface().(*Packet) // err ignored because it is impossible, the stream channels are always packet type
+			c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
+			err = c.sendWireBytes(packet, m)
+			sent = true
+		}
+
+		// 2️⃣ **If no packet was sent, handle other events**
+		if !sent {
+			// select statement ensures the sequential coordination of the concurrent processes
+			select {
+			case <-ping.C: // fires every 'pingInterval'
+				c.log.Debugf("Send Ping to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
+				// send a ping to the peer
+				if err = c.sendWireBytes(new(Ping), m); err != nil {
+					break
+				}
+				// reset the pong timer
+				lib.StopTimer(pongTimer)
+				// set the pong timer to execute an Error function if the timer expires before receiving a pong
+				pongTimer = time.AfterFunc(pongTimeoutDuration, func() {
+					if e := ErrPongTimeout(); e != nil {
+						c.Error(e, NoPongSlash)
+					}
+				})
+			case _, open := <-c.sendPong: // fires when receive service got a 'ping' message
+				// if the channel was closed
+				if !open {
+					// log the close
+					c.log.Debugf("Pong channel closed, stopping")
+					// exit
+					return
+				}
+				// log the pong sending
+				c.log.Debugf("Send Pong to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
+				// send a pong
+				err = c.sendWireBytes(new(Pong), m)
+			case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
+				// if the channel was closed
+				if !open {
+					// log the close
+					c.log.Debugf("Receive pong channel closed, stopping")
+					// exit
+					return
+				}
+				// reset the pong timer
+				lib.StopTimer(pongTimer)
+			case <-c.quitSending: // fires when Stop() is called
+				return
+			}
+		}
+
 		if err != nil {
 			c.Error(err)
 			return
@@ -334,23 +354,6 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) (er
 	return
 }
 
-// getNextPacket() returns the next packet to send ordered by stream.Topic priority
-func (c *MultiConn) getNextPacket() *Packet {
-	// ordered by stream priority
-	// NOTE: switching between streams mid 'Message' is not
-	// a problem as each stream has a unique receiving buffer
-	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
-		stream := c.streams[i]
-		select {
-		case pkt := <-stream.sendQueue:
-			return pkt
-		default:
-			continue // No packet available, try next stream
-		}
-	}
-	return nil
-}
-
 // Stream: an independent, bidirectional communication channel that is scoped to a single topic.
 // In a multiplexed connection there is typically more than one stream per connection
 type Stream struct {
@@ -367,16 +370,6 @@ func (s *Stream) queueSend(p *Packet) bool {
 	case s.sendQueue <- p: // enqueue to the back of the line
 		return true
 	case <-time.After(queueSendTimeout): // may timeout if queue remains full
-		return false
-	}
-}
-
-// notifySend notifies Multiconn of a new packet added
-func (c *MultiConn) notifySend() bool {
-	select {
-	case c.notifySendQueue <- struct{}{}:
-		return true
-	case <-time.After(queueSendTimeout):
 		return false
 	}
 }
