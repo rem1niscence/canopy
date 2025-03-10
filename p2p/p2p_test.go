@@ -337,13 +337,10 @@ func TestID(t *testing.T) {
 }
 
 func TestMaxPacketSize(t *testing.T) {
-	bestNumber, _ := uint64ToBytes(21)
 	a, err := lib.NewAny(&Packet{
-		StreamId:     lib.Topic_INVALID,
-		MessageId:    generateMessageID(),
-		PacketIndex:  bestNumber,
-		TotalPackets: bestNumber,
-		Bytes:        bytes.Repeat([]byte("F"), maxDataChunkSize),
+		StreamId: lib.Topic_INVALID,
+		Eof:      true,
+		Bytes:    bytes.Repeat([]byte("F"), maxDataChunkSize),
 	})
 	require.NoError(t, err)
 	envelope := &Envelope{Payload: a}

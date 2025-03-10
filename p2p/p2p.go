@@ -311,8 +311,8 @@ func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
 		streams[i] = &Stream{
 			topic:        i,
-			msgAssembler: make(map[string]map[int][]byte),
-			sendQueue:    make(chan *Packet, maxSendQueue),
+			msgAssembler: make([]byte, 0, maxMessageSize),
+			sendQueue:    make(chan *Packet, maxQueueSize),
 			inbox:        p.Inbox(i),
 			logger:       p.log,
 		}
