@@ -1756,8 +1756,11 @@ func NewTestSMT(t *testing.T, preset *NodeList, root []byte, keyBitSize int) (*S
 
 // newTestNode creates a new node with the given key, value, left and right child keys
 func newTestNode(k string, value []byte, leftChildKey, rightChildKey string) *node {
+	// create the key bytes for the left child
 	leftKey := keyFromByteStr(leftChildKey)
+	// create the key bytes for the right child
 	rightKey := keyFromByteStr(rightChildKey)
+	// create the node
 	return &node{
 		Key: new(key).fromBytes(keyBytesFromStr(k)),
 		Node: lib.Node{
@@ -1768,49 +1771,64 @@ func newTestNode(k string, value []byte, leftChildKey, rightChildKey string) *no
 	}
 }
 
-// keyFromByteStr converts a string of binary bits to a byte slice
-func keyFromByteStr(k string) []byte {
-	keyBytes := bytesFromStr(k)
-	leftBits := make([]int, 0)
+// keyFromByteStr converts a string of binary bits to a byte slice produced by the key least significant bits, or nil if the string is empty
+func keyFromByteStr(str string) []byte {
+	// convert the string to a byte slice
+	keyBytes := bytesFromStr(str)
+	// create the bits slice to be used by the key
+	bits := make([]int, 0)
 	for _, l := range keyBytes {
-		leftBits = append(leftBits, new(key).byteToBits(l, 0)[0])
+		// convert the byte to bits
+		bits = append(bits, new(key).byteToBits(l, 0)[0])
 	}
+	// create a new key from the bits
 	var bytes []byte
-	if k != "" {
-		bytes = (&key{leastSigBits: leftBits}).bytes()
+	if str != "" {
+		// convert the bits to bytes now producing the key
+		bytes = (&key{leastSigBits: bits}).bytes()
 	}
+	// return the key bytes
 	return bytes
 }
 
-// keyBitsFromString converts a string of binary bits to an int slice
-func keyBitsFromString(k string) []int {
+// bitsFromStr converts a string of binary bits to an int slice
+func bitsFromStr(k string) []int {
+	// create the bits slice
 	bits := make([]int, 0, len(k))
 	for _, ch := range k {
+		// convert the character to an int
 		digit, err := strconv.Atoi(string(ch))
 		if err != nil {
+			// panic if the conversion fails
 			panic(err)
 		}
+		// append the digit to the bits slice
 		bits = append(bits, digit)
 	}
+	// return the bits slice
 	return bits
 }
 
 // keyBytesFromStr converts a string of binary bits to a byte slice from
 // the key's least significant bits
 func keyBytesFromStr(bits string) []byte {
-	k := &key{leastSigBits: keyBitsFromString(bits)}
-	return k.bytes()
+	return (&key{leastSigBits: bitsFromStr(bits)}).bytes()
 }
 
 // bytesFromStr converts a string of binary bits to a byte slice
 func bytesFromStr(k string) []byte {
+	// create the bytes slice
 	bytes := make([]byte, 0, len(k))
 	for _, ch := range k {
+		// convert the character to an int
 		digit, err := strconv.Atoi(string(ch))
 		if err != nil {
+			// panic if the conversion fails
 			panic(err)
 		}
+		// convert the digit to bytes and append it to the bytes slice
 		bytes = append(bytes, byte(digit))
 	}
+	// return the bytes slice
 	return bytes
 }
