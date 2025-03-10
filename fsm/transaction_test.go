@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
@@ -15,7 +14,7 @@ func TestApplyTransaction(t *testing.T) {
 	// predefine a keygroup for signing the transaction
 	kg := newTestKeyGroup(t)
 	// predefine a send-transaction to insert into the block
-	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, 1, 1, 1, "")
+	sendTx, e := NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, 1, 1, 1, "")
 	require.NoError(t, e)
 	tests := []struct {
 		name          string
@@ -73,7 +72,7 @@ func TestApplyTransaction(t *testing.T) {
 				test.expected.TxHash = crypto.HashString(tx)
 			}
 			// preset the state limit for send fee
-			require.NoError(t, sm.UpdateParam("fee", types.ParamSendFee, &lib.UInt64Wrapper{Value: 1}))
+			require.NoError(t, sm.UpdateParam("fee", ParamSendFee, &lib.UInt64Wrapper{Value: 1}))
 			// preset tokens to the sender account (for the fee)
 			require.NoError(t, sm.AccountAdd(newTestAddress(t), test.presetSender))
 			// preset last block for timestamp verification
@@ -103,7 +102,7 @@ func TestCheckTx(t *testing.T) {
 	// predefine a keygroup for signing the transaction
 	kg := newTestKeyGroup(t)
 	// predefine a send-transaction to insert into the block
-	sendTx, e := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, 1, 1, 1, "")
+	sendTx, e := NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, 1, 1, 1, "")
 	require.NoError(t, e)
 	// convert the object to bytes
 	tx, e := lib.Marshal(sendTx)
@@ -173,7 +172,7 @@ func TestCheckTx(t *testing.T) {
 			tx:     tx,
 			expected: &CheckTxResult{
 				tx: sendTx.(*lib.Transaction),
-				msg: &types.MessageSend{
+				msg: &MessageSend{
 					FromAddress: newTestAddressBytes(t),
 					ToAddress:   newTestAddressBytes(t),
 					Amount:      amount,
@@ -187,7 +186,7 @@ func TestCheckTx(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
 			// preset the state limit for send fee
-			require.NoError(t, sm.UpdateParam("fee", types.ParamSendFee, &lib.UInt64Wrapper{Value: 1}))
+			require.NoError(t, sm.UpdateParam("fee", ParamSendFee, &lib.UInt64Wrapper{Value: 1}))
 			// preset tokens to the sender account (for the fee)
 			require.NoError(t, sm.AccountAdd(newTestAddress(t), test.presetSender))
 			// execute the function call
@@ -209,13 +208,13 @@ func TestCheckSignature(t *testing.T) {
 	// predefine a keygroup for signing the transaction
 	kg := newTestKeyGroup(t)
 	// predefine a send message
-	msg := &types.MessageSend{
+	msg := &MessageSend{
 		FromAddress: newTestAddressBytes(t),
 		ToAddress:   newTestAddressBytes(t),
 		Amount:      amount,
 	}
 	// predefine send message with a different signer
-	msg2 := &types.MessageSend{
+	msg2 := &MessageSend{
 		FromAddress: newTestAddressBytes(t, 2),
 		ToAddress:   newTestAddressBytes(t),
 		Amount:      amount,
@@ -433,14 +432,14 @@ func TestCheckMessage(t *testing.T) {
 	nonTxAny, e := lib.NewAny(&lib.UInt64Wrapper{})
 	require.NoError(t, e)
 	// predefine a send message
-	invalidSend := &types.MessageSend{
+	invalidSend := &MessageSend{
 		FromAddress: newTestAddressBytes(t),
 	}
 	// convert the message to 'any' for transaction wrapping
 	invalidMsgSendAny, e := lib.NewAny(invalidSend)
 	require.NoError(t, e)
 	// predefine a send message
-	sendMsg := &types.MessageSend{
+	sendMsg := &MessageSend{
 		FromAddress: newTestAddressBytes(t),
 		ToAddress:   newTestAddressBytes(t),
 		Amount:      100,
@@ -506,7 +505,7 @@ func TestCheckFee(t *testing.T) {
 			detail:     "the fee is less than the parameter",
 			stateLimit: 2,
 			fee:        1,
-			msg:        &types.MessageSend{},
+			msg:        &MessageSend{},
 			error:      "below state limit",
 		},
 		{
@@ -514,14 +513,14 @@ func TestCheckFee(t *testing.T) {
 			detail:     "the fee is equal to the parameter",
 			stateLimit: 2,
 			fee:        2,
-			msg:        &types.MessageSend{},
+			msg:        &MessageSend{},
 		},
 		{
 			name:       "fee > minimum",
 			detail:     "the fee is greater than the parameter",
 			stateLimit: 2,
 			fee:        3,
-			msg:        &types.MessageSend{},
+			msg:        &MessageSend{},
 		},
 	}
 	for _, test := range tests {
@@ -529,7 +528,7 @@ func TestCheckFee(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
 			// preset the state limit
-			require.NoError(t, sm.UpdateParam("fee", types.ParamSendFee, &lib.UInt64Wrapper{Value: test.stateLimit}))
+			require.NoError(t, sm.UpdateParam("fee", ParamSendFee, &lib.UInt64Wrapper{Value: test.stateLimit}))
 			// execute the function call
 			err := sm.CheckFee(test.fee, test.msg)
 			// validate the expected error

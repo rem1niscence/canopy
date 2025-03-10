@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
@@ -123,7 +122,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				require.NoError(t, err)
 				// simulate the escrow supply
 				escrowPoolBalance += preset.AmountForSale
-				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+types.EscrowPoolAddend, preset.AmountForSale))
+				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+EscrowPoolAddend, preset.AmountForSale))
 			}
 			// execute the function call
 			sm.HandleCommitteeSwaps(test.orders, lib.CanopyChainId)
@@ -175,7 +174,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				}
 			}
 			// validate the removal of funds from the escrow pool
-			balance, e := sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
+			balance, e := sm.GetPoolBalance(lib.CanopyChainId + EscrowPoolAddend)
 			require.NoError(t, e)
 			require.Equal(t, escrowPoolBalance-balanceRemovedFromPool, balance)
 		})
@@ -522,7 +521,7 @@ func TestCloseOrder(t *testing.T) {
 			if test.preset != nil {
 				_, err := sm.CreateOrder(test.preset, lib.CanopyChainId)
 				require.NoError(t, err)
-				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+types.EscrowPoolAddend, test.preset.AmountForSale))
+				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+EscrowPoolAddend, test.preset.AmountForSale))
 			}
 			// execute the function call
 			err := sm.CloseOrder(test.order, lib.CanopyChainId)
@@ -542,7 +541,7 @@ func TestCloseOrder(t *testing.T) {
 			require.NoError(t, e)
 			require.Equal(t, order.AmountForSale, accountBalance)
 			// validate the removal of funds from the escrow pool
-			balance, e := sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
+			balance, e := sm.GetPoolBalance(lib.CanopyChainId + EscrowPoolAddend)
 			require.NoError(t, e)
 			require.Zero(t, balance)
 		})
@@ -702,7 +701,7 @@ func TestGetSetOrderBooks(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
-			supply := &types.Supply{}
+			supply := &Supply{}
 			// set the order books
 			require.NoError(t, sm.SetOrderBooks(test.expected, supply))
 			// get the order books
@@ -714,7 +713,7 @@ func TestGetSetOrderBooks(t *testing.T) {
 			require.Equal(t, test.expectedTotalAmount, supply.Total)
 			// validate committee amounts
 			for id, amount := range test.expectedCommitteeAmounts {
-				balance, e := sm.GetPoolBalance(id + types.EscrowPoolAddend)
+				balance, e := sm.GetPoolBalance(id + EscrowPoolAddend)
 				require.NoError(t, e)
 				require.Equal(t, amount, balance)
 			}

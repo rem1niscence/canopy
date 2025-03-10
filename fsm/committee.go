@@ -2,7 +2,6 @@ package fsm
 
 import (
 	"bytes"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"slices"
@@ -28,9 +27,9 @@ func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
 		subsidizedChainIds = append(subsidizedChainIds, s.Config.ChainId)
 	}
 	// calculate the number of halvenings
-	halvenings := s.height / uint64(types.BlocksPerHalvening)
+	halvenings := s.height / uint64(BlocksPerHalvening)
 	// each halving, the reward is divided by 2
-	totalMintAmount := uint64(types.InitialTokensPerBlock >> halvenings)
+	totalMintAmount := uint64(InitialTokensPerBlock >> halvenings)
 	// define a convenience variable for the number of subsidized committees
 	subsidizedCount := uint64(len(subsidizedChainIds))
 	// if there are no subsidized committees or no mint amount
@@ -152,7 +151,7 @@ func (s *StateMachine) DistributeCommitteeRewards() lib.ErrorI {
 }
 
 // DistributeCommitteeReward() issues a single committee reward unit based on an individual 'Payment Stub'
-func (s *StateMachine) DistributeCommitteeReward(stub *lib.PaymentPercents, rewardPoolAmount, numberOfSamples uint64, valParams *types.ValidatorParams) (distributed uint64, err lib.ErrorI) {
+func (s *StateMachine) DistributeCommitteeReward(stub *lib.PaymentPercents, rewardPoolAmount, numberOfSamples uint64, valParams *ValidatorParams) (distributed uint64, err lib.ErrorI) {
 	address := crypto.NewAddress(stub.Address)
 	// full_reward = truncate ( percentage / number_of_samples * available_reward )
 	fullReward := (stub.Percent * rewardPoolAmount) / (numberOfSamples * 100)
@@ -224,7 +223,7 @@ func (s *StateMachine) GetCommitteeMembers(chainId uint64) (vs lib.ValidatorSet,
 		return
 	}
 	// iterate through the prefix for the committee, from the highest stake amount to lowest
-	it, err := s.RevIterator(types.CommitteePrefix(chainId))
+	it, err := s.RevIterator(CommitteePrefix(chainId))
 	if err != nil {
 		return
 	}
@@ -234,7 +233,7 @@ func (s *StateMachine) GetCommitteeMembers(chainId uint64) (vs lib.ValidatorSet,
 	// for each item of the iterator up to MaxCommitteeSize
 	for i := uint64(0); it.Valid() && i < p.MaxCommitteeSize; func() { it.Next(); i++ }() {
 		// extract the address from the iterator key
-		address, e := types.AddressFromKey(it.Key())
+		address, e := AddressFromKey(it.Key())
 		if e != nil {
 			return vs, e
 		}
@@ -261,11 +260,11 @@ func (s *StateMachine) GetCommitteeMembers(chainId uint64) (vs lib.ValidatorSet,
 // GetCommitteePaginated() returns a 'page' of committee members ordered from the highest stake to lowest
 func (s *StateMachine) GetCommitteePaginated(p lib.PageParams, chainId uint64) (page *lib.Page, err lib.ErrorI) {
 	// define a page and result variables
-	page, res := lib.NewPage(p, types.ValidatorsPageName), make(types.ValidatorPage, 0)
+	page, res := lib.NewPage(p, ValidatorsPageName), make(ValidatorPage, 0)
 	// populate the page using an iterator over the 'committee prefix' ordered by stake (high to low)
-	err = page.Load(types.CommitteePrefix(chainId), true, &res, s.store, func(key, value []byte) (err lib.ErrorI) {
+	err = page.Load(CommitteePrefix(chainId), true, &res, s.store, func(key, value []byte) (err lib.ErrorI) {
 		// get the address from the key
-		address, err := types.AddressFromKey(key)
+		address, err := AddressFromKey(key)
 		if err != nil {
 			return err
 		}
@@ -286,7 +285,7 @@ func (s *StateMachine) GetCommitteePaginated(p lib.PageParams, chainId uint64) (
 }
 
 // UpdateCommittees() updates the committee information in state for a specific validator
-func (s *StateMachine) UpdateCommittees(address crypto.AddressI, oldValidator *types.Validator, newStakedAmount uint64, newCommittees []uint64) lib.ErrorI {
+func (s *StateMachine) UpdateCommittees(address crypto.AddressI, oldValidator *Validator, newStakedAmount uint64, newCommittees []uint64) lib.ErrorI {
 	// delete the committee information based on the 'previous state' of the validator
 	if err := s.DeleteCommittees(address, oldValidator.StakedAmount, oldValidator.Committees); err != nil {
 		return err
@@ -329,12 +328,12 @@ func (s *StateMachine) DeleteCommittees(address crypto.AddressI, totalStake uint
 
 // SetCommitteeMember() sets the address as a 'member' of the committee in the state
 func (s *StateMachine) SetCommitteeMember(address crypto.AddressI, chainId, stakeForCommittee uint64) lib.ErrorI {
-	return s.Set(types.KeyForCommittee(chainId, address, stakeForCommittee), nil)
+	return s.Set(KeyForCommittee(chainId, address, stakeForCommittee), nil)
 }
 
 // DeleteCommitteeMember() removes the address from being a 'member' of the committee in the state
 func (s *StateMachine) DeleteCommitteeMember(address crypto.AddressI, chainId, stakeForCommittee uint64) lib.ErrorI {
-	return s.Delete(types.KeyForCommittee(chainId, address, stakeForCommittee))
+	return s.Delete(KeyForCommittee(chainId, address, stakeForCommittee))
 }
 
 // DELEGATIONS BELOW
@@ -342,7 +341,7 @@ func (s *StateMachine) DeleteCommitteeMember(address crypto.AddressI, chainId, s
 // GetAllDelegates() returns all delegates for a certain chainId
 func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err lib.ErrorI) {
 	// iterate from highest stake to lowest
-	it, err := s.RevIterator(types.DelegatePrefix(chainId))
+	it, err := s.RevIterator(DelegatePrefix(chainId))
 	if err != nil {
 		return vs, err
 	}
@@ -352,7 +351,7 @@ func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err
 	// loop through the iterator
 	for ; it.Valid(); it.Next() {
 		// get the address from the iterator key
-		address, e := types.AddressFromKey(it.Key())
+		address, e := AddressFromKey(it.Key())
 		if e != nil {
 			return vs, e
 		}
@@ -378,11 +377,11 @@ func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err
 // GetDelegatesPaginated() returns a page of delegates
 func (s *StateMachine) GetDelegatesPaginated(p lib.PageParams, chainId uint64) (page *lib.Page, err lib.ErrorI) {
 	// create a page of validator objects
-	page, res := lib.NewPage(p, types.ValidatorsPageName), make(types.ValidatorPage, 0)
+	page, res := lib.NewPage(p, ValidatorsPageName), make(ValidatorPage, 0)
 	// populate the page using the 'delegates' prefix sorted by stake (high to low)
-	err = page.Load(types.DelegatePrefix(chainId), true, &res, s.store, func(key, _ []byte) (err lib.ErrorI) {
+	err = page.Load(DelegatePrefix(chainId), true, &res, s.store, func(key, _ []byte) (err lib.ErrorI) {
 		// get the address from the key
-		address, err := types.AddressFromKey(key)
+		address, err := AddressFromKey(key)
 		if err != nil {
 			return err
 		}
@@ -403,7 +402,7 @@ func (s *StateMachine) GetDelegatesPaginated(p lib.PageParams, chainId uint64) (
 }
 
 // UpdateDelegations() updates the delegate information for an address, first removing the outdated delegation information and then setting the new info
-func (s *StateMachine) UpdateDelegations(address crypto.AddressI, oldValidator *types.Validator, newStakedAmount uint64, newCommittees []uint64) lib.ErrorI {
+func (s *StateMachine) UpdateDelegations(address crypto.AddressI, oldValidator *Validator, newStakedAmount uint64, newCommittees []uint64) lib.ErrorI {
 	// remove the outdated delegation information
 	if err := s.DeleteDelegations(address, oldValidator.StakedAmount, oldValidator.Committees); err != nil {
 		return err
@@ -452,12 +451,12 @@ func (s *StateMachine) DeleteDelegations(address crypto.AddressI, totalStake uin
 
 // SetDelegate() sets a delegate in state using the delegate prefix
 func (s *StateMachine) SetDelegate(address crypto.AddressI, chainId, stakeForCommittee uint64) lib.ErrorI {
-	return s.Set(types.KeyForDelegate(chainId, address, stakeForCommittee), nil)
+	return s.Set(KeyForDelegate(chainId, address, stakeForCommittee), nil)
 }
 
 // DeleteDelegate() removes a delegate from the state using the delegate prefix
 func (s *StateMachine) DeleteDelegate(address crypto.AddressI, chainId, stakeForCommittee uint64) lib.ErrorI {
-	return s.Delete(types.KeyForDelegate(chainId, address, stakeForCommittee))
+	return s.Delete(KeyForDelegate(chainId, address, stakeForCommittee))
 }
 
 // COMMITTEE DATA CODE BELOW
@@ -567,13 +566,13 @@ func (s *StateMachine) SetCommitteesData(list *lib.CommitteesData) lib.ErrorI {
 		return err
 	}
 	// set the list bytes under the 'committees data prefix'
-	return s.Set(types.CommitteesDataPrefix(), bz)
+	return s.Set(CommitteesDataPrefix(), bz)
 }
 
 // GetCommitteesData() gets a list of List from the state
 func (s *StateMachine) GetCommitteesData() (list *lib.CommitteesData, err lib.ErrorI) {
 	// get the CommitteesData bytes under 'committees data prefix'
-	bz, err := s.Get(types.CommitteesDataPrefix())
+	bz, err := s.Get(CommitteesDataPrefix())
 	if err != nil {
 		return nil, err
 	}
@@ -591,26 +590,26 @@ func (s *StateMachine) GetCommitteesData() (list *lib.CommitteesData, err lib.Er
 // This is a useful mechanism to gracefully 'end' a committee
 func (s *StateMachine) RetireCommittee(chainId uint64) lib.ErrorI {
 	// set the default value for a chain id using a key for the retired committee prefix key
-	return s.Set(types.KeyForRetiredCommittee(chainId), types.RetiredCommitteesPrefix())
+	return s.Set(KeyForRetiredCommittee(chainId), RetiredCommitteesPrefix())
 }
 
 // CommitteeIsRetired checks if a committee is marked as 'retired' which prevents it from being subsidized for eternity
 func (s *StateMachine) CommitteeIsRetired(chainId uint64) (bool, lib.ErrorI) {
 	// retrieve the bytes under the retired key for the chain id
-	bz, err := s.Get(types.KeyForRetiredCommittee(chainId))
+	bz, err := s.Get(KeyForRetiredCommittee(chainId))
 	if err != nil {
 		return false, err
 	}
 	// check if the bytes equal the default value (RetiredCommitteesPrefix)
-	return bytes.Equal(types.RetiredCommitteesPrefix(), bz), nil
+	return bytes.Equal(RetiredCommitteesPrefix(), bz), nil
 }
 
 // GetRetiredCommittees() returns a list of the retired chainIds
 func (s *StateMachine) GetRetiredCommittees() (list []uint64, err lib.ErrorI) {
 	// for each item under the retired committee prefix
-	err = s.IterateAndExecute(types.RetiredCommitteesPrefix(), func(key, _ []byte) (e lib.ErrorI) {
+	err = s.IterateAndExecute(RetiredCommitteesPrefix(), func(key, _ []byte) (e lib.ErrorI) {
 		// extract the chain id from the key
-		chainId, e := types.IdFromKey(key)
+		chainId, e := IdFromKey(key)
 		if e != nil {
 			return
 		}

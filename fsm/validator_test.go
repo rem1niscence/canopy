@@ -2,7 +2,6 @@ package fsm
 
 import (
 	"bytes"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
@@ -15,7 +14,7 @@ func TestGetValidator(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		preset *types.Validator
+		preset *Validator
 		tryGet crypto.AddressI
 		error  string
 	}{
@@ -28,7 +27,7 @@ func TestGetValidator(t *testing.T) {
 		{
 			name:   "different validator",
 			detail: "the validator that was preset doesn't correspond with the tryGet",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{lib.CanopyChainId},
@@ -39,7 +38,7 @@ func TestGetValidator(t *testing.T) {
 		{
 			name:   "single validator",
 			detail: "set and get a single validator",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{lib.CanopyChainId},
@@ -72,7 +71,7 @@ func TestGetValidatorExists(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		preset *types.Validator
+		preset *Validator
 		tryGet crypto.AddressI
 		exists bool
 	}{
@@ -85,7 +84,7 @@ func TestGetValidatorExists(t *testing.T) {
 		{
 			name:   "different valdiator",
 			detail: "the validator that was preset doesn't correspond with the tryGet",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{lib.CanopyChainId},
@@ -96,7 +95,7 @@ func TestGetValidatorExists(t *testing.T) {
 		{
 			name:   "single validator",
 			detail: "set and get a single validator",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{lib.CanopyChainId},
@@ -127,13 +126,13 @@ func TestSetGetValidators(t *testing.T) {
 	tests := []struct {
 		name           string
 		detail         string
-		preset         []*types.Validator
-		expectedSupply *types.Supply
+		preset         []*Validator
+		expectedSupply *Supply
 	}{
 		{
 			name:   "validators (non-delegate)",
 			detail: "set and get validators (non-delegate)",
-			preset: []*types.Validator{
+			preset: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -153,10 +152,10 @@ func TestSetGetValidators(t *testing.T) {
 					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:  amount*3 + 3,
 				Staked: amount*3 + 3,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     lib.CanopyChainId,
 						Amount: amount*3 + 3,
@@ -171,7 +170,7 @@ func TestSetGetValidators(t *testing.T) {
 		{
 			name:   "delegates",
 			detail: "set and get delegates",
-			preset: []*types.Validator{
+			preset: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -194,11 +193,11 @@ func TestSetGetValidators(t *testing.T) {
 					Committees:   []uint64{lib.CanopyChainId, 2},
 				},
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:         amount*3 + 3,
 				Staked:        amount*3 + 3,
 				DelegatedOnly: amount*3 + 3,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     lib.CanopyChainId,
 						Amount: amount*3 + 3,
@@ -208,7 +207,7 @@ func TestSetGetValidators(t *testing.T) {
 						Amount: amount*3 + 3,
 					},
 				},
-				CommitteeDelegatedOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*Pool{
 					{
 						Id:     lib.CanopyChainId,
 						Amount: amount*3 + 3,
@@ -228,7 +227,7 @@ func TestSetGetValidators(t *testing.T) {
 			// set the validators
 			if test.preset != nil {
 				// convenience variable for supply
-				supply := &types.Supply{}
+				supply := &Supply{}
 				require.NoError(t, sm.SetValidators(test.preset, supply))
 				// set the supply
 				require.NoError(t, sm.SetSupply(supply))
@@ -237,7 +236,7 @@ func TestSetGetValidators(t *testing.T) {
 			got, err := sm.GetValidators()
 			require.NoError(t, err)
 			// sort got by stake
-			slices.SortFunc(got, func(a *types.Validator, b *types.Validator) int {
+			slices.SortFunc(got, func(a *Validator, b *Validator) int {
 				switch {
 				case a.StakedAmount == b.StakedAmount:
 					return 0
@@ -255,14 +254,14 @@ func TestSetGetValidators(t *testing.T) {
 			set, err := sm.GetCommitteePaginated(lib.PageParams{}, lib.CanopyChainId)
 			require.NoError(t, err)
 			// check committees got vs expected
-			for i, member := range *set.Results.(*types.ValidatorPage) {
+			for i, member := range *set.Results.(*ValidatorPage) {
 				require.EqualExportedValues(t, test.preset[i], member)
 			}
 			// get delegates from state
 			set, err = sm.GetDelegatesPaginated(lib.PageParams{}, lib.CanopyChainId)
 			require.NoError(t, err)
 			// check delegates got vs expected
-			for i, member := range *set.Results.(*types.ValidatorPage) {
+			for i, member := range *set.Results.(*ValidatorPage) {
 				require.EqualExportedValues(t, test.preset[i], member)
 			}
 			gotSupply, err := sm.GetSupply()
@@ -278,7 +277,7 @@ func TestGetValidatorsPaginated(t *testing.T) {
 	tests := []struct {
 		name            string
 		detail          string
-		validators      []*types.Validator
+		validators      []*Validator
 		pageParams      lib.PageParams
 		expectedAddress [][]byte
 		filters         lib.ValidatorFilters
@@ -295,7 +294,7 @@ func TestGetValidatorsPaginated(t *testing.T) {
 		{
 			name:   "multi-validator",
 			detail: "test with multiple validators and default page params",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
@@ -322,7 +321,7 @@ func TestGetValidatorsPaginated(t *testing.T) {
 		{
 			name:   "multi-validator filter paused",
 			detail: "test with multiple validators and default page params, filtering paused",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
@@ -357,18 +356,18 @@ func TestGetValidatorsPaginated(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// set the validators
 			if test.validators != nil {
-				require.NoError(t, sm.SetValidators(test.validators, &types.Supply{}))
+				require.NoError(t, sm.SetValidators(test.validators, &Supply{}))
 			}
 			// execute the function call
 			page, err := sm.GetValidatorsPaginated(test.pageParams, test.filters)
 			// validate no error
 			require.NoError(t, err)
 			// check got vs expected page type
-			require.Equal(t, types.ValidatorsPageName, page.Type)
+			require.Equal(t, ValidatorsPageName, page.Type)
 			// check got vs expected page params
 			require.EqualExportedValues(t, test.pageParams, page.PageParams)
 			// check got vs expected page result
-			for i, got := range *page.Results.(*types.ValidatorPage) {
+			for i, got := range *page.Results.(*ValidatorPage) {
 				require.Equal(t, test.expectedAddress[i], got.Address)
 			}
 		})
@@ -380,27 +379,27 @@ func TestUpdateValidatorStake(t *testing.T) {
 	tests := []struct {
 		name           string
 		detail         string
-		preset         *types.Validator
-		update         *types.Validator
-		expectedSupply *types.Supply
+		preset         *Validator
+		update         *Validator
+		expectedSupply *Supply
 	}{
 		{
 			name:   "no updates",
 			detail: "no updates to the validator",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount,
 				Committees:   []uint64{0, 1},
 			},
-			update: &types.Validator{
+			update: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount,
 				Committees:   []uint64{0, 1},
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:  amount,
 				Staked: amount,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: amount,
@@ -415,20 +414,20 @@ func TestUpdateValidatorStake(t *testing.T) {
 		{
 			name:   "stake",
 			detail: "update validator stake",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount,
 				Committees:   []uint64{0, 1},
 			},
-			update: &types.Validator{
+			update: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount + 1,
 				Committees:   []uint64{0, 1},
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:  amount, // not updated by this function
 				Staked: amount + 1,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,
@@ -443,23 +442,23 @@ func TestUpdateValidatorStake(t *testing.T) {
 		{
 			name:   "delegated stake",
 			detail: "update delegate stake",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount,
 				Committees:   []uint64{0, 1},
 				Delegate:     true,
 			},
-			update: &types.Validator{
+			update: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount + 1,
 				Committees:   []uint64{0, 1},
 				Delegate:     true,
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:         amount, // not updated by this function
 				Staked:        amount + 1,
 				DelegatedOnly: amount + 1,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,
@@ -469,7 +468,7 @@ func TestUpdateValidatorStake(t *testing.T) {
 						Amount: amount + 1,
 					},
 				},
-				CommitteeDelegatedOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,
@@ -484,20 +483,20 @@ func TestUpdateValidatorStake(t *testing.T) {
 		{
 			name:   "committees",
 			detail: "update validator committees",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount,
 				Committees:   []uint64{0, 1},
 			},
-			update: &types.Validator{
+			update: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount + 1,
 				Committees:   []uint64{0, 2},
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:  amount, // not updated by this function
 				Staked: amount + 1,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,
@@ -512,23 +511,23 @@ func TestUpdateValidatorStake(t *testing.T) {
 		{
 			name:   "delegated committees",
 			detail: "update delegate committees",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount,
 				Committees:   []uint64{0, 1},
 				Delegate:     true,
 			},
-			update: &types.Validator{
+			update: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount + 1,
 				Committees:   []uint64{0, 2},
 				Delegate:     true,
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:         amount, // not updated by this function
 				Staked:        amount + 1,
 				DelegatedOnly: amount + 1,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,
@@ -538,7 +537,7 @@ func TestUpdateValidatorStake(t *testing.T) {
 						Amount: amount + 1,
 					},
 				},
-				CommitteeDelegatedOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*Pool{
 					{
 						Id:     0,
 						Amount: amount + 1,
@@ -557,9 +556,9 @@ func TestUpdateValidatorStake(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// set the validators
 			if test.preset != nil {
-				supply := &types.Supply{}
+				supply := &Supply{}
 				// set the validator
-				require.NoError(t, sm.SetValidators([]*types.Validator{test.preset}, supply))
+				require.NoError(t, sm.SetValidators([]*Validator{test.preset}, supply))
 				// update the supply in state
 				require.NoError(t, sm.SetSupply(supply))
 			}
@@ -583,7 +582,7 @@ func TestUpdateValidatorStake(t *testing.T) {
 				require.NoError(t, err)
 				// ensure the slice contains the expected
 				var contains bool
-				for _, member := range *page.Results.(*types.ValidatorPage) {
+				for _, member := range *page.Results.(*ValidatorPage) {
 					if bytes.Equal(member.PublicKey, test.update.PublicKey) {
 						contains = true
 						break
@@ -605,55 +604,55 @@ func TestDeleteValidator(t *testing.T) {
 	tests := []struct {
 		name           string
 		detail         string
-		preset         *types.Validator
-		expectedSupply *types.Supply
+		preset         *Validator
+		expectedSupply *Supply
 	}{
 		{
 			name:   "delete validator",
 			detail: "delete validator with 1 committee",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount,
 				Committees:   []uint64{0},
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total: amount,
 			},
 		}, {
 			name:   "delete validator multi committee",
 			detail: "delete validator with multiple committees",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount,
 				Committees:   []uint64{0, 1, 2},
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total: amount,
 			},
 		},
 		{
 			name:   "delete delegate",
 			detail: "delete delegate with 1 committee",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount,
 				Committees:   []uint64{0, 1, 2},
 				Delegate:     true,
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total: amount,
 			},
 		},
 		{
 			name:   "delete delegate multi committee",
 			detail: "delete delegate with multiple committees",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: amount,
 				Committees:   []uint64{0, 1, 2},
 				Delegate:     true,
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total: amount,
 			},
 		},
@@ -664,9 +663,9 @@ func TestDeleteValidator(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// set the validators
 			if test.preset != nil {
-				supply := &types.Supply{}
+				supply := &Supply{}
 				// set the validator
-				require.NoError(t, sm.SetValidators([]*types.Validator{test.preset}, supply))
+				require.NoError(t, sm.SetValidators([]*Validator{test.preset}, supply))
 				// update the supply in state
 				require.NoError(t, sm.SetSupply(supply))
 			}
@@ -688,7 +687,7 @@ func TestDeleteValidator(t *testing.T) {
 				require.NoError(t, err)
 				// ensure the slice contains the expected
 				var contains bool
-				for _, member := range *page.Results.(*types.ValidatorPage) {
+				for _, member := range *page.Results.(*ValidatorPage) {
 					if bytes.Equal(member.PublicKey, test.preset.PublicKey) {
 						contains = true
 						break
@@ -709,13 +708,13 @@ func TestSetValidatorUnstaking(t *testing.T) {
 	tests := []struct {
 		name                  string
 		detail                string
-		preset                *types.Validator
+		preset                *Validator
 		finishUnstakingHeight uint64
 	}{
 		{
 			name:   "set unstaking",
 			detail: "set a standard validator unstaking",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:         newTestAddressBytes(t),
 				Committees:      nil,
 				MaxPausedHeight: 0,
@@ -725,7 +724,7 @@ func TestSetValidatorUnstaking(t *testing.T) {
 		{
 			name:   "set paused unstaking",
 			detail: "set a paused validator unstaking",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:         newTestAddressBytes(t),
 				Committees:      nil,
 				MaxPausedHeight: 1,
@@ -751,7 +750,7 @@ func TestSetValidatorUnstaking(t *testing.T) {
 			// ensure validator unstaking height is expected
 			require.Equal(t, test.finishUnstakingHeight, validator.UnstakingHeight)
 			// ensure unstaking key exists
-			got, err := sm.Get(types.KeyForUnstaking(test.finishUnstakingHeight, address))
+			got, err := sm.Get(KeyForUnstaking(test.finishUnstakingHeight, address))
 			require.NoError(t, err)
 			require.Len(t, got, 1)
 		})
@@ -762,12 +761,12 @@ func TestDeleteFinishedUnstaking(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		preset *types.Validator
+		preset *Validator
 	}{
 		{
 			name:   "validator same output/operator",
 			detail: "validator with the same output and operator address",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{0, 1},
@@ -777,7 +776,7 @@ func TestDeleteFinishedUnstaking(t *testing.T) {
 		{
 			name:   "validator different output/operator",
 			detail: "validator with the different output and operator address",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{0, 1},
@@ -787,7 +786,7 @@ func TestDeleteFinishedUnstaking(t *testing.T) {
 		{
 			name:   "delegate same output/operator",
 			detail: "delegate with the same output and operator address",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{0, 1},
@@ -798,7 +797,7 @@ func TestDeleteFinishedUnstaking(t *testing.T) {
 		{
 			name:   "delegate different output/operator",
 			detail: "delegate with the different output and operator address",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{0, 1},
@@ -814,9 +813,9 @@ func TestDeleteFinishedUnstaking(t *testing.T) {
 			// create a test state machine
 			sm := newTestStateMachine(t)
 			// convenience variable for supply
-			supply := &types.Supply{}
+			supply := &Supply{}
 			// set the validator in state
-			require.NoError(t, sm.SetValidators([]*types.Validator{test.preset}, supply))
+			require.NoError(t, sm.SetValidators([]*Validator{test.preset}, supply))
 			// set the supply in state
 			require.NoError(t, sm.SetSupply(supply))
 			// set the validator as unstaking
@@ -833,7 +832,7 @@ func TestDeleteFinishedUnstaking(t *testing.T) {
 			// validate the addition to the account
 			require.Equal(t, test.preset.StakedAmount, balance)
 			// ensure unstaking key doesn't exist
-			got, err := sm.Get(types.KeyForUnstaking(sm.height, address))
+			got, err := sm.Get(KeyForUnstaking(sm.height, address))
 			require.NoError(t, err)
 			require.Len(t, got, 0)
 		})
@@ -844,14 +843,14 @@ func TestSetValidatorsPaused(t *testing.T) {
 	tests := []struct {
 		name    string
 		detail  string
-		preset  []*types.Validator
+		preset  []*Validator
 		chainId uint64
 		toPause [][]byte
 	}{
 		{
 			name:   "single validator pause",
 			detail: "single validator pause",
-			preset: []*types.Validator{{
+			preset: []*Validator{{
 				Address:    newTestAddressBytes(t),
 				Committees: []uint64{1},
 			}},
@@ -861,7 +860,7 @@ func TestSetValidatorsPaused(t *testing.T) {
 		{
 			name:   "unauthorized validator pause",
 			detail: "unauthorized validator pause",
-			preset: []*types.Validator{{
+			preset: []*Validator{{
 				Address:    newTestAddressBytes(t),
 				Committees: []uint64{1},
 			}},
@@ -871,7 +870,7 @@ func TestSetValidatorsPaused(t *testing.T) {
 		{
 			name:   "multi validator pause",
 			detail: "multi validator pause",
-			preset: []*types.Validator{{
+			preset: []*Validator{{
 				Address:    newTestAddressBytes(t),
 				Committees: []uint64{1},
 			}, {
@@ -884,7 +883,7 @@ func TestSetValidatorsPaused(t *testing.T) {
 		{
 			name:   "mixed authorized multi validator pause",
 			detail: "mixed authorized multi validator pause",
-			preset: []*types.Validator{{
+			preset: []*Validator{{
 				Address:    newTestAddressBytes(t),
 				Committees: []uint64{1},
 			}, {
@@ -901,7 +900,7 @@ func TestSetValidatorsPaused(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// preset the validator
 			if test.preset != nil {
-				supply := &types.Supply{}
+				supply := &Supply{}
 				require.NoError(t, sm.SetValidators(test.preset, supply))
 				require.NoError(t, sm.SetSupply(supply))
 			}
@@ -920,7 +919,7 @@ func TestSetValidatorsPaused(t *testing.T) {
 				// compare got vs expected
 				require.Equal(t, maxPauseBlocks, val.MaxPausedHeight)
 				// check for the paused key
-				bz, e := sm.Get(types.KeyForPaused(maxPauseBlocks, paused))
+				bz, e := sm.Get(KeyForPaused(maxPauseBlocks, paused))
 				require.NoError(t, e)
 				require.Len(t, bz, 1)
 			}
@@ -932,25 +931,25 @@ func TestSetValidatorPausedAndUnpaused(t *testing.T) {
 	tests := []struct {
 		name           string
 		detail         string
-		validator      *types.Validator
+		validator      *Validator
 		maxPauseHeight uint64
 	}{
 		{
 			name:           "pause height 1",
 			detail:         "this function creates a validator object and a key for the validator under the unstaking prefix",
-			validator:      &types.Validator{Address: newTestAddressBytes(t)},
+			validator:      &Validator{Address: newTestAddressBytes(t)},
 			maxPauseHeight: 1,
 		},
 		{
 			name:           "pause height 100",
 			detail:         "this function creates a validator object and a key for the validator under the unstaking prefix",
-			validator:      &types.Validator{Address: newTestAddressBytes(t)},
+			validator:      &Validator{Address: newTestAddressBytes(t)},
 			maxPauseHeight: 100,
 		},
 		{
 			name:           "pause height max",
 			detail:         "this function creates a validator object and a key for the validator under the unstaking prefix",
-			validator:      &types.Validator{Address: newTestAddressBytes(t)},
+			validator:      &Validator{Address: newTestAddressBytes(t)},
 			maxPauseHeight: math.MaxUint64,
 		},
 	}
@@ -967,7 +966,7 @@ func TestSetValidatorPausedAndUnpaused(t *testing.T) {
 			// compare got vs expected
 			require.Equal(t, test.maxPauseHeight, val.MaxPausedHeight)
 			// check for the paused key
-			bz, e := sm.Get(types.KeyForPaused(test.maxPauseHeight, address))
+			bz, e := sm.Get(KeyForPaused(test.maxPauseHeight, address))
 			require.NoError(t, e)
 			require.Len(t, bz, 1)
 			// execute the function 2
@@ -978,7 +977,7 @@ func TestSetValidatorPausedAndUnpaused(t *testing.T) {
 			// compare got vs expected
 			require.Zero(t, val.MaxPausedHeight)
 			// validate no paused key
-			bz, e = sm.Get(types.KeyForPaused(test.maxPauseHeight, address))
+			bz, e = sm.Get(KeyForPaused(test.maxPauseHeight, address))
 			require.NoError(t, e)
 			require.Len(t, bz, 0)
 		})
@@ -989,7 +988,7 @@ func TestGetAuthorizedSignersForValidator(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
-		preset   *types.Validator
+		preset   *Validator
 		address  []byte
 		expected [][]byte
 		error    string
@@ -1006,7 +1005,7 @@ func TestGetAuthorizedSignersForValidator(t *testing.T) {
 			name:    "custodial",
 			detail:  "same output and operator",
 			address: newTestAddressBytes(t),
-			preset: &types.Validator{
+			preset: &Validator{
 				Address: newTestAddressBytes(t),
 				Output:  newTestAddressBytes(t),
 			},
@@ -1018,7 +1017,7 @@ func TestGetAuthorizedSignersForValidator(t *testing.T) {
 			name:    "non-custodial",
 			detail:  "different output and operator",
 			address: newTestAddressBytes(t),
-			preset: &types.Validator{
+			preset: &Validator{
 				Address: newTestAddressBytes(t),
 				Output:  newTestAddressBytes(t, 1),
 			},

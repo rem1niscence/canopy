@@ -22,7 +22,6 @@ import (
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/fsm"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/julienschmidt/httprouter"
@@ -50,7 +49,7 @@ type Server struct {
 	config lib.Config
 
 	// poll is a map of PollResults keyed by the hash of the proposal
-	poll types.Poll
+	poll fsm.Poll
 
 	// Mutex for Poll handler
 	pollMux *sync.RWMutex
@@ -67,7 +66,7 @@ func NewServer(controller *controller.Controller, config lib.Config, logger lib.
 		controller: controller,
 		config:     config,
 		logger:     logger,
-		poll:       make(types.Poll),
+		poll:       make(fsm.Poll),
 		pollMux:    &sync.RWMutex{},
 	}
 }
@@ -129,7 +128,7 @@ func (s *Server) startRPC(router *httprouter.Router, port string) {
 // updatePollResults() updates the poll results based on the current token power
 func (s *Server) updatePollResults() {
 	for {
-		p := new(types.ActivePolls)
+		p := new(fsm.ActivePolls)
 		if err := func() (err error) {
 			if err = p.NewFromFile(s.config.DataDirPath); err != nil {
 				return
@@ -333,7 +332,7 @@ func (s *Server) getFeeFromState(w http.ResponseWriter, ptr *txRequest, messageN
 		}
 		// Error if fee below minimum
 		if ptr.Fee < minimumFee {
-			return types.ErrTxFeeBelowStateLimit()
+			return fsm.ErrTxFeeBelowStateLimit()
 		}
 		return nil
 	})

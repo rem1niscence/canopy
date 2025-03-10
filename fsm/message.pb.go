@@ -4,7 +4,7 @@
 // 	protoc        v3.19.1
 // source: message.proto
 
-package types
+package fsm
 
 import (
 	lib "github.com/canopy-network/canopy/lib"
@@ -1189,25 +1189,25 @@ func file_message_proto_rawDescGZIP() []byte {
 
 var file_message_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_message_proto_goTypes = []interface{}{
-	(*MessageSend)(nil),               // 0: types.MessageSend
-	(*MessageStake)(nil),              // 1: types.MessageStake
-	(*MessageEditStake)(nil),          // 2: types.MessageEditStake
-	(*MessageUnstake)(nil),            // 3: types.MessageUnstake
-	(*MessagePause)(nil),              // 4: types.MessagePause
-	(*MessageUnpause)(nil),            // 5: types.MessageUnpause
-	(*MessageChangeParameter)(nil),    // 6: types.MessageChangeParameter
-	(*MessageDAOTransfer)(nil),        // 7: types.MessageDAOTransfer
-	(*MessageCertificateResults)(nil), // 8: types.MessageCertificateResults
-	(*MessageSubsidy)(nil),            // 9: types.MessageSubsidy
-	(*MessageCreateOrder)(nil),        // 10: types.MessageCreateOrder
-	(*MessageEditOrder)(nil),          // 11: types.MessageEditOrder
-	(*MessageDeleteOrder)(nil),        // 12: types.MessageDeleteOrder
+	(*MessageSend)(nil),               // 0: MessageSend
+	(*MessageStake)(nil),              // 1: MessageStake
+	(*MessageEditStake)(nil),          // 2: MessageEditStake
+	(*MessageUnstake)(nil),            // 3: MessageUnstake
+	(*MessagePause)(nil),              // 4: MessagePause
+	(*MessageUnpause)(nil),            // 5: MessageUnpause
+	(*MessageChangeParameter)(nil),    // 6: MessageChangeParameter
+	(*MessageDAOTransfer)(nil),        // 7: MessageDAOTransfer
+	(*MessageCertificateResults)(nil), // 8: MessageCertificateResults
+	(*MessageSubsidy)(nil),            // 9: MessageSubsidy
+	(*MessageCreateOrder)(nil),        // 10: MessageCreateOrder
+	(*MessageEditOrder)(nil),          // 11: MessageEditOrder
+	(*MessageDeleteOrder)(nil),        // 12: MessageDeleteOrder
 	(*anypb.Any)(nil),                 // 13: google.protobuf.Any
-	(*lib.QuorumCertificate)(nil),     // 14: types.QuorumCertificate
+	(*lib.QuorumCertificate)(nil),     // 14: QuorumCertificate
 }
 var file_message_proto_depIdxs = []int32{
-	13, // 0: types.MessageChangeParameter.parameter_value:type_name -> google.protobuf.Any
-	14, // 1: types.MessageCertificateResults.qc:type_name -> types.QuorumCertificate
+	13, // 0: MessageChangeParameter.parameter_value:type_name -> google.protobuf.Any
+	14, // 1: MessageCertificateResults.qc:type_name -> QuorumCertificate
 	2,  // [2:2] is the sub-list for method output_type
 	2,  // [2:2] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/canopy-network/canopy/fsm"
 	"net/http"
 	"os"
 	"os/exec"
@@ -11,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/julienschmidt/httprouter"
@@ -125,12 +125,12 @@ func (s *Server) TransactionSend(w http.ResponseWriter, r *http.Request, _ httpr
 		}
 
 		// Retrieve the fee required for this type of transaction
-		if err = s.getFeeFromState(w, ptr, types.MessageSendName); err != nil {
+		if err = s.getFeeFromState(w, ptr, fsm.MessageSendName); err != nil {
 			return nil, err
 		}
 
 		// Create and return the transaction to be sent
-		return types.NewSendTransaction(p, toAddress, ptr.Amount, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
+		return fsm.NewSendTransaction(p, toAddress, ptr.Amount, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
 	})
 }
 
@@ -154,12 +154,12 @@ func (s *Server) TransactionStake(w http.ResponseWriter, r *http.Request, _ http
 			return nil, err
 		}
 		// Retrieve the fee required for this type of transaction
-		if err = s.getFeeFromState(w, ptr, types.MessageStakeName); err != nil {
+		if err = s.getFeeFromState(w, ptr, fsm.MessageStakeName); err != nil {
 			return nil, err
 		}
 
 		// Create and return the transaction to be sent
-		return types.NewStakeTx(p, pk.Bytes(), outputAddress, ptr.NetAddress, committees, ptr.Amount, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Delegate, ptr.EarlyWithdrawal, ptr.Memo)
+		return fsm.NewStakeTx(p, pk.Bytes(), outputAddress, ptr.NetAddress, committees, ptr.Amount, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Delegate, ptr.EarlyWithdrawal, ptr.Memo)
 	})
 }
 
@@ -178,11 +178,11 @@ func (s *Server) TransactionEditStake(w http.ResponseWriter, r *http.Request, _ 
 			return nil, err
 		}
 		// Retrieve the fee required for this type of transaction
-		if err = s.getFeeFromState(w, ptr, types.MessageEditStakeName); err != nil {
+		if err = s.getFeeFromState(w, ptr, fsm.MessageEditStakeName); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewEditStakeTx(p, crypto.NewAddress(ptr.Address), outputAddress, ptr.NetAddress, committees, ptr.Amount, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.EarlyWithdrawal, ptr.Memo)
+		return fsm.NewEditStakeTx(p, crypto.NewAddress(ptr.Address), outputAddress, ptr.NetAddress, committees, ptr.Amount, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.EarlyWithdrawal, ptr.Memo)
 	})
 }
 
@@ -191,11 +191,11 @@ func (s *Server) TransactionUnstake(w http.ResponseWriter, r *http.Request, _ ht
 	// Call the transaction handler with a callback that creates the transaction
 	s.txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessageUnstakeName); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageUnstakeName); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewUnstakeTx(p, crypto.NewAddress(ptr.Address), s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
+		return fsm.NewUnstakeTx(p, crypto.NewAddress(ptr.Address), s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
 	})
 }
 
@@ -204,11 +204,11 @@ func (s *Server) TransactionPause(w http.ResponseWriter, r *http.Request, _ http
 	// Call the transaction handler with a callback that creates the transaction
 	s.txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessagePauseName); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessagePauseName); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewPauseTx(p, crypto.NewAddress(ptr.Address), s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
+		return fsm.NewPauseTx(p, crypto.NewAddress(ptr.Address), s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
 	})
 }
 
@@ -217,11 +217,11 @@ func (s *Server) TransactionUnpause(w http.ResponseWriter, r *http.Request, _ ht
 	// Call the transaction handler with a callback that creates the transaction
 	s.txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessageUnpauseName); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageUnpauseName); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewUnpauseTx(p, crypto.NewAddress(ptr.Address), s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
+		return fsm.NewUnpauseTx(p, crypto.NewAddress(ptr.Address), s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
 	})
 }
 
@@ -230,15 +230,15 @@ func (s *Server) TransactionChangeParam(w http.ResponseWriter, r *http.Request, 
 	// Call the transaction handler with a callback that creates the transaction
 	s.txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		// Convert ParamSpace string to the proper ParamSpace name
-		ptr.ParamSpace = types.FormatParamSpace(ptr.ParamSpace)
+		ptr.ParamSpace = fsm.FormatParamSpace(ptr.ParamSpace)
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessageChangeParameterName); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageChangeParameterName); err != nil {
 			return nil, err
 		}
 		// Handle upgrade enforcement
-		if ptr.ParamKey == types.ParamProtocolVersion {
+		if ptr.ParamKey == fsm.ParamProtocolVersion {
 			// Create and return the transaction to be sent
-			return types.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
+			return fsm.NewChangeParamTxString(p, ptr.ParamSpace, ptr.ParamKey, ptr.ParamValue, ptr.StartBlock, ptr.EndBlock, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
 		}
 
 		// Parse the parameter value to a uint64 for non-string parameters
@@ -247,7 +247,7 @@ func (s *Server) TransactionChangeParam(w http.ResponseWriter, r *http.Request, 
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
+		return fsm.NewChangeParamTxUint64(p, ptr.ParamSpace, ptr.ParamKey, paramValue, ptr.StartBlock, ptr.EndBlock, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
 	})
 }
 
@@ -256,11 +256,11 @@ func (s *Server) TransactionDAOTransfer(w http.ResponseWriter, r *http.Request, 
 	// Call the transaction handler with a callback that creates the transaction
 	s.txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessageDAOTransferName); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageDAOTransferName); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewDAOTransferTx(p, ptr.Amount, ptr.StartBlock, ptr.EndBlock, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
+		return fsm.NewDAOTransferTx(p, ptr.Amount, ptr.StartBlock, ptr.EndBlock, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
 	})
 }
 
@@ -275,11 +275,11 @@ func (s *Server) TransactionSubsidy(w http.ResponseWriter, r *http.Request, _ ht
 			chainId = c[0]
 		}
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessageSubsidyName); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageSubsidyName); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewSubsidyTx(p, ptr.Amount, chainId, ptr.OpCode, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
+		return fsm.NewSubsidyTx(p, ptr.Amount, chainId, ptr.OpCode, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
 	})
 }
 
@@ -294,11 +294,11 @@ func (s *Server) TransactionCreateOrder(w http.ResponseWriter, r *http.Request, 
 			chainId = c[0]
 		}
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessageCreateOrderName); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageCreateOrderName); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewCreateOrderTx(p, ptr.Amount, ptr.ReceiveAmount, chainId, ptr.ReceiveAddress, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
+		return fsm.NewCreateOrderTx(p, ptr.Amount, ptr.ReceiveAmount, chainId, ptr.ReceiveAddress, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
 	})
 }
 
@@ -312,11 +312,11 @@ func (s *Server) TransactionEditOrder(w http.ResponseWriter, r *http.Request, _ 
 		if c, err := stringToCommittees(ptr.Committees); err == nil {
 			chainId = c[0]
 		}
-		if err := s.getFeeFromState(w, ptr, types.MessageEditOrderName); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageEditOrderName); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewEditOrderTx(p, ptr.OrderId, ptr.Amount, ptr.ReceiveAmount, chainId, ptr.ReceiveAddress, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
+		return fsm.NewEditOrderTx(p, ptr.OrderId, ptr.Amount, ptr.ReceiveAmount, chainId, ptr.ReceiveAddress, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
 	})
 }
 
@@ -331,11 +331,11 @@ func (s *Server) TransactionDeleteOrder(w http.ResponseWriter, r *http.Request, 
 			chainId = c[0]
 		}
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessageDeleteOrderName); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageDeleteOrderName); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewDeleteOrderTx(p, ptr.OrderId, chainId, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
+		return fsm.NewDeleteOrderTx(p, ptr.OrderId, chainId, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight(), ptr.Memo)
 	})
 }
 
@@ -344,18 +344,18 @@ func (s *Server) TransactionLockOrder(w http.ResponseWriter, r *http.Request, _ 
 	// Call the transaction handler with a callback that creates the transaction
 	s.txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessageSendName, true); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageSendName, true); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewLockOrderTx(p, lib.LockOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
+		return fsm.NewLockOrderTx(p, lib.LockOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
 	})
 }
 
 func (s *Server) TransactionCloseOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	s.txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessageSendName, true); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageSendName, true); err != nil {
 			return nil, err
 		}
 		// If the remote callbacks not yet set
@@ -377,7 +377,7 @@ func (s *Server) TransactionCloseOrder(w http.ResponseWriter, r *http.Request, _
 		// Create the close order structure
 		co := lib.CloseOrder{OrderId: ptr.OrderId, CloseOrder: true}
 		// Exit with the new CloseOrderTx
-		return types.NewCloseOrderTx(p, co, crypto.NewAddress(order.SellerReceiveAddress), order.RequestedAmount, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
+		return fsm.NewCloseOrderTx(p, co, crypto.NewAddress(order.SellerReceiveAddress), order.RequestedAmount, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
 	})
 }
 
@@ -386,11 +386,11 @@ func (s *Server) TransactionStartPoll(w http.ResponseWriter, r *http.Request, _ 
 	// Call the transaction handler with a callback that creates the transaction
 	s.txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessageSendName); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageSendName); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewStartPollTransaction(p, ptr.PollJSON, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
+		return fsm.NewStartPollTransaction(p, ptr.PollJSON, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
 	})
 }
 
@@ -399,11 +399,11 @@ func (s *Server) TransactionVotePoll(w http.ResponseWriter, r *http.Request, _ h
 	// Call the transaction handler with a callback that creates the transaction
 	s.txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		// Retrieve the fee required for this type of transaction
-		if err := s.getFeeFromState(w, ptr, types.MessageSendName); err != nil {
+		if err := s.getFeeFromState(w, ptr, fsm.MessageSendName); err != nil {
 			return nil, err
 		}
 		// Create and return the transaction to be sent
-		return types.NewVotePollTransaction(p, ptr.PollJSON, ptr.PollApprove, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
+		return fsm.NewVotePollTransaction(p, ptr.PollJSON, ptr.PollApprove, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
 	})
 }
 
@@ -510,7 +510,7 @@ func (s *Server) txHandler(w http.ResponseWriter, r *http.Request, callback func
 // AddVote adds a vote to a proposal
 func (s *Server) AddVote(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	// Initialize a map to hold government proposals.
-	proposals := make(types.GovProposals)
+	proposals := make(fsm.GovProposals)
 	// Load existing proposals from a file
 	if err := proposals.NewFromFile(s.config.DataDirPath); err != nil {
 		write(w, err, http.StatusInternalServerError)
@@ -538,7 +538,7 @@ func (s *Server) AddVote(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 // DelVote removes a vote from a proposal
 func (s *Server) DelVote(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	// Initialize a map to hold government proposals.
-	proposals := make(types.GovProposals)
+	proposals := make(fsm.GovProposals)
 	// Load existing proposals from a file
 	if err := proposals.NewFromFile(s.config.DataDirPath); err != nil {
 		write(w, err, http.StatusInternalServerError)

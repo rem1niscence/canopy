@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
@@ -11,11 +10,11 @@ import (
 func TestHandleMessage(t *testing.T) {
 	const amount = uint64(100)
 	// pre-create a 'change parameter' proposal to use during testing
-	a, err := lib.NewAny(&lib.StringWrapper{Value: types.NewProtocolVersion(3, 2)})
+	a, err := lib.NewAny(&lib.StringWrapper{Value: NewProtocolVersion(3, 2)})
 	require.NoError(t, err)
-	msgChangeParam := &types.MessageChangeParameter{
+	msgChangeParam := &MessageChangeParameter{
 		ParameterSpace: "cons",
-		ParameterKey:   types.ParamProtocolVersion,
+		ParameterKey:   ParamProtocolVersion,
 		ParameterValue: a,
 		StartHeight:    1,
 		EndHeight:      2,
@@ -36,7 +35,7 @@ func TestHandleMessage(t *testing.T) {
 			preset: func(sm StateMachine) {
 				require.NoError(t, sm.AccountAdd(newTestAddress(t), 100))
 			},
-			msg: &types.MessageSend{
+			msg: &MessageSend{
 				FromAddress: newTestAddressBytes(t),
 				ToAddress:   newTestAddressBytes(t, 1),
 				Amount:      amount,
@@ -58,7 +57,7 @@ func TestHandleMessage(t *testing.T) {
 			preset: func(sm StateMachine) {
 				require.NoError(t, sm.AccountAdd(newTestAddress(t), 100))
 			},
-			msg: &types.MessageStake{
+			msg: &MessageStake{
 				PublicKey:     newTestPublicKeyBytes(t),
 				Amount:        amount,
 				Committees:    []uint64{lib.CanopyChainId},
@@ -86,7 +85,7 @@ func TestHandleMessage(t *testing.T) {
 				// set account balance
 				require.NoError(t, sm.AccountAdd(newTestAddress(t), 1))
 				// create validator
-				v := &types.Validator{
+				v := &Validator{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
 					Committees:   []uint64{lib.CanopyChainId},
@@ -101,7 +100,7 @@ func TestHandleMessage(t *testing.T) {
 				// set validator committees
 				require.NoError(t, sm.SetCommittees(crypto.NewAddress(v.Address), v.StakedAmount, v.Committees))
 			},
-			msg: &types.MessageEditStake{
+			msg: &MessageEditStake{
 				Address:       newTestAddressBytes(t),
 				Amount:        amount + 1,
 				Committees:    []uint64{lib.CanopyChainId},
@@ -125,7 +124,7 @@ func TestHandleMessage(t *testing.T) {
 			detail: "basic 'happy path' handling for message unstake",
 			preset: func(sm StateMachine) {
 				// create validator
-				v := &types.Validator{
+				v := &Validator{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
 					Committees:   []uint64{lib.CanopyChainId},
@@ -133,7 +132,7 @@ func TestHandleMessage(t *testing.T) {
 				// set the validator in state
 				require.NoError(t, sm.SetValidator(v))
 			},
-			msg: &types.MessageUnstake{Address: newTestAddressBytes(t)},
+			msg: &MessageUnstake{Address: newTestAddressBytes(t)},
 			validate: func(sm StateMachine) {
 				// ensure the validator is unstaking
 				val, e := sm.GetValidator(newTestAddress(t))
@@ -146,7 +145,7 @@ func TestHandleMessage(t *testing.T) {
 			detail: "basic 'happy path' handling for message pause",
 			preset: func(sm StateMachine) {
 				// create validator
-				v := &types.Validator{
+				v := &Validator{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
 					Committees:   []uint64{lib.CanopyChainId},
@@ -154,7 +153,7 @@ func TestHandleMessage(t *testing.T) {
 				// set the validator in state
 				require.NoError(t, sm.SetValidator(v))
 			},
-			msg: &types.MessagePause{Address: newTestAddressBytes(t)},
+			msg: &MessagePause{Address: newTestAddressBytes(t)},
 			validate: func(sm StateMachine) {
 				// ensure the validator is paused
 				val, e := sm.GetValidator(newTestAddress(t))
@@ -167,7 +166,7 @@ func TestHandleMessage(t *testing.T) {
 			detail: "basic 'happy path' handling for message unpause",
 			preset: func(sm StateMachine) {
 				// create validator
-				v := &types.Validator{
+				v := &Validator{
 					Address:         newTestAddressBytes(t),
 					StakedAmount:    amount,
 					Committees:      []uint64{lib.CanopyChainId},
@@ -176,7 +175,7 @@ func TestHandleMessage(t *testing.T) {
 				// set the validator in state
 				require.NoError(t, sm.SetValidator(v))
 			},
-			msg: &types.MessageUnpause{Address: newTestAddressBytes(t)},
+			msg: &MessageUnpause{Address: newTestAddressBytes(t)},
 			validate: func(sm StateMachine) {
 				// ensure the validator is paused
 				val, e := sm.GetValidator(newTestAddress(t))
@@ -193,7 +192,7 @@ func TestHandleMessage(t *testing.T) {
 				// ensure the validator is paused
 				consParams, e := sm.GetParamsCons()
 				require.NoError(t, e)
-				require.Equal(t, types.NewProtocolVersion(3, 2), consParams.ProtocolVersion)
+				require.Equal(t, NewProtocolVersion(3, 2), consParams.ProtocolVersion)
 			},
 		},
 		{
@@ -202,7 +201,7 @@ func TestHandleMessage(t *testing.T) {
 			preset: func(sm StateMachine) {
 				require.NoError(t, sm.PoolAdd(lib.DAOPoolID, amount))
 			},
-			msg: &types.MessageDAOTransfer{
+			msg: &MessageDAOTransfer{
 				Address:     newTestAddressBytes(t),
 				Amount:      amount,
 				StartHeight: 1,
@@ -225,7 +224,7 @@ func TestHandleMessage(t *testing.T) {
 			preset: func(sm StateMachine) {
 				require.NoError(t, sm.AccountAdd(newTestAddress(t), amount))
 			},
-			msg: &types.MessageSubsidy{
+			msg: &MessageSubsidy{
 				Address: newTestAddressBytes(t),
 				ChainId: lib.CanopyChainId,
 				Amount:  amount,
@@ -255,7 +254,7 @@ func TestHandleMessage(t *testing.T) {
 				// set the params back in state
 				require.NoError(t, sm.SetParamsVal(params))
 			},
-			msg: &types.MessageCreateOrder{
+			msg: &MessageCreateOrder{
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        amount,
 				RequestedAmount:      1000,
@@ -268,7 +267,7 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, e)
 				require.Zero(t, got)
 				// ensure the pool was added to
-				got, e = sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
+				got, e = sm.GetPoolBalance(lib.CanopyChainId + EscrowPoolAddend)
 				require.NoError(t, e)
 				require.Equal(t, amount, got)
 				// ensure the order was created
@@ -291,7 +290,7 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, sm.SetParamsVal(params))
 				// pre-set an order to edit
 				// add to the pool
-				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+types.EscrowPoolAddend, amount))
+				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+EscrowPoolAddend, amount))
 				// save the order in state
 				_, err = sm.CreateOrder(&lib.SellOrder{
 					Committee:            lib.CanopyChainId,
@@ -302,7 +301,7 @@ func TestHandleMessage(t *testing.T) {
 				}, lib.CanopyChainId)
 				require.NoError(t, err)
 			},
-			msg: &types.MessageEditOrder{
+			msg: &MessageEditOrder{
 				OrderId:              0,
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        amount * 2,
@@ -315,7 +314,7 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, e)
 				require.Zero(t, got)
 				// ensure the pool was added to
-				got, e = sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
+				got, e = sm.GetPoolBalance(lib.CanopyChainId + EscrowPoolAddend)
 				require.NoError(t, e)
 				require.Equal(t, amount*2, got)
 				// ensure the order was edited
@@ -329,7 +328,7 @@ func TestHandleMessage(t *testing.T) {
 			detail: "basic 'happy path' handling for message delete order",
 			preset: func(sm StateMachine) {
 				// add to the pool
-				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+types.EscrowPoolAddend, amount))
+				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+EscrowPoolAddend, amount))
 				// save the order in state
 				_, err = sm.CreateOrder(&lib.SellOrder{
 					Committee:            lib.CanopyChainId,
@@ -340,7 +339,7 @@ func TestHandleMessage(t *testing.T) {
 				}, lib.CanopyChainId)
 				require.NoError(t, err)
 			},
-			msg: &types.MessageDeleteOrder{
+			msg: &MessageDeleteOrder{
 				OrderId: 0,
 				ChainId: lib.CanopyChainId,
 			},
@@ -350,7 +349,7 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, e)
 				require.Equal(t, amount, got)
 				// ensure the pool was added to
-				got, e = sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
+				got, e = sm.GetPoolBalance(lib.CanopyChainId + EscrowPoolAddend)
 				require.NoError(t, e)
 				require.Zero(t, got)
 				// ensure the order was deleted
@@ -388,67 +387,67 @@ func TestGetFeeForMessage(t *testing.T) {
 		{
 			name:   "msg send",
 			detail: "evaluates the function for message send",
-			msg:    &types.MessageSend{},
+			msg:    &MessageSend{},
 		},
 		{
 			name:   "msg stake",
 			detail: "evaluates the function for message stake",
-			msg:    &types.MessageStake{},
+			msg:    &MessageStake{},
 		},
 		{
 			name:   "msg edit-stake",
 			detail: "evaluates the function for message edit-stake",
-			msg:    &types.MessageEditStake{},
+			msg:    &MessageEditStake{},
 		},
 		{
 			name:   "msg unstake",
 			detail: "evaluates the function for message unstake",
-			msg:    &types.MessageUnstake{},
+			msg:    &MessageUnstake{},
 		},
 		{
 			name:   "msg pause",
 			detail: "evaluates the function for message pause",
-			msg:    &types.MessagePause{},
+			msg:    &MessagePause{},
 		},
 		{
 			name:   "msg unpause",
 			detail: "evaluates the function for message unpause",
-			msg:    &types.MessageUnpause{},
+			msg:    &MessageUnpause{},
 		},
 		{
 			name:   "msg change param",
 			detail: "evaluates the function for message change param",
-			msg:    &types.MessageChangeParameter{},
+			msg:    &MessageChangeParameter{},
 		},
 		{
 			name:   "msg dao transfer",
 			detail: "evaluates the function for message dao transfer",
-			msg:    &types.MessageDAOTransfer{},
+			msg:    &MessageDAOTransfer{},
 		},
 		{
 			name:   "msg certificate results",
 			detail: "evaluates the function for message certificate results",
-			msg:    &types.MessageCertificateResults{},
+			msg:    &MessageCertificateResults{},
 		},
 		{
 			name:   "msg subsidy",
 			detail: "evaluates the function for message subsidy",
-			msg:    &types.MessageSubsidy{},
+			msg:    &MessageSubsidy{},
 		},
 		{
 			name:   "msg create order",
 			detail: "evaluates the function for message create order",
-			msg:    &types.MessageCreateOrder{},
+			msg:    &MessageCreateOrder{},
 		},
 		{
 			name:   "msg edit order",
 			detail: "evaluates the function for message edit order",
-			msg:    &types.MessageEditOrder{},
+			msg:    &MessageEditOrder{},
 		},
 		{
 			name:   "msg delete order",
 			detail: "evaluates the function for message delete order",
-			msg:    &types.MessageDeleteOrder{},
+			msg:    &MessageDeleteOrder{},
 		},
 	}
 	for _, test := range tests {
@@ -461,31 +460,31 @@ func TestGetFeeForMessage(t *testing.T) {
 			// define expected
 			expected := func() uint64 {
 				switch test.msg.(type) {
-				case *types.MessageSend:
+				case *MessageSend:
 					return feeParams.SendFee
-				case *types.MessageStake:
+				case *MessageStake:
 					return feeParams.StakeFee
-				case *types.MessageEditStake:
+				case *MessageEditStake:
 					return feeParams.EditStakeFee
-				case *types.MessageUnstake:
+				case *MessageUnstake:
 					return feeParams.UnstakeFee
-				case *types.MessagePause:
+				case *MessagePause:
 					return feeParams.PauseFee
-				case *types.MessageUnpause:
+				case *MessageUnpause:
 					return feeParams.UnpauseFee
-				case *types.MessageChangeParameter:
+				case *MessageChangeParameter:
 					return feeParams.ChangeParameterFee
-				case *types.MessageDAOTransfer:
+				case *MessageDAOTransfer:
 					return feeParams.DaoTransferFee
-				case *types.MessageCertificateResults:
+				case *MessageCertificateResults:
 					return feeParams.CertificateResultsFee
-				case *types.MessageSubsidy:
+				case *MessageSubsidy:
 					return feeParams.SubsidyFee
-				case *types.MessageCreateOrder:
+				case *MessageCreateOrder:
 					return feeParams.CreateOrderFee
-				case *types.MessageEditOrder:
+				case *MessageEditOrder:
 					return feeParams.EditOrderFee
-				case *types.MessageDeleteOrder:
+				case *MessageDeleteOrder:
 					return feeParams.DeleteOrderFee
 				default:
 					panic("unknown msg")
@@ -511,67 +510,67 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 		{
 			name:     "msg send",
 			detail:   "retrieves the authorized signers for message send",
-			msg:      &types.MessageSend{FromAddress: newTestAddressBytes(t)},
+			msg:      &MessageSend{FromAddress: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg stake",
 			detail:   "retrieves the authorized signers for message stake",
-			msg:      &types.MessageStake{PublicKey: newTestPublicKeyBytes(t), OutputAddress: newTestAddressBytes(t)},
+			msg:      &MessageStake{PublicKey: newTestPublicKeyBytes(t), OutputAddress: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t), newTestAddressBytes(t)},
 		}, {
 			name:     "msg edit-stake",
 			detail:   "retrieves the authorized signers for message stake",
-			msg:      &types.MessageEditStake{Address: newTestAddressBytes(t)},
+			msg:      &MessageEditStake{Address: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t), newTestAddressBytes(t, 1)},
 		}, {
 			name:     "msg unstake",
 			detail:   "retrieves the authorized signers for message unstake",
-			msg:      &types.MessageUnstake{Address: newTestAddressBytes(t)},
+			msg:      &MessageUnstake{Address: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t), newTestAddressBytes(t, 1)},
 		}, {
 			name:     "msg pause",
 			detail:   "retrieves the authorized signers for message pause",
-			msg:      &types.MessagePause{Address: newTestAddressBytes(t)},
+			msg:      &MessagePause{Address: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t), newTestAddressBytes(t, 1)},
 		}, {
 			name:     "msg unpause",
 			detail:   "retrieves the authorized signers for message unpause",
-			msg:      &types.MessageUnpause{Address: newTestAddressBytes(t)},
+			msg:      &MessageUnpause{Address: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t), newTestAddressBytes(t, 1)},
 		}, {
 			name:     "msg change param",
 			detail:   "retrieves the authorized signers for message change param",
-			msg:      &types.MessageChangeParameter{Signer: newTestAddressBytes(t)},
+			msg:      &MessageChangeParameter{Signer: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg dao transfer",
 			detail:   "retrieves the authorized signers for message dao transfer",
-			msg:      &types.MessageDAOTransfer{Address: newTestAddressBytes(t)},
+			msg:      &MessageDAOTransfer{Address: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg subsidy",
 			detail:   "retrieves the authorized signers for message subsidy",
-			msg:      &types.MessageSubsidy{Address: newTestAddressBytes(t)},
+			msg:      &MessageSubsidy{Address: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg create order",
 			detail:   "retrieves the authorized signers for message create order",
-			msg:      &types.MessageCreateOrder{ChainId: lib.CanopyChainId, SellersSendAddress: newTestAddressBytes(t)},
+			msg:      &MessageCreateOrder{ChainId: lib.CanopyChainId, SellersSendAddress: newTestAddressBytes(t)},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg edit order",
 			detail:   "retrieves the authorized signers for message edit order",
-			msg:      &types.MessageEditOrder{ChainId: lib.CanopyChainId},
+			msg:      &MessageEditOrder{ChainId: lib.CanopyChainId},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:     "msg delete order",
 			detail:   "retrieves the authorized signers for message delete order",
-			msg:      &types.MessageEditOrder{ChainId: lib.CanopyChainId},
+			msg:      &MessageEditOrder{ChainId: lib.CanopyChainId},
 			expected: [][]byte{newTestAddressBytes(t)},
 		}, {
 			name:   "msg certificate results",
 			detail: "retrieves the authorized signers for message delete order",
-			msg: &types.MessageCertificateResults{
+			msg: &MessageCertificateResults{
 				Qc: &lib.QuorumCertificate{
 					Header:      &lib.View{ChainId: lib.CanopyChainId, Height: 1},
 					ProposerKey: newTestPublicKeyBytes(t),
@@ -587,7 +586,7 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 			// set the state machine height at 1 for the 'time machine' call
 			sm.height = 1
 			// preset a validator
-			require.NoError(t, sm.SetValidator(&types.Validator{
+			require.NoError(t, sm.SetValidator(&Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				StakedAmount: 100,
@@ -617,7 +616,7 @@ func TestHandleMessageSend(t *testing.T) {
 		detail         string
 		presetSender   uint64
 		presetReceiver uint64
-		msg            *types.MessageSend
+		msg            *MessageSend
 		error          string
 	}{
 		{
@@ -625,7 +624,7 @@ func TestHandleMessageSend(t *testing.T) {
 			detail:         "the sender doesn't have enough tokens",
 			presetSender:   1,
 			presetReceiver: 0,
-			msg: &types.MessageSend{
+			msg: &MessageSend{
 				FromAddress: newTestAddressBytes(t),
 				ToAddress:   newTestAddressBytes(t, 1),
 				Amount:      2,
@@ -637,7 +636,7 @@ func TestHandleMessageSend(t *testing.T) {
 			detail:         "the sender sends all of its tokens (1) to the recipient",
 			presetSender:   1,
 			presetReceiver: 0,
-			msg: &types.MessageSend{
+			msg: &MessageSend{
 				FromAddress: newTestAddressBytes(t),
 				ToAddress:   newTestAddressBytes(t, 1),
 				Amount:      1,
@@ -648,7 +647,7 @@ func TestHandleMessageSend(t *testing.T) {
 			detail:         "the sender sends one of its tokens to the recipient",
 			presetSender:   2,
 			presetReceiver: 0,
-			msg: &types.MessageSend{
+			msg: &MessageSend{
 				FromAddress: newTestAddressBytes(t),
 				ToAddress:   newTestAddressBytes(t, 1),
 				Amount:      1,
@@ -659,7 +658,7 @@ func TestHandleMessageSend(t *testing.T) {
 			detail:         "the sender sends 1 of its tokens to the recipient, who adds it to their existing balance",
 			presetSender:   2,
 			presetReceiver: 1,
-			msg: &types.MessageSend{
+			msg: &MessageSend{
 				FromAddress: newTestAddressBytes(t),
 				ToAddress:   newTestAddressBytes(t, 1),
 				Amount:      1,
@@ -704,29 +703,29 @@ func TestHandleMessageStake(t *testing.T) {
 		detail          string
 		presetSender    uint64
 		presetValidator bool
-		msg             *types.MessageStake
-		expected        *types.Validator
+		msg             *MessageStake
+		expected        *Validator
 		error           string
 	}{
 		{
 			name:   "invalid public key",
 			detail: "the sender public key is invalid",
-			msg:    &types.MessageStake{PublicKey: newTestAddressBytes(t)},
+			msg:    &MessageStake{PublicKey: newTestAddressBytes(t)},
 			error:  "public key is invalid",
 		},
 		{
 			name:            "invalid net address",
 			detail:          "the validator net address is invalid",
-			msg:             &types.MessageStake{PublicKey: newTestPublicKeyBytes(t)},
-			expected:        &types.Validator{Address: newTestAddressBytes(t)},
+			msg:             &MessageStake{PublicKey: newTestPublicKeyBytes(t)},
+			expected:        &Validator{Address: newTestAddressBytes(t)},
 			presetValidator: true,
 			error:           "net address has invalid length",
 		},
 		{
 			name:            "validator already exists",
 			detail:          "the validator already exists in state",
-			msg:             &types.MessageStake{PublicKey: newTestPublicKeyBytes(t), NetAddress: "tcp://example.com"},
-			expected:        &types.Validator{Address: newTestAddressBytes(t), NetAddress: "tcp://example.com"},
+			msg:             &MessageStake{PublicKey: newTestPublicKeyBytes(t), NetAddress: "tcp://example.com"},
+			expected:        &Validator{Address: newTestAddressBytes(t), NetAddress: "tcp://example.com"},
 			presetValidator: true,
 			error:           "validator exists",
 		},
@@ -734,7 +733,7 @@ func TestHandleMessageStake(t *testing.T) {
 			name:         "insufficient amount",
 			detail:       "the sender doesn't have enough tokens",
 			presetSender: 0,
-			msg: &types.MessageStake{
+			msg: &MessageStake{
 				PublicKey:  newTestPublicKeyBytes(t),
 				NetAddress: "tcp://example.com",
 				Amount:     1,
@@ -745,7 +744,7 @@ func TestHandleMessageStake(t *testing.T) {
 			name:         "stake all funds as committee member",
 			detail:       "the sender stakes all funds as committee member",
 			presetSender: 1,
-			msg: &types.MessageStake{
+			msg: &MessageStake{
 				PublicKey:     newTestPublicKeyBytes(t),
 				Amount:        1,
 				Committees:    []uint64{0, 1},
@@ -755,7 +754,7 @@ func TestHandleMessageStake(t *testing.T) {
 				Compound:      true,
 				Signer:        newTestAddressBytes(t),
 			},
-			expected: &types.Validator{
+			expected: &Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				NetAddress:   "tcp://example.com",
@@ -770,7 +769,7 @@ func TestHandleMessageStake(t *testing.T) {
 			name:         "stake partial funds as committee member",
 			detail:       "the sender stakes partial funds as committee member",
 			presetSender: 2,
-			msg: &types.MessageStake{
+			msg: &MessageStake{
 				PublicKey:     newTestPublicKeyBytes(t),
 				Amount:        1,
 				Committees:    []uint64{0, 1},
@@ -780,7 +779,7 @@ func TestHandleMessageStake(t *testing.T) {
 				Compound:      true,
 				Signer:        newTestAddressBytes(t),
 			},
-			expected: &types.Validator{
+			expected: &Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				NetAddress:   "tcp://example.com",
@@ -795,7 +794,7 @@ func TestHandleMessageStake(t *testing.T) {
 			name:         "stake all funds as delegate",
 			detail:       "the sender stakes all funds as delegate",
 			presetSender: 1,
-			msg: &types.MessageStake{
+			msg: &MessageStake{
 				PublicKey:     newTestPublicKeyBytes(t),
 				Amount:        1,
 				Committees:    []uint64{0, 1},
@@ -804,7 +803,7 @@ func TestHandleMessageStake(t *testing.T) {
 				Compound:      true,
 				Signer:        newTestAddressBytes(t),
 			},
-			expected: &types.Validator{
+			expected: &Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				StakedAmount: 1,
@@ -818,7 +817,7 @@ func TestHandleMessageStake(t *testing.T) {
 			name:         "stake partial funds as delegate",
 			detail:       "the sender stakes partial funds as delegate",
 			presetSender: 2,
-			msg: &types.MessageStake{
+			msg: &MessageStake{
 				PublicKey:     newTestPublicKeyBytes(t),
 				Amount:        1,
 				Committees:    []uint64{0, 1},
@@ -827,7 +826,7 @@ func TestHandleMessageStake(t *testing.T) {
 				Compound:      true,
 				Signer:        newTestAddressBytes(t),
 			},
-			expected: &types.Validator{
+			expected: &Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				StakedAmount: 1,
@@ -897,7 +896,7 @@ func TestHandleMessageStake(t *testing.T) {
 					page, e := sm.GetDelegatesPaginated(lib.PageParams{}, id)
 					require.NoError(t, e)
 					// extract the list from the page
-					list := (page.Results).(*types.ValidatorPage)
+					list := (page.Results).(*ValidatorPage)
 					// ensure the list count is correct
 					require.Len(t, *list, 1)
 					// ensure the expected validator is a member
@@ -909,7 +908,7 @@ func TestHandleMessageStake(t *testing.T) {
 					page, e := sm.GetCommitteePaginated(lib.PageParams{}, id)
 					require.NoError(t, e)
 					// extract the list from the page
-					list := (page.Results).(*types.ValidatorPage)
+					list := (page.Results).(*ValidatorPage)
 					// ensure the list count is correct
 					require.Len(t, *list, 1)
 					// ensure the expected validator is a member
@@ -939,43 +938,43 @@ func TestHandleMessageEditStake(t *testing.T) {
 		name              string
 		detail            string
 		presetSender      uint64
-		presetValidator   *types.Validator
-		msg               *types.MessageEditStake
-		expectedValidator *types.Validator
-		expectedSupply    *types.Supply
+		presetValidator   *Validator
+		msg               *MessageEditStake
+		expectedValidator *Validator
+		expectedSupply    *Supply
 		error             string
 	}{
 		{
 			name:   "validator doesn't exist",
 			detail: "validator does not exist to edit it",
-			msg:    &types.MessageEditStake{Address: newTestAddressBytes(t)},
+			msg:    &MessageEditStake{Address: newTestAddressBytes(t)},
 			error:  "validator does not exist",
 		},
 		{
 			name:   "net address",
 			detail: "the validator's net address has an invalid length",
-			presetValidator: &types.Validator{
+			presetValidator: &Validator{
 				Address:         newTestAddressBytes(t),
 				UnstakingHeight: 1,
 			},
-			msg:   &types.MessageEditStake{Address: newTestAddressBytes(t)},
+			msg:   &MessageEditStake{Address: newTestAddressBytes(t)},
 			error: "net address has invalid length",
 		},
 		{
 			name:   "unstaking",
 			detail: "the validator is unstaking and cannot be edited",
-			presetValidator: &types.Validator{
+			presetValidator: &Validator{
 				Address:         newTestAddressBytes(t),
 				NetAddress:      "tcp://example.com",
 				UnstakingHeight: 1,
 			},
-			msg:   &types.MessageEditStake{Address: newTestAddressBytes(t), NetAddress: "tcp://example.com"},
+			msg:   &MessageEditStake{Address: newTestAddressBytes(t), NetAddress: "tcp://example.com"},
 			error: "unstaking",
 		},
 		{
 			name:   "unauthorized output change",
 			detail: "the sender is unable to change the output address",
-			presetValidator: &types.Validator{
+			presetValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				NetAddress:   "tcp://example.com",
@@ -984,7 +983,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Output:       newTestAddressBytes(t),
 				Compound:     true,
 			},
-			msg: &types.MessageEditStake{
+			msg: &MessageEditStake{
 				Address:       newTestAddressBytes(t),
 				Amount:        2,
 				Committees:    []uint64{0, 1},
@@ -997,7 +996,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 		{
 			name:   "insufficient funds",
 			detail: "the sender doesn't have enough funds to complete the edit stake",
-			presetValidator: &types.Validator{
+			presetValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				NetAddress:   "tcp://example.com",
@@ -1006,7 +1005,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Output:       newTestAddressBytes(t),
 				Compound:     true,
 			},
-			msg: &types.MessageEditStake{
+			msg: &MessageEditStake{
 				Address:       newTestAddressBytes(t),
 				Amount:        2,
 				Committees:    []uint64{0, 1},
@@ -1019,7 +1018,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 		{
 			name:   "edit stake, same balance, same committees",
 			detail: "the validator is updated but the balance and committees remains the same",
-			presetValidator: &types.Validator{
+			presetValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				NetAddress:   "tcp://example.com",
@@ -1028,7 +1027,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Output:       newTestAddressBytes(t),
 				Compound:     true,
 			},
-			msg: &types.MessageEditStake{
+			msg: &MessageEditStake{
 				Address:       newTestAddressBytes(t),
 				Amount:        1,
 				Committees:    []uint64{0, 1},
@@ -1037,7 +1036,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Compound:      false,
 				Signer:        newTestAddressBytes(t),
 			},
-			expectedValidator: &types.Validator{
+			expectedValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				NetAddress:   "tcp://example2.com",
@@ -1046,10 +1045,10 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Output:       newTestAddressBytes(t, 1),
 				Compound:     false,
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:  1,
 				Staked: 1,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: 1,
@@ -1064,31 +1063,31 @@ func TestHandleMessageEditStake(t *testing.T) {
 		{
 			name:   "edit stake, same balance, same delegations",
 			detail: "the validator is updated but the balance and delegations remains the same",
-			presetValidator: &types.Validator{
+			presetValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Output:       newTestAddressBytes(t),
 				Delegate:     true,
 			},
-			msg: &types.MessageEditStake{
+			msg: &MessageEditStake{
 				Address:       newTestAddressBytes(t),
 				Amount:        1,
 				Committees:    []uint64{0, 1},
 				OutputAddress: newTestAddressBytes(t),
 			},
-			expectedValidator: &types.Validator{
+			expectedValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Output:       newTestAddressBytes(t),
 				Delegate:     true,
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:         1,
 				Staked:        1,
 				DelegatedOnly: 1,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: 1,
@@ -1098,7 +1097,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 						Amount: 1,
 					},
 				},
-				CommitteeDelegatedOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*Pool{
 					{
 						Id:     0,
 						Amount: 1,
@@ -1113,7 +1112,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 		{
 			name:   "edit stake, same balance, different committees",
 			detail: "the validator is updated with different committees but the balance remains the same",
-			presetValidator: &types.Validator{
+			presetValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				NetAddress:   "tcp://example.com",
@@ -1122,7 +1121,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Output:       newTestAddressBytes(t),
 				Compound:     true,
 			},
-			msg: &types.MessageEditStake{
+			msg: &MessageEditStake{
 				Address:       newTestAddressBytes(t),
 				Amount:        1,
 				Committees:    []uint64{1, 2, 3},
@@ -1130,7 +1129,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				OutputAddress: newTestAddressBytes(t),
 				Compound:      true,
 			},
-			expectedValidator: &types.Validator{
+			expectedValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				NetAddress:   "tcp://example.com",
@@ -1139,10 +1138,10 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Output:       newTestAddressBytes(t),
 				Compound:     true,
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:  1,
 				Staked: 1,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     1,
 						Amount: 1,
@@ -1161,28 +1160,28 @@ func TestHandleMessageEditStake(t *testing.T) {
 		{
 			name:   "edit stake, same balance, different delegations",
 			detail: "the validator is updated with different delegations but the balance remains the same",
-			presetValidator: &types.Validator{
+			presetValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Delegate:     true,
 			},
-			msg: &types.MessageEditStake{
+			msg: &MessageEditStake{
 				Address:    newTestAddressBytes(t),
 				Amount:     1,
 				Committees: []uint64{1, 2, 3},
 			},
-			expectedValidator: &types.Validator{
+			expectedValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 1,
 				Committees:   []uint64{1, 2, 3},
 				Delegate:     true,
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:         1,
 				Staked:        1,
 				DelegatedOnly: 1,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     1,
 						Amount: 1,
@@ -1196,7 +1195,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 						Amount: 1,
 					},
 				},
-				CommitteeDelegatedOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*Pool{
 					{
 						Id:     1,
 						Amount: 1,
@@ -1216,29 +1215,29 @@ func TestHandleMessageEditStake(t *testing.T) {
 			name:         "edit stake, different balance, different committees",
 			detail:       "the validator is updated with different committees and balance",
 			presetSender: 2,
-			presetValidator: &types.Validator{
+			presetValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 1,
 				NetAddress:   "tcp://example.com",
 				Committees:   []uint64{0, 1},
 			},
-			msg: &types.MessageEditStake{
+			msg: &MessageEditStake{
 				Address:    newTestAddressBytes(t),
 				Amount:     2,
 				NetAddress: "tcp://example.com",
 				Committees: []uint64{1, 2, 3},
 				Signer:     newTestAddressBytes(t),
 			},
-			expectedValidator: &types.Validator{
+			expectedValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 2,
 				NetAddress:   "tcp://example.com",
 				Committees:   []uint64{1, 2, 3},
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:  3,
 				Staked: 2,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     1,
 						Amount: 2,
@@ -1258,29 +1257,29 @@ func TestHandleMessageEditStake(t *testing.T) {
 			name:         "edit stake, different balance, different delegations",
 			detail:       "the validator is updated with different delegations and balance",
 			presetSender: 2,
-			presetValidator: &types.Validator{
+			presetValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Delegate:     true,
 			},
-			msg: &types.MessageEditStake{
+			msg: &MessageEditStake{
 				Address:    newTestAddressBytes(t),
 				Amount:     2,
 				Committees: []uint64{1, 2, 3},
 				Signer:     newTestAddressBytes(t),
 			},
-			expectedValidator: &types.Validator{
+			expectedValidator: &Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 2,
 				Committees:   []uint64{1, 2, 3},
 				Delegate:     true,
 			},
-			expectedSupply: &types.Supply{
+			expectedSupply: &Supply{
 				Total:         3,
 				Staked:        2,
 				DelegatedOnly: 2,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     1,
 						Amount: 2,
@@ -1294,7 +1293,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 						Amount: 2,
 					},
 				},
-				CommitteeDelegatedOnly: []*types.Pool{
+				CommitteeDelegatedOnly: []*Pool{
 					{
 						Id:     1,
 						Amount: 2,
@@ -1322,8 +1321,8 @@ func TestHandleMessageEditStake(t *testing.T) {
 			require.NoError(t, sm.AccountAdd(sender, test.presetSender))
 			// preset the validator
 			if test.presetValidator != nil {
-				supply := &types.Supply{}
-				require.NoError(t, sm.SetValidators([]*types.Validator{test.presetValidator}, supply))
+				supply := &Supply{}
+				require.NoError(t, sm.SetValidators([]*Validator{test.presetValidator}, supply))
 				supply.Total = test.presetSender + test.presetValidator.StakedAmount
 				require.NoError(t, sm.SetSupply(supply))
 			}
@@ -1357,7 +1356,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 					page, e := sm.GetDelegatesPaginated(lib.PageParams{}, id)
 					require.NoError(t, e)
 					// extract the list from the page
-					list := (page.Results).(*types.ValidatorPage)
+					list := (page.Results).(*ValidatorPage)
 					// ensure the list count is correct
 					require.Len(t, *list, 1)
 					// ensure the expected validator is a member
@@ -1368,7 +1367,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 					page, e := sm.GetDelegatesPaginated(lib.PageParams{}, id)
 					require.NoError(t, e)
 					// extract the list from the page
-					list := (page.Results).(*types.ValidatorPage)
+					list := (page.Results).(*ValidatorPage)
 					// ensure the non membership
 					require.Len(t, *list, 0)
 				}
@@ -1378,7 +1377,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 					page, e := sm.GetCommitteePaginated(lib.PageParams{}, id)
 					require.NoError(t, e)
 					// extract the list from the page
-					list := (page.Results).(*types.ValidatorPage)
+					list := (page.Results).(*ValidatorPage)
 					// ensure the list count is correct
 					require.Len(t, *list, 1)
 					// ensure the expected validator is a member
@@ -1389,7 +1388,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 					page, e := sm.GetCommitteePaginated(lib.PageParams{}, id)
 					require.NoError(t, e)
 					// extract the list from the page
-					list := (page.Results).(*types.ValidatorPage)
+					list := (page.Results).(*ValidatorPage)
 					// ensure the non membership
 					require.Len(t, *list, 0)
 				}
@@ -1402,41 +1401,41 @@ func TestMessageUnstake(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		preset *types.Validator
-		msg    *types.MessageUnstake
+		preset *Validator
+		msg    *MessageUnstake
 		error  string
 	}{
 		{
 			name:   "validator doesn't exist",
 			detail: "validator does not exist to unstake it",
-			msg:    &types.MessageUnstake{Address: newTestAddressBytes(t)},
+			msg:    &MessageUnstake{Address: newTestAddressBytes(t)},
 			error:  "validator does not exist",
 		}, {
 			name:   "validator already unstaking",
 			detail: "validator is already unstaking so this operation is invalid",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:         newTestAddressBytes(t),
 				UnstakingHeight: 1,
 			},
-			msg:   &types.MessageUnstake{Address: newTestAddressBytes(t)},
+			msg:   &MessageUnstake{Address: newTestAddressBytes(t)},
 			error: "validator is unstaking",
 		},
 		{
 			name:   "validator not delegate",
 			detail: "validator is not a delegate",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address: newTestAddressBytes(t),
 			},
-			msg: &types.MessageUnstake{Address: newTestAddressBytes(t)},
+			msg: &MessageUnstake{Address: newTestAddressBytes(t)},
 		},
 		{
 			name:   "validator a delegate",
 			detail: "validator is a delegate",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:  newTestAddressBytes(t),
 				Delegate: true,
 			},
-			msg: &types.MessageUnstake{Address: newTestAddressBytes(t)},
+			msg: &MessageUnstake{Address: newTestAddressBytes(t)},
 		},
 	}
 	for _, test := range tests {
@@ -1447,8 +1446,8 @@ func TestMessageUnstake(t *testing.T) {
 			sender := crypto.NewAddress(test.msg.Address)
 			// preset the validator
 			if test.preset != nil {
-				supply := &types.Supply{}
-				require.NoError(t, sm.SetValidators([]*types.Validator{test.preset}, supply))
+				supply := &Supply{}
+				require.NoError(t, sm.SetValidators([]*Validator{test.preset}, supply))
 				require.NoError(t, sm.SetSupply(supply))
 			}
 			// execute the function call
@@ -1476,7 +1475,7 @@ func TestMessageUnstake(t *testing.T) {
 			// compare got vs expected
 			require.Equal(t, finishUnstakingHeight, val.UnstakingHeight)
 			// check for the unstaking key
-			bz, err := sm.Get(types.KeyForUnstaking(finishUnstakingHeight, sender))
+			bz, err := sm.Get(KeyForUnstaking(finishUnstakingHeight, sender))
 			require.NoError(t, err)
 			require.Len(t, bz, 1)
 		})
@@ -1487,52 +1486,52 @@ func TestMessagePause(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		preset *types.Validator
-		msg    *types.MessagePause
+		preset *Validator
+		msg    *MessagePause
 		error  string
 	}{
 		{
 			name:   "validator doesn't exist",
 			detail: "validator does not exist to pause it",
-			msg:    &types.MessagePause{Address: newTestAddressBytes(t)},
+			msg:    &MessagePause{Address: newTestAddressBytes(t)},
 			error:  "validator does not exist",
 		}, {
 			name:   "validator already paused",
 			detail: "validator is already paused so this operation is invalid",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:         newTestAddressBytes(t),
 				MaxPausedHeight: 1,
 			},
-			msg:   &types.MessagePause{Address: newTestAddressBytes(t)},
+			msg:   &MessagePause{Address: newTestAddressBytes(t)},
 			error: "validator paused",
 		},
 		{
 			name:   "validator unstaking",
 			detail: "validator is unstaking so this operation is invalid",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:         newTestAddressBytes(t),
 				UnstakingHeight: 1,
 			},
-			msg:   &types.MessagePause{Address: newTestAddressBytes(t)},
+			msg:   &MessagePause{Address: newTestAddressBytes(t)},
 			error: "validator is unstaking",
 		},
 		{
 			name:   "validator is a delegate",
 			detail: "validator is a delegate",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:  newTestAddressBytes(t),
 				Delegate: true,
 			},
-			msg:   &types.MessagePause{Address: newTestAddressBytes(t)},
+			msg:   &MessagePause{Address: newTestAddressBytes(t)},
 			error: "validator is a delegate",
 		},
 		{
 			name:   "validator is not a delegate",
 			detail: "validator is not a delegate",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address: newTestAddressBytes(t),
 			},
-			msg: &types.MessagePause{Address: newTestAddressBytes(t)},
+			msg: &MessagePause{Address: newTestAddressBytes(t)},
 		},
 	}
 	for _, test := range tests {
@@ -1543,8 +1542,8 @@ func TestMessagePause(t *testing.T) {
 			sender := crypto.NewAddress(test.msg.Address)
 			// preset the validator
 			if test.preset != nil {
-				supply := &types.Supply{}
-				require.NoError(t, sm.SetValidators([]*types.Validator{test.preset}, supply))
+				supply := &Supply{}
+				require.NoError(t, sm.SetValidators([]*Validator{test.preset}, supply))
 				require.NoError(t, sm.SetSupply(supply))
 			}
 			// execute the function call
@@ -1566,7 +1565,7 @@ func TestMessagePause(t *testing.T) {
 			// compare got vs expected
 			require.Equal(t, maxPauseBlocks, val.MaxPausedHeight)
 			// check for the paused key
-			bz, err := sm.Get(types.KeyForPaused(maxPauseBlocks, sender))
+			bz, err := sm.Get(KeyForPaused(maxPauseBlocks, sender))
 			require.NoError(t, err)
 			require.Len(t, bz, 1)
 		})
@@ -1577,32 +1576,32 @@ func TestMessageUnpause(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		preset *types.Validator
-		msg    *types.MessageUnpause
+		preset *Validator
+		msg    *MessageUnpause
 		error  string
 	}{
 		{
 			name:   "validator doesn't exist",
 			detail: "validator does not exist to unpause it",
-			msg:    &types.MessageUnpause{Address: newTestAddressBytes(t)},
+			msg:    &MessageUnpause{Address: newTestAddressBytes(t)},
 			error:  "validator does not exist",
 		}, {
 			name:   "validator not paused",
 			detail: "validator is not paused so this operation is invalid",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address: newTestAddressBytes(t),
 			},
-			msg:   &types.MessageUnpause{Address: newTestAddressBytes(t)},
+			msg:   &MessageUnpause{Address: newTestAddressBytes(t)},
 			error: "validator not paused",
 		},
 		{
 			name:   "validator is paused",
 			detail: "validator is paused",
-			preset: &types.Validator{
+			preset: &Validator{
 				Address:         newTestAddressBytes(t),
 				MaxPausedHeight: 1,
 			},
-			msg: &types.MessageUnpause{Address: newTestAddressBytes(t)},
+			msg: &MessageUnpause{Address: newTestAddressBytes(t)},
 		},
 	}
 	for _, test := range tests {
@@ -1613,11 +1612,11 @@ func TestMessageUnpause(t *testing.T) {
 			sender := crypto.NewAddress(test.msg.Address)
 			// preset the validator
 			if test.preset != nil {
-				supply := &types.Supply{}
-				require.NoError(t, sm.SetValidators([]*types.Validator{test.preset}, supply))
+				supply := &Supply{}
+				require.NoError(t, sm.SetValidators([]*Validator{test.preset}, supply))
 				require.NoError(t, sm.SetSupply(supply))
 				// preset the validator as paused
-				require.NoError(t, sm.Set(types.KeyForPaused(test.preset.MaxPausedHeight, sender), []byte{0x0}))
+				require.NoError(t, sm.Set(KeyForPaused(test.preset.MaxPausedHeight, sender), []byte{0x0}))
 			}
 			// execute the function call
 			err := sm.HandleMessageUnpause(test.msg)
@@ -1636,7 +1635,7 @@ func TestMessageUnpause(t *testing.T) {
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
 			// check for the paused key
-			bz, err := sm.Get(types.KeyForPaused(valParams.MaxPauseBlocks+sm.Height(), sender))
+			bz, err := sm.Get(KeyForPaused(valParams.MaxPauseBlocks+sm.Height(), sender))
 			require.NoError(t, err)
 			require.Nil(t, bz)
 		})
@@ -1649,19 +1648,19 @@ func TestHandleMessageChangeParameter(t *testing.T) {
 	tests := []struct {
 		name           string
 		detail         string
-		proposalConfig types.GovProposalVoteConfig
+		proposalConfig GovProposalVoteConfig
 		height         uint64
-		msg            *types.MessageChangeParameter
+		msg            *MessageChangeParameter
 		error          string
 	}{
 		{
 			name:           "before start height",
 			detail:         "the start height is greater than state machine height",
 			height:         1,
-			proposalConfig: types.AcceptAllProposals,
-			msg: &types.MessageChangeParameter{
+			proposalConfig: AcceptAllProposals,
+			msg: &MessageChangeParameter{
 				ParameterSpace: "val",
-				ParameterKey:   types.ParamUnstakingBlocks,
+				ParameterKey:   ParamUnstakingBlocks,
 				ParameterValue: uint64Any,
 				StartHeight:    2,
 				EndHeight:      3,
@@ -1673,10 +1672,10 @@ func TestHandleMessageChangeParameter(t *testing.T) {
 			name:           "after end height",
 			detail:         "the end height is less than state machine height",
 			height:         4,
-			proposalConfig: types.AcceptAllProposals,
-			msg: &types.MessageChangeParameter{
+			proposalConfig: AcceptAllProposals,
+			msg: &MessageChangeParameter{
 				ParameterSpace: "val",
-				ParameterKey:   types.ParamUnstakingBlocks,
+				ParameterKey:   ParamUnstakingBlocks,
 				ParameterValue: uint64Any,
 				StartHeight:    2,
 				EndHeight:      3,
@@ -1687,11 +1686,11 @@ func TestHandleMessageChangeParameter(t *testing.T) {
 		{
 			name:           "reject all config",
 			detail:         "configuration is set to reject all",
-			proposalConfig: types.RejectAllProposals,
+			proposalConfig: RejectAllProposals,
 			height:         2,
-			msg: &types.MessageChangeParameter{
+			msg: &MessageChangeParameter{
 				ParameterSpace: "val",
-				ParameterKey:   types.ParamUnstakingBlocks,
+				ParameterKey:   ParamUnstakingBlocks,
 				ParameterValue: uint64Any,
 				StartHeight:    2,
 				EndHeight:      3,
@@ -1702,11 +1701,11 @@ func TestHandleMessageChangeParameter(t *testing.T) {
 		{
 			name:           "change unstaking blocks",
 			detail:         "successfully change unstaking blocks with the message",
-			proposalConfig: types.AcceptAllProposals,
+			proposalConfig: AcceptAllProposals,
 			height:         2,
-			msg: &types.MessageChangeParameter{
+			msg: &MessageChangeParameter{
 				ParameterSpace: "val",
-				ParameterKey:   types.ParamUnstakingBlocks,
+				ParameterKey:   ParamUnstakingBlocks,
 				ParameterValue: uint64Any,
 				StartHeight:    2,
 				EndHeight:      3,
@@ -1716,11 +1715,11 @@ func TestHandleMessageChangeParameter(t *testing.T) {
 		{
 			name:           "change protocol version",
 			detail:         "successfully the protocol version with the message",
-			proposalConfig: types.AcceptAllProposals,
+			proposalConfig: AcceptAllProposals,
 			height:         2,
-			msg: &types.MessageChangeParameter{
+			msg: &MessageChangeParameter{
 				ParameterSpace: "cons",
-				ParameterKey:   types.ParamProtocolVersion,
+				ParameterKey:   ParamProtocolVersion,
 				ParameterValue: stringAny,
 				StartHeight:    2,
 				EndHeight:      3,
@@ -1762,9 +1761,9 @@ func TestHandleMessageChangeParameter(t *testing.T) {
 			require.NoError(t, err)
 			// validate the update
 			switch test.msg.ParameterKey {
-			case types.ParamUnstakingBlocks: // validator
+			case ParamUnstakingBlocks: // validator
 				require.Equal(t, uint64Value.Value, got.Validator.UnstakingBlocks)
-			case types.ParamProtocolVersion: // consensus
+			case ParamProtocolVersion: // consensus
 				require.Equal(t, stringValue.Value, got.Consensus.ProtocolVersion)
 			}
 		})
@@ -1776,9 +1775,9 @@ func TestHandleMessageDAOTransfer(t *testing.T) {
 		name           string
 		detail         string
 		daoPreset      uint64
-		proposalConfig types.GovProposalVoteConfig
+		proposalConfig GovProposalVoteConfig
 		height         uint64
-		msg            *types.MessageDAOTransfer
+		msg            *MessageDAOTransfer
 		error          string
 	}{
 		{
@@ -1786,8 +1785,8 @@ func TestHandleMessageDAOTransfer(t *testing.T) {
 			detail:         "the start height is greater than state machine height",
 			height:         1,
 			daoPreset:      1,
-			proposalConfig: types.AcceptAllProposals,
-			msg: &types.MessageDAOTransfer{
+			proposalConfig: AcceptAllProposals,
+			msg: &MessageDAOTransfer{
 				Address:     newTestAddressBytes(t),
 				Amount:      1,
 				StartHeight: 2,
@@ -1799,9 +1798,9 @@ func TestHandleMessageDAOTransfer(t *testing.T) {
 			name:           "after end height",
 			detail:         "the end height is less than state machine height",
 			height:         4,
-			proposalConfig: types.AcceptAllProposals,
+			proposalConfig: AcceptAllProposals,
 			daoPreset:      1,
-			msg: &types.MessageDAOTransfer{
+			msg: &MessageDAOTransfer{
 				Address:     newTestAddressBytes(t),
 				Amount:      1,
 				StartHeight: 2,
@@ -1812,10 +1811,10 @@ func TestHandleMessageDAOTransfer(t *testing.T) {
 		{
 			name:           "reject all config",
 			detail:         "configuration is set to reject all",
-			proposalConfig: types.RejectAllProposals,
+			proposalConfig: RejectAllProposals,
 			height:         2,
 			daoPreset:      1,
-			msg: &types.MessageDAOTransfer{
+			msg: &MessageDAOTransfer{
 				Address:     newTestAddressBytes(t),
 				Amount:      1,
 				StartHeight: 2,
@@ -1826,9 +1825,9 @@ func TestHandleMessageDAOTransfer(t *testing.T) {
 		{
 			name:           "insufficient funds",
 			detail:         "dao doesn't have the funds",
-			proposalConfig: types.AcceptAllProposals,
+			proposalConfig: AcceptAllProposals,
 			height:         2,
-			msg: &types.MessageDAOTransfer{
+			msg: &MessageDAOTransfer{
 				Address:     newTestAddressBytes(t),
 				Amount:      1,
 				StartHeight: 2,
@@ -1839,10 +1838,10 @@ func TestHandleMessageDAOTransfer(t *testing.T) {
 		{
 			name:           "successful transfer",
 			detail:         "a successful dao transfer was completed with the message",
-			proposalConfig: types.AcceptAllProposals,
+			proposalConfig: AcceptAllProposals,
 			daoPreset:      1,
 			height:         2,
-			msg: &types.MessageDAOTransfer{
+			msg: &MessageDAOTransfer{
 				Address:     newTestAddressBytes(t),
 				Amount:      1,
 				StartHeight: 2,
@@ -1908,14 +1907,14 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 		detail                 string
 		nonSubsidizedCommittee bool
 		noCommitteeMembers     bool
-		msg                    *types.MessageCertificateResults
+		msg                    *MessageCertificateResults
 		error                  string
 	}{
 		{
 			name:                   "canopy committee",
 			detail:                 "the canopy committee tries to send a certificate results transaction",
 			nonSubsidizedCommittee: true,
-			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+			msg: &MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
 					Height:     1,
 					RootHeight: 3,
@@ -1928,7 +1927,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			name:                   "non subsidized committee",
 			detail:                 "the committee is not subsidized",
 			nonSubsidizedCommittee: true,
-			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+			msg: &MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
 					Height:     1,
 					RootHeight: 3,
@@ -1941,7 +1940,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			name:               "no committee members exist for that id",
 			detail:             "there are no committee members for that ID",
 			noCommitteeMembers: true,
-			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+			msg: &MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
 					Height:     1,
 					RootHeight: 3,
@@ -1954,7 +1953,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			name:               "no committee members exist for that id",
 			detail:             "there are no committee members for that ID",
 			noCommitteeMembers: true,
-			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+			msg: &MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
 					Height:     1,
 					RootHeight: 3,
@@ -1966,7 +1965,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 		{
 			name:   "empty quorum certificate",
 			detail: "the QC is empty",
-			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+			msg: &MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
 					Height:     1,
 					RootHeight: 2,
@@ -1978,7 +1977,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 		{
 			name:   "valid qc",
 			detail: "the qc sent is valid",
-			msg: &types.MessageCertificateResults{Qc: &lib.QuorumCertificate{
+			msg: &MessageCertificateResults{Qc: &lib.QuorumCertificate{
 				Header: &lib.View{
 					Height:     1,
 					NetworkId:  1,
@@ -2003,11 +2002,11 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			// check if there exists a committee
 			if !test.noCommitteeMembers {
 				// track the supply
-				supply := &types.Supply{}
+				supply := &Supply{}
 				// for 4 validators
 				for i := 0; i < 4; i++ {
 					// set the validator
-					require.NoError(t, sm.SetValidators([]*types.Validator{{
+					require.NoError(t, sm.SetValidators([]*Validator{{
 						Address:      newTestAddressBytes(t, i),
 						PublicKey:    newTestPublicKeyBytes(t, i),
 						StakedAmount: 100,
@@ -2142,14 +2141,14 @@ func TestMessageSubsidy(t *testing.T) {
 		detail        string
 		presetAccount uint64
 		presetPool    uint64
-		msg           *types.MessageSubsidy
+		msg           *MessageSubsidy
 		error         string
 	}{
 		{
 			name:          "insufficient funds",
 			detail:        "the account does not have enough funds to complete the transfer",
 			presetAccount: 1,
-			msg: &types.MessageSubsidy{
+			msg: &MessageSubsidy{
 				Address: newTestAddressBytes(t),
 				ChainId: lib.CanopyChainId,
 				Amount:  2,
@@ -2160,7 +2159,7 @@ func TestMessageSubsidy(t *testing.T) {
 			name:          "successful transfer",
 			detail:        "the transfer is successful",
 			presetAccount: 1,
-			msg: &types.MessageSubsidy{
+			msg: &MessageSubsidy{
 				Address: newTestAddressBytes(t),
 				ChainId: lib.CanopyChainId,
 				Amount:  1,
@@ -2171,7 +2170,7 @@ func TestMessageSubsidy(t *testing.T) {
 			detail:        "the transfer is successful with pool having a non-zero balance to start",
 			presetAccount: 1,
 			presetPool:    2,
-			msg: &types.MessageSubsidy{
+			msg: &MessageSubsidy{
 				Address: newTestAddressBytes(t),
 				ChainId: lib.CanopyChainId,
 				Amount:  1,
@@ -2216,7 +2215,7 @@ func TestMessageCreateOrder(t *testing.T) {
 		detail           string
 		presetAccount    uint64
 		minimumOrderSize uint64
-		msg              *types.MessageCreateOrder
+		msg              *MessageCreateOrder
 		error            string
 	}{
 		{
@@ -2224,7 +2223,7 @@ func TestMessageCreateOrder(t *testing.T) {
 			detail:           "the order does not satisfy the minimum order size",
 			presetAccount:    1,
 			minimumOrderSize: 2,
-			msg: &types.MessageCreateOrder{
+			msg: &MessageCreateOrder{
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      1,
@@ -2237,7 +2236,7 @@ func TestMessageCreateOrder(t *testing.T) {
 			name:             "insufficient funds",
 			detail:           "the account does not have sufficient funds to cover the sell order",
 			minimumOrderSize: 1,
-			msg: &types.MessageCreateOrder{
+			msg: &MessageCreateOrder{
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      1,
@@ -2251,7 +2250,7 @@ func TestMessageCreateOrder(t *testing.T) {
 			detail:           "the message creates a sell order in state",
 			presetAccount:    1,
 			minimumOrderSize: 1,
-			msg: &types.MessageCreateOrder{
+			msg: &MessageCreateOrder{
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      1,
@@ -2289,7 +2288,7 @@ func TestMessageCreateOrder(t *testing.T) {
 			// validate the subtraction from the account
 			require.Equal(t, test.presetAccount-test.msg.AmountForSale, got)
 			// get the pool balance
-			got, err = sm.GetPoolBalance(test.msg.ChainId + types.EscrowPoolAddend)
+			got, err = sm.GetPoolBalance(test.msg.ChainId + EscrowPoolAddend)
 			require.NoError(t, err)
 			// validate the addition to the pool
 			require.Equal(t, test.msg.AmountForSale, got)
@@ -2315,14 +2314,14 @@ func TestHandleMessageEditOrder(t *testing.T) {
 		presetAccount    uint64
 		minimumOrderSize uint64
 		preset           *lib.SellOrder
-		msg              *types.MessageEditOrder
+		msg              *MessageEditOrder
 		expected         *lib.SellOrder
 		error            string
 	}{
 		{
 			name:   "no order found",
 			detail: "there exists no order",
-			msg: &types.MessageEditOrder{
+			msg: &MessageEditOrder{
 				OrderId:              0,
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
@@ -2344,7 +2343,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				BuyerChainDeadline:   100,                       // signals a buyer
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
-			msg: &types.MessageEditOrder{
+			msg: &MessageEditOrder{
 				OrderId:              0,
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
@@ -2365,7 +2364,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
-			msg: &types.MessageEditOrder{
+			msg: &MessageEditOrder{
 				OrderId:              0,
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
@@ -2384,7 +2383,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
-			msg: &types.MessageEditOrder{
+			msg: &MessageEditOrder{
 				OrderId:              0,
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        2,
@@ -2404,7 +2403,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
-			msg: &types.MessageEditOrder{
+			msg: &MessageEditOrder{
 				OrderId:              0,
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
@@ -2432,7 +2431,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
-			msg: &types.MessageEditOrder{
+			msg: &MessageEditOrder{
 				OrderId:              0,
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        2,
@@ -2458,7 +2457,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
-			msg: &types.MessageEditOrder{
+			msg: &MessageEditOrder{
 				OrderId:              0,
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
@@ -2499,7 +2498,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				// set it back in state
 				require.NoError(t, sm.SetOrderBook(orderBook))
 				// preset the pool with the amount to sell
-				require.NoError(t, sm.PoolAdd(test.preset.Committee+types.EscrowPoolAddend, test.preset.AmountForSale))
+				require.NoError(t, sm.PoolAdd(test.preset.Committee+EscrowPoolAddend, test.preset.AmountForSale))
 			}
 			// execute the function
 			err := sm.HandleMessageEditOrder(test.msg)
@@ -2515,7 +2514,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			// validate the subtraction/addition to/from the account
 			require.Equal(t, test.presetAccount-(test.msg.AmountForSale-test.preset.AmountForSale), got)
 			// get the pool balance
-			got, err = sm.GetPoolBalance(test.msg.ChainId + types.EscrowPoolAddend)
+			got, err = sm.GetPoolBalance(test.msg.ChainId + EscrowPoolAddend)
 			require.NoError(t, err)
 			// validate the subtraction/addition to/from the pool
 			require.Equal(t, test.preset.AmountForSale-(test.preset.AmountForSale-test.msg.AmountForSale), got)
@@ -2534,13 +2533,13 @@ func TestHandleMessageDelete(t *testing.T) {
 		detail        string
 		presetAccount uint64
 		preset        *lib.SellOrder
-		msg           *types.MessageDeleteOrder
+		msg           *MessageDeleteOrder
 		error         string
 	}{
 		{
 			name:   "no order found",
 			detail: "there exists no order",
-			msg: &types.MessageDeleteOrder{
+			msg: &MessageDeleteOrder{
 				OrderId: 0,
 				ChainId: lib.CanopyChainId,
 			},
@@ -2559,7 +2558,7 @@ func TestHandleMessageDelete(t *testing.T) {
 				BuyerChainDeadline:   100,                       // signals a buyer
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
-			msg: &types.MessageDeleteOrder{
+			msg: &MessageDeleteOrder{
 				OrderId: 0,
 				ChainId: lib.CanopyChainId,
 			},
@@ -2576,7 +2575,7 @@ func TestHandleMessageDelete(t *testing.T) {
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
-			msg: &types.MessageDeleteOrder{
+			msg: &MessageDeleteOrder{
 				OrderId: 0,
 				ChainId: lib.CanopyChainId,
 			},
@@ -2600,7 +2599,7 @@ func TestHandleMessageDelete(t *testing.T) {
 				// set it back in state
 				require.NoError(t, sm.SetOrderBook(orderBook))
 				// preset the pool with the amount to sell
-				require.NoError(t, sm.PoolAdd(test.preset.Committee+types.EscrowPoolAddend, test.preset.AmountForSale))
+				require.NoError(t, sm.PoolAdd(test.preset.Committee+EscrowPoolAddend, test.preset.AmountForSale))
 			}
 			// execute the function
 			err := sm.HandleMessageDeleteOrder(test.msg)
@@ -2616,7 +2615,7 @@ func TestHandleMessageDelete(t *testing.T) {
 			// validate the addition to the account
 			require.Equal(t, test.presetAccount+test.preset.AmountForSale, got)
 			// get the pool balance
-			got, err = sm.GetPoolBalance(test.msg.ChainId + types.EscrowPoolAddend)
+			got, err = sm.GetPoolBalance(test.msg.ChainId + EscrowPoolAddend)
 			require.NoError(t, err)
 			// validate the subtraction from the pool
 			require.Zero(t, got)

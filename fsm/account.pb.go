@@ -4,7 +4,7 @@
 // 	protoc        v3.19.1
 // source: account.proto
 
-package types
+package fsm
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -288,13 +288,13 @@ func file_account_proto_rawDescGZIP() []byte {
 
 var file_account_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_account_proto_goTypes = []interface{}{
-	(*Account)(nil), // 0: types.Account
-	(*Pool)(nil),    // 1: types.Pool
-	(*Supply)(nil),  // 2: types.Supply
+	(*Account)(nil), // 0: Account
+	(*Pool)(nil),    // 1: Pool
+	(*Supply)(nil),  // 2: Supply
 }
 var file_account_proto_depIdxs = []int32{
-	1, // 0: types.Supply.committee_staked:type_name -> types.Pool
-	1, // 1: types.Supply.committee_delegated_only:type_name -> types.Pool
+	1, // 0: Supply.committee_staked:type_name -> Pool
+	1, // 1: Supply.committee_delegated_only:type_name -> Pool
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name

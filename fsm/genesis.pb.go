@@ -4,7 +4,7 @@
 // 	protoc        v3.19.1
 // source: genesis.proto
 
-package types
+package fsm
 
 import (
 	lib "github.com/canopy-network/canopy/lib"
@@ -242,27 +242,27 @@ func file_genesis_proto_rawDescGZIP() []byte {
 
 var file_genesis_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_genesis_proto_goTypes = []interface{}{
-	(*GenesisState)(nil),       // 0: types.GenesisState
-	(*Pool)(nil),               // 1: types.Pool
-	(*Account)(nil),            // 2: types.Account
-	(*Validator)(nil),          // 3: types.Validator
-	(*NonSigner)(nil),          // 4: types.NonSigner
-	(*lib.DoubleSigner)(nil),   // 5: types.DoubleSigner
-	(*lib.OrderBooks)(nil),     // 6: types.OrderBooks
-	(*Params)(nil),             // 7: types.Params
-	(*Supply)(nil),             // 8: types.Supply
-	(*lib.CommitteesData)(nil), // 9: types.CommitteesData
+	(*GenesisState)(nil),       // 0: GenesisState
+	(*Pool)(nil),               // 1: Pool
+	(*Account)(nil),            // 2: Account
+	(*Validator)(nil),          // 3: Validator
+	(*NonSigner)(nil),          // 4: NonSigner
+	(*lib.DoubleSigner)(nil),   // 5: DoubleSigner
+	(*lib.OrderBooks)(nil),     // 6: OrderBooks
+	(*Params)(nil),             // 7: Params
+	(*Supply)(nil),             // 8: Supply
+	(*lib.CommitteesData)(nil), // 9: CommitteesData
 }
 var file_genesis_proto_depIdxs = []int32{
-	1, // 0: types.GenesisState.pools:type_name -> types.Pool
-	2, // 1: types.GenesisState.accounts:type_name -> types.Account
-	3, // 2: types.GenesisState.validators:type_name -> types.Validator
-	4, // 3: types.GenesisState.non_signers:type_name -> types.NonSigner
-	5, // 4: types.GenesisState.double_signers:type_name -> types.DoubleSigner
-	6, // 5: types.GenesisState.order_books:type_name -> types.OrderBooks
-	7, // 6: types.GenesisState.params:type_name -> types.Params
-	8, // 7: types.GenesisState.supply:type_name -> types.Supply
-	9, // 8: types.GenesisState.committees:type_name -> types.CommitteesData
+	1, // 0: GenesisState.pools:type_name -> Pool
+	2, // 1: GenesisState.accounts:type_name -> Account
+	3, // 2: GenesisState.validators:type_name -> Validator
+	4, // 3: GenesisState.non_signers:type_name -> NonSigner
+	5, // 4: GenesisState.double_signers:type_name -> DoubleSigner
+	6, // 5: GenesisState.order_books:type_name -> OrderBooks
+	7, // 6: GenesisState.params:type_name -> Params
+	8, // 7: GenesisState.supply:type_name -> Supply
+	9, // 8: GenesisState.committees:type_name -> CommitteesData
 	9, // [9:9] is the sub-list for method output_type
 	9, // [9:9] is the sub-list for method input_type
 	9, // [9:9] is the sub-list for extension type_name

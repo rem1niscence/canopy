@@ -4,7 +4,7 @@
 // 	protoc        v3.19.1
 // source: gov.proto
 
-package types
+package fsm
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -862,19 +862,19 @@ func file_gov_proto_rawDescGZIP() []byte {
 var file_gov_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_gov_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_gov_proto_goTypes = []interface{}{
-	(GovProposalVoteConfig)(0), // 0: types.GovProposalVoteConfig
-	(*Params)(nil),             // 1: types.Params
-	(*ProtocolVersion)(nil),    // 2: types.ProtocolVersion
-	(*ConsensusParams)(nil),    // 3: types.ConsensusParams
-	(*ValidatorParams)(nil),    // 4: types.ValidatorParams
-	(*FeeParams)(nil),          // 5: types.FeeParams
-	(*GovernanceParams)(nil),   // 6: types.GovernanceParams
+	(GovProposalVoteConfig)(0), // 0: GovProposalVoteConfig
+	(*Params)(nil),             // 1: Params
+	(*ProtocolVersion)(nil),    // 2: ProtocolVersion
+	(*ConsensusParams)(nil),    // 3: ConsensusParams
+	(*ValidatorParams)(nil),    // 4: ValidatorParams
+	(*FeeParams)(nil),          // 5: FeeParams
+	(*GovernanceParams)(nil),   // 6: GovernanceParams
 }
 var file_gov_proto_depIdxs = []int32{
-	3, // 0: types.Params.Consensus:type_name -> types.ConsensusParams
-	4, // 1: types.Params.Validator:type_name -> types.ValidatorParams
-	5, // 2: types.Params.Fee:type_name -> types.FeeParams
-	6, // 3: types.Params.Governance:type_name -> types.GovernanceParams
+	3, // 0: Params.Consensus:type_name -> ConsensusParams
+	4, // 1: Params.Validator:type_name -> ValidatorParams
+	5, // 2: Params.Fee:type_name -> FeeParams
+	6, // 3: Params.Governance:type_name -> GovernanceParams
 	4, // [4:4] is the sub-list for method output_type
 	4, // [4:4] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name

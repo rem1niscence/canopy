@@ -4,13 +4,12 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 )
 
 const (
-	ProtocolVersion = 1
+	CurrentProtocolVersion = 1
 )
 
 /* This is the 'main' file of the state machine store, with the structure definition and other high level operations */
@@ -20,14 +19,14 @@ const (
 type StateMachine struct {
 	store lib.RWStoreI
 
-	ProtocolVersion    uint64                      // the version of the protocol this node is running
-	NetworkID          uint32                      // the id of the network this node is configured to be on
-	height             uint64                      // the 'version' of the state based on number of blocks currently on
-	totalVDFIterations uint64                      // the number of 'verifiable delay iterations' in the blockchain up to this version
-	slashTracker       *types.SlashTracker         // tracks total slashes across multiple blocks
-	proposeVoteConfig  types.GovProposalVoteConfig // the configuration of how the state machine behaves with governance proposals
-	Config             lib.Config                  // the main configuration as defined by the 'config.json' file
-	log                lib.LoggerI                 // the logger for standard output and debugging
+	ProtocolVersion    uint64                // the version of the protocol this node is running
+	NetworkID          uint32                // the id of the network this node is configured to be on
+	height             uint64                // the 'version' of the state based on number of blocks currently on
+	totalVDFIterations uint64                // the number of 'verifiable delay iterations' in the blockchain up to this version
+	slashTracker       *SlashTracker         // tracks total slashes across multiple blocks
+	proposeVoteConfig  GovProposalVoteConfig // the configuration of how the state machine behaves with governance proposals
+	Config             lib.Config            // the main configuration as defined by the 'config.json' file
+	log                lib.LoggerI           // the logger for standard output and debugging
 }
 
 // New() creates a new instance of a StateMachine
@@ -35,10 +34,10 @@ func New(c lib.Config, store lib.StoreI, log lib.LoggerI) (*StateMachine, lib.Er
 	// create the state machine object reference
 	sm := &StateMachine{
 		store:             nil,
-		ProtocolVersion:   ProtocolVersion,
+		ProtocolVersion:   CurrentProtocolVersion,
 		NetworkID:         uint32(c.P2PConfig.NetworkID),
-		slashTracker:      types.NewSlashTracker(),
-		proposeVoteConfig: types.AcceptAllProposals,
+		slashTracker:      NewSlashTracker(),
+		proposeVoteConfig: AcceptAllProposals,
 		Config:            c,
 		log:               log,
 	}
@@ -84,7 +83,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 	store, ok := s.Store().(lib.StoreI)
 	// casting fails, exit with error
 	if !ok {
-		return nil, nil, types.ErrWrongStoreType()
+		return nil, nil, ErrWrongStoreType()
 	}
 	// automated execution at the 'beginning of a block'
 	if err = s.BeginBlock(); err != nil {
@@ -192,7 +191,7 @@ func (s *StateMachine) ApplyTransactions(block *lib.Block) (txResultsList []*lib
 	}
 	// ensure the block size + max block header size is less than the state defined 'MaxBlockSize'
 	if blockSize+lib.MaxBlockHeaderSize > maxBlockSize {
-		return nil, nil, 0, types.ErrMaxBlockSize()
+		return nil, nil, 0, ErrMaxBlockSize()
 	}
 	// create a transaction root for the block header
 	root, _, err = lib.MerkleTree(txResultsBytes)
@@ -214,7 +213,7 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 	// ensure the store is the proper type to allow historical views
 	store, ok := s.store.(lib.StoreI)
 	if !ok {
-		return nil, types.ErrWrongStoreType()
+		return nil, ErrWrongStoreType()
 	}
 	// create a NewReadOnly store at the specific height
 	heightStore, err := store.NewReadOnly(height)
@@ -247,7 +246,7 @@ func (s *StateMachine) LoadCertificate(height uint64) (*lib.QuorumCertificate, l
 	// ensure the store is the proper type to allow indexer actions
 	store, ok := s.store.(lib.RIndexerI)
 	if !ok {
-		return nil, types.ErrWrongStoreType()
+		return nil, ErrWrongStoreType()
 	}
 	// load the quorum certificate by height
 	return store.GetQCByHeight(height)
@@ -279,7 +278,7 @@ func (s *StateMachine) LoadBlock(height uint64) (*lib.BlockResult, lib.ErrorI) {
 	// ensure the store is the proper type to allow indexer actions
 	store, ok := s.store.(lib.RIndexerI)
 	if !ok {
-		return nil, types.ErrWrongStoreType()
+		return nil, ErrWrongStoreType()
 	}
 	// get the block result from the indexer at the 'load height'
 	return store.GetBlockByHeight(height)
@@ -294,7 +293,7 @@ func (s *StateMachine) LoadBlockAndCertificate(height uint64) (cert *lib.QuorumC
 	// ensure the store is the proper type to allow indexer actions
 	store, ok := s.store.(lib.RIndexerI)
 	if !ok {
-		return nil, nil, types.ErrWrongStoreType()
+		return nil, nil, ErrWrongStoreType()
 	}
 	// get the block result at a specific height
 	block, err = store.GetBlockByHeight(height)
@@ -335,7 +334,7 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 	// ensure the store is the right type to 'clone' itself
 	st, ok := s.store.(lib.StoreI)
 	if !ok {
-		return nil, types.ErrWrongStoreType()
+		return nil, ErrWrongStoreType()
 	}
 	// make a clone of the store
 	storeCopy, err := st.Copy()
@@ -349,7 +348,7 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 		NetworkID:          s.NetworkID,
 		height:             s.height,
 		totalVDFIterations: s.totalVDFIterations,
-		slashTracker:       types.NewSlashTracker(),
+		slashTracker:       NewSlashTracker(),
 		proposeVoteConfig:  s.proposeVoteConfig,
 		Config:             s.Config,
 		log:                s.log,
@@ -428,7 +427,7 @@ func (s *StateMachine) TxnWrap() (lib.StoreTxnI, lib.ErrorI) {
 	// ensure the store may be 'cache wrapped' in a 'database transaction'
 	store, ok := s.store.(lib.StoreI)
 	if !ok {
-		return nil, types.ErrWrongStoreType()
+		return nil, ErrWrongStoreType()
 	}
 	// create a new 'database transaction'
 	txn := store.NewTxn()
@@ -448,7 +447,7 @@ func (s *StateMachine) catchPanic() {
 // Reset() resets the state store and the slash tracker
 func (s *StateMachine) Reset() {
 	// reset the slash tracker
-	s.slashTracker = types.NewSlashTracker()
+	s.slashTracker = NewSlashTracker()
 	// reset the state store
 	s.store.(lib.StoreI).Reset()
 }
@@ -463,9 +462,9 @@ func nonEmptyHash(h []byte) []byte {
 }
 
 // various self-explanatory 1 line functions below
-func (s *StateMachine) Store() lib.RWStoreI                                 { return s.store }
-func (s *StateMachine) SetStore(store lib.RWStoreI)                         { s.store = store }
-func (s *StateMachine) Height() uint64                                      { return s.height }
-func (s *StateMachine) TotalVDFIterations() uint64                          { return s.totalVDFIterations }
-func (s *StateMachine) Discard()                                            { s.store.(lib.StoreI).Discard() }
-func (s *StateMachine) SetProposalVoteConfig(c types.GovProposalVoteConfig) { s.proposeVoteConfig = c }
+func (s *StateMachine) Store() lib.RWStoreI                           { return s.store }
+func (s *StateMachine) SetStore(store lib.RWStoreI)                   { s.store = store }
+func (s *StateMachine) Height() uint64                                { return s.height }
+func (s *StateMachine) TotalVDFIterations() uint64                    { return s.totalVDFIterations }
+func (s *StateMachine) Discard()                                      { s.store.(lib.StoreI).Discard() }
+func (s *StateMachine) SetProposalVoteConfig(c GovProposalVoteConfig) { s.proposeVoteConfig = c }

@@ -2,7 +2,6 @@ package fsm
 
 import (
 	"fmt"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
@@ -19,24 +18,24 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 		detail        string
 		mintAmount    uint64
 		daoCutPercent uint64
-		supply        *types.Supply
-		expected      []*types.Pool
+		supply        *Supply
+		expected      []*Pool
 	}{
 		{
 			name:          "1 paid committee",
 			detail:        "1 paid committee should result in 1 distribution to the DAO and 1 distribution to the committee",
 			mintAmount:    100,
 			daoCutPercent: 10,
-			supply: &types.Supply{
+			supply: &Supply{
 				Staked: 100,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     lib.CanopyChainId,
 						Amount: 10,
 					},
 				},
 			},
-			expected: []*types.Pool{
+			expected: []*Pool{
 				{
 					Id:     lib.CanopyChainId,
 					Amount: 90,
@@ -52,9 +51,9 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 			detail:        "2 paid committees should result in 1 distribution to the DAO and 2 distributions to the committees",
 			mintAmount:    100,
 			daoCutPercent: 10,
-			supply: &types.Supply{
+			supply: &Supply{
 				Staked: 100,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     lib.CanopyChainId,
 						Amount: 10,
@@ -65,7 +64,7 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 					},
 				},
 			},
-			expected: []*types.Pool{
+			expected: []*Pool{
 				{
 					Id:     lib.CanopyChainId,
 					Amount: 45,
@@ -85,9 +84,9 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 			detail:        "4 paid committees should result in 1 distribution to the DAO and 4 distributions to the committees (rounded down)",
 			mintAmount:    98,
 			daoCutPercent: 10,
-			supply: &types.Supply{
+			supply: &Supply{
 				Staked: 100,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     lib.CanopyChainId,
 						Amount: 10,
@@ -106,7 +105,7 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 					},
 				},
 			},
-			expected: []*types.Pool{
+			expected: []*Pool{
 				{
 					Id:     lib.CanopyChainId,
 					Amount: 22,
@@ -140,7 +139,7 @@ func TestFundCommitteeRewardPools(t *testing.T) {
 			// override the minimum percent for paid committee
 			params.Validator.StakePercentForSubsidizedCommittee = minPercentForPaidCommittee
 			// override the mint amount
-			types.InitialTokensPerBlock = int(test.mintAmount)
+			InitialTokensPerBlock = int(test.mintAmount)
 			// override the DAO cut percent
 			params.Governance.DaoRewardPercentage = test.daoCutPercent
 			// set the params back in state
@@ -177,22 +176,22 @@ func TestGetPaidCommittees(t *testing.T) {
 		name                       string
 		detail                     string
 		minPercentForPaidCommittee uint64
-		supply                     *types.Supply
+		supply                     *Supply
 		paidChainIds               []uint64
 	}{
 		{
 			name:                       "0 committees",
 			detail:                     "1there exists no committees",
 			minPercentForPaidCommittee: 10,
-			supply:                     &types.Supply{Staked: 100},
+			supply:                     &Supply{Staked: 100},
 		},
 		{
 			name:                       "0 paid committee",
 			detail:                     "1 committee that has less than the minimum committed to it",
 			minPercentForPaidCommittee: 10,
-			supply: &types.Supply{
+			supply: &Supply{
 				Staked: 100,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: 1,
@@ -204,9 +203,9 @@ func TestGetPaidCommittees(t *testing.T) {
 			name:                       "1 100% paid committee",
 			detail:                     "1 paid committee that has 100% of the stake committed to it",
 			minPercentForPaidCommittee: 10,
-			supply: &types.Supply{
+			supply: &Supply{
 				Staked: 100,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: 100,
@@ -219,9 +218,9 @@ func TestGetPaidCommittees(t *testing.T) {
 			name:                       "1 paid committee, 1 non paid committee",
 			detail:                     "1 paid committee that has enough stake to be above the threshold, 1 non paid committee",
 			minPercentForPaidCommittee: 10,
-			supply: &types.Supply{
+			supply: &Supply{
 				Staked: 100,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: 10,
@@ -238,9 +237,9 @@ func TestGetPaidCommittees(t *testing.T) {
 			name:                       "2 100% paid committees",
 			detail:                     "2 paid committees that has 100% of the stake committed to it",
 			minPercentForPaidCommittee: 10,
-			supply: &types.Supply{
+			supply: &Supply{
 				Staked: 100,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: 100,
@@ -257,9 +256,9 @@ func TestGetPaidCommittees(t *testing.T) {
 			name:                       "2 10% paid committees",
 			detail:                     "2 paid committees that has the exact threshold of the stake committed to it",
 			minPercentForPaidCommittee: 10,
-			supply: &types.Supply{
+			supply: &Supply{
 				Staked: 100,
-				CommitteeStaked: []*types.Pool{
+				CommitteeStaked: []*Pool{
 					{
 						Id:     0,
 						Amount: 10,
@@ -307,14 +306,14 @@ func TestGetCommitteeMembers(t *testing.T) {
 		name     string
 		detail   string
 		limit    uint64
-		preset   []*types.Validator
+		preset   []*Validator
 		expected map[uint64][][]byte
 	}{
 		{
 			name:   "1 validator 1 committee",
 			detail: "1 validator staked for 1 committee",
 			limit:  10,
-			preset: []*types.Validator{
+			preset: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -332,7 +331,7 @@ func TestGetCommitteeMembers(t *testing.T) {
 			name:   "3 validators 1 committee",
 			detail: "3 validators staked for 1 committee ordered by stake",
 			limit:  10,
-			preset: []*types.Validator{
+			preset: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -364,7 +363,7 @@ func TestGetCommitteeMembers(t *testing.T) {
 			name:   "3 validators 2 committees",
 			detail: "3 validators staked for 2 committees ordered by stake",
 			limit:  10,
-			preset: []*types.Validator{
+			preset: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -402,7 +401,7 @@ func TestGetCommitteeMembers(t *testing.T) {
 			name:   "3 validators 2 committees various",
 			detail: "3 validators partially staked over 2 committees ordered by stake",
 			limit:  10,
-			preset: []*types.Validator{
+			preset: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -438,7 +437,7 @@ func TestGetCommitteeMembers(t *testing.T) {
 			name:   "3 validators, 1 paused, 1 committee",
 			detail: "3 validators staked, 1 paused, for 1 committee ordered by stake",
 			limit:  10,
-			preset: []*types.Validator{
+			preset: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -470,7 +469,7 @@ func TestGetCommitteeMembers(t *testing.T) {
 			name:   "3 validators, 1 unstaking, 1 committee",
 			detail: "3 validators staked, 1 unstaking, for 1 committee ordered by stake",
 			limit:  10,
-			preset: []*types.Validator{
+			preset: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -502,7 +501,7 @@ func TestGetCommitteeMembers(t *testing.T) {
 			name:   "3 validators, Max 2, 1 committee",
 			detail: "3 validators staked, Limit is 2, for 1 committee ordered by stake",
 			limit:  2,
-			preset: []*types.Validator{
+			preset: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -570,14 +569,14 @@ func TestGetCommitteePaginated(t *testing.T) {
 	tests := []struct {
 		name       string
 		detail     string
-		validators []*types.Validator
+		validators []*Validator
 		pageParams lib.PageParams
 		expected   [][]byte // address
 	}{
 		{
 			name:   "page 1 all members",
 			detail: "returns the first page with both members (ordered by stake)",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -600,7 +599,7 @@ func TestGetCommitteePaginated(t *testing.T) {
 		{
 			name:   "page 1, 1 member",
 			detail: "returns the first page with 1 member (ordered by stake)",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -623,7 +622,7 @@ func TestGetCommitteePaginated(t *testing.T) {
 		{
 			name:   "page 2, 1 member",
 			detail: "returns the second page with 1 member (ordered by stake)",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -661,7 +660,7 @@ func TestGetCommitteePaginated(t *testing.T) {
 			// validate the page params
 			require.Equal(t, test.pageParams, page.PageParams)
 			// cast page and ensure valid
-			got, castOk := page.Results.(*types.ValidatorPage)
+			got, castOk := page.Results.(*ValidatorPage)
 			require.True(t, castOk)
 			for i, gotItem := range *got {
 				require.Equal(t, test.expected[i], gotItem.Address)
@@ -674,7 +673,7 @@ func TestSetGetCommittees(t *testing.T) {
 	tests := []struct {
 		name                  string
 		detail                string
-		validators            []*types.Validator
+		validators            []*Validator
 		expected              map[uint64][][]byte // chainId -> Public Key
 		expectedTotalPower    map[uint64]uint64
 		expectedMin23MajPower map[uint64]uint64
@@ -682,7 +681,7 @@ func TestSetGetCommittees(t *testing.T) {
 		{
 			name:   "1 validator 1 committee",
 			detail: "preset 1 validator with 1 committee and expect to retrieve that validator",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -703,7 +702,7 @@ func TestSetGetCommittees(t *testing.T) {
 		{
 			name:   "1 validator 2 committees",
 			detail: "preset 1 validator with 2 committees and expect to retrieve that validator",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -724,7 +723,7 @@ func TestSetGetCommittees(t *testing.T) {
 		{
 			name:   "2 validator 2 committees",
 			detail: "preset 1 validator with 2 committees and expect to retrieve those validator",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -751,7 +750,7 @@ func TestSetGetCommittees(t *testing.T) {
 		{
 			name:   "2 validator mixed committees",
 			detail: "preset 1 validator with mixed committees and expect to retrieve those validators",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -817,21 +816,21 @@ func TestUpdateCommittees(t *testing.T) {
 	tests := []struct {
 		name               string
 		detail             string
-		validators         []*types.Validator
-		updates            []*types.Validator
+		validators         []*Validator
+		updates            []*Validator
 		expected           map[uint64][][]byte
 		expectedTotalPower map[uint64]uint64
 	}{
 		{
 			name:   "1 validator 1 committee",
 			detail: "updating 1 validator and same 1 committee with more tokens",
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{0},
 			}},
-			updates: []*types.Validator{
+			updates: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -849,13 +848,13 @@ func TestUpdateCommittees(t *testing.T) {
 		{
 			name:   "1 validator 1 different committee",
 			detail: "updating 1 validator and different 1 committee with more tokens",
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{0},
 			}},
-			updates: []*types.Validator{
+			updates: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -873,7 +872,7 @@ func TestUpdateCommittees(t *testing.T) {
 		{
 			name:   "2 validators different committees",
 			detail: "updating 2 validator with different committees with more tokens",
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				StakedAmount: 101,
@@ -884,7 +883,7 @@ func TestUpdateCommittees(t *testing.T) {
 				StakedAmount: 100,
 				Committees:   []uint64{0},
 			}},
-			updates: []*types.Validator{
+			updates: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -953,15 +952,15 @@ func TestDeleteCommittees(t *testing.T) {
 	tests := []struct {
 		name               string
 		detail             string
-		validators         []*types.Validator
-		delete             []*types.Validator
+		validators         []*Validator
+		delete             []*Validator
 		expected           map[uint64][][]byte
 		expectedTotalPower map[uint64]uint64
 	}{
 		{
 			name:   "2 validator 1 committee, 1 delete",
 			detail: "2 validator, deleting 1 validator",
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				StakedAmount: 100,
@@ -972,7 +971,7 @@ func TestDeleteCommittees(t *testing.T) {
 				StakedAmount: 100,
 				Committees:   []uint64{0},
 			}},
-			delete: []*types.Validator{
+			delete: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -1030,14 +1029,14 @@ func TestGetDelegatesPaginated(t *testing.T) {
 	tests := []struct {
 		name       string
 		detail     string
-		validators []*types.Validator
+		validators []*Validator
 		pageParams lib.PageParams
 		expected   [][]byte // address
 	}{
 		{
 			name:   "page 1 all members",
 			detail: "returns the first page with both members (ordered by stake)",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -1060,7 +1059,7 @@ func TestGetDelegatesPaginated(t *testing.T) {
 		{
 			name:   "page 1, 1 member",
 			detail: "returns the first page with 1 member (ordered by stake)",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -1083,7 +1082,7 @@ func TestGetDelegatesPaginated(t *testing.T) {
 		{
 			name:   "page 2, 1 member",
 			detail: "returns the second page with 1 member (ordered by stake)",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -1121,7 +1120,7 @@ func TestGetDelegatesPaginated(t *testing.T) {
 			// validate the page params
 			require.Equal(t, test.pageParams, page.PageParams)
 			// cast page and ensure valid
-			got, castOk := page.Results.(*types.ValidatorPage)
+			got, castOk := page.Results.(*ValidatorPage)
 			require.True(t, castOk)
 			for i, gotItem := range *got {
 				require.Equal(t, test.expected[i], gotItem.Address)
@@ -1134,22 +1133,22 @@ func TestUpdateDelegates(t *testing.T) {
 	tests := []struct {
 		name               string
 		detail             string
-		validators         []*types.Validator
-		updates            []*types.Validator
+		validators         []*Validator
+		updates            []*Validator
 		expected           map[uint64][][]byte
 		expectedTotalPower map[uint64]uint64
 	}{
 		{
 			name:   "1 validator 1 committee",
 			detail: "updating 1 validator and same 1 committee with more tokens",
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{0},
 				Delegate:     true,
 			}},
-			updates: []*types.Validator{
+			updates: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -1168,14 +1167,14 @@ func TestUpdateDelegates(t *testing.T) {
 		{
 			name:   "1 validator 1 different committee",
 			detail: "updating 1 validator and different 1 committee with more tokens",
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				StakedAmount: 100,
 				Committees:   []uint64{0},
 				Delegate:     true,
 			}},
-			updates: []*types.Validator{
+			updates: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -1194,7 +1193,7 @@ func TestUpdateDelegates(t *testing.T) {
 		{
 			name:   "2 validators different committees",
 			detail: "updating 2 validator with different committees with more tokens",
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				StakedAmount: 101,
@@ -1207,7 +1206,7 @@ func TestUpdateDelegates(t *testing.T) {
 				Committees:   []uint64{0},
 				Delegate:     true,
 			}},
-			updates: []*types.Validator{
+			updates: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -1258,7 +1257,7 @@ func TestUpdateDelegates(t *testing.T) {
 				page, err := sm.GetDelegatesPaginated(lib.PageParams{}, id)
 				require.NoError(t, err)
 				// cast page
-				got, ok := page.Results.(*types.ValidatorPage)
+				got, ok := page.Results.(*ValidatorPage)
 				require.True(t, ok)
 				// get the committee pool from the supply object
 				committeePool, err := sm.GetCommitteeStakedSupplyForChain(id)
@@ -1284,15 +1283,15 @@ func TestDeleteDelegates(t *testing.T) {
 	tests := []struct {
 		name               string
 		detail             string
-		validators         []*types.Validator
-		delete             []*types.Validator
+		validators         []*Validator
+		delete             []*Validator
 		expected           map[uint64][][]byte
 		expectedTotalPower map[uint64]uint64
 	}{
 		{
 			name:   "2 validator 1 committee, 1 delete",
 			detail: "2 validator, deleting 1 validator",
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
 				StakedAmount: 100,
@@ -1305,7 +1304,7 @@ func TestDeleteDelegates(t *testing.T) {
 				Committees:   []uint64{0},
 				Delegate:     true,
 			}},
-			delete: []*types.Validator{
+			delete: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
@@ -1344,7 +1343,7 @@ func TestDeleteDelegates(t *testing.T) {
 				page, err := sm.GetDelegatesPaginated(lib.PageParams{}, id)
 				require.NoError(t, err)
 				// cast page
-				got, ok := page.Results.(*types.ValidatorPage)
+				got, ok := page.Results.(*ValidatorPage)
 				require.True(t, ok)
 				// get the committee pool from the supply object
 				committeePool, err := sm.GetCommitteeStakedSupplyForChain(id)
@@ -1568,7 +1567,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 3, // can't overwrite number of samples
 				},
 			},
-			error: map[int]lib.ErrorI{1: types.ErrInvalidCertificateResults()},
+			error: map[int]lib.ErrorI{1: ErrInvalidCertificateResults()},
 		},
 		{
 			name:   "update with committee height error",
@@ -1601,7 +1600,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					NumberOfSamples: 3, // can't overwrite number of samples
 				},
 			},
-			error: map[int]lib.ErrorI{1: types.ErrInvalidCertificateResults()},
+			error: map[int]lib.ErrorI{1: ErrInvalidCertificateResults()},
 		},
 	}
 	for _, test := range tests {

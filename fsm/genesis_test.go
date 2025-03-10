@@ -3,7 +3,6 @@ package fsm
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -16,8 +15,8 @@ func TestNewFromGenesisFile(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
-		input    types.GenesisState
-		expected types.GenesisState
+		input    GenesisState
+		expected GenesisState
 	}{
 		{
 			name:     "complete",
@@ -28,18 +27,18 @@ func TestNewFromGenesisFile(t *testing.T) {
 		{
 			name:   "accounts",
 			detail: "the genesis file tests accounts only",
-			input: types.GenesisState{
-				Accounts: []*types.Account{{
+			input: GenesisState{
+				Accounts: []*Account{{
 					Address: newTestAddressBytes(t),
 					Amount:  100,
 				}, {
 					Address: newTestAddressBytes(t, 1),
 					Amount:  100,
 				}},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
-			expected: types.GenesisState{
-				Accounts: []*types.Account{{
+			expected: GenesisState{
+				Accounts: []*Account{{
 					Address: newTestAddressBytes(t),
 					Amount:  100,
 				}, {
@@ -47,26 +46,26 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Amount:  100,
 				}},
 				OrderBooks: new(lib.OrderBooks),
-				Params:     types.DefaultParams(),
-				Supply:     &types.Supply{Total: 200},
+				Params:     DefaultParams(),
+				Supply:     &Supply{Total: 200},
 				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
 			},
 		},
 		{
 			name:   "validators",
 			detail: "the genesis file tests validators only",
-			input: types.GenesisState{
-				Validators: []*types.Validator{{
+			input: GenesisState{
+				Validators: []*Validator{{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
 					Committees:   []uint64{lib.CanopyChainId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
-			expected: types.GenesisState{
-				Validators: []*types.Validator{{
+			expected: GenesisState{
+				Validators: []*Validator{{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
@@ -74,11 +73,11 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Output:       newTestAddressBytes(t),
 				}},
 				OrderBooks: new(lib.OrderBooks),
-				Params:     types.DefaultParams(),
-				Supply: &types.Supply{
+				Params:     DefaultParams(),
+				Supply: &Supply{
 					Total:  100,
 					Staked: 100,
-					CommitteeStaked: []*types.Pool{{
+					CommitteeStaked: []*Pool{{
 						Id:     lib.CanopyChainId,
 						Amount: 100,
 					}, {
@@ -92,22 +91,22 @@ func TestNewFromGenesisFile(t *testing.T) {
 		{
 			name:   "pools",
 			detail: "the genesis file tests pools only",
-			input: types.GenesisState{
-				Pools: []*types.Pool{{
+			input: GenesisState{
+				Pools: []*Pool{{
 					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
-			expected: types.GenesisState{
-				Pools: []*types.Pool{{
+			expected: GenesisState{
+				Pools: []*Pool{{
 					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}},
 				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
 				OrderBooks: new(lib.OrderBooks),
-				Params:     types.DefaultParams(),
-				Supply: &types.Supply{
+				Params:     DefaultParams(),
+				Supply: &Supply{
 					Total: 100,
 				},
 			},
@@ -115,7 +114,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 		{
 			name:   "order books",
 			detail: "the genesis file tests order books only",
-			input: types.GenesisState{
+			input: GenesisState{
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{{
 						ChainId: lib.CanopyChainId,
@@ -136,11 +135,11 @@ func TestNewFromGenesisFile(t *testing.T) {
 						}},
 					}},
 				},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
-			expected: types.GenesisState{
-				Pools: []*types.Pool{{
-					Id:     lib.CanopyChainId + types.EscrowPoolAddend,
+			expected: GenesisState{
+				Pools: []*Pool{{
+					Id:     lib.CanopyChainId + EscrowPoolAddend,
 					Amount: 200,
 				}},
 				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
@@ -164,8 +163,8 @@ func TestNewFromGenesisFile(t *testing.T) {
 						}},
 					}},
 				},
-				Params: types.DefaultParams(),
-				Supply: &types.Supply{
+				Params: DefaultParams(),
+				Supply: &Supply{
 					Total:                  200,
 					CommitteeDelegatedOnly: nil,
 				},
@@ -198,7 +197,7 @@ func TestReadGenesisFromFile(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
-		expected *types.GenesisState
+		expected *GenesisState
 		error    string
 	}{
 		{
@@ -209,28 +208,28 @@ func TestReadGenesisFromFile(t *testing.T) {
 		{
 			name:   "errored genesis file",
 			detail: "the genesis file has an error in it (address size) which makes it invalid",
-			expected: &types.GenesisState{
-				Accounts: []*types.Account{
+			expected: &GenesisState{
+				Accounts: []*Account{
 					{
 						Address: nil,
 						Amount:  100,
 					},
 				},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
 			error: "address size is invalid",
 		},
 		{
 			name:   "valid genesis file",
 			detail: "the genesis file is valid so will compare read (got) vs expected",
-			expected: &types.GenesisState{
-				Accounts: []*types.Account{
+			expected: &GenesisState{
+				Accounts: []*Account{
 					{
 						Address: newTestAddressBytes(t),
 						Amount:  100,
 					},
 				},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
 		},
 	}
@@ -266,22 +265,22 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
-		input    *types.GenesisState
-		expected *types.GenesisState
+		input    *GenesisState
+		expected *GenesisState
 	}{
 		{
 			name:   "complete",
 			detail: "the complete genesis file testing",
-			input: &types.GenesisState{
-				Pools: []*types.Pool{{
+			input: &GenesisState{
+				Pools: []*Pool{{
 					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}},
-				Accounts: []*types.Account{{
+				Accounts: []*Account{{
 					Address: newTestAddressBytes(t),
 					Amount:  100,
 				}},
-				Validators: []*types.Validator{{
+				Validators: []*Validator{{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
@@ -310,21 +309,21 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					}},
 				},
 				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
-				Params:     types.DefaultParams(),
+				Params:     DefaultParams(),
 			},
-			expected: &types.GenesisState{
-				Pools: []*types.Pool{{
+			expected: &GenesisState{
+				Pools: []*Pool{{
 					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}, {
-					Id:     lib.CanopyChainId + types.EscrowPoolAddend,
+					Id:     lib.CanopyChainId + EscrowPoolAddend,
 					Amount: 200,
 				}},
-				Accounts: []*types.Account{{
+				Accounts: []*Account{{
 					Address: newTestAddressBytes(t),
 					Amount:  100,
 				}},
-				Validators: []*types.Validator{{
+				Validators: []*Validator{{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
@@ -352,11 +351,11 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					}},
 				},
 				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
-				Params:     types.DefaultParams(),
-				Supply: &types.Supply{
+				Params:     DefaultParams(),
+				Supply: &Supply{
 					Total:  500,
 					Staked: 100,
-					CommitteeStaked: []*types.Pool{{
+					CommitteeStaked: []*Pool{{
 						Id:     lib.CanopyChainId,
 						Amount: 100,
 					}, {
@@ -370,18 +369,18 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 		{
 			name:   "accounts",
 			detail: "the genesis file tests accounts only",
-			input: &types.GenesisState{
-				Accounts: []*types.Account{{
+			input: &GenesisState{
+				Accounts: []*Account{{
 					Address: newTestAddressBytes(t),
 					Amount:  100,
 				}, {
 					Address: newTestAddressBytes(t, 1),
 					Amount:  100,
 				}},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
-			expected: &types.GenesisState{
-				Accounts: []*types.Account{{
+			expected: &GenesisState{
+				Accounts: []*Account{{
 					Address: newTestAddressBytes(t),
 					Amount:  100,
 				}, {
@@ -389,26 +388,26 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Amount:  100,
 				}},
 				OrderBooks: new(lib.OrderBooks),
-				Params:     types.DefaultParams(),
+				Params:     DefaultParams(),
 				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
-				Supply:     &types.Supply{Total: 200},
+				Supply:     &Supply{Total: 200},
 			},
 		},
 		{
 			name:   "validators",
 			detail: "the genesis file tests validators only",
-			input: &types.GenesisState{
-				Validators: []*types.Validator{{
+			input: &GenesisState{
+				Validators: []*Validator{{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
 					Committees:   []uint64{lib.CanopyChainId, 2},
 					Output:       newTestAddressBytes(t),
 				}},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
-			expected: &types.GenesisState{
-				Validators: []*types.Validator{{
+			expected: &GenesisState{
+				Validators: []*Validator{{
 					Address:      newTestAddressBytes(t),
 					PublicKey:    newTestPublicKeyBytes(t),
 					StakedAmount: 100,
@@ -417,11 +416,11 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 				}},
 				OrderBooks: new(lib.OrderBooks),
 				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
-				Params:     types.DefaultParams(),
-				Supply: &types.Supply{
+				Params:     DefaultParams(),
+				Supply: &Supply{
 					Total:  100,
 					Staked: 100,
-					CommitteeStaked: []*types.Pool{{
+					CommitteeStaked: []*Pool{{
 						Id:     lib.CanopyChainId,
 						Amount: 100,
 					}, {
@@ -434,22 +433,22 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 		{
 			name:   "pools",
 			detail: "the genesis file tests pools only",
-			input: &types.GenesisState{
-				Pools: []*types.Pool{{
+			input: &GenesisState{
+				Pools: []*Pool{{
 					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
-			expected: &types.GenesisState{
-				Pools: []*types.Pool{{
+			expected: &GenesisState{
+				Pools: []*Pool{{
 					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}},
 				OrderBooks: new(lib.OrderBooks),
 				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
-				Params:     types.DefaultParams(),
-				Supply: &types.Supply{
+				Params:     DefaultParams(),
+				Supply: &Supply{
 					Total: 100,
 				},
 			},
@@ -457,7 +456,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 		{
 			name:   "order books",
 			detail: "the genesis file tests order books only",
-			input: &types.GenesisState{
+			input: &GenesisState{
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{{
 						ChainId: lib.CanopyChainId,
@@ -478,11 +477,11 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 						}},
 					}},
 				},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
-			expected: &types.GenesisState{
-				Pools: []*types.Pool{{
-					Id:     lib.CanopyChainId + types.EscrowPoolAddend,
+			expected: &GenesisState{
+				Pools: []*Pool{{
+					Id:     lib.CanopyChainId + EscrowPoolAddend,
 					Amount: 200,
 				}},
 				OrderBooks: &lib.OrderBooks{
@@ -505,9 +504,9 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 						}},
 					}},
 				},
-				Params:     types.DefaultParams(),
+				Params:     DefaultParams(),
 				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
-				Supply: &types.Supply{
+				Supply: &Supply{
 					Total:                  200,
 					CommitteeDelegatedOnly: nil,
 				},
@@ -525,7 +524,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 			got, err := sm.ExportState()
 			require.NoError(t, err)
 			// sort the supply pools
-			sortById := func(p []*types.Pool) {
+			sortById := func(p []*Pool) {
 				sort.Slice(p, func(i, j int) bool {
 					return (p)[i].Id >= (p)[j].Id
 				})
@@ -549,44 +548,44 @@ func TestValidateGenesisState(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		input  *types.GenesisState
+		input  *GenesisState
 		error  string
 	}{
 		{
 			name:   "bad validator address",
 			detail: "the validator address length is invalid",
-			input: &types.GenesisState{
-				Validators: []*types.Validator{
+			input: &GenesisState{
+				Validators: []*Validator{
 					{
 						Address:      nil,
 						PublicKey:    newTestPublicKeyBytes(t),
 						StakedAmount: 100,
 					},
 				},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
 			error: "address size is invalid",
 		},
 		{
 			name:   "bad validator public key",
 			detail: "the validator public key length is invalid",
-			input: &types.GenesisState{
-				Validators: []*types.Validator{
+			input: &GenesisState{
+				Validators: []*Validator{
 					{
 						Address:      newTestAddressBytes(t),
 						PublicKey:    newTestAddressBytes(t),
 						StakedAmount: 100,
 					},
 				},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
 			error: "public key size is invalid",
 		},
 		{
 			name:   "bad validator output address",
 			detail: "the validator output address length is invalid",
-			input: &types.GenesisState{
-				Validators: []*types.Validator{
+			input: &GenesisState{
+				Validators: []*Validator{
 					{
 						Address:      newTestAddressBytes(t),
 						PublicKey:    newTestPublicKeyBytes(t),
@@ -594,28 +593,28 @@ func TestValidateGenesisState(t *testing.T) {
 						Output:       newTestPublicKeyBytes(t),
 					},
 				},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
 			error: "address size is invalid",
 		},
 		{
 			name:   "account address",
 			detail: "the account address length is invalid",
-			input: &types.GenesisState{
-				Accounts: []*types.Account{
+			input: &GenesisState{
+				Accounts: []*Account{
 					{
 						Address: newTestPublicKeyBytes(t),
 						Amount:  100,
 					},
 				},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
 			error: "address size is invalid",
 		},
 		{
 			name:   "duplicate committee order book",
 			detail: "the order book contains a duplicate committee entry",
-			input: &types.GenesisState{
+			input: &GenesisState{
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{
 						{
@@ -642,14 +641,14 @@ func TestValidateGenesisState(t *testing.T) {
 						},
 					},
 				},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
 			error: "sell order invalid",
 		},
 		{
 			name:   "duplicate sell order id",
 			detail: "the order book contains a sell order with a duplicate id within a single committee",
-			input: &types.GenesisState{
+			input: &GenesisState{
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{
 						{
@@ -671,7 +670,7 @@ func TestValidateGenesisState(t *testing.T) {
 						},
 					},
 				},
-				Params: types.DefaultParams(),
+				Params: DefaultParams(),
 			},
 			error: "sell order invalid",
 		},
@@ -692,17 +691,17 @@ func TestValidateGenesisState(t *testing.T) {
 	}
 }
 
-func newTestGenesisState(t *testing.T) *types.GenesisState {
-	return &types.GenesisState{
-		Pools: []*types.Pool{{
+func newTestGenesisState(t *testing.T) *GenesisState {
+	return &GenesisState{
+		Pools: []*Pool{{
 			Id:     lib.CanopyChainId,
 			Amount: 100,
 		}},
-		Accounts: []*types.Account{{
+		Accounts: []*Account{{
 			Address: newTestAddressBytes(t),
 			Amount:  100,
 		}},
-		Validators: []*types.Validator{{
+		Validators: []*Validator{{
 			Address:      newTestAddressBytes(t),
 			PublicKey:    newTestPublicKeyBytes(t),
 			StakedAmount: 100,
@@ -730,24 +729,24 @@ func newTestGenesisState(t *testing.T) *types.GenesisState {
 				}},
 			}},
 		},
-		Params: types.DefaultParams(),
+		Params: DefaultParams(),
 	}
 }
 
-func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
-	return &types.GenesisState{
-		Pools: []*types.Pool{{
+func newTestValidateGenesisState(t *testing.T) *GenesisState {
+	return &GenesisState{
+		Pools: []*Pool{{
 			Id:     lib.CanopyChainId,
 			Amount: 100,
 		}, {
-			Id:     lib.CanopyChainId + types.EscrowPoolAddend,
+			Id:     lib.CanopyChainId + EscrowPoolAddend,
 			Amount: 200,
 		}},
-		Accounts: []*types.Account{{
+		Accounts: []*Account{{
 			Address: newTestAddressBytes(t),
 			Amount:  100,
 		}},
-		Validators: []*types.Validator{{
+		Validators: []*Validator{{
 			Address:      newTestAddressBytes(t),
 			PublicKey:    newTestPublicKeyBytes(t),
 			StakedAmount: 100,
@@ -777,11 +776,11 @@ func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 				}},
 			}},
 		},
-		Params: types.DefaultParams(),
-		Supply: &types.Supply{
+		Params: DefaultParams(),
+		Supply: &Supply{
 			Total:  500,
 			Staked: 100,
-			CommitteeStaked: []*types.Pool{{
+			CommitteeStaked: []*Pool{{
 				Id:     lib.CanopyChainId,
 				Amount: 100,
 			}, {
@@ -795,12 +794,12 @@ func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 	}
 }
 
-func validateWithExportedState(t *testing.T, sm StateMachine, expected *types.GenesisState) {
+func validateWithExportedState(t *testing.T, sm StateMachine, expected *GenesisState) {
 	// convert written state to
 	got, err := sm.ExportState()
 	require.NoError(t, err)
 	// sort the supply pools
-	sortById := func(p []*types.Pool) {
+	sortById := func(p []*Pool) {
 		sort.Slice(p, func(i, j int) bool {
 			return (p)[i].Id >= (p)[j].Id
 		})

@@ -4,7 +4,7 @@
 // 	protoc        v3.19.1
 // source: validator.proto
 
-package types
+package fsm
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -285,8 +285,8 @@ func file_validator_proto_rawDescGZIP() []byte {
 
 var file_validator_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_validator_proto_goTypes = []interface{}{
-	(*Validator)(nil), // 0: types.Validator
-	(*NonSigner)(nil), // 1: types.NonSigner
+	(*Validator)(nil), // 0: Validator
+	(*NonSigner)(nil), // 1: NonSigner
 }
 var file_validator_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type

@@ -3,7 +3,6 @@ package fsm
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"slices"
@@ -86,7 +85,7 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 	// get all the 'Send' transactions from the block
 	for _, tx := range b.Transactions {
 		// ignore non-send, memo-less, or no valid json embedded
-		if tx.MessageType != types.MessageSendName || tx.Transaction.Memo == "" || !json.Valid([]byte(tx.Transaction.Memo)) {
+		if tx.MessageType != MessageSendName || tx.Transaction.Memo == "" || !json.Valid([]byte(tx.Transaction.Memo)) {
 			continue
 		}
 		// extract the message from the transaction object
@@ -96,7 +95,7 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 			continue
 		}
 		// cast the message to send
-		send, ok := msg.(*types.MessageSend)
+		send, ok := msg.(*MessageSend)
 		if !ok {
 			s.log.Error("Non-send message with a send message name (should not happen)")
 			continue
@@ -192,7 +191,7 @@ func (s *StateMachine) ParseLockOrders(b *lib.BlockResult) (lockOrders []*lib.Lo
 	// for each transaction in the block
 	for _, tx := range b.Transactions {
 		// skip over any that doesn't have the minimum fee or isn't the correct type
-		if tx.MessageType != types.MessageSendName || tx.Transaction.Memo == "" || tx.Transaction.Fee < minFee {
+		if tx.MessageType != MessageSendName || tx.Transaction.Memo == "" || tx.Transaction.Fee < minFee {
 			continue
 		}
 		// parse the transaction for embedded 'lock orders'
@@ -283,10 +282,10 @@ func (s *StateMachine) CloseOrder(orderId, chainId uint64) (err lib.ErrorI) {
 	}
 	// ensure the order already was 'claimed / reserved'
 	if order.BuyerReceiveAddress == nil {
-		return types.ErrInvalidLockOrder()
+		return ErrInvalidLockOrder()
 	}
 	// remove the funds from the escrow pool
-	if err = s.PoolSub(chainId+types.EscrowPoolAddend, order.AmountForSale); err != nil {
+	if err = s.PoolSub(chainId+EscrowPoolAddend, order.AmountForSale); err != nil {
 		return
 	}
 	// send the funds to the recipient address
@@ -333,11 +332,11 @@ func (s *StateMachine) SetOrderBook(b *lib.OrderBook) lib.ErrorI {
 		return err
 	}
 	// set the order book in the store
-	return s.store.Set(types.KeyForOrderBook(b.ChainId), orderBookBz)
+	return s.store.Set(KeyForOrderBook(b.ChainId), orderBookBz)
 }
 
 // SetOrderBooks() sets a series of OrderBooks in the state db
-func (s *StateMachine) SetOrderBooks(list *lib.OrderBooks, supply *types.Supply) lib.ErrorI {
+func (s *StateMachine) SetOrderBooks(list *lib.OrderBooks, supply *Supply) lib.ErrorI {
 	// ensure the order books object reference is not nil
 	if list == nil {
 		return nil
@@ -350,7 +349,7 @@ func (s *StateMachine) SetOrderBooks(list *lib.OrderBooks, supply *types.Supply)
 			return err
 		}
 		// get the state 'key' for the order book
-		key := types.KeyForOrderBook(book.ChainId)
+		key := KeyForOrderBook(book.ChainId)
 		// write the order book for the committee to state under the 'key'
 		if err = s.store.Set(key, orderBookBz); err != nil {
 			return err
@@ -360,7 +359,7 @@ func (s *StateMachine) SetOrderBooks(list *lib.OrderBooks, supply *types.Supply)
 			// update the 'supply' tracker
 			supply.Total += order.AmountForSale
 			// calculate the escrow pool id for a specific chainId
-			escrowPoolId := book.ChainId + uint64(types.EscrowPoolAddend)
+			escrowPoolId := book.ChainId + uint64(EscrowPoolAddend)
 			// add to the 'escrow' pool for the specific id
 			if err = s.PoolAdd(escrowPoolId, order.AmountForSale); err != nil {
 				return err
@@ -378,7 +377,7 @@ func (s *StateMachine) GetOrderBook(chainId uint64) (b *lib.OrderBook, err lib.E
 	// update the orders and chainId of the newly created object ref
 	b.Orders, b.ChainId = make([]*lib.SellOrder, 0), chainId
 	// get order book bytes from the state using the order book key for a specific chainId
-	bz, err := s.Get(types.KeyForOrderBook(chainId))
+	bz, err := s.Get(KeyForOrderBook(chainId))
 	if err != nil {
 		return
 	}
@@ -393,7 +392,7 @@ func (s *StateMachine) GetOrderBooks() (b *lib.OrderBooks, err lib.ErrorI) {
 	// get the order books from the state
 	b = new(lib.OrderBooks)
 	// create an iterator over the OrderBookPrefix
-	it, err := s.Iterator(types.OrderBookPrefix())
+	it, err := s.Iterator(OrderBookPrefix())
 	if err != nil {
 		return
 	}
@@ -402,7 +401,7 @@ func (s *StateMachine) GetOrderBooks() (b *lib.OrderBooks, err lib.ErrorI) {
 	// for each item under the OrderBookPrefix
 	for ; it.Valid(); it.Next() {
 		// extract the chainId from the key
-		id, e := types.IdFromKey(it.Key())
+		id, e := IdFromKey(it.Key())
 		if e != nil {
 			return nil, e
 		}

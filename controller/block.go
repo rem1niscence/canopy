@@ -9,7 +9,6 @@ import (
 
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 )
@@ -208,7 +207,7 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 	// ensure generated the same results
 	if !qc.Results.Equals(compareResults) {
 		// exit with error
-		return types.ErrMismatchCertResults()
+		return fsm.ErrMismatchCertResults()
 	}
 	// exit
 	return
@@ -461,15 +460,15 @@ func (c *Controller) CheckAndSetLastCertificate(candidate *lib.BlockHeader) lib.
 func (c *Controller) SetFSMInConsensusModeForProposals() (reset func()) {
 	if c.Consensus.GetRound() < 3 {
 		// if the node is not having 'consensus issues' refer to the approve list
-		c.FSM.SetProposalVoteConfig(types.GovProposalVoteConfig_APPROVE_LIST)
+		c.FSM.SetProposalVoteConfig(fsm.GovProposalVoteConfig_APPROVE_LIST)
 	} else {
 		// if the node is exhibiting 'chain halt' like behavior, reject all proposals
-		c.FSM.SetProposalVoteConfig(types.GovProposalVoteConfig_REJECT_ALL)
+		c.FSM.SetProposalVoteConfig(fsm.GovProposalVoteConfig_REJECT_ALL)
 	}
 	// a callback that resets the configuration back to default
 	reset = func() {
 		// the default is to accept all except in 'Consensus mode'
-		c.FSM.SetProposalVoteConfig(types.AcceptAllProposals)
+		c.FSM.SetProposalVoteConfig(fsm.AcceptAllProposals)
 	}
 	return
 }

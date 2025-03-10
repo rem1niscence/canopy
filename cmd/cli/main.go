@@ -17,7 +17,6 @@ import (
 	"github.com/canopy-network/canopy/cmd/rpc"
 	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/fsm"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/store"
@@ -190,11 +189,11 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 		log.Infof("Creating %s file", lib.ProposalsFilePath)
 		// create an example proposal
 		blsPrivateKey, _ := crypto.NewBLS12381PrivateKey()
-		proposals := make(types.GovProposals)
+		proposals := make(fsm.GovProposals)
 		a, _ := lib.NewAny(&lib.StringWrapper{Value: "example"})
-		tx, e := types.NewTransaction(blsPrivateKey, &types.MessageChangeParameter{
-			ParameterSpace: types.ParamSpaceCons + "|" + types.ParamSpaceFee + "|" + types.ParamSpaceVal + "|" + types.ParamSpaceGov,
-			ParameterKey:   types.ParamProtocolVersion,
+		tx, e := fsm.NewTransaction(blsPrivateKey, &fsm.MessageChangeParameter{
+			ParameterSpace: fsm.ParamSpaceCons + "|" + fsm.ParamSpaceFee + "|" + fsm.ParamSpaceVal + "|" + fsm.ParamSpaceGov,
+			ParameterKey:   fsm.ParamProtocolVersion,
 			ParameterValue: a,
 			StartHeight:    1,
 			EndHeight:      1000,
@@ -224,11 +223,11 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 		log.Infof("Creating %s file", lib.PollsFilePath)
 		// create an example poll
 		examplePollHash := crypto.HashString([]byte("example"))
-		polls := &types.ActivePolls{
+		polls := &fsm.ActivePolls{
 			Polls: map[string]map[string]bool{
 				examplePollHash: {privateValKey.PublicKey().Address().String(): true},
 			},
-			PollMeta: map[string]*types.StartPoll{
+			PollMeta: map[string]*fsm.StartPoll{
 				examplePollHash: {
 					StartPoll: examplePollHash,
 					Url:       "https://forum.cnpy.network/something",
@@ -259,10 +258,10 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFilePath string) {
 	consPubKey := validatorPrivateKey.PublicKey()
 	addr := consPubKey.Address()
-	j := &types.GenesisState{
+	j := &fsm.GenesisState{
 		Time:     uint64(time.Now().UnixMicro()),
-		Accounts: []*types.Account{{Address: addr.Bytes(), Amount: 1000000}},
-		Validators: []*types.Validator{{
+		Accounts: []*fsm.Account{{Address: addr.Bytes(), Amount: 1000000}},
+		Validators: []*fsm.Validator{{
 			Address:      addr.Bytes(),
 			PublicKey:    consPubKey.Bytes(),
 			Committees:   []uint64{lib.CanopyChainId},
@@ -270,7 +269,7 @@ func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFile
 			StakedAmount: 1000000000000,
 			Output:       addr.Bytes(),
 		}},
-		Params: types.DefaultParams(),
+		Params: fsm.DefaultParams(),
 	}
 	bz, _ := json.MarshalIndent(j, "", "  ")
 	if err := os.WriteFile(genesisFilePath, bz, 0777); err != nil {

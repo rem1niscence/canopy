@@ -2,7 +2,7 @@ package fsm
 
 import (
 	"bytes"
-	"github.com/canopy-network/canopy/fsm/types"
+	"encoding/json"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"slices"
@@ -11,15 +11,15 @@ import (
 /* This file implements state actions on Validators and Delegators*/
 
 // GetValidator() gets the validator from the store via the address
-func (s *StateMachine) GetValidator(address crypto.AddressI) (*types.Validator, lib.ErrorI) {
+func (s *StateMachine) GetValidator(address crypto.AddressI) (*Validator, lib.ErrorI) {
 	// get the bytes from state using the key for a validator at a specific address
-	bz, err := s.Get(types.KeyForValidator(address))
+	bz, err := s.Get(KeyForValidator(address))
 	if err != nil {
 		return nil, err
 	}
 	// if the bytes are empty, return 'validator doesn't exist'
 	if bz == nil {
-		return nil, types.ErrValidatorNotExists()
+		return nil, ErrValidatorNotExists()
 	}
 	// convert the bytes into a validator object reference
 	val, err := s.unmarshalValidator(bz)
@@ -35,7 +35,7 @@ func (s *StateMachine) GetValidator(address crypto.AddressI) (*types.Validator, 
 // GetValidatorExists() checks if the Validator already exists in the state
 func (s *StateMachine) GetValidatorExists(address crypto.AddressI) (bool, lib.ErrorI) {
 	// get the bytes from state using the key for a validator at a specific address
-	bz, err := s.Get(types.KeyForValidator(address))
+	bz, err := s.Get(KeyForValidator(address))
 	if err != nil {
 		return false, err
 	}
@@ -44,9 +44,9 @@ func (s *StateMachine) GetValidatorExists(address crypto.AddressI) (bool, lib.Er
 }
 
 // GetValidators() returns a slice of all validators
-func (s *StateMachine) GetValidators() (result []*types.Validator, err lib.ErrorI) {
+func (s *StateMachine) GetValidators() (result []*Validator, err lib.ErrorI) {
 	// create an iterator to traverse all keys under the 'ValidatorPrefix'
-	it, err := s.Iterator(types.ValidatorPrefix())
+	it, err := s.Iterator(ValidatorPrefix())
 	if err != nil {
 		return nil, err
 	}
@@ -69,11 +69,11 @@ func (s *StateMachine) GetValidators() (result []*types.Validator, err lib.Error
 // GetValidatorsPaginated() returns a page of filtered validators
 func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorFilters) (page *lib.Page, err lib.ErrorI) {
 	// initialize a page and the results slice
-	page, res := lib.NewPage(p, types.ValidatorsPageName), make(types.ValidatorPage, 0)
+	page, res := lib.NewPage(p, ValidatorsPageName), make(ValidatorPage, 0)
 	// if the request has no filters
 	if !f.On() {
 		// populate the page using the validators prefix (validators are stored lexicographically not ordered stake)
-		err = page.Load(types.ValidatorPrefix(), false, &res, s.store, func(_, value []byte) (err lib.ErrorI) {
+		err = page.Load(ValidatorPrefix(), false, &res, s.store, func(_, value []byte) (err lib.ErrorI) {
 			// convert the value into a validator object reference
 			val, err := s.unmarshalValidator(value)
 			// if there's no error
@@ -88,14 +88,14 @@ func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorF
 		return
 	}
 	// create a new iterator for the prefix key
-	it, e := s.Iterator(types.ValidatorPrefix())
+	it, e := s.Iterator(ValidatorPrefix())
 	if e != nil {
 		return nil, e
 	}
 	// ensure memory cleanup
 	defer it.Close()
 	// create a variable to hold the list of filtered validators
-	var filteredVals []*types.Validator
+	var filteredVals []*Validator
 	// for each item in the iterator
 	for ; it.Valid(); it.Next() {
 		// convert the bytes into a validator object reference
@@ -112,7 +112,7 @@ func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorF
 	// populate the page with the list of filtered validators
 	err = page.LoadArray(filteredVals, &res, func(i any) (e lib.ErrorI) {
 		// cast to validator
-		v, ok := i.(*types.Validator)
+		v, ok := i.(*Validator)
 		// ensure the cast was successful
 		if !ok {
 			return lib.ErrInvalidArgument()
@@ -126,7 +126,7 @@ func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorF
 }
 
 // SetValidators() upserts multiple Validators into the state and updates the supply tracker
-func (s *StateMachine) SetValidators(validators []*types.Validator, supply *types.Supply) lib.ErrorI {
+func (s *StateMachine) SetValidators(validators []*Validator, supply *Supply) lib.ErrorI {
 	// for each validator in the list
 	for _, val := range validators {
 		// if the unstaking height or the max paused height is set
@@ -177,14 +177,14 @@ func (s *StateMachine) SetValidators(validators []*types.Validator, supply *type
 }
 
 // SetValidator() upserts a Validator object into the state
-func (s *StateMachine) SetValidator(validator *types.Validator) (err lib.ErrorI) {
+func (s *StateMachine) SetValidator(validator *Validator) (err lib.ErrorI) {
 	// covert the validator object to bytes
 	bz, err := s.marshalValidator(validator)
 	if err != nil {
 		return
 	}
 	// set the bytes under a key for validator using a specific 'validator address'
-	if err = s.Set(types.KeyForValidator(crypto.NewAddressFromBytes(validator.Address)), bz); err != nil {
+	if err = s.Set(KeyForValidator(crypto.NewAddressFromBytes(validator.Address)), bz); err != nil {
 		return
 	}
 	// exit
@@ -193,7 +193,7 @@ func (s *StateMachine) SetValidator(validator *types.Validator) (err lib.ErrorI)
 
 // UpdateValidatorStake() updates the stake of the validator object in state - updating the corresponding committees and supply
 // NOTE: new stake amount must be GTE the previous stake amount
-func (s *StateMachine) UpdateValidatorStake(val *types.Validator, newCommittees []uint64, amountToAdd uint64) (err lib.ErrorI) {
+func (s *StateMachine) UpdateValidatorStake(val *Validator, newCommittees []uint64, amountToAdd uint64) (err lib.ErrorI) {
 	// convert the validator address bytes into an object reference
 	address := crypto.NewAddress(val.Address)
 	// update staked supply accordingly (validator stake amount can never go down except for slashing and unstaking)
@@ -227,7 +227,7 @@ func (s *StateMachine) UpdateValidatorStake(val *types.Validator, newCommittees 
 }
 
 // DeleteValidator() completely removes a validator from the state
-func (s *StateMachine) DeleteValidator(validator *types.Validator) lib.ErrorI {
+func (s *StateMachine) DeleteValidator(validator *Validator) lib.ErrorI {
 	// convert the validator address bytes into an object reference
 	addr := crypto.NewAddress(validator.Address)
 	// subtract from staked supply
@@ -250,7 +250,7 @@ func (s *StateMachine) DeleteValidator(validator *types.Validator) lib.ErrorI {
 		}
 	}
 	// delete the validator from state
-	return s.Delete(types.KeyForValidator(addr))
+	return s.Delete(KeyForValidator(addr))
 }
 
 // UNSTAKING VALIDATORS BELOW
@@ -258,9 +258,9 @@ func (s *StateMachine) DeleteValidator(validator *types.Validator) lib.ErrorI {
 // SetValidatorUnstaking() updates a Validator as 'unstaking' and removes it from its respective committees
 // NOTE: finish unstaking height is the height in the future when the validator will be deleted and their
 // funds be returned
-func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *types.Validator, finishUnstakingHeight uint64) lib.ErrorI {
+func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator *Validator, finishUnstakingHeight uint64) lib.ErrorI {
 	// set an entry in the database to mark this validator as unstaking, a single byte is used to allow 'get' calls to differentiate between non-existing keys
-	if err := s.Set(types.KeyForUnstaking(finishUnstakingHeight, address), []byte{0x1}); err != nil {
+	if err := s.Set(KeyForUnstaking(finishUnstakingHeight, address), []byte{0x1}); err != nil {
 		return err
 	}
 	// if validator is 'paused' (only happens if validator is max paused)
@@ -285,7 +285,7 @@ func (s *StateMachine) DeleteFinishedUnstaking() lib.ErrorI {
 		// add to the 'will delete' list
 		toDelete = append(toDelete, unstakingKey)
 		// get the address from the key
-		addr, err := types.AddressFromKey(unstakingKey)
+		addr, err := AddressFromKey(unstakingKey)
 		if err != nil {
 			return err
 		}
@@ -302,7 +302,7 @@ func (s *StateMachine) DeleteFinishedUnstaking() lib.ErrorI {
 		return s.DeleteValidator(validator)
 	}
 	// for each unstaking key at this height
-	if err := s.IterateAndExecute(types.UnstakingPrefix(s.Height()), callback); err != nil {
+	if err := s.IterateAndExecute(UnstakingPrefix(s.Height()), callback); err != nil {
 		return err
 	}
 	// delete all unstaking keys
@@ -331,7 +331,7 @@ func (s *StateMachine) SetValidatorsPaused(chainId uint64, addresses [][]byte) {
 			return
 		}
 		// handle pausing the validator
-		if err = s.HandleMessagePause(&types.MessagePause{Address: addr}); err != nil {
+		if err = s.HandleMessagePause(&MessagePause{Address: addr}); err != nil {
 			// log error
 			s.log.Debugf("can't pause validator %s with err %s", lib.BytesToString(addr), err.Error())
 			// move on to the next iteration
@@ -341,9 +341,9 @@ func (s *StateMachine) SetValidatorsPaused(chainId uint64, addresses [][]byte) {
 }
 
 // SetValidatorPaused() updates a Validator as 'paused' with a MaxPausedHeight (height at which the Validator is force-unstaked for being paused too long)
-func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *types.Validator, maxPausedHeight uint64) lib.ErrorI {
+func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *Validator, maxPausedHeight uint64) lib.ErrorI {
 	// set an entry in the state to mark this validator as paused, a single byte is used to allow 'get' calls to differentiate between non-existing keys
-	if err := s.Set(types.KeyForPaused(maxPausedHeight, address), []byte{0x1}); err != nil {
+	if err := s.Set(KeyForPaused(maxPausedHeight, address), []byte{0x1}); err != nil {
 		return err
 	}
 	// update the validator max paused height
@@ -353,9 +353,9 @@ func (s *StateMachine) SetValidatorPaused(address crypto.AddressI, validator *ty
 }
 
 // SetValidatorUnpaused() updates a Validator as 'unpaused'
-func (s *StateMachine) SetValidatorUnpaused(address crypto.AddressI, validator *types.Validator) lib.ErrorI {
+func (s *StateMachine) SetValidatorUnpaused(address crypto.AddressI, validator *Validator) lib.ErrorI {
 	// remove the 'paused' entry in the state to mark this validator as not paused
-	if err := s.Delete(types.KeyForPaused(validator.MaxPausedHeight, address)); err != nil {
+	if err := s.Delete(KeyForPaused(validator.MaxPausedHeight, address)); err != nil {
 		return err
 	}
 	// update the validator max paused height to 0
@@ -384,22 +384,22 @@ func (s *StateMachine) pubKeyBytesToAddress(public []byte) ([]byte, lib.ErrorI) 
 	// get the public key object ref from the bytes
 	pk, err := crypto.NewPublicKeyFromBytes(public)
 	if err != nil {
-		return nil, types.ErrInvalidPublicKey(err)
+		return nil, ErrInvalidPublicKey(err)
 	}
 	// get the address bytes from the public key
 	return pk.Address().Bytes(), nil
 }
 
 // marshalValidator() converts the Validator object to bytes
-func (s *StateMachine) marshalValidator(validator *types.Validator) ([]byte, lib.ErrorI) {
+func (s *StateMachine) marshalValidator(validator *Validator) ([]byte, lib.ErrorI) {
 	// convert the object ref into bytes
 	return lib.Marshal(validator)
 }
 
 // unmarshalValidator() converts bytes into a Validator object
-func (s *StateMachine) unmarshalValidator(bz []byte) (*types.Validator, lib.ErrorI) {
+func (s *StateMachine) unmarshalValidator(bz []byte) (*Validator, lib.ErrorI) {
 	// create a new validator object reference to ensure a non-nil result
-	val := new(types.Validator)
+	val := new(Validator)
 	// populate the object reference with validator bytes
 	if err := lib.Unmarshal(bz, val); err != nil {
 		return nil, err
@@ -407,3 +407,121 @@ func (s *StateMachine) unmarshalValidator(bz []byte) (*types.Validator, lib.Erro
 	// return the object ref
 	return val, nil
 }
+
+// VALIDATOR HELPERS BELOW
+
+// validator is the json.Marshaller and json.Unmarshaler implementation for the Validator object
+type validator struct {
+	Address         *crypto.Address           `json:"address"`
+	PublicKey       *crypto.BLS12381PublicKey `json:"publicKey"`
+	Committees      []uint64                  `json:"committees"`
+	NetAddress      string                    `json:"netAddress"`
+	StakedAmount    uint64                    `json:"stakedAmount"`
+	MaxPausedHeight uint64                    `json:"maxPausedHeight"`
+	UnstakingHeight uint64                    `json:"unstakingHeight"`
+	Output          *crypto.Address           `json:"output"`
+	Delegate        bool                      `json:"delegate"`
+	Compound        bool                      `json:"compound"`
+}
+
+// MarshalJSON() is the json.Marshaller implementation for the Validator object
+func (x *Validator) MarshalJSON() ([]byte, error) {
+	publicKey, err := crypto.BytesToBLS12381Public(x.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(validator{
+		Address:         crypto.NewAddressFromBytes(x.Address).(*crypto.Address),
+		PublicKey:       publicKey.(*crypto.BLS12381PublicKey),
+		Committees:      x.Committees,
+		NetAddress:      x.NetAddress,
+		StakedAmount:    x.StakedAmount,
+		MaxPausedHeight: x.MaxPausedHeight,
+		UnstakingHeight: x.UnstakingHeight,
+		Output:          crypto.NewAddressFromBytes(x.Output).(*crypto.Address),
+		Delegate:        x.Delegate,
+		Compound:        x.Compound,
+	})
+}
+
+// UnmarshalJSON() is the json.Unmarshaler implementation for the Validator object
+func (x *Validator) UnmarshalJSON(bz []byte) error {
+	val := new(validator)
+	if err := json.Unmarshal(bz, val); err != nil {
+		return err
+	}
+	*x = Validator{
+		Address:         val.Address.Bytes(),
+		PublicKey:       val.PublicKey.Bytes(),
+		NetAddress:      val.NetAddress,
+		StakedAmount:    val.StakedAmount,
+		Committees:      val.Committees,
+		MaxPausedHeight: val.MaxPausedHeight,
+		UnstakingHeight: val.UnstakingHeight,
+		Output:          val.Output.Bytes(),
+		Delegate:        val.Delegate,
+		Compound:        val.Compound,
+	}
+	return nil
+}
+
+// PassesFilter() returns if the Validator object passes the filter (true) or is filtered out (false)
+func (x *Validator) PassesFilter(f lib.ValidatorFilters) (ok bool) {
+	switch {
+	case f.Unstaking == lib.FilterOption_MustBe:
+		if x.UnstakingHeight == 0 {
+			return
+		}
+	case f.Unstaking == lib.FilterOption_Exclude:
+		if x.UnstakingHeight != 0 {
+			return
+		}
+	}
+	switch {
+	case f.Paused == lib.FilterOption_MustBe:
+		if x.MaxPausedHeight == 0 {
+			return
+		}
+	case f.Paused == lib.FilterOption_Exclude:
+		if x.MaxPausedHeight != 0 {
+			return
+		}
+	}
+	switch {
+	case f.Delegate == lib.FilterOption_MustBe:
+		if !x.Delegate {
+			return
+		}
+	case f.Delegate == lib.FilterOption_Exclude:
+		if x.Delegate {
+			return
+		}
+	}
+	if f.Committee != 0 {
+		if !slices.Contains(x.Committees, f.Committee) {
+			return
+		}
+	}
+	return true
+}
+
+func init() {
+	// Register the pages for converting bytes of Page into the correct Page object
+	lib.RegisteredPageables[ValidatorsPageName] = new(ValidatorPage)
+	lib.RegisteredPageables[ConsValidatorsPageName] = new(ConsValidatorPage)
+}
+
+const (
+	ValidatorsPageName     = "validators"           // name for page of 'Validators'
+	ConsValidatorsPageName = "consensus_validators" // name for page of 'Consensus Validators' (only essential val info needed for consensus)
+)
+
+type ValidatorPage []*Validator
+
+// ValidatorPage satisfies the Page interface
+func (p *ValidatorPage) New() lib.Pageable { return &ValidatorPage{{}} }
+
+type ConsValidatorPage []*lib.ConsensusValidator
+
+// ConsValidatorPage satisfies the Page interface
+func (p *ConsValidatorPage) New() lib.Pageable { return &ConsValidatorPage{{}} }

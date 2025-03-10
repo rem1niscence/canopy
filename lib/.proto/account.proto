@@ -1,7 +1,7 @@
 syntax = "proto3";
 package types;
 
-option go_package = "github.com/canopy-network/canopy/fsm/types";
+option go_package = "github.com/canopy-network/canopy/fsm";
 
 // *****************************************************************************************************
 // This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)

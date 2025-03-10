@@ -3,7 +3,6 @@ package fsm
 import (
 	"bytes"
 	"fmt"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
@@ -21,12 +20,12 @@ func TestHandleByzantine(t *testing.T) {
 
 	const stakeAmount = uint64(100)
 	// pre-generate a set of 4 keys
-	var validators []*types.Validator
+	var validators []*Validator
 	keyGroups := newTestKeyGroups(t, 4)
 
 	// pre-define 4 equally staked validators from those keys
 	for _, k := range keyGroups {
-		validators = append(validators, &types.Validator{
+		validators = append(validators, &Validator{
 			Address:      k.Address.Bytes(),
 			PublicKey:    k.PublicKey.Bytes(),
 			StakedAmount: stakeAmount,
@@ -140,7 +139,7 @@ func TestHandleByzantine(t *testing.T) {
 				// for each expected non signer
 				for _, nonSigner := range expectedNonSigners {
 					// ensure the non-signers array was updated with the expected key
-					require.True(t, slices.ContainsFunc(nonSigners, func(ns *types.NonSigner) bool {
+					require.True(t, slices.ContainsFunc(nonSigners, func(ns *NonSigner) bool {
 						pub, _ := crypto.BytesToBLS12381Public(nonSigner)
 						return bytes.Equal(ns.Address, pub.Address().Bytes())
 					}))
@@ -184,7 +183,7 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 	tests := []struct {
 		name       string
 		detail     string
-		nonSigners types.NonSigners
+		nonSigners NonSigners
 		error      lib.ErrorI
 	}{
 		{
@@ -194,28 +193,28 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 		{
 			name:   "non-slashable-signer",
 			detail: "there exists one non-signer who is not eligible for slashing as they are LTE the 'max' non-signs",
-			nonSigners: types.NonSigners{{
+			nonSigners: NonSigners{{
 				Address: newTestAddressBytes(t),
-				Counter: types.DefaultParams().Validator.MaxNonSign,
+				Counter: DefaultParams().Validator.MaxNonSign,
 			}},
 		},
 		{
 			name:   "slashable-signer",
 			detail: "there exists one non-signer who is eligible for slashing as they are above the 'max' non-signs",
-			nonSigners: types.NonSigners{{
+			nonSigners: NonSigners{{
 				Address: newTestAddressBytes(t),
-				Counter: types.DefaultParams().Validator.MaxNonSign + 1,
+				Counter: DefaultParams().Validator.MaxNonSign + 1,
 			}},
 		},
 		{
 			name:   "one slashable, one non-slashable non-signer",
 			detail: "there exists one non-signer who is eligible for slashing and one who is not eligible",
-			nonSigners: types.NonSigners{{
+			nonSigners: NonSigners{{
 				Address: newTestAddressBytes(t),
-				Counter: types.DefaultParams().Validator.MaxNonSign,
+				Counter: DefaultParams().Validator.MaxNonSign,
 			}, {
 				Address: newTestAddressBytes(t, 1),
-				Counter: types.DefaultParams().Validator.MaxNonSign + 1,
+				Counter: DefaultParams().Validator.MaxNonSign + 1,
 			}},
 		},
 	}
@@ -235,18 +234,18 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 				// add the validator stake to supply
 				require.NoError(t, sm.AddToCommitteeSupplyForChain(lib.CanopyChainId, stakeAmount))
 				// set the non signer as a validator in state
-				require.NoError(t, sm.SetValidator(&types.Validator{
+				require.NoError(t, sm.SetValidator(&Validator{
 					Address:      nonSigner.Address,
 					StakedAmount: stakeAmount,
 					Committees:   []uint64{lib.CanopyChainId},
 				}))
 				// convert the non signer to bytes
-				bz, e := lib.Marshal(&types.NonSigner{
+				bz, e := lib.Marshal(&NonSigner{
 					Counter: nonSigner.Counter,
 				})
 				require.NoError(t, e)
 				// set the non signer in state
-				require.NoError(t, sm.Set(types.KeyForNonSigner(nonSigner.Address), bz))
+				require.NoError(t, sm.Set(KeyForNonSigner(nonSigner.Address), bz))
 			}
 			// retrieve the supply object before the call
 			beforeSupply, err := sm.GetSupply()
@@ -296,9 +295,9 @@ func TestIncrementNonSigners(t *testing.T) {
 	tests := []struct {
 		name       string
 		detail     string
-		preset     types.NonSigners
+		preset     NonSigners
 		nonSigners [][]byte
-		expected   types.NonSigners
+		expected   NonSigners
 		error      string
 	}{
 		{
@@ -315,7 +314,7 @@ func TestIncrementNonSigners(t *testing.T) {
 			name:       "zero preset and one non-sign",
 			detail:     "there are no preset non signers in the state and 1 new didn't sign",
 			nonSigners: [][]byte{newTestPublicKeyBytes(t)},
-			expected: types.NonSigners{{
+			expected: NonSigners{{
 				Address: newTestAddressBytes(t),
 				Counter: 1,
 			}},
@@ -323,12 +322,12 @@ func TestIncrementNonSigners(t *testing.T) {
 		{
 			name:   "one preset and one non-sign",
 			detail: "there is 1 preset non signers in the state and it didn't sign again",
-			preset: types.NonSigners{{
+			preset: NonSigners{{
 				Address: newTestAddressBytes(t),
 				Counter: 1,
 			}},
 			nonSigners: [][]byte{newTestPublicKeyBytes(t)},
-			expected: types.NonSigners{{
+			expected: NonSigners{{
 				Address: newTestAddressBytes(t),
 				Counter: 2,
 			}},
@@ -336,7 +335,7 @@ func TestIncrementNonSigners(t *testing.T) {
 		{
 			name:   "two preset and one non-sign",
 			detail: "there is 2 preset non signers in the state and 1 didn't sign again",
-			preset: types.NonSigners{{
+			preset: NonSigners{{
 				Address: newTestAddressBytes(t),
 				Counter: 1,
 			}, {
@@ -344,7 +343,7 @@ func TestIncrementNonSigners(t *testing.T) {
 				Counter: 1,
 			}},
 			nonSigners: [][]byte{newTestPublicKeyBytes(t)},
-			expected: types.NonSigners{{
+			expected: NonSigners{{
 				Address: newTestAddressBytes(t),
 				Counter: 2,
 			}, {
@@ -360,12 +359,12 @@ func TestIncrementNonSigners(t *testing.T) {
 			// pre-set the non signers
 			for _, nonSigner := range test.preset {
 				// create the non signer info
-				nonSignerInfo := &types.NonSigner{Counter: nonSigner.Counter}
+				nonSignerInfo := &NonSigner{Counter: nonSigner.Counter}
 				// convert it to bytes
 				bz, err := lib.Marshal(nonSignerInfo)
 				require.NoError(t, err)
 				// set the non-signer
-				require.NoError(t, sm.Set(types.KeyForNonSigner(nonSigner.Address), bz))
+				require.NoError(t, sm.Set(KeyForNonSigner(nonSigner.Address), bz))
 			}
 			// execute the function call and check for expected error
 			err := sm.IncrementNonSigners(test.nonSigners)
@@ -505,7 +504,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 				// add to the committee supply
 				require.NoError(t, sm.AddToCommitteeSupplyForChain(lib.CanopyChainId, stakeAmount))
 				// set the double signer as a validator in state
-				require.NoError(t, sm.SetValidator(&types.Validator{
+				require.NoError(t, sm.SetValidator(&Validator{
 					Address:      pub.Address().Bytes(),
 					PublicKey:    pub.Bytes(),
 					StakedAmount: stakeAmount,
@@ -548,7 +547,7 @@ func TestForceUnstakeValidator(t *testing.T) {
 	tests := []struct {
 		name           string
 		detail         string
-		validators     []*types.Validator
+		validators     []*Validator
 		forceUnstakers []crypto.AddressI
 		success        bool
 	}{
@@ -560,7 +559,7 @@ func TestForceUnstakeValidator(t *testing.T) {
 		{
 			name:   "validator already unstaking",
 			detail: "the validator is already unstaking",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:         newTestAddressBytes(t),
 					UnstakingHeight: 1,
@@ -572,7 +571,7 @@ func TestForceUnstakeValidator(t *testing.T) {
 		{
 			name:   "1 validator",
 			detail: "one validator is force unstaked",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: 100,
@@ -584,7 +583,7 @@ func TestForceUnstakeValidator(t *testing.T) {
 		{
 			name:   "2 validators both are force unstaked",
 			detail: "two validators are force unstaked",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: 100,
@@ -651,14 +650,14 @@ func TestSlash(t *testing.T) {
 	tests := []struct {
 		name       string
 		detail     string
-		validators []*types.Validator
+		validators []*Validator
 		slashes    []slash
 		error      string
 	}{
 		{
 			name:   "one double signer",
 			detail: "one validator slashed as a double signer",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
@@ -676,7 +675,7 @@ func TestSlash(t *testing.T) {
 		{
 			name:   "one non signer",
 			detail: "one validator slashed as a non signer",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
@@ -694,7 +693,7 @@ func TestSlash(t *testing.T) {
 		{
 			name:   "one slashed for all",
 			detail: "one validator slashed with all types",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
@@ -717,7 +716,7 @@ func TestSlash(t *testing.T) {
 		{
 			name:   "two slashed for all",
 			detail: "two validators slashed with all types",
-			validators: []*types.Validator{
+			validators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: stakeAmount,
@@ -823,14 +822,14 @@ func TestSlashTracker(t *testing.T) {
 		name                 string
 		detail               string
 		maxSlashPerCommittee uint64
-		validators           []*types.Validator
+		validators           []*Validator
 		slashes              []slash
 	}{
 		{
 			name:                 "1 validator, 1 committee, not max",
 			detail:               "1 validator is slashed for 1 committee under the maximum slash",
 			maxSlashPerCommittee: 15,
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				Committees:   []uint64{0, 1},
 				StakedAmount: stakeAmount,
@@ -847,7 +846,7 @@ func TestSlashTracker(t *testing.T) {
 			name:                 "1 validator, 1 committee, over max",
 			detail:               "1 validator is slashed for 1 committee over the maximum slash",
 			maxSlashPerCommittee: 15,
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				Committees:   []uint64{0, 1},
 				StakedAmount: stakeAmount,
@@ -864,7 +863,7 @@ func TestSlashTracker(t *testing.T) {
 			name:                 "1 validator, 2 committee, over max",
 			detail:               "1 validator is slashed for 2 committees over the maximum slash",
 			maxSlashPerCommittee: 15,
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				Committees:   []uint64{0, 1},
 				StakedAmount: stakeAmount,
@@ -887,7 +886,7 @@ func TestSlashTracker(t *testing.T) {
 			name:                 "2 validator, 1 committee, under max",
 			detail:               "2 validators are slashed for 1 committees under the maximum slash",
 			maxSlashPerCommittee: 15,
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				Committees:   []uint64{0, 1},
 				StakedAmount: stakeAmount,
@@ -913,7 +912,7 @@ func TestSlashTracker(t *testing.T) {
 			name:                 "2 validator, 1 committee, one over one under max",
 			detail:               "2 validators are slashed for 1 committees. One of the slashes is over and one is under the maximum slash",
 			maxSlashPerCommittee: 15,
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:      newTestAddressBytes(t),
 				Committees:   []uint64{0, 1},
 				StakedAmount: stakeAmount,

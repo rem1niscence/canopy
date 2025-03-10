@@ -2,10 +2,10 @@ package controller
 
 import (
 	"bytes"
+	"github.com/canopy-network/canopy/fsm"
 	"slices"
 
 	"github.com/canopy-network/canopy/bft"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 )
 
@@ -43,7 +43,7 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 	// omit the block when sending the transaction as it's not relevant to the root chain
 	qc.Block = nil
 	// create a new certificate results transaction
-	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, rootChainId, c.Config.NetworkID, 0, c.RootChainHeight(), "")
+	tx, err := fsm.NewCertificateResultsTx(c.PrivateKey, qc, rootChainId, c.Config.NetworkID, 0, c.RootChainHeight(), "")
 	// if an error occurred during the tx creation
 	if err != nil {
 		// log the error

@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
@@ -27,7 +26,7 @@ func TestUpdateParam(t *testing.T) {
 			detail: "the parameter space passed is invalid",
 			update: paramUpdate{
 				space: "app",
-				name:  types.ParamMaxCommittees,
+				name:  ParamMaxCommittees,
 				value: &lib.UInt64Wrapper{Value: 100},
 			},
 			error: "unknown param space",
@@ -37,7 +36,7 @@ func TestUpdateParam(t *testing.T) {
 			detail: "the parameter type passed is invalid",
 			update: paramUpdate{
 				space: "val",
-				name:  types.ParamMaxCommittees,
+				name:  ParamMaxCommittees,
 				value: &lib.ConsensusValidator{},
 			},
 			error: "unknown param type",
@@ -47,7 +46,7 @@ func TestUpdateParam(t *testing.T) {
 			detail: "the parameter passed is unknown (this space doesn't have a max committees)",
 			update: paramUpdate{
 				space: "cons",
-				name:  types.ParamMaxCommittees,
+				name:  ParamMaxCommittees,
 				value: &lib.UInt64Wrapper{Value: 100},
 			},
 			error: "unknown param",
@@ -57,7 +56,7 @@ func TestUpdateParam(t *testing.T) {
 			detail: "an update to max committees under the validator param space",
 			update: paramUpdate{
 				space: "val",
-				name:  types.ParamMaxCommittees,
+				name:  ParamMaxCommittees,
 				value: &lib.UInt64Wrapper{Value: 100},
 			},
 		},
@@ -66,9 +65,9 @@ func TestUpdateParam(t *testing.T) {
 			detail: "an update to protocol version under the consensus param space",
 			update: paramUpdate{
 				space: "cons",
-				name:  types.ParamProtocolVersion,
+				name:  ParamProtocolVersion,
 				value: &lib.StringWrapper{
-					Value: types.NewProtocolVersion(2, 2),
+					Value: NewProtocolVersion(2, 2),
 				},
 			},
 		},
@@ -77,7 +76,7 @@ func TestUpdateParam(t *testing.T) {
 			detail: "an update to dao reward percentage under the governance param space",
 			update: paramUpdate{
 				space: "gov",
-				name:  types.ParamDAORewardPercentage,
+				name:  ParamDAORewardPercentage,
 				value: &lib.UInt64Wrapper{Value: 100},
 			},
 		},
@@ -86,7 +85,7 @@ func TestUpdateParam(t *testing.T) {
 			detail: "an update to certificate result tx fee under the fee param space",
 			update: paramUpdate{
 				space: "fee",
-				name:  types.ParamCertificateResultsFee,
+				name:  ParamCertificateResultsFee,
 				value: &lib.UInt64Wrapper{Value: 100},
 			},
 		},
@@ -117,13 +116,13 @@ func TestUpdateParam(t *testing.T) {
 			require.NoError(t, err)
 			// validate the update
 			switch test.update.name {
-			case types.ParamMaxCommittees: // validator
+			case ParamMaxCommittees: // validator
 				require.Equal(t, uint64Value.Value, got.Validator.MaxCommittees)
-			case types.ParamProtocolVersion: // consensus
+			case ParamProtocolVersion: // consensus
 				require.Equal(t, stringValue.Value, got.Consensus.ProtocolVersion)
-			case types.ParamDAORewardPercentage: // gov
+			case ParamDAORewardPercentage: // gov
 				require.Equal(t, uint64Value.Value, got.Governance.DaoRewardPercentage)
-			case types.ParamCertificateResultsFee: // fee
+			case ParamCertificateResultsFee: // fee
 				require.Equal(t, uint64Value.Value, got.Fee.CertificateResultsFee)
 			}
 		})
@@ -133,7 +132,7 @@ func TestUpdateParam(t *testing.T) {
 func TestConformStateToParamUpdate(t *testing.T) {
 	const amount = uint64(100)
 	// preset param sets to test the adjustment after the update
-	defaultParams, higherMaxCommittee, lowerMaxCommittee := types.DefaultParams(), types.DefaultParams(), types.DefaultParams()
+	defaultParams, higherMaxCommittee, lowerMaxCommittee := DefaultParams(), DefaultParams(), DefaultParams()
 	// preset the default to have deterinism in this test
 	defaultParams.Validator.MaxCommittees = 2
 	// increment the default for the higher max committee
@@ -144,16 +143,16 @@ func TestConformStateToParamUpdate(t *testing.T) {
 	tests := []struct {
 		name               string
 		detail             string
-		previousParams     *types.Params
-		presetValidators   []*types.Validator
-		paramUpdate        *types.Params
-		expectedValidators []*types.Validator
+		previousParams     *Params
+		presetValidators   []*Validator
+		paramUpdate        *Params
+		expectedValidators []*Validator
 	}{
 		{
 			name:           "no conform, same max committee size",
 			detail:         "no conform is required as the max committee size is the same",
 			previousParams: defaultParams,
-			presetValidators: []*types.Validator{
+			presetValidators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
@@ -171,7 +170,7 @@ func TestConformStateToParamUpdate(t *testing.T) {
 				},
 			},
 			paramUpdate: defaultParams,
-			expectedValidators: []*types.Validator{
+			expectedValidators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
@@ -193,7 +192,7 @@ func TestConformStateToParamUpdate(t *testing.T) {
 			name:           "no conform, greater than max committee size",
 			detail:         "no conform is required as the max committee size grew",
 			previousParams: defaultParams,
-			presetValidators: []*types.Validator{
+			presetValidators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
@@ -211,7 +210,7 @@ func TestConformStateToParamUpdate(t *testing.T) {
 				},
 			},
 			paramUpdate: higherMaxCommittee,
-			expectedValidators: []*types.Validator{
+			expectedValidators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
@@ -233,7 +232,7 @@ func TestConformStateToParamUpdate(t *testing.T) {
 			name:           "conform, less than max committee size",
 			detail:         "conform is required as the max committee size shrunk",
 			previousParams: defaultParams,
-			presetValidators: []*types.Validator{
+			presetValidators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
@@ -251,7 +250,7 @@ func TestConformStateToParamUpdate(t *testing.T) {
 				},
 			},
 			paramUpdate: lowerMaxCommittee,
-			expectedValidators: []*types.Validator{
+			expectedValidators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
@@ -273,7 +272,7 @@ func TestConformStateToParamUpdate(t *testing.T) {
 			name:           "conform variable committees, less than max committee size",
 			detail:         "conform variable committees, is required as the max committee size shrunk",
 			previousParams: defaultParams,
-			presetValidators: []*types.Validator{
+			presetValidators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
@@ -291,7 +290,7 @@ func TestConformStateToParamUpdate(t *testing.T) {
 				},
 			},
 			paramUpdate: lowerMaxCommittee,
-			expectedValidators: []*types.Validator{
+			expectedValidators: []*Validator{
 				{
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
@@ -312,7 +311,7 @@ func TestConformStateToParamUpdate(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			supply := &types.Supply{}
+			supply := &Supply{}
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
 			// preset the params
@@ -338,12 +337,12 @@ func TestSetGetParams(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
-		expected *types.Params
+		expected *Params
 	}{
 		{
 			name:     "default",
 			detail:   "set the defaults",
-			expected: types.DefaultParams(),
+			expected: DefaultParams(),
 		},
 	}
 	for _, test := range tests {
@@ -351,7 +350,7 @@ func TestSetGetParams(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
 			// clear the params
-			require.NoError(t, sm.SetParams(&types.Params{}))
+			require.NoError(t, sm.SetParams(&Params{}))
 			// execute the function call
 			require.NoError(t, sm.SetParams(test.expected))
 			// validate the set with 'get'
@@ -359,7 +358,7 @@ func TestSetGetParams(t *testing.T) {
 			require.NoError(t, err)
 			require.EqualExportedValues(t, test.expected, got)
 			// clear the params
-			require.NoError(t, sm.SetParams(&types.Params{}))
+			require.NoError(t, sm.SetParams(&Params{}))
 			// execute the individual sets
 			require.NoError(t, sm.SetParamsVal(test.expected.Validator))
 			require.NoError(t, sm.SetParamsCons(test.expected.Consensus))
@@ -389,19 +388,19 @@ func TestApproveProposal(t *testing.T) {
 	// create a new private key
 	pk, err := crypto.NewEd25519PrivateKey()
 	// pre-create a 'change parameter' proposal to use during testing
-	a, err := lib.NewAny(&lib.StringWrapper{Value: types.NewProtocolVersion(3, 2)})
+	a, err := lib.NewAny(&lib.StringWrapper{Value: NewProtocolVersion(3, 2)})
 	require.NoError(t, err)
-	msg := &types.MessageChangeParameter{
+	msg := &MessageChangeParameter{
 		ParameterSpace: "cons",
-		ParameterKey:   types.ParamProtocolVersion,
+		ParameterKey:   ParamProtocolVersion,
 		ParameterValue: a,
 		StartHeight:    1,
 		EndHeight:      2,
 		Signer:         newTestAddressBytes(t),
 	}
 	//  pre-create the change parameter tx
-	changeParamTx, err := types.NewChangeParamTxString(
-		pk, "cons", types.ParamProtocolVersion, types.NewProtocolVersion(3, 2),
+	changeParamTx, err := NewChangeParamTxString(
+		pk, "cons", ParamProtocolVersion, NewProtocolVersion(3, 2),
 		1, 2, 1, 1, 10000, 1, "",
 	)
 	require.NoError(t, err)
@@ -409,21 +408,21 @@ func TestApproveProposal(t *testing.T) {
 	changeParamTxJSON, err := lib.MarshalJSONIndent(changeParamTx)
 	require.NoError(t, err)
 	// create a test 'list' that approves the proposal
-	approveMsgList := types.GovProposals{}
+	approveMsgList := GovProposals{}
 	require.NoError(t, approveMsgList.Add(changeParamTxJSON, true))
 	// create a test 'list' that rejects the proposal
-	rejectMsgList := types.GovProposals{}
+	rejectMsgList := GovProposals{}
 	require.NoError(t, rejectMsgList.Add(changeParamTxJSON, false))
 	// populate the proposal hash in the msg
-	msg.ProposalHash, err = types.TxHashFromJSON(changeParamTxJSON)
+	msg.ProposalHash, err = TxHashFromJSON(changeParamTxJSON)
 	// run test cases
 	tests := []struct {
 		name   string
 		detail string
 		height uint64
-		preset types.GovProposals
-		config types.GovProposalVoteConfig
-		msg    types.GovProposal
+		preset GovProposals
+		config GovProposalVoteConfig
+		msg    GovProposal
 		error  string
 	}{
 		{
@@ -431,14 +430,14 @@ func TestApproveProposal(t *testing.T) {
 			detail: "no error because msg is explicitly approved via file",
 			height: 1,
 			preset: approveMsgList,
-			config: types.GovProposalVoteConfig_APPROVE_LIST,
+			config: GovProposalVoteConfig_APPROVE_LIST,
 			msg:    msg,
 		}, {
 			name:   "explicitly rejected on list",
 			detail: "error because msg is explicitly rejected via file",
 			height: 1,
 			preset: rejectMsgList,
-			config: types.GovProposalVoteConfig_APPROVE_LIST,
+			config: GovProposalVoteConfig_APPROVE_LIST,
 			msg:    msg,
 			error:  "proposal rejected",
 		},
@@ -446,8 +445,8 @@ func TestApproveProposal(t *testing.T) {
 			name:   "not on list",
 			detail: "error because msg is not on list via file",
 			height: 1,
-			preset: types.GovProposals{},
-			config: types.GovProposalVoteConfig_APPROVE_LIST,
+			preset: GovProposals{},
+			config: GovProposalVoteConfig_APPROVE_LIST,
 			msg:    msg,
 			error:  "proposal rejected",
 		},
@@ -455,7 +454,7 @@ func TestApproveProposal(t *testing.T) {
 			name:   "height before start",
 			detail: "error because msg applied at height that is before start",
 			height: 0,
-			config: types.AcceptAllProposals,
+			config: AcceptAllProposals,
 			msg:    msg,
 			error:  "proposal rejected",
 		},
@@ -463,7 +462,7 @@ func TestApproveProposal(t *testing.T) {
 			name:   "height after end",
 			detail: "error because msg applied at height that is after end",
 			height: 3,
-			config: types.AcceptAllProposals,
+			config: AcceptAllProposals,
 			msg:    msg,
 			error:  "proposal rejected",
 		},
@@ -472,8 +471,8 @@ func TestApproveProposal(t *testing.T) {
 			detail: "configuration approves all proposals regardless of list",
 			height: 1,
 			preset: rejectMsgList,
-			config: types.AcceptAllProposals,
-			msg: &types.MessageDAOTransfer{
+			config: AcceptAllProposals,
+			msg: &MessageDAOTransfer{
 				Address:     newTestAddressBytes(t),
 				Amount:      100,
 				StartHeight: 1,
@@ -485,7 +484,7 @@ func TestApproveProposal(t *testing.T) {
 			detail: "configuration approves all proposals regardless of list",
 			height: 1,
 			preset: rejectMsgList,
-			config: types.AcceptAllProposals,
+			config: AcceptAllProposals,
 			msg:    msg,
 		},
 		{
@@ -493,7 +492,7 @@ func TestApproveProposal(t *testing.T) {
 			detail: "configuration rejects all proposals regardless of list",
 			height: 1,
 			preset: approveMsgList,
-			config: types.RejectAllProposals,
+			config: RejectAllProposals,
 			msg:    msg,
 			error:  "proposal rejected",
 		},
@@ -579,7 +578,7 @@ func TestIsFeatureEnabled(t *testing.T) {
 			// set height
 			sm.height = test.height
 			// update the protocol version
-			require.NoError(t, sm.UpdateParam(types.ParamSpaceCons, types.ParamProtocolVersion, &lib.StringWrapper{Value: test.protocolVersion}))
+			require.NoError(t, sm.UpdateParam(ParamSpaceCons, ParamProtocolVersion, &lib.StringWrapper{Value: test.protocolVersion}))
 			// execute the function
 			require.Equal(t, test.expected, sm.IsFeatureEnabled(test.version))
 		})

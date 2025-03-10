@@ -3,7 +3,6 @@ package controller
 import (
 	"fmt"
 	"github.com/canopy-network/canopy/fsm"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/p2p"
@@ -174,7 +173,7 @@ func (m *Mempool) HandleTransaction(tx []byte) (err lib.ErrorI) {
 	// extract the fee from the transaction result
 	fee := result.Transaction.Fee
 	// if the transaction is a special type: 'certificate result'
-	if result.MessageType == types.MessageCertificateResultsName {
+	if result.MessageType == fsm.MessageCertificateResultsName {
 		// prioritize certificate result transactions by artificially raising the fee 'stored fee'
 		fee = math.MaxUint32
 	}

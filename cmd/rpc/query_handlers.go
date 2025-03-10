@@ -11,7 +11,6 @@ import (
 	"strconv"
 
 	"github.com/canopy-network/canopy/fsm"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/store"
@@ -507,7 +506,7 @@ func (s *Server) heightAndAddressParams(w http.ResponseWriter, r *http.Request, 
 	req := new(heightAndAddressRequest)
 	s.readOnlyStateFromHeightParams(w, r, req, func(state *fsm.StateMachine) (err lib.ErrorI) {
 		if req.Address == nil {
-			write(w, types.ErrAddressEmpty(), http.StatusBadRequest)
+			write(w, fsm.ErrAddressEmpty(), http.StatusBadRequest)
 			return
 		}
 		p, err := callback(state, req.Address)
@@ -674,7 +673,7 @@ func (s *Server) addrIndexer(w http.ResponseWriter, r *http.Request, callback fu
 	}
 	defer st.Discard()
 	if req.Address == nil {
-		write(w, types.ErrAddressEmpty(), http.StatusBadRequest)
+		write(w, fsm.ErrAddressEmpty(), http.StatusBadRequest)
 		return
 	}
 	p, err := callback(st, crypto.NewAddressFromBytes(req.Address), req.PageParams)

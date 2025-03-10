@@ -91,7 +91,6 @@ const (
 	CodeNoValidators                ErrorCode = 29
 	CodeInvalidResultsHash          ErrorCode = 30
 	CodeNonNilBlock                 ErrorCode = 31
-	CodeMessageCastFailed           ErrorCode = 32
 
 	// Consensus Module
 	ConsensusModule ErrorModule = "consensus"
@@ -164,97 +163,96 @@ const (
 	StateMachineModule ErrorModule = "state_machine"
 
 	// State Machine Module Error Codes
-	CodeReadGenesisFile                   ErrorCode = 1
-	CodeFeeBelowState                     ErrorCode = 2
-	CodeUnauthorizedTx                    ErrorCode = 3
-	CodeEmptySignature                    ErrorCode = 4
-	CodeTxSignBytes                       ErrorCode = 5
-	CodeInvalidTxMessage                  ErrorCode = 6
-	CodeErrInvalidTxTime                  ErrorCode = 7
-	CodeMaxBlockSize                      ErrorCode = 8
-	CodeMaxTxSize                         ErrorCode = 9
-	CodeRejectProposal                    ErrorCode = 10
-	CodeInvalidNetAddressLen              ErrorCode = 11
-	CodeInvalidSignature                  ErrorCode = 12
-	CodeAddressEmpty                      ErrorCode = 13
-	CodeAddressSize                       ErrorCode = 14
-	CodeRecipientAddressEmpty             ErrorCode = 15
-	CodeRecipientAddressSize              ErrorCode = 16
-	CodeOutputAddressEmpty                ErrorCode = 17
-	CodeOutputAddressSize                 ErrorCode = 18
-	CodeInvalidAmount                     ErrorCode = 19
-	CodePubKeyEmpty                       ErrorCode = 20
-	CodePubKeySize                        ErrorCode = 21
-	CodeParamKeyEmpty                     ErrorCode = 22
-	CodeParamValEmpty                     ErrorCode = 23
-	CodeInvalidSubsidy                    ErrorCode = 24
-	CodeInvalidOpcode                     ErrorCode = 25
-	CodeWrongChainId                      ErrorCode = 26
-	CodeUnknownMsg                        ErrorCode = 27
-	CodeInsufficientFunds                 ErrorCode = 28
-	CodeValidatorExists                   ErrorCode = 29
-	CodeValidatorNotExists                ErrorCode = 30
-	CodeValidatorUnstaking                ErrorCode = 31
-	CodeValidatorPaused                   ErrorCode = 32
-	CodeValidatorNotPaused                ErrorCode = 33
-	CodeEmptyConsParams                   ErrorCode = 34
-	CodeEmptyValParams                    ErrorCode = 35
-	CodeEmptyFeeParams                    ErrorCode = 36
-	CodeEmptyGovParams                    ErrorCode = 37
-	CodeUnknownParam                      ErrorCode = 38
-	CodeUnknownParamType                  ErrorCode = 39
-	CodeUnknownParamSpace                 ErrorCode = 40
-	CodeInvalidProposalHash               ErrorCode = 41
-	CodeBelowMinimumStake                 ErrorCode = 42
-	CodeInvalidSlashPercentage            ErrorCode = 43
-	CodeNonSubsidizedCommittee            ErrorCode = 44
-	CodeInvalidNumberOfSamples            ErrorCode = 45
-	CodeInvalidCertificateResults         ErrorCode = 46
-	CodePaymentRecipientsCount            ErrorCode = 47
-	CodeInvalidPercentAllocation          ErrorCode = 48
-	CodeStringToInt                       ErrorCode = 49
-	CodeInvalidParam                      ErrorCode = 50
-	CodeInvalidPoolName                   ErrorCode = 51
-	CodeInvalidProtocolVersion            ErrorCode = 52
-	CodeInvalidDBKey                      ErrorCode = 53
-	CodeWrongStoreType                    ErrorCode = 54
-	CodeUnmarshalGenesis                  ErrorCode = 55
-	CodeInsufficientSupply                ErrorCode = 56
-	CodeUnknownMsgName                    ErrorCode = 57
-	CodeUnknownPageable                   ErrorCode = 58
-	CodePollValidator                     ErrorCode = 59
-	CodeInvalidBlockRange                 ErrorCode = 60
-	CodeInvalidPublicKey                  ErrorCode = 61
-	CodeInvalidDoubleSignHeights          ErrorCode = 62
-	CodeInvalidDoubleSigner               ErrorCode = 63
-	CodeInvalidNumCommittees              ErrorCode = 64
-	CodeInvalidCommitteeStakeDistribution ErrorCode = 65
-	CodeValidatorIsADelegate              ErrorCode = 66
-	CodeInvalidCommittee                  ErrorCode = 67
-	CodeInvalidChainId                    ErrorCode = 68
-	CodeWrongNetworkID                    ErrorCode = 69
-	CodeInvalidSlashRecipients            ErrorCode = 70
-	CodeRootHeight                        ErrorCode = 71
-	CodeInvalidQCCommitteeHeight          ErrorCode = 72
-	CodeInvalidOrders                     ErrorCode = 73
-	CodeOrderNotFound                     ErrorCode = 74
-	CodeUnauthorizedOrderChange           ErrorCode = 75
-	CodeMinimumOrderSize                  ErrorCode = 76
-	CodeOrderLocked                       ErrorCode = 77
-	CodeInvalidLockOrder                  ErrorCode = 78
-	CodeDuplicateLockOrder                ErrorCode = 79
-	CodeInvalidBuyerDeadline              ErrorCode = 80
-	CodeInvalidCloseOrder                 ErrorCode = 81
-	CodeInvalidResetOrder                 ErrorCode = 82
-	CodeInvalidCheckpoint                 ErrorCode = 83
-	CodeInvalidSellOrder                  ErrorCode = 84
-	CodeStartPollHeight                   ErrorCode = 85
-	CodeEmptyChainId                      ErrorCode = 86
-	CodeMismatchCertResults               ErrorCode = 87
-	CodeInvalidQCRootChainHeight          ErrorCode = 88
-	CodeEmptyCertificateResults           ErrorCode = 89
-	CodeSlashNonValidator                 ErrorCode = 90
-	CodeEmptyOrderBook                    ErrorCode = 91
+	CodeReadGenesisFile  ErrorCode = 1
+	CodeFeeBelowState    ErrorCode = 2
+	CodeUnauthorizedTx   ErrorCode = 3
+	CodeEmptySignature   ErrorCode = 4
+	CodeTxSignBytes      ErrorCode = 5
+	CodeInvalidTxMessage ErrorCode = 6
+
+	CodeMaxBlockSize          ErrorCode = 8
+	CodeMaxTxSize             ErrorCode = 9
+	CodeRejectProposal        ErrorCode = 10
+	CodeInvalidNetAddressLen  ErrorCode = 11
+	CodeInvalidSignature      ErrorCode = 12
+	CodeAddressEmpty          ErrorCode = 13
+	CodeAddressSize           ErrorCode = 14
+	CodeRecipientAddressEmpty ErrorCode = 15
+	CodeRecipientAddressSize  ErrorCode = 16
+	CodeOutputAddressEmpty    ErrorCode = 17
+	CodeOutputAddressSize     ErrorCode = 18
+	CodeInvalidAmount         ErrorCode = 19
+	CodePubKeyEmpty           ErrorCode = 20
+	CodePubKeySize            ErrorCode = 21
+	CodeParamKeyEmpty         ErrorCode = 22
+	CodeParamValEmpty         ErrorCode = 23
+	CodeInvalidSubsidy        ErrorCode = 24
+	CodeInvalidOpcode         ErrorCode = 25
+	CodeWrongChainId          ErrorCode = 26
+	CodeUnknownMsg            ErrorCode = 27
+	CodeInsufficientFunds     ErrorCode = 28
+	CodeValidatorExists       ErrorCode = 29
+	CodeValidatorNotExists    ErrorCode = 30
+	CodeValidatorUnstaking    ErrorCode = 31
+	CodeValidatorPaused       ErrorCode = 32
+	CodeValidatorNotPaused    ErrorCode = 33
+	CodeEmptyConsParams       ErrorCode = 34
+	CodeEmptyValParams        ErrorCode = 35
+	CodeEmptyFeeParams        ErrorCode = 36
+	CodeEmptyGovParams        ErrorCode = 37
+	CodeUnknownParam          ErrorCode = 38
+	CodeUnknownParamType      ErrorCode = 39
+	CodeUnknownParamSpace     ErrorCode = 40
+	CodeInvalidProposalHash   ErrorCode = 41
+
+	CodeNonSubsidizedCommittee    ErrorCode = 44
+	CodeInvalidNumberOfSamples    ErrorCode = 45
+	CodeInvalidCertificateResults ErrorCode = 46
+	CodePaymentRecipientsCount    ErrorCode = 47
+	CodeInvalidPercentAllocation  ErrorCode = 48
+
+	CodeInvalidParam ErrorCode = 50
+
+	CodeInvalidProtocolVersion ErrorCode = 52
+	CodeInvalidDBKey           ErrorCode = 53
+	CodeWrongStoreType         ErrorCode = 54
+	CodeUnmarshalGenesis       ErrorCode = 55
+	CodeInsufficientSupply     ErrorCode = 56
+	CodeUnknownMsgName         ErrorCode = 57
+	CodeUnknownPageable        ErrorCode = 58
+
+	CodeInvalidBlockRange        ErrorCode = 60
+	CodeInvalidPublicKey         ErrorCode = 61
+	CodeInvalidDoubleSignHeights ErrorCode = 62
+	CodeInvalidDoubleSigner      ErrorCode = 63
+	CodeInvalidNumCommittees     ErrorCode = 64
+
+	CodeValidatorIsADelegate ErrorCode = 66
+
+	CodeInvalidChainId ErrorCode = 68
+	CodeWrongNetworkID ErrorCode = 69
+
+	CodeRootHeight               ErrorCode = 71
+	CodeInvalidQCCommitteeHeight ErrorCode = 72
+
+	CodeOrderNotFound ErrorCode = 74
+
+	CodeMinimumOrderSize     ErrorCode = 76
+	CodeOrderLocked          ErrorCode = 77
+	CodeInvalidLockOrder     ErrorCode = 78
+	CodeDuplicateLockOrder   ErrorCode = 79
+	CodeInvalidBuyerDeadline ErrorCode = 80
+	CodeInvalidCloseOrder    ErrorCode = 81
+
+	CodeInvalidCheckpoint        ErrorCode = 83
+	CodeInvalidSellOrder         ErrorCode = 84
+	CodeStartPollHeight          ErrorCode = 85
+	CodeEmptyChainId             ErrorCode = 86
+	CodeMismatchCertResults      ErrorCode = 87
+	CodeInvalidQCRootChainHeight ErrorCode = 88
+	CodeEmptyCertificateResults  ErrorCode = 89
+	CodeSlashNonValidator        ErrorCode = 90
+	CodeEmptyOrderBook           ErrorCode = 91
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
