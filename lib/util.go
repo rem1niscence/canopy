@@ -17,12 +17,21 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"time"
 )
 
+/* This file implements shared general utility functions that are used throughout the app */
+
+// PAGE CODE BELOW
+
 // RegisteredPageables is a global slice of registered pageables for generic unmarshalling
 var RegisteredPageables = make(map[string]Pageable)
+
+func init() {
+	RegisteredPageables[TxResultsPageName] = new(TxResults)      // preregister the page type for unmarshalling
+	RegisteredPageables[PendingResultsPageName] = new(TxResults) // preregister the page type for unmarshalling
+	RegisteredPageables[FailedTxsPageName] = new(FailedTxs)      // preregister the page type for unmarshalling
+}
 
 // Page is a pagination wrapper over a slice of data
 type Page struct {
@@ -49,6 +58,7 @@ func NewPage(p PageParams, pageType string) *Page { return &Page{PageParams: p, 
 
 // Load() fills a page from an IteratorI
 func (p *Page) Load(storePrefix []byte, reverse bool, results Pageable, db RStoreI, callback func(k, v []byte) ErrorI) (err ErrorI) {
+	// create a new iterator object to hold the store iterator
 	var it IteratorI
 	// set the page results so that even if it's a zero page, it will have a castable type
 	p.Results = results
@@ -56,13 +66,18 @@ func (p *Page) Load(storePrefix []byte, reverse bool, results Pageable, db RStor
 	// is highest to lowest and vise versa
 	switch reverse {
 	case true:
+		// use a reverse iterator
 		it, err = db.RevIterator(storePrefix)
 	case false:
+		// use a normal iterator
 		it, err = db.Iterator(storePrefix)
 	}
+	// if an error occurred during iterator construction
 	if err != nil {
-		return err
+		// exit with error
+		return
 	}
+	// close the iterator once function completes for memory recovery
 	defer it.Close()
 	// skip to index makes the starting point appropriate based on the page params
 	// initialize variable to indicate if the loop is counting only or actually populating
@@ -77,7 +92,9 @@ func (p *Page) Load(storePrefix []byte, reverse bool, results Pageable, db RStor
 		}
 		// if reached end of the desired page (+1 because we pre-increment)
 		if p.TotalCount == pageStartIndex+p.PerPage+1 {
-			countOnly = true // switch to only counts
+			// switch to only counts
+			countOnly = true
+			// continue the next
 			continue
 		}
 		// execute the callback; passing key and value
@@ -86,84 +103,116 @@ func (p *Page) Load(storePrefix []byte, reverse bool, results Pageable, db RStor
 		}
 		// set the results and increment the count
 		p.Results = results
+		// increment the count
 		p.Count++
 	}
 	// calculate total pages
 	p.TotalPages = int(math.Ceil(float64(p.TotalCount) / float64(p.PerPage)))
+	// exit
 	return
 }
 
 // LoadArray() fills a page from a slice
 func (p *Page) LoadArray(slice any, results Pageable, callback func(i any) ErrorI) (err ErrorI) {
+	// if the slice is not type of reflect
 	arr := reflect.ValueOf(slice)
+	// if the type is not a slice
 	if arr.Kind() != reflect.Slice {
+		// exit with invalid argument
 		return ErrInvalidArgument()
 	}
 	// skip to index makes the starting point appropriate based on the page params
 	pageStartIndex, size := p.skipToIndex(), arr.Len()
 	// initialize variable to indicate if the loop is counting only or actually populating
 	countOnly := false
+	// for each element in the slice
 	for p.TotalCount < size {
 		// pre-increment total count to ensure each iteration of the loop is counted including if p.TotalCount > size or `countOnly`
 		p.TotalCount++
 		// while count is below the start page index (LTE because we pre-increment)
 		if p.TotalCount <= pageStartIndex || countOnly {
+			// go to next iteration
 			continue
 		}
-		elem := arr.Index(p.TotalCount - 1).Interface()
-		if e := callback(elem); e != nil {
-			return e
+		// convert the element at the index to an 'any'
+		a := arr.Index(p.TotalCount - 1).Interface()
+		// pass the 'any' to the callback
+		if err = callback(a); err != nil {
+			// exit with error
+			return
 		}
 		// if reached end of the desired page (+1 because we pre-increment)
 		if p.TotalCount-1 == pageStartIndex+p.PerPage {
-			countOnly = true // switch to only counts
+			// switch to only counts
+			countOnly = true
+			// continue with next iteration
 			continue
 		}
 		// set the results and increment the count
 		p.Results = results
+		// increment the count
 		p.Count++
 	}
 	// calculate total pages
 	p.TotalPages = int(math.Ceil(float64(p.TotalCount) / float64(p.PerPage)))
+	// exit
 	return
 }
 
 // skipToIndex() sanity checks params and then determines the first index of the page
 func (p *PageParams) skipToIndex() int {
+	// set the defaults
 	defaultPerPage, maxPerPage := 10, 5000
+	// if the perPage isn't set
 	if p.PerPage == 0 {
+		// use the default
 		p.PerPage = defaultPerPage
 	}
+	// if the per page exceeds the max per page
 	if p.PerPage > maxPerPage {
+		// if the perPage exceeds the max, use the max
 		p.PerPage = maxPerPage
 	}
 	// start page count at 1 not 0
 	if p.PageNumber == 0 {
+		// set to page 1
 		p.PageNumber = 1
 	}
+	// if on the first page
 	if p.PageNumber == 1 {
+		// return 0 index
 		return 0
 	}
+	// calculate the previous page number
 	lastPage := p.PageNumber - 1
+	// set the start to the index after the last page
 	return lastPage * p.PerPage
 }
 
 // UnmarshalJSON() overrides the unmarshalling logic of the
 // Page for generic structure assignment (registered pageables) and custom formatting
-func (p *Page) UnmarshalJSON(b []byte) error {
-	var j jsonPage
-	if err := json.Unmarshal(b, &j); err != nil {
-		return err
+func (p *Page) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new json object reference to ensure a non-nil result
+	j := new(jsonPage)
+	// populate the json page with json bytes
+	if err = json.Unmarshal(jsonBytes, &j); err != nil {
+		// exit with error
+		return
 	}
-	var pageable Pageable
-	m, ok := RegisteredPageables[j.Type]
-	if !ok {
+	// extract the pageable implementation from the previously registered pageable type
+	m, found := RegisteredPageables[j.Type]
+	// if not found among the registered
+	if !found {
 		return ErrUnknownPageable(j.Type)
 	}
-	pageable = m.New()
-	if err := json.Unmarshal(j.Results, pageable); err != nil {
-		return err
+	// create a new instance of the page
+	pageable := m.New()
+	// populate the results with json bytes
+	if err = json.Unmarshal(j.Results, pageable); err != nil {
+		// exit with error
+		return
 	}
+	//
 	*p = Page{
 		PageParams: j.PageParams,
 		Results:    pageable,
@@ -172,7 +221,8 @@ func (p *Page) UnmarshalJSON(b []byte) error {
 		TotalPages: j.TotalPages,
 		TotalCount: j.TotalCount,
 	}
-	return nil
+	// exit
+	return
 }
 
 // jsonPage is the internal structure for custom json for the Page structure
@@ -187,132 +237,188 @@ type jsonPage struct {
 
 // Marshal() serializes a proto.Message into a byte slice
 func Marshal(message any) ([]byte, ErrorI) {
-	bz, err := proto.Marshal(message.(proto.Message))
+	// convert the message into proto bytes using the proto marshaller
+	protoBytes, err := proto.Marshal(message.(proto.Message))
+	// if an error occurred during hte conversion process
 	if err != nil {
+		// exit with a wrapped error
 		return nil, ErrMarshal(err)
 	}
-	return bz, nil
+	// exit
+	return protoBytes, nil
 }
 
 // Unmarshal() deserializes a byte slice into a proto.Message
-func Unmarshal(data []byte, ptr any) ErrorI {
-	if data == nil || ptr == nil {
+func Unmarshal(protoBytes []byte, ptr any) ErrorI {
+	// if protoBytes are empty or ptr is nil
+	if protoBytes == nil || ptr == nil {
+		// return with no error
 		return nil
 	}
-	if err := proto.Unmarshal(data, ptr.(proto.Message)); err != nil {
+	// populate the ptr with the proto bytes
+	if err := proto.Unmarshal(protoBytes, ptr.(proto.Message)); err != nil {
+		// exit with wrapped error
 		return ErrUnmarshal(err)
 	}
+	// exit
 	return nil
 }
 
 // MarshalJSON() serializes a message into a JSON byte slice
 func MarshalJSON(message any) ([]byte, ErrorI) {
-	bz, err := json.Marshal(message)
+	// convert the message to json bytes
+	jsonBytes, err := json.Marshal(message)
+	// if an error occurred during the conversion
 	if err != nil {
+		// exit with wrapped error
 		return nil, ErrJSONMarshal(err)
 	}
-	return bz, nil
+	// exit with json bytes
+	return jsonBytes, nil
+}
+
+// UnmarshalJSON() deserializes a JSON byte slice into the specified object
+func UnmarshalJSON(jsonBytes []byte, ptr any) ErrorI {
+	// populate the pointer with json bytes
+	if err := json.Unmarshal(jsonBytes, ptr); err != nil {
+		// exit with error
+		return ErrJSONUnmarshal(err)
+	}
+	// exit
+	return nil
 }
 
 // MarshalJSONIndent() serializes a message into an indented JSON byte slice
 func MarshalJSONIndent(message any) ([]byte, ErrorI) {
+	// convert the message to pretty json bytes
 	bz, err := json.MarshalIndent(message, "", "  ")
+	// if an error occurred during the conversion
 	if err != nil {
+		// exit with wrapped error
 		return nil, ErrJSONMarshal(err)
 	}
+	// exit with pretty json bytes
 	return bz, nil
 }
 
 // MarshalJSONIndentString() serializes a message into an indented JSON string
 func MarshalJSONIndentString(message any) (string, ErrorI) {
+	// convert the message to pretty json bytes
 	bz, err := MarshalJSONIndent(message)
+	// convert to string and exit
 	return string(bz), err
 }
 
-// UnmarshalJSON() deserializes a JSON byte slice into the specified object
-func UnmarshalJSON(bz []byte, ptr any) ErrorI {
-	if err := json.Unmarshal(bz, ptr); err != nil {
-		return ErrJSONUnmarshal(err)
-	}
-	return nil
-}
-
-// NewJSONFromFile() reads a json object from file
+// NewJSONFromFile() reads a json file into an object
 func NewJSONFromFile(o any, dataDirPath, filePath string) ErrorI {
-	bz, err := os.ReadFile(filepath.Join(dataDirPath, filePath))
+	// read the json file into bytes
+	jsonFileBytes, err := os.ReadFile(filepath.Join(dataDirPath, filePath))
+	// if an error occurred during the read
 	if err != nil {
+		// exit with error
 		return ErrReadFile(err)
 	}
-	return UnmarshalJSON(bz, &o)
+	// populate the object using the json file bytes
+	return UnmarshalJSON(jsonFileBytes, &o)
 }
 
 // SaveJSONToFile() saves a json object to a file
 func SaveJSONToFile(j any, dataDirPath, filePath string) (err ErrorI) {
-	bz, err := MarshalJSONIndent(j)
+	// convert the object into json bytes
+	jsonBytes, err := MarshalJSONIndent(j)
+	// if an error occurred during the conversion
 	if err != nil {
+		// exit with error
 		return
 	}
-	if e := os.WriteFile(filepath.Join(dataDirPath, filePath), bz, os.ModePerm); e != nil {
+	// attempt to write the json bytes to a json file at the path
+	if e := os.WriteFile(filepath.Join(dataDirPath, filePath), jsonBytes, os.ModePerm); e != nil {
+		// exit with error
 		return ErrWriteFile(e)
 	}
+	// exit
 	return
 }
 
 // NewAny() converts a proto.Message into an anypb.Any type
 func NewAny(message proto.Message) (*anypb.Any, ErrorI) {
+	// convert the message to a proto any
 	a, err := anypb.New(message)
+	// if an error occurred during the conversion
 	if err != nil {
+		// exit with error
 		return nil, ErrToAny(err)
 	}
+	// exit with any
 	return a, nil
 }
 
 // FromAny() converts an anypb.Any type back into a proto.Message
 func FromAny(any *anypb.Any) (proto.Message, ErrorI) {
+	// convert the proto any into a proto message
 	msg, err := anypb.UnmarshalNew(any, proto.UnmarshalOptions{})
+	// if an error occurred during the conversion
 	if err != nil {
+		// exit with error
 		return nil, ErrFromAny(err)
 	}
+	// exit with the proto message
 	return msg, nil
 }
 
 // BytesToString() converts a byte slice to a hexadecimal string
 func BytesToString(b []byte) string {
+	// hex encode the bytes into a string
 	return hex.EncodeToString(b)
 }
 
 // StringToBytes() converts a hexadecimal string back into a byte slice
 func StringToBytes(s string) ([]byte, ErrorI) {
+	// decode the hex string into bytes
 	b, err := hex.DecodeString(s)
+	// if an error occurred during the decode
 	if err != nil {
+		// exit with error
 		return nil, ErrStringToBytes(err)
 	}
+	// exit with bytes
 	return b, nil
 }
 
 // BytesToTruncatedString() converts a byte slice to a truncated hexadecimal string
 func BytesToTruncatedString(b []byte) string {
-	if len(b) > 10 {
-		return hex.EncodeToString(b[:10])
+	// if the bytes are LTE the truncation
+	if len(b) <= 10 {
+		// simply return the string version
+		return hex.EncodeToString(b)
 	}
-	return hex.EncodeToString(b)
+	// return the truncated string version
+	return hex.EncodeToString(b[:10])
 }
 
 // PublicKeyFromBytes() converts a byte slice into a BLS public key
 func PublicKeyFromBytes(pubKey []byte) (crypto.PublicKeyI, ErrorI) {
+	// convert the public key bytes into a public key object
 	publicKey, err := crypto.NewPublicKeyFromBytes(pubKey)
+	// if an error occurred during the conversion
 	if err != nil {
+		// exit with error
 		return nil, ErrPubKeyFromBytes(err)
 	}
+	// exit with the public key object
 	return publicKey, nil
 }
 
 // MerkleTree() generates a Merkle tree and its root from a list of items
 func MerkleTree(items [][]byte) (root []byte, tree [][]byte, err ErrorI) {
+	// convert the items into a merkle tree
 	root, tree, er := crypto.MerkleTree(items)
+	// if an error occurred during the conversion
 	if er != nil {
+		// exit with error
 		return nil, nil, ErrMerkleTree(er)
 	}
+	// exit
 	return
 }
 
@@ -321,38 +427,52 @@ func BigLess(a *big.Int, b *big.Int) bool { return a.Cmp(b) == -1 }
 
 // Uint64PercentageDiv() calculates the percentage from dividend/divisor
 func Uint64PercentageDiv(dividend, divisor uint64) (percent uint64) {
+	// if either the dividend or the divisor are 0
 	if dividend == 0 || divisor == 0 {
+		// exit with 0
 		return 0
 	}
 	// calculate the percent
 	percent = (dividend * 100) / divisor
 	// ensure the percent can't exceed 100
 	if percent > 100 {
+		// cap the percent at 100
 		percent = 100
 	}
+	// exit
 	return percent
 }
 
-// Uint64Percentage() calculates the result of a percentage of an amount
-func Uint64Percentage(amount uint64, percentage uint64) (res uint64) {
-	if percentage == 0 || amount == 0 {
+// Uint64Percentage() calculates the percentage of an amount
+func Uint64Percentage(total uint64, percentage uint64) (res uint64) {
+	// if either the total or the percentage is 0
+	if percentage == 0 || total == 0 {
+		// exit with 0
 		return 0
 	}
+	// if the percent is GTE 100%
 	if percentage >= 100 {
-		return amount
+		// exit with the full total
+		return total
 	}
-	return (amount * percentage) / 100
+	// exit with a fraction of the total
+	return (total * percentage) / 100
 }
 
 // Uint64ReducePercentage() reduces an amount by a specified percentage
-func Uint64ReducePercentage(amount, percentage uint64) (res uint64) {
-	if percentage >= 100 || amount == 0 {
+func Uint64ReducePercentage(fullAmount, percentage uint64) (res uint64) {
+	// if the percent exceeds 100 or full amount is 0
+	if percentage >= 100 || fullAmount == 0 {
+		// exit with 0
 		return 0
 	}
+	// if the percent is 0
 	if percentage == 0 {
-		return amount
+		// exit with the full amount
+		return fullAmount
 	}
-	return (amount * (100 - percentage)) / 100
+	// exit with a reduced amount
+	return (fullAmount * (100 - percentage)) / 100
 }
 
 // Uint64ToBigFloat() converts a uint64 to a big.Float
@@ -365,10 +485,14 @@ type HexBytes []byte
 
 // NewHexBytesFromString() converts a hexadecimal string into HexBytes
 func NewHexBytesFromString(s string) (HexBytes, ErrorI) {
+	// convert the hex string into bytes
 	bz, err := hex.DecodeString(s)
+	// if an error occurred during the conversion
 	if err != nil {
+		// exit with error
 		return nil, ErrJSONUnmarshal(err)
 	}
+	// exit with hex bytes
 	return bz, nil
 }
 
@@ -383,26 +507,18 @@ func (x HexBytes) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON() deserializes a JSON byte slice into HexBytes
-func (x *HexBytes) UnmarshalJSON(b []byte) (err error) {
-	var s string
-	if err = json.Unmarshal(b, &s); err != nil {
-		return err
+func (x *HexBytes) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new object ref to ensure a non nil result
+	s := new(string)
+	// populate the string object ref with the json bytes
+	if err = json.Unmarshal(jsonBytes, s); err != nil {
+		// exit with error
+		return
 	}
-	*x, err = StringToBytes(s)
+	// populate the underlying object by converting the hex string to hex bytes
+	*x, err = StringToBytes(*s)
+	// exit
 	return
-}
-
-// RemoveIPV4Port() removes the port from an IP address or URL string
-func RemoveIPV4Port(address string) (string, ErrorI) {
-	split := strings.Split(address, ":")
-	switch len(split) {
-	case 2:
-		return split[0], nil
-	case 3:
-		return strings.Join(split[:2], ":"), nil
-	default:
-		return "", ErrInvalidArgument()
-	}
 }
 
 // ValidNetURLInput() validates the input netURL via regex
@@ -417,17 +533,22 @@ func RemoveIPV4Port(address string) (string, ErrorI) {
 func ValidNetURLInput(netURL string) bool {
 	// regex for optional tcp://, valid hostname, or IP with no ports
 	regex := `^(?:tcp:\/\/)?(?:localhost|(?:[a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+|(?:\d{1,3}\.){3}\d{1,3}|(?:\[[0-9a-fA-F:]+\]))$`
-
+	// see if the net url passes the regex check
 	matched, err := regexp.MatchString(regex, netURL)
+	// if an error occurred during the check
 	if err != nil {
+		// exit 'not valid'
 		return false
 	}
+	// exit with the result of the regex check
 	return matched
 }
 
 // AddToPort() adds some number to the port ensuring it doesn't exceed the max port
 func AddToPort(portStr string, add uint64) (string, ErrorI) {
+	// remove the colon from the port
 	portPart := portStr[1:]
+	// convert the port to
 	port, _ := strconv.Atoi(portPart)
 	// add the given number to the port
 	newPort := port + int(add)
@@ -440,23 +561,33 @@ func AddToPort(portStr string, add uint64) (string, ErrorI) {
 
 // NewTimer() creates a 0 value initialized instance of a timer
 func NewTimer() *time.Timer {
+	// create a new timer with duration set to 0
 	t := time.NewTimer(0)
+	// discard the initial fire
 	<-t.C
+	// return the ready timer
 	return t
 }
 
 // ResetTimer() stops the existing timer, and resets with the new duration
 func ResetTimer(t *time.Timer, d time.Duration) {
+	// stop the timer
 	StopTimer(t)
+	// reset with a new duration
 	t.Reset(d)
 }
 
 // StopTimer() stops the existing timer
 func StopTimer(t *time.Timer) {
+	// if the timer isn't empty
 	if t != nil {
+		// stop the timer and check if 'already fired'
 		if !t.Stop() {
+			// if already fired
 			select {
+			// discard the trigger
 			case <-t.C:
+			// non blocking
 			default:
 			}
 		}
@@ -474,7 +605,9 @@ func CatchPanic(l LoggerI) {
 func JoinLenPrefix(toAppend ...[]byte) (res []byte) {
 	// for each item to append
 	for _, item := range toAppend {
+		// if the item is empty
 		if item == nil {
+			// next iteration
 			continue
 		}
 		// store the length of the segment in a single byte
@@ -482,32 +615,36 @@ func JoinLenPrefix(toAppend ...[]byte) (res []byte) {
 		// append to the reset of the segment
 		res = append(append(res, length...), item...)
 	}
+	// exit
 	return
 }
 
 // DecodeLengthPrefixed() decodes a key that is delimited by the length of the segment in a single byte
 func DecodeLengthPrefixed(key []byte) (segments [][]byte) {
+	// create a variable to be 're-used' to track the length part of each prefix
 	var length int
+	// until the end of 'key'
 	for i := 0; i < len(key); i += length {
-		if i >= len(key) {
-			break
-		}
 		// read the length prefix
 		length = int(key[i])
+		// increment the index
 		i++
+		// do a sanity check on the key
 		if i+length > len(key) {
 			panic("corrupt or incomplete key")
 		}
+		// add this portion to the segments list
 		segments = append(segments, key[i:i+length])
 	}
+	// exit
 	return
 }
 
 // Retry is a simple exponential backoff retry structure in the form of doubling the timeout
 type Retry struct {
-	waitTimeMS uint64
-	maxLoops   uint64
-	loopCount  uint64
+	waitTimeMS uint64 // time to wait in milliseconds
+	maxLoops   uint64 // the maximum number of loops before quitting
+	loopCount  uint64 // the loop count itself
 }
 
 // NewRetry() constructs a new Retry given parameters
@@ -520,42 +657,35 @@ func NewRetry(waitTimeMS, maxLoops uint64) *Retry {
 
 // WaitAndDoRetry() sleeps the appropriate time and returns false if maxed out retry
 func (r *Retry) WaitAndDoRetry() bool {
+	// if GTE max loops
 	if r.maxLoops <= r.loopCount {
+		// exit with 'try again'
 		return false
 	}
+	// sleep the allotted time
 	time.Sleep(time.Duration(r.waitTimeMS) * time.Millisecond)
 	// double the timeout
 	r.waitTimeMS += r.waitTimeMS
+	// increment the loop count
 	r.loopCount++
+	// exit with 'try again'
 	return true
-}
-
-// TimeTrack() a utility function to benchmark the time
-func TimeTrack(start time.Time) {
-	elapsed := time.Since(start)
-
-	// Skip this function, and fetch the PC and file for its parent.
-	pc, _, _, _ := runtime.Caller(1)
-
-	// Retrieve a function object this functions parent.
-	funcObj := runtime.FuncForPC(pc)
-
-	// Regex to extract just the function name (and not the module path).
-	runtimeFunc := regexp.MustCompile(`^.*\.(.*)$`)
-	name := runtimeFunc.ReplaceAllString(funcObj.Name(), "$1")
-
-	log.Println(fmt.Sprintf("%s took %s", name, elapsed))
 }
 
 // TruncateSlice() safely ensures that a slice doesn't exceed the max size
 func TruncateSlice[T any](slice []T, max int) []T {
+	// if the slice is empty
 	if slice == nil {
+		// exit
 		return nil
 	}
-	if len(slice) > max {
-		return slice[:max]
+	// if the slice is below the max
+	if len(slice) <= max {
+		// exit with the whole slice
+		return slice
 	}
-	return slice
+	// exit with the truncated slice
+	return slice[:max]
 }
 
 // DeDuplicator is a generic structure that serves as a simple anti-duplication check
@@ -572,35 +702,30 @@ func NewDeDuplicator[T comparable]() *DeDuplicator[T] {
 func (d *DeDuplicator[T]) Found(k T) bool {
 	// check if the key already exists
 	if _, exists := d.m[k]; exists {
-		return true // It's a duplicate
+		// exit with 'it is a duplicate'
+		return true
 	}
 	// add the key to the map
 	d.m[k] = struct{}{}
-	// not a duplicate
+	// exit with 'not a duplicate'
 	return false
 }
 
 // Delete() removes the key from the de-duplicator map
-func (d *DeDuplicator[T]) Delete(k T) {
-	delete(d.m, k)
-}
+func (d *DeDuplicator[T]) Delete(k T) { delete(d.m, k) }
 
 // Map() returns the underlying map to the de-duplicator
-func (d *DeDuplicator[T]) Map() map[T]struct{} {
-	return d.m
-}
+func (d *DeDuplicator[T]) Map() map[T]struct{} { return d.m }
 
-func PrintStackTrace() {
-	pc := make([]uintptr, 10) // Get at most 10 stack frames
-	n := runtime.Callers(2, pc)
-	frames := runtime.CallersFrames(pc[:n])
-
-	fmt.Println("Stack trace:")
-	for {
-		frame, more := frames.Next()
-		fmt.Printf("%s\n\t%s:%d\n", frame.Function, frame.File, frame.Line)
-		if !more {
-			break
-		}
-	}
+// TimeTrack() a utility function to benchmark the time of caller function
+func TimeTrack(start time.Time) {
+	elapsed := time.Since(start)
+	// Skip this function, and fetch the PC and file for its parent
+	pc, _, _, _ := runtime.Caller(1)
+	// Retrieve a function object this functions parent
+	funcObj := runtime.FuncForPC(pc)
+	// Regex to extract just the function name (and not the module path)
+	runtimeFunc := regexp.MustCompile(`^.*\.(.*)$`)
+	name := runtimeFunc.ReplaceAllString(funcObj.Name(), "$1")
+	log.Println(fmt.Sprintf("%s took %s", name, elapsed))
 }

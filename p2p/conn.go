@@ -186,11 +186,26 @@ func (c *MultiConn) startSendService() {
 					c.Error(e, NoPongSlash)
 				}
 			})
-		case <-c.sendPong: // fires when receive service got a 'ping' message
+		case _, open := <-c.sendPong: // fires when receive service got a 'ping' message
+			// if the channel was closed
+			if !open {
+				// log the close
+				c.log.Debugf("Pong channel closed, stopping")
+				// exit
+				return
+			}
+			// log the pong sending
 			c.log.Debugf("Send Pong to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 			// send a pong
 			err = c.sendWireBytes(new(Pong), m)
-		case <-c.receivedPong: // fires when receive service got a 'pong' message
+		case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
+			// if the channel was closed
+			if !open {
+				// log the close
+				c.log.Debugf("Receive pong channel closed, stopping")
+				// exit
+				return
+			}
 			// reset the pong timer
 			lib.StopTimer(pongTimer)
 		case <-c.quitSending: // fires when Stop() is called
@@ -211,7 +226,6 @@ func (c *MultiConn) startReceiveService() {
 	reader, m := *bufio.NewReaderSize(c.conn, maxPacketSize), limiter.New(0, 0)
 	defer func() { close(c.sendPong); close(c.receivedPong); m.Done() }()
 	for {
-		c.log.Debugf("Receive service ready for %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 		select {
 		default: // fires unless quit was signaled
 			// waits until bytes are received from the conn
@@ -223,7 +237,6 @@ func (c *MultiConn) startReceiveService() {
 			// handle different message types
 			switch x := msg.(type) {
 			case *Packet: // receive packet is a partial or full 'Message' with a Stream Topic designation and an EOF signal
-				c.log.Debug("Received Packet")
 				// load the proper stream
 				stream, found := c.streams[x.StreamId]
 				if !found {

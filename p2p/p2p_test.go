@@ -191,7 +191,7 @@ func TestStart(t *testing.T) {
 			return false, "n2 not validator"
 		}
 		if n1.book.Has(random.Bytes()) {
-			return false, "n1 did not churn peer Book"
+			return false, "n1 did not churn peer book"
 		}
 		n3PI, _ := n1.GetPeerInfo(n3.pub)
 		if n3PI == nil {

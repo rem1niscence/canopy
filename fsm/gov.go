@@ -33,19 +33,14 @@ func (s *StateMachine) ApproveProposal(msg types.GovProposal) lib.ErrorI {
 		return types.ErrRejectProposal()
 	// if on the local approve list
 	case types.ProposalApproveList:
-		// convert the governance proposal into bytes
-		bz, err := lib.Marshal(msg)
-		if err != nil {
-			return err
-		}
 		// read the 'approve list' from the data directory
 		proposals := make(types.GovProposals)
 		// get the voted from the local proposals.json file in the data directory
-		if err = proposals.NewFromFile(s.Config.DataDirPath); err != nil {
+		if err := proposals.NewFromFile(s.Config.DataDirPath); err != nil {
 			return err
 		}
 		// check on this specific message for explicit rejection or complete omission
-		if value, ok := proposals[crypto.HashString(bz)]; !ok || !value.Approve {
+		if value, ok := proposals[msg.GetProposalHash()]; !ok || !value.Approve {
 			return types.ErrRejectProposal()
 		}
 		// proposal passes
@@ -475,10 +470,10 @@ func (s *StateMachine) IsFeatureEnabled(requiredVersion uint64) bool {
 
 // ROOT CHAIN CODE BELOW
 
-// IsOwnRoot() returns if this chain is its own root (base)
-func (s *StateMachine) IsOwnRoot() (bool, lib.ErrorI) {
+// LoadIsOwnRoot() returns if this chain is its own root (base)
+func (s *StateMachine) LoadIsOwnRoot() (bool, lib.ErrorI) {
 	// get the latest root chain id from the state
-	rootId, err := s.GetRootChainId()
+	rootId, err := s.LoadRootChainId(s.Height())
 	if err != nil {
 		return false, err
 	}

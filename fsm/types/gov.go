@@ -693,43 +693,46 @@ type GovProposal interface {
 	proto.Message
 	GetStartHeight() uint64
 	GetEndHeight() uint64
+	GetProposalHash() string
 }
 
 // GovProposalWithVote is a wrapper over a GovProposal but contains an approval / disapproval boolean
 type GovProposalWithVote struct {
-	Proposal GovProposal `json:"proposal"`
-	Approve  bool        `json:"approve"`
+	Proposal json.RawMessage `json:"proposal"`
+	Approve  bool            `json:"approve"`
 }
 
-// GovProposals is a list of GovProposalsWithVote keyed by hash of the underlying ProposalJSON
+// GovProposals is a list of GovProposalsWithVote keyed by the transaction hash of the underlying proposal transaction
 type GovProposals map[string]GovProposalWithVote
 
-// NewProposalFromBytes() creates a GovProposal object from json bytes
-func NewProposalFromBytes(b []byte) (GovProposal, lib.ErrorI) {
-	cp, dt := new(MessageChangeParameter), new(MessageDAOTransfer)
-	if err := lib.UnmarshalJSON(b, cp); err != nil || len(cp.Signer) == 0 {
-		if err = lib.UnmarshalJSON(b, dt); err != nil {
-			return nil, err
-		}
-		return dt, nil
-	}
-	return cp, nil
-}
-
 // Add() adds a GovProposalWithVote to the list
-func (p GovProposals) Add(proposal GovProposal, approve bool) lib.ErrorI {
-	bz, err := lib.Marshal(proposal)
+func (p GovProposals) Add(proposalTransaction json.RawMessage, approve bool) (err lib.ErrorI) {
+	// get the transaction hash from the proposal transaction json
+	txHash, err := TxHashFromJSON(proposalTransaction)
+	// if an error occurred during the extraction
 	if err != nil {
-		return err
+		// exit with error
+		return
 	}
-	p[crypto.HashString(bz)] = GovProposalWithVote{proposal, approve}
-	return nil
+	// add to the proposals list keyed by the transaction hash
+	p[txHash] = GovProposalWithVote{proposalTransaction, approve}
+	// exit
+	return
 }
 
 // Del() removes a GovProposalWithVote from the list
-func (p GovProposals) Del(proposal GovProposal) {
-	bz, _ := lib.Marshal(proposal)
-	delete(p, crypto.HashString(bz))
+func (p GovProposals) Del(proposalTransaction json.RawMessage) (err error) {
+	// get the transaction hash from the proposal transaction json
+	txHash, err := TxHashFromJSON(proposalTransaction)
+	// if an error occurred during the extraction
+	if err != nil {
+		// exit with error
+		return
+	}
+	// removed from the proposals list keyed by the transaction hash
+	delete(p, txHash)
+	// exit
+	return
 }
 
 // NewFromFile() creates a new polls object from a file
@@ -740,18 +743,4 @@ func (p *GovProposals) NewFromFile(dataDirPath string) lib.ErrorI {
 // SaveToFile() persists the polls object to a json file
 func (p *GovProposals) SaveToFile(dataDirPath string) lib.ErrorI {
 	return lib.SaveJSONToFile(p, dataDirPath, lib.ProposalsFilePath)
-}
-
-// UnmarshalJSON() implements the json.Unmarshaler interface for GovProposalWithVote
-func (p *GovProposalWithVote) UnmarshalJSON(b []byte) (err error) {
-	j := new(struct {
-		Proposal json.RawMessage `json:"proposal"`
-		Approve  bool            `json:"approve"`
-	})
-	if err = json.Unmarshal(b, &j); err != nil {
-		return
-	}
-	p.Approve = j.Approve
-	p.Proposal, err = NewProposalFromBytes(j.Proposal)
-	return
 }

@@ -122,6 +122,8 @@ message MessageChangeParameter {
   // signer: is the address of the sender / creator of the proposal
   // this field locks in an author of the transaction when it's converted to JSON
   bytes signer = 6;
+  // proposal_hash: internal use only, tracks the hash of the proposal to check against the proposals.json file
+  string proposal_hash = 7; // @gotags: json:"proposalHash"
 }
 
 // MessageDAOTransfer is a governance proposal message used to send funds from the DAO pool to an account
@@ -140,6 +142,8 @@ message MessageDAOTransfer {
   // end_height: is the ending height where the parameter must be sent
   // this field locks in a block-range when it's converted to JSON and allows Validators a deadline to vote
   uint64 end_height = 5; // @gotags: json:"startHeight"
+  // proposal_hash: internal use only, tracks the hash of the proposal to check against the proposals.json file
+  string proposal_hash = 6; // @gotags: json:"proposalHash"
 }
 
 // MessageCertificateResults is a summary from the Leader of a recently completed BFT process in the form of a Quorum

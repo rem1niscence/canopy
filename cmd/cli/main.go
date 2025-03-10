@@ -86,7 +86,7 @@ func Start() {
 		l.Fatal(err.Error())
 	}
 	// create a new instance of the application
-	app, err := controller.New(sm, config, validatorKey, l)
+	app, err := controller.New(sm, config, validatorKey, rpc.RemoteCallbacks, l)
 	if err != nil {
 		l.Fatal(err.Error())
 	}
@@ -185,16 +185,25 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 	if _, err := os.Stat(filepath.Join(dataDirPath, lib.ProposalsFilePath)); errors.Is(err, os.ErrNotExist) {
 		log.Infof("Creating %s file", lib.ProposalsFilePath)
 		// create an example proposal
+		blsPrivateKey, _ := crypto.NewBLS12381PrivateKey()
 		proposals := make(types.GovProposals)
 		a, _ := lib.NewAny(&lib.StringWrapper{Value: "example"})
-		if err = proposals.Add(&types.MessageChangeParameter{
+		tx, e := types.NewTransaction(blsPrivateKey, &types.MessageChangeParameter{
 			ParameterSpace: types.ParamSpaceCons + "|" + types.ParamSpaceFee + "|" + types.ParamSpaceVal + "|" + types.ParamSpaceGov,
 			ParameterKey:   types.ParamProtocolVersion,
 			ParameterValue: a,
 			StartHeight:    1,
-			EndHeight:      1000000,
-			Signer:         []byte(strings.Repeat("F", crypto.HashSize*2)),
-		}, true); err != nil {
+			EndHeight:      1000,
+			Signer:         []byte(strings.Repeat("F", 20)),
+		}, 1, 1, 10000, 1, "example")
+		if e != nil {
+			log.Fatal(e.Error())
+		}
+		jsonBytes, e := lib.MarshalJSONIndent(tx)
+		if e != nil {
+			log.Fatal(e.Error())
+		}
+		if err = proposals.Add(jsonBytes, true); err != nil {
 			log.Fatal(err.Error())
 		}
 		if err = proposals.SaveToFile(dataDirPath); err != nil {
