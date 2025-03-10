@@ -1169,10 +1169,10 @@ var file_message_proto_rawDesc = []byte{
 	0x18, 0x0a, 0x07, 0x4f, 0x72, 0x64, 0x65, 0x72, 0x49, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04,
 	0x52, 0x07, 0x4f, 0x72, 0x64, 0x65, 0x72, 0x49, 0x64, 0x12, 0x18, 0x0a, 0x07, 0x43, 0x68, 0x61,
 	0x69, 0x6e, 0x49, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x07, 0x43, 0x68, 0x61, 0x69,
-	0x6e, 0x49, 0x64, 0x42, 0x2c, 0x5a, 0x2a, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f,
+	0x6e, 0x49, 0x64, 0x42, 0x26, 0x5a, 0x24, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f,
 	0x6d, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2d, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b,
-	0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2f, 0x66, 0x73, 0x6d, 0x2f, 0x74, 0x79, 0x70, 0x65,
-	0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70, 0x79, 0x2f, 0x66, 0x73, 0x6d, 0x62, 0x06, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1189,25 +1189,25 @@ func file_message_proto_rawDescGZIP() []byte {
 
 var file_message_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_message_proto_goTypes = []interface{}{
-	(*MessageSend)(nil),               // 0: MessageSend
-	(*MessageStake)(nil),              // 1: MessageStake
-	(*MessageEditStake)(nil),          // 2: MessageEditStake
-	(*MessageUnstake)(nil),            // 3: MessageUnstake
-	(*MessagePause)(nil),              // 4: MessagePause
-	(*MessageUnpause)(nil),            // 5: MessageUnpause
-	(*MessageChangeParameter)(nil),    // 6: MessageChangeParameter
-	(*MessageDAOTransfer)(nil),        // 7: MessageDAOTransfer
-	(*MessageCertificateResults)(nil), // 8: MessageCertificateResults
-	(*MessageSubsidy)(nil),            // 9: MessageSubsidy
-	(*MessageCreateOrder)(nil),        // 10: MessageCreateOrder
-	(*MessageEditOrder)(nil),          // 11: MessageEditOrder
-	(*MessageDeleteOrder)(nil),        // 12: MessageDeleteOrder
+	(*MessageSend)(nil),               // 0: types.MessageSend
+	(*MessageStake)(nil),              // 1: types.MessageStake
+	(*MessageEditStake)(nil),          // 2: types.MessageEditStake
+	(*MessageUnstake)(nil),            // 3: types.MessageUnstake
+	(*MessagePause)(nil),              // 4: types.MessagePause
+	(*MessageUnpause)(nil),            // 5: types.MessageUnpause
+	(*MessageChangeParameter)(nil),    // 6: types.MessageChangeParameter
+	(*MessageDAOTransfer)(nil),        // 7: types.MessageDAOTransfer
+	(*MessageCertificateResults)(nil), // 8: types.MessageCertificateResults
+	(*MessageSubsidy)(nil),            // 9: types.MessageSubsidy
+	(*MessageCreateOrder)(nil),        // 10: types.MessageCreateOrder
+	(*MessageEditOrder)(nil),          // 11: types.MessageEditOrder
+	(*MessageDeleteOrder)(nil),        // 12: types.MessageDeleteOrder
 	(*anypb.Any)(nil),                 // 13: google.protobuf.Any
-	(*lib.QuorumCertificate)(nil),     // 14: QuorumCertificate
+	(*lib.QuorumCertificate)(nil),     // 14: types.QuorumCertificate
 }
 var file_message_proto_depIdxs = []int32{
-	13, // 0: MessageChangeParameter.parameter_value:type_name -> google.protobuf.Any
-	14, // 1: MessageCertificateResults.qc:type_name -> QuorumCertificate
+	13, // 0: types.MessageChangeParameter.parameter_value:type_name -> google.protobuf.Any
+	14, // 1: types.MessageCertificateResults.qc:type_name -> types.QuorumCertificate
 	2,  // [2:2] is the sub-list for method output_type
 	2,  // [2:2] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name

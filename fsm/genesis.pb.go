@@ -221,11 +221,10 @@ var file_genesis_proto_rawDesc = []byte{
 	0x74, 0x61, 0x52, 0x0a, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x73, 0x12, 0x2d,
 	0x0a, 0x12, 0x72, 0x65, 0x74, 0x69, 0x72, 0x65, 0x64, 0x5f, 0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74,
 	0x74, 0x65, 0x65, 0x73, 0x18, 0x0b, 0x20, 0x03, 0x28, 0x04, 0x52, 0x11, 0x72, 0x65, 0x74, 0x69,
-	0x72, 0x65, 0x64, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x73, 0x42, 0x2c, 0x5a,
-	0x2a, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x61, 0x6e, 0x6f,
+	0x72, 0x65, 0x64, 0x43, 0x6f, 0x6d, 0x6d, 0x69, 0x74, 0x74, 0x65, 0x65, 0x73, 0x42, 0x26, 0x5a,
+	0x24, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x61, 0x6e, 0x6f,
 	0x70, 0x79, 0x2d, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x63, 0x61, 0x6e, 0x6f, 0x70,
-	0x79, 0x2f, 0x66, 0x73, 0x6d, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x79, 0x2f, 0x66, 0x73, 0x6d, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -242,27 +241,27 @@ func file_genesis_proto_rawDescGZIP() []byte {
 
 var file_genesis_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_genesis_proto_goTypes = []interface{}{
-	(*GenesisState)(nil),       // 0: GenesisState
-	(*Pool)(nil),               // 1: Pool
-	(*Account)(nil),            // 2: Account
-	(*Validator)(nil),          // 3: Validator
-	(*NonSigner)(nil),          // 4: NonSigner
-	(*lib.DoubleSigner)(nil),   // 5: DoubleSigner
-	(*lib.OrderBooks)(nil),     // 6: OrderBooks
-	(*Params)(nil),             // 7: Params
-	(*Supply)(nil),             // 8: Supply
-	(*lib.CommitteesData)(nil), // 9: CommitteesData
+	(*GenesisState)(nil),       // 0: types.GenesisState
+	(*Pool)(nil),               // 1: types.Pool
+	(*Account)(nil),            // 2: types.Account
+	(*Validator)(nil),          // 3: types.Validator
+	(*NonSigner)(nil),          // 4: types.NonSigner
+	(*lib.DoubleSigner)(nil),   // 5: types.DoubleSigner
+	(*lib.OrderBooks)(nil),     // 6: types.OrderBooks
+	(*Params)(nil),             // 7: types.Params
+	(*Supply)(nil),             // 8: types.Supply
+	(*lib.CommitteesData)(nil), // 9: types.CommitteesData
 }
 var file_genesis_proto_depIdxs = []int32{
-	1, // 0: GenesisState.pools:type_name -> Pool
-	2, // 1: GenesisState.accounts:type_name -> Account
-	3, // 2: GenesisState.validators:type_name -> Validator
-	4, // 3: GenesisState.non_signers:type_name -> NonSigner
-	5, // 4: GenesisState.double_signers:type_name -> DoubleSigner
-	6, // 5: GenesisState.order_books:type_name -> OrderBooks
-	7, // 6: GenesisState.params:type_name -> Params
-	8, // 7: GenesisState.supply:type_name -> Supply
-	9, // 8: GenesisState.committees:type_name -> CommitteesData
+	1, // 0: types.GenesisState.pools:type_name -> types.Pool
+	2, // 1: types.GenesisState.accounts:type_name -> types.Account
+	3, // 2: types.GenesisState.validators:type_name -> types.Validator
+	4, // 3: types.GenesisState.non_signers:type_name -> types.NonSigner
+	5, // 4: types.GenesisState.double_signers:type_name -> types.DoubleSigner
+	6, // 5: types.GenesisState.order_books:type_name -> types.OrderBooks
+	7, // 6: types.GenesisState.params:type_name -> types.Params
+	8, // 7: types.GenesisState.supply:type_name -> types.Supply
+	9, // 8: types.GenesisState.committees:type_name -> types.CommitteesData
 	9, // [9:9] is the sub-list for method output_type
 	9, // [9:9] is the sub-list for method input_type
 	9, // [9:9] is the sub-list for extension type_name
