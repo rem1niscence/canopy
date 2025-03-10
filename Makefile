@@ -33,4 +33,4 @@ docker-up-fast:
 	cd $(DOCKER_DIR) && docker-compose down && docker-compose up -d
 	
 docker-logs:
-	cd $(DOCKER_DIR) && docker-compose logs -f
+	cd $(DOCKER_DIR) && docker-compose logs -f --tail=1000

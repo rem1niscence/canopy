@@ -7,7 +7,7 @@ import (
 	"slices"
 )
 
-// BYZANTINE EVIDENCE PROCESSING AND SLASHES
+/* This file contains logic regarding byzantine actor handling and bond slashes */
 
 // HandleByzantine() handles the byzantine (faulty/malicious) participants from a QuorumCertificate
 func (s *StateMachine) HandleByzantine(qc *lib.QuorumCertificate, vs *lib.ValidatorSet) (nonSignerPercent int, err lib.ErrorI) {
@@ -181,7 +181,7 @@ func (s *StateMachine) HandleDoubleSigners(chainId uint64, params *types.Validat
 	for _, doubleSigner := range doubleSigners {
 		// ensure the double signer isn't nil nor the id is nil
 		if doubleSigner == nil || doubleSigner.Id == nil {
-			return lib.ErrInvalidEvidence()
+			return lib.ErrEmptyDoubleSigner()
 		}
 		// ensure there's at least 1 height in the list
 		if len(doubleSigner.Heights) == 0 {
@@ -215,13 +215,6 @@ func (s *StateMachine) HandleDoubleSigners(chainId uint64, params *types.Validat
 	}
 	// slash those on the list
 	return s.SlashDoubleSigners(chainId, params, slashList)
-}
-
-// IsValidDoubleSigner() checks if the double signer was already slashed for this height
-// this prevents evidence re-use
-func (s *StateMachine) IsValidDoubleSigner(height uint64, address []byte) bool {
-	isValid, _ := s.Store().(lib.StoreI).IsValidDoubleSigner(address, height)
-	return isValid
 }
 
 // SlashNonSigners() burns the staked tokens of non-quorum-certificate-signers
@@ -344,13 +337,22 @@ func (s *StateMachine) SlashValidator(validator *types.Validator, chainId, perce
 
 // LoadMinimumEvidenceHeight() loads the minimum height the evidence must be to still be usable
 func (s *StateMachine) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) {
+	// use the time machine to ensure a clean database transaction
+	historicalFSM, err := s.TimeMachine(s.Height())
+	// if an error occurred
+	if err != nil {
+		// exit with error
+		return 0, err
+	}
+	// once function completes, discard it
+	defer historicalFSM.Discard()
 	// get the validator params from state
-	valParams, err := s.GetParamsVal()
+	valParams, err := historicalFSM.GetParamsVal()
 	if err != nil {
 		return 0, err
 	}
 	// define convenience variables
-	height, unstakingBlocks := s.Height(), valParams.GetUnstakingBlocks()
+	height, unstakingBlocks := historicalFSM.Height(), valParams.GetUnstakingBlocks()
 	// if height is less than staking blocks, use *genesis* as the minimum evidence height
 	if height < unstakingBlocks {
 		return 0, nil

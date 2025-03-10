@@ -3,9 +3,10 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+	"testing"
+
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestCertificateCheckBasic(t *testing.T) {
@@ -19,6 +20,7 @@ func TestCertificateCheckBasic(t *testing.T) {
 			PaymentPercents: []*PaymentPercents{
 				{
 					Address: newTestAddressBytes(t),
+					ChainId: CanopyChainId,
 					Percent: 100,
 				},
 			},
@@ -184,6 +186,7 @@ func TestCertificateSignBytes(t *testing.T) {
 			PaymentPercents: []*PaymentPercents{
 				{
 					Address: newTestAddressBytes(t),
+					ChainId: CanopyChainId,
 					Percent: 100,
 				},
 			},
@@ -254,8 +257,8 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 			error: "invalid payment recipients count",
 		},
 		{
-			name:   "invalid double signer",
-			detail: "a double signer can't be nil",
+			name:   "empty chain id",
+			detail: "the chain id cannot be empty",
 			result: &CertificateResult{
 				RewardRecipients: &RewardRecipients{
 					PaymentPercents: []*PaymentPercents{{
@@ -267,40 +270,84 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 					DoubleSigners: []*DoubleSigner{nil},
 				},
 			},
-			error: "double signer is invalid",
+			error: "empty chain id",
 		},
 		{
-			name:   "nil buy order",
-			detail: "a buy order cannot be nil",
+			name:   "invalid double signer",
+			detail: "a double signer can't be nil",
 			result: &CertificateResult{
 				RewardRecipients: &RewardRecipients{
 					PaymentPercents: []*PaymentPercents{{
 						Address: newTestAddressBytes(t),
+						ChainId: CanopyChainId,
+						Percent: 100,
+					}},
+				},
+				SlashRecipients: &SlashRecipients{
+					DoubleSigners: []*DoubleSigner{nil},
+				},
+			},
+			error: "double signer is invalid",
+		},
+		{
+			name:   "nil lock order",
+			detail: "a lock order cannot be nil",
+			result: &CertificateResult{
+				RewardRecipients: &RewardRecipients{
+					PaymentPercents: []*PaymentPercents{{
+						Address: newTestAddressBytes(t),
+						ChainId: CanopyChainId,
 						Percent: 100,
 					}},
 				},
 				Orders: &Orders{
-					BuyOrders: []*BuyOrder{
+					LockOrders: []*LockOrder{
 						nil,
 					},
 				},
 			},
-			error: "buy order is nil",
+			error: "lock order is nil",
 		},
 		{
-			name:   "invalid buy order",
-			detail: "a buy order receive address is invalid",
+			name:   "invalid lock order",
+			detail: "a lock order send address is invalid",
 			result: &CertificateResult{
 				RewardRecipients: &RewardRecipients{
 					PaymentPercents: []*PaymentPercents{{
 						Address: newTestAddressBytes(t),
+						ChainId: CanopyChainId,
 						Percent: 100,
 					}},
 				},
 				Orders: &Orders{
-					BuyOrders: []*BuyOrder{
+					LockOrders: []*LockOrder{
 						{
 							OrderId:             0,
+							BuyerSendAddress:    nil,
+							BuyerReceiveAddress: nil,
+							BuyerChainDeadline:  0,
+						},
+					},
+				},
+			},
+			error: "invalid buyer send address",
+		},
+		{
+			name:   "invalid lock order",
+			detail: "a lock order receive address is invalid",
+			result: &CertificateResult{
+				RewardRecipients: &RewardRecipients{
+					PaymentPercents: []*PaymentPercents{{
+						Address: newTestAddressBytes(t),
+						ChainId: CanopyChainId,
+						Percent: 100,
+					}},
+				},
+				Orders: &Orders{
+					LockOrders: []*LockOrder{
+						{
+							OrderId:             0,
+							BuyerSendAddress:    newTestAddressBytes(t),
 							BuyerReceiveAddress: nil,
 							BuyerChainDeadline:  0,
 						},
@@ -316,6 +363,7 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 				RewardRecipients: &RewardRecipients{
 					PaymentPercents: []*PaymentPercents{{
 						Address: newTestAddressBytes(t),
+						ChainId: CanopyChainId,
 						Percent: 100,
 					}},
 				},
@@ -351,7 +399,7 @@ func TestCheckpointHash(t *testing.T) {
 			}},
 		},
 		Orders: &Orders{
-			BuyOrders: []*BuyOrder{
+			LockOrders: []*LockOrder{
 				{
 					OrderId:             0,
 					BuyerReceiveAddress: newTestAddressBytes(t),

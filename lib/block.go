@@ -3,12 +3,12 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+
 	"github.com/canopy-network/canopy/lib/crypto"
 )
 
 /*
-	This file contains the Canopy implementation of a 'Block' which is used as 'Block bytes' in Committee for Canopy
-	NOTE: other Committees will use other 'Block' implementations dictated by the respective plugins
+	This file contains the default implementation of a 'Block' which is used as 'block bytes' in a quorum certificate
 */
 
 // BLOCK HEADER CODE BELOW
@@ -47,15 +47,17 @@ func (x *BlockHeader) Check(networkID, chainId uint64) ErrorI {
 	if len(x.LastBlockHash) != crypto.HashSize {
 		return ErrWrongLengthLastBlockHash()
 	}
+	// if after the first block
 	if x.Height > 1 {
 		// check the LastQuorumCertificate
 		if err := x.LastQuorumCertificate.CheckBasic(); err != nil {
 			return err
 		}
+		// ensure the last quorum certificate has the proper network id
 		if x.LastQuorumCertificate.Header.NetworkId != networkID {
 			return ErrWrongNetworkID()
 		}
-		// check chain id
+		// check the last quorum certificate has the proper chain id
 		if x.LastQuorumCertificate.Header.ChainId != chainId {
 			return ErrWrongChainId()
 		}
@@ -78,7 +80,9 @@ func (x *BlockHeader) Check(networkID, chainId uint64) ErrorI {
 	x.Hash = nil
 	// get the header bytes
 	bz, err := Marshal(x)
+	// if an error occurred when converting to bytes
 	if err != nil {
+		// exit with error
 		return err
 	}
 	// reset the hash
@@ -87,17 +91,24 @@ func (x *BlockHeader) Check(networkID, chainId uint64) ErrorI {
 	if !bytes.Equal(x.Hash, crypto.Hash(bz)) {
 		return ErrMismatchHeaderBlockHash()
 	}
+	// exit
 	return nil
 }
 
 // SetHash() computes and sets the BlockHash to BlockHeader.Hash
 func (x *BlockHeader) SetHash() ([]byte, ErrorI) {
+	// set the hash to empty
 	x.Hash = nil
+	// convert the block header object reference to bytes
 	bz, err := Marshal(x)
+	// if an error occurred during the bytes conversion
 	if err != nil {
+		// exit with error
 		return nil, err
 	}
+	// set the hash to the hash of the block header bytes
 	x.Hash = crypto.Hash(bz)
+	// exit with the block header bytes
 	return x.Hash, nil
 }
 
@@ -105,19 +116,19 @@ func (x *BlockHeader) SetHash() ([]byte, ErrorI) {
 type jsonBlockHeader struct {
 	Height                uint64             `json:"height,omitempty"`
 	Hash                  HexBytes           `json:"hash,omitempty"`
-	NetworkId             uint32             `json:"network_id,omitempty"`
+	NetworkId             uint32             `json:"networkID,omitempty"`
 	Time                  uint64             `json:"time,omitempty"`
-	NumTxs                uint64             `json:"num_txs,omitempty"`
-	TotalTxs              uint64             `json:"total_txs,omitempty"`
-	TotalVdfIterations    uint64             `json:"total_vdf_iterations,omitempty"`
-	LastBlockHash         HexBytes           `json:"last_block_hash,omitempty"`
-	StateRoot             HexBytes           `json:"state_root,omitempty"`
-	TransactionRoot       HexBytes           `json:"transaction_root,omitempty"`
-	ValidatorRoot         HexBytes           `json:"validator_root,omitempty"`
-	NextValidatorRoot     HexBytes           `json:"next_validator_root,omitempty"`
-	ProposerAddress       HexBytes           `json:"proposer_address,omitempty"`
+	NumTxs                uint64             `json:"numTxs,omitempty"`
+	TotalTxs              uint64             `json:"totalTxs,omitempty"`
+	TotalVdfIterations    uint64             `json:"totalVDFIterations,omitempty"`
+	LastBlockHash         HexBytes           `json:"lastBlockHash,omitempty"`
+	StateRoot             HexBytes           `json:"stateRoot,omitempty"`
+	TransactionRoot       HexBytes           `json:"transactionRoot,omitempty"`
+	ValidatorRoot         HexBytes           `json:"validatorRoot,omitempty"`
+	NextValidatorRoot     HexBytes           `json:"nextValidatorRoot,omitempty"`
+	ProposerAddress       HexBytes           `json:"proposerAddress,omitempty"`
 	VDF                   *crypto.VDF        `json:"vdf,omitempty"`
-	LastQuorumCertificate *QuorumCertificate `json:"last_quorum_certificate,omitempty"`
+	LastQuorumCertificate *QuorumCertificate `json:"lastQuorumCertificate,omitempty"`
 }
 
 // MarshalJSON() implements the json.Marshaller interface
@@ -142,15 +153,15 @@ func (x BlockHeader) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON() implements the json.Unmarshaler interface
-func (x *BlockHeader) UnmarshalJSON(b []byte) error {
-	var j jsonBlockHeader
-	if err := json.Unmarshal(b, &j); err != nil {
-		return err
+func (x *BlockHeader) UnmarshalJSON(b []byte) (err error) {
+	// initialize a new object reference for the block header
+	j := new(jsonBlockHeader)
+	// convert the block header object reference to bytes
+	if err = json.Unmarshal(b, &j); err != nil {
+		// exit with error
+		return
 	}
-	//t, err := time.Parse(time.DateTime, j.Time)
-	//if err != nil {
-	//	return err
-	//}
+	// set the underlying object to the new block header
 	*x = BlockHeader{
 		Height:                j.Height,
 		Hash:                  j.Hash,
@@ -168,55 +179,71 @@ func (x *BlockHeader) UnmarshalJSON(b []byte) error {
 		Vdf:                   j.VDF,
 		LastQuorumCertificate: j.LastQuorumCertificate,
 	}
-	return nil
+	// exit
+	return
 }
 
 // BLOCK CODE BELOW
 
 // Check() 'sanity checks' the Block structure
 func (x *Block) Check(networkID, chainId uint64) ErrorI {
+	// ensure the block is non nil
 	if x == nil {
+		// exit with nil error
 		return ErrNilBlock()
 	}
+	// check the header
 	return x.BlockHeader.Check(networkID, chainId)
 }
 
 // Hash() computes, sets, and returns the BlockHash
 func (x *Block) Hash() ([]byte, ErrorI) { return x.BlockHeader.SetHash() }
 
-// BytesToBlock() converts block bytes into a block hash
-func (x *Block) BytesToBlock(blk []byte) (hash []byte, err ErrorI) {
+// BytesToBlockHash() converts block bytes into a block hash
+func (x *Block) BytesToBlockHash(blockBytes []byte) (hash []byte, err ErrorI) {
 	// ensure the block isn't empty
-	if blk == nil {
-		return
+	if blockBytes == nil {
+		// exit with error
+		return nil, ErrNilBlock()
 	}
-	// unmarshal the block
-	if err = Unmarshal(blk, x); err != nil {
+	// convert the block bytes to the object reference
+	if err = Unmarshal(blockBytes, x); err != nil {
+		// exit with error
 		return
 	}
 	// ensure header isn't nil
 	if x.BlockHeader == nil {
+		// exit with error
 		return nil, ErrNilBlockHeader()
 	}
+	// set the block header hash
 	hash, err = x.BlockHeader.SetHash()
+	// if an error occurred setting the block header hash
 	if err != nil {
+		// exit with error
 		return
 	}
+	// exit
 	return
 }
 
 // jsonBlock is the Block implementation of json.Marshaller and json.Unmarshaler
 type jsonBlock struct {
-	BlockHeader  *BlockHeader `json:"block_header,omitempty"`
+	BlockHeader  *BlockHeader `json:"blockHeader,omitempty"`
 	Transactions []HexBytes   `json:"transactions,omitempty"`
 }
 
 // MarshalJSON() implements the json.Marshaller interface
 func (x Block) MarshalJSON() ([]byte, error) {
+	// create a list of hex bytes
 	var txs []HexBytes
+	// for each transaction in the block
 	for _, tx := range x.Transactions {
+		// add the transaction to the list
+		// converting it to hex bytes
 		txs = append(txs, tx)
 	}
+	// convert the block into json bytes
 	return json.Marshal(jsonBlock{
 		BlockHeader:  x.BlockHeader,
 		Transactions: txs,
@@ -224,17 +251,26 @@ func (x Block) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON() implements the json.Unmarshaler interface
-func (x *Block) UnmarshalJSON(b []byte) error {
-	var j jsonBlock
-	if err := json.Unmarshal(b, &j); err != nil {
-		return err
+func (x *Block) UnmarshalJSON(blockBytes []byte) (err error) {
+	// create a new object reference for the json block
+	j := new(jsonBlock)
+	// populate the json block reference with the block bytes
+	if err = json.Unmarshal(blockBytes, j); err != nil {
+		// exit with error
+		return
 	}
+	// create a list of bytes
 	var txs [][]byte
-	for _, tx := range j.Transactions {
-		txs = append(txs, tx)
+	// for each transaction in the json transaction object
+	for _, hexTx := range j.Transactions {
+		// add it to the list
+		// converting it to regular bytes
+		txs = append(txs, hexTx)
 	}
+	// populate the structure with a header and transaction list
 	x.BlockHeader, x.Transactions = j.BlockHeader, txs
-	return nil
+	// exit
+	return
 }
 
 // BLOCK RESULTS CODE BELOW
@@ -247,14 +283,21 @@ func (b *BlockResults) New() Pageable { return &BlockResults{} }
 
 // ToBlock() converts the BlockResult into a Block object
 func (x *BlockResult) ToBlock() (*Block, ErrorI) {
+	// create a list of bytes
 	var txs [][]byte
+	// for each transaction in the block results structure
 	for _, txResult := range x.Transactions {
-		txBz, err := Marshal(txResult.Transaction)
+		// convert the transaction object to bytes
+		txBytes, err := Marshal(txResult.Transaction)
+		// if an error occurred during the conversion
 		if err != nil {
+			// exit with error
 			return nil, err
 		}
-		txs = append(txs, txBz)
+		// add the bytes to the transaction list
+		txs = append(txs, txBytes)
 	}
+	// exit with the populated block structure
 	return &Block{
 		BlockHeader:  x.BlockHeader,
 		Transactions: txs,

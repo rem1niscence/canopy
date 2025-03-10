@@ -2,7 +2,8 @@ import {
     KeystoreGet,
     KeystoreImport,
     KeystoreNew,
-    TxBuyOrder,
+    TxLockOrder,
+    TxCloseOrder,
     TxCreateOrder,
     TxDeleteOrder,
     TxEditOrder,
@@ -30,7 +31,7 @@ import {
 } from "@/components/util";
 import {KeystoreContext} from "@/pages";
 import {
-    BuyIcon,
+    LockIcon,
     CopyIcon,
     EditOrderIcon,
     EditStakeIcon,
@@ -40,10 +41,10 @@ import {
     SendIcon,
     StakeIcon,
     SwapIcon,
-    UnstakeIcon,
+    UnstakeIcon, CloseIcon,
 } from "@/components/svg_icons";
-import { useContext, useEffect, useRef, useState } from "react";
-import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
+import {useContext, useEffect, useRef, useState} from "react";
+import {Button, Card, Col, Form, Modal, Row, Spinner, Table} from "react-bootstrap";
 import Alert from "react-bootstrap/Alert";
 import Truncate from "react-truncate-inside";
 import CanaJSON from "@/components/canaJSON";
@@ -62,7 +63,8 @@ const transactionButtons = [
     {title: "PAUSE", name: "pause", src: PauseIcon},
     {title: "PLAY", name: "unpause", src: UnpauseIcon},
     {title: "SWAP", name: "create_order", src: SwapIcon},
-    {title: "LOCK", name: "buy_order", src: BuyIcon},
+    {title: "LOCK", name: "lock_order", src: LockIcon},
+    {title: "CLOSE", name: "close_order", src: CloseIcon},
     {title: "REPRICE", name: "edit_order", src: EditOrderIcon},
     {title: "VOID", name: "delete_order", src: DeleteOrderIcon},
 ];
@@ -139,6 +141,13 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
         });
     }
 
+    // onFormFieldChange() handles the form input change callback
+    function onFormFieldChange(key, value, newValue) {
+        if (key === "sender") {
+            setActiveKey(Object.keys(ks).findIndex((v) => v === value));
+        }
+    }
+
     // showModal() makes the modal visible
     function showModal(t) {
         setState({...state, showModal: true, txType: t});
@@ -153,7 +162,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
 
     // getValidatorAmount() returns the formatted staked amount of the validator
     function getValidatorAmount() {
-        return validator.staked_amount == null ? "0.00" : formatNumber(validator.staked_amount);
+        return validator.stakedAmount == null ? "0.00" : formatNumber(validator.stakedAmount);
     }
 
     // getStakedStatus() returns the staking status of the validator
@@ -161,9 +170,9 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
         switch (true) {
             case !validator.address:
                 return "UNSTAKED";
-            case validator.unstaking_height !== 0:
+            case validator.unstakingHeight !== 0:
                 return "UNSTAKING";
-            case validator.max_paused_height !== 0:
+            case validator.maxPausedHeight !== 0:
                 return "PAUSED";
             case validator.delegate:
                 return "DELEGATING";
@@ -287,7 +296,10 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                         r.password,
                         submit,
                     ),
-                buy_order: () => TxBuyOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), fee, r.password, submit),
+                close_order: () =>
+                    TxCloseOrder(r.sender, numberFromCommas(r.orderId), fee, r.password, submit),
+                lock_order: () =>
+                    TxLockOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), fee, r.password, submit),
                 edit_order: () =>
                     TxEditOrder(
                         r.sender,
@@ -340,6 +352,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                 closeOnClick={resetState}
                 keystore={ks}
                 JsonViewVariant={JsonViewVariant}
+                onFormFieldChange={onFormFieldChange}
             />
         );
     }
@@ -347,7 +360,9 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
     return (
         <div className="content-container">
             <span id="balance">{formatNumber(acc.amount)}</span>
-            <span style={{fontFamily: "var(--font-heading)", fontWeight: "500", color: state.primaryColor}}>{" CNPY"}</span>
+            <span style={{fontFamily: "var(--font-heading)", fontWeight: "500", color: state.primaryColor}}>
+                {" CNPY"}
+            </span>
             <br/>
             <hr/>
             <br/>
@@ -367,6 +382,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                 showAlert={state.showAlert}
                 alertMsg={state.alertMsg}
                 JsonViewVariant={JsonViewVariant}
+                onFormFieldChange={onFormFieldChange}
             />
             {transactionButtons.map((v, i) => (
                 <RenderActionButton key={i} v={v} i={i} showModal={showModal}/>
@@ -406,6 +422,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                 closeOnClick={resetState}
                 btnType={"reveal-pk"}
                 keystore={ks}
+                onFormFieldChange={onFormFieldChange}
             />
             <RenderModal
                 show={state.showPKImportModal}
@@ -421,6 +438,7 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                 closeOnClick={resetState}
                 btnType={"import-pk"}
                 keystore={ks}
+                onFormFieldChange={onFormFieldChange}
             />
             <RenderModal
                 show={state.showNewModal}
@@ -436,8 +454,13 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
                 closeOnClick={resetState}
                 btnType={"new-pk"}
                 keystore={ks}
+                onFormFieldChange={onFormFieldChange}
             />
-            <Button id="pk-button" variant="outline-secondary" onClick={() => setState({...state, showNewModal: true})}>
+            <Button
+                id="pk-button"
+                variant="outline-secondary"
+                onClick={() => setState({...state, showNewModal: true})}
+            >
                 New Private Key
             </Button>
             <Button
@@ -447,7 +470,11 @@ export default function Accounts({keygroup, account, validator, setActiveKey}) {
             >
                 Import Private Key
             </Button>
-            <Button id="reveal-pk-button" variant="outline-danger" onClick={() => setState({...state, showPKModal: true})}>
+            <Button
+                id="reveal-pk-button"
+                variant="outline-danger"
+                onClick={() => setState({...state, showPKModal: true})}
+            >
                 Reveal Private Key
             </Button>
             <Button
@@ -575,6 +602,7 @@ function RenderModal({
   showAlert = false,
   alertMsg,
   JsonViewVariant,
+  onFormFieldChange,
 }) {
   return (
     <Modal show={show} size="lg" onHide={onHide}>
@@ -599,6 +627,7 @@ function RenderModal({
             account={account}
             show={show}
             validator={validator}
+            onFieldChange={onFormFieldChange}
           />
           {showAlert && <Alert variant={"danger"}>{alertMsg}</Alert>}
           <CanaJSON state={state} setState={setState} JsonViewVariant={JsonViewVariant} />
@@ -615,7 +644,7 @@ function RenderModal({
 
 // RenderActionButton() creates a button with an SVG and title, triggering a modal on click
 function RenderActionButton({v, i, showModal}) {
-    const IconComponent = (v.src);
+    const IconComponent = v.src;
 
     if (!IconComponent) {
         return null; // Or a placeholder if the SVG isn't found
@@ -651,9 +680,7 @@ function RenderAccountInfo({v, i}, color) {
 function RenderTransactions({account, state, setState}) {
     return account.combined.length === 0 ? null : (
         <div className="recent-transactions-table">
-      <span class="table-label">
-        RECENT TRANSACTIONS
-      </span>
+            <span class="table-label">RECENT TRANSACTIONS</span>
             <Table className="table-fixed" bordered hover style={{marginTop: "10px"}}>
                 <thead>
                 <tr>
@@ -666,10 +693,17 @@ function RenderTransactions({account, state, setState}) {
                 {account.combined.slice(0, 5).map((v, i) => (
                     <tr key={i}>
                         <td>{v.height || "N/A"}</td>
-                        <td>{toCNPY(v.transaction.msg.amount) || toCNPY(v.transaction.msg.AmountForSale) || "N/A"}</td>
-                        <AccSumTabCol detail={v.recipient ?? v.sender ?? v.address} i={i} state={state} setState={setState}/>
-                        <td>{v.message_type || v.transaction.type}</td>
-                        <AccSumTabCol detail={v.tx_hash} i={i + 1} state={state} setState={setState}/>
+                        <td>
+                            {toCNPY(v.transaction.msg.amount) || toCNPY(v.transaction.msg.amountForSale) || "N/A"}
+                        </td>
+                        <AccSumTabCol
+                            detail={v.recipient ?? v.sender ?? v.address}
+                            i={i}
+                            state={state}
+                            setState={setState}
+                        />
+                        <td>{v.messageType || v.transaction.type}</td>
+                        <AccSumTabCol detail={v.txHash} i={i + 1} state={state} setState={setState}/>
                         <td>{v.status ?? ""}</td>
                     </tr>
                 ))}

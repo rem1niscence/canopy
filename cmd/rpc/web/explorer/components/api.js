@@ -1,4 +1,5 @@
 let rpcURL = "http://localhost:50002"; // default value for the RPC URL
+let adminRPCURL = "http://localhost:50003"; // default Admin RPC URL
 let chainId = 1; // default chain id
 
 if (typeof window !== "undefined") {
@@ -7,6 +8,7 @@ if (typeof window !== "undefined") {
     chainId = Number(window.__CONFIG__.chainId);
   }
   rpcURL = rpcURL.replace("localhost", window.location.hostname)
+  adminRPCURL = adminRPCURL.replace("localhost", window.location.hostname)
   console.log(rpcURL)
 } else {
   console.log("config undefined");
@@ -30,11 +32,12 @@ const validatorPath = "/v1/query/validator";
 const paramsPath = "/v1/query/params";
 const supplyPath = "/v1/query/supply";
 const ordersPath = "/v1/query/orders";
+const configPath = "/v1/admin/config";
 
 // POST
 
-export async function POST(request, path) {
-  return fetch(rpcURL + path, {
+export async function POST(url, request, path) {
+  return fetch(url + path, {
     method: "POST",
     body: request,
   })
@@ -49,6 +52,23 @@ export async function POST(request, path) {
       return Promise.reject(rejected);
     });
 }
+
+export async function GET(url, path) {
+  return fetch(url + path, {
+    method: "GET",
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        return Promise.reject(response);
+      }
+      return response.json();
+    })
+    .catch((rejected) => {
+      console.log(rejected);
+      return Promise.reject(rejected);
+    });
+}
+
 
 // REQUEST OBJECTS BELOW
 
@@ -83,31 +103,31 @@ function validatorsReq(page, height, committee) {
 // API CALLS BELOW
 
 export function Blocks(page, _) {
-  return POST(pageHeightReq(page, 0), blocksPath);
+  return POST(rpcURL, pageHeightReq(page, 0), blocksPath);
 }
 
 export function Transactions(page, height) {
-  return POST(pageHeightReq(page, height), txsByHeightPath);
+  return POST(rpcURL, pageHeightReq(page, height), txsByHeightPath);
 }
 
 export function Accounts(page, _) {
-  return POST(pageHeightReq(page, 0), accountsPath);
+  return POST(rpcURL, pageHeightReq(page, 0), accountsPath);
 }
 
 export function Validators(page, _) {
-  return POST(pageHeightReq(page, 0), validatorsPath);
+  return POST(rpcURL, pageHeightReq(page, 0), validatorsPath);
 }
 
 export function Committee(page, chain_id) {
-  return POST(validatorsReq(page, 0, chain_id), validatorsPath);
+  return POST(rpcURL, validatorsReq(page, 0, chain_id), validatorsPath);
 }
 
 export function DAO(height, _) {
-  return POST(heightAndIDRequest(height, 4294967296), poolPath);
+  return POST(rpcURL, heightAndIDRequest(height, 131071), poolPath);
 }
 
 export function Account(height, address) {
-  return POST(heightAndAddrRequest(height, address), accountPath);
+  return POST(rpcURL, heightAndAddrRequest(height, address), accountPath);
 }
 
 export async function AccountWithTxs(height, address, page) {
@@ -119,43 +139,47 @@ export async function AccountWithTxs(height, address, page) {
 }
 
 export function Params(height, _) {
-  return POST(heightRequest(height), paramsPath);
+  return POST(rpcURL, heightRequest(height), paramsPath);
 }
 
 export function Supply(height, _) {
-  return POST(heightRequest(height), supplyPath);
+  return POST(rpcURL, heightRequest(height), supplyPath);
 }
 
 export function Validator(height, address) {
-  return POST(heightAndAddrRequest(height, address), validatorPath);
+  return POST(rpcURL, heightAndAddrRequest(height, address), validatorPath);
 }
 
 export function BlockByHeight(height) {
-  return POST(heightRequest(height), blockByHeightPath);
+  return POST(rpcURL, heightRequest(height), blockByHeightPath);
 }
 
 export function BlockByHash(hash) {
-  return POST(hashRequest(hash), blockByHashPath);
+  return POST(rpcURL, hashRequest(hash), blockByHashPath);
 }
 
 export function TxByHash(hash) {
-  return POST(hashRequest(hash), txByHashPath);
+  return POST(rpcURL, hashRequest(hash), txByHashPath);
 }
 
 export function TransactionsBySender(page, sender) {
-  return POST(pageAddrReq(page, sender), txsBySender);
+  return POST(rpcURL, pageAddrReq(page, sender), txsBySender);
 }
 
 export function TransactionsByRec(page, rec) {
-  return POST(pageAddrReq(page, rec), txsByRec);
+  return POST(rpcURL, pageAddrReq(page, rec), txsByRec);
 }
 
 export function Pending(page, _) {
-  return POST(pageAddrReq(page, ""), pendingPath);
+  return POST(rpcURL, pageAddrReq(page, ""), pendingPath);
 }
 
 export function Orders(chain_id) {
-  return POST(heightAndIDRequest(0, chain_id), ordersPath);
+  return POST(rpcURL, heightAndIDRequest(0, chain_id), ordersPath);
+}
+
+export function Config() {
+  return GET(adminRPCURL, configPath)
 }
 
 // COMPONENT SPECIFIC API CALLS BELOW
@@ -169,7 +193,7 @@ export async function getModalData(query, page) {
     // Block by hash
     if (query.length === 64) {
       const block = await BlockByHash(query);
-      if (block?.block_header?.hash) return { block };
+      if (block?.blockHeader?.hash) return { block };
 
       const tx = await TxByHash(query);
       return tx?.sender ? tx : noResult;
@@ -191,7 +215,7 @@ export async function getModalData(query, page) {
 
   // Handle block by height
   const block = await BlockByHeight(query);
-  return block?.block_header?.hash ? { block } : noResult;
+  return block?.blockHeader?.hash ? { block } : noResult;
 }
 
 // getCardData() executes api calls and prepares the data for the cards

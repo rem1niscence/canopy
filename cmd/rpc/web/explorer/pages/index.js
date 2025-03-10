@@ -5,7 +5,7 @@ import DetailModal from "@/components/modal";
 import Cards from "@/components/cards";
 import { useEffect, useState } from "react";
 import { Spinner, Toast, ToastContainer } from "react-bootstrap";
-import { getCardData, getTableData, getModalData } from "@/components/api";
+import { getCardData, getTableData, getModalData, Config } from "@/components/api";
 
 export default function Home() {
   const [state, setState] = useState({
@@ -15,6 +15,7 @@ export default function Home() {
     tablePage: 0,
     tableData: {},
     showToast: false,
+    consensusDuration: 0,
 
     sortColumn: null,
     sortDirection: "asc",
@@ -31,7 +32,7 @@ export default function Home() {
   });
 
   function getCardAndTableData(setLoading) {
-    Promise.allSettled([getTableData(state.tablePage, state.category, state.committee), getCardData()]).then(
+    Promise.allSettled([getTableData(state.tablePage, state.category, state.committee), getCardData(), Config()]).then(
       (values) => {
         let settledValues = [];
         for (const v of values) {
@@ -42,10 +43,14 @@ export default function Home() {
           settledValues.push(v.value);
         }
 
+        const consensusDuration = settledValues[2].electionTimeoutMS + settledValues[2].electionVoteTimeoutMS 
+          + settledValues[2].proposeTimeoutMS + settledValues[2].proposeVoteTimeoutMS + settledValues[2].precommitTimeoutMS 
+          + settledValues[2].precommitVoteTimeoutMS + settledValues[2].commitTimeoutMS + settledValues[2].commitProcessMS + settledValues[2].roundInterruptTimeoutMS;
+
         if (setLoading) {
-          return setState({ ...state, loading: false, tableData: settledValues[0], cardData: settledValues[1] });
+          return setState({ ...state, loading: false, tableData: settledValues[0], cardData: settledValues[1], consensusDuration: consensusDuration });
         }
-        return setState({ ...state, tableData: settledValues[0], cardData: settledValues[1] });
+        return setState({ ...state, tableData: settledValues[0], cardData: settledValues[1], consensusDuration: consensusDuration });
       },
     );
   }

@@ -233,7 +233,7 @@ func TestSlashAndResetNonSigners(t *testing.T) {
 				// add the validator stake to supply
 				require.NoError(t, sm.AddToStakedSupply(stakeAmount))
 				// add the validator stake to supply
-				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyChainId, stakeAmount))
+				require.NoError(t, sm.AddToCommitteeSupplyForChain(lib.CanopyChainId, stakeAmount))
 				// set the non signer as a validator in state
 				require.NoError(t, sm.SetValidator(&types.Validator{
 					Address:      nonSigner.Address,
@@ -402,7 +402,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 			name:          "nil",
 			detail:        "there is 1 invalid double signer, empty",
 			doubleSigners: []*lib.DoubleSigner{nil},
-			error:         lib.ErrInvalidEvidence(),
+			error:         lib.ErrEmptyDoubleSigner(),
 		},
 		{
 			name:   "bad heights",
@@ -465,9 +465,9 @@ func TestHandleDoubleSigners(t *testing.T) {
 			require.NoError(t, e)
 			valParams.DoubleSignSlashPercentage = 1
 			require.NoError(t, sm.SetParamsVal(valParams))
+			s := sm.Store().(lib.StoreI)
 			// preset the double signers
 			for _, doubleSigner := range test.preset {
-				s := sm.Store().(lib.StoreI)
 				// get the address of the double signer
 				pub, err := crypto.NewPublicKeyFromBytes(doubleSigner.Id)
 				require.NoError(t, err)
@@ -476,11 +476,15 @@ func TestHandleDoubleSigners(t *testing.T) {
 					// generate address
 					addr := pub.Address().Bytes()
 					// ensure is a valid double signer
-					require.True(t, sm.IsValidDoubleSigner(h, addr))
+					ok, er := s.IsValidDoubleSigner(addr, h)
+					require.NoError(t, er)
+					require.True(t, ok)
 					// index the double signer
 					require.NoError(t, s.IndexDoubleSigner(addr, h))
 					// ensure no longer is a valid double signer
-					require.False(t, sm.IsValidDoubleSigner(h, addr))
+					ok, er = s.IsValidDoubleSigner(addr, h)
+					require.NoError(t, er)
+					require.False(t, ok)
 				}
 			}
 			// preset the validators
@@ -499,7 +503,7 @@ func TestHandleDoubleSigners(t *testing.T) {
 				// save the public key for later use in the test
 				pubs = append(pubs, pub)
 				// add to the committee supply
-				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyChainId, stakeAmount))
+				require.NoError(t, sm.AddToCommitteeSupplyForChain(lib.CanopyChainId, stakeAmount))
 				// set the double signer as a validator in state
 				require.NoError(t, sm.SetValidator(&types.Validator{
 					Address:      pub.Address().Bytes(),
@@ -527,7 +531,9 @@ func TestHandleDoubleSigners(t *testing.T) {
 				expected := stakeAmount
 				for _, height := range doubleSigner.Heights {
 					// ensure no longer is a valid double signer
-					require.False(t, sm.IsValidDoubleSigner(height, validator.Address))
+					ok, er := s.IsValidDoubleSigner(validator.Address, height)
+					require.NoError(t, er)
+					require.False(t, ok)
 					// re-calculate the expected
 					expected = lib.Uint64ReducePercentage(expected, valParams.DoubleSignSlashPercentage)
 				}
@@ -763,7 +769,7 @@ func TestSlash(t *testing.T) {
 				// set the bad proposer as a validator in state
 				require.NoError(t, sm.SetValidator(v))
 				// add to the committee supply
-				require.NoError(t, sm.AddToCommitteeStakedSupply(lib.CanopyChainId, stakeAmount))
+				require.NoError(t, sm.AddToCommitteeSupplyForChain(lib.CanopyChainId, stakeAmount))
 			}
 			// execute the slashes
 			for _, s := range test.slashes {
@@ -1023,6 +1029,7 @@ func TestLoadMinimumEvidenceHeight(t *testing.T) {
 			valParams.UnstakingBlocks = test.unstakingBlocks
 			// set the params
 			require.NoError(t, sm.SetParamsVal(valParams))
+			sm.Store().(lib.StoreI).Commit()
 			// run the function call with no errors
 			got, err := sm.LoadMinimumEvidenceHeight()
 			require.NoError(t, err)

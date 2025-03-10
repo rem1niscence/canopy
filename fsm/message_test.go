@@ -62,8 +62,11 @@ func TestHandleMessage(t *testing.T) {
 				PublicKey:     newTestPublicKeyBytes(t),
 				Amount:        amount,
 				Committees:    []uint64{lib.CanopyChainId},
-				NetAddress:    "http://example.com",
+				NetAddress:    "tcp://example.com",
 				OutputAddress: newTestAddressBytes(t),
+				Delegate:      false,
+				Compound:      false,
+				Signer:        newTestAddressBytes(t),
 			},
 			validate: func(sm StateMachine) {
 				// ensure the sender account was subtracted from
@@ -87,6 +90,7 @@ func TestHandleMessage(t *testing.T) {
 					Address:      newTestAddressBytes(t),
 					StakedAmount: amount,
 					Committees:   []uint64{lib.CanopyChainId},
+					Output:       newTestAddressBytes(t),
 				}
 				// add the validator stake to total supply
 				require.NoError(t, sm.AddToTotalSupply(v.StakedAmount))
@@ -101,8 +105,9 @@ func TestHandleMessage(t *testing.T) {
 				Address:       newTestAddressBytes(t),
 				Amount:        amount + 1,
 				Committees:    []uint64{lib.CanopyChainId},
-				NetAddress:    "http://example.com",
+				NetAddress:    "tcp://example.com",
 				OutputAddress: newTestAddressBytes(t),
+				Signer:        newTestAddressBytes(t),
 			},
 			validate: func(sm StateMachine) {
 				// ensure the sender account was subtracted from
@@ -487,7 +492,7 @@ func TestGetFeeForMessage(t *testing.T) {
 				}
 			}()
 			// execute function call
-			got, err := sm.GetFeeForMessage(test.msg)
+			got, err := sm.GetFeeForMessageName(test.msg.Name())
 			// validate the expected error
 			require.NoError(t, err)
 			// compare got vs expected
@@ -708,11 +713,20 @@ func TestHandleMessageStake(t *testing.T) {
 			detail: "the sender public key is invalid",
 			msg:    &types.MessageStake{PublicKey: newTestAddressBytes(t)},
 			error:  "public key is invalid",
-		}, {
-			name:            "validator already exists",
-			detail:          "the validator already exists in state",
+		},
+		{
+			name:            "invalid net address",
+			detail:          "the validator net address is invalid",
 			msg:             &types.MessageStake{PublicKey: newTestPublicKeyBytes(t)},
 			expected:        &types.Validator{Address: newTestAddressBytes(t)},
+			presetValidator: true,
+			error:           "net address has invalid length",
+		},
+		{
+			name:            "validator already exists",
+			detail:          "the validator already exists in state",
+			msg:             &types.MessageStake{PublicKey: newTestPublicKeyBytes(t), NetAddress: "tcp://example.com"},
+			expected:        &types.Validator{Address: newTestAddressBytes(t), NetAddress: "tcp://example.com"},
 			presetValidator: true,
 			error:           "validator exists",
 		},
@@ -721,8 +735,9 @@ func TestHandleMessageStake(t *testing.T) {
 			detail:       "the sender doesn't have enough tokens",
 			presetSender: 0,
 			msg: &types.MessageStake{
-				PublicKey: newTestPublicKeyBytes(t),
-				Amount:    1,
+				PublicKey:  newTestPublicKeyBytes(t),
+				NetAddress: "tcp://example.com",
+				Amount:     1,
 			},
 			error: "insufficient funds",
 		},
@@ -734,15 +749,16 @@ func TestHandleMessageStake(t *testing.T) {
 				PublicKey:     newTestPublicKeyBytes(t),
 				Amount:        1,
 				Committees:    []uint64{0, 1},
-				NetAddress:    "http://example.com",
+				NetAddress:    "tcp://example.com",
 				OutputAddress: newTestAddressBytes(t, 1),
 				Delegate:      false,
 				Compound:      true,
+				Signer:        newTestAddressBytes(t),
 			},
 			expected: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
-				NetAddress:   "http://example.com",
+				NetAddress:   "tcp://example.com",
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Output:       newTestAddressBytes(t, 1),
@@ -758,15 +774,16 @@ func TestHandleMessageStake(t *testing.T) {
 				PublicKey:     newTestPublicKeyBytes(t),
 				Amount:        1,
 				Committees:    []uint64{0, 1},
-				NetAddress:    "http://example.com",
+				NetAddress:    "tcp://example.com",
 				OutputAddress: newTestAddressBytes(t, 1),
 				Delegate:      false,
 				Compound:      true,
+				Signer:        newTestAddressBytes(t),
 			},
 			expected: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
-				NetAddress:   "http://example.com",
+				NetAddress:   "tcp://example.com",
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Output:       newTestAddressBytes(t, 1),
@@ -782,15 +799,14 @@ func TestHandleMessageStake(t *testing.T) {
 				PublicKey:     newTestPublicKeyBytes(t),
 				Amount:        1,
 				Committees:    []uint64{0, 1},
-				NetAddress:    "http://example.com",
 				OutputAddress: newTestAddressBytes(t, 1),
 				Delegate:      true,
 				Compound:      true,
+				Signer:        newTestAddressBytes(t),
 			},
 			expected: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
-				NetAddress:   "http://example.com",
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Output:       newTestAddressBytes(t, 1),
@@ -806,15 +822,14 @@ func TestHandleMessageStake(t *testing.T) {
 				PublicKey:     newTestPublicKeyBytes(t),
 				Amount:        1,
 				Committees:    []uint64{0, 1},
-				NetAddress:    "http://example.com",
 				OutputAddress: newTestAddressBytes(t, 1),
 				Delegate:      true,
 				Compound:      true,
+				Signer:        newTestAddressBytes(t),
 			},
 			expected: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
-				NetAddress:   "http://example.com",
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Output:       newTestAddressBytes(t, 1),
@@ -865,7 +880,7 @@ func TestHandleMessageStake(t *testing.T) {
 			// validate the addition to the committees
 			for _, id := range val.Committees {
 				// get the supply for each committee
-				stakedSupply, e := sm.GetCommitteeStakedSupply(id)
+				stakedSupply, e := sm.GetCommitteeStakedSupplyForChain(id)
 				require.NoError(t, e)
 				require.Equal(t, test.msg.Amount, stakedSupply.Amount)
 			}
@@ -875,7 +890,7 @@ func TestHandleMessageStake(t *testing.T) {
 				// validate the addition to the delegations only
 				for _, id := range val.Committees {
 					// get the supply for each committee
-					stakedSupply, e := sm.GetDelegateStakedSupply(id)
+					stakedSupply, e := sm.GetDelegateStakedSupplyForChain(id)
 					require.NoError(t, e)
 					require.Equal(t, test.msg.Amount, stakedSupply.Amount)
 					// validate the delegate membership
@@ -937,13 +952,24 @@ func TestHandleMessageEditStake(t *testing.T) {
 			error:  "validator does not exist",
 		},
 		{
-			name:   "unstaking",
-			detail: "the validator is unstaking and cannot be edited",
+			name:   "net address",
+			detail: "the validator's net address has an invalid length",
 			presetValidator: &types.Validator{
 				Address:         newTestAddressBytes(t),
 				UnstakingHeight: 1,
 			},
 			msg:   &types.MessageEditStake{Address: newTestAddressBytes(t)},
+			error: "net address has invalid length",
+		},
+		{
+			name:   "unstaking",
+			detail: "the validator is unstaking and cannot be edited",
+			presetValidator: &types.Validator{
+				Address:         newTestAddressBytes(t),
+				NetAddress:      "tcp://example.com",
+				UnstakingHeight: 1,
+			},
+			msg:   &types.MessageEditStake{Address: newTestAddressBytes(t), NetAddress: "tcp://example.com"},
 			error: "unstaking",
 		},
 		{
@@ -952,7 +978,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 			presetValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
-				NetAddress:   "http://example.com",
+				NetAddress:   "tcp://example.com",
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Output:       newTestAddressBytes(t),
@@ -962,7 +988,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Address:       newTestAddressBytes(t),
 				Amount:        2,
 				Committees:    []uint64{0, 1},
-				NetAddress:    "http://example.com",
+				NetAddress:    "tcp://example.com",
 				OutputAddress: newTestAddressBytes(t, 1),
 				Compound:      true,
 			},
@@ -974,7 +1000,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 			presetValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
-				NetAddress:   "http://example.com",
+				NetAddress:   "tcp://example.com",
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Output:       newTestAddressBytes(t),
@@ -984,7 +1010,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Address:       newTestAddressBytes(t),
 				Amount:        2,
 				Committees:    []uint64{0, 1},
-				NetAddress:    "http://example.com",
+				NetAddress:    "tcp://example.com",
 				OutputAddress: newTestAddressBytes(t),
 				Compound:      true,
 			},
@@ -996,7 +1022,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 			presetValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
-				NetAddress:   "http://example.com",
+				NetAddress:   "tcp://example.com",
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Output:       newTestAddressBytes(t),
@@ -1006,7 +1032,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Address:       newTestAddressBytes(t),
 				Amount:        1,
 				Committees:    []uint64{0, 1},
-				NetAddress:    "http://example2.com",
+				NetAddress:    "tcp://example2.com",
 				OutputAddress: newTestAddressBytes(t, 1),
 				Compound:      false,
 				Signer:        newTestAddressBytes(t),
@@ -1014,7 +1040,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 			expectedValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
-				NetAddress:   "http://example2.com",
+				NetAddress:   "tcp://example2.com",
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Output:       newTestAddressBytes(t, 1),
@@ -1090,7 +1116,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 			presetValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
-				NetAddress:   "http://example.com",
+				NetAddress:   "tcp://example.com",
 				StakedAmount: 1,
 				Committees:   []uint64{0, 1},
 				Output:       newTestAddressBytes(t),
@@ -1100,14 +1126,14 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Address:       newTestAddressBytes(t),
 				Amount:        1,
 				Committees:    []uint64{1, 2, 3},
-				NetAddress:    "http://example.com",
+				NetAddress:    "tcp://example.com",
 				OutputAddress: newTestAddressBytes(t),
 				Compound:      true,
 			},
 			expectedValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				PublicKey:    newTestPublicKeyBytes(t),
-				NetAddress:   "http://example.com",
+				NetAddress:   "tcp://example.com",
 				StakedAmount: 1,
 				Committees:   []uint64{1, 2, 3},
 				Output:       newTestAddressBytes(t),
@@ -1193,16 +1219,20 @@ func TestHandleMessageEditStake(t *testing.T) {
 			presetValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 1,
+				NetAddress:   "tcp://example.com",
 				Committees:   []uint64{0, 1},
 			},
 			msg: &types.MessageEditStake{
 				Address:    newTestAddressBytes(t),
 				Amount:     2,
+				NetAddress: "tcp://example.com",
 				Committees: []uint64{1, 2, 3},
+				Signer:     newTestAddressBytes(t),
 			},
 			expectedValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
 				StakedAmount: 2,
+				NetAddress:   "tcp://example.com",
 				Committees:   []uint64{1, 2, 3},
 			},
 			expectedSupply: &types.Supply{
@@ -1238,6 +1268,7 @@ func TestHandleMessageEditStake(t *testing.T) {
 				Address:    newTestAddressBytes(t),
 				Amount:     2,
 				Committees: []uint64{1, 2, 3},
+				Signer:     newTestAddressBytes(t),
 			},
 			expectedValidator: &types.Validator{
 				Address:      newTestAddressBytes(t),
@@ -1565,17 +1596,6 @@ func TestMessageUnpause(t *testing.T) {
 			error: "validator not paused",
 		},
 		{
-			name:   "validator unstaking",
-			detail: "validator is unstaking so this operation is invalid",
-			preset: &types.Validator{
-				Address:         newTestAddressBytes(t),
-				MaxPausedHeight: 1,
-				UnstakingHeight: 1,
-			},
-			msg:   &types.MessageUnpause{Address: newTestAddressBytes(t)},
-			error: "validator is unstaking",
-		},
-		{
 			name:   "validator is paused",
 			detail: "validator is paused",
 			preset: &types.Validator{
@@ -1864,7 +1884,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 	// pre-define a quorum certificate to insert into the message change certificate results
 	certificateResults := &lib.CertificateResult{
 		RewardRecipients: &lib.RewardRecipients{
-			PaymentPercents: []*lib.PaymentPercents{{Address: newTestAddressBytes(t), Percent: 100}},
+			PaymentPercents: []*lib.PaymentPercents{{Address: newTestAddressBytes(t), Percent: 100, ChainId: 1}},
 		},
 		SlashRecipients: &lib.SlashRecipients{
 			DoubleSigners: []*lib.DoubleSigner{
@@ -1872,8 +1892,9 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			},
 		},
 		Orders: &lib.Orders{
-			BuyOrders: []*lib.BuyOrder{{
+			LockOrders: []*lib.LockOrder{{
 				OrderId:             0,
+				BuyerSendAddress:    newTestAddressBytes(t),
 				BuyerReceiveAddress: newTestAddressBytes(t),
 				BuyerChainDeadline:  100,
 			}},
@@ -2056,16 +2077,16 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 				require.ErrorContains(t, err, test.error)
 				return
 			}
-			// 1) validate the 'buy order'
+			// 1) validate the 'lock order'
 			func() {
 				order, e := sm.GetOrder(0, lib.CanopyChainId+1)
 				require.NoError(t, e)
-				// convenience variable for buy order
-				buyOrder := test.msg.Qc.Results.Orders.BuyOrders[0]
+				// convenience variable for lock order
+				lockOrder := test.msg.Qc.Results.Orders.LockOrders[0]
 				// validate the receipt address was set
-				require.Equal(t, buyOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
+				require.Equal(t, lockOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
 				// validate the deadline was set
-				require.Equal(t, buyOrder.BuyerChainDeadline, order.BuyerChainDeadline)
+				require.Equal(t, lockOrder.BuyerChainDeadline, order.BuyerChainDeadline)
 			}()
 			// 2) validate the 'reset order'
 			func() {
@@ -2311,7 +2332,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			error: "not found",
 		},
 		{
-			name:   "order already accepted",
+			name:   "order locked",
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
 			preset: &lib.SellOrder{
 				Id:                   0,
@@ -2330,7 +2351,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
-			error: "order already accepted",
+			error: "order locked",
 		},
 		{
 			name:             "minimum order size",
@@ -2526,7 +2547,7 @@ func TestHandleMessageDelete(t *testing.T) {
 			error: "not found",
 		},
 		{
-			name:   "order already accepted",
+			name:   "order locked",
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
 			preset: &lib.SellOrder{
 				Id:                   0,
@@ -2542,7 +2563,7 @@ func TestHandleMessageDelete(t *testing.T) {
 				OrderId: 0,
 				ChainId: lib.CanopyChainId,
 			},
-			error: "order already accepted",
+			error: "order locked",
 		},
 		{
 			name:   "successful delete",

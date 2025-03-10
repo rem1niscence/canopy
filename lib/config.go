@@ -2,23 +2,31 @@ package lib
 
 import (
 	"encoding/json"
-	"github.com/alecthomas/units"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/alecthomas/units"
+)
+
+/* This file implements logic for 'user controlled' global configurations of each module of the node */
+
+const (
+	// GLOBAL CONSTANTS
+	UnknownChainId         = uint64(0)            // the default 'unknown' chain id
+	CanopyChainId          = uint64(1)            // NOTE: to not break nested-chain recursion, this should not be used except for 'default config/genesis' developer setups
+	DAOPoolID              = 2*math.MaxUint16 + 1 // must be above the MaxUint16 * 2 to ensure no 'overlap' with 'chainId + EscrowAddend'
+	CanopyMainnetNetworkId = 1                    // the identifier of the 'mainnet' of Canopy
 )
 
 const (
-	ConfigFilePath         = "config.json"
-	ValKeyPath             = "validator_key.json"
-	GenesisFilePath        = "genesis.json"
-	ProposalsFilePath      = "proposals.json"
-	PollsFilePath          = "polls.json"
-	UnknownChainId         = uint64(0)
-	CanopyChainId          = uint64(1)            // NOTE: to not break nested-chain recursion, this should not be used except for 'default config/genesis' developer setups
-	DAOPoolID              = 2*math.MaxUint16 + 1 // must be above the MaxUint16 * 2 to ensure no 'overlap' with 'chainId + EscrowAddend'
-	CanopyMainnetNetworkId = 1
+	// FILE NAMES in the 'data directory'
+	ConfigFilePath    = "config.json"        // the file path for the node configuration
+	ValKeyPath        = "validator_key.json" // the file path for the node's private key
+	GenesisFilePath   = "genesis.json"       // the file path for the genesis (first block)
+	ProposalsFilePath = "proposals.json"     // the file path for governance proposal voting configuration
+	PollsFilePath     = "polls.json"         // the file path for governance 'straw' polling voting and tracking
 )
 
 // Config is the structure of the user configuration options for a Canopy node
@@ -48,22 +56,28 @@ func DefaultConfig() Config {
 // MAIN CONFIG BELOW
 
 type MainConfig struct {
-	LogLevel   string      `json:"logLevel"`
-	ChainId    uint64      `json:"chainId"`
-	SleepUntil uint64      `json:"sleepUntil"`
-	RootChain  []RootChain `json:"rootChain"`
-	RunVDF     bool        `json:"RunVDF"`
-	Headless   bool        `json:"headless"`
+	LogLevel   string      `json:"logLevel"`   // any level includes the levels above it: debug < info < warning < error
+	ChainId    uint64      `json:"chainId"`    // the identifier of this particular chain within a single 'network id'
+	SleepUntil uint64      `json:"sleepUntil"` // allows coordinated 'wake-ups' for genesis or chain halt events
+	RootChain  []RootChain `json:"rootChain"`  // a list of the root chain(s) a node could connect to as dictated by the governance parameter 'RootChainId'
+	RunVDF     bool        `json:"runVDF"`     // whether the node should run a Verifiable Delay Function to help secure the network against Long-Range-Attacks
+	Headless   bool        `json:"headless"`   // turn off the web wallet and block explorer 'web' front ends
 }
 
 // DefaultMainConfig() sets log level to 'info'
 func DefaultMainConfig() MainConfig {
-	return MainConfig{LogLevel: "info", RootChain: []RootChain{
-		{
-			ChainId: 1,
-			Url:     "http://localhost:50002",
+	return MainConfig{
+		LogLevel: "info", // everything but debug is the default
+		RootChain: []RootChain{
+			{
+				ChainId: CanopyChainId,            // RootChainId is chain id 1
+				Url:     "http://localhost:50002", // RooChainURL points to self
+			},
 		},
-	}, RunVDF: true, ChainId: CanopyChainId, Headless: false}
+		RunVDF:   true,          // run the VDF by default
+		ChainId:  CanopyChainId, // default chain url is 1
+		Headless: false,         // serve the web wallet and block explorer by default
+	}
 }
 
 // GetLogLevel() parses the log string in the config file into a LogLevel Enum
@@ -85,30 +99,31 @@ func (m *MainConfig) GetLogLevel() int32 {
 // RPC CONFIG BELOW
 
 type RPCConfig struct {
-	WalletPort      string // the port where the web wallet is hosted
-	ExplorerPort    string // the port where the block explorer is hosted
-	RPCPort         string // the port where the rpc server is hosted
-	AdminPort       string // the port where the admin rpc server is hosted
-	RPCUrl          string // the url without port where the rpc server is hosted
-	RootChainPollMS uint64 // how often to poll the base chain in milliseconds
-	TimeoutS        int    // the rpc request timeout in seconds
+	WalletPort      string `json:"walletPort"`      // the port where the web wallet is hosted
+	ExplorerPort    string `json:"explorerPort"`    // the port where the block explorer is hosted
+	RPCPort         string `json:"rpcPort"`         // the port where the rpc server is hosted
+	AdminPort       string `json:"adminPort"`       // the port where the admin rpc server is hosted
+	RPCUrl          string `json:"rpcURL"`          // the url without port where the rpc server is hosted
+	RootChainPollMS uint64 `json:"rootChainPollMS"` // how often to poll the base chain in milliseconds
+	TimeoutS        int    `json:"timeoutS"`        // the rpc request timeout in seconds
 }
 
+// RootChain defines a rpc url to a possible 'root chain' which is used if the governance parameter RootChainId == ChainId
 type RootChain struct {
-	ChainId uint64 `json:"chainId"`
-	Url     string `json:"url"`
+	ChainId uint64 `json:"chainId"` // used if the governance parameter RootChainId == ChainId
+	Url     string `json:"url"`     // the url to the 'root chain' rpc
 }
 
 // DefaultRPCConfig() sets rpc url to localhost and sets wallet, explorer, rpc, and admin ports from [50000-50003]
 func DefaultRPCConfig() RPCConfig {
 	return RPCConfig{
-		WalletPort:      "50000",
-		ExplorerPort:    "50001",
-		RPCPort:         "50002",
-		AdminPort:       "50003",
-		RPCUrl:          "http://localhost",
-		RootChainPollMS: 1000,
-		TimeoutS:        3,
+		WalletPort:      "50000",            // find the wallet on localhost:50000
+		ExplorerPort:    "50001",            // find the explorer on localhost:50001
+		RPCPort:         "50002",            // the rpc is served on localhost:50002
+		AdminPort:       "50003",            // the admin rpc is served on localhost:50003
+		RPCUrl:          "http://localhost", // use a local rpc by default
+		RootChainPollMS: 333,                // poll the root chain every 1/3 second
+		TimeoutS:        3,                  // the rpc timeout is 3 seconds
 	}
 }
 
@@ -128,29 +143,28 @@ func DefaultStateMachineConfig() StateMachineConfig { return StateMachineConfig{
 // - async faults may lead to extended block time
 // - social consensus dictates BlockTime for the protocol - being too fast or too slow can lead to Non-Signing and Consensus failures
 type ConsensusConfig struct {
-	ElectionTimeoutMS       int // minus VRF creation time (if Candidate), is how long (in milliseconds) the replica sleeps before moving to ELECTION-VOTE phase
-	ElectionVoteTimeoutMS   int // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to PROPOSE phase
-	ProposeTimeoutMS        int // minus Proposal creation time (if Leader), is how long (in milliseconds) the replica sleeps before moving to PROPOSE-VOTE phase
-	ProposeVoteTimeoutMS    int // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to PRECOMMIT phase
-	PrecommitTimeoutMS      int // minus Proposal-QC aggregation time (if Leader), how long (in milliseconds) the replica sleeps before moving to the PRECOMMIT-VOTE phase
-	PrecommitVoteTimeoutMS  int // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to COMMIT phase
-	CommitTimeoutMS         int // minus Precommit-QC aggregation time (if Leader), how long (in milliseconds) the replica sleeps before moving to the COMMIT-PROCESS phase
-	CommitProcessMS         int // minus Commit Proposal time, how long (in milliseconds) the replica sleeps before 'NewHeight' (NOTE: this is the majority of the block time)
-	RoundInterruptTimeoutMS int // minus gossiping current Round time, how long (in milliseconds) the replica sleeps before moving to PACEMAKER phase
+	ElectionTimeoutMS       int `json:"electionTimeoutMS"`       // minus VRF creation time (if Candidate), is how long (in milliseconds) the replica sleeps before moving to ELECTION-VOTE phase
+	ElectionVoteTimeoutMS   int `json:"electionVoteTimeoutMS"`   // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to PROPOSE phase
+	ProposeTimeoutMS        int `json:"proposeTimeoutMS"`        // minus Proposal creation time (if Leader), is how long (in milliseconds) the replica sleeps before moving to PROPOSE-VOTE phase
+	ProposeVoteTimeoutMS    int `json:"proposeVoteTimeoutMS"`    // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to PRECOMMIT phase
+	PrecommitTimeoutMS      int `json:"precommitTimeoutMS"`      // minus Proposal-QC aggregation time (if Leader), how long (in milliseconds) the replica sleeps before moving to the PRECOMMIT-VOTE phase
+	PrecommitVoteTimeoutMS  int `json:"precommitVoteTimeoutMS"`  // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to COMMIT phase
+	CommitTimeoutMS         int `json:"commitTimeoutMS"`         // minus Precommit-QC aggregation time (if Leader), how long (in milliseconds) the replica sleeps before moving to the COMMIT-PROCESS phase
+	CommitProcessMS         int `json:"commitProcessMS"`         // minus Commit Proposal time, how long (in milliseconds) the replica sleeps before 'NewHeight' (NOTE: this is the majority of the block time)
+	RoundInterruptTimeoutMS int `json:"roundInterruptTimeoutMS"` // minus gossiping current Round time, how long (in milliseconds) the replica sleeps before moving to PACEMAKER phase
 }
 
 // DefaultConsensusConfig() configures the block time
 func DefaultConsensusConfig() ConsensusConfig {
 	return ConsensusConfig{
-		ElectionTimeoutMS:       5000,
-		ElectionVoteTimeoutMS:   2000,
-		ProposeTimeoutMS:        2000,
-		ProposeVoteTimeoutMS:    2000,
-		PrecommitTimeoutMS:      2000,
-		PrecommitVoteTimeoutMS:  2000,
-		CommitTimeoutMS:         2000,
-		CommitProcessMS:         5000,
-		RoundInterruptTimeoutMS: 5000,
+		ElectionTimeoutMS:      2000, // 2 seconds
+		ElectionVoteTimeoutMS:  2000, // 2 seconds
+		ProposeTimeoutMS:       3000, // 3 seconds
+		ProposeVoteTimeoutMS:   3000, // 3 seconds
+		PrecommitTimeoutMS:     2000, // 2 seconds
+		PrecommitVoteTimeoutMS: 2000, // 2 seconds
+		CommitTimeoutMS:        2000, // 2 seconds
+		CommitProcessMS:        3000, // 3 seconds
 	}
 }
 
@@ -158,24 +172,24 @@ func DefaultConsensusConfig() ConsensusConfig {
 
 // P2PConfig defines peering compatibility and limits as well as actions on specific peering IPs / IDs
 type P2PConfig struct {
-	NetworkID       uint64   // the ID for the peering network
-	ListenAddress   string   // listen for incoming connection
-	ExternalAddress string   // advertise for external dialing
-	MaxInbound      int      // max inbound peers
-	MaxOutbound     int      // max outbound peers
-	TrustedPeerIDs  []string // trusted public keys
-	DialPeers       []string // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
-	BannedPeerIDs   []string // banned public keys
-	BannedIPs       []string // banned IPs
+	NetworkID       uint64   `json:"networkID"`       // the ID for the peering network
+	ListenAddress   string   `json:"listenAddress"`   // listen for incoming connection
+	ExternalAddress string   `json:"externalAddress"` // advertise for external dialing
+	MaxInbound      int      `json:"maxInbound"`      // max inbound peers
+	MaxOutbound     int      `json:"maxOutbound"`     // max outbound peers
+	TrustedPeerIDs  []string `json:"trutedPeersIDs"`  // trusted public keys
+	DialPeers       []string `json:"dialPeers"`       // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
+	BannedPeerIDs   []string `json:"bannedPeersIDs"`  // banned public keys
+	BannedIPs       []string `json:"bannedIPs"`       // banned IPs
 }
 
 func DefaultP2PConfig() P2PConfig {
 	return P2PConfig{
 		NetworkID:       CanopyMainnetNetworkId,
-		ListenAddress:   "0.0.0.0:9001", // default TCP address is 9001
-		ExternalAddress: "",
-		MaxInbound:      21,
-		MaxOutbound:     7,
+		ListenAddress:   "0.0.0.0:9001", // default TCP address is 9001 for chain 1 (9002 for chain 2 etc.)
+		ExternalAddress: "",             // should be populated by the user
+		MaxInbound:      21,             // inbounds should be close to 3x greater than outbounds
+		MaxOutbound:     7,              // to ensure 'new joiners' have slots to take
 	}
 }
 
@@ -183,23 +197,30 @@ func DefaultP2PConfig() P2PConfig {
 
 // StoreConfig is user configurations for the key value database
 type StoreConfig struct {
-	DataDirPath string // path of the designated folder where the application stores its data
-	DBName      string // name of the database
-	InMemory    bool   // non-disk database, only for testing
+	DataDirPath string `json:"dataDirPath"` // path of the designated folder where the application stores its data
+	DBName      string `json:"dbName"`      // name of the database
+	InMemory    bool   `json:"inMemory"`    // non-disk database, only for testing
 }
 
 // DefaultDataDirPath() is $USERHOME/.canopy
 func DefaultDataDirPath() string {
-	home, _ := os.UserHomeDir()
+	// get the user home
+	home, err := os.UserHomeDir()
+	// if unable to get the user home
+	if err != nil {
+		// fatal error
+		panic(err)
+	}
+	// exit with full default data directory path
 	return filepath.Join(home, ".canopy")
 }
 
 // DefaultStoreConfig() returns the developer recommended store configuration
 func DefaultStoreConfig() StoreConfig {
 	return StoreConfig{
-		DataDirPath: DefaultDataDirPath(),
-		DBName:      "canopy",
-		InMemory:    false,
+		DataDirPath: DefaultDataDirPath(), // use the default data dir path
+		DBName:      "canopy",             // 'canopy' database name
+		InMemory:    false,                // persist to disk, not memory
 	}
 }
 
@@ -207,61 +228,51 @@ func DefaultStoreConfig() StoreConfig {
 
 // MempoolConfig is the user configuration of the unconfirmed transaction pool
 type MempoolConfig struct {
-	MaxTotalBytes       uint64 // maximum collective bytes in the pool
-	MaxTransactionCount uint32 // max number of Transactions
-	IndividualMaxTxSize uint32 // max bytes of a single Transaction
-	DropPercentage      int    // percentage that is dropped from the bottom of the queue if limits are reached
+	MaxTotalBytes       uint64 `json:"maxTotalBytes"`       // maximum collective bytes in the pool
+	MaxTransactionCount uint32 `json:"maxTransactionCount"` // max number of Transactions
+	IndividualMaxTxSize uint32 `json:"individualMaxTxSize"` // max bytes of a single Transaction
+	DropPercentage      int    `json:"dropPercentage"`      // percentage that is dropped from the bottom of the queue if limits are reached
 }
 
 // DefaultMempoolConfig() returns the developer created Mempool options
 func DefaultMempoolConfig() MempoolConfig {
 	return MempoolConfig{
-		MaxTotalBytes:       uint64(10 * units.MB),
-		IndividualMaxTxSize: uint32(4 * units.Kilobyte),
-		MaxTransactionCount: 5000,
-		DropPercentage:      35,
+		MaxTotalBytes:       uint64(10 * units.MB),      // 10 MB max size
+		IndividualMaxTxSize: uint32(4 * units.Kilobyte), // 4 KB max individual tx size
+		MaxTransactionCount: 5000,                       // 5000 max transactions
+		DropPercentage:      35,                         // drop 35% if limits are reached
 	}
-}
-
-// PLUGINS CONFIG BELOW
-
-// PluginsConfig is a list of the 'add-on' software that dictates and enables Committee consensus
-type PluginsConfig struct {
-	Plugins []PluginConfig
-}
-
-// PluginConfig defines the 'add-on' software that dictates and enables Committee consensus
-type PluginConfig struct {
-	ID        uint64    // socially conceived numerical identifier of the satellite chain
-	Name      string    // non-used (only for user clarity), human-readable identifier
-	URL       string    // url where the plugin may reach the 3rd party software (ex. http://localhost:1234)
-	BasicAuth BasicAuth // optional basic authentication the plugin may use to reach the 3rd party software
-}
-
-// BasicAuth is the golang abstraction of the simple user/pass http authentication scheme
-type BasicAuth struct {
-	Username string
-	Password string
 }
 
 // WriteToFile() saves the Config object to a JSON file
 func (c Config) WriteToFile(filepath string) error {
-	configBz, err := json.MarshalIndent(c, "", "  ")
+	// convert the config to indented 'pretty' json bytes
+	jsonBytes, err := json.MarshalIndent(c, "", "  ")
+	// if an error occurred during the conversion
 	if err != nil {
+		// exit with error
 		return err
 	}
-	return os.WriteFile(filepath, configBz, os.ModePerm)
+	// write the config.json file to the data directory
+	return os.WriteFile(filepath, jsonBytes, os.ModePerm)
 }
 
 // NewConfigFromFile() populates a Config object from a JSON file
 func NewConfigFromFile(filepath string) (Config, error) {
-	bz, err := os.ReadFile(filepath)
+	// read the file into bytes using
+	fileBytes, err := os.ReadFile(filepath)
+	// if an error occurred
 	if err != nil {
+		// exit with error
 		return Config{}, err
 	}
+	// define the default config to fill in any blanks in the file
 	c := DefaultConfig()
-	if err = json.Unmarshal(bz, &c); err != nil {
+	// populate the default config with the file bytes
+	if err = json.Unmarshal(fileBytes, &c); err != nil {
+		// exit with error
 		return Config{}, err
 	}
+	// exit
 	return c, nil
 }

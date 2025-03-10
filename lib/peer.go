@@ -12,6 +12,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+/* This file contains shared code for peers and messages that are routed by the controller throughout the app */
+
 // MESSAGE CODE BELOW
 
 // Channels are logical communication paths or streams that operate over a single 'multiplexed' network connection
@@ -20,109 +22,30 @@ type Channels map[Topic]chan *MessageAndMetadata
 // MessageAndMetadata is a wrapper over a P2P message with information about the sender and the hash of the message
 // for easy de-duplication at the module level
 type MessageAndMetadata struct {
-	Message proto.Message
-	Hash    []byte
-	Sender  *PeerInfo
+	Message proto.Message // the (proto) payload of the message
+	Hash    []byte        // the hash of the payload
+	Sender  *PeerInfo     // the sender information
 }
 
 // WithHash() fills the hash field with the cryptographic hash of the message (used for de-duplication)
 func (x *MessageAndMetadata) WithHash() *MessageAndMetadata {
-	x.Hash = nil
-	bz, _ := MarshalJSON(x)
-	x.Hash = crypto.Hash(bz)
+	// convert the payload into proto bytes
+	payloadBytes, _ := Marshal(x.Message)
+	// hash the payload bytes and set the hash
+	x.Hash = crypto.Hash(payloadBytes)
+	// exit with the message
 	return x
-}
-
-// MessageCache is a simple p2p message de-duplicator that protects redundancy in the p2p network
-type MessageCache struct {
-	queue   *list.List
-	m       map[string]struct{}
-	maxSize int
-}
-
-// NewMessageCache() initializes and returns a new MessageCache instance
-func NewMessageCache() *MessageCache {
-	return &MessageCache{
-		queue:   list.New(),
-		m:       map[string]struct{}{},
-		maxSize: 10000,
-	}
-}
-
-// Add inserts a new message into the cache if it doesn't already exist
-// It removes the oldest message if the cache is full
-func (c *MessageCache) Add(msg *MessageAndMetadata) (ok bool) {
-	k := BytesToString(msg.Hash)
-	if _, found := c.m[k]; found {
-		return false
-	}
-	if c.queue.Len() >= c.maxSize {
-		e := c.queue.Back()
-		message := e.Value.(*MessageAndMetadata)
-		delete(c.m, BytesToString(message.Hash))
-		c.queue.Remove(e)
-	}
-	c.m[k] = struct{}{}
-	c.queue.PushFront(msg)
-	return true
-}
-
-// MESSAGE LIMITERS BELOW
-
-// SimpleLimiter ensures the number of requests don't exceed
-// a total limit and a limit per requester during a timeframe
-type SimpleLimiter struct {
-	requests        map[string]int
-	totalRequests   int
-	maxPerRequester int
-	maxRequests     int
-	reset           *time.Ticker
-}
-
-// NewLimiter() returns a new instance of SimpleLimiter with
-// - max requests per requester
-// - max total requests
-// - how often to reset the limiter
-func NewLimiter(maxPerRequester, maxRequests, resetWindowS int) *SimpleLimiter {
-	return &SimpleLimiter{
-		requests:        map[string]int{},
-		maxPerRequester: maxPerRequester,
-		maxRequests:     maxRequests,
-		reset:           time.NewTicker(time.Duration(resetWindowS) * time.Second),
-	}
-}
-
-// NewRequest() processes a new request and checks if the requester or total requests should be blocked
-func (l *SimpleLimiter) NewRequest(requester string) (requesterBlock, totalBlock bool) {
-	if l.totalRequests >= l.maxRequests {
-		return false, true
-	}
-	if count := l.requests[requester]; count >= l.maxPerRequester {
-		return true, false
-	}
-	l.requests[requester]++
-	l.totalRequests++
-	return
-}
-
-// Reset() clears the requests and resets the total request count
-func (l *SimpleLimiter) Reset() {
-	l.requests = map[string]int{}
-	l.totalRequests = 0
-}
-
-// TimeToReset() returns the channel that signals when the limiter may be reset
-// This channel is called by the time.Ticker() set in NewLimiter
-func (l *SimpleLimiter) TimeToReset() <-chan time.Time {
-	return l.reset.C
 }
 
 // PEER ADDRESS CODE BELOW
 
-// Copy() returns a clone of the PeerAddress
+// Copy() returns a deep clone of the PeerAddress
 func (x *PeerAddress) Copy() *PeerAddress {
+	// make a destination for a copy of the peer's public key
 	pkCopy := make([]byte, len(x.PublicKey))
+	// copy the public key to the destination
 	copy(pkCopy, x.PublicKey)
+	// return a deep copy of the peer address
 	return &PeerAddress{
 		PublicKey:  pkCopy,
 		NetAddress: x.NetAddress,
@@ -132,34 +55,51 @@ func (x *PeerAddress) Copy() *PeerAddress {
 
 // FromString() creates a new PeerAddress object from string (without meta)
 // Peer String example: <some-public-key>@<some-net-address>
-func (x *PeerAddress) FromString(s string) (e ErrorI) {
-	arr := strings.Split(s, "@")
-	if len(arr) != 2 {
-		return ErrInvalidNetAddrString(s)
+func (x *PeerAddress) FromString(stringFromConfig string) (e ErrorI) {
+	// split the string from the config file using the @ delimiter
+	splitArr := strings.Split(stringFromConfig, "@")
+	// if the split isn't length 2 (public key + net address)
+	if len(splitArr) != 2 {
+		// exit with invalid format
+		return ErrInvalidNetAddrString(stringFromConfig)
 	}
-	pubKey, err := crypto.NewPublicKeyFromString(arr[0])
+	// try to extract the public key from the first item of the split
+	pubKey, err := crypto.NewPublicKeyFromString(splitArr[0])
+	// if an error occurred during the conversion
 	if err != nil {
-		return ErrInvalidNetAddressPubKey(arr[0])
+		// exit with invalid public key
+		return ErrInvalidNetAddressPubKey(splitArr[0])
 	}
-	u, er := url.Parse(arr[1])
-	if er != nil || u.Hostname() == "" {
-		return ErrInvalidNetAddress(s)
+	// attempt to extract the net address from the second part of the split array
+	netAddress, er := url.Parse(splitArr[1])
+	// if an error occurred during the parsing
+	if er != nil || netAddress.Hostname() == "" {
+		// exit with 'invalid net address'
+		return ErrInvalidNetAddress(stringFromConfig)
 	}
-	port := u.Port()
+	// get the port from the net address
+	port := netAddress.Port()
 	// resolve port automatically if not exists
 	// port definition exists everywhere except for in state
 	if port == "" {
+		// resolve the port
 		port, e = ResolvePort(x.PeerMeta.ChainId)
+		// if an error occurred resolving the port
 		if e != nil {
+			// exit
 			return
 		}
 	}
 	// ensure the port starts with a colon
 	if !strings.HasPrefix(port, ":") {
+		// add the colon if not exists
 		port = ":" + port
 	}
-	x.NetAddress = strings.ReplaceAll(u.Hostname(), "tcp://", "") + port
+	// remove the transport prefix (if exists) and set the NetAddress
+	x.NetAddress = strings.ReplaceAll(netAddress.Hostname(), "tcp://", "") + port
+	// set the PublicKey
 	x.PublicKey = pubKey.Bytes()
+	// exit
 	return
 }
 
@@ -175,9 +115,9 @@ func (x *PeerAddress) HasChain(id uint64) bool { return x.PeerMeta.ChainId == id
 
 // peerAddressJSON is the json.Marshaller and json.Unmarshaler representation fo the PeerAddress object
 type peerAddressJSON struct {
-	PublicKey  HexBytes  `json:"public_key,omitempty"`
-	NetAddress string    `json:"net_address,omitempty"`
-	PeerMeta   *PeerMeta `json:"peer_meta,omitempty"`
+	PublicKey  HexBytes  `json:"publicKey,omitempty"`
+	NetAddress string    `json:"netAddress,omitempty"`
+	PeerMeta   *PeerMeta `json:"peerMeta,omitempty"`
 }
 
 // MarshalJSON satisfies the json.Marshaller interface for PeerAddress
@@ -190,37 +130,51 @@ func (x PeerAddress) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON satisfies the json.Unmarshlaer interface for PeerAddress
-func (x *PeerAddress) UnmarshalJSON(bz []byte) error {
+func (x *PeerAddress) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// make a new json object reference to ensure a non nil result
 	j := new(peerAddressJSON)
-	if err := json.Unmarshal(bz, j); err != nil {
-		return err
+	// populate the json object using the json bytes
+	if err = json.Unmarshal(jsonBytes, j); err != nil {
+		// exit with error
+		return
 	}
+	// populate the underlying object using the json object
 	x.PublicKey, x.NetAddress, x.PeerMeta = j.PublicKey, j.NetAddress, j.PeerMeta
-	return nil
+	// exit
+	return
 }
 
 // PEER META CODE BELOW
 
 // Sign() adds a digital signature to the PeerMeta for remote public key verification
 func (x *PeerMeta) Sign(key crypto.PrivateKeyI) *PeerMeta {
+	// sign the peer meta and populate the signature field
 	x.Signature = key.Sign(x.SignBytes())
+	// return the meta
 	return x
 }
 
 // SignBytes() returns the canonical byte representation used to digitally sign the bytes
-func (x *PeerMeta) SignBytes() []byte {
-	sig := x.Signature
+func (x *PeerMeta) SignBytes() (signBytes []byte) {
+	// save the signature in a temporary variable
+	temp := x.Signature
+	// nullify the signature
 	x.Signature = nil
-	bz, _ := Marshal(x)
-	x.Signature = sig
-	return bz
+	// convert the structure into proto bytes
+	signBytes, _ = Marshal(x)
+	// set the signature back into the object
+	x.Signature = temp
+	// exit
+	return
 }
 
 // Copy() returns a reference to a clone of the PeerMeta
 func (x *PeerMeta) Copy() *PeerMeta {
+	// if the peer meta is nil, return nil
 	if x == nil {
 		return nil
 	}
+	// exit deep copy of the peer meta
 	return &PeerMeta{
 		NetworkId: x.NetworkId,
 		ChainId:   x.ChainId,
@@ -232,6 +186,7 @@ func (x *PeerMeta) Copy() *PeerMeta {
 
 // Copy() returns a reference to a clone of the PeerInfo
 func (x *PeerInfo) Copy() *PeerInfo {
+	// exit with a deep copy of the peer info
 	return &PeerInfo{
 		Address:       x.Address.Copy(),
 		IsOutbound:    x.IsOutbound,
@@ -258,10 +213,110 @@ func (x PeerInfo) MarshalJSON() ([]byte, error) {
 
 // peerInfoJSON is the json marshaller and unmarshaler representation of PeerInfo
 type peerInfoJSON struct {
-	Address       *PeerAddress `json:"Address"`
-	IsOutbound    bool         `json:"is_outbound"`
-	IsValidator   bool         `json:"is_validator"`
-	IsMustConnect bool         `json:"is_must_connect"`
-	IsTrusted     bool         `json:"is_trusted"`
+	Address       *PeerAddress `json:"address"`
+	IsOutbound    bool         `json:"isOutbound"`
+	IsValidator   bool         `json:"isValidator"`
+	IsMustConnect bool         `json:"isMustConnect"`
+	IsTrusted     bool         `json:"isTrusted"`
 	Reputation    int32        `json:"reputation"`
 }
+
+// MessageCache is a simple p2p message de-duplicator that protects redundancy in the p2p network
+type MessageCache struct {
+	queue   *list.List            // a FIFO list of MessageAndMetadata
+	deDupe  *DeDuplicator[string] // the O(1) de-duplicator
+	maxSize int                   // the max size before evicting the oldest
+}
+
+// NewMessageCache() initializes and returns a new MessageCache instance
+func NewMessageCache() *MessageCache {
+	return &MessageCache{
+		queue:   list.New(),
+		deDupe:  NewDeDuplicator[string](),
+		maxSize: 10000,
+	}
+}
+
+// Add inserts a new message into the cache if it doesn't already exist
+// It removes the oldest message if the cache is full
+func (c *MessageCache) Add(msg *MessageAndMetadata) (ok bool) {
+	// convert the hash into a hex string
+	key := BytesToString(msg.Hash)
+	// check / add to the de-duplicator to ensure no duplicates
+	if c.deDupe.Found(key) {
+		// exit with 'already found'
+		return false
+	}
+	// add the new message to the front
+	c.queue.PushFront(msg)
+	// if the queue size is exceeded
+	if c.queue.Len() > c.maxSize {
+		// get the oldest element
+		e := c.queue.Back()
+		// cast it to a MessageAndMetadata
+		message := e.Value.(*MessageAndMetadata)
+		// delete it from the underlying de-duplicator
+		c.deDupe.Delete(BytesToString(message.Hash))
+		// remove it from the queue
+		c.queue.Remove(e)
+	}
+	// exit with 'added'
+	return true
+}
+
+// MESSAGE LIMITERS BELOW
+
+// SimpleLimiter ensures the number of requests don't exceed
+// a total limit and a limit per requester during a timeframe
+type SimpleLimiter struct {
+	requests        map[string]int // [requester_id] -> number_of_requests
+	totalRequests   int            // total requests from all requesters
+	maxPerRequester int            // config: max requests per requester
+	maxRequests     int            // config: max total requests
+	reset           *time.Ticker   // a timer that indicates the caller to 'reset' the limiter
+}
+
+// NewLimiter() returns a new instance of SimpleLimiter with
+// - max requests per requester
+// - max total requests
+// - how often to reset the limiter
+func NewLimiter(maxPerRequester, maxRequests, resetWindowS int) *SimpleLimiter {
+	return &SimpleLimiter{
+		requests:        map[string]int{},
+		maxPerRequester: maxPerRequester,
+		maxRequests:     maxRequests,
+		reset:           time.NewTicker(time.Duration(resetWindowS) * time.Second),
+	}
+}
+
+// NewRequest() processes a new request and checks if the requester or total requests should be blocked
+func (l *SimpleLimiter) NewRequest(requester string) (requesterBlock, totalBlock bool) {
+	// if the total requests exceed the max requests
+	if l.totalRequests >= l.maxRequests {
+		// exit with 'block every requester'
+		return false, true
+	}
+	// if the count of requests for this requester is larger than the max per requester
+	if count := l.requests[requester]; count >= l.maxPerRequester {
+		// exit with 'block this requester'
+		return true, false
+	}
+	// add to the requests for this requester
+	l.requests[requester]++
+	// add to the total requests
+	l.totalRequests++
+	// exit
+	return
+}
+
+// Reset() clears the requests and resets the total request count
+func (l *SimpleLimiter) Reset() {
+	// reset the requester -> requestCounts
+	l.requests = map[string]int{}
+	// reset the total requests
+	l.totalRequests = 0
+}
+
+// TimeToReset() returns the channel that signals when the limiter may be reset
+// This channel is called by the time.Ticker() set in NewLimiter
+func (l *SimpleLimiter) TimeToReset() <-chan time.Time { return l.reset.C }

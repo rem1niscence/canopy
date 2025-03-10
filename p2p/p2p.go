@@ -109,7 +109,7 @@ func (p *P2P) ListenForInboundPeers(listenAddress *lib.PeerAddress) {
 	if er != nil {
 		p.log.Fatal(ErrFailedListen(er).Error())
 	}
-	p.log.Debugf("Starting net.Listener on tcp://%s", listenAddress.NetAddress)
+	p.log.Infof("Starting net.Listener on tcp://%s", listenAddress.NetAddress)
 	p.listener = netutil.LimitListener(ln, p.MaxPossibleInbound())
 	// continuous service until program exit
 	for {
@@ -147,19 +147,25 @@ func (p *P2P) ListenForInboundPeers(listenAddress *lib.PeerAddress) {
 
 // DialForOutboundPeers() uses the config and peer book to try to max out the outbound peer connections
 func (p *P2P) DialForOutboundPeers() {
+	// create a tracking variable to ensure not 'over dialing'
 	dialing := 0
 	// Try to connect to the DialPeers in the config
 	for _, peerString := range p.config.DialPeers {
-		peer := &lib.PeerAddress{PeerMeta: &lib.PeerMeta{NetworkId: p.meta.NetworkId, ChainId: p.meta.ChainId}}
-		if err := peer.FromString(peerString); err != nil {
+		// start a peer address structure using the basic configurations
+		peerAddress := &lib.PeerAddress{PeerMeta: &lib.PeerMeta{NetworkId: p.meta.NetworkId, ChainId: p.meta.ChainId}}
+		// try to populate the peer address using the peer string from the config
+		if err := peerAddress.FromString(peerString); err != nil {
+			// log the invalid format
 			p.log.Errorf("invalid dial peer %s: %s", peerString, err.Error())
+			// continue with the next
 			continue
 		}
+		// dial in a non-blocking fashion
 		go func() {
 			// increment dialing
 			dialing++
 			// dial the peer with exponential backoff
-			p.DialWithBackoff(peer)
+			p.DialWithBackoff(peerAddress)
 		}()
 	}
 	// Continuous service until program exit, dial timeout loop frequency for resource break
@@ -307,6 +313,7 @@ func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 			msgAssembler: make([]byte, 0, maxMessageSize),
 			sendQueue:    make(chan []byte, maxQueueSize),
 			inbox:        p.Inbox(i),
+			logger:       p.log,
 		}
 	}
 	return
@@ -320,10 +327,13 @@ func (p *P2P) IsSelf(a *lib.PeerAddress) bool {
 // SelfSend() executes an internal pipe send to self
 func (p *P2P) SelfSend(fromPublicKey []byte, topic lib.Topic, payload proto.Message) lib.ErrorI {
 	p.log.Debugf("Self sending %s message", topic)
-	p.Inbox(topic) <- (&lib.MessageAndMetadata{
-		Message: proto.Clone(payload),
-		Sender:  &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: fromPublicKey}},
-	}).WithHash()
+	// non blocking
+	go func() {
+		p.Inbox(topic) <- (&lib.MessageAndMetadata{
+			Message: proto.Clone(payload),
+			Sender:  &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: fromPublicKey}},
+		}).WithHash()
+	}()
 	return nil
 }
 

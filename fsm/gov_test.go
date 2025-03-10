@@ -3,6 +3,7 @@ package fsm
 import (
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"os"
@@ -385,6 +386,8 @@ func TestSetGetParams(t *testing.T) {
 }
 
 func TestApproveProposal(t *testing.T) {
+	// create a new private key
+	pk, err := crypto.NewEd25519PrivateKey()
 	// pre-create a 'change parameter' proposal to use during testing
 	a, err := lib.NewAny(&lib.StringWrapper{Value: types.NewProtocolVersion(3, 2)})
 	require.NoError(t, err)
@@ -396,12 +399,23 @@ func TestApproveProposal(t *testing.T) {
 		EndHeight:      2,
 		Signer:         newTestAddressBytes(t),
 	}
+	//  pre-create the change parameter tx
+	changeParamTx, err := types.NewChangeParamTxString(
+		pk, "cons", types.ParamProtocolVersion, types.NewProtocolVersion(3, 2),
+		1, 2, 1, 1, 10000, 1, "",
+	)
+	require.NoError(t, err)
+	// convert it to json
+	changeParamTxJSON, err := lib.MarshalJSONIndent(changeParamTx)
+	require.NoError(t, err)
 	// create a test 'list' that approves the proposal
 	approveMsgList := types.GovProposals{}
-	require.NoError(t, approveMsgList.Add(msg, true))
+	require.NoError(t, approveMsgList.Add(changeParamTxJSON, true))
 	// create a test 'list' that rejects the proposal
 	rejectMsgList := types.GovProposals{}
-	require.NoError(t, rejectMsgList.Add(msg, false))
+	require.NoError(t, rejectMsgList.Add(changeParamTxJSON, false))
+	// populate the proposal hash in the msg
+	msg.ProposalHash, err = types.TxHashFromJSON(changeParamTxJSON)
 	// run test cases
 	tests := []struct {
 		name   string
@@ -508,7 +522,7 @@ func TestApproveProposal(t *testing.T) {
 	}
 }
 
-func TestOnOrAfterVersion(t *testing.T) {
+func TestIsFeatureEnabled(t *testing.T) {
 	tests := []struct {
 		name            string
 		detail          string
@@ -567,7 +581,7 @@ func TestOnOrAfterVersion(t *testing.T) {
 			// update the protocol version
 			require.NoError(t, sm.UpdateParam(types.ParamSpaceCons, types.ParamProtocolVersion, &lib.StringWrapper{Value: test.protocolVersion}))
 			// execute the function
-			require.Equal(t, test.expected, sm.OnOrAfterVersion(test.version))
+			require.Equal(t, test.expected, sm.IsFeatureEnabled(test.version))
 		})
 	}
 }

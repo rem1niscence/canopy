@@ -8,7 +8,7 @@ import (
 	"slices"
 )
 
-// COMMITTEES BELOW
+/* This file contains logic for 'committees' or validator sets responsible for 'nestedChain' consensus */
 
 // FundCommitteeRewardPools() mints newly created tokens to protocol subsidized committees
 func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
@@ -173,6 +173,49 @@ func (s *StateMachine) DistributeCommitteeReward(stub *lib.PaymentPercents, rewa
 	return earlyWithdrawalReward, s.AccountAdd(crypto.NewAddress(validator.Output), earlyWithdrawalReward)
 }
 
+// LotteryWinner() selects a validator/delegate randomly weighted based on their stake within a committee
+func (s *StateMachine) LotteryWinner(id uint64, validators ...bool) (lottery *lib.LotteryWinner, err lib.ErrorI) {
+	// create a variable to hold the 'members' of the committee
+	var p lib.ValidatorSet
+	// if validators
+	if len(validators) == 1 && validators[0] == true {
+		p, _ = s.GetCommitteeMembers(s.Config.ChainId)
+	} else {
+		// else get the delegates
+		p, _ = s.GetAllDelegates(id)
+	}
+	// get the validator params from state
+	valParams, err := s.GetParamsVal()
+	if err != nil {
+		return nil, err
+	}
+	// define a convenience variable for the 'cut' of the lottery winner
+	winnerCut := valParams.DelegateRewardPercentage
+	// if there are no validators in the set - return
+	if p.NumValidators == 0 {
+		return &lib.LotteryWinner{Winner: nil, Cut: winnerCut}, nil
+	}
+	// get the last proposers
+	lastProposers, err := s.GetLastProposers()
+	if err != nil {
+		return
+	}
+	// use un-grindable weighted pseudorandom to select a winner
+	winner := lib.WeightedPseudorandom(&lib.PseudorandomParams{
+		SortitionData: &lib.SortitionData{
+			LastProposerAddresses: lastProposers.Addresses,
+			Height:                s.Height(),
+			TotalValidators:       p.NumValidators,
+			TotalPower:            p.TotalPower,
+		}, ValidatorSet: p.ValidatorSet,
+	})
+	// return the lottery winner and cut
+	return &lib.LotteryWinner{
+		Winner: winner.Address().Bytes(),
+		Cut:    winnerCut,
+	}, nil
+}
+
 // GetCommitteeMembers() retrieves the ValidatorSet that is responsible for the 'chainId'
 func (s *StateMachine) GetCommitteeMembers(chainId uint64) (vs lib.ValidatorSet, err lib.ErrorI) {
 	// get the validator params
@@ -189,7 +232,7 @@ func (s *StateMachine) GetCommitteeMembers(chainId uint64) (vs lib.ValidatorSet,
 	// create a variable to hold the committee members
 	members := make([]*lib.ConsensusValidator, 0)
 	// for each item of the iterator up to MaxCommitteeSize
-	for i := uint64(0); it.Valid() && i <= p.MaxCommitteeSize; func() { it.Next(); i++ }() {
+	for i := uint64(0); it.Valid() && i < p.MaxCommitteeSize; func() { it.Next(); i++ }() {
 		// extract the address from the iterator key
 		address, e := types.AddressFromKey(it.Key())
 		if e != nil {
@@ -261,7 +304,7 @@ func (s *StateMachine) SetCommittees(address crypto.AddressI, totalStake uint64,
 			return
 		}
 		// add to the committee staked supply
-		if err = s.AddToCommitteeStakedSupply(committee, totalStake); err != nil {
+		if err = s.AddToCommitteeSupplyForChain(committee, totalStake); err != nil {
 			return
 		}
 	}
@@ -277,7 +320,7 @@ func (s *StateMachine) DeleteCommittees(address crypto.AddressI, totalStake uint
 			return
 		}
 		// subtract from the committee staked supply
-		if err = s.SubFromCommitteeStakedSupply(committee, totalStake); err != nil {
+		if err = s.SubFromCommitteeStakedSupplyForChain(committee, totalStake); err != nil {
 			return
 		}
 	}
@@ -359,13 +402,17 @@ func (s *StateMachine) GetDelegatesPaginated(p lib.PageParams, chainId uint64) (
 	return
 }
 
+// UpdateDelegations() updates the delegate information for an address, first removing the outdated delegation information and then setting the new info
 func (s *StateMachine) UpdateDelegations(address crypto.AddressI, oldValidator *types.Validator, newStakedAmount uint64, newCommittees []uint64) lib.ErrorI {
+	// remove the outdated delegation information
 	if err := s.DeleteDelegations(address, oldValidator.StakedAmount, oldValidator.Committees); err != nil {
 		return err
 	}
+	// set the delegations back into state
 	return s.SetDelegations(address, newStakedAmount, newCommittees)
 }
 
+// SetDelegations() sets the delegate 'membership' for an address, adding to the list and updating the supply pools
 func (s *StateMachine) SetDelegations(address crypto.AddressI, totalStake uint64, committees []uint64) lib.ErrorI {
 	for _, committee := range committees {
 		// actually set the address in the delegate list
@@ -373,17 +420,18 @@ func (s *StateMachine) SetDelegations(address crypto.AddressI, totalStake uint64
 			return err
 		}
 		// add to the delegate supply (used for tracking amounts)
-		if err := s.AddToDelegateStakedSupply(committee, totalStake); err != nil {
+		if err := s.AddToDelegateSupplyForChain(committee, totalStake); err != nil {
 			return err
 		}
 		// add to the committee supply as well (used for tracking amounts)
-		if err := s.AddToCommitteeStakedSupply(committee, totalStake); err != nil {
+		if err := s.AddToCommitteeSupplyForChain(committee, totalStake); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+// DeleteDelegations() removes the delegate 'membership' for an address, removing from the list and updating the supply pools
 func (s *StateMachine) DeleteDelegations(address crypto.AddressI, totalStake uint64, committees []uint64) lib.ErrorI {
 	for _, committee := range committees {
 		// remove the address from the delegate list
@@ -391,21 +439,23 @@ func (s *StateMachine) DeleteDelegations(address crypto.AddressI, totalStake uin
 			return err
 		}
 		// remove from the delegate supply (used for tracking amounts)
-		if err := s.SubFromDelegateStakedSupply(committee, totalStake); err != nil {
+		if err := s.SubFromDelegateStakedSupplyForChain(committee, totalStake); err != nil {
 			return err
 		}
 		// remove from the committee supply as well (used for tracking amounts)
-		if err := s.SubFromCommitteeStakedSupply(committee, totalStake); err != nil {
+		if err := s.SubFromCommitteeStakedSupplyForChain(committee, totalStake); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+// SetDelegate() sets a delegate in state using the delegate prefix
 func (s *StateMachine) SetDelegate(address crypto.AddressI, chainId, stakeForCommittee uint64) lib.ErrorI {
 	return s.Set(types.KeyForDelegate(chainId, address, stakeForCommittee), nil)
 }
 
+// DeleteDelegate() removes a delegate from the state using the delegate prefix
 func (s *StateMachine) DeleteDelegate(address crypto.AddressI, chainId, stakeForCommittee uint64) lib.ErrorI {
 	return s.Delete(types.KeyForDelegate(chainId, address, stakeForCommittee))
 }
@@ -421,15 +471,17 @@ func (s *StateMachine) UpsertCommitteeData(new *lib.CommitteeData) lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	// check the new committee data is not 'out-dated'
+	// check the new committee data is not 'outdated'
+	// new.ChainHeight must be > state.ChainHeight
 	if new.LastChainHeightUpdated <= targetData.LastChainHeightUpdated {
 		return lib.ErrInvalidQCCommitteeHeight()
 	}
+	// new.RootHeight must be >= state.RootHeight
 	if new.LastRootHeightUpdated < targetData.LastRootHeightUpdated {
 		return lib.ErrInvalidQCRootChainHeight()
 	}
-	// combine the new data with the target
-	if err = targetData.Combine(new); err != nil {
+	// combine the new data with the target, only capturing payment percents for self chainId
+	if err = targetData.Combine(new, s.Config.ChainId); err != nil {
 		return err
 	}
 	// add the target back into the list
@@ -442,19 +494,32 @@ func (s *StateMachine) UpsertCommitteeData(new *lib.CommitteeData) lib.ErrorI {
 // note: use UpsertCommitteeData for the safe committee upsert
 func (s *StateMachine) OverwriteCommitteeData(d *lib.CommitteeData) lib.ErrorI {
 	// retrieve the committees' data list, the target and index in the list based on the chainId
-	committeesData, targetData, idx, err := s.getCommitteeDataAndList(d.ChainId)
+	committeesData, _, idx, err := s.getCommitteeDataAndList(d.ChainId)
 	if err != nil {
 		return err
 	}
 	// add the target back into the list
-	committeesData.List[idx] = targetData
+	committeesData.List[idx] = d
 	// set the list back into state
 	return s.SetCommitteesData(committeesData)
 }
 
+// LoadCommitteeData() loads a historical (or clean latest) committee data from the master list
+func (s *StateMachine) LoadCommitteeData(height, targetChainId uint64) (*lib.CommitteeData, lib.ErrorI) {
+	// get a historical FSM (or clean latest)
+	historicalFSM, err := s.TimeMachine(height)
+	if err != nil {
+		return nil, err
+	}
+	// ensure the historical fsm is discarded for memory management
+	defer historicalFSM.Discard()
+	// exit
+	return historicalFSM.GetCommitteeData(targetChainId)
+}
+
 // GetCommitteeData() is a convenience function to retrieve the committee data from the master list
 func (s *StateMachine) GetCommitteeData(targetChainId uint64) (*lib.CommitteeData, lib.ErrorI) {
-	// pass through call
+	// retrieve the committee's data and return it
 	_, targetData, _, err := s.getCommitteeDataAndList(targetChainId)
 	if err != nil {
 		return nil, err
@@ -490,67 +555,84 @@ func (s *StateMachine) getCommitteeDataAndList(targetChainId uint64) (list *lib.
 	}
 	// insert a new committee fund at the end of the list
 	list.List = append(list.List, d)
+	// exit
 	return
 }
 
-// SetCommitteesData() sets a list of List into the state
-func (s *StateMachine) SetCommitteesData(f *lib.CommitteesData) lib.ErrorI {
-	bz, err := lib.Marshal(f)
+// SetCommitteesData() sets a list of committee data in the state
+func (s *StateMachine) SetCommitteesData(list *lib.CommitteesData) lib.ErrorI {
+	// convert the committee data list to bytes
+	bz, err := lib.Marshal(list)
 	if err != nil {
 		return err
 	}
+	// set the list bytes under the 'committees data prefix'
 	return s.Set(types.CommitteesDataPrefix(), bz)
 }
 
 // GetCommitteesData() gets a list of List from the state
-func (s *StateMachine) GetCommitteesData() (f *lib.CommitteesData, err lib.ErrorI) {
+func (s *StateMachine) GetCommitteesData() (list *lib.CommitteesData, err lib.ErrorI) {
+	// get the CommitteesData bytes under 'committees data prefix'
 	bz, err := s.Get(types.CommitteesDataPrefix())
 	if err != nil {
 		return nil, err
 	}
-	f = &lib.CommitteesData{
+	// create a list variable to ensure non-nil results
+	list = &lib.CommitteesData{
 		List: make([]*lib.CommitteeData, 0),
 	}
-	err = lib.Unmarshal(bz, f)
+	// populate the list reference with the CommitteesData bytes
+	err = lib.Unmarshal(bz, list)
+	// exit
 	return
 }
 
 // RetireCommittee marks a committee as non-subsidized for eternity
 // This is a useful mechanism to gracefully 'end' a committee
-func (s *StateMachine) RetireCommittee(id uint64) lib.ErrorI {
-	return s.Set(types.KeyForRetiredCommittee(id), types.RetiredCommitteesPrefix())
+func (s *StateMachine) RetireCommittee(chainId uint64) lib.ErrorI {
+	// set the default value for a chain id using a key for the retired committee prefix key
+	return s.Set(types.KeyForRetiredCommittee(chainId), types.RetiredCommitteesPrefix())
 }
 
 // CommitteeIsRetired checks if a committee is marked as 'retired' which prevents it from being subsidized for eternity
-func (s *StateMachine) CommitteeIsRetired(id uint64) (bool, lib.ErrorI) {
-	bz, err := s.Get(types.KeyForRetiredCommittee(id))
+func (s *StateMachine) CommitteeIsRetired(chainId uint64) (bool, lib.ErrorI) {
+	// retrieve the bytes under the retired key for the chain id
+	bz, err := s.Get(types.KeyForRetiredCommittee(chainId))
 	if err != nil {
 		return false, err
 	}
+	// check if the bytes equal the default value (RetiredCommitteesPrefix)
 	return bytes.Equal(types.RetiredCommitteesPrefix(), bz), nil
 }
 
 // GetRetiredCommittees() returns a list of the retired chainIds
-func (s *StateMachine) GetRetiredCommittees() (result []uint64, err lib.ErrorI) {
+func (s *StateMachine) GetRetiredCommittees() (list []uint64, err lib.ErrorI) {
 	// for each item under the retired committee prefix
 	err = s.IterateAndExecute(types.RetiredCommitteesPrefix(), func(key, _ []byte) (e lib.ErrorI) {
-		// extract the id from the key
-		id, e := types.IdFromKey(key)
+		// extract the chain id from the key
+		chainId, e := types.IdFromKey(key)
 		if e != nil {
 			return
 		}
-		result = append(result, id)
+		// add the chainId to the list of retired committees
+		list = append(list, chainId)
+		// exit inner
 		return
 	})
+	// exit outer
 	return
 }
 
 // SetRetiredCommittees() sets a list of chainIds as retired
-func (s *StateMachine) SetRetiredCommittees(ids []uint64) (err lib.ErrorI) {
-	for _, id := range ids {
+func (s *StateMachine) SetRetiredCommittees(chainIds []uint64) (err lib.ErrorI) {
+	// for each chain id on the list
+	for _, id := range chainIds {
+		// set the committee as retired
 		if err = s.RetireCommittee(id); err != nil {
+			// exit if error
 			return
 		}
 	}
+	// exit
 	return
 }

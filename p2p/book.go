@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/canopy-network/canopy/lib"
 	"math"
 	"math/rand"
 	"os"
@@ -14,6 +13,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/canopy-network/canopy/lib"
 )
 
 const (
@@ -28,8 +29,8 @@ const (
 
 // PeerBook is a persisted structure that maintains information on potential peers
 type PeerBook struct {
-	Book      []*BookPeer  // persisted list of peers
-	BookSize  int          // number of peers in the book
+	Book      []*BookPeer  `json:"book"`     // persisted list of peers
+	BookSize  int          `json:"bookSize"` // number of peers in the book
 	publicKey []byte       // self public key
 	path      string       // path to write the peer book json file to
 	l         sync.RWMutex // thread safety to update the list
@@ -56,11 +57,11 @@ func NewPeerBook(publicKey []byte, c lib.Config, l lib.LoggerI) *PeerBook {
 	// read the json file
 	bz, err := os.ReadFile(pb.path)
 	if err != nil {
-		l.Fatalf("unable to read peer Book: %s", err.Error())
+		l.Fatalf("unable to read peer book: %s", err.Error())
 	}
 	// load the bytes into the peer book object
 	if err = json.Unmarshal(bz, pb); err != nil {
-		l.Fatalf("unable to unmarshal peer Book: %s", err.Error())
+		l.Fatalf("unable to unmarshal peer book: %s", err.Error())
 	}
 	return pb
 }
@@ -78,11 +79,11 @@ func (p *P2P) SendPeerBookRequests() {
 		if peerInfo == nil || err != nil {
 			continue
 		}
-		p.log.Debugf("Sent peer Book request to %s", lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
+		p.log.Debugf("Sent peer book request to %s", lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
 		select {
 		// fires when received the response to the request
 		case msg := <-p.Inbox(lib.Topic_PEERS_RESPONSE):
-			p.log.Debugf("Received peer Book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
+			p.log.Debugf("Received peer book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 			senderID := msg.Sender.Address.PublicKey
 			// ensure PeerBookResponse message type
 			peerBookResponseMsg, ok := msg.Message.(*PeerBookResponseMessage)
@@ -125,7 +126,7 @@ func (p *P2P) ListenForPeerBookRequests() {
 		select {
 		// fires after receiving a peer request
 		case msg := <-p.Inbox(lib.Topic_PEERS_REQUEST):
-			p.log.Debugf("Received peer Book request from %s", lib.BytesToString(msg.Sender.Address.PublicKey))
+			p.log.Debugf("Received peer book request from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 			requesterID := msg.Sender.Address.PublicKey
 			// rate limit per requester
 			blocked, totalBlock := l.NewRequest(lib.BytesToString(requesterID))
@@ -140,7 +141,7 @@ func (p *P2P) ListenForPeerBookRequests() {
 			}
 			// only should be PeerBookMessage in this channel
 			if _, ok := msg.Message.(*PeerBookRequestMessage); !ok {
-				p.log.Warnf("Received invalid peer Book request from %s", lib.BytesToString(msg.Sender.Address.PublicKey))
+				p.log.Warnf("Received invalid peer book request from %s", lib.BytesToString(msg.Sender.Address.PublicKey))
 				p.ChangeReputation(requesterID, InvalidMsgRep)
 				continue
 			}
@@ -234,7 +235,7 @@ func (p *PeerBook) GetAll() (res []*BookPeer) {
 
 // Add() adds a peer to the book in sorted order by public key
 func (p *PeerBook) Add(peer *BookPeer) {
-	p.log.Debugf("try add book peer %s", lib.BytesToString(peer.Address.PublicKey))
+	p.log.Debugf("Try add book peer %s", lib.BytesToTruncatedString(peer.Address.PublicKey))
 	// if peer is self, ignore
 	if bytes.Equal(p.publicKey, peer.Address.PublicKey) {
 		return

@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -792,7 +793,7 @@ func TestSetGetCommittees(t *testing.T) {
 				got, err := sm.GetCommitteeMembers(id)
 				require.NoError(t, err)
 				// get the committee pool from the supply object
-				p, err := sm.GetCommitteeStakedSupply(id)
+				p, err := sm.GetCommitteeStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// compare got total power vs expected total power
 				require.Equal(t, test.expectedTotalPower[id], got.TotalPower)
@@ -934,7 +935,7 @@ func TestUpdateCommittees(t *testing.T) {
 				// compare got num validators vs num validators
 				require.EqualValues(t, len(test.expected[id]), got.NumValidators)
 				// get the committee pool from the supply object
-				p, err := sm.GetCommitteeStakedSupply(id)
+				p, err := sm.GetCommitteeStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// for each expected public key
 				for i, expectedPublicKey := range publicKeys {
@@ -1011,7 +1012,7 @@ func TestDeleteCommittees(t *testing.T) {
 				// compare got num validators vs num validators
 				require.EqualValues(t, len(test.expected[id]), got.NumValidators)
 				// get the committee pool from the supply object
-				p, err := sm.GetCommitteeStakedSupply(id)
+				p, err := sm.GetCommitteeStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// for each expected public key
 				for i, expectedPublicKey := range publicKeys {
@@ -1260,10 +1261,10 @@ func TestUpdateDelegates(t *testing.T) {
 				got, ok := page.Results.(*types.ValidatorPage)
 				require.True(t, ok)
 				// get the committee pool from the supply object
-				committeePool, err := sm.GetCommitteeStakedSupply(id)
+				committeePool, err := sm.GetCommitteeStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// get the delegates pool from the supply object
-				delegatePool, err := sm.GetDelegateStakedSupply(id)
+				delegatePool, err := sm.GetDelegateStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// for each expected public key
 				for i, expectedPublicKey := range publicKeys {
@@ -1346,9 +1347,9 @@ func TestDeleteDelegates(t *testing.T) {
 				got, ok := page.Results.(*types.ValidatorPage)
 				require.True(t, ok)
 				// get the committee pool from the supply object
-				committeePool, err := sm.GetCommitteeStakedSupply(id)
+				committeePool, err := sm.GetCommitteeStakedSupplyForChain(id)
 				// get the committee pool from the supply object
-				delegatePool, err := sm.GetDelegateStakedSupply(id)
+				delegatePool, err := sm.GetDelegateStakedSupplyForChain(id)
 				require.NoError(t, err)
 				// for each expected public key
 				for i, expectedPublicKey := range publicKeys {
@@ -1383,6 +1384,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
+							ChainId: 1,
 							Percent: 1,
 						},
 					},
@@ -1395,6 +1397,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
+							ChainId: 1,
 							Percent: 2,
 						},
 					},
@@ -1409,6 +1412,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t),
+							ChainId: 1,
 							Percent: 1,
 						},
 					},
@@ -1421,10 +1425,63 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 					PaymentPercents: []*lib.PaymentPercents{
 						{
 							Address: newTestAddressBytes(t, 1),
+							ChainId: 1,
 							Percent: 2,
 						},
 					},
 					NumberOfSamples: 1,
+				},
+			},
+		},
+		{
+			name:   "inserts but ignore 1 payment percent",
+			detail: "2 inserts but only 1 payment percent is used due to chainId",
+			upsert: []*lib.CommitteeData{
+				{
+					ChainId:                1,
+					LastRootHeightUpdated:  1,
+					LastChainHeightUpdated: 1,
+					PaymentPercents: []*lib.PaymentPercents{
+						{
+							Address: newTestAddressBytes(t),
+							ChainId: 1,
+							Percent: 1,
+						},
+						{
+							Address: newTestAddressBytes(t),
+							ChainId: 2,
+							Percent: 1,
+						},
+					},
+					NumberOfSamples: 2, // can't overwrite number of samples
+				},
+				{
+					ChainId:                1,
+					LastRootHeightUpdated:  2,
+					LastChainHeightUpdated: 2,
+					PaymentPercents: []*lib.PaymentPercents{
+						{
+							Address: newTestAddressBytes(t, 1),
+							ChainId: 2,
+							Percent: 2,
+						},
+					},
+					NumberOfSamples: 2, // can't overwrite number of samples
+				},
+			},
+			expected: []*lib.CommitteeData{
+				{
+					ChainId:                1,
+					LastRootHeightUpdated:  2,
+					LastChainHeightUpdated: 2,
+					PaymentPercents: []*lib.PaymentPercents{
+						{
+							Address: newTestAddressBytes(t),
+							ChainId: 1,
+							Percent: 1,
+						},
+					},
+					NumberOfSamples: 2,
 				},
 			},
 		},
@@ -1440,6 +1497,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t),
 							Percent: 1,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 2, // can't overwrite number of samples
@@ -1452,6 +1510,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t, 1),
 							Percent: 2,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 3, // can't overwrite number of samples
@@ -1466,10 +1525,12 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t),
 							Percent: 1,
+							ChainId: 1,
 						},
 						{
 							Address: newTestAddressBytes(t, 1),
 							Percent: 2,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 2,
@@ -1488,6 +1549,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t),
 							Percent: 1,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 2, // can't overwrite number of samples
@@ -1500,6 +1562,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t, 1),
 							Percent: 2,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 3, // can't overwrite number of samples
@@ -1519,6 +1582,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t),
 							Percent: 1,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 2, // can't overwrite number of samples
@@ -1531,6 +1595,7 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 						{
 							Address: newTestAddressBytes(t, 1),
 							Percent: 2,
+							ChainId: 1,
 						},
 					},
 					NumberOfSamples: 3, // can't overwrite number of samples
@@ -1561,7 +1626,9 @@ func TestUpsertGetCommitteeData(t *testing.T) {
 				require.Equal(t, expected.NumberOfSamples, got.NumberOfSamples)
 				// check chain heights
 				require.Equal(t, expected.LastChainHeightUpdated, got.LastChainHeightUpdated)
-				// check payment percents
+				// check payment percents length
+				require.Equal(t, len(expected.PaymentPercents), len(got.PaymentPercents), fmt.Sprintf("%v, %v", expected.PaymentPercents, got.PaymentPercents))
+				// check actualy payment percents
 				for i, expectedPP := range expected.PaymentPercents {
 					require.EqualExportedValues(t, expectedPP, got.PaymentPercents[i])
 				}

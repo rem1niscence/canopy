@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
@@ -13,16 +14,16 @@ const (
 	MessageSendName               = "send"
 	MessageStakeName              = "stake"
 	MessageUnstakeName            = "unstake"
-	MessageEditStakeName          = "edit_stake"
+	MessageEditStakeName          = "editStake"
 	MessagePauseName              = "pause"
 	MessageUnpauseName            = "unpause"
-	MessageChangeParameterName    = "change_parameter"
-	MessageDAOTransferName        = "dao_transfer"
-	MessageCertificateResultsName = "certificate_results"
+	MessageChangeParameterName    = "changeParameter"
+	MessageDAOTransferName        = "daoTransfer"
+	MessageCertificateResultsName = "certificateResults"
 	MessageSubsidyName            = "subsidy"
-	MessageCreateOrderName        = "create_order"
-	MessageEditOrderName          = "edit_order"
-	MessageDeleteOrderName        = "delete_order"
+	MessageCreateOrderName        = "createOrder"
+	MessageEditOrderName          = "editOrder"
+	MessageDeleteOrderName        = "deleteOrder"
 )
 
 func init() {
@@ -86,8 +87,8 @@ func (x *MessageSend) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageSend struct {
-	FromAddress lib.HexBytes `json:"from_address"`
-	ToAddress   lib.HexBytes `json:"to_address"`
+	FromAddress lib.HexBytes `json:"fromAddress"`
+	ToAddress   lib.HexBytes `json:"toAddress"`
 	Amount      uint64       `json:"amount"`
 }
 
@@ -96,9 +97,6 @@ var _ lib.MessageI = &MessageStake{} // interface enforcement
 // Check() validates the Message structure
 func (x *MessageStake) Check() lib.ErrorI {
 	if err := checkOutputAddress(x.OutputAddress); err != nil {
-		return err
-	}
-	if err := checkNetAddress(x.NetAddress); err != nil {
 		return err
 	}
 	if err := checkPubKey(x.PublicKey); err != nil {
@@ -146,11 +144,11 @@ func (x *MessageStake) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageStake struct {
-	PublicKey     lib.HexBytes `json:"public_key"`
+	PublicKey     lib.HexBytes `json:"publickey"`
 	Amount        uint64       `json:"amount"`
 	Committees    []uint64     `json:"committees"`
-	NetAddress    string       `json:"net_address"`
-	OutputAddress lib.HexBytes `json:"output_address"`
+	NetAddress    string       `json:"netAddress"`
+	OutputAddress lib.HexBytes `json:"outputAddress"`
 	Delegate      bool         `json:"delegate"`
 	Compound      bool         `json:"compound"`
 }
@@ -163,9 +161,6 @@ func (x *MessageEditStake) Check() lib.ErrorI {
 		return err
 	}
 	if err := checkOutputAddress(x.OutputAddress); err != nil {
-		return err
-	}
-	if err := checkNetAddress(x.NetAddress); err != nil {
 		return err
 	}
 	if err := checkCommittees(x.Committees); err != nil {
@@ -211,8 +206,8 @@ type jsonMessageEditStake struct {
 	Address       lib.HexBytes `json:"address"`
 	Amount        uint64       `json:"amount"`
 	Committees    []uint64     `json:"committees"`
-	NetAddress    string       `json:"net_address"`
-	OutputAddress lib.HexBytes `json:"output_address"`
+	NetAddress    string       `json:"netAddress"`
+	OutputAddress lib.HexBytes `json:"outputAddress"`
 	Compound      bool         `json:"compound"`
 }
 
@@ -305,6 +300,9 @@ func (x *MessageChangeParameter) Check() lib.ErrorI {
 	if err := checkStartEndHeight(x); err != nil {
 		return err
 	}
+	if x.ProposalHash != "" {
+		return ErrInvalidProposalHash()
+	}
 	return nil
 }
 
@@ -330,6 +328,7 @@ func (x MessageChangeParameter) MarshalJSON() ([]byte, error) {
 		StartHeight:    x.StartHeight,
 		EndHeight:      x.EndHeight,
 		Signer:         x.Signer,
+		ProposalHash:   x.ProposalHash,
 	})
 }
 
@@ -361,17 +360,19 @@ func (x *MessageChangeParameter) UnmarshalJSON(b []byte) (err error) {
 		StartHeight:    j.StartHeight,
 		EndHeight:      j.EndHeight,
 		Signer:         j.Signer,
+		ProposalHash:   j.ProposalHash,
 	}
 	return
 }
 
 type jsonMessageChangeParameter struct {
-	ParameterSpace string       `json:"parameter_space"`
-	ParameterKey   string       `json:"parameter_key"`
-	ParameterValue any          `json:"parameter_value"`
-	StartHeight    uint64       `json:"start_height"`
-	EndHeight      uint64       `json:"end_height"`
+	ParameterSpace string       `json:"parameterSpace"`
+	ParameterKey   string       `json:"parameterKey"`
+	ParameterValue any          `json:"parameterValue"`
+	StartHeight    uint64       `json:"startHeight"`
+	EndHeight      uint64       `json:"endHeight"`
 	Signer         lib.HexBytes `json:"signer"`
+	ProposalHash   string       `json:"proposalHash,omitempty"`
 }
 
 func (x *MessageChangeParameter) Name() string      { return MessageChangeParameterName }
@@ -388,6 +389,9 @@ func (x *MessageDAOTransfer) Check() lib.ErrorI {
 	if err := checkStartEndHeight(x); err != nil {
 		return err
 	}
+	if x.ProposalHash != "" {
+		return ErrInvalidProposalHash()
+	}
 	return checkAmount(x.Amount)
 }
 
@@ -398,10 +402,11 @@ func (x *MessageDAOTransfer) Recipient() []byte { return nil }
 // MarshalJSON() is the json.Marshaller implementation for MessageDAOTransfer
 func (x MessageDAOTransfer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonMessageDaoTransfer{
-		Address:     x.Address,
-		Amount:      x.Amount,
-		StartHeight: x.StartHeight,
-		EndHeight:   x.EndHeight,
+		Address:      x.Address,
+		Amount:       x.Amount,
+		StartHeight:  x.StartHeight,
+		EndHeight:    x.EndHeight,
+		ProposalHash: x.ProposalHash,
 	})
 }
 
@@ -412,19 +417,21 @@ func (x *MessageDAOTransfer) UnmarshalJSON(b []byte) (err error) {
 		return
 	}
 	*x = MessageDAOTransfer{
-		Address:     j.Address,
-		Amount:      j.Amount,
-		StartHeight: j.StartHeight,
-		EndHeight:   j.EndHeight,
+		Address:      j.Address,
+		Amount:       j.Amount,
+		StartHeight:  j.StartHeight,
+		EndHeight:    j.EndHeight,
+		ProposalHash: j.ProposalHash,
 	}
 	return
 }
 
 type jsonMessageDaoTransfer struct {
-	Address     lib.HexBytes `json:"address"`
-	Amount      uint64       `json:"amount"`
-	StartHeight uint64       `json:"start_height"`
-	EndHeight   uint64       `json:"end_height"`
+	Address      lib.HexBytes `json:"address"`
+	Amount       uint64       `json:"amount"`
+	StartHeight  uint64       `json:"startHeight"`
+	EndHeight    uint64       `json:"endHeight"`
+	ProposalHash string       `json:"proposalHash,omitempty"`
 }
 
 var _ lib.MessageI = &MessageCertificateResults{} // interface enforcement
@@ -535,7 +542,7 @@ func (x *MessageSubsidy) UnmarshalJSON(b []byte) (err error) {
 
 type jsonMessageSubsidy struct {
 	Address lib.HexBytes `json:"address"`
-	ChainId uint64       `json:"chain_id"`
+	ChainId uint64       `json:"chainID"`
 	Amount  uint64       `json:"amount"`
 	Opcode  string       `json:"opcode"`
 }
@@ -585,11 +592,11 @@ func (x *MessageCreateOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageCreateOrder struct {
-	ChainId              uint64       `json:"ChainId"`
-	AmountForSale        uint64       `json:"AmountForSale"`
-	RequestedAmount      uint64       `json:"RequestedAmount"`
-	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress"`
-	SellersSellAddress   lib.HexBytes `json:"SellersSendAddress"`
+	ChainId              uint64       `json:"chainId"`
+	AmountForSale        uint64       `json:"amountForSale"`
+	RequestedAmount      uint64       `json:"requestedAmount"`
+	SellerReceiveAddress lib.HexBytes `json:"sellerReceiveAddress"`
+	SellersSellAddress   lib.HexBytes `json:"sellersSendAddress"`
 }
 
 var _ lib.MessageI = &MessageEditOrder{} // interface enforcement
@@ -637,11 +644,11 @@ func (x *MessageEditOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageEditOrder struct {
-	OrderId              uint64       `json:"OrderId"`
-	ChainId              uint64       `json:"ChainId"`
-	AmountForSale        uint64       `json:"AmountForSale"`
-	RequestedAmount      uint64       `json:"RequestedAmount"`
-	SellerReceiveAddress lib.HexBytes `json:"SellerReceiveAddress"`
+	OrderId              uint64       `json:"orderID"`
+	ChainId              uint64       `json:"chainID"`
+	AmountForSale        uint64       `json:"amountForSale"`
+	RequestedAmount      uint64       `json:"requestedAmount"`
+	SellerReceiveAddress lib.HexBytes `json:"sellerReceiveAddress"`
 }
 
 var _ lib.MessageI = &MessageDeleteOrder{} // interface enforcement
@@ -675,8 +682,8 @@ func (x *MessageDeleteOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageDeleteOrder struct {
-	OrderId uint64 `json:"OrderId"`
-	ChainId uint64 `json:"ChainId"`
+	OrderId uint64 `json:"orderID"`
+	ChainId uint64 `json:"chainID"`
 }
 
 // checkAmount() validates the amount sent in the Message
@@ -707,9 +714,15 @@ func checkExternalAddress(address []byte) lib.ErrorI {
 	return nil
 }
 
-// checkNetAddress() validates the p2p address in the Message
-func checkNetAddress(netAddress string) lib.ErrorI {
+// CheckNetAddress() validates the p2p address in the Message
+func CheckNetAddress(netAddress string, isDelegate bool) lib.ErrorI {
 	netAddressLen := len(netAddress)
+	if isDelegate {
+		if netAddressLen != 0 {
+			return ErrInvalidNetAddressLen()
+		}
+		return nil
+	}
 	if netAddressLen < 1 || netAddressLen > 50 {
 		return ErrInvalidNetAddressLen()
 	}
@@ -780,37 +793,90 @@ func checkStartEndHeight(proposal GovProposal) lib.ErrorI {
 
 func checkOrders(orders *lib.Orders) lib.ErrorI {
 	if orders != nil {
-		deDupe := make(map[uint64]struct{})
-		for _, buyOrder := range orders.BuyOrders {
-			if buyOrder == nil {
-				return ErrInvalidBuyOrder()
+		deDupe := lib.NewDeDuplicator[uint64]()
+		for _, lockOrder := range orders.LockOrders {
+			if lockOrder == nil {
+				return ErrInvalidLockOrder()
 			}
-			if _, found := deDupe[buyOrder.OrderId]; found {
-				return ErrDuplicateBuyOrder()
+			if found := deDupe.Found(lockOrder.OrderId); found {
+				return ErrDuplicateLockOrder()
 			}
-			if err := checkAddress(buyOrder.BuyerReceiveAddress); err != nil {
+			if err := checkAddress(lockOrder.BuyerReceiveAddress); err != nil {
 				return err
 			}
-			if buyOrder.BuyerChainDeadline == 0 {
+			if lockOrder.BuyerChainDeadline == 0 {
 				return ErrInvalidBuyerDeadline()
 			}
-			deDupe[buyOrder.OrderId] = struct{}{}
 		}
-
-		deDupe = make(map[uint64]struct{})
+		deDupe = lib.NewDeDuplicator[uint64]()
 		for _, resetOrder := range orders.ResetOrders {
-			if _, found := deDupe[resetOrder]; found {
+			if found := deDupe.Found(resetOrder); found {
 				return ErrInvalidCloseOrder()
 			}
-			deDupe[resetOrder] = struct{}{}
 		}
-		deDupe = make(map[uint64]struct{})
+		deDupe = lib.NewDeDuplicator[uint64]()
 		for _, closeOrder := range orders.CloseOrders {
-			if _, found := deDupe[closeOrder]; found {
+			if found := deDupe.Found(closeOrder); found {
 				return ErrInvalidCloseOrder()
 			}
-			deDupe[closeOrder] = struct{}{}
 		}
 	}
 	return nil
+}
+
+// messageFromTxJSON() extracts a lib.MessageI from a transaction json
+func messageFromTxJSON(txJSONBytes []byte) (message lib.MessageI, tx *lib.Transaction, err lib.ErrorI) {
+	// create a new transaction object reference to ensure a non-nil transaction
+	tx = new(lib.Transaction)
+	// populate the object ref with the bytes of the transaction
+	if err = lib.UnmarshalJSON(txJSONBytes, tx); err != nil {
+		// exit with error
+		return
+	}
+	// perform basic validations against the tx object
+	if err = tx.CheckBasic(); err != nil {
+		// exit with error
+		return
+	}
+	// extract the message from a protobuf any
+	p, err := lib.FromAny(tx.Msg)
+	// if an error occurred during the conversion
+	if err != nil {
+		// exit with error
+		return
+	}
+	// cast the proto message to a Message interface that may be interpreted
+	message, castOk := p.(lib.MessageI)
+	// if cast fails, throw an error
+	if !castOk {
+		// exit with invalid cast
+		return nil, nil, ErrInvalidTxMessage()
+	}
+	// do stateless checks on the message
+	if err = message.Check(); err != nil {
+		// exit with error
+		return
+	}
+	// exit
+	return
+}
+
+// TxHashFromJSON converts the json transaction into a proto tx hash
+func TxHashFromJSON(transactionJSON json.RawMessage) (txHash string, err lib.ErrorI) {
+	// extract the message from the transaction
+	_, tx, err := messageFromTxJSON(transactionJSON)
+	// if an error occurred during the extraction
+	if err != nil {
+		// exit with error
+		return
+	}
+	// convert into proto bytes
+	protoBytes, err := lib.Marshal(tx)
+	// if an error occurred during the encoding
+	if err != nil {
+		// exit with error
+		return
+	}
+	// exit with hash
+	return crypto.HashString(protoBytes), nil
 }

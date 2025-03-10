@@ -5,6 +5,8 @@ import (
 	"github.com/canopy-network/canopy/lib"
 )
 
+/* This file handles 'automatic' (non-transaction-induced) state changes that occur ath the beginning and ending of a block */
+
 // BeginBlock() is code that is executed at the start of `applying` the block
 func (s *StateMachine) BeginBlock() lib.ErrorI {
 	// prevent attempting to load the certificate for height 0
@@ -29,7 +31,7 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	// if not root-Chain: the committee won't match the certificate result
+	// if not root-chain: the committee won't match the certificate result
 	// so just set the committee to nil to ignore the byzantine evidence
 	// the byzantine evidence is handled at `Transaction Level` on the root
 	// chain with a HandleMessageCertificateResults
@@ -146,7 +148,7 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	})
 }
 
-// HandleCheckpoint() handles the `checkpoint-as-a-service` root-Chain functionality
+// HandleCheckpoint() handles the `checkpoint-as-a-service` root-chain functionality
 // NOTE: this will index self checkpoints - but allows for nested-chain checkpointing too
 func (s *StateMachine) HandleCheckpoint(chainId uint64, results *lib.CertificateResult) (err lib.ErrorI) {
 	storeI := s.store.(lib.StoreI)
@@ -214,6 +216,21 @@ func (s *StateMachine) UpdateLastProposers(address []byte) lib.ErrorI {
 	list.Addresses[index] = address
 	// set the list in state
 	return s.SetLastProposers(list)
+}
+
+// LoadLastProposers() returns the last Proposer addresses saved in the state for a particular height
+func (s *StateMachine) LoadLastProposers(height uint64) (*lib.Proposers, lib.ErrorI) {
+	// get the historical finite state machine using the height
+	historicalFSM, err := s.TimeMachine(height)
+	// if an error occurred when retrieving the historical FSM
+	if err != nil {
+		// return the error
+		return nil, err
+	}
+	// memory manage the historical FSM
+	defer historicalFSM.Discard()
+	// return the GetLastProposers call for this historical FSM
+	return historicalFSM.GetLastProposers()
 }
 
 // GetLastProposers() returns the last Proposer addresses saved in the state

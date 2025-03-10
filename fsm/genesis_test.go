@@ -49,6 +49,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 				OrderBooks: new(lib.OrderBooks),
 				Params:     types.DefaultParams(),
 				Supply:     &types.Supply{Total: 200},
+				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
 			},
 		},
 		{
@@ -85,6 +86,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 						Amount: 100,
 					}},
 				},
+				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
 			},
 		},
 		{
@@ -102,6 +104,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Id:     lib.CanopyChainId,
 					Amount: 100,
 				}},
+				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
 				OrderBooks: new(lib.OrderBooks),
 				Params:     types.DefaultParams(),
 				Supply: &types.Supply{
@@ -140,6 +143,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					Id:     lib.CanopyChainId + types.EscrowPoolAddend,
 					Amount: 200,
 				}},
+				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
 				OrderBooks: &lib.OrderBooks{
 					OrderBooks: []*lib.OrderBook{{
 						ChainId: lib.CanopyChainId,
@@ -305,7 +309,8 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 						}},
 					}},
 				},
-				Params: types.DefaultParams(),
+				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
+				Params:     types.DefaultParams(),
 			},
 			expected: &types.GenesisState{
 				Pools: []*types.Pool{{
@@ -346,7 +351,8 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 						}},
 					}},
 				},
-				Params: types.DefaultParams(),
+				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
+				Params:     types.DefaultParams(),
 				Supply: &types.Supply{
 					Total:  500,
 					Staked: 100,
@@ -384,6 +390,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 				}},
 				OrderBooks: new(lib.OrderBooks),
 				Params:     types.DefaultParams(),
+				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
 				Supply:     &types.Supply{Total: 200},
 			},
 		},
@@ -409,6 +416,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Output:       newTestAddressBytes(t),
 				}},
 				OrderBooks: new(lib.OrderBooks),
+				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
 				Params:     types.DefaultParams(),
 				Supply: &types.Supply{
 					Total:  100,
@@ -439,6 +447,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					Amount: 100,
 				}},
 				OrderBooks: new(lib.OrderBooks),
+				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
 				Params:     types.DefaultParams(),
 				Supply: &types.Supply{
 					Total: 100,
@@ -496,7 +505,8 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 						}},
 					}},
 				},
-				Params: types.DefaultParams(),
+				Params:     types.DefaultParams(),
+				Committees: &lib.CommitteesData{List: []*lib.CommitteeData{}},
 				Supply: &types.Supply{
 					Total:                  200,
 					CommitteeDelegatedOnly: nil,
@@ -744,6 +754,8 @@ func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 			Committees:   []uint64{lib.CanopyChainId, 2},
 			Output:       newTestAddressBytes(t),
 		}},
+		NonSigners:    nil,
+		DoubleSigners: nil,
 		OrderBooks: &lib.OrderBooks{
 			OrderBooks: []*lib.OrderBook{{
 				ChainId: lib.CanopyChainId,
@@ -778,6 +790,8 @@ func newTestValidateGenesisState(t *testing.T) *types.GenesisState {
 			}},
 			CommitteeDelegatedOnly: nil,
 		},
+		Committees:        &lib.CommitteesData{List: []*lib.CommitteeData{}},
+		RetiredCommittees: nil,
 	}
 }
 

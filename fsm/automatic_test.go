@@ -152,7 +152,7 @@ func TestEndBlock(t *testing.T) {
 			LastChainHeightUpdated: 1,
 			LastRootHeightUpdated:  2,
 			PaymentPercents: []*lib.PaymentPercents{
-				{Address: newTestAddressBytes(t, 1), Percent: 100},
+				{Address: newTestAddressBytes(t, 1), ChainId: lib.CanopyChainId, Percent: 100},
 			},
 		},
 		{
@@ -160,7 +160,7 @@ func TestEndBlock(t *testing.T) {
 			LastChainHeightUpdated: 2,
 			LastRootHeightUpdated:  2,
 			PaymentPercents: []*lib.PaymentPercents{
-				{Address: newTestAddressBytes(t, 2), Percent: 100},
+				{Address: newTestAddressBytes(t, 2), ChainId: lib.CanopyChainId, Percent: 100},
 			},
 		},
 		{
@@ -168,7 +168,7 @@ func TestEndBlock(t *testing.T) {
 			LastChainHeightUpdated: 3,
 			LastRootHeightUpdated:  2,
 			PaymentPercents: []*lib.PaymentPercents{
-				{Address: newTestAddressBytes(t, 3), Percent: 100},
+				{Address: newTestAddressBytes(t, 3), ChainId: lib.CanopyChainId, Percent: 100},
 			},
 		},
 	}

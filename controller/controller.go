@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"bytes"
-	"fmt"
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
@@ -13,60 +11,67 @@ import (
 	"time"
 )
 
+/* This file contains the 'Controller' implementation which acts as a bus between the bft, p2p, fsm, and store modules to create the node */
+
 var _ bft.Controller = new(Controller)
 
 // Controller acts as the 'manager' of the modules of the application
 type Controller struct {
-	FSM           *fsm.StateMachine
-	RootChainInfo lib.RootChainInfo
-	Mempool       *Mempool
-	Consensus     *bft.BFT           // the async consensus process between the committee members for the chain
-	isSyncing     *atomic.Bool       // is the chain currently being downloaded from peers
-	P2P           *p2p.P2P           // the P2P module the node uses to connect to the network
-	Address       []byte             // self address
-	PublicKey     []byte             // self public key
-	PrivateKey    crypto.PrivateKeyI // self private key
-	Config        lib.Config         // node configuration
-	log           lib.LoggerI        // object for logging
-	sync.Mutex                       // mutex for thread safety
+	Address    []byte             // self address
+	PublicKey  []byte             // self public key
+	PrivateKey crypto.PrivateKeyI // self private key
+	Config     lib.Config         // node configuration
+
+	FSM       *fsm.StateMachine // the core protocol component responsible for maintaining and updating the state of the blockchain
+	Mempool   *Mempool          // the in memory list of pending transactions
+	Consensus *bft.BFT          // the async consensus process between the committee members for the chain
+	P2P       *p2p.P2P          // the P2P module the node uses to connect to the network
+
+	RootChainInfo lib.RootChainInfo // the latest information from the 'root chain'
+	isSyncing     *atomic.Bool      // is the chain currently being downloaded from peers
+	log           lib.LoggerI       // object for logging
+	sync.Mutex                      // mutex for thread safety
 }
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
-func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (*Controller, lib.ErrorI) {
-	// make a convenience variable for the 'height' of the state machine
-	height := fsm.Height()
-	// load maxMembersPerCommittee param to set limits on P2P
+func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.LoggerI) (controller *Controller, err lib.ErrorI) {
+	// load the maximum validators param to set limits on P2P
 	maxMembersPerCommittee, err := fsm.GetMaxValidators()
+	// if an error occurred when retrieving the max validators
 	if err != nil {
-		return nil, err
+		// exit with error
+		return
 	}
-	mempoolFSM, err := fsm.Copy()
+	// initialize the mempool using the FSM copy and the mempool config
+	mempool, err := NewMempool(fsm, c.MempoolConfig, l)
+	// if an error occurred when creating a new mempool
 	if err != nil {
-		return nil, err
+		// exit with error
+		return
 	}
-	mempool, err := NewMempool(mempoolFSM, c.MempoolConfig, l)
+	// create the controller
+	controller = &Controller{
+		FSM:           fsm,
+		Mempool:       mempool,
+		isSyncing:     &atomic.Bool{},
+		P2P:           p2p.New(valKey, maxMembersPerCommittee, c, l),
+		Address:       valKey.PublicKey().Address().Bytes(),
+		PublicKey:     valKey.PublicKey().Bytes(),
+		PrivateKey:    valKey,
+		Config:        c,
+		log:           l,
+		RootChainInfo: lib.RootChainInfo{Log: l},
+		Mutex:         sync.Mutex{},
+	}
+	// initialize the consensus in the controller, passing a reference to itself
+	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, true, l)
+	// if an error occurred initializing the bft module
 	if err != nil {
-		return nil, err
+		// exit with error
+		return
 	}
-	// create a controller structure
-	controller := &Controller{
-		FSM:        fsm,
-		Mempool:    mempool,
-		Consensus:  nil,
-		isSyncing:  &atomic.Bool{},
-		P2P:        p2p.New(valKey, maxMembersPerCommittee, c, l),
-		Address:    valKey.PublicKey().Address().Bytes(),
-		PublicKey:  valKey.PublicKey().Bytes(),
-		PrivateKey: valKey,
-		Config:     c,
-		log:        l,
-		Mutex:      sync.Mutex{},
-	}
-	controller.Consensus, err = bft.New(c, valKey, height, height-1, controller, true, l)
-	if err != nil {
-		return nil, err
-	}
-	return controller, err
+	// exit
+	return
 }
 
 // Start() begins the Controller service
@@ -75,27 +80,47 @@ func (c *Controller) Start() {
 	c.P2P.Start()
 	// start internal Controller listeners for P2P
 	c.StartListeners()
+	// in a non-blocking sub-function
 	go func() {
-		c.log.Warnf("Attempting to connect to the root-Chain")
+		// log the beginning of the root-chain API connection
+		c.log.Warnf("Attempting to connect to the root-chain")
+		// set a timer to go off once per second
 		t := time.NewTicker(time.Second)
+		// once function completes, stop the timer
 		defer t.Stop()
+		// each time the timer fires
 		for range t.C {
+			// if the root chain height is updated
 			if c.RootChainInfo.GetHeight() != 0 {
 				break
 			}
 		}
 		// start internal Controller listeners for P2P
 		c.StartListeners()
-		// sync and start each bft module
+		// start the syncing process (if not synced to top)
 		go c.Sync()
+		// start the bft consensus (if synced to top)
 		go c.Consensus.Start()
 	}()
+}
+
+// StartListeners() runs all listeners on separate threads
+func (c *Controller) StartListeners() {
+	c.log.Debug("Listening for inbound txs, block requests, and consensus messages")
+	// listen for syncing peers
+	go c.ListenForBlockRequests()
+	// listen for inbound consensus messages
+	go c.ListenForConsensus()
+	// listen for inbound
+	go c.ListenForTx()
+	// ListenForBlock() is called once syncing finished
 }
 
 // Stop() terminates the Controller service
 func (c *Controller) Stop() {
 	// lock the controller
 	c.Lock()
+	// unlock when the function completes
 	defer c.Unlock()
 	// stop the store module
 	if err := c.FSM.Store().(lib.StoreI).Close(); err != nil {
@@ -105,14 +130,21 @@ func (c *Controller) Stop() {
 	c.P2P.Stop()
 }
 
-// UpdateRootChainInfo() receives updates from the root-Chain thread
+// ROOT CHAIN CALLS BELOW
+
+// UpdateRootChainInfo() receives updates from the root-chain thread
 func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
+	// lock the controller for thread safety
 	c.Lock()
+	// unlock when the function completes
 	defer c.Unlock()
-	info.RemoteCallbacks = c.RootChainInfo.RemoteCallbacks
-	info.Log = c.log
-	// update the root-Chain info
+	// use the logger from the controller
+	info.Log = c.RootChainInfo.Log
+	// use the get remote callback 'callback' from the controller
+	info.GetRemoteCallbacks = c.RootChainInfo.GetRemoteCallbacks
+	// update the root chain info
 	c.RootChainInfo = *info
+	// if the last validator set is empty
 	if info.LastValidatorSet.NumValidators == 0 {
 		// signal to reset consensus and start a new height
 		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: false}
@@ -125,160 +157,156 @@ func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 }
 
 // LoadCommittee() gets the ValidatorSet that is authorized to come to Consensus agreement on the Proposal for a specific height/chainId
-func (c *Controller) LoadCommittee(height uint64) (lib.ValidatorSet, lib.ErrorI) {
-	return c.RootChainInfo.GetValidatorSet(c.Config.ChainId, height)
+func (c *Controller) LoadCommittee(rootChainId, rootHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
+	return c.RootChainInfo.GetValidatorSet(rootChainId, c.Config.ChainId, rootHeight)
 }
 
-// LoadRootChainOrderBook() gets the order book from the root-Chain
-func (c *Controller) LoadRootChainOrderBook(height uint64) (*lib.OrderBook, lib.ErrorI) {
-	return c.RootChainInfo.GetOrders(height, c.Config.ChainId)
-}
-
-// LoadCertificate() gets the Quorum Block from the chainId-> plugin at a certain height
-func (c *Controller) LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
-	return c.FSM.LoadCertificate(height)
-}
-
-// LoadMinimumEvidenceHeight() gets the minimum evidence height from Canopy
-func (c *Controller) LoadMinimumEvidenceHeight(height uint64) (uint64, lib.ErrorI) {
-	return c.RootChainInfo.GetMinimumEvidenceHeight(height)
+// LoadRootChainOrderBook() gets the order book from the root-chain
+func (c *Controller) LoadRootChainOrderBook(rootHeight uint64) (*lib.OrderBook, lib.ErrorI) {
+	return c.RootChainInfo.GetOrders(c.LoadRootChainId(c.ChainHeight()), rootHeight, c.Config.ChainId)
 }
 
 // GetRootChainLotteryWinner() gets the pseudorandomly selected delegate to reward and their cut
 func (c *Controller) GetRootChainLotteryWinner(rootHeight uint64) (winner *lib.LotteryWinner, err lib.ErrorI) {
-	return c.RootChainInfo.GetLotteryWinner(rootHeight, c.Config.ChainId)
+	// get the root chain id from the state machine
+	rootChainId, err := c.FSM.LoadRootChainId(c.ChainHeight())
+	// if an error occurred retrieving the id
+	if err != nil {
+		// exit with error
+		return nil, err
+	}
+	// execute the remote call
+	return c.RootChainInfo.GetLotteryWinner(rootChainId, rootHeight, c.Config.ChainId)
 }
 
-// IsValidDoubleSigner() Canopy checks if the double signer is valid at a certain height
-func (c *Controller) IsValidDoubleSigner(height uint64, address []byte) bool {
-	isValidDoubleSigner, err := c.RootChainInfo.IsValidDoubleSigner(height, lib.BytesToString(address))
+// IsValidDoubleSigner() checks if the double signer is valid at a certain double sign height
+func (c *Controller) IsValidDoubleSigner(rootHeight uint64, address []byte) bool {
+	// do a remote call to the root chain to see if the double signer is valid
+	isValidDoubleSigner, err := c.RootChainInfo.IsValidDoubleSigner(c.LoadRootChainId(c.ChainHeight()), rootHeight, lib.BytesToString(address))
+	// if an error occurred during the remote call
 	if err != nil {
+		// log the error
 		c.log.Errorf("IsValidDoubleSigner failed with error: %s", err.Error())
+		// return is not a valid double signer for safety
 		return false
 	}
+	// return the result from the remote call
 	return *isValidDoubleSigner
+}
+
+// INTERNAL CALLS BELOW
+
+// LoadIsOwnRoot() returns if this chain is its own root (base)
+func (c *Controller) LoadIsOwnRoot() (isOwnRoot bool) {
+	// use the state machine to check if this chain is the root chain
+	isOwnRoot, err := c.FSM.LoadIsOwnRoot()
+	// if an error occurred
+	if err != nil {
+		// log the error
+		c.log.Error(err.Error())
+	}
+	// exit
+	return
+}
+
+// RootChainId() returns the root chain id according to the FSM
+func (c *Controller) LoadRootChainId(height uint64) (rootChainId uint64) {
+	// use the state machine to get the root chain id
+	rootChainId, err := c.FSM.LoadRootChainId(height)
+	// if an error occurred
+	if err != nil {
+		// log the error
+		c.log.Error(err.Error())
+	}
+	// exit
+	return
+}
+
+// LoadCertificate() gets the certificate for from the indexer at a specific height
+func (c *Controller) LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
+	return c.FSM.LoadCertificate(height)
+}
+
+// LoadMinimumEvidenceHeight() gets the minimum evidence height from the finite state machine
+func (c *Controller) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) {
+	return c.FSM.LoadMinimumEvidenceHeight()
 }
 
 // LoadMaxBlockSize() gets the max block size from the state
 func (c *Controller) LoadMaxBlockSize() int {
+	// load the maximum block size from the nested chain FSM
 	params, _ := c.FSM.GetParamsCons()
+	// if the parameters are empty
 	if params == nil {
+		// return 0 as the 'max'
 		return 0
 	}
+	// return the max block size as set by the governance param
 	return int(params.BlockSize)
 }
 
 // LoadLastCommitTime() gets a timestamp from the most recent Quorum Block
 func (c *Controller) LoadLastCommitTime(height uint64) time.Time {
+	// load the certificate (and block) from the indexer
 	cert, err := c.FSM.LoadCertificate(height)
 	if err != nil {
 		c.log.Error(err.Error())
 		return time.Time{}
 	}
+	// create a new object reference (to ensure a non-nil result)
 	block := new(lib.Block)
+	// populate the object reference with bytes
 	if err = lib.Unmarshal(cert.Block, block); err != nil {
+		// log the error
 		c.log.Error(err.Error())
+		// exit with empty time
 		return time.Time{}
 	}
+	// ensure the block isn't nil
 	if block.BlockHeader == nil {
+		// log the error
+		c.log.Error("Last block synced is nil")
+		// exit with empty time
 		return time.Time{}
 	}
+	// return the last block time
 	return time.UnixMicro(int64(block.BlockHeader.Time))
 }
 
-// LoadProposerKeys() gets the last Root-ChainId proposer keys
+// LoadProposerKeys() gets the last root-chainId proposer keys
 func (c *Controller) LoadLastProposers(height uint64) (*lib.Proposers, lib.ErrorI) {
-	// return the last proposers from the Root-ChainId
-	return c.RootChainInfo.GetLastProposers(height)
+	// load the last proposers as determined by the last 5 quorum certificates
+	return c.FSM.LoadLastProposers(height)
 }
 
-// LoadCommitteeHeightInState() returns the last height the committee submitted a proposal for rewards
-func (c *Controller) LoadCommitteeHeightInState(height uint64) (uint64, lib.ErrorI) {
-	// return the committee height
-	return c.RootChainInfo.GetLastChainHeightUpdated(height, c.Config.ChainId)
+// LoadCommitteeData() returns the state metadata for the 'self chain'
+func (c *Controller) LoadCommitteeData() (data *lib.CommitteeData, err lib.ErrorI) {
+	// get the committee data from the FSM
+	return c.FSM.LoadCommitteeData(c.ChainHeight(), c.Config.ChainId)
 }
 
 // Syncing() returns if any of the supported chains are currently syncing
 func (c *Controller) Syncing() *atomic.Bool { return c.isSyncing }
 
-// RootChainHeight() returns the height of the canopy root-Chain
+// RootChainHeight() returns the height of the canopy root-chain
 func (c *Controller) RootChainHeight() uint64 { return c.RootChainInfo.GetHeight() }
 
 // ChainHeight() returns the height of this target chain
 func (c *Controller) ChainHeight() uint64 { return c.FSM.Height() }
 
-// ConsensusSummary() for the RPC - returns the summary json object of the bft for a specific chainID
-func (c *Controller) ConsensusSummary() ([]byte, lib.ErrorI) {
-	// lock for thread safety
-	c.Lock()
-	defer c.Unlock()
-	// convert self public key from bytes into an object
-	selfKey, _ := crypto.NewPublicKeyFromBytes(c.PublicKey)
-	// create the consensus summary object
-	consensusSummary := &ConsensusSummary{
-		Syncing:              c.isSyncing.Load(),
-		View:                 c.Consensus.View,
-		Locked:               c.Consensus.HighQC != nil,
-		Address:              selfKey.Address().Bytes(),
-		PublicKey:            c.PublicKey,
-		Proposer:             c.Consensus.ProposerKey,
-		Proposals:            c.Consensus.Proposals,
-		PartialQCs:           c.Consensus.PartialQCs,
-		PacemakerVotes:       c.Consensus.PacemakerMessages,
-		MinimumPowerFor23Maj: c.Consensus.ValidatorSet.MinimumMaj23,
-		Votes:                c.Consensus.Votes,
-		Status:               "",
+// emptyInbox() discards all unread messages for a specific topic
+func (c *Controller) emptyInbox(topic lib.Topic) {
+	// for each message in the inbox
+	for len(c.P2P.Inbox(topic)) > 0 {
+		// discard the message
+		<-c.P2P.Inbox(topic)
 	}
-	consensusSummary.BlockHash = c.Consensus.BlockHash
-	// if exists, populate the proposal hash
-	if c.Consensus.Results != nil {
-		consensusSummary.ResultsHash = c.Consensus.Results.Hash()
-	}
-	if c.Consensus.HighQC != nil {
-		consensusSummary.BlockHash = c.Consensus.HighQC.BlockHash
-		consensusSummary.ResultsHash = c.Consensus.HighQC.ResultsHash
-	}
-	// if exists, populate the proposer address
-	if c.Consensus.ProposerKey != nil {
-		propKey, _ := crypto.NewPublicKeyFromBytes(c.Consensus.ProposerKey)
-		consensusSummary.ProposerAddress = propKey.Address().Bytes()
-	}
-	// create a status string
-	switch c.Consensus.View.Phase {
-	case bft.Election, bft.Propose, bft.Precommit, bft.Commit:
-		proposal := c.Consensus.GetProposal()
-		if proposal == nil {
-			consensusSummary.Status = "waiting for proposal"
-		} else {
-			consensusSummary.Status = "received proposal"
-		}
-	case bft.ElectionVote, bft.ProposeVote, bft.CommitProcess:
-		if bytes.Equal(c.Consensus.ProposerKey, c.PublicKey) {
-			_, _, votedPercentage := c.Consensus.GetLeadingVote()
-			consensusSummary.Status = fmt.Sprintf("received %d%% of votes", votedPercentage)
-		} else {
-			consensusSummary.Status = "voting on proposal"
-		}
-	}
-	// convert the object into json
-	return lib.MarshalJSONIndent(&consensusSummary)
 }
 
-// ConsensusSummary is simply a json informational structure about the local status of the BFT
-type ConsensusSummary struct {
-	Syncing              bool                   `json:"isSyncing"`
-	View                 *lib.View              `json:"view"`
-	BlockHash            lib.HexBytes           `json:"blockHash"`
-	ResultsHash          lib.HexBytes           `json:"resultsHash"`
-	Locked               bool                   `json:"locked"`
-	Address              lib.HexBytes           `json:"address"`
-	PublicKey            lib.HexBytes           `json:"publicKey"`
-	ProposerAddress      lib.HexBytes           `json:"proposerAddress"`
-	Proposer             lib.HexBytes           `json:"proposer"`
-	Proposals            bft.ProposalsForHeight `json:"proposals"`
-	PartialQCs           bft.PartialQCs         `json:"partialQCs"`
-	PacemakerVotes       bft.PacemakerMessages  `json:"pacemakerVotes"`
-	MinimumPowerFor23Maj uint64                 `json:"minimumPowerFor23Maj"`
-	Votes                bft.VotesForHeight     `json:"votes"`
-	Status               string                 `json:"status"`
-}
+// convenience aliases that reference the library package
+const (
+	BlockRequest = lib.Topic_BLOCK_REQUEST
+	Block        = lib.Topic_BLOCK
+	Tx           = lib.Topic_TX
+	Cons         = lib.Topic_CONSENSUS
+)

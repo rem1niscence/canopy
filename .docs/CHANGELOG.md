@@ -1,8 +1,12 @@
 # CHANGELOG
 
+## [Unreleased] - 3/02/2024
+- Removed optimistic bft timer to prepare for optimized pacemaker implementation
+- Updated phase pacemaker to wait the entire round before going to the next
+
 ## [Unreleased] - 2/05/2024
 - Fix hooks order error on Wallet
-- Refactor components to prevent unnecesary re-renders
+- Refactor components to prevent unnecessary re-renders
 
 ## [Unreleased] - 2/04/2024
 - Refactor wallet forms and consolidate all of them as one 

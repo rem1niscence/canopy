@@ -47,7 +47,7 @@ export default function FormInputs({keygroup, account, validator, fields, show, 
     };
 
     const renderFormInputs = (input, i) => {
-        if (input.label === "net_address" && formValues["delegate"] === "true" || validator?.delegate === true) return null;
+        if (input.label === "net_address" && (formValues["delegate"] === "true" || validator?.delegate === true)) return null;
 
         if (input.type === "select") {
             return (

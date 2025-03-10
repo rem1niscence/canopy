@@ -7,6 +7,8 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+/* This file contains transaction handling logic - for the payload handling check message.go */
+
 // ApplyTransaction() processes the transaction within the state machine, returning the corresponding TxResult.
 func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash string) (*lib.TxResult, lib.ErrorI) {
 	// validate the transaction and get the check result
@@ -36,8 +38,9 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 
 // CheckTx() validates the transaction object
 func (s *StateMachine) CheckTx(transaction []byte, txHash string) (result *CheckTxResult, err lib.ErrorI) {
-	// convert the transaction bytes into an object
+	// create a new transaction object reference to ensure a non-nil transaction
 	tx := new(lib.Transaction)
+	// populate the object ref with the bytes of the transaction
 	if err = lib.Unmarshal(transaction, tx); err != nil {
 		return
 	}
@@ -55,7 +58,7 @@ func (s *StateMachine) CheckTx(transaction []byte, txHash string) (result *Check
 		return
 	}
 	// validate the signature of the transaction
-	sender, err := s.CheckSignature(msg, tx)
+	sender, err := s.CheckSignature(msg, tx, txHash)
 	if err != nil {
 		return
 	}
@@ -79,7 +82,7 @@ type CheckTxResult struct {
 }
 
 // CheckSignature() validates the signer and the digital signature associated with the transaction object
-func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (crypto.AddressI, lib.ErrorI) {
+func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction, txHash string) (crypto.AddressI, lib.ErrorI) {
 	// validate the actual signature bytes
 	if tx.Signature == nil || len(tx.Signature.Signature) == 0 {
 		return nil, types.ErrEmptySignature()
@@ -94,33 +97,51 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction) (cr
 	if e != nil {
 		return nil, types.ErrInvalidPublicKey(e)
 	}
-	// validate the signature
+	// validate the actual signature
 	if !publicKey.VerifyBytes(signBytes, tx.Signature.Signature) {
 		return nil, types.ErrInvalidSignature()
 	}
+	// calculate the corresponding address from the public key
 	address := publicKey.Address()
-	signers, er := s.GetAuthorizedSignersFor(msg)
+	// check the authorized signers for the message
+	authorizedSigners, er := s.GetAuthorizedSignersFor(msg)
 	if er != nil {
 		return nil, er
 	}
-	for _, signer := range signers {
-		if address.Equals(crypto.NewAddressFromBytes(signer)) {
-			// edit stake is a special case where the signer must be known by the handler
-			if editStake, ok := msg.(*types.MessageEditStake); ok {
-				editStake.Signer = signer
+	// for each authorized signer
+	for _, authorized := range authorizedSigners {
+		// if the address that signed the transaction matches one of the authorized signers
+		if address.Equals(crypto.NewAddressFromBytes(authorized)) {
+			// populate the signer field for stake
+			if stake, ok := msg.(*types.MessageStake); ok {
+				stake.Signer = authorized
 			}
+			// populate the signer field for edit-stake
+			if editStake, ok := msg.(*types.MessageEditStake); ok {
+				editStake.Signer = authorized
+			}
+			// populate the proposal hash for change parameter
+			if changeParam, ok := msg.(*types.MessageChangeParameter); ok {
+				changeParam.ProposalHash = txHash
+			}
+			// populate the proposal hash for dao transfer
+			if daoTransfer, ok := msg.(*types.MessageDAOTransfer); ok {
+				daoTransfer.ProposalHash = txHash
+			}
+			// return the signer address
 			return address, nil
 		}
 	}
+	// if no authorized signer matched the signer address, it's unauthorized
 	return nil, types.ErrUnauthorizedTx()
 }
 
 // CheckReplay() validates the timestamp of the transaction
-// Instead of using an increasing 'sequence number' Canopy uses timestamps to act as a prune-friendly, replay attack / hash collision prevention mechanism
+// Instead of using an increasing 'sequence number' Canopy uses timestamp + created block to act as a prune-friendly, replay attack / hash collision prevention mechanism
 //   - Canopy searches the transaction indexer for the transaction using its hash to prevent 'replay attacks'
 //   - The timestamp protects against hash collisions as it injects 'micro-second level entropy'
 //     into the hash of the transaction, ensuring no transactions will 'accidentally collide'
-//   - The timestamp acceptance policy for transactions maintains an acceptable bound of time to support database pruning
+//   - The created block acceptance policy for transactions maintains an acceptable bound of 'time' to support database pruning
 func (s *StateMachine) CheckReplay(tx *lib.Transaction, txHash string) lib.ErrorI {
 	// ensure the right network
 	if uint64(s.NetworkID) != tx.NetworkId {
@@ -131,62 +152,83 @@ func (s *StateMachine) CheckReplay(tx *lib.Transaction, txHash string) lib.Error
 		return lib.ErrWrongChainId()
 	}
 	// if below height 2, skip this check as GetBlockByHeight will load a block that has a lastQC that doesn't exist
-	height := s.Height()
-	if height < 2 {
+	if s.Height() < 2 {
 		return nil
 	}
-	store, ok := s.store.(lib.StoreI)
+	// ensure the store can 'read the indexer'
+	store, ok := s.store.(lib.RIndexerI)
+	// if it can't then exit
 	if !ok {
 		return types.ErrWrongStoreType()
 	}
-	// convert the hash to bytes
-	hash, err := lib.StringToBytes(txHash)
+	// convert the transaction hash string into bytes
+	hashBz, err := lib.StringToBytes(txHash)
 	if err != nil {
 		return err
 	}
-	// ensure the tx doesn't already exist
-	txResult, err := store.GetTxByHash(hash)
-	if txResult.TxHash != "" {
+	// ensure the tx doesn't already exist in the indexer
+	// same block replays are protected at a higher level
+	txResult, err := store.GetTxByHash(hashBz)
+	if err != nil {
+		return err
+	}
+	// if the tx transaction result isn't nil, and it has a hash
+	if txResult != nil && txResult.TxHash == txHash {
 		return lib.ErrDuplicateTx(txHash)
 	}
-	// define some safe mempool acceptance policy
+	// define some safe +/- tx indexer prune height
 	const blockAcceptancePolicy = 120
-	// this gives us a safe mempool to block acceptance while providing a safe tx indexer prune time
+	// this gives the protocol a theoretically safe tx indexer prune height
 	maxHeight, minHeight := s.Height()+blockAcceptancePolicy, uint64(0)
+	// if height is after the blockAcceptancePolicy blocks
 	if s.Height() > blockAcceptancePolicy {
+		// update the minimum height
 		minHeight = s.Height() - blockAcceptancePolicy
 	}
 	// ensure the tx 'created height' is not above or below the acceptable bounds
 	if tx.CreatedHeight > maxHeight || tx.CreatedHeight < minHeight {
 		return lib.ErrInvalidTxHeight()
 	}
+	// exit
 	return nil
 }
 
 // CheckMessage() performs basic validations on the msg payload
 func (s *StateMachine) CheckMessage(msg *anypb.Any) (message lib.MessageI, err lib.ErrorI) {
+	// ensure the message isn't nil
+	if msg == nil {
+		return nil, lib.ErrEmptyMessage()
+	}
+	// extract the message from an protobuf any
 	proto, err := lib.FromAny(msg)
 	if err != nil {
 		return nil, err
 	}
+	// cast the proto message to a Message interface that may be interpreted
 	message, ok := proto.(lib.MessageI)
+	// if cast fails, throw an error
 	if !ok {
 		return nil, types.ErrInvalidTxMessage()
 	}
+	// do stateless checks on the message
 	if err = message.Check(); err != nil {
 		return nil, err
 	}
+	// return the message as the interface
 	return message, nil
 }
 
 // CheckFee() validates the fee amount is sufficient to pay for a transaction
-func (s *StateMachine) CheckFee(fee uint64, msg lib.MessageI) lib.ErrorI {
-	stateLimitFee, err := s.GetFeeForMessage(msg)
+func (s *StateMachine) CheckFee(fee uint64, msg lib.MessageI) (err lib.ErrorI) {
+	// get the fee for the message name
+	stateLimitFee, err := s.GetFeeForMessageName(msg.Name())
 	if err != nil {
 		return err
 	}
+	// if the fee is below the limit
 	if fee < stateLimitFee {
 		return types.ErrTxFeeBelowStateLimit()
 	}
-	return nil
+	// exit
+	return
 }

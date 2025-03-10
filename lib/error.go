@@ -19,9 +19,9 @@ type ErrorCode uint32 // Defines a type for error codes
 type ErrorModule string // Defines a type for error modules
 
 type Error struct {
-	ECode   ErrorCode   `json:"Code"`   // Error code
-	EModule ErrorModule `json:"Module"` // Error module
-	Msg     string      `json:"Msg"`    // Error message
+	ECode   ErrorCode   `json:"code"`   // Error code
+	EModule ErrorModule `json:"module"` // Error module
+	Msg     string      `json:"msg"`    // Error message
 }
 
 func NewError(code ErrorCode, module ErrorModule, msg string) *Error {
@@ -91,6 +91,7 @@ const (
 	CodeNoValidators                ErrorCode = 29
 	CodeInvalidResultsHash          ErrorCode = 30
 	CodeNonNilBlock                 ErrorCode = 31
+	CodeMessageCastFailed           ErrorCode = 32
 
 	// Consensus Module
 	ConsensusModule ErrorModule = "consensus"
@@ -107,7 +108,7 @@ const (
 	CodeUnknownConsensusMessage         ErrorCode = 9
 	CodeValidatorNotInSet               ErrorCode = 10
 	CodeWrongHeight                     ErrorCode = 11
-	CodeWrongRound                      ErrorCode = 12
+	CodeOutOfSync                       ErrorCode = 12
 	CodeWrongPhase                      ErrorCode = 13
 	CodePartialSignatureEmpty           ErrorCode = 14
 	CodeInvalidPartialSignature         ErrorCode = 15
@@ -138,7 +139,7 @@ const (
 	CodeNonNilCertResults               ErrorCode = 40
 	CodeInvalidMemo                     ErrorCode = 41
 	CodeNilCertResult                   ErrorCode = 42
-	CodeNilBuyOrder                     ErrorCode = 43
+	CodeNilLockOrder                    ErrorCode = 43
 	CodeInvalidBuyerReceiveAddress      ErrorCode = 44
 	CodeEmptyTransaction                ErrorCode = 45
 	CodeHashSize                        ErrorCode = 46
@@ -152,6 +153,12 @@ const (
 	CodeInvalidSigner                   ErrorCode = 54
 	CodeMismatchQcBlockHash             ErrorCode = 55
 	CodeMismatchHeaderBlockHash         ErrorCode = 56
+	CodeEmptyDoubleSigner               ErrorCode = 57
+	CodeNonEquivocatingVote             ErrorCode = 58
+	CodeInvalidEvidenceHeights          ErrorCode = 59
+	CodeInvalidBuyerSendAddress         ErrorCode = 60
+	CodeDuplicateCloseOrder             ErrorCode = 61
+	CodeDuplicateResetOrder             ErrorCode = 62
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -233,9 +240,9 @@ const (
 	CodeOrderNotFound                     ErrorCode = 74
 	CodeUnauthorizedOrderChange           ErrorCode = 75
 	CodeMinimumOrderSize                  ErrorCode = 76
-	CodeOrderAlreadyAccepted              ErrorCode = 77
-	CodeInvalidBuyOrder                   ErrorCode = 78
-	CodeDuplicateBuyOrder                 ErrorCode = 79
+	CodeOrderLocked                       ErrorCode = 77
+	CodeInvalidLockOrder                  ErrorCode = 78
+	CodeDuplicateLockOrder                ErrorCode = 79
 	CodeInvalidBuyerDeadline              ErrorCode = 80
 	CodeInvalidCloseOrder                 ErrorCode = 81
 	CodeInvalidResetOrder                 ErrorCode = 82
@@ -247,6 +254,7 @@ const (
 	CodeInvalidQCRootChainHeight          ErrorCode = 88
 	CodeEmptyCertificateResults           ErrorCode = 89
 	CodeSlashNonValidator                 ErrorCode = 90
+	CodeEmptyOrderBook                    ErrorCode = 91
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -286,23 +294,18 @@ const (
 	CodeIncompatiblePeer        ErrorCode = 32
 	CodeInvalidNetAddress       ErrorCode = 33
 
-	StorageModule       ErrorModule = "store"
-	CodeOpenDB          ErrorCode   = 1
-	CodeCloseDB         ErrorCode   = 2
-	CodeStoreSet        ErrorCode   = 3
-	CodeStoreGet        ErrorCode   = 4
-	CodeStoreDelete     ErrorCode   = 5
-	CodeStoreIter       ErrorCode   = 6
-	CodeStoreRevIter    ErrorCode   = 7
-	CodeCopyStore       ErrorCode   = 8
-	CodeWriteTxn        ErrorCode   = 9
-	CodeDecompactProof  ErrorCode   = 10
-	CodeCommitDB        ErrorCode   = 11
-	CodeCommitTree      ErrorCode   = 12
-	CodeProve           ErrorCode   = 13
-	CodeCompactProof    ErrorCode   = 14
-	CodeInvalidKey      ErrorCode   = 15
-	CodeReserveKeyWrite ErrorCode   = 16
+	StorageModule              ErrorModule = "store"
+	CodeOpenDB                 ErrorCode   = 1
+	CodeCloseDB                ErrorCode   = 2
+	CodeStoreSet               ErrorCode   = 3
+	CodeStoreGet               ErrorCode   = 4
+	CodeStoreDelete            ErrorCode   = 5
+	CodeCommitDB               ErrorCode   = 6
+	CodeCompactProof           ErrorCode   = 7
+	CodeInvalidKey             ErrorCode   = 8
+	CodeReserveKeyWrite        ErrorCode   = 9
+	CodeInvalidMerkleTree      ErrorCode   = 10
+	CodeInvalidMerkleTreeProof ErrorCode   = 11
 
 	RPCModule             ErrorModule = "rpc"
 	CodeRPCTimeout        ErrorCode   = 1
@@ -434,7 +437,7 @@ func ErrWrongHeight() ErrorI {
 }
 
 func ErrWrongRootHeight() ErrorI {
-	return NewError(CodeRootHeight, ConsensusModule, "wrong canopy height")
+	return NewError(CodeRootHeight, ConsensusModule, "wrong root height")
 }
 
 func ErrInvalidQCCommitteeHeight() ErrorI {
@@ -442,7 +445,7 @@ func ErrInvalidQCCommitteeHeight() ErrorI {
 }
 
 func ErrInvalidQCRootChainHeight() ErrorI {
-	return NewError(CodeInvalidQCRootChainHeight, ConsensusModule, "invalid certificate root-Chain height")
+	return NewError(CodeInvalidQCRootChainHeight, ConsensusModule, "invalid certificate root-chain height")
 }
 
 func ErrWrongMaxHeight() ErrorI {
@@ -453,8 +456,8 @@ func ErrEmptyView() ErrorI {
 	return NewError(CodeEmptyView, ConsensusModule, "empty view")
 }
 
-func ErrWrongRound() ErrorI {
-	return NewError(CodeWrongRound, ConsensusModule, "wrong round")
+func ErrOutOfSync() ErrorI {
+	return NewError(CodeOutOfSync, ConsensusModule, "out of sync")
 }
 
 func ErrWrongPhase() ErrorI {
@@ -523,6 +526,18 @@ func ErrEmptyEvidence() ErrorI {
 
 func ErrInvalidEvidence() ErrorI {
 	return NewError(CodeInvalidEvidence, ConsensusModule, "evidence is invalid")
+}
+
+func ErrInvalidEvidenceHeights() ErrorI {
+	return NewError(CodeInvalidEvidenceHeights, ConsensusModule, "evidence heights are invalid")
+}
+
+func ErrNonEquivocatingVote() ErrorI {
+	return NewError(CodeNonEquivocatingVote, ConsensusModule, "non equivocating vote")
+}
+
+func ErrEmptyDoubleSigner() ErrorI {
+	return NewError(CodeEmptyDoubleSigner, ConsensusModule, "double signer is empty")
 }
 
 func ErrEvidenceTooOld() ErrorI {
@@ -641,6 +656,10 @@ func ErrEmptyChainId() ErrorI {
 	return NewError(CodeEmptyChainId, StateMachineModule, "empty chain id")
 }
 
+func ErrEmptyOrderBook() ErrorI {
+	return NewError(CodeEmptyOrderBook, StateMachineModule, "empty order book")
+}
+
 func ErrWrongChainId() ErrorI {
 	return NewError(CodeWrongChainId, StateMachineModule, "wrong chain id")
 }
@@ -657,6 +676,10 @@ func ErrInvalidArgument() ErrorI {
 	return NewError(CodeInvalidArgument, MainModule, "the argument is invalid")
 }
 
+func ErrInvalidMessageCast() ErrorI {
+	return NewError(CodeInvalidArgument, MainModule, "the message cast failed")
+}
+
 func ErrExpectedMaxBlockSize() ErrorI {
 	return NewError(CodeExpectedBlockSizeLimit, MainModule, "the block size exceeds the expected limit")
 }
@@ -665,12 +688,24 @@ func ErrNonNilCertResults() ErrorI {
 	return NewError(CodeNonNilCertResults, MainModule, "the certificate results is not empty")
 }
 
-func ErrNilBuyOrder() ErrorI {
-	return NewError(CodeNilBuyOrder, MainModule, "buy order is nil")
+func ErrNilLockOrder() ErrorI {
+	return NewError(CodeNilLockOrder, MainModule, "lock order is nil")
 }
 
 func ErrInvalidBuyerReceiveAddress() ErrorI {
 	return NewError(CodeInvalidBuyerReceiveAddress, MainModule, "invalid buyer receive address")
+}
+
+func ErrInvalidBuyerSendAddress() ErrorI {
+	return NewError(CodeInvalidBuyerSendAddress, MainModule, "invalid buyer send address")
+}
+
+func ErrDuplicateResetOrder() ErrorI {
+	return NewError(CodeDuplicateResetOrder, MainModule, "duplicate reset order")
+}
+
+func ErrDuplicateCloseOrder() ErrorI {
+	return NewError(CodeDuplicateCloseOrder, MainModule, "duplicate close order")
 }
 
 func ErrNilCertResults() ErrorI {
@@ -685,8 +720,8 @@ func ErrMaxPort() ErrorI {
 	return NewError(CodeMaxPort, MainModule, "max port exceeded")
 }
 
-func ErrOrderAlreadyAccepted() ErrorI {
-	return NewError(CodeOrderAlreadyAccepted, StateMachineModule, "order already accepted")
+func ErrOrderLocked() ErrorI {
+	return NewError(CodeOrderLocked, StateMachineModule, "order locked")
 }
 
 func ErrOrderNotFound(id int) ErrorI {
@@ -695,4 +730,45 @@ func ErrOrderNotFound(id int) ErrorI {
 
 func ErrPanic() ErrorI {
 	return NewError(CodePanic, StateMachineModule, "panic")
+}
+
+func ErrServerTimeout() ErrorI {
+	return NewError(CodeRPCTimeout, RPCModule, "server timeout")
+}
+
+func ErrInvalidParams(err error) ErrorI {
+	bz, _ := MarshalJSON(err)
+	return NewError(CodeInvalidParams, RPCModule, fmt.Sprintf("invalid params: %s", string(bz)))
+}
+
+func ErrNewFSM(err error) ErrorI {
+	return NewError(CodeNewFSM, RPCModule, fmt.Sprintf("new fsm failed with err: %s", err.Error()))
+}
+
+func ErrNewStore(err error) ErrorI {
+	return NewError(CodeNewFSM, RPCModule, fmt.Sprintf("new store failed with err: %s", err.Error()))
+}
+
+func ErrTimeMachine(err error) ErrorI {
+	return NewError(CodeTimeMachine, RPCModule, fmt.Sprintf("fsm.TimeMachine() failed with err: %s", err.Error()))
+}
+
+func ErrPostRequest(err error) ErrorI {
+	return NewError(CodePostRequest, RPCModule, fmt.Sprintf("http.Post() failed with err: %s", err.Error()))
+}
+
+func ErrGetRequest(err error) ErrorI {
+	return NewError(CodeGetRequest, RPCModule, fmt.Sprintf("http.Get() failed with err: %s", err.Error()))
+}
+
+func ErrHttpStatus(status string, statusCode int, body []byte) ErrorI {
+	return NewError(CodeHttpStatus, RPCModule, fmt.Sprintf("http response bad status %s with code %d and body %s", status, statusCode, body))
+}
+
+func ErrReadBody(err error) ErrorI {
+	return NewError(CodeReadBody, RPCModule, fmt.Sprintf("io.ReadAll(http.ResponseBody) failed with err: %s", err.Error()))
+}
+
+func ErrStringToCommittee(s string) ErrorI {
+	return NewError(CodeStringToCommittee, RPCModule, fmt.Sprintf("committee arg %s is invalid, requires a comma separated list of <chainId>=<percent> ex. 0=50,21=25,99=25", s))
 }

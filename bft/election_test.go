@@ -68,7 +68,7 @@ func TestSortitionAndVerifyCandidate(t *testing.T) {
 		{
 			name:        "isNotCandidate",
 			detail:      "deterministic key set ensures sortition results in not a candidate in a set of 6 validators",
-			totalVals:   4,
+			totalVals:   6,
 			isCandidate: false,
 		},
 	}
@@ -151,7 +151,7 @@ func TestSelectProposerFromCandidates(t *testing.T) {
 			detail:              "deterministic key set ensures that the weighted leader id is deterministic",
 			totalVals:           3,
 			totalCandidates:     0,
-			expectedProposerIdx: 0,
+			expectedProposerIdx: 2,
 		},
 		{
 			name:                "3 candidates, lowest index (0) is the proposer",

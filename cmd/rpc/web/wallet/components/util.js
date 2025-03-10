@@ -4,7 +4,7 @@ import {OverlayTrigger, Toast, ToastContainer, Tooltip} from "react-bootstrap";
 // account and validator is passed to assist with auto fill
 export function getFormInputs(type, keyGroup, account, validator, keyStore) {
     let amount = null;
-    let netAddr = validator && validator.address ? validator.net_address : "";
+    let netAddr = validator && validator.address ? validator.netAddress : "";
     let delegate = validator && validator.address ? validator.delegate : false;
     let compound = validator && validator.address ? validator.compound : false;
     let output = validator && validator.address ? validator.output : "";
@@ -17,7 +17,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
     defaultNick = type !== "send" && validator && validator.nickname ? validator.nickname : defaultNick;
     defaultNick = type === "stake" && validator && validator.nickname ? "WARNING: validator already staked" : defaultNick;
     if (type === "edit-stake" || type === "stake") {
-        amount = validator && validator.address ? validator.staked_amount : null;
+        amount = validator && validator.address ? validator.stakedAmount : null;
     }
     let a = {
         privateKey: {
@@ -46,7 +46,7 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
             tooltip: "comma separated list of committee chain IDs to stake for",
             label: "committees",
             inputText: "committees",
-            feedback: "please input atleast 1 committee",
+            feedback: "please input at least 1 committee",
             required: true,
             type: "text",
             minLength: 1,
@@ -315,8 +315,10 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
             ];
         case "create_order":
             return [a.account, a.chainId, a.amount, a.receiveAmount, a.receiveAddress, a.memo, a.fee, a.password];
-        case "buy_order":
+        case "lock_order":
             return [a.account, a.buyersReceiveAddress, a.orderId, a.fee, a.password];
+        case "close_order":
+            return [a.account, a.orderId, a.fee, a.password];
         case "edit_order":
             return [
                 a.account,
@@ -395,36 +397,45 @@ export const placeholders = {
     proposals: {
         "2cbb73b8abdacf233f4c9b081991f1692145624a95004f496a95d3cce4d492a4": {
             proposal: {
-                parameter_space: "cons|fee|val|gov",
-                parameter_key: "protocol_version",
-                parameter_value: "example",
-                start_height: 1,
-                end_height: 1000000,
+                parameterSpace: "cons|fee|val|gov",
+                parameterKey: "protocolVersion",
+                parameterValue: "example",
+                startHeight: 1,
+                endHeight: 1000000,
                 signer: "4646464646464646464646464646464646464646464646464646464646464646",
             },
             approve: false,
         },
     },
     params: {
-        parameter_space: "consensus",
-        parameter_key: "protocol_version",
-        parameter_value: "1/150",
-        start_height: 1,
-        end_height: 100,
-        signer: "303739303732333263...",
-    },
-    rawTx: {
-        type: "change_parameter",
+        type: "changeParameter",
         msg: {
-            parameter_space: "cons",
-            parameter_key: "block_size",
-            parameter_value: 1000,
-            start_height: 1,
-            end_height: 100,
+            parameterSpace: "cons",
+            parameterKey: "blockSize",
+            parameterValue: 1000,
+            startHeight: 1,
+            endHeight: 100,
             signer: "1fe1e32edc41d688...",
         },
         signature: {
-            public_key: "a88b9c0c7b77e7f8ac...",
+            publicKey: "a88b9c0c7b77e7f8ac...",
+            signature: "8f6d016d04e350...",
+        },
+        memo: "",
+        fee: 10000,
+    },
+    rawTx: {
+        type: "changeParameter",
+        msg: {
+            parameterSpace: "cons",
+            parameterKey: "blockSize",
+            parameterValue: 1000,
+            startHeight: 1,
+            endHeight: 100,
+            signer: "1fe1e32edc41d688...",
+        },
+        signature: {
+            publicKey: "a88b9c0c7b77e7f8ac...",
             signature: "8f6d016d04e350...",
         },
         memo: "",
@@ -563,17 +574,17 @@ export const sanitizeTextInput = (value) => {
 // it also converts the value to a CNPY representation if toCnpy is true.
 // It is meant to be used as an onChange event handler.
 export const sanitizeNumberInput = (value, toCnpy = true) => {
-    let input = value
-        .replace(/[^\d]/g, "") // Removes all non-digit characters
-        .replace(/^0+/, ""); // Removes leading zeros
+    let input = value.replace(/[^\d]/g, ""); // Remove all non-digit characters
+    // Allow a single zero but remove leading zeros once other numbers are added
+    if (input.length > 1) {
+        input = input.replace(/^0+/, "");
+    }
     if (input === "") {
         return "";
     }
-
     if (toCnpy) {
         return formatLocaleNumber(toCNPY(input), 6, 6);
     }
-
     return formatLocaleNumber(Number(input));
 };
 

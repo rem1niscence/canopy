@@ -15,7 +15,7 @@ import {
 
 // convertValue() converts the value based on its key and handles different types
 function convertValue(k, v, openModal) {
-  if (k === "public_key") return <Truncate text={v} />;
+  if (k === "publicKey") return <Truncate text={v} />;
   if (isHex(v) || k === "height") {
     const content = isNumber(v) ? v : <Truncate text={v} />;
     return (
@@ -59,26 +59,26 @@ function filterData(data, filterText) {
 // convertBlock() processes block header, removing specific fields for table
 function convertBlock(v) {
   let {
-    last_quorum_certificate,
-    next_validator_root,
-    state_root,
-    transaction_root,
-    validator_root,
-    last_block_hash,
-    network_id,
-    total_vdf_iterations,
+    lastQuorumCertificate,
+    nextValidatorRoot,
+    stateRoot,
+    transactionRoot,
+    validatorRoot,
+    lastBlockHash,
+    networkID,
+    totalVDFIterations,
     vdf,
     ...value
-  } = cpyObj(v.block_header);
-  value.num_txs = "num_txs" in v.block_header ? v.block_header.num_txs : "0";
-  value.total_txs = "total_txs" in v.block_header ? v.block_header.total_txs : "0";
-  return JSON.parse(JSON.stringify(value, ["height", "hash", "time", "num_txs", "total_txs", "proposer_address"], 4));
+  } = cpyObj(v.blockHeader);
+  value.numTxs = "numTxs" in v.blockHeader ? v.blockHeader.numTxs : "0";
+  value.totalTxs = "totalTxs" in v.blockHeader ? v.blockHeader.totalTxs : "0";
+  return JSON.parse(JSON.stringify(value, ["height", "hash", "time", "numTxs", "totalTxs", "proposerAddress"], 4));
 }
 
 // convertValidator() processes validator details, converting uCNPY values to CNPY
 function convertValidator(v) {
   let value = Object.assign({}, v);
-  value.staked_amount = toCNPY(value.staked_amount);
+  value.stakedAmount = toCNPY(value.stakedAmount);
   value.committees = value.committees.toString()
   return value;
 }
@@ -92,24 +92,24 @@ function convertAccount(v) {
 
 // convertParams() processes different consensus parameters for table structure
 function convertGovernanceParams(v) {
-  if (!v.Consensus) return ["0"];
+  if (!v.consensus) return ["0"];
   let value = cpyObj(v);
   let toCNPYParams = [
-    "send_fee",
-    "stake_fee",
-    "edit_stake_fee",
-    "unstake_fee",
-    "pause_fee",
-    "unpause_fee",
-    "change_parameter_fee",
-    "dao_transfer_fee",
-    "subsidy_fee",
-    "create_order_fee",
-    "edit_order_fee",
-    "delete_order_fee",
-    "minimum_order_size",
+    "sendFee",
+    "stakeFee",
+    "editStakeFee",
+    "unstakeFee",
+    "pauseFee",
+    "unpauseFee",
+    "changeParameterFee",
+    "daoTransferFee",
+    "subsidyFee",
+    "createOrderFee",
+    "editOrderFee",
+    "deleteOrderFee",
+    "minimumOrderSize",
   ];
-  return ["Consensus", "Validator", "Fee", "Governance"].flatMap((space) =>
+  return ["consensus", "validator", "fee", "governance"].flatMap((space) =>
     Object.entries(value[space] || {}).map(([k, v]) => ({
       ParamName: k,
       ParamValue: toCNPYParams.includes(k) ? toCNPY(v) : v,
@@ -120,19 +120,19 @@ function convertGovernanceParams(v) {
 
 // convertOrder() transforms order details into a table-compatible convert
 function convertOrder(v) {
-  const exchangeRate = v.RequestedAmount / v.AmountForSale;
+  const exchangeRate = v.requestedAmount / v.amountForSale;
   return {
-    Id: v.Id ?? 0,
-    Chain: v.Committee,
-    AmountForSale: toCNPY(v.AmountForSale),
+    Id: v.id ?? 0,
+    Chain: v.committee,
+    AmountForSale: toCNPY(v.amountForSale),
     Rate: exchangeRate.toFixed(2),
-    RequestedAmount: toCNPY(v.RequestedAmount),
-    SellerReceiveAddress: v.SellerReceiveAddress,
-    SellersSendAddress: v.SellersSendAddress,
-    BuyerSendAddress: v.BuyerSendAddress,
-    Status: "BuyerReceiveAddress" in v ? "Reserved" : "Open",
-    BuyerReceiveAddress: v.BuyerReceiveAddress,
-    BuyerChainDeadline: v.BuyerChainDeadline,
+    RequestedAmount: toCNPY(v.requestedAmount),
+    SellerReceiveAddress: v.sellerReceiveAddress,
+    SellersSendAddress: v.sellersSendAddress,
+    BuyerSendAddress: v.buyerSendAddress,
+    Status: "buyerReceiveAddress" in v ? "Reserved" : "Open",
+    BuyerReceiveAddress: v.buyerReceiveAddress,
+    BuyerChainDeadline: v.buyerChainDeadline,
   };
 }
 
@@ -153,17 +153,17 @@ function getHeader(v) {
   if (v.type === "block-results-page") return "Blocks";
   if (v.type === "accounts") return "Accounts";
   if (v.type === "validators") return "Validators";
-  if ("Consensus" in v) return "Governance";
-  if ("committee_staked" in v) return "Committees";
+  if ("consensus" in v) return "Governance";
+  if ("committeeStaked" in v) return "Committees";
   return "Sell Orders";
 }
 
 // getTableBody() determines the body of the table based on the provided object type
 function getTableBody(v) {
   let empty = [{ Results: "null" }];
-  if ("Consensus" in v) return convertGovernanceParams(v);
-  if ("committee_staked" in v) return v.committee_staked.map((item) => convertCommitteeSupply(item, v.staked));
-  if (!v.hasOwnProperty("type")) return v[0]?.orders?.map(convertOrder) || empty;
+  if ("consensus" in v) return convertGovernanceParams(v);
+  if ("committeeStaked" in v) return v.committeeStaked.map((item) => convertCommitteeSupply(item, v.staked));
+  if (!v.hasOwnProperty("type")) return v[0]?.orders?.filter(order => order.sellersSendAddress).map(convertOrder) || empty;
   if (v.results === null) return empty;
   const converters = {
     "tx-results-page": convertTransaction,
