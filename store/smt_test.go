@@ -24,13 +24,174 @@ func TestSet(t *testing.T) {
 		targetValue []byte
 	}{
 		{
+			name: "insert and target at 1110",
+			detail: `BEFORE    root
+                               /   \
+						    0000  1111
+					 
+			          AFTER     root
+		                        /  \
+						    0000   111
+                                   /  \
+							   *1110*  1111
+                              `,
+			keyBitSize:  4,
+			rootKey:     []byte{0b10010000}, // arbitrary
+			targetKey:   []byte{5},          // hashes to [1110]
+			targetValue: []byte("some_value"),
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("1100", nil, "0000", "1111"), // root
+					newTestNode("0000", nil, "", ""),         // leaf
+					newTestNode("1111", nil, "", ""),         // leaf
+				},
+			},
+			expected: &NodeList{
+				Nodes: []*node{
+					newTestNode("0000", nil, "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode( // root
+						"1100",
+						func() []byte {
+							// grandchildren
+							input1110 := append(keyBytesFromStr("1110"), crypto.Hash([]byte("some_value"))...)
+							input1111 := append(keyBytesFromStr("1111"), []byte{}...)
+							//  children
+							input0000 := append(keyBytesFromStr("0000"), []byte{}...)
+							input111 := append(keyBytesFromStr("111"), crypto.Hash(append(input1110, input1111...))...)
+							// root
+							return crypto.Hash(append(input0000, input111...))
+						}(),
+						"0000", "111"),
+					newTestNode("1110", []byte("some_value"), "", ""), // new leaf
+					newTestNode("1111", nil, "", ""),                  // leaf
+				},
+			},
+		},
+		{
+			name: "insert and target at 011",
+			detail: `BEFORE    root
+		                           / \
+		                          0   1
+							 / \
+		                       010  001
+
+			          AFTER    root
+		                        / \
+		                       0   1
+							  / \
+						     01  001
+						    / \
+						  010 *011*
+		                          `,
+			keyBitSize:  3,
+			rootKey:     []byte{0b10010000}, // arbitrary
+			targetKey:   []byte{6},          // hashes to [011]
+			targetValue: []byte("some_value"),
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("110", nil, "0", "1"), // root
+					newTestNode("0", nil, "001", "010"),
+					newTestNode("1", nil, "", ""),   // leaf
+					newTestNode("001", nil, "", ""), // leaf
+					newTestNode("010", nil, "", ""), // leaf
+				},
+			},
+			expected: &NodeList{
+				Nodes: []*node{
+					newTestNode("0", nil, "001", "01"),
+					newTestNode("1", nil, "", ""), // leaf
+					newTestNode("01", nil, "010", "011"),
+					newTestNode("001", nil, "", ""),                  // leaf
+					newTestNode("010", nil, "", ""),                  // leaf
+					newTestNode("011", []byte("some_value"), "", ""), // new leaf
+					newTestNode( // root
+						"110",
+						func() []byte {
+							// great-grandchildren
+							input010 := append(keyBytesFromStr("010"), []byte{}...)
+							input011 := append(keyBytesFromStr("011"), crypto.Hash([]byte("some_value"))...)
+							// grandchildren
+							input01 := append(keyBytesFromStr("01"), crypto.Hash(append(input010, input011...))...)
+							input001 := append(keyBytesFromStr("001"), []byte{}...)
+							//  children
+							input0 := append(keyBytesFromStr("0"), crypto.Hash(append(input001, input01...))...)
+							input1 := append(keyBytesFromStr("1"), []byte{}...)
+							// root
+							return crypto.Hash(append(input0, input1...))
+						}(),
+						"0", "1"),
+				},
+			},
+		},
+		{
+			name: "update and target at 101",
+			detail: `BEFORE    root
+		                           / \
+		                          0   1
+		                              / \
+		                             10  11
+		                            / \
+		                           100 101
+
+			          AFTER    root
+		                        / \
+		                       0   1
+		                          / \
+		                         10  11
+		                         / \
+		                      100 *101*
+		                          `,
+			keyBitSize:  3,
+			rootKey:     []byte{0b10010000}, // arbitrary
+			targetKey:   []byte{8},          // hashes to [101]
+			targetValue: []byte("some_value"),
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("111", nil, "0", "1"), // root
+					newTestNode("0", nil, "", ""),     // leaf
+					newTestNode("1", nil, "10", "11"),
+					newTestNode("10", nil, "100", "101"),
+					newTestNode("11", nil, "", ""),  // leaf
+					newTestNode("100", nil, "", ""), // leaf
+					newTestNode("101", nil, "", ""), // leaf
+				},
+			},
+			expected: &NodeList{
+				Nodes: []*node{
+					newTestNode("0", nil, "", ""), // leaf
+					newTestNode("1", nil, "10", "11"),
+					newTestNode("10", nil, "100", "101"),
+					newTestNode("11", nil, "", ""),                   // leaf
+					newTestNode("100", nil, "", ""),                  // leaf
+					newTestNode("101", []byte("some_value"), "", ""), // updated
+					newTestNode( // root
+						"111",
+						func() []byte {
+							// great-grandchildren
+							input100 := append(keyBytesFromStr("100"), []byte{}...)
+							input101 := append(keyBytesFromStr("101"), crypto.Hash([]byte("some_value"))...)
+							// grandchildren
+							input10 := append(keyBytesFromStr("10"), crypto.Hash(append(input100, input101...))...)
+							input11 := append(keyBytesFromStr("11"), []byte{}...)
+							//  children
+							input1 := append(keyBytesFromStr("1"), crypto.Hash(append(input10, input11...))...)
+							input0 := append(keyBytesFromStr("0"), []byte{}...)
+							// root
+							return crypto.Hash(append(input0, input1...))
+						}(),
+						"0", "1"),
+				},
+			},
+		},
+		{
 			name: "update and target at 010",
 			detail: `BEFORE:   root
 							  /    \
 						     0      1
 		                   /  \    /  \
 		                000  010 101  111
-		
+
 					AFTER:      root
 							  /      \
 						     0        1
@@ -97,7 +258,7 @@ func TestSet(t *testing.T) {
 								1000 *11*
 		                             /  \
 							      *1101* 111
-                                        /   \
+									    /   \
 								      1110  1111
 							`,
 			keyBitSize:  4,
@@ -106,8 +267,8 @@ func TestSet(t *testing.T) {
 			targetValue: []byte("some_value"),
 			preset: &NodeList{
 				Nodes: []*node{
-					newTestNode("1001", nil, "0000", "1"),
-					newTestNode("0000", nil, "", ""), // leaf
+					newTestNode("1001", nil, "0000", "1"), // root
+					newTestNode("0000", nil, "", ""),      // leaf
 					newTestNode("1", nil, "1000", "111"),
 					newTestNode("1000", nil, "", ""), // leaf
 					newTestNode("111", nil, "1110", "1111"),
@@ -156,11 +317,11 @@ func TestSet(t *testing.T) {
 									  /   \
 								    1110  1111
 
-					AFTER:     root
-							  /     \
-                          *01*       1
-                           / \      /  \
-                       0000 *0110* 1000  111
+					AFTER:         root
+							      /     \
+		                      *01*       1
+		                       / \      /  \
+		                   0000 *0110* 1000  111
 									   /  \
 								     1110   1111
 							`,
@@ -206,16 +367,16 @@ func TestSet(t *testing.T) {
 			detail: `BEFORE:   root
 							  /    \
 						    00     111111111
-                           /  \
-                   000000000  001111111
+						   /  \
+				   000000000  001111111
 
 					AFTER:     root
 							  /    \
 						    00     111111111
-                           /  \
+		                        /  \
 					   *0000*   001111111
-                       /   \
-                  000000000 *000010000*
+					   /   \
+				  000000000 *000010000*
 							`,
 			keyBitSize:  9,
 			rootKey:     []byte{0b10010000, 0}, // arbitrary
