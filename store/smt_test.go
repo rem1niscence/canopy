@@ -827,7 +827,7 @@ func TestTraverse(t *testing.T) {
 							  /    \
 							*000*   111`,
 			keyBitSize: 3,
-			target:     &node{Key: &key{leastSigBits: []int{0, 0, 0}}},
+			target:     newTestNode("000", nil, "", ""),
 			expectedTraversal: &NodeList{Nodes: []*node{
 				newTestNode("111", func() []byte { // root
 					// left child key + value
@@ -848,7 +848,7 @@ func TestTraverse(t *testing.T) {
 							  /    \
 							000   *111*`,
 			keyBitSize: 3,
-			target:     &node{Key: &key{leastSigBits: []int{1, 1, 1}}},
+			target:     newTestNode("111", nil, "", ""),
 			expectedTraversal: &NodeList{Nodes: []*node{
 				newTestNode("111", func() []byte {
 					// left child key + value
@@ -868,7 +868,7 @@ func TestTraverse(t *testing.T) {
 							  /    \
 						   *0000*   1111`,
 			keyBitSize: 4,
-			target:     &node{Key: &key{leastSigBits: []int{0, 0, 0, 0}}},
+			target:     newTestNode("0000", nil, "", ""),
 			expectedTraversal: &NodeList{Nodes: []*node{
 				newTestNode("1111",
 					func() []byte {
@@ -889,7 +889,7 @@ func TestTraverse(t *testing.T) {
 							  /    \
 							00000  *11111*`,
 			keyBitSize: 5,
-			target:     &node{Key: &key{leastSigBits: []int{1, 1, 1, 1, 1}}},
+			target:     newTestNode("11111", nil, "", ""),
 			expectedTraversal: &NodeList{Nodes: []*node{
 				newTestNode("11111",
 					func() []byte {
@@ -914,46 +914,16 @@ func TestTraverse(t *testing.T) {
 								   *1110* 1111
 							`,
 			keyBitSize: 4,
-			target:     &node{Key: &key{leastSigBits: []int{1, 1, 1, 0}}},
+			target:     newTestNode("1110", nil, "", ""),
 			preset: &NodeList{
 				Nodes: []*node{
-					{ // root
-						Key: &key{leastSigBits: []int{1, 0, 0, 1}}, // arbitrary
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b0, 3}, // 0000
-							RightChildKey: []byte{0b1, 0}, // 1
-						},
-					},
-					{ // 0000
-						Key:  &key{leastSigBits: []int{0, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 1
-						Key: &key{leastSigBits: []int{1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1000, 0}, // 1000
-							RightChildKey: []byte{0b111, 0},  // 111
-						},
-					},
-					{ // 1000
-						Key:  &key{leastSigBits: []int{1, 0, 0, 0}},
-						Node: lib.Node{}, // leaf
-					},
-					{ // 111
-						Key: &key{leastSigBits: []int{1, 1, 1}},
-						Node: lib.Node{
-							LeftChildKey:  []byte{0b1110, 0}, // 1110
-							RightChildKey: []byte{0b1111, 0}, // 1111
-						},
-					},
-					{ // 1110
-						Key:  &key{leastSigBits: []int{1, 1, 1, 0}},
-						Node: lib.Node{Value: []byte("some_value")}, // leaf
-					},
-					{ // 1111
-						Key:  &key{leastSigBits: []int{1, 1, 1, 1}},
-						Node: lib.Node{}, // leaf
-					},
+					newTestNode("1001", nil, "0000", "1"), // root
+					newTestNode("0000", nil, "", ""),      // leaf
+					newTestNode("1", nil, "1000", "111"),
+					newTestNode("1000", nil, "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1110", []byte("some_value"), "", ""), // leaf
+					newTestNode("1111", nil, "", ""),                  // leaf
 				},
 			},
 			expectedTraversal: &NodeList{
@@ -1027,6 +997,66 @@ func TestTraverse(t *testing.T) {
 				},
 			},
 			expectedCurrent: newTestNode("0000", []byte("some_value"), "", ""),
+			rootKey:         []byte{0b10010000},
+		},
+		{
+			name: "traversal with preset and target at 010",
+			detail: `Preset:   root
+							  /    \
+						     0       1
+						   /  \     /  \
+					    000 *010*  101 111
+							`,
+			keyBitSize: 3,
+			target:     newTestNode("010", nil, "", ""),
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("110", nil, "0", "1"), // root
+					newTestNode("0", nil, "000", "010"),
+					newTestNode("1", nil, "101", "111"),
+					newTestNode("000", nil, "", ""),                  // leaf
+					newTestNode("010", []byte("some_value"), "", ""), // leaf
+					newTestNode("101", nil, "", ""),                  // leaf
+					newTestNode("111", nil, "", ""),                  // leaf
+				},
+			},
+			expectedTraversal: &NodeList{
+				Nodes: []*node{
+					newTestNode("110", nil, "0", "1"), // root
+					newTestNode("0", nil, "000", "010"),
+				},
+			},
+			expectedCurrent: newTestNode("010", []byte("some_value"), "", ""),
+			rootKey:         []byte{0b10010000},
+		},
+		{
+			name: "traversal with preset and target at 101",
+			detail: `Preset:   root
+							  /    \
+						     0       1
+						   /  \     /  \
+					    000   010 *101* 111
+							`,
+			keyBitSize: 3,
+			target:     newTestNode("101", nil, "", ""),
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("110", nil, "0", "1"), // root
+					newTestNode("0", nil, "000", "010"),
+					newTestNode("1", nil, "101", "111"),
+					newTestNode("000", nil, "", ""),                  // leaf
+					newTestNode("010", nil, "", ""),                  // leaf
+					newTestNode("101", []byte("some_value"), "", ""), // leaf
+					newTestNode("111", nil, "", ""),                  // leaf
+				},
+			},
+			expectedTraversal: &NodeList{
+				Nodes: []*node{
+					newTestNode("110", nil, "0", "1"), // root
+					newTestNode("1", nil, "101", "111"),
+				},
+			},
+			expectedCurrent: newTestNode("101", []byte("some_value"), "", ""),
 			rootKey:         []byte{0b10010000},
 		},
 	}
