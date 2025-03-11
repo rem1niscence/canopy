@@ -73,8 +73,8 @@ func TestSet(t *testing.T) {
 			detail: `BEFORE    root
 		                           / \
 		                          0   1
-							 / \
-		                       010  001
+							     / \
+						       010 001
 
 			          AFTER    root
 		                        / \
@@ -148,11 +148,11 @@ func TestSet(t *testing.T) {
 			targetValue: []byte("some_value"),
 			preset: &NodeList{
 				Nodes: []*node{
-					newTestNode("111", nil, "0", "1"), // root
+					newTestNode("110", nil, "0", "1"), // root
 					newTestNode("0", nil, "", ""),     // leaf
-					newTestNode("1", nil, "10", "11"),
+					newTestNode("1", nil, "10", "111"),
 					newTestNode("10", nil, "100", "101"),
-					newTestNode("11", nil, "", ""),  // leaf
+					newTestNode("111", nil, "", ""), // leaf
 					newTestNode("100", nil, "", ""), // leaf
 					newTestNode("101", nil, "", ""), // leaf
 				},
@@ -160,27 +160,27 @@ func TestSet(t *testing.T) {
 			expected: &NodeList{
 				Nodes: []*node{
 					newTestNode("0", nil, "", ""), // leaf
-					newTestNode("1", nil, "10", "11"),
+					newTestNode("1", nil, "10", "111"),
 					newTestNode("10", nil, "100", "101"),
-					newTestNode("11", nil, "", ""),                   // leaf
 					newTestNode("100", nil, "", ""),                  // leaf
 					newTestNode("101", []byte("some_value"), "", ""), // updated
 					newTestNode( // root
-						"111",
+						"110",
 						func() []byte {
 							// great-grandchildren
 							input100 := append(keyBytesFromStr("100"), []byte{}...)
 							input101 := append(keyBytesFromStr("101"), crypto.Hash([]byte("some_value"))...)
 							// grandchildren
 							input10 := append(keyBytesFromStr("10"), crypto.Hash(append(input100, input101...))...)
-							input11 := append(keyBytesFromStr("11"), []byte{}...)
+							input111 := append(keyBytesFromStr("111"), []byte{}...)
 							//  children
-							input1 := append(keyBytesFromStr("1"), crypto.Hash(append(input10, input11...))...)
+							input1 := append(keyBytesFromStr("1"), crypto.Hash(append(input10, input111...))...)
 							input0 := append(keyBytesFromStr("0"), []byte{}...)
 							// root
 							return crypto.Hash(append(input0, input1...))
 						}(),
 						"0", "1"),
+					newTestNode("111", nil, "", ""), // leaf
 				},
 			},
 		},
@@ -509,6 +509,45 @@ func TestDelete(t *testing.T) {
 		targetKey  []byte
 	}{
 		{
+			name: "delete with target at 110",
+			detail: `BEFORE:   root
+							  /    \
+						 	000    11
+		                          /  \
+		                        110  111
+		
+					AFTER:      root
+							   /    \
+                             000    111
+							`,
+			keyBitSize: 3,
+			rootKey:    []byte{0b10010000}, // arbitrary
+			targetKey:  []byte{2},          // hashes to [110]
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("100", nil, "000", "11"), // root
+					newTestNode("000", nil, "", ""),      // leaf
+					newTestNode("11", nil, "110", "111"),
+					newTestNode("110", nil, "", ""), // leaf
+					newTestNode("111", nil, "", ""), // leaf
+				},
+			},
+			expected: &NodeList{
+				Nodes: []*node{
+					newTestNode("000", nil, "", ""), // leaf
+					newTestNode("100",
+						func() []byte { // root
+							// children
+							input000 := append(keyBytesFromStr("000"), []byte{}...)
+							input111 := append(keyBytesFromStr("111"), []byte{}...)
+							// root value
+							return crypto.Hash(append(input000, input111...))
+						}(), "000", "111"),
+					newTestNode("111", nil, "", ""), // leaf
+				},
+			},
+		},
+		{
 			name: "delete with target at 010",
 			detail: `BEFORE:   root
 							  /    \
@@ -551,6 +590,57 @@ func TestDelete(t *testing.T) {
 						}(), "000", "1"),
 					newTestNode("101", nil, "", ""), // leaf
 					newTestNode("111", nil, "", ""), // leaf
+				},
+			},
+		},
+		{
+			name: "Delete and target at 1 1 1 0",
+			detail: `BEFORE:   root
+								  /    \
+							    0000    1
+									  /   \
+								    1011   111
+										  /   \
+									   *1110* 1111
+	
+						AFTER:     root
+								  /     \
+			                      0000       1
+			                                /  \
+			                             1011  1111
+								`,
+			keyBitSize: 4,
+			rootKey:    []byte{0b10010000},
+			targetKey:  []byte{4}, // hashes to [1 1 1 0]
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("1001", nil, "0000", "1"),
+					newTestNode("0000", nil, "", ""), // leaf
+					newTestNode("1", nil, "1011", "111"),
+					newTestNode("1011", nil, "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1110", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
+				},
+			},
+			expected: &NodeList{
+				Nodes: []*node{
+					newTestNode("0000", nil, "", ""), // leaf
+					newTestNode("1", nil, "1011", "1111"),
+					newTestNode("1001", // root
+						func() []byte {
+							// grandChildren
+							input1011 := keyBytesFromStr("1011")
+							input1111 := keyBytesFromStr("1111")
+							// children
+							input0000 := keyBytesFromStr("0000")
+							// 1 needs to be rehashed as now it has a new child node
+							input1 := append(keyBytesFromStr("1"), crypto.Hash(append(input1011, input1111...))...)
+							// root value
+							return crypto.Hash(append(input0000, input1...))
+						}(), "0000", "1"),
+					newTestNode("1011", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
 				},
 			},
 		},
@@ -598,6 +688,46 @@ func TestDelete(t *testing.T) {
 						}(), "0000", "111"),
 					newTestNode("1110", nil, "", ""), // leaf
 					newTestNode("1111", nil, "", ""), // leaf
+				},
+			},
+		},
+		{
+			name: "delete (not exists) and target at 011",
+			detail: `BEFORE:   root     *011* <- target not exists
+							  /     \
+						    0        10
+						  /   \     /  \
+					    001   010  100  101
+
+					After:     root
+							  /     \
+						    0        10
+						  /   \     /  \
+					    001   010  100  101
+							`,
+			keyBitSize: 3,
+			rootKey:    []byte{0b10010000},
+			targetKey:  []byte{6}, // hashes to [011]
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("110", nil, "0", "10"), // root
+					newTestNode("0", nil, "001", "010"),
+					newTestNode("001", nil, "", ""), // leaf
+					newTestNode("10", nil, "100", "101"),
+					newTestNode("010", nil, "", ""), // leaf
+					newTestNode("100", nil, "", ""), // leaf
+					newTestNode("101", nil, "", ""), // leaf
+				},
+			},
+			expected: &NodeList{
+				Nodes: []*node{
+					newTestNode("0", nil, "001", "010"),
+					newTestNode("001", nil, "", ""), // leaf
+					newTestNode("10", nil, "100", "101"),
+					newTestNode("010", nil, "", ""),    // leaf
+					newTestNode("100", nil, "", ""),    // leaf
+					newTestNode("101", nil, "", ""),    // leaf
+					newTestNode("110", nil, "0", "10"), // root
 				},
 			},
 		},
@@ -1815,7 +1945,7 @@ func TestStoreProof(t *testing.T) {
 	}
 }
 
-func FuzzBytestToBits(f *testing.F) {
+func FuzzBytesToBits(f *testing.F) {
 	// seed corpus
 	tests := []struct {
 		byt           byte
@@ -1942,14 +2072,14 @@ func keyFromByteStr(str string) []byte {
 		// convert the byte to bits
 		bits = append(bits, new(key).byteToBits(l, 0)[0])
 	}
-	// create a new key from the bits
-	var bytes []byte
+	// create a new key from the byts
+	var byts []byte
 	if str != "" {
 		// convert the bits to bytes now producing the key
-		bytes = (&key{leastSigBits: bits}).bytes()
+		byts = (&key{leastSigBits: bits}).bytes()
 	}
 	// return the key bytes
-	return bytes
+	return byts
 }
 
 // bitsFromStr converts a string of binary bits to an int slice
@@ -1978,8 +2108,8 @@ func keyBytesFromStr(bits string) []byte {
 
 // bytesFromStr converts a string of binary bits to a byte slice
 func bytesFromStr(k string) []byte {
-	// create the bytes slice
-	bytes := make([]byte, 0, len(k))
+	// create the byts slice
+	byts := make([]byte, 0, len(k))
 	for _, ch := range k {
 		// convert the character to an int
 		digit, err := strconv.Atoi(string(ch))
@@ -1988,8 +2118,8 @@ func bytesFromStr(k string) []byte {
 			panic(err)
 		}
 		// convert the digit to bytes and append it to the bytes slice
-		bytes = append(bytes, byte(digit))
+		byts = append(byts, byte(digit))
 	}
 	// return the bytes slice
-	return bytes
+	return byts
 }

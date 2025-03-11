@@ -21,7 +21,7 @@ test:
 # For more information check the open issue: https://github.com/golang/go/issues/46312
 fuzz-test:
 	go test -fuzz=FuzzKeyDecodeEncode ./store -fuzztime=5s
-	go test -fuzz=FuzzBytestToBits ./store -fuzztime=5s
+	go test -fuzz=FuzzBytesToBits ./store -fuzztime=5s
 
 build-wallet:
 	cd $(WALLET_DIR) && npm install && npm run build
