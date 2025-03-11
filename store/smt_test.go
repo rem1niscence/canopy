@@ -468,7 +468,9 @@ func TestSet(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			func() {
+				// create a new SMT
 				smt, memStore := NewTestSMT(t, test.preset, nil, test.keyBitSize)
+				// close the store when done
 				defer memStore.Close()
 				// execute the traversal code
 				require.NoError(t, smt.Set(test.targetKey, test.targetValue))
@@ -779,7 +781,9 @@ func TestDelete(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			func() {
+				// create a new SMT
 				smt, memStore := NewTestSMT(t, test.preset, nil, test.keyBitSize)
+				// close the store when done
 				defer memStore.Close()
 				// execute the traversal code
 				require.NoError(t, smt.Delete(test.targetKey))
@@ -1063,7 +1067,9 @@ func TestTraverse(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			func() {
+				// create a new SMT
 				smt, memStore := NewTestSMT(t, test.preset, nil, test.keyBitSize)
+				// close the store when done
 				defer memStore.Close()
 				// set target
 				smt.target = test.target
@@ -1246,6 +1252,7 @@ func TestKeyGreatestCommonPrefix(t *testing.T) {
 
 		expectedGCP    *key
 		expectedBitPos int
+		shouldPanic    bool
 	}{
 		{
 			name: "0000 partial",
@@ -1415,10 +1422,57 @@ func TestKeyGreatestCommonPrefix(t *testing.T) {
 			},
 			expectedBitPos: 13,
 		},
+		{
+			name: "0 001 panic current greater than target",
+			target: &key{
+				mostSigBytes: nil,
+				leastSigBits: []int{0},
+			},
+			current: &key{
+				mostSigBytes: nil,
+				leastSigBits: []int{0, 0, 1},
+			},
+			bitPos:         1,
+			shouldPanic:    true,
+			expectedBitPos: 2,
+		},
+		{
+			name:        "nil nil panic nil current and target",
+			target:      nil,
+			current:     nil,
+			shouldPanic: true,
+		},
+		{
+			name: "0000 nil panic nil current",
+			target: &key{
+				mostSigBytes: nil,
+				leastSigBits: []int{0, 0, 0, 0},
+			},
+			current:     nil,
+			shouldPanic: true,
+		},
+		{
+			name: "nil 0000 panic nil target",
+			current: &key{
+				mostSigBytes: nil,
+				leastSigBits: []int{0, 0, 0, 0},
+			},
+			target:      nil,
+			shouldPanic: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					// check whether the test should panic
+					require.Equal(t, r != nil, test.shouldPanic)
+				}
+			}()
+
+			// Compare the greatest common prefix between the target and the current key
 			test.target.greatestCommonPrefix(&test.bitPos, test.gcp, test.current)
+			// Compare the results
 			require.Equal(t, test.expectedGCP, test.gcp)
 			require.Equal(t, test.expectedBitPos, test.bitPos)
 		})
@@ -1530,8 +1584,9 @@ func TestKeyDecode(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := new(key)
-			got.fromBytes(test.data)
+			// create a new key from the bytes
+			got := new(key).fromBytes(test.data)
+			// compare got vs expected
 			require.Equal(t, test.expectedKey, got)
 		})
 	}
@@ -1634,7 +1689,9 @@ func TestKeyEncode(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// get the bytes of the pre-made key
 			got := test.key.bytes()
+			// compare got vs expected
 			require.Equal(t, test.expectedEncoded, got)
 		})
 	}
@@ -1679,8 +1736,11 @@ func TestBitsToBytes(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// create a new key
 			k := new(key)
+			// convert the bits to a byte
 			got := k.bitsToByte(test.ba)
+			// compare got vs expected
 			require.Equal(t, test.expected, got, fmt.Sprintf("Expected: %8b, Got: %8b\n", test.expected, got))
 		})
 	}
@@ -1732,8 +1792,11 @@ func TestBytesToBits(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// create a new key
 			k := new(key)
+			// convert the byte to bits, adding the leading zeroes
 			got := k.byteToBits(test.byt, test.leadingZeroes)
+			// compare got vs expected
 			require.Equal(t, test.expected, got, fmt.Sprintf("Expected: %v, Got: %v\n", test.expected, got))
 		})
 	}
