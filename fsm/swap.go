@@ -1,7 +1,8 @@
 package fsm
 
 import (
-	"github.com/canopy-network/canopy/fsm/types"
+	"bytes"
+	"encoding/json"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"slices"
@@ -15,11 +16,11 @@ import (
 // - 'close' is a 'claimed' order whose 'buyer' sent the tokens to the seller before the deadline, thus the order is 'closed' and the tokens are moved from escrow to the buyer
 func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, chainId uint64) {
 	if orders != nil {
-		// buy orders are a result of the committee witnessing a 'reserve transaction' for the order on the 'buyer chain'
-		// think of 'buy orders' like reserving the 'sell order'
-		for _, buyOrder := range orders.BuyOrders {
-			if err := s.BuyOrder(buyOrder, chainId); err != nil {
-				s.log.Warnf("BuyOrder failed (can happen due to asynchronicity): %s", err.Error())
+		// lock orders are a result of the committee witnessing a 'reserve transaction' for the order on the 'buyer chain'
+		// think of 'lock orders' like reserving the 'sell order'
+		for _, lockOrder := range orders.LockOrders {
+			if err := s.LockOrder(lockOrder, chainId); err != nil {
+				s.log.Warnf("LockOrder failed (can happen due to asynchronicity): %s", err.Error())
 			}
 		}
 		// reset orders are a result of the committee witnessing 'no-action' from the buyer of the sell order aka NOT sending the
@@ -42,10 +43,14 @@ func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, chainId uint64) 
 	return
 }
 
-// ParseBuyOrder() parses a transaction for an embedded buy order messages in the memo field
-func (s *StateMachine) ParseBuyOrder(tx *lib.Transaction, deadlineBlocks uint64) (bo *lib.BuyOrder, ok bool) {
+// ParseLockOrder() parses a transaction for an embedded lock order messages in the memo field
+func (s *StateMachine) ParseLockOrder(tx *lib.Transaction, deadlineBlocks uint64) (bo *lib.LockOrder, ok bool) {
+	// check for valid json
+	if !json.Valid([]byte(tx.Memo)) {
+		return nil, false
+	}
 	// create a new reference to a 'lock order' object in order to ensure a non-nil result
-	bo = new(lib.BuyOrder)
+	bo = new(lib.LockOrder)
 	// attempt to unmarshal the transaction memo into a 'lock order'
 	if err := lib.UnmarshalJSON([]byte(tx.Memo), bo); err == nil {
 		// sanity check some critical fields of the 'lock order' to ensure the unmarshal was successful
@@ -59,16 +64,28 @@ func (s *StateMachine) ParseBuyOrder(tx *lib.Transaction, deadlineBlocks uint64)
 	return
 }
 
+// ParseCloseOrder() parses a transaction for an embedded close order messages in the memo field
+func (s *StateMachine) ParseCloseOrder(tx *lib.Transaction) (co *lib.CloseOrder, ok bool) {
+	// create a new reference to a 'close order' object in order to ensure a non-nil result
+	co = new(lib.CloseOrder)
+	// attempt to parse the close order from the memo
+	if err := lib.UnmarshalJSON([]byte(tx.Memo), co); err != nil {
+		return nil, false
+	}
+	// exit
+	return co, co.CloseOrder // signals if this is a 'close order' or not
+}
+
 // ProcessRootChainOrderBook() processes the order book from the root-chain and cross-references blocks on this chain to determine
 // actions that warrant committee level changes to the root-chain order book like: ResetOrder and CloseOrder
 func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.BlockResult) (closeOrders, resetOrders []uint64) {
-	// create a variable to track the 'same-block' transfers
-	// map structure is [from+to] -> amount sent
-	transferred := make(map[string]uint64)
+	// create a variable to track the 'close orders'
+	// map structure is [orderId] -> amount sent
+	transferred := make(map[uint64]uint64)
 	// get all the 'Send' transactions from the block
 	for _, tx := range b.Transactions {
-		// ignore non-send
-		if tx.MessageType != types.MessageSendName {
+		// ignore non-send, memo-less, or no valid json embedded
+		if tx.MessageType != MessageSendName || tx.Transaction.Memo == "" || !json.Valid([]byte(tx.Transaction.Memo)) {
 			continue
 		}
 		// extract the message from the transaction object
@@ -78,13 +95,30 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 			continue
 		}
 		// cast the message to send
-		send, ok := msg.(*types.MessageSend)
+		send, ok := msg.(*MessageSend)
 		if !ok {
 			s.log.Error("Non-send message with a send message name (should not happen)")
 			continue
 		}
-		// update the transferred map using the [from + to] as the key and add send.Amount to the value
-		transferred[lib.BytesToString(append(tx.Sender, tx.Recipient...))] += send.Amount
+		// try parse close orders
+		closeOrder, isCloseOrder := s.ParseCloseOrder(tx.Transaction)
+		// if not a 'close order'
+		if !isCloseOrder {
+			// not a close order
+			continue
+		}
+		// try to get the close order
+		order, err := book.GetOrder(int(closeOrder.OrderId))
+		// if an error occurred during the retrieval
+		if err != nil {
+			s.log.Warnf("An error occurred during the close order retrieval: %s", err.Error())
+			continue
+		}
+		// if the 'sent amount' is the same as the order amount
+		if bytes.Equal(send.ToAddress, order.SellerReceiveAddress) && order.RequestedAmount == send.Amount {
+			// update the transferred map using the [order_id] as the key and add send.Amount to the value
+			transferred[closeOrder.OrderId] += send.Amount
+		}
 	}
 	// for each order in the book
 	for _, order := range book.Orders {
@@ -99,31 +133,22 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 			// go to the next order
 			continue
 		}
-		// extract a key that should correspond to the transferred map
-		key := lib.BytesToString(append(order.BuyerSendAddress, order.SellerReceiveAddress...))
 		// check if the order was closed this block
-		if transferred[key] == order.RequestedAmount {
+		if sent := transferred[order.Id]; sent == order.RequestedAmount { // double check on amount for sanity
 			// add to the closed order list
 			closeOrders = append(closeOrders, order.Id)
 			// go to the next order
 			continue
 		}
-		// scan the N-10 through N-15 blocks to ensure no orders are lost
-		start, end, n := uint64(0), uint64(0), b.BlockHeader.Height
-		// bounds check
-		if n >= 15 {
-			end = n - 15
-		}
-		// bounds check
-		if n >= 10 {
-			start = n - 10
-		}
-		// don't begin doing this check until after block 15
-		if start == 0 || end == 0 {
+		// don't do historical checking before block 16
+		if b.BlockHeader.Height < 16 {
+			// go to the next order
 			continue
 		}
-		// from blocks N-10 to N-15
-		for i := start; i > end; i-- {
+		// calculate hte bounds of the loop (N-15 to N-10)
+		start, end := b.BlockHeader.Height-15, b.BlockHeader.Height-10
+		// from blocks N-15 to N-10
+		for i := start; i < end; i++ {
 			// load the certificate (hopefully from cache)
 			qc, err := s.LoadCertificate(i)
 			if err != nil {
@@ -137,8 +162,11 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 			}
 			// check if the 'close order' command was issued previously
 			if qc.Results.Orders != nil && slices.Contains(qc.Results.Orders.CloseOrders, order.Id) {
-				// if so, add it to the close orders
-				closeOrders = append(closeOrders, order.Id)
+				// ensure no already added to close order
+				if !slices.Contains(closeOrders, order.Id) {
+					// if so, add it to the close orders
+					closeOrders = append(closeOrders, order.Id)
+				}
 				// exit the loop
 				break
 			}
@@ -148,30 +176,30 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 	return
 }
 
-// ParseBuyOrders() parses the proposal block for memo commands to execute specialized 'buy order' functionality
-func (s *StateMachine) ParseBuyOrders(b *lib.BlockResult) (buyOrders []*lib.BuyOrder) {
+// ParseLockOrders() parses the proposal block for memo commands to execute specialized 'lock order' functionality
+func (s *StateMachine) ParseLockOrders(b *lib.BlockResult) (lockOrders []*lib.LockOrder) {
 	// get the governance parameters from state
 	params, err := s.GetParams()
 	if err != nil {
 		s.log.Error(err.Error())
 		return
 	}
-	// calculate the minimum buy order fee
-	minFee := params.Fee.SendFee * params.Validator.BuyOrderFeeMultiplier
+	// calculate the minimum lock order fee
+	minFee := params.Fee.SendFee * params.Validator.LockOrderFeeMultiplier
 	// ensure duplicate actions are skipped
-	deDupeBuyOrders := lib.NewDeDuplicator[uint64]()
+	deDupeLockOrders := lib.NewDeDuplicator[uint64]()
 	// for each transaction in the block
 	for _, tx := range b.Transactions {
 		// skip over any that doesn't have the minimum fee or isn't the correct type
-		if tx.MessageType != types.MessageSendName && tx.Transaction.Fee < minFee {
+		if tx.MessageType != MessageSendName || tx.Transaction.Memo == "" || tx.Transaction.Fee < minFee {
 			continue
 		}
-		// parse the transaction for embedded 'buy orders'
-		if buyOrder, ok := s.ParseBuyOrder(tx.Transaction, params.Validator.BuyDeadlineBlocks); ok {
+		// parse the transaction for embedded 'lock orders'
+		if lockOrder, ok := s.ParseLockOrder(tx.Transaction, params.Validator.BuyDeadlineBlocks); ok {
 			// if not found (non-duplicate)
-			if found := deDupeBuyOrders.Found(buyOrder.OrderId); !found {
+			if found := deDupeLockOrders.Found(lockOrder.OrderId); !found {
 				// add to the 'lock orders' list
-				buyOrders = append(buyOrders, buyOrder)
+				lockOrders = append(lockOrders, lockOrder)
 			}
 		}
 	}
@@ -211,15 +239,15 @@ func (s *StateMachine) EditOrder(order *lib.SellOrder, chainId uint64) (err lib.
 	return
 }
 
-// BuyOrder() adds a recipient and a deadline height to an existing order and saves it to the state
-func (s *StateMachine) BuyOrder(buyOrder *lib.BuyOrder, chainId uint64) (err lib.ErrorI) {
+// LockOrder() adds a recipient and a deadline height to an existing order and saves it to the state
+func (s *StateMachine) LockOrder(lockOrder *lib.LockOrder, chainId uint64) (err lib.ErrorI) {
 	// get the order book for a specific chainId from state
 	orderBook, err := s.GetOrderBook(chainId)
 	if err != nil {
 		return
 	}
 	// 'reserve' the order in the book
-	if err = orderBook.BuyOrder(int(buyOrder.OrderId), buyOrder.BuyerReceiveAddress, buyOrder.BuyerSendAddress, buyOrder.BuyerChainDeadline); err != nil {
+	if err = orderBook.LockOrder(int(lockOrder.OrderId), lockOrder.BuyerReceiveAddress, lockOrder.BuyerSendAddress, lockOrder.BuyerChainDeadline); err != nil {
 		return
 	}
 	// set the order book back in state
@@ -254,10 +282,10 @@ func (s *StateMachine) CloseOrder(orderId, chainId uint64) (err lib.ErrorI) {
 	}
 	// ensure the order already was 'claimed / reserved'
 	if order.BuyerReceiveAddress == nil {
-		return types.ErrInvalidBuyOrder()
+		return ErrInvalidLockOrder()
 	}
 	// remove the funds from the escrow pool
-	if err = s.PoolSub(chainId+types.EscrowPoolAddend, order.AmountForSale); err != nil {
+	if err = s.PoolSub(chainId+EscrowPoolAddend, order.AmountForSale); err != nil {
 		return
 	}
 	// send the funds to the recipient address
@@ -304,11 +332,11 @@ func (s *StateMachine) SetOrderBook(b *lib.OrderBook) lib.ErrorI {
 		return err
 	}
 	// set the order book in the store
-	return s.store.Set(types.KeyForOrderBook(b.ChainId), orderBookBz)
+	return s.store.Set(KeyForOrderBook(b.ChainId), orderBookBz)
 }
 
 // SetOrderBooks() sets a series of OrderBooks in the state db
-func (s *StateMachine) SetOrderBooks(list *lib.OrderBooks, supply *types.Supply) lib.ErrorI {
+func (s *StateMachine) SetOrderBooks(list *lib.OrderBooks, supply *Supply) lib.ErrorI {
 	// ensure the order books object reference is not nil
 	if list == nil {
 		return nil
@@ -321,7 +349,7 @@ func (s *StateMachine) SetOrderBooks(list *lib.OrderBooks, supply *types.Supply)
 			return err
 		}
 		// get the state 'key' for the order book
-		key := types.KeyForOrderBook(book.ChainId)
+		key := KeyForOrderBook(book.ChainId)
 		// write the order book for the committee to state under the 'key'
 		if err = s.store.Set(key, orderBookBz); err != nil {
 			return err
@@ -331,7 +359,7 @@ func (s *StateMachine) SetOrderBooks(list *lib.OrderBooks, supply *types.Supply)
 			// update the 'supply' tracker
 			supply.Total += order.AmountForSale
 			// calculate the escrow pool id for a specific chainId
-			escrowPoolId := book.ChainId + uint64(types.EscrowPoolAddend)
+			escrowPoolId := book.ChainId + uint64(EscrowPoolAddend)
 			// add to the 'escrow' pool for the specific id
 			if err = s.PoolAdd(escrowPoolId, order.AmountForSale); err != nil {
 				return err
@@ -349,7 +377,7 @@ func (s *StateMachine) GetOrderBook(chainId uint64) (b *lib.OrderBook, err lib.E
 	// update the orders and chainId of the newly created object ref
 	b.Orders, b.ChainId = make([]*lib.SellOrder, 0), chainId
 	// get order book bytes from the state using the order book key for a specific chainId
-	bz, err := s.Get(types.KeyForOrderBook(chainId))
+	bz, err := s.Get(KeyForOrderBook(chainId))
 	if err != nil {
 		return
 	}
@@ -364,7 +392,7 @@ func (s *StateMachine) GetOrderBooks() (b *lib.OrderBooks, err lib.ErrorI) {
 	// get the order books from the state
 	b = new(lib.OrderBooks)
 	// create an iterator over the OrderBookPrefix
-	it, err := s.Iterator(types.OrderBookPrefix())
+	it, err := s.Iterator(OrderBookPrefix())
 	if err != nil {
 		return
 	}
@@ -373,7 +401,7 @@ func (s *StateMachine) GetOrderBooks() (b *lib.OrderBooks, err lib.ErrorI) {
 	// for each item under the OrderBookPrefix
 	for ; it.Valid(); it.Next() {
 		// extract the chainId from the key
-		id, e := types.IdFromKey(it.Key())
+		id, e := IdFromKey(it.Key())
 		if e != nil {
 			return nil, e
 		}

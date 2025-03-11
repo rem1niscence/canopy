@@ -5,7 +5,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
@@ -15,7 +14,7 @@ func TestSetGetAccount(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
-		accounts []*types.Account
+		accounts []*Account
 	}{
 		{
 			name:     "zero / empty account",
@@ -25,7 +24,7 @@ func TestSetGetAccount(t *testing.T) {
 		{
 			name:   "single account",
 			detail: "test setting and getting an account",
-			accounts: []*types.Account{{
+			accounts: []*Account{{
 				Address: newTestAddress(t).Bytes(),
 				Amount:  100,
 			}, {
@@ -36,7 +35,7 @@ func TestSetGetAccount(t *testing.T) {
 		{
 			name:   "multi-accounts",
 			detail: "test setting and getting multiple accounts",
-			accounts: []*types.Account{{
+			accounts: []*Account{{
 				Address: newTestAddress(t).Bytes(),
 				Amount:  100,
 			}, {
@@ -96,7 +95,7 @@ func TestGetSetAccounts(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
-		accounts []*types.Account
+		accounts []*Account
 	}{
 		{
 			name:     "no accounts",
@@ -106,7 +105,7 @@ func TestGetSetAccounts(t *testing.T) {
 		{
 			name:   "multi-accounts",
 			detail: "test with multiple accounts",
-			accounts: []*types.Account{{
+			accounts: []*Account{{
 				Address: newTestAddress(t).Bytes(),
 				Amount:  100,
 			}, {
@@ -120,7 +119,7 @@ func TestGetSetAccounts(t *testing.T) {
 			// create a test state machine
 			sm := newTestStateMachine(t)
 			// setup supply tracker and expected total tokens
-			supply, expectedTokens := &types.Supply{}, uint64(0)
+			supply, expectedTokens := &Supply{}, uint64(0)
 			for _, acc := range test.accounts {
 				expectedTokens += acc.Amount
 			}
@@ -146,7 +145,7 @@ func TestGetAccountsPaginated(t *testing.T) {
 	tests := []struct {
 		name       string
 		detail     string
-		accounts   []*types.Account
+		accounts   []*Account
 		pageParams lib.PageParams
 	}{
 		{
@@ -161,7 +160,7 @@ func TestGetAccountsPaginated(t *testing.T) {
 		{
 			name:   "multi-accounts",
 			detail: "test with multiple accounts and default page params",
-			accounts: []*types.Account{{
+			accounts: []*Account{{
 				Address: newTestAddress(t).Bytes(),
 				Amount:  100,
 			}, {
@@ -190,7 +189,7 @@ func TestGetAccountsPaginated(t *testing.T) {
 			got, err := sm.GetAccountsPaginated(test.pageParams)
 			require.NoError(t, err)
 			// ensure results type string
-			require.Equal(t, got.Type, types.AccountsPageName)
+			require.Equal(t, got.Type, AccountsPageName)
 			// ensure total count
 			require.Equal(t, got.TotalCount, len(test.accounts))
 			// ensure expected per page NOTE: if setting below minimum page params, it will change results
@@ -198,7 +197,7 @@ func TestGetAccountsPaginated(t *testing.T) {
 			// ensure expected page number NOTE: if setting below minimum page params, it will change results
 			require.Equal(t, got.PageNumber, test.pageParams.PageNumber)
 			// ensure expected results type
-			accountsPage, ok := got.Results.(*types.AccountPage)
+			accountsPage, ok := got.Results.(*AccountPage)
 			require.True(t, ok)
 			require.NotNil(t, accountsPage)
 			// ensure expected results
@@ -213,17 +212,17 @@ func TestAccountDeductFees(t *testing.T) {
 	tests := []struct {
 		name    string
 		detail  string
-		account *types.Account
-		pool    *types.Pool
+		account *Account
+		pool    *Pool
 		error   bool
 	}{
 		{
 			name:   "empty account",
 			detail: "try (and fail) deducting from an empty account",
-			account: &types.Account{
+			account: &Account{
 				Address: newTestAddress(t).Bytes(),
 			},
-			pool: &types.Pool{
+			pool: &Pool{
 				Id: lib.CanopyChainId,
 			},
 			error: true,
@@ -231,11 +230,11 @@ func TestAccountDeductFees(t *testing.T) {
 		{
 			name:   "insufficient account balance",
 			detail: "try (and fail) deducting from an insufficient account balance",
-			account: &types.Account{
+			account: &Account{
 				Address: newTestAddress(t).Bytes(),
 				Amount:  100,
 			},
-			pool: &types.Pool{
+			pool: &Pool{
 				Id: lib.CanopyChainId,
 			},
 			error: true,
@@ -243,22 +242,22 @@ func TestAccountDeductFees(t *testing.T) {
 		{
 			name:   "just enough account balance",
 			detail: "deduct from a account that has just enough balance",
-			account: &types.Account{
+			account: &Account{
 				Address: newTestAddress(t).Bytes(),
 				Amount:  10000,
 			},
-			pool: &types.Pool{
+			pool: &Pool{
 				Id: lib.CanopyChainId,
 			},
 		},
 		{
 			name:   "non empty fee pool",
 			detail: "add to a pool that has some balance already",
-			account: &types.Account{
+			account: &Account{
 				Address: newTestAddress(t).Bytes(),
 				Amount:  100000,
 			},
-			pool: &types.Pool{
+			pool: &Pool{
 				Id:     lib.CanopyChainId,
 				Amount: 100,
 			},
@@ -297,7 +296,7 @@ func TestAccountAdd(t *testing.T) {
 	tests := []struct {
 		name    string
 		detail  string
-		account *types.Account
+		account *Account
 		amount  uint64
 	}{
 		{
@@ -308,7 +307,7 @@ func TestAccountAdd(t *testing.T) {
 		{
 			name:   "non empty account",
 			detail: "add to a non-empty account",
-			account: &types.Account{
+			account: &Account{
 				Address: newTestAddress(t).Bytes(),
 				Amount:  1000,
 			},
@@ -343,7 +342,7 @@ func TestAccountSub(t *testing.T) {
 	tests := []struct {
 		name    string
 		detail  string
-		account *types.Account
+		account *Account
 		amount  uint64
 		error   bool
 	}{
@@ -356,7 +355,7 @@ func TestAccountSub(t *testing.T) {
 		{
 			name:   "insufficient account balance",
 			detail: "try (and fail) to subtract from an insufficient account balance",
-			account: &types.Account{
+			account: &Account{
 				Address: newTestAddress(t).Bytes(),
 				Amount:  99,
 			},
@@ -366,7 +365,7 @@ func TestAccountSub(t *testing.T) {
 		{
 			name:   "non empty account",
 			detail: "subtract from a non-empty account",
-			account: &types.Account{
+			account: &Account{
 				Address: newTestAddress(t).Bytes(),
 				Amount:  1000,
 			},
@@ -405,7 +404,7 @@ func TestSetGetPool(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		pools  []*types.Pool
+		pools  []*Pool
 	}{
 		{
 			name:   "zero / empty pools",
@@ -415,7 +414,7 @@ func TestSetGetPool(t *testing.T) {
 		{
 			name:   "single pool",
 			detail: "test setting and getting a pool",
-			pools: []*types.Pool{{
+			pools: []*Pool{{
 				Id:     lib.CanopyChainId,
 				Amount: 100,
 			}, {
@@ -426,7 +425,7 @@ func TestSetGetPool(t *testing.T) {
 		{
 			name:   "multi-pool",
 			detail: "test setting and getting multiple pools",
-			pools: []*types.Pool{{
+			pools: []*Pool{{
 				Id:     lib.CanopyChainId,
 				Amount: 100,
 			}, {
@@ -469,7 +468,7 @@ func TestGetSetPools(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		pools  []*types.Pool
+		pools  []*Pool
 	}{
 		{
 			name:   "no pools",
@@ -479,7 +478,7 @@ func TestGetSetPools(t *testing.T) {
 		{
 			name:   "multi-pool",
 			detail: "test with multiple pool",
-			pools: []*types.Pool{{
+			pools: []*Pool{{
 				Id:     lib.CanopyChainId,
 				Amount: 100,
 			}, {
@@ -496,7 +495,7 @@ func TestGetSetPools(t *testing.T) {
 			// create a test state machine
 			sm := newTestStateMachine(t)
 			// setup supply tracker and expected total tokens
-			supply, expectedTokens := &types.Supply{}, uint64(0)
+			supply, expectedTokens := &Supply{}, uint64(0)
 			for _, p := range test.pools {
 				expectedTokens += p.Amount
 			}
@@ -530,7 +529,7 @@ func TestGetPoolsPaginated(t *testing.T) {
 	tests := []struct {
 		name       string
 		detail     string
-		pools      []*types.Pool
+		pools      []*Pool
 		pageParams lib.PageParams
 	}{
 		{
@@ -545,7 +544,7 @@ func TestGetPoolsPaginated(t *testing.T) {
 		{
 			name:   "multi-pool",
 			detail: "test with multiple pools and default page params",
-			pools: []*types.Pool{{
+			pools: []*Pool{{
 				Id:     lib.CanopyChainId,
 				Amount: 100,
 			}, {
@@ -574,7 +573,7 @@ func TestGetPoolsPaginated(t *testing.T) {
 			got, err := sm.GetPoolsPaginated(test.pageParams)
 			require.NoError(t, err)
 			// ensure results type string
-			require.Equal(t, got.Type, types.PoolPageName)
+			require.Equal(t, got.Type, PoolPageName)
 			// ensure total count
 			require.Equal(t, got.TotalCount, len(test.pools))
 			// ensure expected per page NOTE: if setting below minimum page params, it will change results
@@ -582,7 +581,7 @@ func TestGetPoolsPaginated(t *testing.T) {
 			// ensure expected page number NOTE: if setting below minimum page params, it will change results
 			require.Equal(t, got.PageNumber, test.pageParams.PageNumber)
 			// ensure expected results type
-			poolsPage, ok := got.Results.(*types.PoolPage)
+			poolsPage, ok := got.Results.(*PoolPage)
 			require.True(t, ok)
 			require.NotNil(t, poolsPage)
 			// ensure expected results
@@ -597,7 +596,7 @@ func TestMintToPool(t *testing.T) {
 	tests := []struct {
 		name           string
 		detail         string
-		pool           *types.Pool
+		pool           *Pool
 		startingSupply uint64
 		amount         uint64
 	}{
@@ -609,7 +608,7 @@ func TestMintToPool(t *testing.T) {
 		{
 			name:   "non empty pool",
 			detail: "mint to a non-empty pool",
-			pool: &types.Pool{
+			pool: &Pool{
 				Id:     lib.CanopyChainId,
 				Amount: 1000,
 			},
@@ -618,7 +617,7 @@ func TestMintToPool(t *testing.T) {
 		{
 			name:   "non empty supply",
 			detail: "mint with a non-zero starting supply",
-			pool: &types.Pool{
+			pool: &Pool{
 				Id:     lib.CanopyChainId,
 				Amount: 1000,
 			},
@@ -661,7 +660,7 @@ func TestPoolAdd(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		pool   *types.Pool
+		pool   *Pool
 		amount uint64
 	}{
 		{
@@ -672,7 +671,7 @@ func TestPoolAdd(t *testing.T) {
 		{
 			name:   "non empty pool",
 			detail: "add to a non-empty pool",
-			pool: &types.Pool{
+			pool: &Pool{
 				Id:     lib.CanopyChainId,
 				Amount: 1000,
 			},
@@ -705,7 +704,7 @@ func TestPoolSub(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
-		pool   *types.Pool
+		pool   *Pool
 		amount uint64
 		error  bool
 	}{
@@ -718,7 +717,7 @@ func TestPoolSub(t *testing.T) {
 		{
 			name:   "insufficient pool balance",
 			detail: "try (and fail) to subtract from an insufficient pool balance",
-			pool: &types.Pool{
+			pool: &Pool{
 				Id:     lib.CanopyChainId,
 				Amount: 99,
 			},
@@ -728,7 +727,7 @@ func TestPoolSub(t *testing.T) {
 		{
 			name:   "non empty pool",
 			detail: "subtract from a non-empty pool",
-			pool: &types.Pool{
+			pool: &Pool{
 				Id:     lib.CanopyChainId,
 				Amount: 1000,
 			},
@@ -874,7 +873,7 @@ func TestAddToCommitteeStakedSupply(t *testing.T) {
 				// retrieve supply before addition
 				supply, err := sm.GetSupply()
 				require.NoError(t, err)
-				supply.CommitteeStaked = append(supply.CommitteeStaked, &types.Pool{
+				supply.CommitteeStaked = append(supply.CommitteeStaked, &Pool{
 					Id:     test.id,
 					Amount: test.preAmount,
 				})
@@ -920,7 +919,7 @@ func TestAddToDelegationStakedSupply(t *testing.T) {
 				// retrieve supply before addition
 				supply, err := sm.GetSupply()
 				require.NoError(t, err)
-				supply.CommitteeDelegatedOnly = append(supply.CommitteeDelegatedOnly, &types.Pool{
+				supply.CommitteeDelegatedOnly = append(supply.CommitteeDelegatedOnly, &Pool{
 					Id:     test.id,
 					Amount: test.preAmount,
 				})
@@ -1030,7 +1029,7 @@ func TestSubFromCommitteeStakedSupply(t *testing.T) {
 				// retrieve supply before addition
 				supply, err := sm.GetSupply()
 				require.NoError(t, err)
-				supply.CommitteeStaked = append(supply.CommitteeStaked, &types.Pool{
+				supply.CommitteeStaked = append(supply.CommitteeStaked, &Pool{
 					Id:     test.id,
 					Amount: test.preAmount,
 				})
@@ -1095,7 +1094,7 @@ func TestSubFromDelegationStakedSupply(t *testing.T) {
 				// retrieve supply before addition
 				supply, err := sm.GetSupply()
 				require.NoError(t, err)
-				supply.CommitteeDelegatedOnly = append(supply.CommitteeDelegatedOnly, &types.Pool{
+				supply.CommitteeDelegatedOnly = append(supply.CommitteeDelegatedOnly, &Pool{
 					Id:     test.id,
 					Amount: test.preAmount,
 				})

@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
@@ -15,11 +14,11 @@ import (
 // - checks message sent between start height and end height
 // - if APPROVE_ALL set or proposal on the APPROVE_LIST then no error
 // - else return ErrRejectProposal
-func (s *StateMachine) ApproveProposal(msg types.GovProposal) lib.ErrorI {
+func (s *StateMachine) ApproveProposal(msg GovProposal) lib.ErrorI {
 	// if height is before start height or height is after end height (both exclusive)
 	if s.Height() < msg.GetStartHeight() || s.Height() > msg.GetEndHeight() {
 		// reject the proposal
-		return types.ErrRejectProposal()
+		return ErrRejectProposal()
 	}
 	// handle the proposal based on config
 	switch s.proposeVoteConfig {
@@ -28,25 +27,20 @@ func (s *StateMachine) ApproveProposal(msg types.GovProposal) lib.ErrorI {
 		// proposal passes
 		return nil
 	// if rejecting all proposals
-	case types.RejectAllProposals:
+	case RejectAllProposals:
 		// proposal is rejected
-		return types.ErrRejectProposal()
+		return ErrRejectProposal()
 	// if on the local approve list
-	case types.ProposalApproveList:
-		// convert the governance proposal into bytes
-		bz, err := lib.Marshal(msg)
-		if err != nil {
-			return err
-		}
+	case ProposalApproveList:
 		// read the 'approve list' from the data directory
-		proposals := make(types.GovProposals)
+		proposals := make(GovProposals)
 		// get the voted from the local proposals.json file in the data directory
-		if err = proposals.NewFromFile(s.Config.DataDirPath); err != nil {
+		if err := proposals.NewFromFile(s.Config.DataDirPath); err != nil {
 			return err
 		}
 		// check on this specific message for explicit rejection or complete omission
-		if value, ok := proposals[crypto.HashString(bz)]; !ok || !value.Approve {
-			return types.ErrRejectProposal()
+		if value, ok := proposals[msg.GetProposalHash()]; !ok || !value.Approve {
+			return ErrRejectProposal()
 		}
 		// proposal passes
 		return nil
@@ -63,18 +57,18 @@ func (s *StateMachine) UpdateParam(paramSpace, paramName string, value proto.Mes
 		return
 	}
 	// retrieve the space from the string
-	var sp types.ParamSpace
+	var sp ParamSpace
 	switch paramSpace {
-	case types.ParamSpaceCons:
+	case ParamSpaceCons:
 		sp, err = s.GetParamsCons()
-	case types.ParamSpaceVal:
+	case ParamSpaceVal:
 		sp, err = s.GetParamsVal()
-	case types.ParamSpaceFee:
+	case ParamSpaceFee:
 		sp, err = s.GetParamsFee()
-	case types.ParamSpaceGov:
+	case ParamSpaceGov:
 		sp, err = s.GetParamsGov()
 	default:
-		return types.ErrUnknownParamSpace()
+		return ErrUnknownParamSpace()
 	}
 	if err != nil {
 		return err
@@ -86,21 +80,21 @@ func (s *StateMachine) UpdateParam(paramSpace, paramName string, value proto.Mes
 	case *lib.StringWrapper:
 		err = sp.SetString(paramName, v.Value)
 	default:
-		return types.ErrUnknownParamType(value)
+		return ErrUnknownParamType(value)
 	}
 	if err != nil {
 		return err
 	}
 	// set the param space back in state
 	switch paramSpace {
-	case types.ParamSpaceCons:
-		return s.SetParamsCons(sp.(*types.ConsensusParams))
-	case types.ParamSpaceVal:
-		return s.SetParamsVal(sp.(*types.ValidatorParams))
-	case types.ParamSpaceFee:
-		return s.SetParamsFee(sp.(*types.FeeParams))
-	case types.ParamSpaceGov:
-		return s.SetParamsGov(sp.(*types.GovernanceParams))
+	case ParamSpaceCons:
+		return s.SetParamsCons(sp.(*ConsensusParams))
+	case ParamSpaceVal:
+		return s.SetParamsVal(sp.(*ValidatorParams))
+	case ParamSpaceFee:
+		return s.SetParamsFee(sp.(*FeeParams))
+	case ParamSpaceGov:
+		return s.SetParamsGov(sp.(*GovernanceParams))
 	}
 	// adjust the state if necessary
 	return s.ConformStateToParamUpdate(previousParams)
@@ -109,7 +103,7 @@ func (s *StateMachine) UpdateParam(paramSpace, paramName string, value proto.Mes
 // ConformStateToParamUpdate() ensures the state does not violate the new values of the governance parameters
 // - Only MaxCommitteeSize & RootChainId requires an adjustment
 // - MinSellOrderSize is purposefully allowed to violate new updates
-func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) lib.ErrorI {
+func (s *StateMachine) ConformStateToParamUpdate(previousParams *Params) lib.ErrorI {
 	// retrieve the params from state
 	params, err := s.GetParams()
 	if err != nil {
@@ -138,7 +132,7 @@ func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) l
 	// maintain a counter for pseudorandom removal of the 'chain ids'
 	var idx int
 	// for each validator, remove the excess ids in a pseudorandom fashion
-	return s.IterateAndExecute(types.ValidatorPrefix(), func(key, value []byte) lib.ErrorI {
+	return s.IterateAndExecute(ValidatorPrefix(), func(key, value []byte) lib.ErrorI {
 		// convert bytes into a validator object
 		v, e := s.unmarshalValidator(value)
 		if e != nil {
@@ -180,7 +174,7 @@ func (s *StateMachine) ConformStateToParamUpdate(previousParams *types.Params) l
 }
 
 // SetParams() writes an entire Params object into state
-func (s *StateMachine) SetParams(p *types.Params) lib.ErrorI {
+func (s *StateMachine) SetParams(p *Params) lib.ErrorI {
 	// set the parameters in the consensus 'space'
 	if err := s.SetParamsCons(p.GetConsensus()); err != nil {
 		return err
@@ -198,23 +192,23 @@ func (s *StateMachine) SetParams(p *types.Params) lib.ErrorI {
 }
 
 // SetParamsCons() sets Consensus params into state
-func (s *StateMachine) SetParamsCons(c *types.ConsensusParams) lib.ErrorI {
-	return s.setParams(types.ParamSpaceCons, c)
+func (s *StateMachine) SetParamsCons(c *ConsensusParams) lib.ErrorI {
+	return s.setParams(ParamSpaceCons, c)
 }
 
 // SetParamsVal() sets Validator params into state
-func (s *StateMachine) SetParamsVal(v *types.ValidatorParams) lib.ErrorI {
-	return s.setParams(types.ParamSpaceVal, v)
+func (s *StateMachine) SetParamsVal(v *ValidatorParams) lib.ErrorI {
+	return s.setParams(ParamSpaceVal, v)
 }
 
 // SetParamsGov() sets Governance params into state
-func (s *StateMachine) SetParamsGov(g *types.GovernanceParams) lib.ErrorI {
-	return s.setParams(types.ParamSpaceGov, g)
+func (s *StateMachine) SetParamsGov(g *GovernanceParams) lib.ErrorI {
+	return s.setParams(ParamSpaceGov, g)
 }
 
 // SetParamsFee() sets Fee params into state
-func (s *StateMachine) SetParamsFee(f *types.FeeParams) lib.ErrorI {
-	return s.setParams(types.ParamSpaceFee, f)
+func (s *StateMachine) SetParamsFee(f *FeeParams) lib.ErrorI {
+	return s.setParams(ParamSpaceFee, f)
 }
 
 // setParams() converts the ParamSpace into bytes and sets them in state
@@ -225,11 +219,11 @@ func (s *StateMachine) setParams(space string, p proto.Message) lib.ErrorI {
 		return err
 	}
 	// set the bytes under the 'space' for the parameters
-	return s.Set(types.KeyForParams(space), bz)
+	return s.Set(KeyForParams(space), bz)
 }
 
 // GetParams() returns the aggregated ParamSpaces in a single Params object
-func (s *StateMachine) GetParams() (*types.Params, lib.ErrorI) {
+func (s *StateMachine) GetParams() (*Params, lib.ErrorI) {
 	// get the consensus parameters from state
 	cons, err := s.GetParamsCons()
 	if err != nil {
@@ -251,7 +245,7 @@ func (s *StateMachine) GetParams() (*types.Params, lib.ErrorI) {
 		return nil, err
 	}
 	// return a collective 'parameters' object that holds all the spaces
-	return &types.Params{
+	return &Params{
 		Consensus:  cons,
 		Validator:  val,
 		Fee:        fee,
@@ -260,41 +254,41 @@ func (s *StateMachine) GetParams() (*types.Params, lib.ErrorI) {
 }
 
 // GetParamsCons() returns the current state of the governance params in the Consensus space
-func (s *StateMachine) GetParamsCons() (ptr *types.ConsensusParams, err lib.ErrorI) {
+func (s *StateMachine) GetParamsCons() (ptr *ConsensusParams, err lib.ErrorI) {
 	// create a new object ref for the consensus params to ensure a non-nil result
-	ptr = new(types.ConsensusParams)
+	ptr = new(ConsensusParams)
 	// get the consensus parameters from state
-	err = s.getParams(types.ParamSpaceCons, ptr, types.ErrEmptyConsParams)
+	err = s.getParams(ParamSpaceCons, ptr, ErrEmptyConsParams)
 	// exit
 	return
 }
 
 // GetParamsVal() returns the current state of the governance params in the Validator space
-func (s *StateMachine) GetParamsVal() (ptr *types.ValidatorParams, err lib.ErrorI) {
+func (s *StateMachine) GetParamsVal() (ptr *ValidatorParams, err lib.ErrorI) {
 	// create a new object ref for the validator params to ensure a non-nil result
-	ptr = new(types.ValidatorParams)
+	ptr = new(ValidatorParams)
 	// get the validator parameters from state
-	err = s.getParams(types.ParamSpaceVal, ptr, types.ErrEmptyValParams)
+	err = s.getParams(ParamSpaceVal, ptr, ErrEmptyValParams)
 	// exit
 	return
 }
 
 // GetParamsGov() returns the current state of the governance params in the Governance space
-func (s *StateMachine) GetParamsGov() (ptr *types.GovernanceParams, err lib.ErrorI) {
+func (s *StateMachine) GetParamsGov() (ptr *GovernanceParams, err lib.ErrorI) {
 	// create a new object ref for the governance params to ensure a non-nil result
-	ptr = new(types.GovernanceParams)
+	ptr = new(GovernanceParams)
 	// get the governance parameters from state
-	err = s.getParams(types.ParamSpaceGov, ptr, types.ErrEmptyGovParams)
+	err = s.getParams(ParamSpaceGov, ptr, ErrEmptyGovParams)
 	// exit
 	return
 }
 
 // GetParamsFee() returns the current state of the governance params in the Fee space
-func (s *StateMachine) GetParamsFee() (ptr *types.FeeParams, err lib.ErrorI) {
+func (s *StateMachine) GetParamsFee() (ptr *FeeParams, err lib.ErrorI) {
 	// create a new object ref for the fee params to ensure a non-nil result
-	ptr = new(types.FeeParams)
+	ptr = new(FeeParams)
 	// get the fee parameters from state
-	err = s.getParams(types.ParamSpaceFee, ptr, types.ErrEmptyFeeParams)
+	err = s.getParams(ParamSpaceFee, ptr, ErrEmptyFeeParams)
 	// exit
 	return
 }
@@ -302,7 +296,7 @@ func (s *StateMachine) GetParamsFee() (ptr *types.FeeParams, err lib.ErrorI) {
 // getParams() is a generic helper function loads the params for a specific ParamSpace into a ptr object
 func (s *StateMachine) getParams(space string, ptr any, emptyErr func() lib.ErrorI) (err lib.ErrorI) {
 	// get the parameters bytes using the key for the parameter space
-	bz, err := s.Get(types.KeyForParams(space))
+	bz, err := s.Get(KeyForParams(space))
 	if err != nil {
 		return err
 	}
@@ -323,7 +317,7 @@ func (s *StateMachine) getParams(space string, ptr any, emptyErr func() lib.Erro
 // ParsePollTransactions() parses the last valid block for memo commands to execute specialized 'straw polling' functionality
 func (s *StateMachine) ParsePollTransactions(b *lib.BlockResult) {
 	// create a new object reference to ensure non-nil results
-	ap := new(types.ActivePolls)
+	ap := new(ActivePolls)
 	// load the active polls from the json file
 	if err := ap.NewFromFile(s.Config.DataDirPath); err != nil {
 		return
@@ -354,9 +348,9 @@ func (s *StateMachine) ParsePollTransactions(b *lib.BlockResult) {
 }
 
 // PollsToResults() coverts the polling objects to a compressed result based on the voting power
-func (s *StateMachine) PollsToResults(polls *types.ActivePolls) (result types.Poll, err lib.ErrorI) {
+func (s *StateMachine) PollsToResults(polls *ActivePolls) (result Poll, err lib.ErrorI) {
 	// create a new poll object ref to ensure non-nil results
-	result = make(types.Poll)
+	result = make(Poll)
 	// create caches to span over multiple blocks
 	accountCache, valList := map[string]uint64{}, map[string]uint64{} // address -> power (tokens)
 	// get the canopy validator set
@@ -383,11 +377,11 @@ func (s *StateMachine) PollsToResults(polls *types.ActivePolls) (result types.Po
 	// for each active poll in list
 	for proposalHash, addresses := range polls.Polls {
 		// initialize the poll result
-		r := types.PollResult{
+		r := PollResult{
 			ProposalHash: proposalHash,
 			ProposalURL:  polls.PollMeta[proposalHash].Url,
-			Accounts:     types.VoteStats{TotalTokens: supply.Total - supply.Staked - dao.Amount},
-			Validators:   types.VoteStats{TotalTokens: members.TotalPower},
+			Accounts:     VoteStats{TotalTokens: supply.Total - supply.Staked - dao.Amount},
+			Validators:   VoteStats{TotalTokens: members.TotalPower},
 		}
 		// for each vote in the active poll
 		for address, approve := range addresses {
@@ -475,10 +469,10 @@ func (s *StateMachine) IsFeatureEnabled(requiredVersion uint64) bool {
 
 // ROOT CHAIN CODE BELOW
 
-// IsOwnRoot() returns if this chain is its own root (base)
-func (s *StateMachine) IsOwnRoot() (bool, lib.ErrorI) {
+// LoadIsOwnRoot() returns if this chain is its own root (base)
+func (s *StateMachine) LoadIsOwnRoot() (bool, lib.ErrorI) {
 	// get the latest root chain id from the state
-	rootId, err := s.GetRootChainId()
+	rootId, err := s.LoadRootChainId(s.Height())
 	if err != nil {
 		return false, err
 	}
@@ -500,12 +494,14 @@ func (s *StateMachine) GetRootChainId() (uint64, lib.ErrorI) {
 // LoadRootChainId() loads the root chain id from the state at a certain height
 func (s *StateMachine) LoadRootChainId(height uint64) (uint64, lib.ErrorI) {
 	// create a read-only historical version of the state
-	sm, err := s.TimeMachine(height)
+	historicalFSM, err := s.TimeMachine(height)
+	// if an error occurred when loading the historical state machine
 	if err != nil {
+		// exit with error
 		return 0, err
 	}
 	// memory cleanup
-	defer sm.Discard()
+	defer historicalFSM.Discard()
 	// return the root chain id at that height
-	return sm.GetRootChainId()
+	return historicalFSM.GetRootChainId()
 }

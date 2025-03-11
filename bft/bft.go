@@ -87,7 +87,7 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, rootHeight, height uint64,
 func (b *BFT) Start() {
 	var err lib.ErrorI
 	// load the committee from the base chain
-	b.ValidatorSet, err = b.Controller.LoadCommittee(b.Controller.RootChainHeight())
+	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.ChainHeight()), b.Controller.RootChainHeight())
 	if err != nil {
 		b.log.Warn(err.Error())
 	}
@@ -103,12 +103,12 @@ func (b *BFT) Start() {
 			}()
 
 		// RESET BFT
-		// - This triggers when receiving a new Commit Block (QC) from either Root-ChainId (a) or the Target-ChainId (b)
+		// - This triggers when receiving a new Commit Block (QC) from either root-chainId (a) or the Target-ChainId (b)
 		case resetBFT := <-b.ResetBFT:
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
-				// if is a root-Chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
+				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
 				// else increment the height and don't maintain locks
 				b.NewHeight(resetBFT.IsRootChainUpdate)
 				// if not a base chain update, reset the timers
@@ -119,7 +119,7 @@ func (b *BFT) Start() {
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
 					// if this chain is not its own root
-					if !b.Controller.IsOwnRoot() {
+					if !b.Controller.LoadIsOwnRoot() {
 						// start BFT over after sleeping CommitProcessMS
 						// add poll ms wait here to ensure ample time for all nested chains to be updated
 						// if not the new committee messages will overwrite any candidacy proposals that were received prior to the 'reset'
@@ -128,7 +128,6 @@ func (b *BFT) Start() {
 				}
 			}()
 		}
-		b.log.Debug("Consensus thread sleeping")
 	}
 }
 
@@ -477,7 +476,7 @@ func (b *BFT) StartCommitProcessPhase() {
 // - Replica sends current View message to other replicas (Pacemaker vote)
 func (b *BFT) RoundInterrupt() {
 	b.Config.RoundInterruptTimeoutMS = b.msLeftInRound()
-	b.log.Warnf("Starting next round ~ %s", time.Now().Add(time.Duration(b.Config.RoundInterruptTimeoutMS)*time.Millisecond).Format(time.TimeOnly))
+	b.log.Warnf("Starting next round in %.2f secs", (time.Duration(b.Config.RoundInterruptTimeoutMS) * time.Millisecond).Seconds())
 	b.Phase = RoundInterrupt
 	// send pacemaker message
 	b.SendToReplicas(b.ValidatorSet, &Message{
@@ -593,7 +592,7 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	// update canopy height
 	b.RootHeight = b.Controller.RootChainHeight()
 	// update the validator set
-	b.ValidatorSet, err = b.Controller.LoadCommittee(b.RootHeight)
+	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.Height), b.RootHeight)
 	if err != nil {
 		b.log.Errorf("LoadCommittee() failed with err: %s", err.Error())
 	}
@@ -735,7 +734,7 @@ func (b *BFT) SetWaitTimers(phaseWaitTime, processTime time.Duration) {
 	}
 	// calculate the phase timer by subtracting the process time
 	phaseWaitTime = subtract(phaseWaitTime, processTime)
-	b.log.Infof("Setting consensus timer: %.2f sec", phaseWaitTime.Seconds())
+	b.log.Debugf("Setting consensus timer: %.2f sec", phaseWaitTime.Seconds())
 	// set Phase timers to go off in their respective timeouts
 	lib.ResetTimer(b.PhaseTimer, phaseWaitTime)
 }
@@ -824,7 +823,7 @@ type (
 		Unlock()
 		// ChainHeight returns the height of the target-chain
 		ChainHeight() uint64
-		// RootChainHeight returns the height of the root-Chain
+		// RootChainHeight returns the height of the root-chain
 		RootChainHeight() uint64
 		// ProduceProposal() as a Leader, create a Proposal in the form of a block and certificate results
 		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
@@ -840,23 +839,25 @@ type (
 		SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 		// SendToProposer() is a P2P call to directly send a Consensus message to the Leader
 		SendToProposer(msg lib.Signable)
+		// LoadRootChainId() returns the unique identifier of the root chain
+		LoadRootChainId(height uint64) (rootChainId uint64)
 		// IsOwnRoot() returns a boolean if self chain is root
-		IsOwnRoot() bool
+		LoadIsOwnRoot() bool
 		// Syncing() returns true if the plugin is currently syncing
 		Syncing() *atomic.Bool
 
-		/* Root-Chain Functionality Below*/
+		/* root-chain Functionality Below*/
 
 		// SendCertificateResultsTx() is a P2P call that allows a Leader to submit their CertificateResults (reward) transaction
 		SendCertificateResultsTx(certificate *lib.QuorumCertificate)
 		// LoadCommittee() loads the ValidatorSet operating under ChainId
-		LoadCommittee(rootHeight uint64) (lib.ValidatorSet, lib.ErrorI)
+		LoadCommittee(rootChainId, rootHeight uint64) (lib.ValidatorSet, lib.ErrorI)
 		// LoadCommitteeHeightInState() loads the committee information from state as updated by the quorum certificates
 		LoadCommitteeData() (*lib.CommitteeData, lib.ErrorI)
 		// LoadLastProposers() loads the last Canopy committee proposers for sortition data
 		LoadLastProposers(rootHeight uint64) (*lib.Proposers, lib.ErrorI)
 		// LoadMinimumEvidenceHeight() loads the Canopy enforced minimum height for valid Byzantine Evidence
-		LoadMinimumEvidenceHeight(rootHeight uint64) (uint64, lib.ErrorI)
+		LoadMinimumEvidenceHeight() (uint64, lib.ErrorI)
 		// IsValidDoubleSigner() checks to see if the double signer is valid for this specific height
 		IsValidDoubleSigner(height uint64, address []byte) bool
 	}

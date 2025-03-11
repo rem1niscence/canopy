@@ -24,9 +24,9 @@ func TestMessageCacheAdd(t *testing.T) {
 			name:   "exists",
 			detail: "not added as message already exists in cache",
 			cache: MessageCache{
-				m: map[string]struct{}{
+				deDupe: &DeDuplicator[string]{m: map[string]struct{}{
 					crypto.HashString([]byte("b")): {},
-				},
+				}},
 				maxSize: 2,
 			},
 			toAdd: &MessageAndMetadata{
@@ -48,9 +48,9 @@ func TestMessageCacheAdd(t *testing.T) {
 					})
 					return
 				}(),
-				m: map[string]struct{}{
+				deDupe: &DeDuplicator[string]{m: map[string]struct{}{
 					crypto.HashString([]byte("b")): {},
-				},
+				}},
 				maxSize: 2,
 			},
 			toAdd: &MessageAndMetadata{
@@ -73,9 +73,9 @@ func TestMessageCacheAdd(t *testing.T) {
 					})
 					return
 				}(),
-				m: map[string]struct{}{
+				deDupe: &DeDuplicator[string]{m: map[string]struct{}{
 					crypto.HashString([]byte("b")): {},
-				},
+				}},
 				maxSize: 1,
 			},
 			toAdd: &MessageAndMetadata{
@@ -92,7 +92,7 @@ func TestMessageCacheAdd(t *testing.T) {
 			// execute function call
 			require.Equal(t, test.expectedOk, test.cache.Add(test.toAdd))
 			// compare got vs expected
-			require.Equal(t, test.expected, test.cache.m)
+			require.Equal(t, test.expected, test.cache.deDupe.Map())
 		})
 	}
 }

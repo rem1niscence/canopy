@@ -1,11 +1,13 @@
 package lib
 
 import (
+	"errors"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"math"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestAddTransactionFeeOrdering(t *testing.T) {
@@ -40,7 +42,7 @@ func TestAddTransactionFeeOrdering(t *testing.T) {
 	for ; it.Valid(); it.Next() {
 		result += string(it.Key())
 	}
-	// copmare got vs expected
+	// compare got vs expected
 	require.Equal(t, "abcde", result)
 }
 
@@ -62,16 +64,6 @@ func TestAddTransaction(t *testing.T) {
 		error        string
 	}{
 		{
-			name:   "already exists",
-			detail: "transaction not added because it already exists",
-			mempool: FeeMempool{
-				l:       sync.RWMutex{},
-				hashMap: map[string]struct{}{crypto.HashString(transaction.Tx): {}},
-			},
-			toAdd: transaction,
-			error: "already found in mempool",
-		},
-		{
 			name:   "max tx size",
 			detail: "the tx size exceeds max (config)",
 			mempool: FeeMempool{
@@ -79,6 +71,22 @@ func TestAddTransaction(t *testing.T) {
 			},
 			toAdd: transaction,
 			error: "max tx size",
+		},
+		{
+			name:   "already exists",
+			detail: "transaction not added because it already exists",
+			mempool: FeeMempool{
+				l:       sync.RWMutex{},
+				hashMap: map[string]struct{}{crypto.HashString(transaction.Tx): {}},
+				config: MempoolConfig{
+					MaxTotalBytes:       math.MaxUint64,
+					MaxTransactionCount: 0,
+					IndividualMaxTxSize: math.MaxUint32,
+					DropPercentage:      10,
+				},
+			},
+			toAdd: transaction,
+			error: "already found in mempool",
 		},
 		{
 			name:   "recheck max tx count",
@@ -432,6 +440,105 @@ func TestDeleteTransaction(t *testing.T) {
 			for i := 0; i < len(got); i++ {
 				require.Equal(t, test.expectedTxs[i].Tx, got[i])
 				require.True(t, test.mempool.Contains(crypto.HashString(test.expectedTxs[i].Tx)))
+			}
+		})
+	}
+}
+
+func TestFailedTxCache(t *testing.T) {
+	rawPubKey := newTestPublicKeyBytes(t)
+	pubKey, err := crypto.NewPublicKeyFromBytes(rawPubKey)
+	require.NoError(t, err)
+
+	// pre-define a test message
+	sig := &Signature{
+		PublicKey: newTestPublicKeyBytes(t),
+		Signature: rawPubKey,
+	}
+	// pre-define an any for testing
+	a, e := NewAny(sig)
+	require.NoError(t, e)
+	// pre-define a transaction
+	tx := &Transaction{
+		MessageType: testMessageName,
+		Msg:         a,
+		Signature:   sig,
+		Time:        uint64(time.Now().UnixMicro()),
+		Fee:         1,
+		Memo:        "memo",
+	}
+	// marshal transaction to bytes
+	txBytes, err := Marshal(tx)
+	require.NoError(t, err)
+
+	// define test cases
+	tests := []struct {
+		name                    string
+		dissallowedMessageTypes []string
+		txBytes                 []byte
+		hash                    string
+		err                     error
+		expectedResult          bool
+		address                 string
+	}{
+		{
+			name:                    "valid transaction",
+			dissallowedMessageTypes: []string{},
+			txBytes:                 txBytes,
+			hash:                    "validHash",
+			err:                     nil,
+			expectedResult:          true,
+			address:                 pubKey.Address().String(),
+		},
+		{
+			name:                    "invalid message type",
+			dissallowedMessageTypes: []string{testMessageName},
+			txBytes:                 txBytes,
+			hash:                    "invalidHash",
+			err:                     nil,
+			expectedResult:          false,
+			address:                 pubKey.Address().String(),
+		},
+		{
+			name:                    "unmarshal error",
+			dissallowedMessageTypes: []string{},
+			txBytes:                 []byte("invalidBytes"),
+			hash:                    "unmarshalErrorHash",
+			err:                     ErrUnmarshal(errors.New("unmarshal error")),
+			expectedResult:          false,
+			address:                 pubKey.Address().String(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// create a new failed tx cache
+			cache := NewFailedTxCache(test.dissallowedMessageTypes...)
+			// add transaction to cache
+			result := cache.Add(test.txBytes, test.hash, test.err)
+			// validate result
+			require.Equal(t, test.expectedResult, result)
+			if test.expectedResult {
+				// validate cache
+				failedTx, ok := cache.Get(test.hash)
+				require.True(t, ok)
+				require.Equal(t, test.err, failedTx.Error)
+				require.EqualExportedValues(t, tx, failedTx.Transaction)
+
+				// validate get all
+				failedTxs := cache.GetFailedForAddress(test.address)
+				require.Len(t, failedTxs, 1)
+				require.Equal(t, failedTx, failedTxs[0])
+
+				// validate removal
+				cache.Remove(test.hash)
+				_, ok = cache.Get(test.hash)
+				require.False(t, ok)
+			} else {
+				// validate cache
+				tx, ok := cache.Get(test.hash)
+				require.False(t, ok)
+				require.Nil(t, tx)
 			}
 		})
 	}

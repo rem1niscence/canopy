@@ -313,7 +313,7 @@ func (s *Store) UnsafeRollback(rollbackToHeight uint64) {
 
 // Prune() removes older heights of the blockchain database for a 'lighter weight node'
 // NOTE: this is not recommended and at-least breaks peer syncing from genesis and could
-// be dangerous for nested-chains syncing from the root-Chain
+// be dangerous for nested-chains syncing from the root-chain
 func (s *Store) Prune(highestPruneHeight uint64) {
 	// TODO incomplete, pruning breaks the initializeTree design which attempts to write
 	//   on a read only store. Need to ensure that if pruned - don't accept historical

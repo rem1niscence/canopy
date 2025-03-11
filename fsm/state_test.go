@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/store"
@@ -19,9 +18,9 @@ func TestInitialize(t *testing.T) {
 		name          string
 		detail        string
 		presetBlock   *lib.Block
-		presetGenesis *types.GenesisState
+		presetGenesis *GenesisState
 		height        uint64
-		expected      *types.GenesisState
+		expected      *GenesisState
 	}{
 		{
 			name:        "after genesis",
@@ -90,7 +89,7 @@ func TestApplyBlock(t *testing.T) {
 	// define a key group to use in testing
 	kg := newTestKeyGroup(t)
 	// predefine a send-transaction to insert into the block
-	sendTx, err := types.NewSendTransaction(kg.PrivateKey, newTestAddress(t), 1, 1, 1, 1, 1, "")
+	sendTx, err := NewSendTransaction(kg.PrivateKey, newTestAddress(t), 1, 1, 1, 1, 1, "")
 	txn := sendTx.(*lib.Transaction)
 	// set the timestamp to a fixed time for validity checking
 	txn.Time = timestamp
@@ -155,9 +154,9 @@ func TestApplyBlock(t *testing.T) {
 				NumTxs:                1,
 				TotalTxs:              1,
 				TotalVdfIterations:    0,
-				Hash:                  []byte{0xc9, 0x64, 0x72, 0xd4, 0x31, 0x7d, 0x2b, 0x53, 0x7d, 0xf6, 0x92, 0xea, 0xf5, 0x1b, 0xde, 0xe9, 0x8d, 0x4f, 0x4b, 0x13, 0x11, 0x89, 0xd7, 0x1e, 0x47, 0x62, 0x82, 0x3b, 0x28, 0x6c, 0x13, 0x76},
+				Hash:                  []byte{0xfa, 0x62, 0x55, 0x55, 0xb3, 0x27, 0xc8, 0x1e, 0x68, 0x50, 0x36, 0x77, 0x4c, 0xb2, 0xa9, 0x1d, 0x8e, 0x76, 0x28, 0xeb, 0x11, 0x42, 0xd3, 0xd0, 0xac, 0x56, 0x7b, 0x28, 0xd7, 0xa, 0x9d, 0xf2},
 				LastBlockHash:         []byte{0x26, 0x46, 0xe, 0xd3, 0x76, 0x17, 0x95, 0x7c, 0x96, 0xd9, 0xab, 0xf5, 0x94, 0xa1, 0xac, 0x86, 0x5a, 0x43, 0x11, 0x2, 0xfc, 0x38, 0x77, 0x71, 0xa8, 0xc7, 0x6d, 0xa0, 0x2e, 0x6f, 0x1, 0xe8},
-				StateRoot:             []byte{0x7d, 0x6b, 0x3a, 0x21, 0x6a, 0x55, 0x19, 0xf2, 0x8d, 0xa5, 0x46, 0x4, 0x3f, 0x60, 0x8, 0xdb, 0xf3, 0x31, 0xdd, 0x1, 0xa8, 0x2a, 0x6f, 0xe4, 0x9, 0xe2, 0xa4, 0xbe, 0xee, 0xd, 0xd0, 0x0},
+				StateRoot:             []byte{0xb6, 0x92, 0xd8, 0x6c, 0x39, 0x2e, 0x39, 0x87, 0x2a, 0xfa, 0x27, 0x17, 0x43, 0x59, 0x57, 0xc4, 0x88, 0x50, 0xd9, 0x6b, 0x9d, 0x27, 0x1b, 0xef, 0xc1, 0xea, 0x46, 0x10, 0x96, 0x5c, 0x11, 0x1b},
 				TransactionRoot:       []byte{0x7f, 0x1, 0x75, 0x98, 0x49, 0x5, 0x73, 0x43, 0xb7, 0xb7, 0xea, 0x6c, 0x55, 0x84, 0x91, 0xe7, 0x7d, 0x51, 0xf4, 0x8a, 0x3, 0x3a, 0xe6, 0x9e, 0x4, 0x6, 0x58, 0x8a, 0xfb, 0x63, 0xde, 0x25},
 				ValidatorRoot:         []byte{0x24, 0xa5, 0xf1, 0x5d, 0xdd, 0x13, 0xdd, 0x75, 0x33, 0x2a, 0xe4, 0xf6, 0x2b, 0x3f, 0xa, 0x8c, 0xdf, 0x90, 0x1d, 0x9f, 0xaa, 0xb0, 0x5d, 0xae, 0x7a, 0x47, 0xa7, 0x59, 0x98, 0x64, 0xb3, 0x7c},
 				NextValidatorRoot:     []byte{0x24, 0xa5, 0xf1, 0x5d, 0xdd, 0x13, 0xdd, 0x75, 0x33, 0x2a, 0xe4, 0xf6, 0x2b, 0x3f, 0xa, 0x8c, 0xdf, 0x90, 0x1d, 0x9f, 0xaa, 0xb0, 0x5d, 0xae, 0x7a, 0x47, 0xa7, 0x59, 0x98, 0x64, 0xb3, 0x7c},
@@ -193,7 +192,7 @@ func TestApplyBlock(t *testing.T) {
 					},
 				}))
 				// set the minimum fee to 1 for send transactions
-				require.NoError(t, sm.UpdateParam("fee", types.ParamSendFee, &lib.UInt64Wrapper{Value: 1}))
+				require.NoError(t, sm.UpdateParam("fee", ParamSendFee, &lib.UInt64Wrapper{Value: 1}))
 				// preset the account with funds
 				require.NoError(t, sm.AccountAdd(newTestAddress(t), test.accountPreset))
 				qc := &lib.QuorumCertificate{
@@ -206,11 +205,11 @@ func TestApplyBlock(t *testing.T) {
 					}},
 				}
 				// track the supply
-				supply := &types.Supply{}
+				supply := &Supply{}
 				// for 4 validators
 				for i := 0; i < 4; i++ {
 					// set the validator
-					require.NoError(t, sm.SetValidators([]*types.Validator{{
+					require.NoError(t, sm.SetValidators([]*Validator{{
 						Address:      newTestAddressBytes(t, i),
 						PublicKey:    newTestPublicKeyBytes(t, i),
 						StakedAmount: 100,
@@ -278,22 +277,22 @@ func TestApplyBlock(t *testing.T) {
 func newSingleAccountStateMachine(t *testing.T) StateMachine {
 	sm := newTestStateMachine(t)
 	keyGroup := newTestKeyGroup(t)
-	require.NoError(t, sm.SetParams(types.DefaultParams()))
-	require.NoError(t, sm.SetAccount(&types.Account{
+	require.NoError(t, sm.SetParams(DefaultParams()))
+	require.NoError(t, sm.SetAccount(&Account{
 		Address: keyGroup.Address.Bytes(),
 		Amount:  1000000,
 	}))
-	require.NoError(t, sm.HandleMessageStake(&types.MessageStake{
+	require.NoError(t, sm.HandleMessageStake(&MessageStake{
 		PublicKey:     keyGroup.PublicKey.Bytes(),
 		Amount:        1000000,
 		Committees:    []uint64{lib.CanopyChainId},
-		NetAddress:    "http://localhost:80",
+		NetAddress:    "tcp://localhost",
 		OutputAddress: keyGroup.Address.Bytes(),
 		Delegate:      false,
 		Compound:      true,
 		Signer:        keyGroup.Address.Bytes(),
 	}))
-	require.NoError(t, sm.SetParams(types.DefaultParams()))
+	require.NoError(t, sm.SetParams(DefaultParams()))
 	return sm
 }
 
@@ -307,16 +306,16 @@ func newTestStateMachine(t *testing.T) StateMachine {
 		NetworkID:          1,
 		height:             2,
 		totalVDFIterations: 0,
-		slashTracker:       types.NewSlashTracker(),
-		proposeVoteConfig:  types.AcceptAllProposals,
+		slashTracker:       NewSlashTracker(),
+		proposeVoteConfig:  AcceptAllProposals,
 		Config: lib.Config{
 			MainConfig: lib.DefaultMainConfig(),
 		},
 		log: log,
 	}
-	require.NoError(t, sm.SetParams(types.DefaultParams()))
+	require.NoError(t, sm.SetParams(DefaultParams()))
 	db.Commit()
-	require.NoError(t, sm.SetParams(types.DefaultParams()))
+	require.NoError(t, sm.SetParams(DefaultParams()))
 	return sm
 }
 
@@ -374,7 +373,7 @@ type testQCParams struct {
 	height        uint64
 	idxSigned     map[int]bool
 	committeeKeys []*crypto.KeyGroup
-	committee     []*types.Validator
+	committee     []*Validator
 	results       *lib.CertificateResult
 }
 

@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/canopy-network/canopy/fsm"
 	"io"
 	"net/http"
 
 	"github.com/canopy-network/canopy/controller"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/p2p"
@@ -61,14 +61,14 @@ func (c *Client) Pending(params lib.PageParams) (p *lib.Page, err lib.ErrorI) {
 	return
 }
 
-func (c *Client) Proposals() (p *types.GovProposals, err lib.ErrorI) {
-	p = new(types.GovProposals)
+func (c *Client) Proposals() (p *fsm.GovProposals, err lib.ErrorI) {
+	p = new(fsm.GovProposals)
 	err = c.get(ProposalsRouteName, "", p)
 	return
 }
 
-func (c *Client) Poll() (p *types.Poll, err lib.ErrorI) {
-	p = new(types.Poll)
+func (c *Client) Poll() (p *fsm.Poll, err lib.ErrorI) {
+	p = new(fsm.Poll)
 	err = c.get(PollRouteName, "", p)
 	return
 }
@@ -122,8 +122,8 @@ func (c *Client) TransactionsByRecipient(address string, params lib.PageParams) 
 	return
 }
 
-func (c *Client) Account(height uint64, address string) (p *types.Account, err lib.ErrorI) {
-	p = new(types.Account)
+func (c *Client) Account(height uint64, address string) (p *fsm.Account, err lib.ErrorI) {
+	p = new(fsm.Account)
 	err = c.heightAndAddressRequest(AccountRouteName, height, address, p)
 	return
 }
@@ -134,8 +134,8 @@ func (c *Client) Accounts(height uint64, params lib.PageParams) (p *lib.Page, er
 	return
 }
 
-func (c *Client) Pool(height uint64, id uint64) (p *types.Pool, err lib.ErrorI) {
-	p = new(types.Pool)
+func (c *Client) Pool(height uint64, id uint64) (p *fsm.Pool, err lib.ErrorI) {
+	p = new(fsm.Pool)
 	err = c.heightAndIdRequest(PoolRouteName, height, id, p)
 	return
 }
@@ -146,8 +146,8 @@ func (c *Client) Pools(height uint64, params lib.PageParams) (p *lib.Page, err l
 	return
 }
 
-func (c *Client) Validator(height uint64, address string) (p *types.Validator, err lib.ErrorI) {
-	p = new(types.Validator)
+func (c *Client) Validator(height uint64, address string) (p *fsm.Validator, err lib.ErrorI) {
+	p = new(fsm.Validator)
 	err = c.heightAndAddressRequest(ValidatorRouteName, height, address, p)
 	return
 }
@@ -251,54 +251,54 @@ func (c *Client) Lottery(height, id uint64) (p *lib.LotteryWinner, err lib.Error
 	return
 }
 
-func (c *Client) Supply(height uint64) (p *types.Supply, err lib.ErrorI) {
-	p = new(types.Supply)
+func (c *Client) Supply(height uint64) (p *fsm.Supply, err lib.ErrorI) {
+	p = new(fsm.Supply)
 	err = c.heightRequest(SupplyRouteName, height, p)
 	return
 }
 
-func (c *Client) NonSigners(height uint64) (p *types.NonSigners, err lib.ErrorI) {
-	p = new(types.NonSigners)
+func (c *Client) NonSigners(height uint64) (p *fsm.NonSigners, err lib.ErrorI) {
+	p = new(fsm.NonSigners)
 	err = c.heightRequest(NonSignersRouteName, height, p)
 	return
 }
 
-func (c *Client) Params(height uint64) (p *types.Params, err lib.ErrorI) {
-	p = new(types.Params)
+func (c *Client) Params(height uint64) (p *fsm.Params, err lib.ErrorI) {
+	p = new(fsm.Params)
 	err = c.heightRequest(ParamRouteName, height, p)
 	return
 }
 
-func (c *Client) FeeParams(height uint64) (p *types.FeeParams, err lib.ErrorI) {
-	p = new(types.FeeParams)
+func (c *Client) FeeParams(height uint64) (p *fsm.FeeParams, err lib.ErrorI) {
+	p = new(fsm.FeeParams)
 	err = c.heightRequest(FeeParamRouteName, height, p)
 	return
 }
 
-func (c *Client) GovParams(height uint64) (p *types.GovernanceParams, err lib.ErrorI) {
-	p = new(types.GovernanceParams)
+func (c *Client) GovParams(height uint64) (p *fsm.GovernanceParams, err lib.ErrorI) {
+	p = new(fsm.GovernanceParams)
 	err = c.heightRequest(GovParamRouteName, height, p)
 	return
 }
 
-func (c *Client) ConParams(height uint64) (p *types.ConsensusParams, err lib.ErrorI) {
-	p = new(types.ConsensusParams)
+func (c *Client) ConParams(height uint64) (p *fsm.ConsensusParams, err lib.ErrorI) {
+	p = new(fsm.ConsensusParams)
 	err = c.heightRequest(ConParamsRouteName, height, p)
 	return
 }
 
-func (c *Client) ValParams(height uint64) (p *types.ValidatorParams, err lib.ErrorI) {
-	p = new(types.ValidatorParams)
+func (c *Client) ValParams(height uint64) (p *fsm.ValidatorParams, err lib.ErrorI) {
+	p = new(fsm.ValidatorParams)
 	err = c.heightRequest(ValParamRouteName, height, p)
 	return
 }
 
-func (c *Client) State(height uint64) (p *types.GenesisState, err lib.ErrorI) {
+func (c *Client) State(height uint64) (p *fsm.GenesisState, err lib.ErrorI) {
 	var param string
 	if height != 0 {
 		param = fmt.Sprintf("?height=%d", height)
 	}
-	p = new(types.GenesisState)
+	p = new(fsm.GenesisState)
 	err = c.get(StateRouteName, param, p)
 	return
 }
@@ -310,11 +310,11 @@ func (c *Client) StateDiff(height, startHeight uint64) (diff string, err lib.Err
 	}
 	resp, e := c.client.Post(c.url(StateDiffRouteName, "", false), ApplicationJSON, bytes.NewBuffer(bz))
 	if e != nil {
-		return "", ErrPostRequest(e)
+		return "", lib.ErrPostRequest(e)
 	}
 	bz, e = io.ReadAll(resp.Body)
 	if e != nil {
-		return "", ErrReadBody(e)
+		return "", lib.ErrReadBody(e)
 	}
 	diff = string(bz)
 	return
@@ -629,7 +629,7 @@ func (c *Client) TxDeleteOrder(from AddrOrNickname, orderId, chainId uint64,
 	return c.transactionRequest(TxDeleteOrderRouteName, txReq)
 }
 
-func (c *Client) TxBuyOrder(from AddrOrNickname, receiveAddress string, orderId uint64,
+func (c *Client) TxLockOrder(from AddrOrNickname, receiveAddress string, orderId uint64,
 	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	receiveHex, err := lib.NewHexBytesFromString(receiveAddress)
 	if err != nil {
@@ -646,7 +646,21 @@ func (c *Client) TxBuyOrder(from AddrOrNickname, receiveAddress string, orderId 
 	if err != nil {
 		return nil, nil, err
 	}
-	return c.transactionRequest(TxBuyOrderRouteName, txReq)
+	return c.transactionRequest(TxLockOrderRouteName, txReq)
+}
+
+func (c *Client) TxCloseOrder(from AddrOrNickname, orderId uint64, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+	txReq := txRequest{
+		Fee:             optFee,
+		Submit:          submit,
+		OrderId:         orderId,
+		passwordRequest: passwordRequest{Password: pwd},
+	}
+	txReq, err := setFrom(from, txReq)
+	if err != nil {
+		return nil, nil, err
+	}
+	return c.transactionRequest(TxCloseOrderRouteName, txReq)
 }
 
 func (c *Client) TxStartPoll(from AddrOrNickname, pollJSON json.RawMessage,
@@ -715,11 +729,11 @@ func (c *Client) Config() (returned *lib.Config, err lib.ErrorI) {
 func (c *Client) Logs() (logs string, err lib.ErrorI) {
 	resp, e := c.client.Get(c.url(LogsRouteName, "", true))
 	if e != nil {
-		return "", ErrGetRequest(err)
+		return "", lib.ErrGetRequest(err)
 	}
 	bz, e := io.ReadAll(resp.Body)
 	if e != nil {
-		return "", ErrGetRequest(e)
+		return "", lib.ErrGetRequest(e)
 	}
 	return string(bz), nil
 }
@@ -897,18 +911,18 @@ func (c *Client) url(routeName, param string, admin ...bool) string {
 	// if rpc port and admin ports are defined then it's a local RPC deployment
 	if c.rpcPort != "" && c.adminPort != "" {
 		if admin != nil && admin[0] {
-			return "http://" + localhost + colon + c.adminPort + router[routeName].Path + param
+			return "http://" + localhost + colon + c.adminPort + routePaths[routeName].Path + param
 		}
-		return c.rpcURL + colon + c.rpcPort + router[routeName].Path + param
+		return c.rpcURL + colon + c.rpcPort + routePaths[routeName].Path + param
 	}
 	// if rpc port is not defined then it's consider a remote RPC deployment
-	return c.rpcURL + router[routeName].Path + param
+	return c.rpcURL + routePaths[routeName].Path + param
 }
 
 func (c *Client) post(routeName string, json []byte, ptr any, admin ...bool) lib.ErrorI {
 	resp, err := c.client.Post(c.url(routeName, "", admin...), ApplicationJSON, bytes.NewBuffer(json))
 	if err != nil {
-		return ErrPostRequest(err)
+		return lib.ErrPostRequest(err)
 	}
 	return c.unmarshal(resp, ptr)
 }
@@ -916,7 +930,7 @@ func (c *Client) post(routeName string, json []byte, ptr any, admin ...bool) lib
 func (c *Client) get(routeName, param string, ptr any, admin ...bool) lib.ErrorI {
 	resp, err := c.client.Get(c.url(routeName, param, admin...))
 	if err != nil {
-		return ErrGetRequest(err)
+		return lib.ErrGetRequest(err)
 	}
 	return c.unmarshal(resp, ptr)
 }
@@ -924,10 +938,10 @@ func (c *Client) get(routeName, param string, ptr any, admin ...bool) lib.ErrorI
 func (c *Client) unmarshal(resp *http.Response, ptr any) lib.ErrorI {
 	bz, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return ErrReadBody(err)
+		return lib.ErrReadBody(err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return ErrHttpStatus(resp.Status, resp.StatusCode, bz)
+		return lib.ErrHttpStatus(resp.Status, resp.StatusCode, bz)
 	}
 	return lib.UnmarshalJSON(bz, ptr)
 }

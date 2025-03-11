@@ -4,81 +4,123 @@ import (
 	"encoding/json"
 )
 
+/* This file implements 'sell order book' logic for token swaps that is used throughout the app */
+
 // AddOrder() adds a sell order to the OrderBook
 func (x *OrderBook) AddOrder(order *SellOrder) (id uint64) {
 	// if there's an empty slot, fill it with the sell order
 	for i, slot := range x.Orders {
-		if slot == nil {
+		// if a slot is empty
+		if slot.Empty() {
+			// set the order id to index
 			id = uint64(i)
+			// set the structure order id to 'id'
 			order.Id = id
+			// set the 'order' in the book
 			x.Orders[i] = order
+			// exit
 			return
 		}
 	}
-	// if there's no empty slots, add the sell order to the
+	// if there's no empty slots, add the sell order to the end
 	id = uint64(len(x.Orders))
+	// set the structure order id to 'id'
 	order.Id = id
+	// add to the end of the book
 	x.Orders = append(x.Orders, order)
+	// exit
 	return
 }
 
-// BuyOrder() adds a recipient address and deadline height to the order to 'claim' the order and prevent others from 'claiming it'
-func (x *OrderBook) BuyOrder(orderId int, buyersReceiveAddress, buyersSendAddress []byte, buyerChainDeadlineHeight uint64) ErrorI {
+// LockOrder() adds a 'buyer' recipient and send address and deadline height to the order to 'reserve' the order and prevent others from 'reserving it'
+func (x *OrderBook) LockOrder(orderId int, buyersReceiveAddress, buyersSendAddress []byte, buyerChainDeadlineHeight uint64) (err ErrorI) {
+	// get the order from the order book using the 'order id'
 	order, err := x.GetOrder(orderId)
+	// if an error occurred during retrieval
 	if err != nil {
-		return err
+		// exit with error
+		return
 	}
+	// if the buyer's receive address isn't nil
 	if order.BuyerReceiveAddress != nil {
-		return ErrOrderAlreadyAccepted()
+		// exit with 'order already locked' error
+		return ErrOrderLocked()
 	}
+	// set the buyer's receive, send, and deadline height in the order
 	order.BuyerReceiveAddress, order.BuyerSendAddress, order.BuyerChainDeadline = buyersReceiveAddress, buyersSendAddress, buyerChainDeadlineHeight
+	// update the order in the order book
 	x.Orders[orderId] = order
-	return nil
+	// exit
+	return
 }
 
-// ResetOrder() removes a recipient address and the deadline height from the order to 'un-claim' the order
-func (x *OrderBook) ResetOrder(orderId int) ErrorI {
+// ResetOrder() removes a 'lock' from the order to 'un-reserve' the order
+func (x *OrderBook) ResetOrder(orderId int) (err ErrorI) {
+	// get the order from the order book using the 'order id'
 	order, err := x.GetOrder(orderId)
+	// if an error occurred during retrieval
 	if err != nil {
-		return err
+		// exit with error
+		return
 	}
+	// reset the buyer's receive, send, and deadline height in the order
 	order.BuyerReceiveAddress, order.BuyerSendAddress, order.BuyerChainDeadline = nil, nil, 0
+	// update the order in the order book
 	x.Orders[orderId] = order
-	return nil
+	// exit
+	return
 }
 
 // UpdateOrder() updates a sell order to the OrderBook, passing a nil `order` is effectively a delete operation
 func (x *OrderBook) UpdateOrder(orderId int, order *SellOrder) (err ErrorI) {
-	numOfOrderSlots := len(x.Orders)
-	if orderId >= numOfOrderSlots {
+	// create a variable to track the 'max index' of order slots
+	maxIdx := len(x.Orders) - 1
+	// if the order id exceeds the max index
+	if orderId > maxIdx {
+		// exit with 'not found' error
 		return ErrOrderNotFound(orderId)
 	}
 	// if deleting from the end, shrink the slice
-	if order == nil && orderId == numOfOrderSlots-1 {
-		x.Orders = x.Orders[:numOfOrderSlots-1]
+	if order == nil && orderId == maxIdx {
+		// remove the final order from the slice
+		x.Orders = x.Orders[:maxIdx]
 		// continue shrinking the slice if nil entries are at the end
-		for i := numOfOrderSlots - 2; i >= 0; i-- {
-			if x.Orders[i] != nil {
+		for i := maxIdx - 1; i >= 0; i-- {
+			// if the order slot is not empty
+			if !x.Orders[i].Empty() {
+				// exit the loop
 				break
 			}
+			// shrink the slice by 1
 			x.Orders = x.Orders[:i]
 		}
+		// exit
 		return
 	}
-	// if not deleting from the end of the slice,
-	// simply replace the order
+	// if not deleting from the end of the slice, simply replace the order
 	x.Orders[orderId] = order
+	// exit
 	return
 }
 
 // GetOrder() retrieves a sell order from the OrderBook
 func (x *OrderBook) GetOrder(orderId int) (order *SellOrder, err ErrorI) {
-	numOfOrderSlots := len(x.Orders)
-	if orderId >= numOfOrderSlots || x.Orders[orderId] == nil {
+	// create a variable to track the 'max index' of order slots
+	maxIdx := len(x.Orders) - 1
+	// if the order id exceeds the max index
+	if orderId > maxIdx || x.Orders[orderId].Empty() {
+		// exit with 'not found' error
 		return nil, ErrOrderNotFound(orderId)
 	}
+	// return the order at the index
 	order = x.Orders[orderId]
+	// exit
 	return
+}
+
+// Empty() indicates whether the sell order is null
+func (x *SellOrder) Empty() bool {
+	return x == nil || x.SellersSendAddress == nil
 }
 
 // jsonSellOrder is the json.Marshaller and json.Unmarshaler implementation for the SellOrder object
@@ -110,11 +152,15 @@ func (x SellOrder) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON() is the json.Unmarshaler implementation for the SellOrder object
-func (x *SellOrder) UnmarshalJSON(bz []byte) error {
+func (x *SellOrder) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new json object reference to ensure a non nil result
 	j := new(jsonSellOrder)
-	if err := json.Unmarshal(bz, j); err != nil {
-		return err
+	// populate the json object using the json bytes
+	if err = json.Unmarshal(jsonBytes, j); err != nil {
+		// exit with error
+		return
 	}
+	// populate the underlying sell order using the json object
 	*x = SellOrder{
 		Id:                   j.Id,
 		Committee:            j.Committee,
@@ -126,7 +172,8 @@ func (x *SellOrder) UnmarshalJSON(bz []byte) error {
 		BuyerChainDeadline:   j.BuyerChainDeadline,
 		SellersSendAddress:   j.SellersSellAddress,
 	}
-	return nil
+	// exit
+	return
 }
 
 // MarshalJSON() is the json.Marshaller implementation for the OrderBooks object
@@ -135,13 +182,18 @@ func (x OrderBooks) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON() is the json.Unmarshaler implementation for the OrderBooks object
-func (x *OrderBooks) UnmarshalJSON(bz []byte) error {
+func (x *OrderBooks) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new json object ref to ensure a non nil result
 	jsonOrderBooks := new([]*OrderBook)
-	if err := json.Unmarshal(bz, jsonOrderBooks); err != nil {
-		return err
+	// populate the object using json bytes
+	if err = json.Unmarshal(jsonBytes, jsonOrderBooks); err != nil {
+		// exit
+		return
 	}
+	// populate the underlying object using the json object
 	*x = OrderBooks{
 		OrderBooks: *jsonOrderBooks,
 	}
-	return nil
+	// exit
+	return
 }

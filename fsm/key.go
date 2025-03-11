@@ -1,4 +1,4 @@
-package types
+package fsm
 
 import (
 	"encoding/binary"

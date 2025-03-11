@@ -120,7 +120,7 @@ function convertGovernanceParams(v) {
 
 // convertOrder() transforms order details into a table-compatible convert
 function convertOrder(v) {
-  const exchangeRate = v.RequestedAmount / v.AmountForSale;
+  const exchangeRate = v.requestedAmount / v.amountForSale;
   return {
     Id: v.id ?? 0,
     Chain: v.committee,
@@ -162,8 +162,8 @@ function getHeader(v) {
 function getTableBody(v) {
   let empty = [{ Results: "null" }];
   if ("consensus" in v) return convertGovernanceParams(v);
-  if ("committeeStaked" in v) return v.committee_staked.map((item) => convertCommitteeSupply(item, v.staked));
-  if (!v.hasOwnProperty("type")) return v[0]?.orders?.map(convertOrder) || empty;
+  if ("committeeStaked" in v) return v.committeeStaked.map((item) => convertCommitteeSupply(item, v.staked));
+  if (!v.hasOwnProperty("type")) return v[0]?.orders?.filter(order => order.sellersSendAddress).map(convertOrder) || empty;
   if (v.results === null) return empty;
   const converters = {
     "tx-results-page": convertTransaction,

@@ -1,15 +1,14 @@
-package types
+package fsm
 
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
-
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -32,7 +31,7 @@ const (
 
 var (
 	// the number of tokens in micro denomination that are initially (before halvenings) minted per block
-	InitialTokensPerBlock = 256 * 1000000 // 256 CNPY
+	InitialTokensPerBlock = 80 * 1000000 // 80 CNPY
 	// the number of blocks between each halvening (block reward is cut in half) event
 	BlocksPerHalvening = 3150000 // ~ 2 years - 20 second blocks
 )
@@ -68,8 +67,8 @@ func DefaultParams() *Params {
 			StakePercentForSubsidizedCommittee: 33,
 			MaxSlashPerCommittee:               15,
 			DelegateRewardPercentage:           10,
-			BuyDeadlineBlocks:                  15,
-			BuyOrderFeeMultiplier:              2,
+			BuyDeadlineBlocks:                  60,
+			LockOrderFeeMultiplier:             2,
 		},
 		Fee: &FeeParams{
 			SendFee:               10000,
@@ -109,7 +108,7 @@ func (x *Params) Check() lib.ErrorI {
 const (
 	ParamBlockSize       = "blockSize"       // size of the block - header
 	ParamProtocolVersion = "protocolVersion" // current protocol version (upgrade enforcement)
-	ParamRetired         = "retired"         // if the chain is marking itself as 'retired' to the root-Chain making it forever un-subsidized
+	ParamRetired         = "retired"         // if the chain is marking itself as 'retired' to the root-chain making it forever un-subsidized
 	ParamRootChainId     = "rootChainID"     // the chain id of the root chain (source of the validator set)
 )
 
@@ -228,7 +227,7 @@ const (
 	ParamMaxSlashPerCommittee               = "maxSlashPerCommittee"               // the maximum validator slash per committee per block
 	ParamDelegateRewardPercentage           = "delegateRewardPercentage"           // the percentage of the block reward that is awarded to the delegates
 	ParamBuyDeadlineBlocks                  = "buyDeadlineBlocks"                  // the amount of blocks a 'buyer' has to complete an order they reserved
-	ParamBuyOrderFeeMultiplier              = "buyOrderFeeMultiplier"              // the fee multiplier of the 'send' fee that is required to execute a buy order
+	ParamLockOrderFeeMultiplier             = "lockOrderFeeMultiplier"             // the fee multiplier of the 'send' fee that is required to execute a lock order
 )
 
 // Check() validates the Validator params
@@ -275,8 +274,8 @@ func (x *ValidatorParams) Check() lib.ErrorI {
 	if x.BuyDeadlineBlocks == 0 {
 		return ErrInvalidParam(ParamBuyDeadlineBlocks)
 	}
-	if x.BuyOrderFeeMultiplier == 0 {
-		return ErrInvalidParam(ParamBuyOrderFeeMultiplier)
+	if x.LockOrderFeeMultiplier == 0 {
+		return ErrInvalidParam(ParamLockOrderFeeMultiplier)
 	}
 	return nil
 }
@@ -314,8 +313,8 @@ func (x *ValidatorParams) SetUint64(paramName string, value uint64) lib.ErrorI {
 		x.DelegateRewardPercentage = value
 	case ParamBuyDeadlineBlocks:
 		x.BuyDeadlineBlocks = value
-	case ParamBuyOrderFeeMultiplier:
-		x.BuyOrderFeeMultiplier = value
+	case ParamLockOrderFeeMultiplier:
+		x.LockOrderFeeMultiplier = value
 	default:
 		return ErrUnknownParam()
 	}
@@ -693,43 +692,46 @@ type GovProposal interface {
 	proto.Message
 	GetStartHeight() uint64
 	GetEndHeight() uint64
+	GetProposalHash() string
 }
 
 // GovProposalWithVote is a wrapper over a GovProposal but contains an approval / disapproval boolean
 type GovProposalWithVote struct {
-	Proposal GovProposal `json:"proposal"`
-	Approve  bool        `json:"approve"`
+	Proposal json.RawMessage `json:"proposal"`
+	Approve  bool            `json:"approve"`
 }
 
-// GovProposals is a list of GovProposalsWithVote keyed by hash of the underlying ProposalJSON
+// GovProposals is a list of GovProposalsWithVote keyed by the transaction hash of the underlying proposal transaction
 type GovProposals map[string]GovProposalWithVote
 
-// NewProposalFromBytes() creates a GovProposal object from json bytes
-func NewProposalFromBytes(b []byte) (GovProposal, lib.ErrorI) {
-	cp, dt := new(MessageChangeParameter), new(MessageDAOTransfer)
-	if err := lib.UnmarshalJSON(b, cp); err != nil || len(cp.Signer) == 0 {
-		if err = lib.UnmarshalJSON(b, dt); err != nil {
-			return nil, err
-		}
-		return dt, nil
-	}
-	return cp, nil
-}
-
 // Add() adds a GovProposalWithVote to the list
-func (p GovProposals) Add(proposal GovProposal, approve bool) lib.ErrorI {
-	bz, err := lib.Marshal(proposal)
+func (p GovProposals) Add(proposalTransaction json.RawMessage, approve bool) (err lib.ErrorI) {
+	// get the transaction hash from the proposal transaction json
+	txHash, err := TxHashFromJSON(proposalTransaction)
+	// if an error occurred during the extraction
 	if err != nil {
-		return err
+		// exit with error
+		return
 	}
-	p[crypto.HashString(bz)] = GovProposalWithVote{proposal, approve}
-	return nil
+	// add to the proposals list keyed by the transaction hash
+	p[txHash] = GovProposalWithVote{proposalTransaction, approve}
+	// exit
+	return
 }
 
 // Del() removes a GovProposalWithVote from the list
-func (p GovProposals) Del(proposal GovProposal) {
-	bz, _ := lib.Marshal(proposal)
-	delete(p, crypto.HashString(bz))
+func (p GovProposals) Del(proposalTransaction json.RawMessage) (err error) {
+	// get the transaction hash from the proposal transaction json
+	txHash, err := TxHashFromJSON(proposalTransaction)
+	// if an error occurred during the extraction
+	if err != nil {
+		// exit with error
+		return
+	}
+	// removed from the proposals list keyed by the transaction hash
+	delete(p, txHash)
+	// exit
+	return
 }
 
 // NewFromFile() creates a new polls object from a file
@@ -740,18 +742,4 @@ func (p *GovProposals) NewFromFile(dataDirPath string) lib.ErrorI {
 // SaveToFile() persists the polls object to a json file
 func (p *GovProposals) SaveToFile(dataDirPath string) lib.ErrorI {
 	return lib.SaveJSONToFile(p, dataDirPath, lib.ProposalsFilePath)
-}
-
-// UnmarshalJSON() implements the json.Unmarshaler interface for GovProposalWithVote
-func (p *GovProposalWithVote) UnmarshalJSON(b []byte) (err error) {
-	j := new(struct {
-		Proposal json.RawMessage `json:"proposal"`
-		Approve  bool            `json:"approve"`
-	})
-	if err = json.Unmarshal(b, &j); err != nil {
-		return
-	}
-	p.Approve = j.Approve
-	p.Proposal, err = NewProposalFromBytes(j.Proposal)
-	return
 }

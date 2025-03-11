@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
@@ -19,8 +18,8 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 		notFound        bool
 	}{
 		{
-			name:   "buy order already accepted",
-			detail: "the buy order cannot be claimed as its already reserved",
+			name:   "lock order locked",
+			detail: "the lock order cannot be claimed as its already reserved",
 			preset: []*lib.SellOrder{
 				{
 					Committee:           lib.CanopyChainId,
@@ -31,7 +30,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				},
 			},
 			orders: &lib.Orders{
-				BuyOrders: []*lib.BuyOrder{
+				LockOrders: []*lib.LockOrder{
 					{
 						OrderId:             0,
 						BuyerReceiveAddress: newTestAddressBytes(t, 1),
@@ -100,7 +99,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				},
 			},
 			orders: &lib.Orders{
-				BuyOrders: []*lib.BuyOrder{
+				LockOrders: []*lib.LockOrder{
 					{
 						OrderId:             0,
 						BuyerReceiveAddress: newTestAddressBytes(t, 1),
@@ -123,22 +122,22 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				require.NoError(t, err)
 				// simulate the escrow supply
 				escrowPoolBalance += preset.AmountForSale
-				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+types.EscrowPoolAddend, preset.AmountForSale))
+				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+EscrowPoolAddend, preset.AmountForSale))
 			}
 			// execute the function call
 			sm.HandleCommitteeSwaps(test.orders, lib.CanopyChainId)
-			// validate the buy orders
-			for _, buyOrder := range test.orders.BuyOrders {
+			// validate the lock orders
+			for _, lockOrder := range test.orders.LockOrders {
 				// get the order
-				order, e := sm.GetOrder(buyOrder.OrderId, lib.CanopyChainId)
+				order, e := sm.GetOrder(lockOrder.OrderId, lib.CanopyChainId)
 				require.NoError(t, e)
-				// if the buy order is already accepted
+				// if the lock order is already accepted
 				if test.alreadyAccepted {
-					require.NotEqual(t, buyOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
+					require.NotEqual(t, lockOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
 				} else {
 					// validate the update of the 'buy' fields
-					require.Equal(t, buyOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
-					require.Equal(t, buyOrder.BuyerChainDeadline, order.BuyerChainDeadline)
+					require.Equal(t, lockOrder.BuyerReceiveAddress, order.BuyerReceiveAddress)
+					require.Equal(t, lockOrder.BuyerChainDeadline, order.BuyerChainDeadline)
 				}
 			}
 			// validate the reset orders
@@ -175,7 +174,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				}
 			}
 			// validate the removal of funds from the escrow pool
-			balance, e := sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
+			balance, e := sm.GetPoolBalance(lib.CanopyChainId + EscrowPoolAddend)
 			require.NoError(t, e)
 			require.Equal(t, escrowPoolBalance-balanceRemovedFromPool, balance)
 		})
@@ -347,18 +346,18 @@ func TestEditOrder(t *testing.T) {
 	}
 }
 
-func TestBuyOrder(t *testing.T) {
+func TestLockOrder(t *testing.T) {
 	tests := []struct {
 		name   string
 		detail string
 		preset *lib.SellOrder
-		order  *lib.BuyOrder
+		order  *lib.LockOrder
 		error  string
 	}{
 		{
-			name:   "buy order not found",
-			detail: "the buy order cannot be found",
-			order: &lib.BuyOrder{
+			name:   "lock order not found",
+			detail: "the lock order cannot be found",
+			order: &lib.LockOrder{
 
 				OrderId:             0,
 				BuyerReceiveAddress: newTestAddressBytes(t, 1),
@@ -367,8 +366,8 @@ func TestBuyOrder(t *testing.T) {
 			error: "not found",
 		},
 		{
-			name:   "buy order already accepted",
-			detail: "the buy order cannot be claimed as its already reserved",
+			name:   "lock order locked",
+			detail: "the lock order cannot be claimed as its already reserved",
 			preset: &lib.SellOrder{
 				Committee:           lib.CanopyChainId,
 				AmountForSale:       100,
@@ -376,24 +375,24 @@ func TestBuyOrder(t *testing.T) {
 				BuyerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:  newTestAddressBytes(t),
 			},
-			order: &lib.BuyOrder{
+			order: &lib.LockOrder{
 
 				OrderId:             0,
 				BuyerReceiveAddress: newTestAddressBytes(t, 1),
 				BuyerChainDeadline:  100,
 			},
-			error: "order already accepted",
+			error: "order locked",
 		},
 		{
-			name:   "buy order",
-			detail: "successful buy order without error",
+			name:   "lock order",
+			detail: "successful lock order without error",
 			preset: &lib.SellOrder{
 				Committee:          lib.CanopyChainId,
 				AmountForSale:      100,
 				RequestedAmount:    100,
 				SellersSendAddress: newTestAddressBytes(t),
 			},
-			order: &lib.BuyOrder{
+			order: &lib.LockOrder{
 				OrderId:             0,
 				BuyerReceiveAddress: newTestAddressBytes(t, 1),
 				BuyerChainDeadline:  100,
@@ -410,7 +409,7 @@ func TestBuyOrder(t *testing.T) {
 				require.NoError(t, err)
 			}
 			// execute the function call
-			err := sm.BuyOrder(test.order, lib.CanopyChainId)
+			err := sm.LockOrder(test.order, lib.CanopyChainId)
 			// validate the expected error
 			require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {
@@ -499,7 +498,7 @@ func TestCloseOrder(t *testing.T) {
 				SellersSendAddress: newTestAddressBytes(t),
 			},
 			order: 0,
-			error: "buy order invalid",
+			error: "lock order invalid",
 		},
 		{
 			name:   "close order",
@@ -522,7 +521,7 @@ func TestCloseOrder(t *testing.T) {
 			if test.preset != nil {
 				_, err := sm.CreateOrder(test.preset, lib.CanopyChainId)
 				require.NoError(t, err)
-				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+types.EscrowPoolAddend, test.preset.AmountForSale))
+				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+EscrowPoolAddend, test.preset.AmountForSale))
 			}
 			// execute the function call
 			err := sm.CloseOrder(test.order, lib.CanopyChainId)
@@ -542,7 +541,7 @@ func TestCloseOrder(t *testing.T) {
 			require.NoError(t, e)
 			require.Equal(t, order.AmountForSale, accountBalance)
 			// validate the removal of funds from the escrow pool
-			balance, e := sm.GetPoolBalance(lib.CanopyChainId + types.EscrowPoolAddend)
+			balance, e := sm.GetPoolBalance(lib.CanopyChainId + EscrowPoolAddend)
 			require.NoError(t, e)
 			require.Zero(t, balance)
 		})
@@ -702,7 +701,7 @@ func TestGetSetOrderBooks(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// create a state machine instance with default parameters
 			sm := newTestStateMachine(t)
-			supply := &types.Supply{}
+			supply := &Supply{}
 			// set the order books
 			require.NoError(t, sm.SetOrderBooks(test.expected, supply))
 			// get the order books
@@ -714,7 +713,7 @@ func TestGetSetOrderBooks(t *testing.T) {
 			require.Equal(t, test.expectedTotalAmount, supply.Total)
 			// validate committee amounts
 			for id, amount := range test.expectedCommitteeAmounts {
-				balance, e := sm.GetPoolBalance(id + types.EscrowPoolAddend)
+				balance, e := sm.GetPoolBalance(id + EscrowPoolAddend)
 				require.NoError(t, e)
 				require.Equal(t, amount, balance)
 			}

@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 )
 
@@ -31,7 +30,7 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	// if not root-Chain: the committee won't match the certificate result
+	// if not root-chain: the committee won't match the certificate result
 	// so just set the committee to nil to ignore the byzantine evidence
 	// the byzantine evidence is handled at `Transaction Level` on the root
 	// chain with a HandleMessageCertificateResults
@@ -83,7 +82,7 @@ func (s *StateMachine) CheckProtocolVersion() (err lib.ErrorI) {
 	}
 	// ensure that the software version is correct
 	if s.Height() >= version.Height && s.ProtocolVersion < version.Version {
-		return types.ErrInvalidProtocolVersion()
+		return ErrInvalidProtocolVersion()
 	}
 	return
 }
@@ -101,7 +100,7 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	}
 	// block the certificate results message
 	if retired {
-		return types.ErrNonSubsidizedCommittee()
+		return ErrNonSubsidizedCommittee()
 	}
 	// get the last data for the committee
 	data, err := s.GetCommitteeData(qc.Header.ChainId)
@@ -148,7 +147,7 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	})
 }
 
-// HandleCheckpoint() handles the `checkpoint-as-a-service` root-Chain functionality
+// HandleCheckpoint() handles the `checkpoint-as-a-service` root-chain functionality
 // NOTE: this will index self checkpoints - but allows for nested-chain checkpointing too
 func (s *StateMachine) HandleCheckpoint(chainId uint64, results *lib.CertificateResult) (err lib.ErrorI) {
 	storeI := s.store.(lib.StoreI)
@@ -161,7 +160,7 @@ func (s *StateMachine) HandleCheckpoint(chainId uint64, results *lib.Certificate
 		}
 		// ensure checkpoint isn't older than the most recent
 		if results.Checkpoint.Height <= mostRecentCheckpoint.Height {
-			return types.ErrInvalidCheckpoint()
+			return ErrInvalidCheckpoint()
 		}
 		// index the checkpoint
 		if err = storeI.IndexCheckpoint(chainId, results.Checkpoint); err != nil {
@@ -178,11 +177,11 @@ func (s *StateMachine) HandleCheckpoint(chainId uint64, results *lib.Certificate
 func (s *StateMachine) ForceUnstakeMaxPaused() lib.ErrorI {
 	var deleteList [][]byte
 	// force unstake all addresses under the (max) paused prefix for the latest height
-	err := s.IterateAndExecute(types.PausedPrefix(s.Height()), func(key, _ []byte) lib.ErrorI {
+	err := s.IterateAndExecute(PausedPrefix(s.Height()), func(key, _ []byte) lib.ErrorI {
 		// add the key to the 'delete list'
 		deleteList = append(deleteList, key)
 		// extract the address from the key
-		addr, err := types.AddressFromKey(key)
+		addr, err := AddressFromKey(key)
 		if err != nil {
 			return err
 		}
@@ -218,10 +217,25 @@ func (s *StateMachine) UpdateLastProposers(address []byte) lib.ErrorI {
 	return s.SetLastProposers(list)
 }
 
+// LoadLastProposers() returns the last Proposer addresses saved in the state for a particular height
+func (s *StateMachine) LoadLastProposers(height uint64) (*lib.Proposers, lib.ErrorI) {
+	// get the historical finite state machine using the height
+	historicalFSM, err := s.TimeMachine(height)
+	// if an error occurred when retrieving the historical FSM
+	if err != nil {
+		// return the error
+		return nil, err
+	}
+	// memory manage the historical FSM
+	defer historicalFSM.Discard()
+	// return the GetLastProposers call for this historical FSM
+	return historicalFSM.GetLastProposers()
+}
+
 // GetLastProposers() returns the last Proposer addresses saved in the state
 func (s *StateMachine) GetLastProposers() (*lib.Proposers, lib.ErrorI) {
 	// get the bytes for the last proposers using the last proposers prefix
-	bz, err := s.Get(types.LastProposersPrefix())
+	bz, err := s.Get(LastProposersPrefix())
 	if err != nil {
 		return nil, err
 	}
@@ -243,5 +257,5 @@ func (s *StateMachine) SetLastProposers(keys *lib.Proposers) lib.ErrorI {
 		return err
 	}
 	// set the bytes under the proposers prefix key
-	return s.Set(types.LastProposersPrefix(), bz)
+	return s.Set(LastProposersPrefix(), bz)
 }

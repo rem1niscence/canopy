@@ -2,7 +2,6 @@ package fsm
 
 import (
 	"fmt"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
@@ -48,7 +47,7 @@ func TestBeginBlock(t *testing.T) {
 			name:            "begin_block after genesis with invalid protocol version",
 			detail:          "after genesis with an invalid protocol version will return error",
 			protocolVersion: 0,
-			error:           types.ErrInvalidProtocolVersion(),
+			error:           ErrInvalidProtocolVersion(),
 		},
 	}
 	for _, test := range tests {
@@ -70,11 +69,11 @@ func TestBeginBlock(t *testing.T) {
 					}},
 				}
 				// track the supply
-				supply := &types.Supply{}
+				supply := &Supply{}
 				// for 4 validators
 				for i := 0; i < 4; i++ {
 					// set the validator
-					require.NoError(t, sm.SetValidators([]*types.Validator{{
+					require.NoError(t, sm.SetValidators([]*Validator{{
 						Address:      newTestAddressBytes(t, i),
 						PublicKey:    newTestPublicKeyBytes(t, i),
 						StakedAmount: 100,
@@ -180,7 +179,7 @@ func TestEndBlock(t *testing.T) {
 		previousProposers     [][]byte
 		committeeRewardAmount uint64
 		committeeData         []*lib.CommitteeData
-		validators            []*types.Validator
+		validators            []*Validator
 		error                 lib.ErrorI
 	}{
 		{
@@ -218,7 +217,7 @@ func TestEndBlock(t *testing.T) {
 			committeeData:     committeeData,
 			height:            1,
 			previousProposers: [][]byte{{}, {}, {}, {}, {}},
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:         newTestAddressBytes(t),
 				NetAddress:      "http://localhost:8081",
 				StakedAmount:    100,
@@ -232,7 +231,7 @@ func TestEndBlock(t *testing.T) {
 			committeeData:     committeeData,
 			height:            1,
 			previousProposers: [][]byte{{}, {}, {}, {}, {}},
-			validators: []*types.Validator{{
+			validators: []*Validator{{
 				Address:         newTestAddressBytes(t),
 				NetAddress:      "http://localhost:8081",
 				StakedAmount:    100,
@@ -403,14 +402,14 @@ func TestCheckProtocolVersion(t *testing.T) {
 			detail:      "local protocol version < protocol version && local height == protocol version height. Like someone not upgraded at the required height",
 			localHeight: 1, localProtocolVersion: 0,
 			protocolVersionHeight: 1, protocolVersion: 1,
-			error: types.ErrInvalidProtocolVersion(),
+			error: ErrInvalidProtocolVersion(),
 		},
 		{
 			name:        "higher protocol version after height",
 			detail:      "local protocol version < protocol version && local height == protocol version height. Like someone not upgraded after the required height",
 			localHeight: 2, localProtocolVersion: 0,
 			protocolVersionHeight: 1, protocolVersion: 1,
-			error: types.ErrInvalidProtocolVersion(),
+			error: ErrInvalidProtocolVersion(),
 		},
 	}
 	for _, test := range tests {
@@ -425,7 +424,7 @@ func TestCheckProtocolVersion(t *testing.T) {
 			consParams, err := sm.GetParamsCons()
 			require.NoError(t, err)
 			// set the protocol version in state
-			consParams.ProtocolVersion = types.NewProtocolVersion(test.protocolVersionHeight, test.protocolVersion)
+			consParams.ProtocolVersion = NewProtocolVersion(test.protocolVersionHeight, test.protocolVersion)
 			require.NoError(t, sm.SetParamsCons(consParams))
 			// run the function call and ensure expected error is returned
 			require.Equal(t, test.error, sm.CheckProtocolVersion())
@@ -437,21 +436,21 @@ func TestForceUnstakeMaxPaused(t *testing.T) {
 	tests := []struct {
 		name            string
 		detail          string
-		preset          []*types.Validator
-		expected        []*types.Validator
+		preset          []*Validator
+		expected        []*Validator
 		unstakingBlocks uint64
 		height          uint64
 	}{
 		{
 			name:   "single validator",
 			detail: "only 1 validator",
-			preset: []*types.Validator{
+			preset: []*Validator{
 				{
 					Address:         newTestAddressBytes(t),
 					MaxPausedHeight: 2,
 				},
 			},
-			expected: []*types.Validator{
+			expected: []*Validator{
 				{
 					Address:         newTestAddressBytes(t),
 					MaxPausedHeight: 0,
@@ -464,7 +463,7 @@ func TestForceUnstakeMaxPaused(t *testing.T) {
 		{
 			name:   "multi validator all max paused",
 			detail: "multiple validators all max paused",
-			preset: []*types.Validator{
+			preset: []*Validator{
 				{
 					Address:         newTestAddressBytes(t),
 					MaxPausedHeight: 2,
@@ -474,7 +473,7 @@ func TestForceUnstakeMaxPaused(t *testing.T) {
 					MaxPausedHeight: 2,
 				},
 			},
-			expected: []*types.Validator{
+			expected: []*Validator{
 				{
 					Address:         newTestAddressBytes(t),
 					MaxPausedHeight: 0,
@@ -497,7 +496,7 @@ func TestForceUnstakeMaxPaused(t *testing.T) {
 			// set the height
 			sm.height = test.height
 			// set the unstaking blocks
-			require.NoError(t, sm.UpdateParam(types.ParamSpaceVal, types.ParamUnstakingBlocks, &lib.UInt64Wrapper{Value: test.unstakingBlocks}))
+			require.NoError(t, sm.UpdateParam(ParamSpaceVal, ParamUnstakingBlocks, &lib.UInt64Wrapper{Value: test.unstakingBlocks}))
 			// get the validator params
 			valParams, err := sm.GetParamsVal()
 			require.NoError(t, err)
@@ -517,7 +516,7 @@ func TestForceUnstakeMaxPaused(t *testing.T) {
 				// compare got vs expected
 				require.EqualExportedValues(t, expected, got)
 				// validate pause key removed
-				bz, e := sm.Get(types.KeyForPaused(sm.Height(), address))
+				bz, e := sm.Get(KeyForPaused(sm.Height(), address))
 				require.NoError(t, e)
 				require.Len(t, bz, 0)
 				// validate not paused on structure
@@ -527,7 +526,7 @@ func TestForceUnstakeMaxPaused(t *testing.T) {
 				// validate unstaking on structure
 				require.Equal(t, expectedUnstakingHeight, expected.UnstakingHeight)
 				// validate unstaking key exists
-				bz, e = sm.Get(types.KeyForUnstaking(expectedUnstakingHeight, address))
+				bz, e = sm.Get(KeyForUnstaking(expectedUnstakingHeight, address))
 				require.NoError(t, e)
 				require.Len(t, bz, 1)
 			}
@@ -595,9 +594,9 @@ func (s *StateMachine) calculateRewardPerCommittee(t *testing.T, numberOfSubsidi
 	govParams, err := s.GetParamsGov()
 	require.NoError(t, err)
 	// calculate the number of halvenings
-	halvings := float64(s.height / uint64(types.BlocksPerHalvening))
+	halvings := float64(s.height / uint64(BlocksPerHalvening))
 	// each halving, the reward is divided by 2
-	totalMintAmount := uint64(float64(types.InitialTokensPerBlock) / (math.Pow(2, halvings)))
+	totalMintAmount := uint64(float64(InitialTokensPerBlock) / (math.Pow(2, halvings)))
 	// calculate the amount left for the committees after the parameterized DAO cut
 	mintAmountAfterDAOCut := lib.Uint64ReducePercentage(totalMintAmount, govParams.DaoRewardPercentage)
 	// calculate the DAO cut

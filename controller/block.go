@@ -2,13 +2,13 @@ package controller
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/canopy-network/canopy/p2p"
 	"math/rand"
 	"time"
 
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 )
@@ -207,7 +207,7 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 	// ensure generated the same results
 	if !qc.Results.Equals(compareResults) {
 		// exit with error
-		return types.ErrMismatchCertResults()
+		return fsm.ErrMismatchCertResults()
 	}
 	// exit
 	return
@@ -256,6 +256,11 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	c.Mempool.checkMempool()
 	// parse committed block for straw polls
 	c.FSM.ParsePollTransactions(blockResult)
+	// if self was the proposer
+	if bytes.Equal(qc.ProposerKey, c.PublicKey) && !c.isSyncing.Load() {
+		// send the certificate results transaction on behalf of the quorum
+		c.SendCertificateResultsTx(qc)
+	}
 	// log the start of the commit
 	c.log.Debug("Committing to store")
 	// atomically write all from the ephemeral database batch to the actual database
@@ -264,7 +269,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		return
 	}
 	// log to signal finishing the commit
-	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToString(qc.ResultsHash), block.BlockHeader.Height)
+	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToTruncatedString(qc.BlockHash), block.BlockHeader.Height)
 	// set up the finite state machine for the next height
 	c.FSM, err = fsm.New(c.Config, storeI, c.log)
 	if err != nil {
@@ -293,11 +298,12 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 	candidate, candidateHash, candidateHeight := block.BlockHeader, lib.BytesToString(block.BlockHeader.Hash), block.BlockHeader.Height
 	// check the last qc in the candidate and set it in the ephemeral indexer to prepare for block application
 	if err = c.CheckAndSetLastCertificate(candidate); err != nil {
+		fmt.Println("last certificate")
 		// exit with error
 		return
 	}
 	// log the start of 'apply block'
-	c.log.Debugf("Applying block %s for height %d", candidateHash, candidateHeight)
+	c.log.Debugf("Applying block %s for height %d", candidateHash[:20], candidateHeight)
 	// apply the block against the state machine
 	compare, txResults, err := c.FSM.ApplyBlock(block)
 	if err != nil {
@@ -326,7 +332,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 		}
 	}
 	// log that the proposal is valid
-	c.log.Infof("Block %s with %d txs is valid for height %d ✅ ", candidateHash, len(block.Transactions), candidateHeight)
+	c.log.Infof("Block %s with %d txs is valid for height %d ✅ ", candidateHash[:20], len(block.Transactions), candidateHeight)
 	// exit with the valid results
 	return &lib.BlockResult{BlockHeader: candidate, Transactions: txResults}, nil
 }
@@ -347,7 +353,7 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 		// use checkpoints to protect against long-range attacks
 		if qc.Header.Height%CheckpointFrequency == 0 {
 			// get the checkpoint from the base chain (or file if independent)
-			checkpoint, err := c.RootChainInfo.GetCheckpoint(qc.Header.Height, c.Config.ChainId)
+			checkpoint, err := c.RootChainInfo.GetCheckpoint(c.LoadRootChainId(qc.Header.Height), qc.Header.Height, c.Config.ChainId)
 			// if getting the checkpoint failed
 			if err != nil {
 				// warn of the inability to get the checkpoint
@@ -361,7 +367,7 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 		}
 	} else {
 		// load the committee from the root chain using the root height embedded in the certificate message
-		v, err := c.Consensus.LoadCommittee(qc.Header.RootHeight)
+		v, err := c.Consensus.LoadCommittee(c.LoadRootChainId(qc.Header.Height), qc.Header.RootHeight)
 		if err != nil {
 			// exit with error
 			return nil, err
@@ -399,11 +405,6 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 		// exit with error
 		return nil, err
 	}
-	// if self was the proposer
-	if bytes.Equal(qc.ProposerKey, c.PublicKey) && !c.isSyncing.Load() {
-		// send the certificate results transaction on behalf of the quorum
-		c.SendCertificateResultsTx(qc)
-	}
 	// exit
 	return qc, nil
 }
@@ -425,9 +426,9 @@ func (c *Controller) CheckAndSetLastCertificate(candidate *lib.BlockHeader) lib.
 			return lib.ErrInvalidLastQuorumCertificate()
 		}
 		// define a convenience variable for the 'root height'
-		rHeight := candidate.LastQuorumCertificate.Header.RootHeight
-		// get the committee from the 'root chain'
-		vs, err := c.LoadCommittee(rHeight)
+		rHeight, height := candidate.LastQuorumCertificate.Header.RootHeight, candidate.LastQuorumCertificate.Header.Height
+		// get the committee from the 'root chain' from the n-1 height because state heights represent 'end block state' once committed
+		vs, err := c.LoadCommittee(c.LoadRootChainId(height), rHeight)
 		if err != nil {
 			// exit with error
 			return err
@@ -459,15 +460,15 @@ func (c *Controller) CheckAndSetLastCertificate(candidate *lib.BlockHeader) lib.
 func (c *Controller) SetFSMInConsensusModeForProposals() (reset func()) {
 	if c.Consensus.GetRound() < 3 {
 		// if the node is not having 'consensus issues' refer to the approve list
-		c.FSM.SetProposalVoteConfig(types.GovProposalVoteConfig_APPROVE_LIST)
+		c.FSM.SetProposalVoteConfig(fsm.GovProposalVoteConfig_APPROVE_LIST)
 	} else {
 		// if the node is exhibiting 'chain halt' like behavior, reject all proposals
-		c.FSM.SetProposalVoteConfig(types.GovProposalVoteConfig_REJECT_ALL)
+		c.FSM.SetProposalVoteConfig(fsm.GovProposalVoteConfig_REJECT_ALL)
 	}
 	// a callback that resets the configuration back to default
 	reset = func() {
 		// the default is to accept all except in 'Consensus mode'
-		c.FSM.SetProposalVoteConfig(types.AcceptAllProposals)
+		c.FSM.SetProposalVoteConfig(fsm.AcceptAllProposals)
 	}
 	return
 }

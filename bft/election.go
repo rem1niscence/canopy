@@ -68,7 +68,7 @@ func VerifyCandidate(p *SortitionVerifyParams) (out []byte, isCandidate bool) {
 		return nil, false
 	}
 	// build the seed data
-	msg := lib.FormatSortitionInput(p.LastProposerAddresses, p.Height, p.Round)
+	msg := lib.FormatInputIntoSeed(p.LastProposerAddresses, p.Height, p.Round)
 	// validate the VRF out
 	if !p.PublicKey.VerifyBytes(msg, p.Signature) {
 		return nil, false
@@ -119,7 +119,7 @@ func SelectProposerFromCandidates(candidates []VRFCandidate, data *lib.Sortition
 // for applications like digital signatures, VRFs, and blockchain consensus mechanisms.
 func VRF(lastNProposers [][]byte, height, round uint64, privateKey crypto.PrivateKeyI) *lib.Signature {
 	// generate the seed data that all Validators use during this View
-	vrfIn := lib.FormatSortitionInput(lastNProposers, height, round)
+	vrfIn := lib.FormatInputIntoSeed(lastNProposers, height, round)
 	// sign it with the Private Key
 	return &lib.Signature{
 		PublicKey: privateKey.PublicKey().Bytes(),

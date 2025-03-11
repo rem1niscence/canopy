@@ -130,7 +130,7 @@ function getCardNote(props, idx) {
     case 0:
       return <Truncate className="d-inline" text={v.results[0].blockHeader.hash} />;
     case 1:
-      return "+" + Number(50) + "/blk";
+      return "+" + Number(80) + "/blk";
     case 2:
       return "TOTAL " + convertNumber(v.results[0].blockHeader.totalTxs);
     case 3:

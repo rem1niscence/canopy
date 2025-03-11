@@ -5,9 +5,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
-/*
-	Persistence interfaces
-*/
+/* This file contains persistence module interfaces that are used throughout the app */
 
 // StoreI defines the interface for interacting with blockchain storage
 type StoreI interface {

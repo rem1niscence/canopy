@@ -2,10 +2,11 @@ package controller
 
 import (
 	"bytes"
-	"github.com/canopy-network/canopy/bft"
-	"github.com/canopy-network/canopy/fsm/types"
-	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/fsm"
 	"slices"
+
+	"github.com/canopy-network/canopy/bft"
+	"github.com/canopy-network/canopy/lib"
 )
 
 /* This file implements the 'Certificate Result' logic which ensures the */
@@ -29,7 +30,7 @@ func (c *Controller) NewCertificateResults(block *lib.Block, blockResult *lib.Bl
 // SendCertificateResultsTx() originates and auto-sends a CertificateResultsTx after successfully leading a Consensus height
 func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 	// get the root chain id from the state
-	rootChainId, err := c.FSM.GetRootChainId()
+	rootChainId := c.LoadRootChainId(c.ChainHeight())
 	// if the chain is its own root, don't send a transaction
 	if c.Config.ChainId == rootChainId {
 		// exit
@@ -42,7 +43,7 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 	// omit the block when sending the transaction as it's not relevant to the root chain
 	qc.Block = nil
 	// create a new certificate results transaction
-	tx, err := types.NewCertificateResultsTx(c.PrivateKey, qc, rootChainId, c.Config.NetworkID, 0, c.RootChainHeight(), "")
+	tx, err := fsm.NewCertificateResultsTx(c.PrivateKey, qc, rootChainId, c.Config.NetworkID, 0, c.RootChainHeight(), "")
 	// if an error occurred during the tx creation
 	if err != nil {
 		// log the error
@@ -50,8 +51,17 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 		// exit
 		return
 	}
-	// handle the transaction on the root-Chain
-	hash, err := c.RootChainInfo.RemoteCallbacks.Transaction(tx)
+	// get a rpc client for the root chain id
+	rpcClient, err := c.RootChainInfo.GetRemoteCallbacks(rootChainId)
+	// if an error occurred getting the callback
+	if err != nil {
+		// log the error
+		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
+		// exit
+		return
+	}
+	// handle the transaction on the root-chain
+	hash, err := rpcClient.Transaction(tx)
 	// if an error occurred during the tx submission
 	if err != nil {
 		// log the error
@@ -173,9 +183,9 @@ func (c *Controller) addPaymentPercent(toAdd *lib.LotteryWinner, results *lib.Ce
 
 // HandleSwaps() handles the 'buy' side of the sell orders
 func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.CertificateResult, rootChainHeight uint64) {
-	// parse the last block for 'buy orders'
-	buyOrders := c.FSM.ParseBuyOrders(blockResult)
-	// get orders from the root-Chain
+	// parse the last block for 'lock orders'
+	lockOrders := c.FSM.ParseLockOrders(blockResult)
+	// get orders from the root-chain
 	orders, err := c.LoadRootChainOrderBook(rootChainHeight)
 	// if an error occurred while loading the orders
 	if err != nil {
@@ -186,13 +196,13 @@ func (c *Controller) HandleSwaps(blockResult *lib.BlockResult, results *lib.Cert
 	closeOrders, resetOrders := c.FSM.ProcessRootChainOrderBook(orders, blockResult)
 	// add the orders to the certificate result - truncating the 'lock orders' for defensive spam protection
 	results.Orders = &lib.Orders{
-		BuyOrders:   lib.TruncateSlice(buyOrders, 1000),
+		LockOrders:  lib.TruncateSlice(lockOrders, 1000),
 		ResetOrders: resetOrders,
 		CloseOrders: closeOrders,
 	}
 }
 
-// CalculateSlashRecipients() calculates the addresses who receive slashes on the root-Chain
+// CalculateSlashRecipients() calculates the addresses who receive slashes on the root-chain
 func (c *Controller) CalculateSlashRecipients(results *lib.CertificateResult, be *bft.ByzantineEvidence) {
 	// define an error variable to be able to populate the Double signers directly
 	var err lib.ErrorI

@@ -73,12 +73,13 @@ func (b *BFT) ProcessDSE(dse ...*DoubleSignEvidence) (results []*lib.DoubleSigne
 		}
 		// load the Validator set for this Committee at that height
 		committeeHeight := x.VoteA.Header.RootHeight
-		vs, err := b.LoadCommittee(committeeHeight)
+		// load the committee from the root chain id using the n-1 height because state machine heights are 'end state' once committed
+		vs, err := b.LoadCommittee(b.LoadRootChainId(x.VoteA.Header.Height), committeeHeight)
 		if err != nil {
 			return nil, err
 		}
 		// ensure the evidence isn't expired
-		minEvidenceHeight, err := b.LoadMinimumEvidenceHeight(committeeHeight)
+		minEvidenceHeight, err := b.LoadMinimumEvidenceHeight()
 		if err != nil {
 			return nil, err
 		}

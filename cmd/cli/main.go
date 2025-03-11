@@ -17,7 +17,6 @@ import (
 	"github.com/canopy-network/canopy/cmd/rpc"
 	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/fsm"
-	"github.com/canopy-network/canopy/fsm/types"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/store"
@@ -90,10 +89,14 @@ func Start() {
 	if err != nil {
 		l.Fatal(err.Error())
 	}
+	// initialize the rpc server
+	rpcServer := rpc.NewServer(app, config, l)
+	// set the remote callbacks
+	app.RootChainInfo.GetRemoteCallbacks = rpcServer.RemoteCallbacks
 	// start the application
 	app.Start()
-	// start the rpc
-	rpc.StartRPC(app, config, l)
+	// start the rpc server
+	rpcServer.Start()
 	// block until a kill signal is received
 	waitForKill()
 	// gracefully stop the app
@@ -185,16 +188,25 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 	if _, err := os.Stat(filepath.Join(dataDirPath, lib.ProposalsFilePath)); errors.Is(err, os.ErrNotExist) {
 		log.Infof("Creating %s file", lib.ProposalsFilePath)
 		// create an example proposal
-		proposals := make(types.GovProposals)
+		blsPrivateKey, _ := crypto.NewBLS12381PrivateKey()
+		proposals := make(fsm.GovProposals)
 		a, _ := lib.NewAny(&lib.StringWrapper{Value: "example"})
-		if err = proposals.Add(&types.MessageChangeParameter{
-			ParameterSpace: types.ParamSpaceCons + "|" + types.ParamSpaceFee + "|" + types.ParamSpaceVal + "|" + types.ParamSpaceGov,
-			ParameterKey:   types.ParamProtocolVersion,
+		tx, e := fsm.NewTransaction(blsPrivateKey, &fsm.MessageChangeParameter{
+			ParameterSpace: fsm.ParamSpaceCons + "|" + fsm.ParamSpaceFee + "|" + fsm.ParamSpaceVal + "|" + fsm.ParamSpaceGov,
+			ParameterKey:   fsm.ParamProtocolVersion,
 			ParameterValue: a,
 			StartHeight:    1,
-			EndHeight:      1000000,
-			Signer:         []byte(strings.Repeat("F", crypto.HashSize*2)),
-		}, true); err != nil {
+			EndHeight:      1000,
+			Signer:         []byte(strings.Repeat("F", 20)),
+		}, 1, 1, 10000, 1, "example")
+		if e != nil {
+			log.Fatal(e.Error())
+		}
+		jsonBytes, e := lib.MarshalJSONIndent(tx)
+		if e != nil {
+			log.Fatal(e.Error())
+		}
+		if err = proposals.Add(jsonBytes, true); err != nil {
 			log.Fatal(err.Error())
 		}
 		if err = proposals.SaveToFile(dataDirPath); err != nil {
@@ -211,11 +223,11 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 		log.Infof("Creating %s file", lib.PollsFilePath)
 		// create an example poll
 		examplePollHash := crypto.HashString([]byte("example"))
-		polls := &types.ActivePolls{
+		polls := &fsm.ActivePolls{
 			Polls: map[string]map[string]bool{
 				examplePollHash: {privateValKey.PublicKey().Address().String(): true},
 			},
-			PollMeta: map[string]*types.StartPoll{
+			PollMeta: map[string]*fsm.StartPoll{
 				examplePollHash: {
 					StartPoll: examplePollHash,
 					Url:       "https://forum.cnpy.network/something",
@@ -246,10 +258,10 @@ func InitializeDataDirectory(dataDirPath string, log lib.LoggerI) (c lib.Config,
 func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFilePath string) {
 	consPubKey := validatorPrivateKey.PublicKey()
 	addr := consPubKey.Address()
-	j := &types.GenesisState{
+	j := &fsm.GenesisState{
 		Time:     uint64(time.Now().UnixMicro()),
-		Accounts: []*types.Account{{Address: addr.Bytes(), Amount: 1000000}},
-		Validators: []*types.Validator{{
+		Accounts: []*fsm.Account{{Address: addr.Bytes(), Amount: 1000000}},
+		Validators: []*fsm.Validator{{
 			Address:      addr.Bytes(),
 			PublicKey:    consPubKey.Bytes(),
 			Committees:   []uint64{lib.CanopyChainId},
@@ -257,7 +269,7 @@ func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFile
 			StakedAmount: 1000000000000,
 			Output:       addr.Bytes(),
 		}},
-		Params: types.DefaultParams(),
+		Params: fsm.DefaultParams(),
 	}
 	bz, _ := json.MarshalIndent(j, "", "  ")
 	if err := os.WriteFile(genesisFilePath, bz, 0777); err != nil {

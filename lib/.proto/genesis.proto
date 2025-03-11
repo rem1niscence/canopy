@@ -1,7 +1,7 @@
 syntax = "proto3";
 package types;
 
-option go_package = "github.com/canopy-network/canopy/fsm/types";
+option go_package = "github.com/canopy-network/canopy/fsm";
 
 import "account.proto";
 import "validator.proto";
