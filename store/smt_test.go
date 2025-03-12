@@ -1803,234 +1803,290 @@ func TestBytesToBits(t *testing.T) {
 }
 
 func TestStoreProof(t *testing.T) {
-	threeLeavesPreset := &NodeList{
-		Nodes: []*node{
-			{ // 1000
-				Key:  &key{leastSigBits: []int{1, 0, 0, 0}}, // leaf
-				Node: lib.Node{},
-			},
-			{ // 1110
-				Key: &key{leastSigBits: []int{1, 1, 1, 0}}, // leaf
-				Node: lib.Node{
-					Value: []byte("some_value"),
-				},
-			},
-			{ // 1111
-				Key:  &key{leastSigBits: []int{1, 1, 1, 1}}, // leaf
-				Node: lib.Node{},
-			},
-		},
-	}
-
-	fourLeavesPreset := &NodeList{
-		Nodes: []*node{
-			{ // 0001
-				Key: &key{leastSigBits: []int{0, 0, 0, 1}}, // leaf
-				Node: lib.Node{
-					Value: []byte("some_value"),
-				},
-			},
-			{ // 0010
-				Key:  &key{leastSigBits: []int{0, 0, 1, 0}}, // leaf
-				Node: lib.Node{},
-			},
-			{ // 1000
-				Key:  &key{leastSigBits: []int{1, 1, 1, 0}}, // leaf
-				Node: lib.Node{},
-			},
-			{ // 1111
-				Key: &key{leastSigBits: []int{1, 1, 1, 1}}, // leaf
-				Node: lib.Node{
-					Value: []byte("some_value"),
-				},
-			},
-		},
-	}
-
 	tests := []struct {
 		name               string
 		detail             string
 		keyBitSize         int
-		target             *node
 		preset             *NodeList
-		rootKey            []byte
 		valid              bool
 		validateMembership bool
 		proofErr           error
+		targetKey          []byte
+		targetValue        []byte
 	}{
 		{
-			name: "valid proof of membership with target at 1110",
-			detail: `Preset:      root
-		                         /    \
-							   0000    1
-		                         /      \
-		                       1000     111
-		                                /   \
-		                            *1110*  1111
+			name: "valid proof of membership with target at 010",
+			detail: `Preset:   root
+							  /    \
+						     0       1
+						   /  \     /  \
+					    000  *010* 101 111
 							`,
-			keyBitSize:         4,
-			preset:             threeLeavesPreset,
-			target:             &node{Key: &key{leastSigBits: []int{1, 1, 1, 0}}, Node: lib.Node{Value: []byte("some_value")}},
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("110", nil, "0", "1"), // root
+					newTestNode("0", nil, "000", "010"),
+					newTestNode("1", nil, "101", "111"),
+					newTestNode("000", nil, "", ""),                  // leaf
+					newTestNode("010", []byte("some_value"), "", ""), // leaf
+					newTestNode("101", nil, "", ""),                  // leaf
+					newTestNode("111", nil, "", ""),                  // leaf
+				},
+			},
+			keyBitSize:         3,
 			validateMembership: true,
 			valid:              true,
-			rootKey:            []byte("a_random_root_key"),
+			targetKey:          []byte{1}, // hashes to [010]
+			targetValue:        []byte("some_value"),
 		},
 		{
-			name: "valid proof of non membership with target at 2101",
+			name: "valid proof of non-membership with target at 011",
+			detail: `Preset:   root
+							  /    \
+						     0       1
+						   /  \     /  \
+					    000  *010* 101 111
+							`,
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("110", nil, "0", "1"), // root
+					newTestNode("0", nil, "000", "010"),
+					newTestNode("1", nil, "101", "111"),
+					newTestNode("000", nil, "", ""),                  // leaf
+					newTestNode("010", []byte("some_value"), "", ""), // leaf
+					newTestNode("101", nil, "", ""),                  // leaf
+					newTestNode("111", nil, "", ""),                  // leaf
+				},
+			},
+			keyBitSize:         3,
+			validateMembership: false,
+			valid:              true,
+			targetKey:          []byte{6}, // hashes to [011]
+			targetValue:        []byte("some_value"),
+		},
+		{
+			name: "invalid proof of membership with target at 010 (key exist, values differ)",
+			detail: `Preset:   root
+							  /    \
+						     0       1
+						   /  \     /  \
+					    000  *010* 101 111
+							`,
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("110", nil, "0", "1"), // root
+					newTestNode("0", nil, "000", "010"),
+					newTestNode("1", nil, "101", "111"),
+					newTestNode("000", nil, "", ""),                  // leaf
+					newTestNode("010", []byte("some_value"), "", ""), // leaf
+					newTestNode("101", nil, "", ""),                  // leaf
+					newTestNode("111", nil, "", ""),                  // leaf
+				},
+			},
+			keyBitSize:         3,
+			validateMembership: true,
+			valid:              false,
+			targetKey:          []byte{1}, // hashes to [010]
+			targetValue:        []byte("wrong_value"),
+		},
+		{
+			name: "invalid proof of non membership with target at 110 (key exists)",
+			detail: `Preset:   root
+							  /    \
+						     0       1
+						   /  \     /  \
+					    000   010 100 *110*
+							`,
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("001", nil, "0", "1"), // root
+					newTestNode("0", nil, "000", "010"),
+					newTestNode("1", nil, "100", "110"),
+					newTestNode("000", nil, "", ""), // leaf
+					newTestNode("010", []byte("some_value"), "", ""),
+					newTestNode("100", nil, "", ""), // leaf
+					newTestNode("110", nil, "", ""), // leaf
+				},
+			},
+			keyBitSize:         3,
+			validateMembership: false,
+			valid:              false,
+			targetKey:          []byte{2}, // hashes to [110]
+			targetValue:        []byte(""),
+		},
+		{
+			name: "valid proof of membership with target at 1000",
 			detail: `Preset:      root
 		                         /    \
 		                       0000    1
-		                         /      \
-		                       1000     111
+		                             /  \
+							    *1000*  111
 		                                /   \
-		                             1110  1111
+		                              1110  1111
 							`,
-			keyBitSize:         4,
-			preset:             threeLeavesPreset,
-			target:             &node{Key: &key{leastSigBits: []int{2, 1, 0, 1}}, Node: lib.Node{Value: []byte("some_value")}},
-			validateMembership: false,
+			keyBitSize: 4,
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("1011", nil, "0000", "1"), // root
+					newTestNode("0000", nil, "", ""),      // leaf
+					newTestNode("1", nil, "1000", "111"),
+					newTestNode("1000", []byte("some_value"), "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1110", nil, "", ""), // leaf
+					newTestNode("1111", nil, "", ""), // leaf
+				},
+			},
+			targetKey:          []byte{20}, // hashes to [1 0 0 0]
+			targetValue:        []byte("some_value"),
+			validateMembership: true,
 			valid:              true,
-			rootKey:            []byte("a_random_root_key"),
 		},
 		{
-			name: "invalid proof of non membership with target at 1111 (key exist, values differ)",
+			name: "invalid proof of membership with target at 1110 (key exist, values differ)",
 			detail: `Preset:      root
 		                         /    \
 		                       0000    1
-		                         /      \
-		                       1000     111
+		                             /  \
+							      1000   11
 		                                /   \
-		                             1110  *1111*
+		                              1100  *1110*
 							`,
-			keyBitSize:         4,
-			preset:             threeLeavesPreset,
-			target:             &node{Key: &key{leastSigBits: []int{1, 1, 1, 1}}, Node: lib.Node{Value: []byte("some_value")}},
+			keyBitSize: 4,
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("1011", nil, "0000", "1"), // root
+					newTestNode("0000", nil, "", ""),      // leaf
+					newTestNode("1", nil, "1000", "11"),
+					newTestNode("1000", nil, "", ""), // leaf
+					newTestNode("11", nil, "1100", "1110"),
+					newTestNode("1100", nil, "", ""),                  // leaf
+					newTestNode("1110", []byte("some_value"), "", ""), // leaf
+				},
+			},
+
+			targetKey:          []byte{4}, // hashes to [1 1 1 0]
+			targetValue:        []byte("wrong_value"),
 			validateMembership: true,
 			valid:              false,
-			rootKey:            []byte("a_random_root_key"),
 		},
 		{
-			name: "invalid proof of non membership with target at 1111 (key exists)",
-			detail: `Preset:        root
-		                         /        \
-		                       0           1
-		                     /  \         /   \
-		                   0001 0010    1110  1111
+			name: "valid proof of non membership with target at 1001",
+			detail: `Preset:      root
+		                         /    \
+		                       0000    1
+		                             /  \
+							      1000  111
+		                                /   \
+		                              1110  1111 (does not exist)
 							`,
-			keyBitSize:         4,
-			preset:             fourLeavesPreset,
-			target:             &node{Key: &key{leastSigBits: []int{1, 1, 1, 1}}, Node: lib.Node{Value: []byte("some_value")}},
+			keyBitSize: 4,
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("1011", nil, "0000", "1"), // root
+					newTestNode("0000", nil, "", ""),      // leaf
+					newTestNode("1", nil, "1000", "111"),
+					newTestNode("1000", nil, "", ""), // leaf
+					newTestNode("111", nil, "1110", "1111"),
+					newTestNode("1110", nil, "", ""),                  // leaf
+					newTestNode("1111", []byte("some_value"), "", ""), // leaf
+				},
+			},
+
+			targetKey:          []byte{13}, // hashes to [1 0 0 1]
+			targetValue:        []byte("wrong_value"),
 			validateMembership: false,
-			valid:              false,
-			rootKey:            []byte("a_random_root_key"),
-		},
-		{
-			name: "valid proof of membership with target at 0001",
-			detail: `Preset:        root
-		                         /        \
-		                       0           1
-		                     /  \         /   \
-		                   0001 0010    1110  1111
-							`,
-			keyBitSize:         4,
-			preset:             fourLeavesPreset,
-			target:             &node{Key: &key{leastSigBits: []int{0, 0, 0, 1}}, Node: lib.Node{Value: []byte("some_value")}},
-			validateMembership: true,
 			valid:              true,
-			rootKey:            []byte("a_random_root_key"),
 		},
 		{
-			name: "invalid proof of non membership with target at 0001 (values differ)",
-			detail: `Preset:        root
+			name: "attempt to verify a root key",
+			detail: `Preset:        root (*1011*)
 		                         /        \
-		                       0           1
-		                     /  \         /   \
-		                   0001 0010    1110  1111
+		                       0000       1111
 							`,
-			keyBitSize:         4,
-			preset:             fourLeavesPreset,
-			target:             &node{Key: &key{leastSigBits: []int{0, 0, 0, 1}}, Node: lib.Node{Value: []byte("some_value1")}},
-			validateMembership: true,
-			valid:              false,
-			rootKey:            []byte("a_random_root_key"),
-		},
-		{
-			name: "invalid proof of membership with default smt root value as target (gcp is never equal to root)",
-			detail: `Preset:       *root*
-		                         /        \
-		                       min          max
-							`,
-			keyBitSize:         4,
-			target:             &node{Key: newNodeKey(bytes.Clone(RootKey), MaxKeyBitLength), Node: lib.Node{}},
-			validateMembership: true,
-			valid:              false,
-			rootKey:            []byte("a_random_root_key"),
-		},
-		{
-			name: "invalid proof of membership with default smt max value value as target (default min-max keys are not hashed)",
-			detail: `Preset:        root
-		                         /        \
-		                       min          *max*
-							`,
-			keyBitSize:         MaxKeyBitLength,
-			target:             &node{Key: newNodeKey(bytes.Repeat([]byte{255}, 20), MaxKeyBitLength), Node: lib.Node{}},
-			validateMembership: true,
-			valid:              false,
-			rootKey:            nil,
-		},
-		{
-			name: "Attempt to verify the root key on the default tree",
-			detail: `Preset:        root
-		                         /        \
-		                       min          max
-							`,
-			keyBitSize:         4,
-			target:             &node{Key: &key{leastSigBits: []int{1, 1, 1, 0}}, Node: lib.Node{Value: []byte("some_value1")}},
-			validateMembership: true,
+			keyBitSize: 4,
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("1011", nil, "0000", "1111"), // root
+				},
+			},
+			targetKey:          []byte{8}, // hashes to [1 0 1 1]
+			targetValue:        []byte("some_value"),
+			validateMembership: false,
 			valid:              false,
 			proofErr:           ErrReserveKeyWrite("root"),
-			rootKey:            nil,
+		},
+		{
+			name: "attempt to verify a key minimum",
+			detail: `Preset:        root (1011)
+		                         /        \
+						      *0000*     1111
+							`,
+			keyBitSize: 4,
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("1011", nil, "0000", "1111"), // root
+				},
+			},
+			targetKey:   []byte{3}, // hashes to [0 0 0 0]
+			targetValue: []byte(""),
+			proofErr:    ErrReserveKeyWrite("minimum"),
+		},
+		{
+			name: "attempt to verify a key maximum",
+			detail: `Preset:        root (1011)
+		                         /        \
+		                       0000     *1111*
+							`,
+			keyBitSize: 4,
+			preset: &NodeList{
+				Nodes: []*node{
+					newTestNode("1011", nil, "0000", "1111"), // root
+				},
+			},
+			targetKey:   []byte{18}, // hashes to [1 1 1 1]
+			targetValue: []byte(""),
+			proofErr:    ErrReserveKeyWrite("maximum"),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
-			// VerifyProof uses the same default root for the in-memory store, so we
-			//  are setting the test root key as the global RootKey to use the same
-			// root for the test
-			if test.rootKey != nil {
-				tempRootKey := RootKey
-				RootKey = test.rootKey
-				defer func() { RootKey = tempRootKey }()
+			// preset must have at least one node in order to set expected root to verify
+			require.True(t, len(test.preset.Nodes) > 0, "preset must have at least one node")
+			// only preset the root so the smt is created with the root key
+			rootPreset := &NodeList{
+				Nodes: []*node{
+					test.preset.Nodes[0],
+				},
 			}
-
 			// create the smt
-			smt, memStore := NewTestSMT(t, nil, test.rootKey, test.keyBitSize)
+			smt, memStore := NewTestSMT(t, rootPreset, nil, test.keyBitSize)
+			// close the store when done
 			defer memStore.Close()
-
 			// preset the nodes manually to trigger rehashing
-			if test.preset != nil {
-				for _, n := range test.preset.Nodes {
-					// set the node in the db
-					require.NoError(t, smt.Set(n.Key.bytes(), n.Value))
-				}
+			for _, n := range test.preset.Nodes[1:] {
+				// set the node in the db manually (value is hashed before as a normal Set operation would)
+				n.Value = crypto.Hash(n.Value)
+				require.NoError(t, smt.setNode(n))
+				// set the target node as the node just created
+				smt.target = n
+				require.NoError(t, smt.traverse())
+				// traverse to the node that was just set
+				require.Equal(t, n, smt.target)
+				// rehash the tree from the newly created node
+				require.NoError(t, smt.rehash())
 			}
-
 			// generate the merkle proof
-			proof, err := smt.GetMerkleProof(test.target.Key.bytes())
-
-			// validate proof results
+			proof, err := smt.GetMerkleProof(test.targetKey)
 			if test.proofErr != nil {
 				require.Equal(t, test.proofErr, err)
 				return
 			}
-
-			require.NoError(t, err)
+			// validate proof results
+			require.Equal(t, test.proofErr, err)
 			// verify the proof
-			valid, err := smt.VerifyProof(test.target.Key.bytes(), test.target.Value,
+			valid, err := smt.VerifyProof(test.targetKey, test.targetValue,
 				test.validateMembership, smt.Root(), proof)
-
 			// validate results
 			require.NoError(t, err)
 			require.Equal(t, test.valid, valid)
