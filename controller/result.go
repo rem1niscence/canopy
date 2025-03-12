@@ -163,6 +163,10 @@ func (c *Controller) AddPaymentPercent(toAdd *lib.LotteryWinner, results *lib.Ce
 
 // addPaymentPercent() is a helper function to add a payment percent to the certificate result
 func (c *Controller) addPaymentPercent(toAdd *lib.LotteryWinner, results *lib.CertificateResult, chainId uint64) {
+	// don't add 0% cuts
+	if toAdd.Cut == 0 {
+		return
+	}
 	// check if the winner's address is already in the reward recipients list for the root chain
 	// if found, update their reward percentage - else add them as a new recipient
 	if !slices.ContainsFunc(results.RewardRecipients.PaymentPercents, func(pp *lib.PaymentPercents) (has bool) {
