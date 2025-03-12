@@ -417,7 +417,7 @@ func (s *SMT) validateTarget() lib.ErrorI {
 	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{0}, 20), s.keyBitLength).bytes(), s.target.Key.bytes()) {
 		return ErrReserveKeyWrite("minimum")
 	}
-	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{0}, 20), s.keyBitLength).bytes(), s.target.Key.bytes()) {
+	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{255}, 20), s.keyBitLength).bytes(), s.target.Key.bytes()) {
 		return ErrReserveKeyWrite("maximum")
 	}
 	return nil
@@ -461,7 +461,7 @@ func (s *SMT) GetMerkleProof(k []byte) ([]*lib.Node, lib.ErrorI) {
 		}
 		// add the sibling node to the proof slice
 		proof = append(proof, &lib.Node{
-			Key:     siblingNode.Key.bytes(),
+			Key:     siblingKey,
 			Value:   siblingNode.Value,
 			Bitmask: int32(order),
 		})
