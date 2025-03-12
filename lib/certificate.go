@@ -839,6 +839,11 @@ func (x *CommitteeData) Combine(data *CommitteeData, chainId uint64) (err ErrorI
 
 // addPercents() is a helper function that adds reward distribution percents on behalf of an address
 func (x *CommitteeData) addPercents(address []byte, percent, chainId uint64) {
+	// if payment percent is 0 simply exit
+	if percent == 0 {
+		// exit
+		return
+	}
 	// check to see if the address already exists
 	for i, p := range x.PaymentPercents {
 		// if already exists
