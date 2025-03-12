@@ -268,7 +268,7 @@ func (x *ValidatorParams) Check() lib.ErrorI {
 	if x.MaxSlashPerCommittee == 0 || x.MaxSlashPerCommittee > 100 {
 		return ErrInvalidParam(ParamMaxSlashPerCommittee)
 	}
-	if x.DelegateRewardPercentage == 0 || x.DelegateRewardPercentage > 100 {
+	if x.DelegateRewardPercentage > 100 {
 		return ErrInvalidParam(ParamDelegateRewardPercentage)
 	}
 	if x.BuyDeadlineBlocks == 0 {
