@@ -153,12 +153,8 @@ func (s *SMT) Root() []byte { return bytes.Clone(s.root.Value) }
 
 // Set: insert or update a target
 func (s *SMT) Set(k, v []byte) lib.ErrorI {
-	return s.set(&node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), Node: lib.Node{Value: crypto.Hash(v)}})
-}
-
-func (s *SMT) set(target *node) lib.ErrorI {
 	// calculate the key and value to upsert
-	s.target = target
+	s.target = &node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), Node: lib.Node{Value: crypto.Hash(v)}}
 	// check to make sure the target is valid
 	if err := s.validateTarget(); err != nil {
 		return err
@@ -421,7 +417,7 @@ func (s *SMT) validateTarget() lib.ErrorI {
 	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{0}, 20), s.keyBitLength).bytes(), s.target.Key.bytes()) {
 		return ErrReserveKeyWrite("minimum")
 	}
-	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{0}, 20), s.keyBitLength).bytes(), s.target.Key.bytes()) {
+	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{255}, 20), s.keyBitLength).bytes(), s.target.Key.bytes()) {
 		return ErrReserveKeyWrite("maximum")
 	}
 	return nil
@@ -465,7 +461,7 @@ func (s *SMT) GetMerkleProof(k []byte) ([]*lib.Node, lib.ErrorI) {
 		}
 		// add the sibling node to the proof slice
 		proof = append(proof, &lib.Node{
-			Key:     siblingNode.Key.bytes(),
+			Key:     siblingKey,
 			Value:   siblingNode.Value,
 			Bitmask: int32(order),
 		})
