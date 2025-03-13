@@ -15,14 +15,13 @@ import (
 )
 
 type Client struct {
-	rpcURL    string
-	rpcPort   string
-	adminPort string
-	client    http.Client
+	rpcURL      string
+	adminRpcUrl string
+	client      http.Client
 }
 
-func NewClient(rpcURL, rpcPort, adminPort string) *Client {
-	return &Client{rpcURL: rpcURL, rpcPort: rpcPort, adminPort: adminPort, client: http.Client{}}
+func NewClient(rpcURL, adminRPCUrl string) *Client {
+	return &Client{rpcURL: rpcURL, adminRpcUrl: adminRPCUrl, client: http.Client{}}
 }
 
 func (c *Client) Version() (version *string, err lib.ErrorI) {
@@ -908,14 +907,11 @@ func (c *Client) heightAndIdRequest(routeName string, height, id uint64, ptr any
 }
 
 func (c *Client) url(routeName, param string, admin ...bool) string {
-	// if rpc port and admin ports are defined then it's a local RPC deployment
-	if c.rpcPort != "" && c.adminPort != "" {
-		if admin != nil && admin[0] {
-			return "http://" + localhost + colon + c.adminPort + routePaths[routeName].Path + param
-		}
-		return c.rpcURL + colon + c.rpcPort + routePaths[routeName].Path + param
+	// if an admin call
+	if admin != nil && admin[0] {
+		return c.adminRpcUrl + routePaths[routeName].Path + param
 	}
-	// if rpc port is not defined then it's consider a remote RPC deployment
+	// if non admin call
 	return c.rpcURL + routePaths[routeName].Path + param
 }
 
