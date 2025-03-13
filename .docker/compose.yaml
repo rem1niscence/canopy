@@ -19,6 +19,9 @@ services:
     command: [ "start" ]
     volumes:
       - ./volumes/node_1:/root/.canopy
+    environment:
+      - WALLET_BASE_PATH=''
+      - EXPLORER_BASE_PATH=''
     deploy:
       resources:
         limits:
@@ -43,6 +46,9 @@ services:
     command: [ "start" ]
     volumes:
       - ./volumes/node_2:/root/.canopy
+    environment:
+      - WALLET_BASE_PATH=''
+      - EXPLORER_BASE_PATH=''
     deploy:
       resources:
         limits:
