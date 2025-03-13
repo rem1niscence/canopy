@@ -3,7 +3,6 @@ package p2p
 import (
 	"bufio"
 	"net"
-	reflect "reflect"
 	"sync"
 	"time"
 
@@ -14,17 +13,14 @@ import (
 )
 
 const (
-	maxDataChunkSize    = 1024 - packetHeaderSize // maximum size of the chunk of bytes in a packet
-	maxPacketSize       = 1024                    // maximum size of the full packet
-	packetHeaderSize    = 47                      // the overhead of the protobuf packet header
-	pingInterval        = 30 * time.Second        // how often a ping is to be sent
-	sendInterval        = 100 * time.Millisecond  // the minimum time between sends
-	pongTimeoutDuration = 20 * time.Second        // how long the sender of a ping waits for a pong before throwing an error
-	queueSendTimeout    = 10 * time.Second        // how long a message waits to be queued before throwing an error
-	dataFlowRatePerS    = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
-	maxMessageSize      = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
-	maxChanSize         = 1                       // maximum number of items in a channel before blocking
-	maxQueueSize        = 1                       // maximum number of items in a queue before blocking
+	maxDataChunkSize = 1024 - packetHeaderSize // maximum size of the chunk of bytes in a packet
+	maxPacketSize    = 1024                    // maximum size of the full packet
+	packetHeaderSize = 47                      // the overhead of the protobuf packet header
+	queueSendTimeout = 10 * time.Second        // how long a message waits to be queued before throwing an error
+	dataFlowRatePerS = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
+	maxMessageSize   = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
+	maxChanSize      = 1                       // maximum number of items in a channel before blocking
+	maxQueueSize     = 1                       // maximum number of items in a queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
@@ -133,7 +129,6 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 		}
 
 		ok = stream.queueSend(packet)
-		// ok = c.notifySend()
 		c.log.Debugf("Packet(ID:%s, L:%d, E:%t) packet queued", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 	}
 
@@ -154,81 +149,37 @@ func split(buf []byte, lim int) [][]byte {
 	return chunks
 }
 
+// logAndSendPacket logs packet data in debug and sends it as a proto message
+func (c *MultiConn) logAndSendPacket(packet *Packet, m *limiter.Monitor) error {
+	c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
+	return c.sendWireBytes(packet, m)
+}
+
 // startSendService() starts the main send service
 // - converges and writes the send queue from all streams into the underlying tcp connection.
 // - manages the keep alive protocol by sending pings and monitoring the receipt of the corresponding pong
 func (c *MultiConn) startSendService() {
 	defer lib.CatchPanic(c.log)
 	m := limiter.New(0, 0)
-	ping, err := time.NewTicker(pingInterval), lib.ErrorI(nil)
-	pongTimer := time.NewTimer(pongTimeoutDuration)
-	defer func() { lib.StopTimer(pongTimer); ping.Stop(); m.Done() }()
+	var err error
+	defer func() { m.Done() }()
 	for {
-		sent := false
-		// 1️⃣ **Prioritize sending packets first**
-		// reflect is needed because it is the only way to ensure all channels in the stream map are checked right when a packet gets sent
-		var sendCases []reflect.SelectCase
-		streamTopics := make([]lib.Topic, 0)
-
-		for topic, stream := range c.streams {
-			sendCases = append(sendCases, reflect.SelectCase{
-				Dir:  reflect.SelectRecv,
-				Chan: reflect.ValueOf(stream.sendQueue),
-			})
-			streamTopics = append(streamTopics, topic)
-		}
-
-		_, value, ok := reflect.Select(sendCases)
-		if ok {
-			packet, _ := value.Interface().(*Packet) // err ignored because it is impossible, the stream channels are always packet type
-			c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
-			err = c.sendWireBytes(packet, m)
-			sent = true
-		}
-
-		// 2️⃣ **If no packet was sent, handle other events**
-		if !sent {
-			// select statement ensures the sequential coordination of the concurrent processes
-			select {
-			case <-ping.C: // fires every 'pingInterval'
-				c.log.Debugf("Send Ping to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
-				// send a ping to the peer
-				if err = c.sendWireBytes(new(Ping), m); err != nil {
-					break
-				}
-				// reset the pong timer
-				lib.StopTimer(pongTimer)
-				// set the pong timer to execute an Error function if the timer expires before receiving a pong
-				pongTimer = time.AfterFunc(pongTimeoutDuration, func() {
-					if e := ErrPongTimeout(); e != nil {
-						c.Error(e, NoPongSlash)
-					}
-				})
-			case _, open := <-c.sendPong: // fires when receive service got a 'ping' message
-				// if the channel was closed
-				if !open {
-					// log the close
-					c.log.Debugf("Pong channel closed, stopping")
-					// exit
-					return
-				}
-				// log the pong sending
-				c.log.Debugf("Send Pong to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
-				// send a pong
-				err = c.sendWireBytes(new(Pong), m)
-			case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
-				// if the channel was closed
-				if !open {
-					// log the close
-					c.log.Debugf("Receive pong channel closed, stopping")
-					// exit
-					return
-				}
-				// reset the pong timer
-				lib.StopTimer(pongTimer)
-			case <-c.quitSending: // fires when Stop() is called
-				return
-			}
+		// select statement ensures the sequential coordination of the concurrent processes
+		select {
+		case packet := <-c.streams[lib.Topic_CONSENSUS].sendQueue:
+			err = c.logAndSendPacket(packet, m)
+		case packet := <-c.streams[lib.Topic_BLOCK].sendQueue:
+			err = c.logAndSendPacket(packet, m)
+		case packet := <-c.streams[lib.Topic_BLOCK_REQUEST].sendQueue:
+			err = c.logAndSendPacket(packet, m)
+		case packet := <-c.streams[lib.Topic_TX].sendQueue:
+			err = c.logAndSendPacket(packet, m)
+		case packet := <-c.streams[lib.Topic_PEERS_RESPONSE].sendQueue:
+			err = c.logAndSendPacket(packet, m)
+		case packet := <-c.streams[lib.Topic_PEERS_REQUEST].sendQueue:
+			err = c.logAndSendPacket(packet, m)
+		case <-c.quitSending: // fires when Stop() is called
+			return
 		}
 
 		if err != nil {
@@ -275,12 +226,6 @@ func (c *MultiConn) startReceiveService() {
 					c.Error(er, slash)
 					return
 				}
-			case *Ping: // receive ping message notifies the "send" service to respond with a 'pong' message
-				c.log.Debugf("Received ping from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
-				c.sendPong <- struct{}{}
-			case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
-				c.log.Debugf("Received pong from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
-				c.receivedPong <- struct{}{}
 			default: // unknown type results in slash and exiting the service
 				c.Error(ErrUnknownP2PMsg(x), UnknownMessageSlash)
 				return

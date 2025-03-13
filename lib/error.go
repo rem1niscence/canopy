@@ -293,7 +293,6 @@ const (
 	CodeBannedID                ErrorCode = 31
 	CodeIncompatiblePeer        ErrorCode = 32
 	CodeInvalidNetAddress       ErrorCode = 33
-	CodeSemaphoreFailed         ErrorCode = 34
 
 	StorageModule              ErrorModule = "store"
 	CodeOpenDB                 ErrorCode   = 1
