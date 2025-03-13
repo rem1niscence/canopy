@@ -13,14 +13,14 @@ import (
 )
 
 const (
-	maxDataChunkSize = 1024 - packetHeaderSize // maximum size of the chunk of bytes in a packet
-	maxPacketSize    = 1024                    // maximum size of the full packet
-	packetHeaderSize = 47                      // the overhead of the protobuf packet header
-	queueSendTimeout = 10 * time.Second        // how long a message waits to be queued before throwing an error
-	dataFlowRatePerS = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
-	maxMessageSize   = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
-	maxChanSize      = 1                       // maximum number of items in a channel before blocking
-	maxQueueSize     = 1                       // maximum number of items in a queue before blocking
+	maxDataChunkSize       = 1024 - packetHeaderSize // maximum size of the chunk of bytes in a packet
+	maxPacketSize          = 1024                    // maximum size of the full packet
+	packetHeaderSize       = 47                      // the overhead of the protobuf packet header
+	queueSendTimeout       = 10 * time.Second        // how long a message waits to be queued before throwing an error
+	dataFlowRatePerS       = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
+	maxMessageSize         = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
+	maxChanSize            = 1                       // maximum number of items in a channel before blocking
+	maxStreamSendQueueSize = 100                     // maximum number of items in a stream send queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
@@ -121,16 +121,16 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 	}
 
 	chunks := split(bz, maxDataChunkSize)
+	var packets []*Packet
 	for i, chunk := range chunks {
-		packet := &Packet{
+		packets = append(packets, &Packet{
 			StreamId: topic,
 			Eof:      i == len(chunks)-1,
 			Bytes:    chunk,
-		}
-
-		ok = stream.queueSend(packet)
-		c.log.Debugf("Packet(ID:%s, L:%d, E:%t) packet queued", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
+		})
 	}
+
+	ok = stream.queueSends(packets)
 
 	return
 }
@@ -306,7 +306,24 @@ type Stream struct {
 	sendQueue    chan *Packet                 // a queue of unsent messages
 	msgAssembler []byte                       // collects and adds incoming packets until the entire message is received (EOF signal)
 	inbox        chan *lib.MessageAndMetadata // the channel where fully received messages are held for other parts of the app to read
+	mu           sync.Mutex                   // mutex to prevent race conditions when sending packets (all packets of the same message should be one right after the other)
 	logger       lib.LoggerI
+}
+
+// queueSends() schedules the packets to be sent ensuring coordination with the mutex
+func (s *Stream) queueSends(packets []*Packet) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, packet := range packets {
+		ok := s.queueSend(packet)
+		if !ok {
+			return false
+		}
+		s.logger.Debugf("Packet(ID:%s, L:%d, E:%t) packet queued", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
+	}
+
+	return true
 }
 
 // queueSend() schedules the packet to be sent

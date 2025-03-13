@@ -312,7 +312,7 @@ func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 		streams[i] = &Stream{
 			topic:        i,
 			msgAssembler: make([]byte, 0, maxMessageSize),
-			sendQueue:    make(chan *Packet, maxQueueSize),
+			sendQueue:    make(chan *Packet, maxStreamSendQueueSize),
 			inbox:        p.Inbox(i),
 			logger:       p.log,
 		}
