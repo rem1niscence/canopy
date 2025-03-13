@@ -2,6 +2,7 @@
 const nextConfig = {
   output: "export",
   basePath: process.env.EXPLORER_BASE_PATH || '',  // default to root if no wallet base path
+  trailingSlash: true,
 };
 
 module.exports = nextConfig;
