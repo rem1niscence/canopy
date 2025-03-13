@@ -11,8 +11,8 @@ function CanaJSON({ state, setState, JsonViewVariant }) {
   const jsonRef = useRef(null);
 
   if (isEmptyPK && isEmptyTxRes) return <></>;
-
-  const formattedJson = { result: state.txResult };
+  console.log("STATE", state)
+  const formattedJson = { result: Object.keys(state.pk).length === 0?state.txResult:state.pk };
 
   const handleCopyClick = () => {
     if (jsonRef.current) {
