@@ -251,7 +251,7 @@ func (s *Server) RemoteCallbacks(rootChainId uint64) (*lib.RemoteCallbacks, lib.
 		return nil, lib.ErrEmptyChainId()
 	}
 	// create a rpc client
-	rpcClient := NewClient(rootChainUrl, "", "")
+	rpcClient := NewClient(rootChainUrl, "")
 	// set the remote callbacks
 	return &lib.RemoteCallbacks{
 		Height:              rpcClient.Height,
