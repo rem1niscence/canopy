@@ -5,7 +5,7 @@ let chainId = 1; // default chain id
 if (typeof window !== "undefined") {
   if (window.__CONFIG__) {
     rpcURL = window.__CONFIG__.rpcURL;
-    rpcURL = window.__CONFIG__.adminRPCURL;
+    adminRPCURL = window.__CONFIG__.adminRPCURL;
     chainId = Number(window.__CONFIG__.chainId);
   }
   rpcURL = rpcURL.replace("localhost", window.location.hostname)
