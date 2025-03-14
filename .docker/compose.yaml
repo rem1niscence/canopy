@@ -8,6 +8,8 @@ services:
       dockerfile: .docker/Dockerfile
       args:
         BUILD_PATH: cmd/cli
+        EXPLORER_BASE_PATH: ''
+        WALLET_BASE_PATH: ''
     ports:
       - 50000:50000 # Wallet
       - 50001:50001 # Explorer
@@ -19,9 +21,6 @@ services:
     command: [ "start" ]
     volumes:
       - ./volumes/node_1:/root/.canopy
-    environment:
-      - WALLET_BASE_PATH=''
-      - EXPLORER_BASE_PATH=''
     deploy:
       resources:
         limits:
@@ -35,6 +34,8 @@ services:
       dockerfile: .docker/Dockerfile
       args:
         BUILD_PATH: cmd/cli
+        EXPLORER_BASE_PATH: ''
+        WALLET_BASE_PATH: ''
     ports:
       - 40000:40000 # Wallet
       - 40001:40001 # Explorer
@@ -46,9 +47,6 @@ services:
     command: [ "start" ]
     volumes:
       - ./volumes/node_2:/root/.canopy
-    environment:
-      - WALLET_BASE_PATH=''
-      - EXPLORER_BASE_PATH=''
     deploy:
       resources:
         limits:
