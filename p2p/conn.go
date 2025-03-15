@@ -114,12 +114,10 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 	if !ok {
 		return
 	}
-
 	bz, err := lib.Marshal(msg)
 	if err != nil {
 		return false
 	}
-
 	chunks := split(bz, maxDataChunkSize)
 	var packets []*Packet
 	for i, chunk := range chunks {
@@ -129,30 +127,8 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 			Bytes:    chunk,
 		})
 	}
-
 	ok = stream.queueSends(packets)
-
 	return
-}
-
-// split returns bytes splited to size up to the lim param
-func split(buf []byte, lim int) [][]byte {
-	var chunk []byte
-	chunks := make([][]byte, 0, len(buf)/lim+1)
-	for len(buf) >= lim {
-		chunk, buf = buf[:lim], buf[lim:]
-		chunks = append(chunks, chunk)
-	}
-	if len(buf) > 0 {
-		chunks = append(chunks, buf[:])
-	}
-	return chunks
-}
-
-// logAndSendPacket logs packet data in debug and sends it as a proto message
-func (c *MultiConn) logAndSendPacket(packet *Packet, m *limiter.Monitor) error {
-	c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
-	return c.sendWireBytes(packet, m)
 }
 
 // startSendService() starts the main send service
@@ -161,28 +137,21 @@ func (c *MultiConn) logAndSendPacket(packet *Packet, m *limiter.Monitor) error {
 func (c *MultiConn) startSendService() {
 	defer lib.CatchPanic(c.log)
 	m := limiter.New(0, 0)
-	var err error
+	var packet *Packet
 	defer func() { m.Done() }()
 	for {
 		// select statement ensures the sequential coordination of the concurrent processes
 		select {
-		case packet := <-c.streams[lib.Topic_CONSENSUS].sendQueue:
-			err = c.logAndSendPacket(packet, m)
-		case packet := <-c.streams[lib.Topic_BLOCK].sendQueue:
-			err = c.logAndSendPacket(packet, m)
-		case packet := <-c.streams[lib.Topic_BLOCK_REQUEST].sendQueue:
-			err = c.logAndSendPacket(packet, m)
-		case packet := <-c.streams[lib.Topic_TX].sendQueue:
-			err = c.logAndSendPacket(packet, m)
-		case packet := <-c.streams[lib.Topic_PEERS_RESPONSE].sendQueue:
-			err = c.logAndSendPacket(packet, m)
-		case packet := <-c.streams[lib.Topic_PEERS_REQUEST].sendQueue:
-			err = c.logAndSendPacket(packet, m)
+		case packet = <-c.streams[lib.Topic_CONSENSUS].sendQueue:
+		case packet = <-c.streams[lib.Topic_BLOCK].sendQueue:
+		case packet = <-c.streams[lib.Topic_BLOCK_REQUEST].sendQueue:
+		case packet = <-c.streams[lib.Topic_TX].sendQueue:
+		case packet = <-c.streams[lib.Topic_PEERS_RESPONSE].sendQueue:
+		case packet = <-c.streams[lib.Topic_PEERS_REQUEST].sendQueue:
 		case <-c.quitSending: // fires when Stop() is called
 			return
 		}
-
-		if err != nil {
+		if err := c.sendPacket(packet, m); err != nil {
 			c.Error(err)
 			return
 		}
@@ -270,20 +239,22 @@ func (c *MultiConn) waitForAndHandleWireBytes(reader bufio.Reader, m *limiter.Mo
 	return lib.FromAny(msg.Payload)
 }
 
-// sendWireBytes() a rate limited writer of outbound bytes to the wire
+// sendPacket() a rate limited writer of outbound bytes to the wire
 // wraps a proto.Message into a universal Envelope, then converts to bytes and
 // sends them across the wire without violating the data flow rate limits
 // message may be a Packet, a Ping or a Pong
-func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) (err lib.ErrorI) {
+func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) (err lib.ErrorI) {
+	// c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t)", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 	// convert the proto.Message into a proto.Any
-	a, err := lib.NewAny(message)
+	a, err := lib.NewAny(packet)
 	if err != nil {
 		return err
 	}
 	// wrap into an Envelope
-	bz, err := lib.Marshal(&Envelope{
-		Payload: a,
-	})
+	bz, err := lib.Marshal(&Envelope{Payload: a})
+	if err != nil {
+		return err
+	}
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
@@ -314,15 +285,13 @@ type Stream struct {
 func (s *Stream) queueSends(packets []*Packet) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	for _, packet := range packets {
 		ok := s.queueSend(packet)
 		if !ok {
 			return false
 		}
-		s.logger.Debugf("Packet(ID:%s, L:%d, E:%t) packet queued", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
+		// s.logger.Debugf("Packet(ID:%s, L:%d, E:%t) packet queued", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 	}
-
 	return true
 }
 
@@ -339,8 +308,8 @@ func (s *Stream) queueSend(p *Packet) bool {
 // handlePacket() merge the new packet with the previously received ones until the entire message is complete (EOF signal)
 func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
 	msgAssemblerLen, packetLen := len(s.msgAssembler), len(packet.Bytes)
-	s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t) from %s",
-		lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof, lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
+	// s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t) from %s",
+	//	lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof, lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
 	// if the addition of this new packet pushes the total message size above max
 	if int(maxMessageSize) < msgAssemblerLen+packetLen {
 		s.msgAssembler = s.msgAssembler[:0]
@@ -367,9 +336,22 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		}).WithHash()
 		// add to inbox for other parts of the app to read
 		s.inbox <- m
-		s.logger.Debugf("Forwarded message to inbox: %s", lib.Topic_name[int32(packet.StreamId)])
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]
 	}
 	return 0, nil
+}
+
+// split returns bytes splited to size up to the lim param
+func split(buf []byte, lim int) [][]byte {
+	var chunk []byte
+	chunks := make([][]byte, 0, len(buf)/lim+1)
+	for len(buf) >= lim {
+		chunk, buf = buf[:lim], buf[lim:]
+		chunks = append(chunks, chunk)
+	}
+	if len(buf) > 0 {
+		chunks = append(chunks, buf[:])
+	}
+	return chunks
 }
