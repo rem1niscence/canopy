@@ -57,7 +57,7 @@ type SortitionVerifyParams struct {
 
 // Sortition() runs the VRF and uses the Hash(output) to determine if IsCandidate
 func Sortition(p *SortitionParams) (out []byte, vrf *lib.Signature, isCandidate bool) {
-	vrf = VRF(p.LastProposerAddresses, p.Height, p.Round, p.PrivateKey)
+	vrf = VRF(p.LastProposerAddresses, p.RootHeight, p.Height, p.Round, p.PrivateKey)
 	out, isCandidate = sortition(p.VotingPower, p.TotalPower, p.TotalValidators, vrf.Signature)
 	return
 }
@@ -68,7 +68,7 @@ func VerifyCandidate(p *SortitionVerifyParams) (out []byte, isCandidate bool) {
 		return nil, false
 	}
 	// build the seed data
-	msg := lib.FormatInputIntoSeed(p.LastProposerAddresses, p.Height, p.Round)
+	msg := lib.FormatInputIntoSeed(p.LastProposerAddresses, p.RootHeight, p.Height, p.Round)
 	// validate the VRF out
 	if !p.PublicKey.VerifyBytes(msg, p.Signature) {
 		return nil, false
@@ -117,9 +117,9 @@ func SelectProposerFromCandidates(candidates []VRFCandidate, data *lib.Sortition
 // NOTE: Academically speaking, this is not a true VRF because BLS signatures are not perfectly uniformly distributed in the strictest mathematical sense.
 // The slight deviation from perfect uniformity does not significantly affect the security of BLS signatures are still considered secure and suitable
 // for applications like digital signatures, VRFs, and blockchain consensus mechanisms.
-func VRF(lastNProposers [][]byte, height, round uint64, privateKey crypto.PrivateKeyI) *lib.Signature {
+func VRF(lastNProposers [][]byte, rootHeight, height, round uint64, privateKey crypto.PrivateKeyI) *lib.Signature {
 	// generate the seed data that all Validators use during this View
-	vrfIn := lib.FormatInputIntoSeed(lastNProposers, height, round)
+	vrfIn := lib.FormatInputIntoSeed(lastNProposers, rootHeight, height, round)
 	// sign it with the Private Key
 	return &lib.Signature{
 		PublicKey: privateKey.PublicKey().Bytes(),

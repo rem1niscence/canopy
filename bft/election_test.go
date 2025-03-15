@@ -61,14 +61,14 @@ func TestSortitionAndVerifyCandidate(t *testing.T) {
 	}{
 		{
 			name:        "isCandidate",
-			detail:      "deterministic key set ensures sortition results in a candidate in a set of 3 validators",
-			totalVals:   3,
+			detail:      "deterministic key set ensures sortition results in a candidate in a set of 6 validators",
+			totalVals:   6,
 			isCandidate: true,
 		},
 		{
 			name:        "isNotCandidate",
-			detail:      "deterministic key set ensures sortition results in not a candidate in a set of 6 validators",
-			totalVals:   6,
+			detail:      "deterministic key set ensures sortition results in not a candidate in a set of 5 validators",
+			totalVals:   5,
 			isCandidate: false,
 		},
 	}
@@ -81,7 +81,7 @@ func TestSortitionAndVerifyCandidate(t *testing.T) {
 				SortitionData: sortitionData,
 				PrivateKey:    privateKey,
 			})
-			require.Equal(t, VRF(sortitionData.LastProposerAddresses, sortitionData.Height, sortitionData.Round, privateKey), vrf)
+			require.Equal(t, VRF(sortitionData.LastProposerAddresses, sortitionData.RootHeight, sortitionData.Height, sortitionData.Round, privateKey), vrf)
 			require.Equal(t, crypto.Hash(vrf.Signature), out)
 			require.Equal(t, test.isCandidate, isCandidate)
 			outVerify, isCandidateFromVerify := VerifyCandidate(&SortitionVerifyParams{
@@ -188,6 +188,7 @@ func newTestSortitionData(t *testing.T, c *testConsensus) *lib.SortitionData {
 	require.NoError(t, err)
 	sortitionData := &lib.SortitionData{
 		LastProposerAddresses: lastNProposers,
+		RootHeight:            1,
 		Height:                1,
 		Round:                 0,
 		TotalValidators:       uint64(len(c.valKeys)),
@@ -198,6 +199,6 @@ func newTestSortitionData(t *testing.T, c *testConsensus) *lib.SortitionData {
 }
 
 func vrfAndCDF(p SortitionParams) bool {
-	vrf := VRF(p.LastProposerAddresses, p.Height, p.Round, p.PrivateKey)
+	vrf := VRF(p.LastProposerAddresses, p.RootHeight, p.Height, p.Round, p.PrivateKey)
 	return IsCandidate(p.VotingPower, p.TotalPower, 1, crypto.Hash(vrf.Signature))
 }

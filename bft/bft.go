@@ -193,6 +193,7 @@ func (b *BFT) StartElectionPhase() {
 	// initialize the sortition parameters
 	b.SortitionData = &lib.SortitionData{
 		LastProposerAddresses: lastProposers.Addresses,      // LastProposers ensures defense against Grinding Attacks
+		RootHeight:            b.RootHeight,                 // the height of the root ensures a unique sortition for each root height
 		Height:                b.Height,                     // height ensures a unique sortition seed for each height
 		Round:                 b.Round,                      // round ensures a unique sortition seed for each round
 		TotalValidators:       b.ValidatorSet.NumValidators, // validator count is required for CDF
