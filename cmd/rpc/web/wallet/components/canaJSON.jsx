@@ -7,11 +7,15 @@ import {CopyIcon} from "@/components/svg_icons";
 function CanaJSON({ state, setState, JsonViewVariant }) {
   const isEmptyPK = objEmpty(state.pk);
   const isEmptyTxRes = objEmpty(state.txResult);
+  const needsWrapper = !isEmptyTxRes && Object.keys(state.txResult).length === 0
   const [copySuccess, setCopySuccess] = useState(false);
   const jsonRef = useRef(null);
-
   if (isEmptyPK && isEmptyTxRes) return <></>;
-  const formattedJson = { result: (!state.pk || Object.keys(state.pk).length === 0)?state.txResult:state.pk };
+
+  let formattedJson = isEmptyPK?state.txResult:state.pk
+  // if (needsWrapper) {
+  //   formattedJson = { result: formattedJson}
+  // }
 
   const handleCopyClick = () => {
     if (jsonRef.current) {
@@ -24,7 +28,7 @@ function CanaJSON({ state, setState, JsonViewVariant }) {
         })
         .catch(err => {
           console.error("Failed to copy: ", err);
-          setState({ ...state, toast: "Failed to Copy JSON." }); 
+          setState({ ...state, toast: "Failed to Copy JSON." });
         });
     }
   };
@@ -55,12 +59,9 @@ function CanaJSON({ state, setState, JsonViewVariant }) {
   return (
     <div className={`json-viewer ${JsonViewVariant || ''}`}>
             <pre ref={jsonRef}>
-                {'{'}
               <div className="json-entry">
-                    <span className="json-key">"result": </span>
-                {renderJson(formattedJson.result, 1)}
+                {renderJson(formattedJson, 1)}
                 </div>
-              {'}'}
             </pre>
       <a href="#" onClick={handleCopyClick} className="copy-link">
         {copySuccess ? <CopyIcon /> : (
