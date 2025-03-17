@@ -154,11 +154,12 @@ export function isEmpty(obj) {
 export function copy(state, setState, detail, toastText = "Copied!") {
   if (navigator.clipboard && window.isSecureContext) {
     // if HTTPS - use Clipboard API
-    navigator.clipboard.writeText(detail)
-      .then(() => setState({...state, toast: toastText}))
+    navigator.clipboard
+      .writeText(detail)
+      .then(() => setState({ ...state, toast: toastText }))
       .catch(() => fallbackCopy(detail, state, setState, toastText));
   } else {
-    fallbackCopy(state, setState, detail, toastText)
+    fallbackCopy(state, setState, detail, toastText);
   }
 }
 
@@ -171,10 +172,10 @@ export function fallbackCopy(state, setState, detail, toastText = "Copied!") {
   textArea.select();
   try {
     document.execCommand("copy");
-    setState({...state, toast: toastText});
+    setState({ ...state, toast: toastText });
   } catch (err) {
     console.error("Fallback copy failed", err);
-    setState({...state, toast: "Clipboard access denied"});
+    setState({ ...state, toast: "Clipboard access denied" });
   }
   document.body.removeChild(textArea);
 }

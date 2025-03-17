@@ -5,7 +5,7 @@ import Container from "react-bootstrap/Container";
 import { Button, Card, Carousel, Col, Row, Spinner } from "react-bootstrap";
 import { YAxis, Tooltip, Legend, AreaChart, Area } from "recharts";
 import CanaLog from "@/components/canalog";
-import {PauseIcon, UnpauseIcon} from "@/components/svg_icons";
+import { PauseIcon, UnpauseIcon } from "@/components/svg_icons";
 import {
   getAdminRPCURL,
   configPath,
@@ -20,7 +20,7 @@ import {
 } from "@/components/api";
 
 // Memoized log controller button
-const RenderControlButton = memo(({ state, setState }) => { 
+const RenderControlButton = memo(({ state, setState }) => {
   return (
     <div onClick={() => setState({ ...state, pauseLogs: !state.pauseLogs })} className="logs-button-container">
       {state.pauseLogs ? <UnpauseIcon className="icon-button" /> : <PauseIcon className="icon-button" />}
@@ -128,8 +128,7 @@ export default function Dashboard() {
             dT: "INBOUND: " + inPeer + ", OUTBOUND: " + ouPeer,
             d1: "ID: " + state.peerInfo.id.publicKey,
             d2:
-              "NET ADDR: " +
-              (state.peerInfo.id.netAddress ? state.peerInfo.id.netAddress : "External Address Not Set"),
+              "NET ADDR: " + (state.peerInfo.id.netAddress ? state.peerInfo.id.netAddress : "External Address Not Set"),
             d3: "I / O RATIO " + (ioRatio ? ioRatio : "0:0"),
           },
         ],
@@ -139,7 +138,7 @@ export default function Dashboard() {
         ],
       },
     ];
-  
+
   // renderButtonCarouselItem() generates the button for the carousel
   function renderButtonCarouselItem(props) {
     return (

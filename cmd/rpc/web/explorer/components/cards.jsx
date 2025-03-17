@@ -87,7 +87,7 @@ function getCardSubHeader(props, consensusDuration, idx) {
   }
   switch (idx) {
     case 0:
-      return convertTime(v.results[0].blockHeader.time-consensusDuration);
+      return convertTime(v.results[0].blockHeader.time - consensusDuration);
     case 1:
       return convertNumber(Number(props.supply.total) - Number(props.supply.staked), 1000, true) + " liquid";
     case 2:
@@ -114,9 +114,7 @@ function getCardRightAligned(props, idx) {
     case 2:
       return "block #" + v.results[0].blockHeader.height;
     case 3:
-      return (
-        "stake threshold " + convertNumber(props.params.validator.stakePercentForSubsidizedCommittee, 1000) + "%"
-      );
+      return "stake threshold " + convertNumber(props.params.validator.stakePercentForSubsidizedCommittee, 1000) + "%";
   }
 }
 
@@ -212,7 +210,9 @@ export default function Cards(props) {
                 <Card.Title className="card-title">{cardTitles[idx]}</Card.Title>
                 <h5>{getCardHeader(cardData, idx)}</h5>
                 <div className="d-flex justify-content-between mb-1">
-                  <Card.Text className="card-info-2 mb-2">{getCardSubHeader(cardData, consensusDuration, idx)}</Card.Text>
+                  <Card.Text className="card-info-2 mb-2">
+                    {getCardSubHeader(cardData, consensusDuration, idx)}
+                  </Card.Text>
                   <Card.Text className="card-info-3">{getCardRightAligned(cardData, idx)}</Card.Text>
                 </div>
                 <div className="card-info-4 mb-3">{getCardNote(cardData, idx)}</div>

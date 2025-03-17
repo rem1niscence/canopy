@@ -25,10 +25,10 @@ function convertCardData(state, v) {
   }
   return value.block
     ? {
-      height: value.block.blockHeader.height,
-      hash: value.block.blockHeader.hash,
-      proposer: value.block.blockHeader.proposerAddress,
-    }
+        height: value.block.blockHeader.height,
+        hash: value.block.blockHeader.hash,
+        proposer: value.block.blockHeader.proposerAddress,
+      }
     : value.validator && !state.modalState.accOnly
       ? {
           address: value.validator.address,
@@ -57,15 +57,8 @@ export function convertTransactions(txs) {
 
 // convertBlock() converts a block item into a display object for rendering
 export function convertBlock(blk) {
-  let {
-    lastQuorumCertificate,
-    nextValidatorRoot,
-    stateRoot,
-    transactionRoot,
-    validatorRoot,
-    vdf,
-    ...value
-  } = blk.block.blockHeader;
+  let { lastQuorumCertificate, nextValidatorRoot, stateRoot, transactionRoot, validatorRoot, vdf, ...value } =
+    blk.block.blockHeader;
   return value;
 }
 

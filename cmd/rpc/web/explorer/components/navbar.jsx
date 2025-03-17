@@ -14,11 +14,7 @@ export default function Navigation({ openModal }) {
       <Navbar sticky="top" data-bs-theme="light" className="nav-bar">
         <Container>
           <Navbar.Brand className="nav-bar-brand">
-            <img 
-              src="./scanopy.png"
-              alt="Scanopy Logo" 
-              className="nav-bar-logo"
-             />
+            <img src="./scanopy.png" alt="Scanopy Logo" className="nav-bar-logo" />
           </Navbar.Brand>
           <div className="nav-bar-center">
             <Form

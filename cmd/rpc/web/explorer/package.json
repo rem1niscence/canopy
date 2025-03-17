@@ -6,7 +6,8 @@
     "dev": "next dev -p 50001",
     "build": "next build",
     "start": "npx serve@latest out -p 50001",
-    "lint": "next lint"
+    "lint": "next lint",
+    "prettier": "prettier --write ."
   },
   "dependencies": {
     "@mui/material": "^5.16.13",
