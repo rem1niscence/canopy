@@ -26,10 +26,10 @@
   --callout-border-rgb: 172, 175, 176;
   --card-rgb: 180, 185, 188;
   --card-border-rgb: 131, 134, 135;
-  --primary-color: #2C9B5A;
-  --secondary-color: #16502E;
-  --font-heading: 'Unbounded', sans-serif;
-  --font-body: 'Unbounded', sans-serif;
+  --primary-color: #2c9b5a;
+  --secondary-color: #16502e;
+  --font-heading: "Unbounded", sans-serif;
+  --font-body: "Unbounded", sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -120,7 +120,7 @@ input::placeholder {
 }
 
 .search-table:focus {
-  outline: 2px solid rgba(0, 123, 255, 0.5); 
+  outline: 2px solid rgba(0, 123, 255, 0.5);
 }
 
 .chain-table {
@@ -291,7 +291,7 @@ h5 {
 .card-info-4 {
   font-size: 9px;
   color: #222222;
-  font-weight:600;
+  font-weight: 600;
 }
 
 .card-footer {
@@ -352,7 +352,7 @@ h5 {
 }
 
 .search-toast-body {
-  font-weight:600;
+  font-weight: 600;
   color: darkred;
 }
 
@@ -370,7 +370,7 @@ th {
 
 .detail-table-title {
   white-space: nowrap;
-  font-weight:600;
+  font-weight: 600;
   font-size: 14px;
   background-color: white !important;
   font-family: var(--font-heading);
@@ -383,7 +383,7 @@ th {
 
 .detail-table-row-title {
   font-size: 14px;
-  font-weight:600;
+  font-weight: 600;
   font-family: var(--font-heading);
 }
 
@@ -404,7 +404,7 @@ th {
 }
 
 .data-table-head {
-  font-weight:600;
+  font-weight: 600;
 }
 
 .pagination {
@@ -463,7 +463,7 @@ th {
 }
 
 .nav-bar-brand {
-  font-weight:600;
+  font-weight: 600;
   color: black;
   cursor: pointer;
 }
@@ -486,7 +486,7 @@ th {
 .nav-link.active {
   color: var(--primary-color) !important;
   background-color: white !important;
-  font-weight:600;
+  font-weight: 600;
   opacity: 100%;
   border: 0 !important;
   border-bottom: 2px solid var(--primary-color) !important;
@@ -579,6 +579,6 @@ th {
 
 .nav-bar-logo {
   height: 20px;
-  margin-right: 8px; 
+  margin-right: 8px;
   vertical-align: middle;
 }
