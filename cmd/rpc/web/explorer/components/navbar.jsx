@@ -15,7 +15,7 @@ export default function Navigation({ openModal }) {
         <Container>
           <Navbar.Brand className="nav-bar-brand">
             <img 
-              src="/scanopy.png" 
+              src="./scanopy.png"
               alt="Scanopy Logo" 
               className="nav-bar-logo"
              />

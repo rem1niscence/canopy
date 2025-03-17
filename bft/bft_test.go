@@ -23,9 +23,9 @@ func TestStartElectionPhase(t *testing.T) {
 	}{
 		{
 			name:            "self is leader",
-			detail:          `deterministic key set ensures 'self' is an election candidate with a set of 3 Validators`,
+			detail:          `deterministic key set ensures 'self' is an election candidate with a set of 6 Validators`,
 			selfIsValidator: true,
-			numValidators:   3,
+			numValidators:   6,
 			isCandidate:     true,
 		},
 		{
@@ -82,7 +82,7 @@ func TestStartElectionPhase(t *testing.T) {
 					require.True(t, ok)
 					require.Equal(t, expectedView, *msg.Header)
 					require.Equal(t, pub.Bytes(), msg.Vrf.PublicKey)
-					require.Equal(t, private.Sign(lib.FormatInputIntoSeed(c.cont.proposers.Addresses, expectedView.Height, expectedView.Round)), msg.Vrf.Signature)
+					require.Equal(t, private.Sign(lib.FormatInputIntoSeed(c.cont.proposers.Addresses, expectedView.RootHeight, expectedView.Height, expectedView.Round)), msg.Vrf.Signature)
 				}
 			}
 		})
@@ -106,20 +106,20 @@ func TestStartElectionVotePhase(t *testing.T) {
 		},
 		{
 			name:                "self is not an election candidate",
-			detail:              `deterministic key set ensures 'self' is not an election candidate with a set of 4 Validators`,
-			numValidators:       4,
+			detail:              `deterministic key set ensures 'self' is not an election candidate with a set of 5 Validators`,
+			numValidators:       5,
 			isElectionCandidate: false,
 		},
 		{
 			name:                 "pseudorandom",
 			detail:               `didn't 'handle messages' from any candidate, fallback to pseudorandom`,
-			numValidators:        4,
+			numValidators:        8,
 			noElectionCandidates: true,
 		},
 		{
 			name:          "byzantine evidence not nil",
 			detail:        `testing sending the byzantine evidence to the leader with the leader vote`,
-			numValidators: 4,
+			numValidators: 5,
 			hasBE:         true,
 		},
 	}

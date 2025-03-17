@@ -2,7 +2,6 @@ package controller
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/canopy-network/canopy/p2p"
 	"math/rand"
 	"time"
@@ -298,7 +297,6 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 	candidate, candidateHash, candidateHeight := block.BlockHeader, lib.BytesToString(block.BlockHeader.Hash), block.BlockHeader.Height
 	// check the last qc in the candidate and set it in the ephemeral indexer to prepare for block application
 	if err = c.CheckAndSetLastCertificate(candidate); err != nil {
-		fmt.Println("last certificate")
 		// exit with error
 		return
 	}
@@ -428,7 +426,7 @@ func (c *Controller) CheckAndSetLastCertificate(candidate *lib.BlockHeader) lib.
 		// define a convenience variable for the 'root height'
 		rHeight, height := candidate.LastQuorumCertificate.Header.RootHeight, candidate.LastQuorumCertificate.Header.Height
 		// get the committee from the 'root chain' from the n-1 height because state heights represent 'end block state' once committed
-		vs, err := c.LoadCommittee(c.LoadRootChainId(height), rHeight)
+		vs, err := c.LoadCommittee(c.LoadRootChainId(height), rHeight-1)
 		if err != nil {
 			// exit with error
 			return err

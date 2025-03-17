@@ -38,6 +38,7 @@ const (
 // Topic: an identifier used to organize and manage different streams of data within a single communication channel
 // It allows multiple, independent message streams to be handled simultaneously over the same connection
 // It's ordered by stream priority
+// IMPORTANT: if adding a new topic remember to also add it to the select statement in startSendService() in p2p/conn.go
 type Topic int32
 
 const (

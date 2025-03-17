@@ -251,7 +251,7 @@ func (s *Server) RemoteCallbacks(rootChainId uint64) (*lib.RemoteCallbacks, lib.
 		return nil, lib.ErrEmptyChainId()
 	}
 	// create a rpc client
-	rpcClient := NewClient(rootChainUrl, "", "")
+	rpcClient := NewClient(rootChainUrl, "")
 	// set the remote callbacks
 	return &lib.RemoteCallbacks{
 		Height:              rpcClient.Height,
@@ -476,11 +476,11 @@ func (s *Server) runStaticFileServer(fileSys fs.FS, dir, port string, conf lib.C
 func injectConfig(html string, config lib.Config) string {
 	script := fmt.Sprintf(`<script>
 		window.__CONFIG__ = {
-            rpcURL: "%s:%s",
-            adminRPCURL: "%s:%s",
+            rpcURL: "%s",
+            adminRPCURL: "%s",
             chainId: %d
         };
-	</script>`, config.RPCUrl, config.RPCPort, config.RPCUrl, config.AdminPort, config.ChainId)
+	</script>`, config.RPCUrl, config.AdminRPCUrl, config.ChainId)
 
 	// inject the script just before </head>
 	return strings.Replace(html, "</head>", script+"</head>", 1)

@@ -697,8 +697,13 @@ span.canalog-msgtype.canalog-debug {
     margin: 0 auto;
 }
 
+.poll-container {
+  display: flex;
+  flex-direction: column;
+}
+
 .poll-carousel {
-    height: 480px;
+    height: 100%;
     width: 80%;
 }
 

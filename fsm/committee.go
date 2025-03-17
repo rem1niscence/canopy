@@ -203,6 +203,7 @@ func (s *StateMachine) LotteryWinner(id uint64, validators ...bool) (lottery *li
 	winner := lib.WeightedPseudorandom(&lib.PseudorandomParams{
 		SortitionData: &lib.SortitionData{
 			LastProposerAddresses: lastProposers.Addresses,
+			RootHeight:            0, // deterministic
 			Height:                s.Height(),
 			TotalValidators:       p.NumValidators,
 			TotalPower:            p.TotalPower,

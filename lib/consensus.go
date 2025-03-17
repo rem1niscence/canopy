@@ -882,6 +882,7 @@ func (x *Proposers) UnmarshalJSON(jsonBytes []byte) (err error) {
 // SortitionData is the seed data for the IsCandidate and VRF functions
 type SortitionData struct {
 	LastProposerAddresses [][]byte // the last N proposers addresses prevents any grinding attacks
+	RootHeight            uint64   // the height of the root (optional) ensures leader rotation in a chain halt
 	Height                uint64   // the height ensures unique proposer selection for each height
 	Round                 uint64   // the round ensures unique proposer selection for each round
 	TotalValidators       uint64   // the count of validators in the set
@@ -898,7 +899,7 @@ type PseudorandomParams struct {
 // WeightedPseudorandom() generates an index for the 'token' that the winner has in their stake
 func WeightedPseudorandom(p *PseudorandomParams) (publicKey crypto.PublicKeyI) {
 	// convert the seed data to a 16 byte hash, so it may fit in a uint64 type
-	seed := FormatInputIntoSeed(p.LastProposerAddresses, p.Height, p.Round)[:16]
+	seed := FormatInputIntoSeed(p.LastProposerAddresses, p.RootHeight, p.Height, p.Round)[:16]
 	// convert the seedBytes into a uint64 number
 	seedUint64 := binary.BigEndian.Uint64(seed)
 	// ensure that number falls within our 'Total Power'
@@ -926,7 +927,7 @@ func WeightedPseudorandom(p *PseudorandomParams) (publicKey crypto.PublicKeyI) {
 
 // FormatInputIntoSeed() returns the 'seed data' for the VRF function
 // `seed = lastProposerAddresses + height + round`
-func FormatInputIntoSeed(lastProposerAddresses [][]byte, height, round uint64) []byte {
+func FormatInputIntoSeed(lastProposerAddresses [][]byte, rootHeight, height, round uint64) []byte {
 	// create a string to hold the vrf input
 	var input string
 	// for each proposer address
@@ -935,7 +936,7 @@ func FormatInputIntoSeed(lastProposerAddresses [][]byte, height, round uint64) [
 		input += BytesToString(address) + "/"
 	}
 	// add the height and round to the end of the input
-	input += fmt.Sprintf("%d/%d", height, round)
+	input += fmt.Sprintf("%d/%d/%d", rootHeight, height, round)
 	// hash the result
 	return crypto.Hash([]byte(input))
 }

@@ -124,8 +124,6 @@ func (c *Controller) ListenForConsensus() {
 			c.Lock()
 			// once the handler completes, unlock
 			defer c.Unlock()
-			// log the initialization of the consensus message handler
-			c.log.Debug("Handling inbound consensus message")
 			// try to cast the message to a 'consensus message'
 			consensusMessage, ok := msg.Message.(*lib.ConsensusMessage)
 			// if cast unsuccessful

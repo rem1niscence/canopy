@@ -98,7 +98,7 @@ func (tc *testConsensus) simElectionPhase(t *testing.T) {
 		// signs and sends a message with their VRF
 		msg := &Message{
 			Header: tc.view(Election),
-			Vrf:    VRF(tc.cont.proposers.Addresses, 1, 0, k),
+			Vrf:    VRF(tc.cont.proposers.Addresses, 0, 1, 0, k),
 		}
 		require.NoError(t, msg.Sign(k))
 		require.NoError(t, tc.bft.HandleMessage(msg))

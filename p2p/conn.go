@@ -405,7 +405,6 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		}).WithHash()
 		// add to inbox for other parts of the app to read
 		s.inbox <- m
-		s.logger.Debugf("Forwarded message to inbox: %s", lib.Topic_name[int32(packet.StreamId)])
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]
 	}

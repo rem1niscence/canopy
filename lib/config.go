@@ -103,7 +103,8 @@ type RPCConfig struct {
 	ExplorerPort    string `json:"explorerPort"`    // the port where the block explorer is hosted
 	RPCPort         string `json:"rpcPort"`         // the port where the rpc server is hosted
 	AdminPort       string `json:"adminPort"`       // the port where the admin rpc server is hosted
-	RPCUrl          string `json:"rpcURL"`          // the url without port where the rpc server is hosted
+	RPCUrl          string `json:"rpcURL"`          // the url where the rpc server is hosted
+	AdminRPCUrl     string `json:"adminRPCUrl"`     // the url where the admin rpc server is hosted
 	RootChainPollMS uint64 `json:"rootChainPollMS"` // how often to poll the base chain in milliseconds
 	TimeoutS        int    `json:"timeoutS"`        // the rpc request timeout in seconds
 }
@@ -117,13 +118,14 @@ type RootChain struct {
 // DefaultRPCConfig() sets rpc url to localhost and sets wallet, explorer, rpc, and admin ports from [50000-50003]
 func DefaultRPCConfig() RPCConfig {
 	return RPCConfig{
-		WalletPort:      "50000",            // find the wallet on localhost:50000
-		ExplorerPort:    "50001",            // find the explorer on localhost:50001
-		RPCPort:         "50002",            // the rpc is served on localhost:50002
-		AdminPort:       "50003",            // the admin rpc is served on localhost:50003
-		RPCUrl:          "http://localhost", // use a local rpc by default
-		RootChainPollMS: 333,                // poll the root chain every 1/3 second
-		TimeoutS:        3,                  // the rpc timeout is 3 seconds
+		WalletPort:      "50000",                  // find the wallet on localhost:50000
+		ExplorerPort:    "50001",                  // find the explorer on localhost:50001
+		RPCPort:         "50002",                  // the rpc is served on localhost:50002
+		AdminPort:       "50003",                  // the admin rpc is served on localhost:50003
+		RPCUrl:          "http://localhost:50002", // use a local rpc by default
+		AdminRPCUrl:     "http://localhost:50003", // use a local admin rpc by default
+		RootChainPollMS: 333,                      // poll the root chain every 1/3 second
+		TimeoutS:        3,                        // the rpc timeout is 3 seconds
 	}
 }
 

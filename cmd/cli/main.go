@@ -49,7 +49,7 @@ func init() {
 
 	config, validatorKey = InitializeDataDirectory(dataDir, lib.NewDefaultLogger())
 	l = lib.NewLogger(lib.LoggerConfig{Level: config.GetLogLevel()})
-	client = rpc.NewClient(config.RPCUrl, config.RPCPort, config.AdminPort)
+	client = rpc.NewClient(config.RPCUrl, config.AdminRPCUrl)
 }
 
 func main() {
