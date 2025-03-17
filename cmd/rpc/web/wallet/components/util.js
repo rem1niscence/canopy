@@ -673,8 +673,6 @@ export function getActionFee(action, params) {
           return params.stakeFee;
       case "create_order":
           return params.createOrderFee;
-      case "lock_order":
-          return params.lockOrderFee;
       case "close_order":
           return params.closeOrderFee;
       case "edit_order":
