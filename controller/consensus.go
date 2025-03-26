@@ -54,6 +54,8 @@ func (c *Controller) Sync() {
 			c.log.Debugf("Received a block response msg from %s", lib.BytesToTruncatedString(responder))
 			// check to see if the 'responder' is who was 'requested'
 			if !bytes.Equal(responder, requested) {
+				// log this unexpected behavior
+				c.log.Warn("unexpected sender")
 				// slash the reputation of the unexpected responder
 				c.P2P.ChangeReputation(responder, p2p.UnexpectedBlockRep)
 				// exit the select to re-poll
@@ -83,7 +85,7 @@ func (c *Controller) Sync() {
 			// if the max height has grown, we accept that as the new max height
 			if blockMessage.MaxHeight > maxHeight && blockMessage.TotalVdfIterations >= minVDFIterations {
 				// log the update
-				c.log.Debugf("Updated chain %d with max height: %d and iterations %d\n%s", c.Config.ChainId, maxHeight, minVDFIterations)
+				c.log.Debugf("Updated chain %d with max height: %d and iterations %d", c.Config.ChainId, maxHeight, minVDFIterations)
 				// update the max height and vdf iterations
 				maxHeight, minVDFIterations = blockMessage.MaxHeight, blockMessage.TotalVdfIterations
 			}
@@ -418,7 +420,7 @@ func (c *Controller) pollMaxHeight(backoff int) (max, minVDF uint64, syncingPeer
 			// don't listen to any peers below the minimumVDFIterations
 			if int(blockMessage.TotalVdfIterations) < minimumVDFIterations {
 				// log the status
-				c.log.Error("Ignoring below the minimum vdf iterations")
+				c.log.Warnf("Ignoring below the minimum vdf iterations")
 				// reset loop
 				continue
 			}

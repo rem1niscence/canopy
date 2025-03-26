@@ -4,7 +4,8 @@
   "explorerPort": "40001",
   "rpcPort": "40002",
   "adminPort": "40003",
-  "rpcUrl": "http://localhost",
+  "rpcURL": "http://localhost:40002",
+  "adminRPCUrl": "http://localhost:40003",
   "rootChain": [
     {
       "chainID": 1,
@@ -22,8 +23,8 @@
   "inMemory": false,
   "networkID": 1,
   "listenAddress": "0.0.0.0:9001",
-  "externalAddress": "node-1",
-  "chainID": 2,
+  "externalAddress": "node-2",
+  "chainID": 1,
   "maxInbound": 21,
   "maxOutbound": 7,
   "trustedPeerIDs": null,

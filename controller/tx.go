@@ -28,7 +28,7 @@ func (c *Controller) ListenForTx() {
 		// if the chain is syncing, just return without handling
 		if c.isSyncing.Load() {
 			// exit
-			return
+			continue
 		}
 		func() {
 			// lock the controller for thread safety

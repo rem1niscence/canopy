@@ -4,6 +4,8 @@
   "explorerPort": "50001",
   "rpcPort": "50002",
   "adminPort": "50003",
+  "rpcURL": "http://localhost:50002",
+  "adminRPCUrl": "http://localhost:50003",
   "rootChain": [
     {
       "chainId": 1,
