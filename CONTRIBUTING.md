@@ -175,10 +175,11 @@ each package in the project. Follow these markdown guidelines to write effective
 
 #### Fenced Code Blocks
 
--	Use triple backticks (```) to denote code blocks.
--	Specify the language immediately after the opening backticks for syntax highlighting.
+- Use triple backticks (```) to denote code blocks.
+- Specify the language immediately after the opening backticks for syntax highlighting.
 
 Example:
+
 ```go
 func main() {
   fmt.Println("hello world")
@@ -187,5 +188,5 @@ func main() {
 
 #### Image Guidelines
 
--	Provide descriptive alt text for accessibility.
--	Ensure images are relevant and enhance the content.
+- Provide descriptive alt text for accessibility.
+- Ensure images are relevant and enhance the content.
