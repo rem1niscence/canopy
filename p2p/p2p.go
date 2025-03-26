@@ -53,7 +53,7 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l li
 	// Make inbound multiplexed channels
 	channels := make(lib.Channels)
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
-		channels[i] = make(chan *lib.MessageAndMetadata, maxChanSize)
+		channels[i] = make(chan *lib.MessageAndMetadata, maxInboxQueueSize)
 	}
 	// Load banned IPs
 	var bannedIPs []net.IPAddr

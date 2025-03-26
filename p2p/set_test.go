@@ -117,8 +117,6 @@ func newTestMultiConnMock(_ *testing.T, peerPubKey []byte, conn net.Conn, p *P2P
 		streams:       p.NewStreams(),
 		quitSending:   make(chan struct{}, maxChanSize),
 		quitReceiving: make(chan struct{}, maxChanSize),
-		sendPong:      make(chan struct{}, maxChanSize),
-		receivedPong:  make(chan struct{}, maxChanSize),
 		onError:       func(err error, bytes []byte, s string) { p.log.Error(err.Error()) },
 		error:         sync.Once{},
 		p2p:           p,

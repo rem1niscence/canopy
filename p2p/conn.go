@@ -20,6 +20,7 @@ const (
 	dataFlowRatePerS       = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
 	maxMessageSize         = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
 	maxChanSize            = 1                       // maximum number of items in a channel before blocking
+	maxInboxQueueSize      = 100                     // maxinum number of items in inbox queue before blocking
 	maxStreamSendQueueSize = 100                     // maximum number of items in a stream send queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
@@ -57,8 +58,6 @@ type MultiConn struct {
 	streams       map[lib.Topic]*Stream       // multiple independent bi-directional communication channels
 	quitSending   chan struct{}               // signal to quit
 	quitReceiving chan struct{}               // signal to quit
-	sendPong      chan struct{}               // signal to send keep alive message
-	receivedPong  chan struct{}               // signal that received keep alive message
 	onError       func(error, []byte, string) // callback to call if peer errors
 	error         sync.Once                   // thread safety to ensure MultiConn.onError is only called once
 	p2p           *P2P                        // a pointer reference to the P2P module
@@ -78,8 +77,6 @@ func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
 		streams:       p.NewStreams(),
 		quitSending:   make(chan struct{}, maxChanSize),
 		quitReceiving: make(chan struct{}, maxChanSize),
-		sendPong:      make(chan struct{}, maxChanSize),
-		receivedPong:  make(chan struct{}, maxChanSize),
 		onError:       p.OnPeerError,
 		error:         sync.Once{},
 		p2p:           p,
@@ -164,7 +161,7 @@ func (c *MultiConn) startSendService() {
 func (c *MultiConn) startReceiveService() {
 	defer lib.CatchPanic(c.log)
 	reader, m := *bufio.NewReaderSize(c.conn, maxPacketSize), limiter.New(0, 0)
-	defer func() { close(c.sendPong); close(c.receivedPong); m.Done() }()
+	defer func() { m.Done() }()
 	for {
 		select {
 		default: // fires unless quit was signaled
