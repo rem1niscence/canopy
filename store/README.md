@@ -203,15 +203,13 @@ Canopy's SMT implementation introduces key optimizations to address traditional 
 
 3. **ReHash**
    - Progressively updates hash values from modified node to root after each operation
-   - Ensures cryptographic integrity of tree structure
+   - Ensures cryptographic integrity of tree structure.
 
 #### Example operations
 
-##### Insert 1101
-
+#### Insert 1101
 
 <div style="display: flex;">
-
 <div style="width: 50%;">
 Before
 
@@ -224,8 +222,8 @@ graph TD
     n111 --> n1110[1110]
     n111 --> n1111[1111]
 ```
-</div>
 
+</div>
 <div style="width: 50%;">
 After
 
@@ -234,20 +232,88 @@ graph TD
     root((root)) --> n0000[0000]
     root --> n1[1]
     n1 --> n1000[1000]
-    n1 --> n11[11]
-    n11 --> n1101[1101]
+    n1 --> n11[11 *new parent*]
+    n11 --> n1101[1101 inserted node]
     n11 --> n111[111]
     n111 --> n1110[1110]
     n111 --> n1111[1111]
     %% n1000 --> n1101[1101]
 
-    classDef highlightParent fill:#0000ff,stroke:#333;
-    class n11 highlightParent;
-    classDef highlightNewNode fill:#ff0000,stroke:#333;
+    classDef highlightNewNode fill:#0000ff,stroke:#333;
     class n1101 highlightNewNode;
+    classDef highlightRehashedNodes fill:#006622,stroke:#333;
+    class n1,n11,root highlightRehashedNodes;
+
 ```
+
 </div>
 </div>
+
+Steps:
+
+1. **Path Finding**: Navigate down the tree following the binary path of '1101' until reaching the closest existing node ('111')
+
+2. **Position Check**: Determine target node ('1101') doesn't exist at current position
+
+3. **Parent Creation**: Form new parent node with key '11' (greatest common prefix between '1101' and '111')
+
+4. **Restructure**: Update old parent to reference new parent node, making previous node ('111') a child of new parent
+
+5. **Insert**: Add new node ('1101') as the second child of the new parent, maintaining binary tree properties
+
+6. **ReHash**: Progressively updates hash values from the modified node'parent to the root after each
+   operation, ensuring cryptographic integrity of tree structure as shown in the diagram in green.
+
+#### Delete 010
+
+<div style="display: flex;">
+<div style="width: 50%;">
+Before
+
+```mermaid
+graph TD;
+    root((root)) --> n0["0"]
+    root --> n1["1"]
+    n0 --> n000["000"]
+    n0 --> n010["010"]
+    n1 --> n101["101"]
+    n1 --> n111["111"]
+
+    classDef highlightDeleteNode fill:#ff0000,stroke:#333;
+    class n010 highlightDeleteNode;
+```
+
+</div>
+<div style="width: 50%;">
+After
+
+```mermaid
+graph TD;
+    root((root)) --> n000["000 new parent"]
+    root --> n1["1"]
+    n1 --> n101["101"]
+    n1 --> n111["111"]
+
+    classDef highlightNewNode fill:#0000ff,stroke:#333;
+    class n000 highlightNewNode;
+    classDef highlightRehashedNodes fill:#006622,stroke:#333;
+    class root highlightRehashedNodes;
+```
+
+</div>
+</div>
+
+Steps:
+
+1. **Path Finding**: Navigate down the tree following the binary path of '010' until reaching the
+   target node
+
+2. **Node Removal**: Remove target node ('010') from tree structure
+
+3. **Parent Update**: Replace parent node '0' in grandparent with target's sibling '000'
+
+4. **Tree Rehash**: Recalculate hash values upward from '000' parent to the root (on this case is the
+   same as root) to maintain integrity as shown in the diagram in green.
 
 ## Indexer operations and prefix usage to optimize iterations
 
