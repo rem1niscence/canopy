@@ -136,7 +136,7 @@ graph TD
 
     classDef highlight fill:#0000ff,stroke:#333,stroke-width:2px;
     class Root,H0,H00,L0 highlight;
-    classDef highlightSiblings fill:#cc2900,stroke:#333,stroke-width:2px;
+    classDef highlightSiblings fill:#ff0000,stroke:#333,stroke-width:2px;
     class H01,H1,L1 highlightSiblings;
 ```
 
@@ -164,16 +164,90 @@ these challenges while maintaining the security properties of traditional Sparse
 
 ### Canopy's Sparse Merkle Tree
 
-Some of the key optimizations of Canopy's SMT are:
+Canopy's SMT implementation introduces key optimizations to address traditional SMT limitations:
 
-- **Sparse Structure**: Keys are organized by their binary representation, with internal nodes storing
-  common prefixes to reduce redundant paths
+1. **Optimized Node Structure**:
+   - Nil leaf nodes for empty values
+   - Parent nodes with single non-nil child are replaced by that child
+   - A tree starts and always maintains two root children for consistent operations
 
-- **Optimized Traversals**: Operations like insertion, deletion, and lookup focus only on the relevant
-  parts of the tree, minimizing unnecessary traversal of empty nodes
+2. **Efficient Tree Operations**:
+   - Key organization via binary representation and common prefix storage for internal nodes
+   - Targeted traversal that only visits relevant tree paths
+   - Dynamic node creation/deletion with automatic tree restructuring
 
-- **Key-Value Operations**: Supports upserts and deletions by dynamically creating or removing nodes
-  while maintaining the Merkle tree structure
+3. **Space and Performance**:
+   - Eliminates storage of empty branches
+   - Reduces hash computation overhead
+   - Maintains compact tree structure without compromising security
+
+### Core Algorithm Operations
+
+1. **Tree Traversal**
+   - Navigates downward to locate the closest existing node matching the target key's binary path
+
+2. **Modification Operations**
+
+   a. **Upsert (Insert/Update)**
+   - Updates node directly if the target node matches current position
+   - Otherwise:
+     - Creates new parent node using the greatest common prefix between target and current node keys
+     - Updates old parent's pointer to reference new parent
+     - Sets current and target as children of new parent
+
+   b. **Delete**
+   - When target matches current position:
+     - Removes current node
+     - Updates grandparent to point to current's sibling
+     - Removes current's parent node
+
+3. **ReHash**
+   - Progressively updates hash values from modified node to root after each operation
+   - Ensures cryptographic integrity of tree structure
+
+#### Example operations
+
+##### Insert 1101
+
+
+<div style="display: flex;">
+
+<div style="width: 50%;">
+Before
+
+```mermaid
+graph TD
+    root((root)) --> n0000[0000]
+    root --> n1[1]
+    n1 --> n1000[1000]
+    n1 --> n111[111]
+    n111 --> n1110[1110]
+    n111 --> n1111[1111]
+```
+</div>
+
+<div style="width: 50%;">
+After
+
+```mermaid
+graph TD
+    root((root)) --> n0000[0000]
+    root --> n1[1]
+    n1 --> n1000[1000]
+    n1 --> n11[11]
+    n11 --> n1101[1101]
+    n11 --> n111[111]
+    n111 --> n1110[1110]
+    n111 --> n1111[1111]
+    %% n1000 --> n1101[1101]
+
+    classDef highlightParent fill:#0000ff,stroke:#333;
+    class n11 highlightParent;
+    classDef highlightNewNode fill:#ff0000,stroke:#333;
+    class n1101 highlightNewNode;
+```
+</div>
+</div>
 
 ## Indexer operations and prefix usage to optimize iterations
 
