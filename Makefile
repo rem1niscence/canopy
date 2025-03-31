@@ -23,8 +23,8 @@ help:
 # BUILDING
 # ==================================================================================== #
 
-## build: build the canopy binary into the specified directory
-build/canopy: build-wallet build-explorer
+## build/canopy: build the canopy binary into the GO_BIN_DIR
+build/canopy: build/wallet build/explorer
 	go build -o $(GO_BIN_DIR)/canopy $(CLI_DIR)
 
 ## build/wallet: build the canopy's wallet project
