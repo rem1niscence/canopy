@@ -76,11 +76,8 @@ func (c *Controller) ListenForBlock() {
 			}
 			// gossip the block to our peers
 			c.GossipBlock(qc, sender)
-			// if self != root
-			if !c.LoadIsOwnRoot() {
-				// signal a reset to the bft module
-				c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
-			}
+			// signal a reset to the bft module
+			c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
 		}()
 		// if quit signaled
 		if quit {
