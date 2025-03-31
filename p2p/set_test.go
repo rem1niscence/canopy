@@ -11,6 +11,8 @@ import (
 )
 
 func TestPeerSetAddGetDel(t *testing.T) {
+	isTest = true
+	defer func() { isTest = false }()
 	n1, n2 := newTestP2PNode(t), newTestP2PNode(t)
 	require.True(t, len(n1.PeerSet.m) == 0)
 	expected := &lib.PeerInfo{
@@ -40,6 +42,8 @@ func TestPeerSetAddGetDel(t *testing.T) {
 }
 
 func TestUpdateMustConnects(t *testing.T) {
+	isTest = true
+	defer func() { isTest = false }()
 	n1, n2, n3 := newTestP2PNode(t), newTestP2PNode(t), newTestP2PNode(t)
 	require.NoError(t, n1.Add(&Peer{
 		PeerInfo: &lib.PeerInfo{Address: n2.ID()},
@@ -58,6 +62,8 @@ func TestUpdateMustConnects(t *testing.T) {
 }
 
 func TestChangeReputation(t *testing.T) {
+	isTest = true
+	defer func() { isTest = false }()
 	n1, n2, cleanup := newTestP2PPair(t)
 	defer cleanup()
 	n1.UpdateMustConnects([]*lib.PeerAddress{{PublicKey: n2.pub}})
@@ -78,6 +84,8 @@ func TestChangeReputation(t *testing.T) {
 }
 
 func TestGetAllInfosAndBookPeers(t *testing.T) {
+	isTest = true
+	defer func() { isTest = false }()
 	n1, n2, cleanup := newTestP2PPair(t)
 	n3 := newTestP2PNode(t)
 	_, c := net.Pipe()
