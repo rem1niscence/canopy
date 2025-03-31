@@ -285,9 +285,10 @@ func (s *Stream) queueSends(packets []*Packet) bool {
 	for _, packet := range packets {
 		ok := s.queueSend(packet)
 		if !ok {
+			s.logger.Errorf("Packet(ID:%s, L:%d, E:%t) packet failed in queue", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 			return false
 		}
-		// s.logger.Debugf("Packet(ID:%s, L:%d, E:%t) packet queued", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
+		s.logger.Debugf("Packet(ID:%s, L:%d, E:%t) packet queued", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 	}
 	return true
 }
@@ -305,8 +306,8 @@ func (s *Stream) queueSend(p *Packet) bool {
 // handlePacket() merge the new packet with the previously received ones until the entire message is complete (EOF signal)
 func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
 	msgAssemblerLen, packetLen := len(s.msgAssembler), len(packet.Bytes)
-	// s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t) from %s",
-	//	lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof, lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
+	s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t) from %s",
+		lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof, lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
 	// if the addition of this new packet pushes the total message size above max
 	if int(maxMessageSize) < msgAssemblerLen+packetLen {
 		s.msgAssembler = s.msgAssembler[:0]
