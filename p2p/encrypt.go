@@ -129,8 +129,8 @@ func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKe
 func (c *EncryptedConn) Write(data []byte) (n int, err error) {
 	// fallback to regular conn in case encrypted conn is not yet set
 	if c.send.aead == nil {
-		c.mu.Lock()
-		defer c.mu.Unlock()
+		// c.mu.Lock()
+		// defer c.mu.Unlock()
 		return c.conn.Write(data)
 	}
 	// thread safety sends
@@ -178,10 +178,10 @@ func (c *EncryptedConn) Read(data []byte) (n int, err error) {
 	// fallback to regular conn in case encrypted conn is not yet set
 	if c.receive.aead == nil {
 		// flag to allow unit test to pass (without this a deadlock would happen because of using same instances of conn in read and write)
-		if !isTest {
-			c.mu.Lock()
-			defer c.mu.Unlock()
-		}
+		// if !isTest {
+		// 	c.mu.Lock()
+		// 	defer c.mu.Unlock()
+		// }
 		return c.conn.Read(data)
 	}
 	// read thread safety
@@ -244,33 +244,33 @@ func (c *EncryptedConn) holdUnread(bytesRead int, chunk []byte) {
 
 // EncryptedConn satisfies the net.conn interface
 func (c *EncryptedConn) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	// c.mu.Lock()
+	// defer c.mu.Unlock()
 	return c.conn.Close()
 }
 func (c *EncryptedConn) LocalAddr() net.Addr {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	// c.mu.Lock()
+	// defer c.mu.Unlock()
 	return c.conn.LocalAddr()
 }
 func (c *EncryptedConn) RemoteAddr() net.Addr {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	// c.mu.Lock()
+	// defer c.mu.Unlock()
 	return c.conn.RemoteAddr()
 }
 func (c *EncryptedConn) SetDeadline(t time.Time) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	// c.mu.Lock()
+	// defer c.mu.Unlock()
 	return c.conn.SetDeadline(t)
 }
 func (c *EncryptedConn) SetReadDeadline(t time.Time) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	// c.mu.Lock()
+	// defer c.mu.Unlock()
 	return c.conn.SetReadDeadline(t)
 }
 func (c *EncryptedConn) SetWriteDeadline(t time.Time) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	// c.mu.Lock()
+	// defer c.mu.Unlock()
 	return c.conn.SetWriteDeadline(t)
 }
 
