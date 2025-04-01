@@ -315,6 +315,56 @@ Steps:
 4. **Tree Rehash**: Recalculate hash values upward from '000' parent to the root (on this case is the
    same as root) to maintain integrity as shown in the diagram in green.
 
+### Proof Generation and verification
+
+Canopy's SMT implementation supports both proof-of-membership and proof-of-non-membership through
+the `GetMerkleProof` and `VerifyProof` methods. These proofs enable verification of whether a
+specific key-value pair exists in the tree without requiring access to the complete tree data.
+
+#### Proof Generation (`GetMerkleProof`)
+
+The proof generation process constructs an ordered path from the target leaf node (or the closest
+existing node where the key would reside if present) back to the root, by including every sibling
+node encountered along each branch of this traversal.
+
+1. **Initial Node**: The first element in the proof is always the target node (for membership
+   proofs) or the node at the potential location (for non-membership proofs)
+
+2. **Sibling Collection**: For each level from the leaf to the root:
+   1. Record the sibling node's key and value
+   2. Store the sibling's position (left=0 or right=1) in the bitmask
+      - These siblings are essential for reconstructing parent hashes
+
+#### Proof Verification (`VerifyProof`)
+
+The verification process reconstructs the root hash using the provided proof and compares it with
+the known root, if the hashes match, the resulting tree is then used in order to verify the
+existence of the requested key-value pair. As a side note, unlike traditional sparse merkle trees,
+both the key and value are required in order to generate the parent's hash:
+
+1. **Initial Setup**:
+    - Create a temporary in-memory tree
+    - Add the first proof node (target/potential location)
+    - The first proof node's key and value hash are then used to build the parent of the upcoming node
+
+2. **Hash Reconstruction**:
+    - For each sibling in the proof:
+      - Use the bitmask to determine sibling position
+      - Combine the current hash with the sibling's hash
+      - Compute the parent hash using the same function as the main tree
+      - Compute the parent's key by calculating the Greatest Common Prefix (GCP) of the current
+        node's key and the sibling's key
+      - Save the resulting parent node in the temporary tree
+
+3. **Root Hash Validation**:
+    - Compare reconstructed root hash with provided root
+      - If the hashes do not match, the proof is invalid and the verification fails
+
+4. **Final Verification**:
+    - Traverse the temporary tree to verify the existence of the requested key-value pair
+      - For membership proofs: Verifies target exists and value matches
+      - For non-membership proofs: Confirms target doesn't exist at expected position
+
 ## Indexer operations and prefix usage to optimize iterations
 
 ## Store struct and how it adds up all together
