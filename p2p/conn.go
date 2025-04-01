@@ -109,10 +109,12 @@ func (c *MultiConn) Stop() {
 func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 	stream, ok := c.streams[topic]
 	if !ok {
+		c.log.Errorf("Stream %s does not exist", topic)
 		return
 	}
 	bz, err := lib.Marshal(msg)
 	if err != nil {
+		c.log.Errorf("Marshaling failed of payload: %s", msg.String())
 		return false
 	}
 	chunks := split(bz, maxDataChunkSize)
