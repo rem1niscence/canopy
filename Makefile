@@ -16,7 +16,7 @@ help:
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
 
 # Targets, this is a list of all available commands which can be executed using the make command.
-.PHONY: build/canopy build/wallet build/explorer test/all dev/deps docker/up \
+.PHONY: build/canopy build/canopy-full build/wallet build/explorer test/all dev/deps docker/up \
 	docker/down docker/up-fast docker/down docker/logs
 
 # ==================================================================================== #
@@ -24,13 +24,17 @@ help:
 # ==================================================================================== #
 
 ## build/canopy: build the canopy binary into the GO_BIN_DIR
-build/canopy: build/wallet build/explorer
+build/canopy:
 	go build -o $(GO_BIN_DIR)/canopy $(CLI_DIR)
+
+## build/canopy-full: build the canopy binary and its wallet and explorer altogether
+build/canopy-full: build/wallet build/explorer build/canopy
 
 ## build/wallet: build the canopy's wallet project
 build/wallet:
 	npm install --prefix $(WALLET_DIR) && npm run build --prefix $(WALLET_DIR)
 
+## build/explorer: build the canopy's explorer project
 build/explorer:
 	npm install --prefix $(EXPLORER_DIR) && npm run build --prefix $(EXPLORER_DIR)
 
