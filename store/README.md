@@ -6,7 +6,111 @@
 The `store` package implements the storage layer for the Canopy blockchain, leveraging
 **[BadgerDB](https://github.com/hypermodeinc/badger)** as its underlying key-value store. It
 provides structured abstractions for nested transactions, state management, and indexed blockchain
-data storage.
+data storage. This document aims to provide a comprehensive overview of the package's core
+components and their functionalities while also introducing most of the concepts used in the package
+and builds up each component step by step to form a complete storage solution.
+
+## Basic Concepts
+
+### Persistent Storage
+
+Persistent storage refers to data storage mechanisms where information persists after power loss or
+process termination, unlike volatile memory (RAM) where data is temporary.
+
+Persistent storage systems must balance performance, durability, and consistency requirements. While
+RAM provides fast access but loses data on power loss, storage devices like SSDs and HDDs offer
+permanence at the cost of slower access speeds. This tradeoff is particularly important in
+blockchain systems where transaction history and state changes must be both quickly accessible and
+permanently stored while maintaining data integrity across system restarts.
+
+### Key-Value Storage
+
+A key-value storage is like a dictionary where unique keys can be associated with values. It
+provides a fast and efficient way to store and retrieve data.
+
+Examples:
+
+- Key: "user_123" → Value: `{name: "John", balance: 100}`
+- Key: "settings" → Value: `{theme: "dark", notifications: "on"}`
+
+Benefits:
+
+- Fast lookups ([O(1)](https://en.wikipedia.org/wiki/Time_complexity) in ideal cases)
+- Simple to understand and use
+- Flexible value storage (can store any type of data)
+
+### Transactions
+
+A transaction is a group of operations that must either all succeed or all fail together. A good
+analogy is like transferring money between two bank accounts.
+
+```mermaid
+graph LR
+    A[Account A: $100<br>Account B: $0] --> B[A Transfers $50 to B] --> C[Account B: $50<br>Account A: $50]
+```
+
+If anything fails during the transfer, both accounts should return to their original state. As
+clients would be pretty upset if they lost their money.
+
+#### Transaction Properties (ACID)
+
+1. **Atomicity**: All operations in a transaction either succeed or fail together
+   - Example: In a money transfer, both the withdrawal and deposit must succeed together
+
+2. **Consistency**: Data remains valid before and after the transaction
+   - Example: Total money in all accounts must remain the same after transfers
+
+3. **Isolation**: Multiple transactions don't interfere with each other
+   - Example: Two people withdrawing money simultaneously shouldn't cause conflicts
+
+4. **Durability**: Once a transaction is committed, changes are permanent
+   - Example: After confirming a transfer, the new balances persist even if the system crashes
+
+#### Nested Transactions
+
+Nested transactions behave like a set of Russian dolls, where each transaction sits inside another:
+
+```mermaid
+graph TD
+    A[Main Transaction] --> B[Sub-Transaction 1]
+    A --> C[Sub-Transaction 2]
+    B --> D[Sub-Sub-Transaction]
+```
+
+Benefits:
+
+- More granular control over operations
+- Ability to rollback partial operations
+- Better organization of complex operations
+
+### Why BadgerDB?
+
+**[BadgerDB](https://github.com/hypermodeinc/badger)** is a fast, embeddable, persistent key-value
+(KV) database written in pure Go. It's designed to be highly performant for both read and write
+operations.
+
+#### Key Features
+
+1. **LSM Tree-based**: Uses a [Log-Structured Merge-Tree](https://en.wikipedia.org/wiki/Log-structured_merge-tree) architecture, optimized for SSDs
+2. **ACID Compliant**: Ensures data consistency through Atomicity, Consistency, Isolation, and
+   Durability
+3. **Concurrent Access**: Supports multiple readers and a single writer simultaneously
+4. **Key-Value Separation**: Stores keys and values separately to improve performance
+5. **Transactions**: Native support for both read-only and read-write transactions
+6. **Iteration**: Provides efficient iteration over key-value pairs that are byte-wise
+   lexicographically ordered
+
+### Putting It All Together
+
+In Canopy's storage system:
+
+1. BadgerDB provides the persistent key-value store
+2. Transactions ensure data consistency
+3. Nested transactions enable complex operations
+4. Key-value pairs store blockchain state and data
+
+This foundation helps understand the more complex features that will be discussed in the following
+sections.
 
 ## **Core Components**
 
@@ -39,23 +143,6 @@ data storage.
 
 This layered design decouples storage concerns while ensuring compatibility with BadgerDB’s
 performance characteristics and the blockchain’s integrity requirements.
-
-## Understanding BadgerDB and Transaction Management in Canopy
-
-**[BadgerDB](https://github.com/hypermodeinc/badger)** is a fast, embeddable, persistent key-value
-(KV) database written in pure Go. It's designed to be highly performant for both read and write
-operations.
-
-### Key Features
-
-1. **LSM Tree-based**: Uses a Log-Structured Merge-Tree architecture, optimized for SSDs
-2. **ACID Compliant**: Ensures data consistency through Atomicity, Consistency, Isolation, and
-   Durability
-3. **Concurrent Access**: Supports multiple readers and a single writer simultaneously
-4. **Key-Value Separation**: Stores keys and values separately to improve performance
-5. **Transactions**: Native support for both read-only and read-write transactions
-6. **Iteration**: Provides efficient iteration over key-value pairs that are byte-wise
-   lexicographically ordered
 
 ### TxnWrapper
 
