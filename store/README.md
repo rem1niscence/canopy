@@ -3,14 +3,34 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/canopy/canopy-network.svg)](https://pkg.go.dev/github.com/canopy-network/canopy/store)
 [![License](https://img.shields.io/github/license/canopy-network/canopy)](https://github.com/canopy/canopy-network/blob/main/LICENSE)
 
-The `store` package implements the storage layer for the Canopy blockchain, leveraging
-**[BadgerDB](https://github.com/hypermodeinc/badger)** as its underlying key-value store. It
-provides structured abstractions for nested transactions, state management, and indexed blockchain
-data storage. This document aims to provide a comprehensive overview of the package's core
-components and their functionalities while also introducing most of the concepts used in the package
-and builds up each component step by step to form a complete storage solution.
+The store package serves as the storage layer for the Canopy blockchain, utilizing
+**[BadgerDB](https://github.com/hypermodeinc/badger)** as its underlying key-value store. It offers
+structured abstractions for nested transactions, state management, and indexed blockchain data
+storage. This document provides a comprehensive overview of the package’s core components and their
+functionalities, introducing key concepts while progressively building each component into a
+complete storage solution.
 
 ## Basic Concepts
+
+### Hashing
+
+Hashing is the process of converting data into an unique "fingerprint". A hash function converts any
+data into a fixed-size string of characters, making it useful for data verification and storage.
+
+```mermaid
+graph LR
+    A["Hello World"] -->|Hash Function| B["68e109f..."]
+    C["hello world"] -->|Hash Function| D["5eb63b..."]
+```
+
+Key Properties:
+
+- **Same Input, Same Hash**: "Hello" always produces the same hash
+- **Small Changes, Different Hash**: "Hello" and "hello" produce completely different hashes
+- **One-way**: You can't recreate the original data from its hash
+- **Fixed Size**: All hashes have the same length, regardless of input size
+
+In blockchain, hashing is used to create unique IDs for transactions, verify data hasn't changed, and link blocks together.
 
 ### Persistent Storage
 
@@ -46,7 +66,7 @@ analogy is like transferring money between two bank accounts.
 
 ```mermaid
 graph LR
-    A[Account A: $100<br>Account B: $0] --> B[A Transfers $50 to B] --> C[Account B: $50<br>Account A: $50]
+    A[Account A: $100<br>Account B: $0] --> B[A Transfers $50 to B] --> C[Account A: $50<br>Account B: $50]
 ```
 
 If anything fails during the transfer, both accounts should return to their original state. As
@@ -91,12 +111,15 @@ operations.
 
 #### Key Features
 
-1. **LSM Tree-based**: Uses a [Log-Structured Merge-Tree](https://en.wikipedia.org/wiki/Log-structured_merge-tree) architecture, optimized for SSDs
+1. **LSM Tree-based**: Uses a
+   [Log-Structured Merge-Tree](https://en.wikipedia.org/wiki/Log-structured_merge-tree)
+   architecture, optimized for SSDs
 2. **ACID Compliant**: Ensures data consistency through Atomicity, Consistency, Isolation, and
    Durability
 3. **Concurrent Access**: Supports multiple readers and a single writer simultaneously
 4. **Key-Value Separation**: Stores keys and values separately to improve performance
-5. **Transactions**: Native support for both read-only and read-write transactions
+5. **Transactions**: Native support for both read-only and read-write transactions. Every action in
+   BadgerDB happens within a transaction
 6. **Iteration**: Provides efficient iteration over key-value pairs that are byte-wise
    lexicographically ordered
 
@@ -108,41 +131,85 @@ In Canopy's storage system:
 2. Transactions ensure data consistency
 3. Nested transactions enable complex operations
 4. Key-value pairs store blockchain state and data
+5. Blockchain data is frequently stored hashed to improve security
 
 This foundation helps understand the more complex features that will be discussed in the following
 sections.
 
-## **Core Components**
+## **Store Package Components**
 
-1. **`Txn`**: The foundational transactional layer. This implements ad-hoc **nested transactions** on top
-   of BadgerDB, enabling atomic operations and rollbacks for complex storage workflows.
+The store package is built from several key components that work together, like building blocks, to
+create a complete storage system. It could be represented like a well-organized filing cabinet,
+where each component has a specific job in managing and storing data. Each compoent from the
+simplest to the most complex is described as follows:
 
-2. **`TxnWrapper` & `SMT`**:
-   - **`TxnWrapper`**: Wraps BadgerDB to conform to the `RWStoreI` interface, providing a simple
-     read/write abstraction with transaction support.
-   - **`SMT`**: An optimized Sparse Merkle Tree implementation backed by BadgerDB. It adheres to the
-     `RWStoreI` interface and enables efficient cryptographic commitment to state data and proof of
-     membership/non-membership of the keys.
+1. **TxnWrapper**: It is a Wrapper around BadgerDB operations:
+    - Makes sure all database operations follow the [`RWStoreI`](../lib/store.go) interface
+    - Handles basic operations like storing and retrieving data
+    - Allows iteration between ranges of data
+    - Works like one of the translators between BadgerDB and the rest of Canopy
 
-3. **`Indexer`**: Built on `TxnWrapper`, this component organizes blockchain data (blocks,
-   transactions, addresses, etc.) using **prefix-based keys**. This design allows efficient
-   iteration and querying of domain-specific data (e.g., "all transactions in block X").
+2. **`Txn`**: The transaction manager
+    - Ensures that a group of operations happen together or not all (transactions)
+    - Enhances BadgerDB by implementing in-memory nested transactions, to allows to write or discard
+      groups of operations (like multiple read/writes) within a single BadgerDB transaction
+    - Follows the [`RWStoreI`](../lib/store.go) interface to interact with the database
 
-4. **`Store`**: The top-level struct coordinating the storage layer:
-   - **`Indexer`**: Manages indexed blockchain operations.
-   - **`StateStore`**: Stores raw blockchain state data (blobs) using `TxnWrapper`.
-   - **`StateCommitStore`**: Uses the `SMT` implementation to cryptographically commit hashes of
-     `StateStore` data into the Sparse Merkle Tree, ensuring tamper-evident state verification.
+3. **`SMT`** (Sparse Merkle Tree): A special data structure for proving data existence
+   - Organizes data in a tree-like structure
+   - Makes it easy to prove whether data exists or doesn't exist
+   - Uses smart optimizations to save space and work faster
+   - Just like `TxnWrapper` it also follows the [`RWStoreI`](../lib/store.go) interface and
+     leverages `TxnWrapper` itself in order to interact with the database
+
+4. **`Indexer`**: The filing system
+   - Organizes blockchain data (like blocks and transactions) in an easy-to-find way
+   - Uses `TxnWrapper` under the hood to save the data in BadgerDB
+   - Uses prefixes (like labels on filing cabinets) to group related data
+   - Makes searching through data fast and efficient
+
+5. **`Store`**: The main coordinator
+   - Brings all other components together
+   - Contains three main parts:
+     - `Indexer`: Organizes and indexes blockchain data
+     - `StateStore`: Stores the actual blockchain data using `TxnWrapper` under the hood
+     - `StateCommitStore`: Stores hashes of the data using `SMT` under the hood
+   - Is the only component that commits to the database directly
 
 ## **Key Interactions**
 
-- **Transactions**: `Txn` provides atomicity for operations across BadgerDB.
-- **State Management**: `StateStore` (raw data) and `StateCommitStore` (hashes in SMT) work in
-  tandem to balance performance with cryptographic integrity.
-- **Querying**: The `Indexer`’s prefix-based structure enables fast, type-specific data retrieval.
+```mermaid
+graph TD
+    Store[Store] --> Indexer[Indexer<br/><i>Indexed data</i>]
+    Store --> StateStore[StateStore<br/><i>Raw Data</i>]
+    Store --> StateCommitStore[StateCommitStore<br/><i>Hash Data</i>]
 
-This layered design decouples storage concerns while ensuring compatibility with BadgerDB’s
-performance characteristics and the blockchain’s integrity requirements.
+    StateStore --> TxnWrapper[TxnWrapper]
+    StateCommitStore --> SMT[SMT<br/><i>Sparse Merkle Tree</i>]
+    Indexer --> TxnWrapper
+
+    SMT --> TxnWrapper
+
+    TxnWrapper --> BadgerDB[BadgerDB]
+    Store --> BadgerDB
+```
+
+1. The `Store` manages three main components:
+   - `Indexer` (for indexed blockchain data)
+   - `StateStore` (for raw data)
+   - `StateCommitStore` (for hash data)
+   - Commits directly to the database the data on all the components
+
+2. `TxnWrapper` acts as a bridge to BadgerDB:
+   - Both `StateStore` and `Indexer` use it directly
+   - `SMT` also uses it for data storage
+   - Provides consistent way to interact with the database
+
+3. `BadgerDB` serves as the foundation:
+   - All data ultimately gets stored here
+   - Everything flows through `TxnWrapper` to reach BadgerDB
+
+This architecture ensures each component handles its specific tasks while maintaining consistent data storage and access patterns.
 
 ### TxnWrapper
 
