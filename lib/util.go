@@ -36,9 +36,9 @@ func init() {
 // Page is a pagination wrapper over a slice of data
 type Page struct {
 	PageParams          // the input parameters for the page
-	Results    Pageable `json:"results"` // the actual returned array of items
-	Type       string   `json:"type"` // the type of the page
-	Count      int      `json:"count"` // count of items included in the page
+	Results    Pageable `json:"results"`    // the actual returned array of items
+	Type       string   `json:"type"`       // the type of the page
+	Count      int      `json:"count"`      // count of items included in the page
 	TotalPages int      `json:"totalPages"` // number of pages that exist based on these page parameters
 	TotalCount int      `json:"totalCount"` // count of items that exist
 }
@@ -658,7 +658,7 @@ func NewRetry(waitTimeMS, maxLoops uint64) *Retry {
 // WaitAndDoRetry() sleeps the appropriate time and returns false if maxed out retry
 func (r *Retry) WaitAndDoRetry() bool {
 	// if GTE max loops
-	if r.maxLoops <= r.loopCount {
+	if r.maxLoops < r.loopCount {
 		// exit with 'try again'
 		return false
 	}
