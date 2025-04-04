@@ -36,9 +36,9 @@ func init() {
 // Page is a pagination wrapper over a slice of data
 type Page struct {
 	PageParams          // the input parameters for the page
-	Results    Pageable `json:"results"`    // the actual returned array of items
-	Type       string   `json:"type"`       // the type of the page
-	Count      int      `json:"count"`      // count of items included in the page
+	Results    Pageable `json:"results"` // the actual returned array of items
+	Type       string   `json:"type"` // the type of the page
+	Count      int      `json:"count"` // count of items included in the page
 	TotalPages int      `json:"totalPages"` // number of pages that exist based on these page parameters
 	TotalCount int      `json:"totalCount"` // count of items that exist
 }
@@ -662,10 +662,13 @@ func (r *Retry) WaitAndDoRetry() bool {
 		// exit with 'try again'
 		return false
 	}
-	// sleep the allotted time
-	time.Sleep(time.Duration(r.waitTimeMS) * time.Millisecond)
-	// double the timeout
-	r.waitTimeMS += r.waitTimeMS
+	// don't sleep or increment on the first iteration
+	if r.loopCount != 0 {
+		// sleep the allotted time
+		time.Sleep(time.Duration(r.waitTimeMS) * time.Millisecond)
+		// double the timeout
+		r.waitTimeMS += r.waitTimeMS
+	}
 	// increment the loop count
 	r.loopCount++
 	// exit with 'try again'
