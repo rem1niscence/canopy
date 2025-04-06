@@ -38,13 +38,109 @@ func (s *StateMachine) GetValidator(address crypto.AddressI) (*Validator, lib.Er
 	return v, nil
 }
 
-// GetValidatorExists() checks if the Validator already exists in the state
-func (s *StateMachine) GetValidatorExists(address crypto.AddressI) (bool, lib.ErrorI) {
-	// get the bytes from state using the key for a validator at a specific address
-	val, _ := s.GetValidator(address)
-	// check if the validator exists
-	return val != nil, nil
+// SetValidator() sets a Validator object into the state
+// IMPORTANT: 'setting' doesn't 'update' a validator unless it has the same stake as before!
+// - Use s.UpdateValidator() instead
+func (s *StateMachine) SetValidator(v *Validator) lib.ErrorI {
+	return s.UpdateValidator(v, v.StakedAmount)
 }
+
+// UpdateValidator()
+// - takes a Validator object with the 'old stake amount'
+// - deletes it from the Validators list
+// - updates the validator with the 'new stake amount'
+// - inserts it in the proper order (sorted by stake then address)
+func (s *StateMachine) UpdateValidator(val *Validator, newStakeAmount uint64) lib.ErrorI {
+	// get the list of validators / delegates sorted by stake then address
+	list, idx, found, err := s.GetValidatorIndexFromList(val.Address, val.StakedAmount, val.Delegate)
+	// if an error occurred
+	if err != nil {
+		// exit with error
+		return err
+	}
+	// if found in the list
+	if found {
+		// remove it from the list
+		list.List = append(list.List[:idx], list.List[idx+1:]...)
+	}
+	// update the new stake amount
+	val.StakedAmount = newStakeAmount
+	// if cache is initialized
+	if len(s.valsCache) != 0 {
+		// update the cache
+		s.valsCache[lib.BytesToString(val.Address)] = val
+	}
+	// get the index from the validator list
+	i, _ := s.getValidatorIndexFromList(list, val.Address, val.StakedAmount)
+	// if the index is at the end of the list (new entry)
+	list.List = append(list.List[:i], append([]*Validator{val}, list.List[i:]...)...)
+	// set the updated list back in state
+	return s.SetValidatorList(list, val.Delegate)
+}
+
+// UpdateValidatorStake() updates the stake of the validator object in state - updating the corresponding committees and supply
+// NOTE: new stake amount must be GTE the previous stake amount
+func (s *StateMachine) UpdateValidatorStake(val *Validator, newCommittees []uint64, amountToAdd uint64) (err lib.ErrorI) {
+	// update staked supply accordingly (validator stake amount can never go down except for slashing and unstaking)
+	if err = s.AddToStakedSupply(amountToAdd); err != nil {
+		return err
+	}
+	// calculate the new stake amount
+	newStakedAmount := val.StakedAmount + amountToAdd
+	// if the validator is a delegate or not
+	if val.Delegate {
+		// update the new 'total delegated tokens' amount by adding to the staked supply
+		if err = s.AddToDelegateSupply(amountToAdd); err != nil {
+			return err
+		}
+		// update the delegations with the new chainIds and stake amount
+		if err = s.UpdateDelegations(val, newStakedAmount, newCommittees); err != nil {
+			return err
+		}
+	} else {
+		// update the committees with the new chainIds and stake amount
+		if err = s.UpdateCommittees(val, newStakedAmount, newCommittees); err != nil {
+			return err
+		}
+	}
+	// update the validator committees in the structure
+	val.Committees = newCommittees
+	// set validator
+	return s.UpdateValidator(val, newStakedAmount)
+}
+
+// DeleteValidator() completely removes a validator from the state
+func (s *StateMachine) DeleteValidator(validator *Validator) lib.ErrorI {
+	// subtract from staked supply
+	if err := s.SubFromStakedSupply(validator.StakedAmount); err != nil {
+		return err
+	}
+	// delete the validator committee information
+	if validator.Delegate {
+		// subtract those tokens from the delegate supply count
+		if err := s.SubFromDelegateSupply(validator.StakedAmount); err != nil {
+			return err
+		}
+		// remove the delegations for the validator
+		if err := s.RemoveDelegationsFromCommittees(validator.StakedAmount, validator.Committees); err != nil {
+			return err
+		}
+	} else {
+		// removes the validator stake from the committees
+		if err := s.RemoveStakeFromCommittees(validator.StakedAmount, validator.Committees); err != nil {
+			return err
+		}
+	}
+	// if cache is initialized
+	if len(s.valsCache) != 0 {
+		// update the cache
+		delete(s.valsCache, lib.BytesToString(validator.Address))
+	}
+	// delete the validator from state
+	return s.DeleteValidatorFromList(validator.Address, validator.StakedAmount, validator.Delegate)
+}
+
+// MASS GETTERS AND SETTERS BELOW
 
 // GetValidators() returns a slice of all validators
 func (s *StateMachine) GetValidators() (result []*Validator, err lib.ErrorI) {
@@ -62,135 +158,7 @@ func (s *StateMachine) GetValidators() (result []*Validator, err lib.ErrorI) {
 	return append(validators.List, delegates.List...), nil
 }
 
-// GetValidatorList() gets a list of validators from state, there are 2 lists in the state:
-// - Delegates (non-bft participants)
-// - Validators (bft participants)
-func (s *StateMachine) GetValidatorList(delegate bool) (list *ValidatorsList, err lib.ErrorI) {
-	var key []byte
-	// if delegates
-	if delegate {
-		key = DelegatePrefix()
-	} else {
-		key = ValidatorPrefix()
-	}
-	// initialize the proto addresses
-	list = new(ValidatorsList)
-	// get the addresses bytes under the committee prefix
-	protoBytes, err := s.Get(key)
-	// if not found
-	if protoBytes == nil {
-		// exit without error
-		return new(ValidatorsList), nil
-	}
-	// if an error occurred
-	if err != nil {
-		// exit with error
-		return
-	}
-	// populate the struct with proto bytes
-	err = lib.Unmarshal(protoBytes, list)
-	// exit
-	return
-}
-
-// GetValidatorIndexFromList() is a pass through function to getValidatorIndexFromList() that retrieves the list first
-func (s *StateMachine) GetValidatorIndexFromList(address []byte, stake uint64, delegate bool) (list *ValidatorsList, i int, found bool, err lib.ErrorI) {
-	// get the list of validators / delegates sorted (stake then address)
-	list, err = s.GetValidatorList(delegate)
-	// if an error occurred
-	if err != nil {
-		// exit with error
-		return
-	}
-	// perform a binary search on the validators list
-	i, found = s.getValidatorIndexFromList(list, address, stake)
-	// exit
-	return
-}
-
-// getValidatorIndexFromList() performs a binary search on the validators list which is sorted
-// first by stake then by address and returns the list, index and if the validator is found
-func (s *StateMachine) getValidatorIndexFromList(list *ValidatorsList, address []byte, stake uint64) (i int, found bool) {
-	// get the size of the list
-	n := len(list.List)
-	// insert using binary search
-	i = sort.Search(n, func(i int) bool {
-		// load the validator from the state using the address
-		v := list.List[i]
-		// if stakes are equal, sort by address
-		if v.StakedAmount == stake {
-			return bytes.Compare(v.Address, address) <= 0
-		}
-		// sort the highest stake to lowest
-		return v.StakedAmount <= stake
-	})
-	// if the index is at the end of the list
-	if i == n {
-		// not found
-		return
-	}
-	// check if it's the correct address
-	found = bytes.Equal(list.List[i].Address, address)
-	// exit
-	return
-}
-
-// GetValidatorsPaginated() returns a page of filtered validators
-func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorFilters) (page *lib.Page, err lib.ErrorI) {
-	// get all validators
-	vals, err := s.GetValidators()
-	if err != nil {
-		return nil, err
-	}
-	// initialize a page and the results slice
-	page, res := lib.NewPage(p, ValidatorsPageName), make(ValidatorPage, 0)
-	page.Results = &res
-	// create a variable to hold the list of filtered validators
-	var filteredVals []*Validator
-	// for each item in the iterator
-	for _, val := range vals {
-		// pre-filter the possible candidates
-		if val.PassesFilter(f) {
-			// add to the list
-			filteredVals = append(filteredVals, val)
-		}
-	}
-	// populate the page with the list of filtered validators
-	err = page.LoadArray(filteredVals, &res, func(i any) (e lib.ErrorI) {
-		// cast to validator
-		v, ok := i.(*Validator)
-		// ensure the cast was successful
-		if !ok {
-			return lib.ErrInvalidArgument()
-		}
-		// add to the resulting page
-		res = append(res, v)
-		// exit
-		return
-	})
-	return
-}
-
-// SetValidatorList() sets a list of validators to the state
-func (s *StateMachine) SetValidatorList(list *ValidatorsList, delegate bool) (err lib.ErrorI) {
-	var key []byte
-	// if delegates
-	if delegate {
-		key = DelegatePrefix()
-	} else {
-		key = ValidatorPrefix()
-	}
-	// convert the object to proto bytes
-	protoBytes, err := lib.Marshal(list)
-	// if an error occurred
-	if err != nil {
-		// exit with error
-		return
-	}
-	return s.Set(key, protoBytes)
-}
-
-// SetValidators() upserts multiple Validators into the state and updates the supply tracker
+// SetValidators() inserts multiple Validators into the state and updates the supply tracker
 func (s *StateMachine) SetValidators(validators []*Validator, supply *Supply) lib.ErrorI {
 	// for each validator in the list
 	for _, val := range validators {
@@ -241,126 +209,157 @@ func (s *StateMachine) SetValidators(validators []*Validator, supply *Supply) li
 	return nil
 }
 
-// SetValidator() upserts a Validator object into the state
-func (s *StateMachine) SetValidator(validator *Validator) (err lib.ErrorI) {
-	// if cache is initialized
-	if len(s.valsCache) != 0 {
-		// update the cache
-		s.valsCache[lib.BytesToString(validator.Address)] = validator
+// GetValidatorsPaginated() returns a page of filtered validators
+func (s *StateMachine) GetValidatorsPaginated(p lib.PageParams, f lib.ValidatorFilters) (page *lib.Page, err lib.ErrorI) {
+	// get all validators
+	vals, err := s.GetValidators()
+	if err != nil {
+		return nil, err
 	}
-	// update the list in state
-	return s.UpsertIntoValidatorsList(validator, validator.StakedAmount)
+	// initialize a page and the results slice
+	page, res := lib.NewPage(p, ValidatorsPageName), make(ValidatorPage, 0)
+	page.Results = &res
+	// create a variable to hold the list of filtered validators
+	var filteredVals []*Validator
+	// for each item in the iterator
+	for _, val := range vals {
+		// pre-filter the possible candidates
+		if val.PassesFilter(f) {
+			// add to the list
+			filteredVals = append(filteredVals, val)
+		}
+	}
+	// populate the page with the list of filtered validators
+	err = page.LoadArray(filteredVals, &res, func(i any) (e lib.ErrorI) {
+		// cast to validator
+		v, ok := i.(*Validator)
+		// ensure the cast was successful
+		if !ok {
+			return lib.ErrInvalidArgument()
+		}
+		// add to the resulting page
+		res = append(res, v)
+		// exit
+		return
+	})
+	return
 }
 
-// UpdateValidatorStake() updates the stake of the validator object in state - updating the corresponding committees and supply
-// NOTE: new stake amount must be GTE the previous stake amount
-func (s *StateMachine) UpdateValidatorStake(val *Validator, newCommittees []uint64, amountToAdd uint64) (err lib.ErrorI) {
-	// update staked supply accordingly (validator stake amount can never go down except for slashing and unstaking)
-	if err = s.AddToStakedSupply(amountToAdd); err != nil {
-		return err
-	}
-	// calculate the new stake amount
-	newStakedAmount := val.StakedAmount + amountToAdd
-	// if the validator is a delegate or not
-	if val.Delegate {
-		// update the new 'total delegated tokens' amount by adding to the staked supply
-		if err = s.AddToDelegateSupply(amountToAdd); err != nil {
-			return err
-		}
-		// update the delegations with the new chainIds and stake amount
-		if err = s.UpdateDelegations(val, newStakedAmount, newCommittees); err != nil {
-			return err
-		}
+// VALIDATORS LIST LOGIC BELOW
+// There are only 2 master lists in state: Validators and Delegators
+
+// SetValidatorList() sets a list of validators to the state
+func (s *StateMachine) SetValidatorList(list *ValidatorsList, delegate bool) (err lib.ErrorI) {
+	var key []byte
+	// if delegates
+	if delegate {
+		// non-bft participants
+		key = DelegatePrefix()
 	} else {
-		// update the committees with the new chainIds and stake amount
-		if err = s.UpdateCommittees(val, newStakedAmount, newCommittees); err != nil {
-			return err
-		}
+		// bft participants
+		key = ValidatorPrefix()
 	}
-	// update the validator committees in the structure
-	val.Committees = newCommittees
-	// if cache is initialized
-	if len(s.valsCache) != 0 {
-		// update the cache
-		s.valsCache[lib.BytesToString(val.Address)] = val
-	}
-	// set validator
-	return s.UpsertIntoValidatorsList(val, newStakedAmount)
-}
-
-// DeleteValidator() completely removes a validator from the state
-func (s *StateMachine) DeleteValidator(validator *Validator) lib.ErrorI {
-	// subtract from staked supply
-	if err := s.SubFromStakedSupply(validator.StakedAmount); err != nil {
-		return err
-	}
-	// delete the validator committee information
-	if validator.Delegate {
-		// subtract those tokens from the delegate supply count
-		if err := s.SubFromDelegateSupply(validator.StakedAmount); err != nil {
-			return err
-		}
-		// remove the delegations for the validator
-		if err := s.RemoveDelegationsFromCommittees(validator.StakedAmount, validator.Committees); err != nil {
-			return err
-		}
-	} else {
-		// removes the validator stake from the committees
-		if err := s.RemoveStakeFromCommittees(validator.StakedAmount, validator.Committees); err != nil {
-			return err
-		}
-	}
-	// if cache is initialized
-	if len(s.valsCache) != 0 {
-		// update the cache
-		delete(s.valsCache, lib.BytesToString(validator.Address))
-	}
-	// delete the validator from state
-	return s.DeleteValidatorFromList(validator.Address, validator.StakedAmount, validator.Delegate)
-}
-
-// UpsertIntoValidatorsList() inserts a validator into the list sorted stake then address
-func (s *StateMachine) UpsertIntoValidatorsList(val *Validator, newStake uint64) lib.ErrorI {
-	// get the list of validators / delegates sorted by stake then address
-	list, idx, found, err := s.GetValidatorIndexFromList(val.Address, val.StakedAmount, val.Delegate)
+	// convert the object to proto bytes
+	protoBytes, err := lib.Marshal(list)
 	// if an error occurred
 	if err != nil {
 		// exit with error
-		return err
+		return
 	}
-	// update the new stake amount
-	val.StakedAmount = newStake
-	// if found in the list
-	if found {
-		// remove it from the list
-		list.List = append(list.List[:idx], list.List[idx+1:]...)
+	return s.Set(key, protoBytes)
+}
+
+// GetValidatorList() gets a list of validators from state, there are 2 lists in the state:
+// - Delegates (non-bft participants)
+// - Validators (bft participants)
+func (s *StateMachine) GetValidatorList(delegate bool) (list *ValidatorsList, err lib.ErrorI) {
+	var key []byte
+	// if delegates
+	if delegate {
+		// non-bft participants
+		key = DelegatePrefix()
+	} else {
+		// bft participants
+		key = ValidatorPrefix()
 	}
-	// get the index from the validator list
-	i, _ := s.getValidatorIndexFromList(list, val.Address, val.StakedAmount)
-	// if the index is at the end of the list (new entry)
-	list.List = append(list.List[:i], append([]*Validator{val}, list.List[i:]...)...)
-	// set the updated list back in state
-	return s.SetValidatorList(list, val.Delegate)
+	// initialize the proto addresses
+	list = new(ValidatorsList)
+	// get the addresses bytes under the committee prefix
+	protoBytes, err := s.Get(key)
+	// if an error occurred
+	if err != nil {
+		// exit with error
+		return
+	}
+	// if not found
+	if protoBytes == nil {
+		// exit without error
+		return new(ValidatorsList), nil
+	}
+	// populate the struct with proto bytes
+	err = lib.Unmarshal(protoBytes, list)
+	// exit
+	return
+}
+
+// GetValidatorIndexFromList() is a pass through function to getValidatorIndexFromList() that retrieves the list first
+func (s *StateMachine) GetValidatorIndexFromList(address []byte, stake uint64, delegate bool) (list *ValidatorsList, i int, found bool, err lib.ErrorI) {
+	// get the list of validators / delegates sorted (stake then address)
+	list, err = s.GetValidatorList(delegate)
+	// if an error occurred
+	if err != nil {
+		// exit with error
+		return
+	}
+	// perform a binary search on the validators list
+	i, found = s.getValidatorIndexFromList(list, address, stake)
+	// exit
+	return
 }
 
 // DeleteValidatorFromList() removes the validator from the list sorted by stake then address
-func (s *StateMachine) DeleteValidatorFromList(address []byte, stake uint64, delegate bool) lib.ErrorI {
+func (s *StateMachine) DeleteValidatorFromList(address []byte, stake uint64, delegate bool) (err lib.ErrorI) {
 	// get the validator's index in the list
 	list, idx, found, err := s.GetValidatorIndexFromList(address, stake, delegate)
 	// if an error occurred
 	if err != nil {
-		// exit with error
-		return err
+		return // error
 	}
 	// if not found in the list
 	if !found {
-		// exit
-		return nil
+		return // no error
 	}
 	// remove it from the list
 	list.List = append(list.List[:idx], list.List[idx+1:]...)
 	// set the list in state
 	return s.SetValidatorList(list, delegate)
+}
+
+// getValidatorIndexFromList() performs a binary search on the validators list which is sorted
+// first by stake then by address and returns the list, index and if the validator is found
+func (s *StateMachine) getValidatorIndexFromList(list *ValidatorsList, address []byte, stake uint64) (i int, found bool) {
+	// get the size of the list
+	n := len(list.List)
+	// insert using binary search
+	i = sort.Search(n, func(i int) bool {
+		// load the validator from the state using the address
+		v := list.List[i]
+		// if stakes are equal, sort by address in lexicographical order
+		if v.StakedAmount == stake {
+			return bytes.Compare(v.Address, address) <= 0
+		}
+		// sort the highest stake to lowest
+		return v.StakedAmount <= stake
+	})
+	// if the index is at the end of the list
+	if i == n {
+		// not found
+		return
+	}
+	// check if it's the correct address
+	found = bytes.Equal(list.List[i].Address, address)
+	// exit
+	return
 }
 
 // UNSTAKING VALIDATORS BELOW
@@ -396,23 +395,34 @@ func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator 
 }
 
 // DeleteFinishedUnstaking() deletes the Validator structure and unstaking keys for those who have finished unstaking
-func (s *StateMachine) DeleteFinishedUnstaking() lib.ErrorI {
-	// for each unstaking key at this height
-	callback := func(address []byte) lib.ErrorI {
+func (s *StateMachine) DeleteFinishedUnstaking() (err lib.ErrorI) {
+	// define the key for the list
+	key := UnstakingPrefix(s.Height())
+	// get the address list from state
+	list, err := s.GetAddressList(key)
+	// if an error occurred
+	if err != nil {
+		// exit with error
+		return
+	}
+	// for each address in the list
+	for _, address := range list.Addresses {
 		// get the validator associated with that address
-		v, err := s.GetValidator(crypto.NewAddress(address))
-		if err != nil {
-			return err
+		v, e := s.GetValidator(crypto.NewAddress(address))
+		if e != nil {
+			return e
 		}
 		// transfer the staked tokens to the designated output address
 		if err = s.AccountAdd(crypto.NewAddressFromBytes(v.Output), v.StakedAmount); err != nil {
 			return err
 		}
 		// delete the validator structure
-		return s.DeleteValidator(v)
+		if err = s.DeleteValidator(v); err != nil {
+			return err
+		}
 	}
-	// for each address under this unstaking key
-	return s.IterateAndExecuteOverList(UnstakingPrefix(s.Height()), callback, true)
+	// remove the list
+	return s.Delete(key)
 }
 
 // PAUSED VALIDATORS BELOW
@@ -489,16 +499,16 @@ func (s *StateMachine) SetValidatorUnpaused(address crypto.AddressI, validator *
 // GetAuthorizedSignersForValidator() returns the addresses that are able to sign messages on behalf of the validator
 func (s *StateMachine) GetAuthorizedSignersForValidator(address []byte) (signers [][]byte, err lib.ErrorI) {
 	// retrieve the validator from state
-	validator, err := s.GetValidator(crypto.NewAddressFromBytes(address))
+	v, err := s.GetValidator(crypto.NewAddressFromBytes(address))
 	if err != nil {
 		return nil, err
 	}
 	// return the operator only if custodial
-	if bytes.Equal(validator.Address, validator.Output) {
-		return [][]byte{validator.Address}, nil
+	if bytes.Equal(v.Address, v.Output) {
+		return [][]byte{v.Address}, nil
 	}
 	// return the operator and output
-	return [][]byte{validator.Address, validator.Output}, nil
+	return [][]byte{v.Address, v.Output}, nil
 }
 
 // pubKeyBytesToAddress() is a convenience function that converts a public key to an address

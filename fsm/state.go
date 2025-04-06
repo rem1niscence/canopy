@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"bytes"
 	"runtime/debug"
 	"strings"
 
@@ -425,85 +424,6 @@ func (s *StateMachine) IterateAndExecute(prefix []byte, callback func(key, value
 	return
 }
 
-// IterateAndExecuteOverList() iterates over an address list and applies a callback
-func (s *StateMachine) IterateAndExecuteOverList(key []byte, callback func(address []byte) lib.ErrorI, deleteList bool) (err lib.ErrorI) {
-	// get the address list from state
-	list, err := s.GetAddressList(key)
-	// if an error occurred
-	if err != nil {
-		// exit with error
-		return
-	}
-	// for each address in the list
-	for _, address := range list.Addresses {
-		// execute the callback
-		if err = callback(address); err != nil {
-			// if err then exit
-			return
-		}
-	}
-	// if delete list enabled
-	if deleteList {
-		// remove the list
-		return s.Delete(key)
-	}
-	// exit
-	return
-}
-
-// SetCommitteeList() gets a list of addresses from state
-func (s *StateMachine) GetAddressList(key []byte) (list *crypto.ProtoAddresses, err lib.ErrorI) {
-	// initialize the proto addresses
-	list = new(crypto.ProtoAddresses)
-	// get the addresses bytes under the committee prefix
-	protoBytes, err := s.Get(key)
-	// if not found
-	if protoBytes == nil {
-		// exit without error
-		return new(crypto.ProtoAddresses), nil
-	}
-	// if an error occurred
-	if err != nil {
-		// exit with error
-		return
-	}
-	// populate the struct with proto bytes
-	err = lib.Unmarshal(protoBytes, list)
-	// exit
-	return
-}
-
-// SetCommitteeList() sets a list of addresses to state
-func (s *StateMachine) SetAddressList(key []byte, list *crypto.ProtoAddresses) (err lib.ErrorI) {
-	// convert the object to proto bytes
-	protoBytes, err := lib.Marshal(list)
-	// if an error occurred
-	if err != nil {
-		// exit with error
-		return
-	}
-	return s.Set(key, protoBytes)
-}
-
-// AddToAddressList() appends to the addresses list
-func (s *StateMachine) AddToAddressList(address []byte, list *crypto.ProtoAddresses) {
-	list.Addresses = append(list.Addresses, address)
-}
-
-// DelFromAddressList() removes an element from the address lsit
-func (s *StateMachine) DeleteFromAddressList(address []byte, list *crypto.ProtoAddresses) {
-	// remove existing entry if it already exists
-	for i, currentAddr := range list.Addresses {
-		// if the current == the new address
-		if bytes.Equal(currentAddr, address) {
-			// remove it from the list
-			list.Addresses = append(list.Addresses[:i], list.Addresses[i+1:]...)
-			// exit
-			break
-		}
-	}
-}
-
 // TxnWrap() is an atomicity and consistency feature that enables easy rollback of changes by discarding the transaction if an error occurs
 func (s *StateMachine) TxnWrap() (lib.StoreTxnI, lib.ErrorI) {
 	// ensure the store may be 'cache wrapped' in a 'database transaction'
@@ -530,6 +450,8 @@ func (s *StateMachine) catchPanic() {
 func (s *StateMachine) Reset() {
 	// reset the slash tracker
 	s.slashTracker = NewSlashTracker()
+	// reset the slash tracker
+	s.valsCache = make(map[string]*Validator)
 	// reset the state store
 	s.store.(lib.StoreI).Reset()
 }

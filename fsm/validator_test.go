@@ -113,10 +113,9 @@ func TestGetValidatorExists(t *testing.T) {
 				require.NoError(t, sm.SetValidator(test.preset))
 			}
 			// execute the function call
-			got, err := sm.GetValidatorExists(test.tryGet)
-			require.NoError(t, err)
+			val, _ := sm.GetValidator(test.tryGet)
 			// compare got vs expected
-			require.Equal(t, test.exists, got)
+			require.Equal(t, test.exists, val != nil)
 		})
 	}
 }

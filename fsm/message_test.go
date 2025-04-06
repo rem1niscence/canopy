@@ -73,9 +73,9 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, e)
 				require.Zero(t, got)
 				// ensure the validator was created
-				exists, e := sm.GetValidatorExists(newTestAddress(t))
+				val, _ := sm.GetValidator(newTestAddress(t))
 				require.NoError(t, e)
-				require.True(t, exists)
+				require.True(t, val != nil)
 			},
 		},
 		{

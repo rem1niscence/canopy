@@ -240,6 +240,12 @@ func (p *PeerBook) Add(peer *BookPeer) {
 	if bytes.Equal(p.publicKey, peer.Address.PublicKey) {
 		return
 	}
+	// replace the peer's port with the resolved port TODO
+	//if err := lib.ResolveAndReplacePort(&peer.Address.NetAddress, peer.Address.PeerMeta.ChainId); err != nil {
+	//	p.log.Error(err.Error())
+	//	return
+	//}
+	// lock for thread safety
 	p.l.Lock()
 	defer p.l.Unlock()
 	// get the index where the peer should be located in the slice

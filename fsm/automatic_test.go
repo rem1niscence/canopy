@@ -323,10 +323,9 @@ func TestEndBlock(t *testing.T) {
 					return
 				}
 				// ensure validator no longer exists in state
-				exists, err := sm.GetValidatorExists(crypto.NewAddress(test.validators[0].Address))
-				require.NoError(t, err)
+				val, _ := sm.GetValidator(crypto.NewAddress(test.validators[0].Address))
 				// ensure no longer exists after unstaking
-				require.False(t, exists)
+				require.False(t, val != nil)
 				// ensure output address has staked funds
 				balance, err := sm.GetAccountBalance(crypto.NewAddress(test.validators[0].Output))
 				require.NoError(t, err)
