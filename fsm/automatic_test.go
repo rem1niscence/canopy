@@ -79,8 +79,6 @@ func TestBeginBlock(t *testing.T) {
 						StakedAmount: 100,
 						Committees:   []uint64{lib.CanopyChainId},
 					}}, supply))
-					// set the committee member
-					require.NoError(t, sm.SetCommitteeMember(newTestAddress(t, i), lib.CanopyChainId, 100))
 				}
 				// set the supply in state
 				require.NoError(t, sm.SetSupply(supply))
@@ -220,7 +218,7 @@ func TestEndBlock(t *testing.T) {
 			validators: []*Validator{{
 				Address:         newTestAddressBytes(t),
 				NetAddress:      "http://localhost:8081",
-				StakedAmount:    100,
+				StakedAmount:    1000000,
 				MaxPausedHeight: 1,
 				Output:          newTestAddressBytes(t),
 			}},
@@ -234,7 +232,7 @@ func TestEndBlock(t *testing.T) {
 			validators: []*Validator{{
 				Address:         newTestAddressBytes(t),
 				NetAddress:      "http://localhost:8081",
-				StakedAmount:    100,
+				StakedAmount:    1000000,
 				UnstakingHeight: 1,
 				Output:          newTestAddressBytes(t),
 			}},
@@ -507,6 +505,10 @@ func TestForceUnstakeMaxPaused(t *testing.T) {
 			}
 			// execute the function call
 			require.NoError(t, sm.ForceUnstakeMaxPaused())
+			// validate paused removed
+			bz, err := sm.Get(PausedPrefix(sm.Height()))
+			require.NoError(t, err)
+			require.Len(t, bz, 0)
 			// validate the effects
 			for _, expected := range test.expected {
 				address := crypto.NewAddress(expected.Address)
@@ -515,10 +517,6 @@ func TestForceUnstakeMaxPaused(t *testing.T) {
 				require.NoError(t, e)
 				// compare got vs expected
 				require.EqualExportedValues(t, expected, got)
-				// validate pause key removed
-				bz, e := sm.Get(KeyForPaused(sm.Height(), address))
-				require.NoError(t, e)
-				require.Len(t, bz, 0)
 				// validate not paused on structure
 				require.Zero(t, expected.MaxPausedHeight)
 				// calculate the expected unstaking height
@@ -526,9 +524,9 @@ func TestForceUnstakeMaxPaused(t *testing.T) {
 				// validate unstaking on structure
 				require.Equal(t, expectedUnstakingHeight, expected.UnstakingHeight)
 				// validate unstaking key exists
-				bz, e = sm.Get(KeyForUnstaking(expectedUnstakingHeight, address))
+				list, e := sm.GetAddressList(UnstakingPrefix(expectedUnstakingHeight))
 				require.NoError(t, e)
-				require.Len(t, bz, 1)
+				require.Contains(t, list.Addresses, address.Bytes())
 			}
 		})
 	}

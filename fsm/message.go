@@ -93,12 +93,12 @@ func (s *StateMachine) HandleMessageStake(msg *MessageStake) lib.ErrorI {
 			return err
 		}
 		// set delegated validator in each committee in state
-		if err = s.SetDelegations(address, msg.Amount, msg.Committees); err != nil {
+		if err = s.AddDelegationsToCommittees(msg.Amount, msg.Committees); err != nil {
 			return err
 		}
 	} else {
 		// set validator in each committee in state
-		if err = s.SetCommittees(address, msg.Amount, msg.Committees); err != nil {
+		if err = s.AddStakeToCommittees(msg.Amount, msg.Committees); err != nil {
 			return err
 		}
 	}
