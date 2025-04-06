@@ -323,7 +323,7 @@ func (s *StateMachine) RemoveDelegationsFromCommittees(totalStake uint64, commit
 // GetValidatorsFromCommitteeList() returns a validator set from a committee list
 func (s *StateMachine) GetValidatorsFromCommitteeList(chainId uint64, delegate bool, max uint64) (vs lib.ValidatorSet, err lib.ErrorI) {
 	// get the delegates from the list
-	list, err := s.GetCommitteeList(chainId, delegate, false, max)
+	list, err := s.GetCommitteeList(chainId, delegate, max)
 	// create a variable to hold the committee members
 	members := make([]*lib.ConsensusValidator, 0)
 	// loop through the iterator
@@ -341,7 +341,7 @@ func (s *StateMachine) GetValidatorsFromCommitteeList(chainId uint64, delegate b
 // GetCommitteeListPaginated() returns a page of committee members
 func (s *StateMachine) GetCommitteeListPaginated(p lib.PageParams, chainId uint64, delegate bool) (page *lib.Page, err lib.ErrorI) {
 	// get the delegates from the list
-	list, err := s.GetCommitteeList(chainId, delegate, false, math.MaxUint64)
+	list, err := s.GetCommitteeList(chainId, delegate, math.MaxUint64)
 	// if an error occurred
 	if err != nil {
 		// exit with error
@@ -362,7 +362,7 @@ func (s *StateMachine) GetCommitteeListPaginated(p lib.PageParams, chainId uint6
 }
 
 // GetCommitteeList() returns every address that is registered for a committee as a validator or delegator
-func (s *StateMachine) GetCommitteeList(chainId uint64, delegate, allowUnstakingAndPaused bool, max uint64) (members []*Validator, err lib.ErrorI) {
+func (s *StateMachine) GetCommitteeList(chainId uint64, delegate bool, max uint64) (members []*Validator, err lib.ErrorI) {
 	// ensure a non-nil result
 	members = make([]*Validator, 0)
 	// get the list of validators / delegates sorted by stake then address
@@ -380,7 +380,7 @@ func (s *StateMachine) GetCommitteeList(chainId uint64, delegate, allowUnstaking
 			break
 		}
 		// if disallow < unstaking or paused >
-		if !allowUnstakingAndPaused && (val.UnstakingHeight != 0 || val.MaxPausedHeight != 0) {
+		if val.UnstakingHeight != 0 || val.MaxPausedHeight != 0 {
 			// next iteration
 			continue
 		}
