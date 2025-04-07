@@ -460,14 +460,17 @@ func (c *Controller) SetFSMInConsensusModeForProposals() (reset func()) {
 	if c.Consensus.GetRound() < 3 {
 		// if the node is not having 'consensus issues' refer to the approve list
 		c.FSM.SetProposalVoteConfig(fsm.GovProposalVoteConfig_APPROVE_LIST)
+		c.Mempool.FSM.SetProposalVoteConfig(fsm.GovProposalVoteConfig_APPROVE_LIST)
 	} else {
 		// if the node is exhibiting 'chain halt' like behavior, reject all proposals
 		c.FSM.SetProposalVoteConfig(fsm.GovProposalVoteConfig_REJECT_ALL)
+		c.Mempool.FSM.SetProposalVoteConfig(fsm.GovProposalVoteConfig_REJECT_ALL)
 	}
 	// a callback that resets the configuration back to default
 	reset = func() {
 		// the default is to accept all except in 'Consensus mode'
 		c.FSM.SetProposalVoteConfig(fsm.AcceptAllProposals)
+		c.Mempool.FSM.SetProposalVoteConfig(fsm.AcceptAllProposals)
 	}
 	return
 }

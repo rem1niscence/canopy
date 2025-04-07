@@ -88,6 +88,7 @@ func (p *Page) Load(storePrefix []byte, reverse bool, results Pageable, db RStor
 		p.TotalCount++
 		// while count is below the start page index (LTE because we pre-increment)
 		if p.TotalCount <= pageStartIndex || countOnly {
+			// TODO investigate how to optimize skips (turn pre-fetching off etc.)
 			continue
 		}
 		// if reached end of the desired page (+1 because we pre-increment)
@@ -113,7 +114,7 @@ func (p *Page) Load(storePrefix []byte, reverse bool, results Pageable, db RStor
 }
 
 // LoadArray() fills a page from a slice
-func (p *Page) LoadArray(slice any, results Pageable, callback func(i any) ErrorI) (err ErrorI) {
+func (p *Page) LoadArray(slice any, results Pageable, callback func(item any) ErrorI) (err ErrorI) {
 	// if the slice is not type of reflect
 	arr := reflect.ValueOf(slice)
 	// if the type is not a slice
@@ -136,17 +137,17 @@ func (p *Page) LoadArray(slice any, results Pageable, callback func(i any) Error
 		}
 		// convert the element at the index to an 'any'
 		a := arr.Index(p.TotalCount - 1).Interface()
-		// pass the 'any' to the callback
-		if err = callback(a); err != nil {
-			// exit with error
-			return
-		}
 		// if reached end of the desired page (+1 because we pre-increment)
 		if p.TotalCount-1 == pageStartIndex+p.PerPage {
 			// switch to only counts
 			countOnly = true
 			// continue with next iteration
 			continue
+		}
+		// pass the 'any' to the callback
+		if err = callback(a); err != nil {
+			// exit with error
+			return
 		}
 		// set the results and increment the count
 		p.Results = results
@@ -658,14 +659,17 @@ func NewRetry(waitTimeMS, maxLoops uint64) *Retry {
 // WaitAndDoRetry() sleeps the appropriate time and returns false if maxed out retry
 func (r *Retry) WaitAndDoRetry() bool {
 	// if GTE max loops
-	if r.maxLoops <= r.loopCount {
+	if r.maxLoops < r.loopCount {
 		// exit with 'try again'
 		return false
 	}
-	// sleep the allotted time
-	time.Sleep(time.Duration(r.waitTimeMS) * time.Millisecond)
-	// double the timeout
-	r.waitTimeMS += r.waitTimeMS
+	// don't sleep or increment on the first iteration
+	if r.loopCount != 0 {
+		// sleep the allotted time
+		time.Sleep(time.Duration(r.waitTimeMS) * time.Millisecond)
+		// double the timeout
+		r.waitTimeMS += r.waitTimeMS
+	}
 	// increment the loop count
 	r.loopCount++
 	// exit with 'try again'
