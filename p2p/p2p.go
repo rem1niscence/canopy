@@ -222,6 +222,12 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err l
 	if err != nil {
 		return err
 	}
+	// replace the peer's port with the resolved port
+	if err = lib.ResolveAndReplacePort(&info.Address.NetAddress, p.config.ChainId); err != nil {
+		p.log.Error(err.Error())
+		return
+	}
+	// log the peer add attempt
 	p.log.Debugf("Try Add peer: %s@%s", lib.BytesToString(connection.Address.PublicKey), info.Address.NetAddress)
 	// if peer is outbound, ensure the public key matches who we expected to dial
 	if info.IsOutbound {
