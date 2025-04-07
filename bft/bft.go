@@ -179,9 +179,6 @@ func (b *BFT) HandlePhase() {
 // - Replicas run the Cumulative Distribution Function and a 'practical' Verifiable Random Function
 // - If they are a candidate they send the VRF Out to the replicas
 func (b *BFT) StartElectionPhase() {
-	if b.Round == 2 {
-		panic("TESTNET HALTED AT ROUND 2")
-	}
 	b.log.Infof(b.View.ToString())
 	// retrieve Validator object from the ValidatorSet
 	selfValidator, err := b.ValidatorSet.GetValidator(b.PublicKey)
