@@ -143,7 +143,7 @@ create a complete storage system. It could be represented like a well-organized 
 where each component has a specific job in managing and storing data. Each compoent from the
 simplest to the most complex is described as follows:
 
-1. **TxnWrapper**: It is a Wrapper around BadgerDB operations:
+1. *`TxnWrapper`*: It is a Wrapper around BadgerDB operations:
     - Makes sure all database operations follow the [`RWStoreI`](../lib/store.go) interface
     - Handles basic operations like storing and retrieving data
     - Allows iteration between ranges of data
@@ -265,9 +265,16 @@ These prefixes are only used internally and never exposed to the user.
 A [Merkle Tree](https://en.wikipedia.org/wiki/Merkle_tree) is a data structure that enables
 efficient and secure verification of large data sets. It works by hashing pairs of nodes and
 progressively combining them upwards to create a single "root" hash that cryptographically commits
-to all the data below it. A Sparse Merkle Tree (SMT) is a specialized variant that efficiently
-handles sparse key-value mappings, making it particularly useful for storing state data and proof
-the existence or non-existence of keys.
+to all the data below it.
+
+A Sparse Merkle Tree (SMT) extends this concept by efficiently handling sparse key-value mappings -
+meaning it's optimized for situations where only a small subset of possible keys are actually used,
+such as in blockchain state storage like this module. This optimization is crucial because a
+traditional Merkle tree would require storing all possible keys, even empty ones, making it
+impractical for large key spaces.
+
+Instead, a SMT allows us to both store and prove the existence (or non-existence) of key-value pairs
+while maintaining a minimal memory footprint and providing efficient verification capabilities.
 
 ### Traditional Sparse Merkle Tree
 
@@ -279,14 +286,14 @@ graph TD
     H0 --> H01
     H1 --> H10
     H1 --> H11
-    H00 --> L0[Value 1]
-    H00 --> L1[Empty]
-    H01 --> L2[Empty]
-    H01 --> L3[Empty]
-    H10 --> L4[Empty]
-    H10 --> L5[Empty]
-    H11 --> L6[Empty]
-    H11 --> L7[Empty]
+    H00 --> L0[L0 - Value 1]
+    H00 --> L1[L1 - Empty]
+    H01 --> L2[L2 - Empty]
+    H01 --> L3[L3 - Empty]
+    H10 --> L4[L4 - Empty]
+    H10 --> L5[L5 - Empty]
+    H11 --> L6[L6 - Empty]
+    H11 --> L7[L7 - Empty]
 
     classDef highlight fill:#0000ff,stroke:#333,stroke-width:2px;
     class Root,H0,H00,L0 highlight;
