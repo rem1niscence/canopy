@@ -107,6 +107,8 @@ func (b *BFT) Start() {
 		// - This triggers when receiving a new Commit Block (QC) from either root-chainId (a) or the Target-ChainId (b)
 		case resetBFT := <-b.ResetBFT:
 			func() {
+				b.log.Debugf("Reset BFT: %d", len(b.ResetBFT))
+				defer lib.TimeTrack(time.Now())
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
 				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
