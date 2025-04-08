@@ -722,16 +722,16 @@ func (d *DeDuplicator[T]) Delete(k T) { delete(d.m, k) }
 func (d *DeDuplicator[T]) Map() map[T]struct{} { return d.m }
 
 // TimeTrack() a utility function to benchmark the time of caller function
-func TimeTrack(start time.Time) {
+func TimeTrack(functionName string, start time.Time) {
 	elapsed := time.Since(start)
 	// Skip this function, and fetch the PC and file for its parent
-	pc, _, _, _ := runtime.Caller(1)
+	//pc, _, _, _ := runtime.Caller(1)
 	// Retrieve a function object this functions parent
-	funcObj := runtime.FuncForPC(pc)
-	// Regex to extract just the function name (and not the module path)
-	runtimeFunc := regexp.MustCompile(`^.*\.(.*)$`)
-	name := runtimeFunc.ReplaceAllString(funcObj.Name(), "$1")
-	log.Println(fmt.Sprintf("%s took %s", name, elapsed))
+	//funcObj := runtime.FuncForPC(pc)
+	//// Regex to extract just the function name (and not the module path)
+	//runtimeFunc := regexp.MustCompile(`^.*\.(.*)$`)
+	//name := runtimeFunc.ReplaceAllString(funcObj.Name(), "$1")
+	log.Println(fmt.Sprintf("%s took %s", functionName, elapsed))
 }
 
 func PrintStackTrace() {

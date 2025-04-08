@@ -135,7 +135,7 @@ func (c *Controller) Stop() {
 // UpdateRootChainInfo() receives updates from the root-chain thread
 func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 	c.log.Debugf("Updating root chain info")
-	defer lib.TimeTrack(time.Now())
+	defer lib.TimeTrack("UpdateRootChainInfo", time.Now())
 	// lock the controller for thread safety
 	c.Lock()
 	// unlock when the function completes

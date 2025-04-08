@@ -27,7 +27,7 @@ func (c *Controller) ListenForBlock() {
 		// wrap in a function call to use 'defer' functionality
 		func() {
 			c.log.Debug("Handling block message")
-			defer lib.TimeTrack(time.Now())
+			defer lib.TimeTrack("ListenForBlock", time.Now())
 			// lock the controller to prevent multi-thread conflicts
 			c.Lock()
 			// when iteration completes, unlock

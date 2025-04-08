@@ -33,7 +33,7 @@ func (c *Controller) ListenForTx() {
 		}
 		func() {
 			c.log.Debug("Handling transaction")
-			defer lib.TimeTrack(time.Now())
+			defer lib.TimeTrack("ListenForTx", time.Now())
 			// lock the controller for thread safety
 			c.Lock()
 			// unlock when this iteration completes
