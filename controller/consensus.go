@@ -122,7 +122,7 @@ func (c *Controller) ListenForConsensus() {
 		}
 		// execute in a sub-function to unify error handling and enable 'defer' functionality
 		if err := func() (err lib.ErrorI) {
-			c.log.Errorf("Handling consensus message")
+			c.log.Debugf("Handling consensus message")
 			defer lib.TimeTrack("ListenForConsensus", time.Now())
 			// lock the controller for thread safety
 			c.Lock()
