@@ -2,10 +2,11 @@ package p2p
 
 import (
 	"bufio"
-	"github.com/canopy-network/canopy/lib/crypto"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/canopy-network/canopy/lib/crypto"
 
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib"
@@ -260,11 +261,13 @@ func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) (err lib.Erro
 	// will block the execution until at or below the desired rate of flow
 	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
 	// write bytes to the wire up to max packet size
+	startTime := time.Now()
 	_, er := c.conn.Write(bz)
 	if er != nil {
 		err = ErrFailedWrite(er)
 		c.log.Error(err.Error())
 	}
+	lib.TimeTrack("MultiConn.sendPacket's c.conn.Write", startTime)
 	// update the rate limiter with how many bytes were written
 	//m.Update(n)
 	return
