@@ -10,111 +10,19 @@ storage. This document provides a comprehensive overview of the package’s core
 functionalities, introducing key concepts while progressively building each component into a
 complete storage solution.
 
-## Basic Concepts
-
-### Hashing
-
-Hashing is the process of converting data into an unique "fingerprint". A hash function converts any
-data into a fixed-size string of characters, making it useful for data verification and storage.
-
-```mermaid
-graph LR
-    A["Hello World"] -->|Hash Function| B["68e109f..."]
-    C["hello world"] -->|Hash Function| D["5eb63b..."]
-```
-
-Key Properties:
-
-- **Same Input, Same Hash**: "Hello" always produces the same hash
-- **Small Changes, Different Hash**: "Hello" and "hello" produce completely different hashes
-- **One-way**: You can't recreate the original data from its hash
-- **Fixed Size**: All hashes have the same length, regardless of input size
-
-In blockchain, hashing is used to create unique IDs for transactions, verify data hasn't changed, and link blocks together.
-
-### Persistent Storage
-
-Persistent storage refers to data storage mechanisms where information persists after power loss or
-process termination, unlike volatile memory (RAM) where data is temporary.
-
-Persistent storage systems must balance performance, durability, and consistency requirements. While
-RAM provides fast access but loses data on power loss, storage devices like SSDs and HDDs offer
-permanence at the cost of slower access speeds. This tradeoff is particularly important in
-blockchain systems where transaction history and state changes must be both quickly accessible and
-permanently stored while maintaining data integrity across system restarts.
-
-### Key-Value Storage
-
-A key-value storage is like a dictionary where unique keys can be associated with values. It
-provides a fast and efficient way to store and retrieve data.
-
-Examples:
-
-- Key: "user_123" → Value: `{name: "John", balance: 100}`
-- Key: "settings" → Value: `{theme: "dark", notifications: "on"}`
-
-Benefits:
-
-- Fast lookups ([O(1)](https://en.wikipedia.org/wiki/Time_complexity) in ideal cases)
-- Simple to understand and use
-- Flexible value storage (can store any type of data)
-
-### Transactions
-
-A transaction is a group of operations that must either all succeed or all fail together. A good
-analogy is like transferring money between two bank accounts.
-
-```mermaid
-graph LR
-    A[Account A: $100<br>Account B: $0] --> B[A Transfers $50 to B] --> C[Account A: $50<br>Account B: $50]
-```
-
-If anything fails during the transfer, both accounts should return to their original state. As
-clients would be pretty upset if they lost their money.
-
-#### Transaction Properties (ACID)
-
-1. **Atomicity**: All operations in a transaction either succeed or fail together
-   - Example: In a money transfer, both the withdrawal and deposit must succeed together
-
-2. **Consistency**: Data remains valid before and after the transaction
-   - Example: Total money in all accounts must remain the same after transfers
-
-3. **Isolation**: Multiple transactions don't interfere with each other
-   - Example: Two people withdrawing money simultaneously shouldn't cause conflicts
-
-4. **Durability**: Once a transaction is committed, changes are permanent
-   - Example: After confirming a transfer, the new balances persist even if the system crashes
-
-#### Nested Transactions
-
-Nested transactions behave like a set of Russian dolls, where each transaction sits inside another:
-
-```mermaid
-graph TD
-    A[Main Transaction] --> B[Sub-Transaction 1]
-    A --> C[Sub-Transaction 2]
-    B --> D[Sub-Sub-Transaction]
-```
-
-Benefits:
-
-- More granular control over operations
-- Ability to rollback partial operations
-- Better organization of complex operations
-
-### Why BadgerDB?
+## Why BadgerDB?
 
 **[BadgerDB](https://github.com/hypermodeinc/badger)** is a fast, embeddable, persistent key-value
 (KV) database written in pure Go. It's designed to be highly performant for both read and write
+operations and is the underlying databased used by the Canopy Blockchain for all of its persistence
 operations.
 
-#### Key Features
+### Key Features
 
 1. **LSM Tree-based**: Uses a
    [Log-Structured Merge-Tree](https://en.wikipedia.org/wiki/Log-structured_merge-tree)
    architecture, optimized for SSDs
-2. **ACID Compliant**: Ensures data consistency through Atomicity, Consistency, Isolation, and
+2. **[ACID](https://en.wikipedia.org/wiki/ACID) Compliant**: Ensures data consistency through Atomicity, Consistency, Isolation, and
    Durability
 3. **Concurrent Access**: Supports multiple readers and a single writer simultaneously
 4. **Key-Value Separation**: Stores keys and values separately to improve performance
@@ -123,18 +31,15 @@ operations.
 6. **Iteration**: Provides efficient iteration over key-value pairs that are byte-wise
    lexicographically ordered
 
-### Putting It All Together
+### Overview of Canopy store's module
 
-In Canopy's storage system:
+In Canopy's store's module:
 
 1. BadgerDB provides the persistent key-value store
 2. Transactions ensure data consistency
 3. Nested transactions enable complex operations
 4. Key-value pairs store blockchain state and data
-5. Blockchain data is frequently stored hashed to improve security
-
-This foundation helps understand the more complex features that will be discussed in the following
-sections.
+5. Blockchain data is frequently stored [hashed](https://en.wikipedia.org/wiki/Hash_function) to improve security
 
 ## **Store Package Components**
 
@@ -527,5 +432,100 @@ both the key and value are required in order to generate the parent's hash:
       - For non-membership proofs: Confirms target doesn't exist at expected position
 
 ## Indexer operations and prefix usage to optimize iterations
+
+The Indexer component serves as an organized filing system for blockchain data, using prefix-based
+storage patterns to enable efficient data retrieval and iteration. It manages four primary types of
+data: transactions, blocks, quorum certificates, and checkpoints.
+
+### Prefix-Based Storage Structure
+
+The Indexer uses unique prefix bytes to segregate different types of data:
+
+```go
+var (
+    txHashPrefix       = []byte{1} // Transaction by hash
+    txHeightPrefix     = []byte{2} // Transactions by height
+    txSenderPrefix     = []byte{3} // Transactions from sender
+    // and more...
+)
+```
+
+This prefix system creates distinct "namespaces" in the database, allowing for:
+
+1. Data isolation between different types
+2. Efficient range queries within specific data types
+3. Prevention of key collisions
+
+### Key Operations
+
+#### 1. Transaction Indexing
+
+```mermaid
+graph TD
+    TX[Transaction] --> TxHash[By Hash<br/>prefix: 1]
+    TX --> TxHeight[By Height<br/>prefix: 2]
+    TX --> TxSender[By Sender<br/>prefix: 3]
+    TX --> TxRecipient[By Recipient<br/>prefix: 4]
+```
+
+- **Multiple Access Patterns**: Each transaction is indexed in four ways:
+  - By hash: Direct lookup
+  - By height: Group transactions in same block
+  - By sender: Find all transactions from an address
+  - By recipient: Find all transactions to an address
+
+#### 2. Block Indexing
+
+```mermaid
+graph TD
+    Block[Block] --> BlockHash[By Hash<br/>prefix: 5]
+    Block --> BlockHeight[By Height<br/>prefix: 6]
+    BlockHeight --> Txs[Associated Transactions<br/>prefix: 2]
+```
+
+- **Dual Indexing**: Blocks are indexed by both:
+  - Hash: For direct lookups
+  - Height: For chronological access
+- **Associated Data**: Links to related transactions using height references
+
+#### 3. Special Purpose Indices
+
+- **Quorum Certificates**: Indexed by height for consensus validation
+- **Double Signers**: Track validator misbehavior
+- **Checkpoints**: Store chain security checkpoints
+
+### Optimized Iteration Patterns
+
+The Indexer leverages BadgerDB's lexicographical ordering to implement iterations:
+
+1. **Forward/Reverse Iteration**:
+
+```go
+// Example: Get transactions newest to oldest
+it, err := indexer.db.RevIterator(txHeightPrefix)
+// Example: Get transactions oldest to newest
+it, err := indexer.db.Iterator(txHeightPrefix)
+```
+
+While the Indexer supports iteration capabilities, this approach should be used cautiously due to
+its performance overhead. When dealing with large datasets, it is strongly recommended to retrieve
+multiple elements in a single bulk operation and unmarshal them collectively, rather than performing
+individual iterations and unmarshalling operations, as this pattern has proven to be significantly
+more performant in practice.
+
+### Key Encoding Strategy
+
+The Indexer uses the following key encoding strategy:
+
+1. **Big-Endian Height Encoding**:
+    - Ensures proper lexicographical ordering
+    - Enables range queries by height
+
+2. **Length-Prefixed Keys**:
+    - Prevents key collision
+    - Maintains clear separation between key components
+    - Enables prefix scanning
+
+This structured approach to data indexing and storage enables efficient querying and iteration over blockchain data while maintaining data integrity and accessibility.
 
 ## Store struct and how it adds up all together
