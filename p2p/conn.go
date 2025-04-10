@@ -245,11 +245,12 @@ func (c *MultiConn) waitForAndHandleWireBytes(reader bufio.Reader, m *limiter.Mo
 // sends them across the wire without violating the data flow rate limits
 // message may be a Packet, a Ping or a Pong
 func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) (err lib.ErrorI) {
-	c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t), hash: %s, chan queued: %d, chan cap: %d",
+	c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t), hash: %s",
 		lib.Topic_name[int32(packet.StreamId)],
-		len(packet.Bytes), packet.Eof, crypto.ShortHashString(packet.Bytes),
-		len(c.streams[lib.Topic(packet.StreamId)].sendQueue),
-		cap(c.streams[lib.Topic(packet.StreamId)].sendQueue))
+		len(packet.Bytes),
+		packet.Eof,
+		crypto.ShortHashString(packet.Bytes),
+	)
 	// convert the proto.Message into a proto.Any
 	a, err := lib.NewAny(packet)
 	if err != nil {
@@ -305,6 +306,8 @@ func (s *Stream) queueSends(packets []*Packet) bool {
 
 // queueSend() schedules the packet to be sent
 func (s *Stream) queueSend(p *Packet) bool {
+	s.logger.Debugf("Queuing packet (ID:%s, Q:%d, C:%d)",
+		lib.Topic_name[int32(p.StreamId)], len(s.sendQueue), cap(s.sendQueue))
 	select {
 	case s.sendQueue <- p: // enqueue to the back of the line
 		return true
