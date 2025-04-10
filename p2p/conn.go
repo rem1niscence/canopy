@@ -1,7 +1,8 @@
 package p2p
 
 import (
-	"bufio"
+	"encoding/binary"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -164,13 +165,13 @@ func (c *MultiConn) startSendService() {
 // - manages keep alive protocol by notifying the 'send service' of pings and pongs
 func (c *MultiConn) startReceiveService() {
 	defer lib.CatchPanic(c.log)
-	reader, m := *bufio.NewReaderSize(c.conn, maxPacketSize), limiter.New(0, 0)
+	m := limiter.New(0, 0)
 	defer func() { m.Done() }()
 	for {
 		select {
 		default: // fires unless quit was signaled
 			// waits until bytes are received from the conn
-			msg, err := c.waitForAndHandleWireBytes(reader, m)
+			msg, err := c.waitForAndHandleWireBytes(m)
 			if err != nil {
 				c.Error(err)
 				return
@@ -217,26 +218,18 @@ func (c *MultiConn) Error(err error, reputationDelta ...int32) {
 
 // waitForAndHandleWireBytes() a rate limited handler of inbound bytes from the wire.
 // Blocks until bytes are received converts bytes into a proto.Message using an Envelope
-func (c *MultiConn) waitForAndHandleWireBytes(reader bufio.Reader, m *limiter.Monitor) (proto.Message, lib.ErrorI) {
+func (c *MultiConn) waitForAndHandleWireBytes(m *limiter.Monitor) (proto.Message, lib.ErrorI) {
 	// initialize the wrapper object
 	msg := new(Envelope)
-	// create a buffer up to the maximum packet size
-	buffer := make([]byte, maxPacketSize)
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
 	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
-	// read up to maxPacketSize bytes
-	n, er := reader.Read(buffer)
-	if er != nil {
-		return nil, ErrFailedRead(er)
-	}
-	// update the rate limiter with how many bytes were read
-	//m.Update(n)
-	// unmarshal the buffer
-	if err := lib.Unmarshal(buffer[:n], msg); err != nil {
+	// read the proto message from the wire
+	if err := receiveProtoMsg(c.conn, msg); err != nil {
 		return nil, err
 	}
+	// unmarshal the payload from proto.any
 	return lib.FromAny(msg.Payload)
 }
 
@@ -256,22 +249,16 @@ func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) (err lib.Erro
 	if err != nil {
 		return err
 	}
-	// wrap into an Envelope
-	bz, err := lib.Marshal(&Envelope{Payload: a})
-	if err != nil {
-		return err
-	}
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
 	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
-	// write bytes to the wire up to max packet size
 	startTime := time.Now()
-	_, er := c.conn.Write(bz)
-	if er != nil {
-		err = ErrFailedWrite(er)
-		c.log.Error(err.Error())
+	// send the proto message wrapped in an Envelope over the wire
+	if err = sendProtoMsg(c.conn, &Envelope{Payload: a}); err != nil {
+		return err
 	}
+	// debug log to remove
 	lib.TimeTrack("MultiConn.sendPacket's c.conn.Write", startTime)
 	// update the rate limiter with how many bytes were written
 	//m.Update(n)
@@ -319,8 +306,12 @@ func (s *Stream) queueSend(p *Packet) bool {
 // handlePacket() merge the new packet with the previously received ones until the entire message is complete (EOF signal)
 func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
 	msgAssemblerLen, packetLen := len(s.msgAssembler), len(packet.Bytes)
-	s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t) from %s",
-		lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof, lib.BytesToTruncatedString(peerInfo.Address.PublicKey))
+	s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t), hash: %s",
+		lib.Topic_name[int32(packet.StreamId)],
+		len(packet.Bytes),
+		packet.Eof,
+		crypto.ShortHashString(packet.Bytes),
+	)
 	// if the addition of this new packet pushes the total message size above max
 	if int(maxMessageSize) < msgAssemblerLen+packetLen {
 		s.msgAssembler = s.msgAssembler[:0]
@@ -351,6 +342,75 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 		s.msgAssembler = s.msgAssembler[:0]
 	}
 	return 0, nil
+}
+
+// HELPERS BELOW
+
+// sendProtoMsg() encodes and sends a length-prefixed proto message to a net.Conn
+func sendProtoMsg(conn net.Conn, ptr proto.Message) lib.ErrorI {
+	// marshal into proto bytes
+	bz, err := lib.Marshal(ptr)
+	if err != nil {
+		return err
+	}
+	// send the bytes prefixed by length
+	return sendLengthPrefixed(conn, bz)
+}
+
+// receiveProtoMsg() receives and decodes a length-prefixed proto message from a net.Conn
+func receiveProtoMsg(conn net.Conn, ptr proto.Message) lib.ErrorI {
+	// read the message from the wire
+	msg, err := receiveLengthPrefixed(conn)
+	if err != nil {
+		return err
+	}
+	// unmarshal into proto
+	if err = lib.Unmarshal(msg, ptr); err != nil {
+		return err
+	}
+	return nil
+}
+
+// sendLengthPrefixed() sends a message that is prefix by length through a tcp connection
+func sendLengthPrefixed(conn net.Conn, bz []byte) lib.ErrorI {
+	// create the length prefix (2 bytes, big endian)
+	lengthPrefix := make([]byte, 2)
+	binary.BigEndian.PutUint16(lengthPrefix, uint16(len(bz)))
+	// set the write deadline to 1 second
+	if e := conn.SetWriteDeadline(time.Now().Add(time.Second)); e != nil {
+		return ErrFailedWrite(e)
+	}
+	// write the message (length prefixed)
+	if _, er := conn.Write(append(lengthPrefix, bz...)); er != nil {
+		return ErrFailedWrite(er)
+	}
+	return nil
+}
+
+// receiveLengthPrefixed() reads a length prefixed message from a tcp connection
+func receiveLengthPrefixed(conn net.Conn) ([]byte, lib.ErrorI) {
+	// set the read conn deadline
+	if err := conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+		return nil, ErrFailedRead(err)
+	}
+	// read the 2-byte length prefix
+	lengthBuffer := make([]byte, 2)
+	if _, err := io.ReadFull(conn, lengthBuffer); err != nil {
+		return nil, ErrFailedRead(err)
+	}
+	// determine the length of the message
+	messageLength := binary.BigEndian.Uint16(lengthBuffer)
+	// ensure the message size isn't larger than the allowed max packet size
+	if messageLength > maxPacketSize {
+		return nil, ErrMaxMessageSize()
+	}
+	// read the actual message bytes
+	msg := make([]byte, messageLength)
+	if _, err := io.ReadFull(conn, msg); err != nil {
+		return nil, ErrFailedRead(err)
+	}
+	// exit with no error
+	return msg, nil
 }
 
 // split returns bytes splited to size up to the lim param

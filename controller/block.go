@@ -101,10 +101,13 @@ func (c *Controller) GossipBlock(certificate *lib.QuorumCertificate, senderPubTo
 		ChainId:             c.Config.ChainId,
 		BlockAndCertificate: certificate,
 	}
-	// send the block message to all peers excluding the sender (gossip)
-	if err := c.P2P.SendToPeers(Block, blockMessage, lib.BytesToString(senderPubToExclude)); err != nil {
-		c.log.Errorf("unable to gossip block with err: %s", err.Error())
-	}
+	// non-blocking send
+	go func() {
+		// send the block message to all peers excluding the sender (gossip)
+		if err := c.P2P.SendToPeers(Block, blockMessage, lib.BytesToString(senderPubToExclude)); err != nil {
+			c.log.Errorf("unable to gossip block with err: %s", err.Error())
+		}
+	}()
 }
 
 // SelfSendBlock() gossips a QuorumCertificate (with block) through the P2P network for handling
@@ -114,10 +117,13 @@ func (c *Controller) SelfSendBlock(certificate *lib.QuorumCertificate) {
 		ChainId:             c.Config.ChainId,
 		BlockAndCertificate: certificate,
 	}
-	// internally route the block to the 'block inbox'
-	if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
-		c.log.Errorf("unable to gossip block with err: %s", err.Error())
-	}
+	// non-blocking send
+	go func() {
+		// internally route the block to the 'block inbox'
+		if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {
+			c.log.Errorf("unable to gossip block with err: %s", err.Error())
+		}
+	}()
 }
 
 // BFT FUNCTIONS BELOW

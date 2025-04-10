@@ -158,11 +158,14 @@ func (p *P2P) ListenForPeerBookRequests() {
 					response = append(response, toBeAdded) // add BookPeer to response
 				}
 			}
-			// send response to the requester
-			err := p.SendTo(requesterID, lib.Topic_PEERS_RESPONSE, &PeerBookResponseMessage{Book: response})
-			if err != nil {
-				p.log.Error(err.Error()) // log error
-			}
+			// non-blocking send
+			go func() {
+				// send response to the requester
+				err := p.SendTo(requesterID, lib.Topic_PEERS_RESPONSE, &PeerBookResponseMessage{Book: response})
+				if err != nil {
+					p.log.Error(err.Error()) // log error
+				}
+			}()
 		case <-l.TimeToReset(): // fires when the limiter should reset
 			l.Reset()
 		}

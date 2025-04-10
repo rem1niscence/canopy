@@ -43,7 +43,7 @@ func (c *Controller) Sync() {
 		// log the initialization of the block request
 		c.log.Infof("Syncing height %d 🔄 from %s", c.FSM.Height(), lib.BytesToTruncatedString(requested))
 		// send the request to the
-		c.RequestBlock(false, requested)
+		go c.RequestBlock(false, requested)
 		// block until one of the two cases happens
 		select {
 		// a) got a block in the inbox
@@ -253,17 +253,23 @@ func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 	for _, replica := range replicas.ValidatorSet.ValidatorSet {
 		// check if replica is self
 		if bytes.Equal(replica.PublicKey, c.PublicKey) {
-			// send the message to self using internal routing
-			if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
-				// log the error
-				c.log.Error(err.Error())
-			}
+			// non-blocking send
+			go func() {
+				// send the message to self using internal routing
+				if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
+					// log the error
+					c.log.Error(err.Error())
+				}
+			}()
 		} else {
-			// if not self, send directly to peer using P2P
-			if err = c.P2P.SendTo(replica.PublicKey, Cons, signedMessage); err != nil {
-				// log the error (warning is used in case 'some' replicas are not reachable)
-				c.log.Warn(err.Error())
-			}
+			// non-blocking send
+			go func() {
+				// if not self, send directly to peer using P2P
+				if err = c.P2P.SendTo(replica.PublicKey, Cons, signedMessage); err != nil {
+					// log the error (warning is used in case 'some' replicas are not reachable)
+					c.log.Warn(err.Error())
+				}
+			}()
 		}
 	}
 }
@@ -280,17 +286,23 @@ func (c *Controller) SendToProposer(msg lib.Signable) {
 	}
 	// check if sending to 'self' or peer
 	if c.Consensus.SelfIsProposer() {
-		// send using internal routing
-		if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
-			// log the error
-			c.log.Error(err.Error())
-		}
+		// non-blocking send
+		go func() {
+			// send using internal routing
+			if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
+				// log the error
+				c.log.Error(err.Error())
+			}
+		}()
 	} else {
-		// handle peer send
-		if err = c.P2P.SendTo(c.Consensus.ProposerKey, Cons, signedMessage); err != nil {
-			// log the error
-			c.log.Error(err.Error())
-		}
+		// non-blocking send
+		go func() {
+			// handle peer send
+			if err = c.P2P.SendTo(c.Consensus.ProposerKey, Cons, signedMessage); err != nil {
+				// log the error
+				c.log.Error(err.Error())
+			}
+		}()
 	}
 }
 
@@ -331,16 +343,19 @@ func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
 
 // SendBlock() responds to a `blockRequest` message to a peer - always sending the self.MaxHeight and sometimes sending the actual block and supporting QC
 func (c *Controller) SendBlock(maxHeight, vdfIterations uint64, blockAndCert *lib.QuorumCertificate, recipient []byte) {
-	// send the block to the recipient public key specified
-	if err := c.P2P.SendTo(recipient, Block, &lib.BlockMessage{
-		ChainId:             c.Config.ChainId,
-		MaxHeight:           maxHeight,
-		TotalVdfIterations:  vdfIterations,
-		BlockAndCertificate: blockAndCert,
-	}); err != nil {
-		// log error
-		c.log.Error(err.Error())
-	}
+	// non-blocking send
+	go func() {
+		// send the block to the recipient public key specified
+		if err := c.P2P.SendTo(recipient, Block, &lib.BlockMessage{
+			ChainId:             c.Config.ChainId,
+			MaxHeight:           maxHeight,
+			TotalVdfIterations:  vdfIterations,
+			BlockAndCertificate: blockAndCert,
+		}); err != nil {
+			// log error
+			c.log.Error(err.Error())
+		}
+	}()
 }
 
 // INTERNAL HELPERS BELOW
@@ -399,7 +414,7 @@ func (c *Controller) pollMaxHeight(backoff int) (max, minVDF uint64, syncingPeer
 	// initialize the syncing peers list
 	syncingPeerList = make([]string, 0)
 	// ask only for 'max height' from all peers
-	c.RequestBlock(true)
+	go c.RequestBlock(true)
 	// debug log the current status
 	c.log.Debug("Waiting for peer max heights")
 	// loop until timeout case
