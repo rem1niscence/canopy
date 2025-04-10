@@ -145,7 +145,6 @@ func (p *P2P) ListenForPeerBookRequests() {
 				p.ChangeReputation(requesterID, InvalidMsgRep)
 				continue
 			}
-			p.book.l.RLock()
 			var response []*BookPeer
 			// grab up to MaxPeerExchangePerChain number of peers for that specific chain
 			for i := 0; i < MaxPeersExchanged; i++ {
@@ -161,7 +160,6 @@ func (p *P2P) ListenForPeerBookRequests() {
 			}
 			// send response to the requester
 			err := p.SendTo(requesterID, lib.Topic_PEERS_RESPONSE, &PeerBookResponseMessage{Book: response})
-			p.book.l.RUnlock()
 			if err != nil {
 				p.log.Error(err.Error()) // log error
 			}

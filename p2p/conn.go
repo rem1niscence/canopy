@@ -22,8 +22,8 @@ const (
 	dataFlowRatePerS       = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
 	maxMessageSize         = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
 	maxChanSize            = 1                       // maximum number of items in a channel before blocking
-	maxInboxQueueSize      = 15                      // maxinum number of items in inbox queue before blocking
-	maxStreamSendQueueSize = 15                      // maximum number of items in a stream send queue before blocking
+	maxInboxQueueSize      = 100                     // maxinum number of items in inbox queue before blocking
+	maxStreamSendQueueSize = 100                     // maximum number of items in a stream send queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
