@@ -384,6 +384,10 @@ func sendLengthPrefixed(conn net.Conn, bz []byte) lib.ErrorI {
 	if _, er := conn.Write(append(lengthPrefix, bz...)); er != nil {
 		return ErrFailedWrite(er)
 	}
+	// reset the write deadline
+	if e := conn.SetWriteDeadline(time.Now().Add(time.Second * 20)); e != nil {
+		return ErrFailedWrite(e)
+	}
 	return nil
 }
 
@@ -407,6 +411,10 @@ func receiveLengthPrefixed(conn net.Conn) ([]byte, lib.ErrorI) {
 	// read the actual message bytes
 	msg := make([]byte, messageLength)
 	if _, err := io.ReadFull(conn, msg); err != nil {
+		return nil, ErrFailedRead(err)
+	}
+	// reset the read conn deadline
+	if err := conn.SetReadDeadline(time.Now().Add(time.Second * 20)); err != nil {
 		return nil, ErrFailedRead(err)
 	}
 	// exit with no error
