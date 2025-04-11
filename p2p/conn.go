@@ -376,10 +376,10 @@ func sendLengthPrefixed(conn net.Conn, bz []byte) lib.ErrorI {
 	// create the length prefix (2 bytes, big endian)
 	lengthPrefix := make([]byte, 2)
 	binary.BigEndian.PutUint16(lengthPrefix, uint16(len(bz)))
-	// set the write deadline to 1 second
-	if e := conn.SetWriteDeadline(time.Now().Add(20 * time.Second)); e != nil {
-		return ErrFailedWrite(e)
-	}
+	//// set the write deadline to 20 second
+	//if e := conn.SetWriteDeadline(time.Now().Add(20 * time.Second)); e != nil {
+	//	return ErrFailedWrite(e)
+	//}
 	// write the message (length prefixed)
 	if _, er := conn.Write(append(lengthPrefix, bz...)); er != nil {
 		return ErrFailedWrite(er)
@@ -389,10 +389,10 @@ func sendLengthPrefixed(conn net.Conn, bz []byte) lib.ErrorI {
 
 // receiveLengthPrefixed() reads a length prefixed message from a tcp connection
 func receiveLengthPrefixed(conn net.Conn) ([]byte, lib.ErrorI) {
-	// set the read conn deadline
-	if err := conn.SetReadDeadline(time.Now().Add(20 * time.Second)); err != nil {
-		return nil, ErrFailedRead(err)
-	}
+	//// set the read conn deadline
+	//if err := conn.SetReadDeadline(time.Now().Add(20 * time.Second)); err != nil {
+	//	return nil, ErrFailedRead(err)
+	//}
 	// read the 2-byte length prefix
 	lengthBuffer := make([]byte, 2)
 	if _, err := io.ReadFull(conn, lengthBuffer); err != nil {
