@@ -253,23 +253,17 @@ func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 	for _, replica := range replicas.ValidatorSet.ValidatorSet {
 		// check if replica is self
 		if bytes.Equal(replica.PublicKey, c.PublicKey) {
-			// non-blocking send
-			go func() {
-				// send the message to self using internal routing
-				if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
-					// log the error
-					c.log.Error(err.Error())
-				}
-			}()
+			// send the message to self using internal routing
+			if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
+				// log the error
+				c.log.Error(err.Error())
+			}
 		} else {
-			// non-blocking send
-			go func() {
-				// if not self, send directly to peer using P2P
-				if err = c.P2P.SendTo(replica.PublicKey, Cons, signedMessage); err != nil {
-					// log the error (warning is used in case 'some' replicas are not reachable)
-					c.log.Warn(err.Error())
-				}
-			}()
+			// if not self, send directly to peer using P2P
+			if err = c.P2P.SendTo(replica.PublicKey, Cons, signedMessage); err != nil {
+				// log the error (warning is used in case 'some' replicas are not reachable)
+				c.log.Warn(err.Error())
+			}
 		}
 	}
 }
@@ -286,23 +280,17 @@ func (c *Controller) SendToProposer(msg lib.Signable) {
 	}
 	// check if sending to 'self' or peer
 	if c.Consensus.SelfIsProposer() {
-		// non-blocking send
-		go func() {
-			// send using internal routing
-			if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
-				// log the error
-				c.log.Error(err.Error())
-			}
-		}()
+		// send using internal routing
+		if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
+			// log the error
+			c.log.Error(err.Error())
+		}
 	} else {
-		// non-blocking send
-		go func() {
-			// handle peer send
-			if err = c.P2P.SendTo(c.Consensus.ProposerKey, Cons, signedMessage); err != nil {
-				// log the error
-				c.log.Error(err.Error())
-			}
-		}()
+		// handle peer send
+		if err = c.P2P.SendTo(c.Consensus.ProposerKey, Cons, signedMessage); err != nil {
+			// log the error
+			c.log.Error(err.Error())
+		}
 	}
 }
 
@@ -343,19 +331,16 @@ func (c *Controller) RequestBlock(heightOnly bool, recipients ...[]byte) {
 
 // SendBlock() responds to a `blockRequest` message to a peer - always sending the self.MaxHeight and sometimes sending the actual block and supporting QC
 func (c *Controller) SendBlock(maxHeight, vdfIterations uint64, blockAndCert *lib.QuorumCertificate, recipient []byte) {
-	// non-blocking send
-	go func() {
-		// send the block to the recipient public key specified
-		if err := c.P2P.SendTo(recipient, Block, &lib.BlockMessage{
-			ChainId:             c.Config.ChainId,
-			MaxHeight:           maxHeight,
-			TotalVdfIterations:  vdfIterations,
-			BlockAndCertificate: blockAndCert,
-		}); err != nil {
-			// log error
-			c.log.Error(err.Error())
-		}
-	}()
+	// send the block to the recipient public key specified
+	if err := c.P2P.SendTo(recipient, Block, &lib.BlockMessage{
+		ChainId:             c.Config.ChainId,
+		MaxHeight:           maxHeight,
+		TotalVdfIterations:  vdfIterations,
+		BlockAndCertificate: blockAndCert,
+	}); err != nil {
+		// log error
+		c.log.Error(err.Error())
+	}
 }
 
 // INTERNAL HELPERS BELOW
