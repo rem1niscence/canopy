@@ -170,6 +170,18 @@ func DefaultConsensusConfig() ConsensusConfig {
 	}
 }
 
+// BlockTimeMS() returns the expected block time in milliseconds
+func (c *ConsensusConfig) BlockTimeMS() int {
+	return c.ElectionTimeoutMS +
+		c.ElectionVoteTimeoutMS +
+		c.ProposeTimeoutMS +
+		c.ProposeVoteTimeoutMS +
+		c.PrecommitTimeoutMS +
+		c.PrecommitVoteTimeoutMS +
+		c.CommitTimeoutMS +
+		c.CommitProcessMS
+}
+
 // P2P CONFIG BELOW
 
 // P2PConfig defines peering compatibility and limits as well as actions on specific peering IPs / IDs

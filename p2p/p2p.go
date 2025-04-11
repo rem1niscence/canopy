@@ -48,14 +48,14 @@ type P2P struct {
 
 // New() creates an initialized pointer instance of a P2P object
 func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l lib.LoggerI) *P2P {
-	// Initialize the peer book
+	// initialize the peer book
 	peerBook := NewPeerBook(p.PublicKey().Bytes(), c, l)
-	// Make inbound multiplexed channels
+	// make inbound multiplexed channels
 	channels := make(lib.Channels)
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
 		channels[i] = make(chan *lib.MessageAndMetadata, maxInboxQueueSize)
 	}
-	// Load banned IPs
+	// load banned IPs
 	var bannedIPs []net.IPAddr
 	for _, ip := range c.BannedIPs {
 		i, err := net.ResolveIPAddr("", ip)
@@ -64,7 +64,11 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l li
 		}
 		bannedIPs = append(bannedIPs, *i)
 	}
+	// set the read/write timeout to be 2 x the block time
+	ReadWriteTimeout = time.Duration(2*c.BlockTimeMS()) * time.Millisecond
+	// set the peer meta
 	meta := &lib.PeerMeta{ChainId: c.ChainId}
+	// return the p2p structure
 	return &P2P{
 		privateKey:             p,
 		channels:               channels,

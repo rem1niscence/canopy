@@ -54,6 +54,10 @@ const (
 	MaxMessageExceededSlash = -10 // slash for sending a 'Message (sum of Packets)' above the allowed maximum size
 )
 
+var (
+	ReadWriteTimeout = 40 * time.Second // this is just the default; it gets set by config upon initialization
+)
+
 // MultiConn: A rate-limited, multiplexed connection that utilizes a series streams with varying priority for sending and receiving
 type MultiConn struct {
 	conn          net.Conn                    // underlying connection
@@ -377,7 +381,7 @@ func sendLengthPrefixed(conn net.Conn, bz []byte) lib.ErrorI {
 	lengthPrefix := make([]byte, 2)
 	binary.BigEndian.PutUint16(lengthPrefix, uint16(len(bz)))
 	//// set the write deadline to 20 second
-	if e := conn.SetWriteDeadline(time.Now().Add(20 * time.Second)); e != nil {
+	if e := conn.SetWriteDeadline(time.Now().Add(ReadWriteTimeout)); e != nil {
 		return ErrFailedWrite(e)
 	}
 	// write the message (length prefixed)
@@ -392,7 +396,7 @@ func sendLengthPrefixed(conn net.Conn, bz []byte) lib.ErrorI {
 // receiveLengthPrefixed() reads a length prefixed message from a tcp connection
 func receiveLengthPrefixed(conn net.Conn) ([]byte, lib.ErrorI) {
 	// set the read conn deadline
-	if err := conn.SetReadDeadline(time.Now().Add(20 * time.Second)); err != nil {
+	if err := conn.SetReadDeadline(time.Now().Add(ReadWriteTimeout)); err != nil {
 		return nil, ErrFailedRead(err)
 	}
 	// read the 2-byte length prefix
