@@ -2,17 +2,12 @@ package fsm
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"slices"
 	"testing"
 )
-
-func Test(t *testing.T) {
-	fmt.Println(lib.Uint64ReducePercentage(1, 1))
-}
 
 func TestHandleByzantine(t *testing.T) {
 	// IMPORTANT NOTE: the amount of case testing is limited here due to the amount of code covered in this function
