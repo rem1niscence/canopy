@@ -23,8 +23,8 @@ const (
 	dataFlowRatePerS       = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
 	maxMessageSize         = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
 	maxChanSize            = 1                       // maximum number of items in a channel before blocking
-	maxInboxQueueSize      = 100                     // maxinum number of items in inbox queue before blocking
-	maxStreamSendQueueSize = 100                     // maximum number of items in a stream send queue before blocking
+	maxInboxQueueSize      = 15                      // maxinum number of items in inbox queue before blocking
+	maxStreamSendQueueSize = 15                      // maximum number of items in a stream send queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
@@ -157,10 +157,7 @@ func (c *MultiConn) startSendService() {
 		case <-c.quitSending: // fires when Stop() is called
 			return
 		}
-		if err := c.sendPacket(packet, m); err != nil {
-			c.Error(err)
-			return
-		}
+		c.sendPacket(packet, m)
 	}
 }
 
@@ -242,7 +239,8 @@ func (c *MultiConn) waitForAndHandleWireBytes(m *limiter.Monitor) (proto.Message
 // sends them across the wire without violating the data flow rate limits
 // message may be a Packet, a Ping or a Pong
 func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) (err lib.ErrorI) {
-	c.log.Debugf("Send Packet(ID:%s, L:%d, E:%t), hash: %s",
+	c.log.Debugf("Send Packet to %s (ID:%s, L:%d, E:%t), hash: %s",
+		lib.BytesToTruncatedString(c.Address.PublicKey),
 		lib.Topic_name[int32(packet.StreamId)],
 		len(packet.Bytes),
 		packet.Eof,
@@ -257,13 +255,15 @@ func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) (err lib.Erro
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
 	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
-	startTime := time.Now()
-	// send the proto message wrapped in an Envelope over the wire
-	if err = sendProtoMsg(c.conn, &Envelope{Payload: a}); err != nil {
-		return err
-	}
-	// debug log to remove
-	lib.TimeTrack("MultiConn.sendPacket's c.conn.Write", startTime)
+	go func() {
+		startTime := time.Now()
+		// send the proto message wrapped in an Envelope over the wire
+		if err = sendProtoMsg(c.conn, &Envelope{Payload: a}); err != nil {
+			c.Error(err)
+		}
+		// debug log to remove
+		lib.TimeTrack("MultiConn.sendPacket's c.conn.Write", startTime)
+	}()
 	// update the rate limiter with how many bytes were written
 	//m.Update(n)
 	return
@@ -310,7 +310,8 @@ func (s *Stream) queueSend(p *Packet) bool {
 // handlePacket() merge the new packet with the previously received ones until the entire message is complete (EOF signal)
 func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
 	msgAssemblerLen, packetLen := len(s.msgAssembler), len(packet.Bytes)
-	s.logger.Debugf("Received Packet(ID:%s, L:%d, E:%t), hash: %s",
+	s.logger.Debugf("Received Packet from %s (ID:%s, L:%d, E:%t), hash: %s",
+		lib.BytesToTruncatedString(peerInfo.Address.PublicKey),
 		lib.Topic_name[int32(packet.StreamId)],
 		len(packet.Bytes),
 		packet.Eof,
@@ -341,7 +342,10 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 			Sender:  peerInfo,
 		}).WithHash()
 		// add to inbox for other parts of the app to read
-		s.inbox <- m
+		go func() {
+			s.logger.Debugf("inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
+			s.inbox <- m
+		}()
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]
 	}
@@ -421,7 +425,7 @@ func receiveLengthPrefixed(conn net.Conn) ([]byte, lib.ErrorI) {
 	return msg, nil
 }
 
-// split returns bytes splited to size up to the lim param
+// split returns bytes split to size up to the lim param
 func split(buf []byte, lim int) [][]byte {
 	var chunk []byte
 	chunks := make([][]byte, 0, len(buf)/lim+1)

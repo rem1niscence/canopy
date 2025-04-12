@@ -185,7 +185,7 @@ func (p *P2P) DialForOutboundPeers() {
 			p.log.Debugf("Executing P2P Dial for more outbound peers")
 			// get random peer for chain
 			rand := p.book.GetRandom()
-			if rand == nil || p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) {
+			if rand == nil || p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) || p.IsMustConnect(rand.Address.PublicKey) {
 				return
 			}
 			// sequential operation means we'll never be dialing more than 1 peer at a time
@@ -219,8 +219,6 @@ func (p *P2P) Dial(address *lib.PeerAddress, disconnect bool) lib.ErrorI {
 // create a E2E encrypted channel with a fully authenticated peer and save it to
 // the peer set and the peer book
 func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err lib.ErrorI) {
-	p.Lock()
-	defer p.Unlock()
 	// create the e2e encrypted connection while establishing a full peer info object
 	connection, err := p.NewConnection(conn)
 	if err != nil {
@@ -250,6 +248,8 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err l
 		connection.Stop()
 		return nil
 	}
+	p.Lock()
+	defer p.Unlock()
 	// check if is must connect
 	for _, item := range p.mustConnect {
 		if bytes.Equal(item.PublicKey, info.Address.PublicKey) {

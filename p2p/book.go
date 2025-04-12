@@ -205,17 +205,17 @@ func (p *PeerBook) StartChurnManagement(dialAndDisconnect func(a *lib.PeerAddres
 
 // GetRandom() returns a random peer from the Book that has a specific chain in the Meta
 func (p *PeerBook) GetRandom() *BookPeer {
-	peeringCandidates, numCandidates := p.GetPeers()
+	p.l.RLock()
+	defer p.l.RUnlock()
+	peeringCandidates, numCandidates := p.getPeers()
 	if numCandidates == 0 {
 		return nil
 	}
 	return peeringCandidates[rand.Intn(numCandidates)]
 }
 
-// GetPeers() returns peers from the peer book
-func (p *PeerBook) GetPeers() (peers []*BookPeer, count int) {
-	p.l.RLock()
-	defer p.l.RUnlock()
+// getPeers() returns peers from the peer book
+func (p *PeerBook) getPeers() (peers []*BookPeer, count int) {
 	for _, peer := range p.Book {
 		count++
 		peers = append(peers, peer)
@@ -274,7 +274,7 @@ func (p *PeerBook) Remove(publicKey []byte) {
 func (p *PeerBook) GetBookSize() int {
 	p.l.RLock()
 	defer p.l.RUnlock()
-	_, count := p.GetPeers()
+	_, count := p.getPeers()
 	return count
 }
 
