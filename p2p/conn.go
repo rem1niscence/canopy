@@ -255,15 +255,13 @@ func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) (err lib.Erro
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
 	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
-	go func() {
-		startTime := time.Now()
-		// send the proto message wrapped in an Envelope over the wire
-		if err = sendProtoMsg(c.conn, &Envelope{Payload: a}); err != nil {
-			c.Error(err)
-		}
-		// debug log to remove
-		lib.TimeTrack("MultiConn.sendPacket's c.conn.Write", startTime)
-	}()
+	startTime := time.Now()
+	// send the proto message wrapped in an Envelope over the wire
+	if err = sendProtoMsg(c.conn, &Envelope{Payload: a}); err != nil {
+		c.Error(err)
+	}
+	// debug log to remove
+	lib.TimeTrack("MultiConn.sendPacket's c.conn.Write", startTime)
 	// update the rate limiter with how many bytes were written
 	//m.Update(n)
 	return
@@ -342,10 +340,8 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 			Sender:  peerInfo,
 		}).WithHash()
 		// add to inbox for other parts of the app to read
-		go func() {
-			s.logger.Debugf("inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
-			s.inbox <- m
-		}()
+		s.logger.Debugf("inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
+		s.inbox <- m
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]
 	}

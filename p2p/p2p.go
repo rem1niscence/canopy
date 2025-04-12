@@ -185,7 +185,7 @@ func (p *P2P) DialForOutboundPeers() {
 			p.log.Debugf("Executing P2P Dial for more outbound peers")
 			// get random peer for chain
 			rand := p.book.GetRandom()
-			if rand == nil || p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) || p.IsMustConnect(rand.Address.PublicKey) {
+			if rand == nil || p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) {
 				return
 			}
 			// sequential operation means we'll never be dialing more than 1 peer at a time
@@ -308,10 +308,6 @@ func (p *P2P) OnPeerError(err error, publicKey []byte, remoteAddr string) {
 	peer, _ := p.PeerSet.Remove(publicKey)
 	if peer != nil {
 		peer.stop.Do(peer.conn.Stop)
-		// if peer is a 'must connect' try to connect back
-		if peer.IsMustConnect {
-			go p.DialWithBackoff(peer.Address)
-		}
 	}
 }
 
