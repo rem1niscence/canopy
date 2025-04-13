@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"runtime/debug"
 	"testing"
 	"time"
@@ -126,55 +125,6 @@ func TestIteratorCommitAndPrefixed(t *testing.T) {
 	require.NoError(t, err)
 	validateIterators(t, []string{"test2/e", "test2/d", "test2/c"}, it4)
 	it4.Close()
-}
-
-func TestUnsafeRollback(t *testing.T) {
-	store, _, cleanup := testStore(t)
-	defer cleanup()
-	for i := 0; i < 100; i++ {
-		require.NoError(t, store.Set([]byte("key"), []byte(fmt.Sprintf("%d", i+1))))
-		_, err := store.Commit()
-		require.NoError(t, err)
-	}
-	require.Equal(t, uint64(100), store.Version())
-	store.UnsafeRollback(1)
-	k, err := store.Get([]byte("key"))
-	require.NoError(t, err)
-	require.Equal(t, "1", string(k))
-}
-
-func TestRollback(t *testing.T) { // TODO fix this functionality
-	logger := lib.NewDefaultLogger()
-	s, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	store, err := NewStore(filepath.Join(s, ".canopy/canopy"), logger)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rollbackStore := store.(*Store)
-	rollbackStore.UnsafeRollback(14)
-	rollbackStore.Close()
-}
-
-func TestPrune(t *testing.T) {
-	t.Skip()
-	store, _, cleanup := testStore(t)
-	defer cleanup()
-	for i := 1000000; i < 1000100; i++ {
-		store.version = uint64(i)
-		require.NoError(t, store.Set([]byte("key"), []byte(fmt.Sprintf("%d", i+1))))
-		_, err := store.Commit()
-		require.NoError(t, err)
-	}
-	require.Equal(t, uint64(1000100), store.Version())
-	store.Prune(1000099)
-	readOnly, err := store.NewReadOnly(10000100)
-	require.NoError(t, err)
-	got, err := readOnly.Get([]byte("key"))
-	require.NoError(t, err)
-	fmt.Println(string(got))
 }
 
 func testStore(t *testing.T) (*Store, *badger.DB, func()) {

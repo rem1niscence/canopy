@@ -304,6 +304,7 @@ const (
 	CodeReserveKeyWrite        ErrorCode   = 9
 	CodeInvalidMerkleTree      ErrorCode   = 10
 	CodeInvalidMerkleTreeProof ErrorCode   = 11
+	CodeGarbageCollectDB       ErrorCode   = 12
 
 	RPCModule             ErrorModule = "rpc"
 	CodeRPCTimeout        ErrorCode   = 1
