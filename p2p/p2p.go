@@ -49,14 +49,14 @@ type P2P struct {
 
 // New() creates an initialized pointer instance of a P2P object
 func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l lib.LoggerI) *P2P {
-	// Initialize the peer book
+	// initialize the peer book
 	peerBook := NewPeerBook(p.PublicKey().Bytes(), c, l)
-	// Make inbound multiplexed channels
+	// make inbound multiplexed channels
 	channels := make(lib.Channels)
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
-		channels[i] = make(chan *lib.MessageAndMetadata, maxChanSize)
+		channels[i] = make(chan *lib.MessageAndMetadata, maxInboxQueueSize)
 	}
-	// Load banned IPs
+	// load banned IPs
 	var bannedIPs []net.IPAddr
 	for _, ip := range c.BannedIPs {
 		i, err := net.ResolveIPAddr("", ip)
@@ -65,7 +65,11 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l li
 		}
 		bannedIPs = append(bannedIPs, *i)
 	}
+	// set the read/write timeout to be 2 x the block time
+	ReadWriteTimeout = time.Duration(2*c.BlockTimeMS()) * time.Millisecond
+	// set the peer meta
 	meta := &lib.PeerMeta{ChainId: c.ChainId}
+	// return the p2p structure
 	return &P2P{
 		privateKey:             p,
 		channels:               channels,
@@ -83,7 +87,8 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l li
 // Start() begins the P2P service
 func (p *P2P) Start() {
 	p.log.Info("Starting P2P 🤝 ")
-	// Listens for 'must connect peer ids' from the main internal controller
+	// Listens for 'must connect peer ids' from the 
+  internal controller
 	go p.ListenForMustConnects()
 	// Starts the peer address book exchange service
 	go p.StartPeerBookService()
@@ -216,13 +221,17 @@ func (p *P2P) Dial(address *lib.PeerAddress, disconnect bool) lib.ErrorI {
 // create a E2E encrypted channel with a fully authenticated peer and save it to
 // the peer set and the peer book
 func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err lib.ErrorI) {
-	p.Lock()
-	defer p.Unlock()
 	// create the e2e encrypted connection while establishing a full peer info object
 	connection, err := p.NewConnection(conn)
 	if err != nil {
 		return err
 	}
+	// replace the peer's port with the resolved port
+	if err = lib.ResolveAndReplacePort(&info.Address.NetAddress, p.config.ChainId); err != nil {
+		p.log.Error(err.Error())
+		return
+	}
+	// log the peer add attempt
 	p.log.Debugf("Try Add peer: %s@%s", lib.BytesToString(connection.Address.PublicKey), info.Address.NetAddress)
 	// if peer is outbound, ensure the public key matches who we expected to dial
 	if info.IsOutbound {
@@ -241,6 +250,8 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err l
 		connection.Stop()
 		return nil
 	}
+	p.Lock()
+	defer p.Unlock()
 	// check if is must connect
 	for _, item := range p.mustConnect {
 		if bytes.Equal(item.PublicKey, info.Address.PublicKey) {
@@ -301,10 +312,6 @@ func (p *P2P) OnPeerError(err error, publicKey []byte, remoteAddr string) {
 	peer, _ := p.PeerSet.Remove(publicKey)
 	if peer != nil {
 		peer.stop.Do(peer.conn.Stop)
-		// if peer is a 'must connect' try to connect back
-		if peer.IsMustConnect {
-			go p.DialWithBackoff(peer.Address)
-		}
 	}
 }
 
@@ -315,7 +322,7 @@ func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 		streams[i] = &Stream{
 			topic:        i,
 			msgAssembler: make([]byte, 0, maxMessageSize),
-			sendQueue:    make(chan []byte, maxQueueSize),
+			sendQueue:    make(chan *Packet, maxStreamSendQueueSize),
 			inbox:        p.Inbox(i),
 			logger:       p.log,
 		}
