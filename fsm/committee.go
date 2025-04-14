@@ -34,7 +34,7 @@ func (s *StateMachine) GetBlockMintStats(chainId uint64) (daoCut uint64, totalMi
 	subsidizedCount := uint64(len(subsidizedChainIds))
 	// if there are no subsidized committees or no mint amount
 	if subsidizedCount == 0 || totalMintAmount == 0 {
-		err = &lib.Error{Msg: "Nothing to do"}
+		err = lib.ErrNoSubsidizedCommittees(chainId)
 		return
 	}
 	// calculate the amount left for the committees after the parameterized DAO cut
@@ -54,7 +54,7 @@ func (s *StateMachine) GetBlockMintStats(chainId uint64) (daoCut uint64, totalMi
 func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
 	daoCut, _, mintAmountPerCommittee, err := s.GetBlockMintStats(s.Config.ChainId)
 	if err != nil {
-		if err.Error() == "Nothing to do" {
+		if err == lib.ErrNoSubsidizedCommittees(s.Config.ChainId) {
 			return nil
 		}
 		return err

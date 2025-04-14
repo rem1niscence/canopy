@@ -52,7 +52,6 @@ func (s *Server) EcoParameters(w http.ResponseWriter, r *http.Request, _ httprou
 	if ok := unmarshal(w, r, post); !ok {
 		return
 	}
-
 	// Create a read-only state for the latest block and determine economic parameters
 	s.readOnlyState(0, func(state *fsm.StateMachine) lib.ErrorI {
 		// Get the lottery winner
