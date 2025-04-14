@@ -233,7 +233,7 @@ func (s *Store) Partition() {
 			return err
 		}
 		// set a signal the partition was successfully created <only written if batch succeeds>
-		if e := writer.Set([]byte(partitionPrefix+partitionExistsKey), []byte(partitionExistsKey)); e != nil {
+		if e := writer.SetEntryAt(&badger.Entry{Key: []byte(partitionPrefix + partitionExistsKey), Value: []byte(partitionExistsKey)}, partHeight); e != nil {
 			return ErrSetBatch(e)
 		}
 		// for each key in the state at the partition height
@@ -241,13 +241,11 @@ func (s *Store) Partition() {
 			// get the key from the iterator item
 			k, v := it.Key(), it.Value()
 			// set in the historical partition
-			if e := writer.Set(append([]byte(partitionPrefix), k...), v); e != nil {
+			if e := writer.SetEntryAt(&badger.Entry{Key: append([]byte(partitionPrefix), k...), Value: v}, partHeight); e != nil {
 				return ErrSetBatch(e)
 			}
-			// create an entry for the latest state store
-			entry := &badger.Entry{Key: append([]byte(stateStorePrefix), k...), Value: v}
 			// set in the latest store prefix with telling badgerDB that it may discard earlier versions
-			if e := writer.SetEntryAt(entry.WithDiscard(), partHeight); e != nil {
+			if e := writer.SetEntryAt((&badger.Entry{Key: append([]byte(stateStorePrefix), k...), Value: v}).WithDiscard(), partHeight); e != nil {
 				return ErrSetBatch(e)
 			}
 		}
