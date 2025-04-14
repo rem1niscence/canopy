@@ -299,12 +299,13 @@ const (
 	CodeStoreGet               ErrorCode   = 4
 	CodeStoreDelete            ErrorCode   = 5
 	CodeCommitDB               ErrorCode   = 6
-	CodeCompactProof           ErrorCode   = 7
+	CodeFlushBatch             ErrorCode   = 7
 	CodeInvalidKey             ErrorCode   = 8
 	CodeReserveKeyWrite        ErrorCode   = 9
 	CodeInvalidMerkleTree      ErrorCode   = 10
 	CodeInvalidMerkleTreeProof ErrorCode   = 11
 	CodeGarbageCollectDB       ErrorCode   = 12
+	CodeDeleteBatch            ErrorCode   = 13
 
 	RPCModule             ErrorModule = "rpc"
 	CodeRPCTimeout        ErrorCode   = 1

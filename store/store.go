@@ -85,7 +85,7 @@ func NewStore(path string, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	// memTableSize is set to 1.28GB (max) to allow 128MB (10%) of writes in a
 	// single batch. It is seemingly unknown why the 10% limit is set
 	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
-	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(int(partitionFrequency)).
+	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxUint64).
 		WithLoggingLevel(badger.ERROR).WithMemTableSize(int64(1*units.GB + 280*units.MB)))
 	if err != nil {
 		return nil, ErrOpenDB(err)
@@ -182,11 +182,6 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	}
 	// reset the writer for the next height
 	s.resetWriter()
-	// check if the store should partition
-	if s.ShouldPartition() {
-		// execute the partition as a background process
-		go s.Partition()
-	}
 	// return the root
 	return bytes.Clone(s.root), nil
 }
@@ -212,10 +207,11 @@ func (s *Store) ShouldPartition() bool {
 }
 
 // Partition()
-//  1. for each key in the state store, copy them in the new historical partition to ensure
+//  1. SNAPSHOT: for each key in the state store, copy them in the new historical partition to ensure
 //     each partition has a complete snapshot and allows older partitions to safely be pruned
-//  2. Drop all versions in the LSS older than the latest @ partition height
+//  2. PRUNE: Drop all versions in the LSS older than the latest @ partition height
 func (s *Store) Partition() {
+	s.log.Info("Started partition process ✂️")
 	if err := func() lib.ErrorI {
 		// calculate the partition height
 		partHeight := partitionHeight(s.version)
@@ -232,14 +228,28 @@ func (s *Store) Partition() {
 			return err
 		}
 		// create an iterator that traverses the entire state at the partition height
-		it, err := lss.Iterator(nil)
+		iterator, err := lss.ArchiveIterator(nil)
 		if err != nil {
 			return err
 		}
+		// convert the iterator to a type Iterator for lower level functionality
+		it := iterator.(*Iterator)
+		// create a variable to save the height to drop keys below
+		toDeleteVersions := map[string][]uint64{}
 		// for each key in the state at the partition height
 		for ; it.Valid(); it.Next() {
+			// get the item key
+			k := it.Key()
+			// check if it exists in the map
+			if list, found := toDeleteVersions[string(k)]; found {
+				// add the version to delete to the list
+				toDeleteVersions[string(k)] = append(list, it.Version())
+			} else {
+				// just initialize the list, but don't delete the latest version
+				toDeleteVersions[string(k)] = make([]uint64, 0)
+			}
 			// set it in the historical partition
-			if err = hss.Set(it.Key(), it.Value()); err != nil {
+			if err = hss.Set(k, it.Value()); err != nil {
 				return err
 			}
 		}
@@ -249,8 +259,24 @@ func (s *Store) Partition() {
 		}
 		// 2. ------------------------------------------------------------------------
 		// drop all versions in the LSS older than the latest @ partition height
+		wb := s.db.NewManagedWriteBatch()
+		defer wb.Cancel() // In case of early return
+		for k, versions := range toDeleteVersions {
+			// for each delete version
+			for _, version := range versions {
+				// delete the key at the specific version
+				if e := wb.DeleteAt([]byte(k), version); e != nil {
+					return ErrDeleteBatch(e)
+				}
+			}
+		}
+		// write the batch atomically
+		if e := wb.Flush(); e != nil {
+			return ErrFlushBatch(e)
+		}
+		// run the garbage collector
 		if e := s.db.RunValueLogGC(.25); e != nil {
-			return ErrGarbageCollectDB(e) // NumVersionsToKeep = PartitionFrequency
+			return ErrGarbageCollectDB(e)
 		}
 		return nil
 	}(); err != nil {

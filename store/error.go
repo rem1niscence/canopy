@@ -22,6 +22,10 @@ func ErrGarbageCollectDB(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeGarbageCollectDB, lib.StorageModule, fmt.Sprintf("garbageCollectDB() failed with err: %s", err.Error()))
 }
 
+func ErrDeleteBatch(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeDeleteBatch, lib.StorageModule, fmt.Sprintf("deleteBatchAt() failed with err: %s", err.Error()))
+}
+
 func ErrStoreSet(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeStoreSet, lib.StorageModule, fmt.Sprintf("store.set() failed with err: %s", err.Error()))
 }
@@ -34,8 +38,8 @@ func ErrStoreGet(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeStoreGet, lib.StorageModule, fmt.Sprintf("store.get() failed with err: %s", err.Error()))
 }
 
-func ErrCompactProof(err error) lib.ErrorI {
-	return lib.NewError(lib.CodeCompactProof, lib.StorageModule, fmt.Sprintf("compactProof() failed with err: %s", err.Error()))
+func ErrFlushBatch(err error) lib.ErrorI {
+	return lib.NewError(lib.CodeFlushBatch, lib.StorageModule, fmt.Sprintf("flushBatch() failed with err: %s", err.Error()))
 }
 
 func ErrInvalidKey() lib.ErrorI {

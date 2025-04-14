@@ -89,6 +89,20 @@ func (t *TxnWrapper) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	}, nil
 }
 
+// ArchiveIterator() creates a new iterator for all versions under the given prefix in the BadgerDB transaction
+func (t *TxnWrapper) ArchiveIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
+	parent := t.db.NewIterator(badger.IteratorOptions{
+		Prefix:      append([]byte(t.prefix), prefix...),
+		AllVersions: true,
+	})
+	parent.Rewind()
+	return &Iterator{
+		logger: t.logger,
+		parent: parent,
+		prefix: t.prefix,
+	}, nil
+}
+
 // seekLast() positions the iterator at the last key for the given prefix
 func seekLast(it *badger.Iterator, prefix []byte) {
 	it.Seek(prefixEnd(prefix))
@@ -105,9 +119,10 @@ type Iterator struct {
 	err    error
 }
 
-func (i *Iterator) Valid() bool { return i.parent.Valid() }
-func (i *Iterator) Next()       { i.parent.Next() }
-func (i *Iterator) Close()      { i.parent.Close() }
+func (i *Iterator) Valid() bool     { return i.parent.Valid() }
+func (i *Iterator) Next()           { i.parent.Next() }
+func (i *Iterator) Close()          { i.parent.Close() }
+func (i *Iterator) Version() uint64 { return i.parent.Item().Version() }
 func (i *Iterator) Key() (key []byte) {
 	// get the key from the parent
 	key = i.parent.Item().Key()
