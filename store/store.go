@@ -85,7 +85,7 @@ func NewStore(path string, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	// memTableSize is set to 1.28GB (max) to allow 128MB (10%) of writes in a
 	// single batch. It is seemingly unknown why the 10% limit is set
 	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
-	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxUint64).
+	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt64).
 		WithLoggingLevel(badger.ERROR).WithMemTableSize(int64(1*units.GB + 280*units.MB)))
 	if err != nil {
 		return nil, ErrOpenDB(err)
@@ -216,67 +216,50 @@ func (s *Store) Partition() {
 		// calculate the partition height
 		partHeight := partitionHeight(s.version)
 		// create a writer at the partition height
-		writer := s.db.NewTransactionAt(partHeight, true)
+		reader := s.db.NewTransactionAt(partHeight, false)
 		// discard the writer when complete
-		defer writer.Discard()
+		defer reader.Discard()
+		// create a managed batch to do the 'writing'
+		writer := s.db.NewManagedWriteBatch()
+		defer writer.Cancel()
+		// generate the historical partition prefix
+		partitionPrefix := historicalPrefix(partHeight)
 		// 1. ------------------------------------------------------------------------
 		// create vars for the latest store <source> and historical store <destination>
-		lss := NewTxnWrapper(writer, s.log, stateStorePrefix)
-		hss := NewTxnWrapper(writer, s.log, historicalPrefix(partHeight))
+		lss := NewTxnWrapper(reader, s.log, stateStorePrefix)
+		hss := NewTxnWrapper(reader, s.log, partitionPrefix)
 		// set a signal the partition was successfully created <only written if batch succeeds>
 		if err := hss.Set([]byte(partitionExistsKey), []byte(partitionExistsKey)); err != nil {
 			return err
 		}
 		// create an iterator that traverses the entire state at the partition height
-		iterator, err := lss.ArchiveIterator(nil)
+		it, err := lss.Iterator(nil)
 		if err != nil {
 			return err
 		}
-		// convert the iterator to a type Iterator for lower level functionality
-		it := iterator.(*Iterator)
-		// create a variable to save the height to drop keys below
-		toDeleteVersions := map[string][]uint64{}
 		// for each key in the state at the partition height
 		for ; it.Valid(); it.Next() {
-			// get the item key
-			k := it.Key()
-			// check if it exists in the map
-			if list, found := toDeleteVersions[string(k)]; found {
-				// add the version to delete to the list
-				toDeleteVersions[string(k)] = append(list, it.Version())
-			} else {
-				// just initialize the list, but don't delete the latest version
-				toDeleteVersions[string(k)] = make([]uint64, 0)
+			// get the key from the iterator item
+			k, v := it.Key(), it.Value()
+			// set in the historical partition
+			if e := writer.Set(append([]byte(partitionPrefix), k...), v); e != nil {
+				return ErrSetBatch(e)
 			}
-			// set it in the historical partition
-			if err = hss.Set(k, it.Value()); err != nil {
-				return err
+			// create an entry for the latest state store
+			entry := &badger.Entry{Key: append([]byte(stateStorePrefix), k...), Value: v}
+			// set in the latest store prefix with telling badgerDB that it may discard earlier versions
+			if e := writer.SetEntryAt(entry.WithDiscard(), partHeight); e != nil {
+				return ErrSetBatch(e)
 			}
 		}
-		// commit the transaction
-		if e := writer.Commit(); e != nil {
-			return ErrCommitDB(e)
+		// commit the batch
+		if e := writer.Flush(); e != nil {
+			return ErrFlushBatch(e)
 		}
 		// 2. ------------------------------------------------------------------------
 		// drop all versions in the LSS older than the latest @ partition height
-		wb := s.db.NewManagedWriteBatch()
-		defer wb.Cancel() // In case of early return
-		for k, versions := range toDeleteVersions {
-			// for each delete version
-			for _, version := range versions {
-				// delete the key at the specific version
-				if e := wb.DeleteAt([]byte(k), version); e != nil {
-					return ErrDeleteBatch(e)
-				}
-			}
-		}
-		// write the batch atomically
-		if e := wb.Flush(); e != nil {
-			return ErrFlushBatch(e)
-		}
-		// run the garbage collector
 		if e := s.db.RunValueLogGC(.25); e != nil {
-			return ErrGarbageCollectDB(e)
+			return ErrGarbageCollectDB(e) // NumVersionsToKeep = PartitionFrequency
 		}
 		return nil
 	}(); err != nil {
