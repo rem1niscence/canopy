@@ -191,7 +191,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 // ShouldPartition() determines if it is time to partition
 func (s *Store) ShouldPartition() bool {
 	// check 10 times per partition range (in case there's a failure)
-	checkFrequency := partitionFrequency / 10
+	checkFrequency := partitionFrequency / 5
 	// check if it's time to partition
 	if s.version < partitionFrequency || s.version%checkFrequency != 1 {
 		return false
@@ -223,14 +223,14 @@ func (s *Store) Partition() {
 		defer writer.Cancel()
 		// generate the historical partition prefix
 		partitionPrefix := historicalPrefix(partHeight)
-		// 1. ------------------------------------------------------------------------
-		// create vars for the latest store <source> and historical store <destination>
+		// get the latest store in a transaction wrapper
 		lss := NewTxnWrapper(reader, s.log, stateStorePrefix)
 		// create an iterator that traverses the entire state at the partition height
 		it, err := lss.Iterator(nil)
 		if err != nil {
 			return err
 		}
+		defer it.Close()
 		// set a signal the partition was successfully created <only written if batch succeeds>
 		if e := writer.SetEntryAt(&badger.Entry{Key: []byte(partitionPrefix + partitionExistsKey), Value: []byte(partitionExistsKey)}, partHeight); e != nil {
 			return ErrSetBatch(e)
@@ -252,10 +252,9 @@ func (s *Store) Partition() {
 		if e := writer.Flush(); e != nil {
 			return ErrFlushBatch(e)
 		}
-		// 2. ------------------------------------------------------------------------
-		// drop all versions in the LSS older than the latest @ partition height
+		// trigger garbage collector to prune keys
 		if e := s.db.RunValueLogGC(.25); e != nil {
-			return ErrGarbageCollectDB(e) // NumVersionsToKeep = PartitionFrequency
+			s.log.Error(ErrGarbageCollectDB(e).Error())
 		}
 		return nil
 	}(); err != nil {
