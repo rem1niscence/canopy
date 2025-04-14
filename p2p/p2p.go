@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/canopy-network/canopy/lib"
-	"github.com/canopy-network/canopy/lib/crypto"
-	"github.com/cenkalti/backoff/v4"
-	"github.com/phuslu/iploc"
-	"golang.org/x/net/netutil"
-	"google.golang.org/protobuf/proto"
 	"net"
 	"runtime/debug"
 	"slices"
 	"sync"
 	"time"
+
+	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/metrics"
+	"github.com/cenkalti/backoff/v4"
+	"github.com/phuslu/iploc"
+	"golang.org/x/net/netutil"
+	"google.golang.org/protobuf/proto"
 )
 
 /*
@@ -270,6 +272,8 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err l
 	}); err != nil {
 		connection.Stop()
 	}
+	// Update peer metrics
+	metrics.UpdatePeerMetrics(p.PeerSet.PeerCount(), p.PeerSet.inbound, p.PeerSet.outbound)
 	return
 }
 

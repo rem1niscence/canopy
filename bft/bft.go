@@ -3,11 +3,13 @@ package bft
 import (
 	"bytes"
 	"fmt"
-	"github.com/canopy-network/canopy/lib"
-	"github.com/canopy-network/canopy/lib/crypto"
 	"sort"
 	"sync/atomic"
 	"time"
+
+	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/metrics"
 )
 
 // BFT is a structure that holds data for a Hotstuff BFT instance
@@ -589,6 +591,8 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.Height = b.Controller.ChainHeight()
 	// update canopy height
 	b.RootHeight = b.Controller.RootChainHeight()
+	// Update BFT metrics
+	metrics.UpdateBFTMetrics(b.Height, b.RootHeight)
 	// update the validator set
 	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.Height), b.RootHeight)
 	if err != nil {

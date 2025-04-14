@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -19,6 +20,7 @@ import (
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/metrics"
 	"github.com/canopy-network/canopy/store"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -93,6 +95,19 @@ func Start() {
 	rpcServer := rpc.NewServer(app, config, l)
 	// set the remote callbacks
 	app.RootChainInfo.GetRemoteCallbacks = rpcServer.RemoteCallbacks
+
+	// initialize and start the metrics server
+	metricsConfig := metrics.DefaultMetricsConfig()
+	metricsServer := metrics.NewMetricsServer(metricsConfig)
+	if metricsServer != nil {
+		go func() {
+			if err := metricsServer.Start(); err != nil && err != http.ErrServerClosed {
+				l.Errorf("Metrics server error: %v", err)
+			}
+		}()
+		l.Infof("Metrics server started on %s", metricsServer.GetAddr())
+	}
+
 	// start the application
 	app.Start()
 	// start the rpc server
@@ -101,9 +116,14 @@ func Start() {
 	waitForKill()
 	// gracefully stop the app
 	app.Stop()
+	// gracefully stop the metrics server
+	if metricsServer != nil {
+		if err := metricsServer.Stop(); err != nil {
+			l.Errorf("Error stopping metrics server: %v", err)
+		}
+	}
 	// exit
 	os.Exit(0)
-
 }
 
 // waitForKill() blocks until a kill signal is received

@@ -2,14 +2,18 @@ package controller
 
 import (
 	"bytes"
-	"github.com/canopy-network/canopy/p2p"
 	"math/rand"
 	"time"
+
+	"github.com/canopy-network/canopy/p2p"
+
+	"encoding/hex"
 
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/metrics"
 )
 
 /* This file contains the high level functionality of block / proposal processing */
@@ -60,6 +64,8 @@ func (c *Controller) ListenForBlock() {
 				if err == lib.ErrOutOfSync() {
 					// log the 'out of sync' message
 					c.log.Warnf("Node fell out of sync for chainId: %d", blockMessage.ChainId)
+					// update the node status metric
+					metrics.NodeSyncingStatus.Set(0) // not syncing
 					// revert to syncing mode
 					go c.Sync()
 					// signal exit the out loop
@@ -285,6 +291,10 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
+	// update the node status
+	metrics.NodeStatus.Set(1) // Node is active
+	// update the node sync status
+	metrics.NodeSyncingStatus.Set(1) // Node is syncing
 	// exit
 	return
 }
@@ -322,7 +332,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 	if commit && compare.Height > 1 && candidate.Vdf != nil {
 		// this design has similar security guarantees but lowers the computational requirements at a per-node basis
 		if rand.Intn(100) == 0 {
-			// validate the VDF included in the block
+			// validate the VDF included in the block/
 			if !crypto.VerifyVDF(candidate.LastBlockHash, candidate.Vdf.Output, candidate.Vdf.Proof, int(candidate.Vdf.Iterations)) {
 				// exit with vdf error
 				return nil, lib.ErrInvalidVDF()
@@ -331,7 +341,49 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 	}
 	// log that the proposal is valid
 	c.log.Infof("Block %s with %d txs is valid for height %d ✅ ", candidateHash[:20], len(block.Transactions), candidateHeight)
+
+	// Update metrics:
+	// Transaction count, Block processing time, Blocks validated by proposer
+	metrics.TransactionCount.Add(float64(len(block.Transactions)))
+	metrics.UpdateBlockProcessingTime(time.Duration(block.BlockHeader.Time) * time.Microsecond)
+
+	// If this node is the proposer, increment the blocks validated metric
+	if bytes.Equal(candidate.ProposerAddress, c.Address) {
+		metrics.UpdateBlocksValidatedByProposer()
+		// Update transaction metrics for the validator
+		metrics.UpdateTransactionMetrics(hex.EncodeToString(c.Address), uint64(len(block.Transactions)), 0)
+	}
+
+	// Update validators metrics:
+	// Validator balance, Validator compounding, Validator type, Validator status
+	validator, err := c.FSM.GetValidator(crypto.NewAddressFromBytes(c.Address))
+	if err == nil && validator != nil {
+		metrics.UpdateAccountBalance(hex.EncodeToString(c.Address), validator.StakedAmount)
+		metrics.UpdateValidatorCompounding(hex.EncodeToString(c.Address), validator.Compound)
+		if validator.Delegate {
+			metrics.UpdateValidatorType(hex.EncodeToString(c.Address), metrics.ValidatorTypeDelegate)
+		} else {
+			metrics.UpdateValidatorType(hex.EncodeToString(c.Address), metrics.ValidatorTypeValidator)
+		}
+
+		// Determine validator status
+		var status int
+		if validator.UnstakingHeight > 0 {
+			status = metrics.ValidatorStatusUnstaking
+		} else if validator.MaxPausedHeight > 0 {
+			status = metrics.ValidatorStatusPaused
+		} else if validator.StakedAmount > 0 {
+			status = metrics.ValidatorStatusStaked
+		} else {
+			status = metrics.ValidatorStatusUnstaked
+		}
+		metrics.UpdateValidatorStatus(hex.EncodeToString(c.Address), status)
+	}
+
 	// exit with the valid results
+	//for _, tx := range block.Transactions {
+	//	metrics.UpdateTransactionMetrics(string(c.Address), 0, uint64(len(tx)))
+	//}
 	return &lib.BlockResult{BlockHeader: candidate, Transactions: txResults}, nil
 }
 

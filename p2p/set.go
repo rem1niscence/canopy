@@ -2,11 +2,13 @@ package p2p
 
 import (
 	"bytes"
-	"github.com/canopy-network/canopy/lib"
-	"github.com/canopy-network/canopy/lib/crypto"
-	"google.golang.org/protobuf/proto"
 	"slices"
 	"sync"
+
+	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/metrics"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -76,6 +78,10 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 	}
 	// set the peer
 	ps.set(p)
+
+	// Update metrics
+	metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
+
 	return nil
 }
 
@@ -88,6 +94,10 @@ func (ps *PeerSet) Remove(publicKey []byte) (peer *Peer, err lib.ErrorI) {
 		return
 	}
 	ps.remove(peer)
+
+	// Update metrics
+	metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
+
 	return
 }
 

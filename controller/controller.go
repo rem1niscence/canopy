@@ -1,14 +1,17 @@
 package controller
 
 import (
+	"runtime"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/metrics"
 	"github.com/canopy-network/canopy/p2p"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 /* This file contains the 'Controller' implementation which acts as a bus between the bft, p2p, fsm, and store modules to create the node */
@@ -80,6 +83,16 @@ func (c *Controller) Start() {
 	c.P2P.Start()
 	// start internal Controller listeners for P2P
 	c.StartListeners()
+	// Start memory usage metrics collection
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			metrics.UpdateMemoryUsage(m.Alloc)
+		}
+	}()
 	// in a non-blocking sub-function
 	go func() {
 		// log the beginning of the root-chain API connection
