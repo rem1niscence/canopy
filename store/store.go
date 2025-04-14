@@ -227,15 +227,14 @@ func (s *Store) Partition() {
 		// 1. ------------------------------------------------------------------------
 		// create vars for the latest store <source> and historical store <destination>
 		lss := NewTxnWrapper(reader, s.log, stateStorePrefix)
-		hss := NewTxnWrapper(reader, s.log, partitionPrefix)
-		// set a signal the partition was successfully created <only written if batch succeeds>
-		if err := hss.Set([]byte(partitionExistsKey), []byte(partitionExistsKey)); err != nil {
-			return err
-		}
 		// create an iterator that traverses the entire state at the partition height
 		it, err := lss.Iterator(nil)
 		if err != nil {
 			return err
+		}
+		// set a signal the partition was successfully created <only written if batch succeeds>
+		if e := writer.Set([]byte(partitionPrefix+partitionExistsKey), []byte(partitionExistsKey)); e != nil {
+			return ErrSetBatch(e)
 		}
 		// for each key in the state at the partition height
 		for ; it.Valid(); it.Next() {
