@@ -64,7 +64,7 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.L
 		RootChainInfo: lib.RootChainInfo{Log: l},
 		Mutex:         sync.Mutex{},
 	}
-	l.Debugf("VDF Enabled: %v", c.RunVDF)
+	l.Infof("VDF Enabled: %v", c.RunVDF)
 	// initialize the consensus in the controller, passing a reference to itself
 	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, c.RunVDF, l)
 	// if an error occurred initializing the bft module
