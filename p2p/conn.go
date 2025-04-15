@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -141,7 +142,11 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 // - converges and writes the send queue from all streams into the underlying tcp connection.
 // - manages the keep alive protocol by sending pings and monitoring the receipt of the corresponding pong
 func (c *MultiConn) startSendService() {
-	defer lib.CatchPanic(c.log)
+	defer func() {
+		if r := recover(); r != nil {
+			c.log.Errorf("panic recovered, err: %s, stack: %s", r, string(debug.Stack()))
+		}
+	}()
 	m := limiter.New(0, 0)
 	var packet *Packet
 	defer func() { m.Done() }()
@@ -165,7 +170,11 @@ func (c *MultiConn) startSendService() {
 // - reads from the underlying tcp connection and 'routes' the messages to the appropriate streams
 // - manages keep alive protocol by notifying the 'send service' of pings and pongs
 func (c *MultiConn) startReceiveService() {
-	defer lib.CatchPanic(c.log)
+	defer func() {
+		if r := recover(); r != nil {
+			c.log.Errorf("panic recovered, err: %s, stack: %s", r, string(debug.Stack()))
+		}
+	}()
 	m := limiter.New(0, 0)
 	defer func() { m.Done() }()
 	for {
