@@ -84,6 +84,8 @@ func Start() {
 	if err != nil {
 		l.Fatal(err.Error())
 	}
+	l.Infof("VDF Enabled Start: %v", config.RunVDF)
+	panic(config.RunVDF)
 	// create a new instance of the application
 	app, err := controller.New(sm, config, validatorKey, l)
 	if err != nil {
