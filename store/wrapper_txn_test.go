@@ -65,7 +65,7 @@ func TestIteratorWithDelete(t *testing.T) {
 func newTestTxnWrapper(t *testing.T) (*badger.DB, *TxnWrapper, func()) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	parent := NewTxnWrapper(db.NewTransactionAt(0, true), lib.NewDefaultLogger(), stateStorePrefix)
+	parent := NewTxnWrapper(db.NewTransactionAt(0, true), lib.NewDefaultLogger(), latestStatePrefix)
 	return db, parent, func() {
 		db.Close()
 		parent.Close()

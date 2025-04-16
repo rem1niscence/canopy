@@ -4,6 +4,16 @@ import (
 	"bytes"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
+	"reflect"
+	"unsafe"
+)
+
+const (
+	badgerMetaFieldName               = "meta"    // badgerDB Entry 'meta' field name
+	badgerDiscardEarlierVersions byte = 1 << 2    // badgerDB 'discard earlier versions' flag
+	badgerDeleteBit              byte = 1 << 0    // badgerDB 'tombstoned' flag
+	badgerNoDiscardBit           byte = 1 << 3    // badgerDB 'never discard'  bit
+	badgerGCRatio                     = .00000001 // the ratio when badgerDB will run the garbage collector
 )
 
 // RWStoreI interface enforcement
@@ -57,6 +67,24 @@ func (t *TxnWrapper) Delete(k []byte) lib.ErrorI {
 	return nil
 }
 
+// Set() stores the key-value pair in the BadgerDB transaction
+func (t *TxnWrapper) SetNonPruneable(k, v []byte) lib.ErrorI {
+	// set an entry with a bit that prevents it from being discarded
+	if err := t.db.SetEntry(newEntry(append([]byte(t.prefix), k...), v, badgerNoDiscardBit)); err != nil {
+		return ErrStoreSet(err)
+	}
+	return nil
+}
+
+// DeleteNonPrunable() removes the key-value pair from the BadgerDB transaction but prevents it from being garbage collected
+func (t *TxnWrapper) DeleteNonPrunable(k []byte) lib.ErrorI {
+	// set an entry with a bit that marks it as deleted and prevents it from being discarded
+	if err := t.db.SetEntry(newEntry(append([]byte(t.prefix), k...), nil, badgerDeleteBit|badgerNoDiscardBit)); err != nil {
+		return ErrStoreDelete(err)
+	}
+	return nil
+}
+
 // Close() discards the current transaction
 func (t *TxnWrapper) Close()              { t.db.Discard() }
 func (t *TxnWrapper) setDB(p *badger.Txn) { t.db = p }
@@ -89,6 +117,20 @@ func (t *TxnWrapper) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	}, nil
 }
 
+// ArchiveIterator() creates a new iterator for all versions under the given prefix in the BadgerDB transaction
+func (t *TxnWrapper) ArchiveIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
+	parent := t.db.NewIterator(badger.IteratorOptions{
+		Prefix:      append([]byte(t.prefix), prefix...),
+		AllVersions: true,
+	})
+	parent.Rewind()
+	return &Iterator{
+		logger: t.logger,
+		parent: parent,
+		prefix: t.prefix,
+	}, nil
+}
+
 // seekLast() positions the iterator at the last key for the given prefix
 func seekLast(it *badger.Iterator, prefix []byte) {
 	it.Seek(prefixEnd(prefix))
@@ -105,9 +147,11 @@ type Iterator struct {
 	err    error
 }
 
-func (i *Iterator) Valid() bool { return i.parent.Valid() }
-func (i *Iterator) Next()       { i.parent.Next() }
-func (i *Iterator) Close()      { i.parent.Close() }
+func (i *Iterator) Valid() bool     { return i.parent.Valid() }
+func (i *Iterator) Next()           { i.parent.Next() }
+func (i *Iterator) Close()          { i.parent.Close() }
+func (i *Iterator) Version() uint64 { return i.parent.Item().Version() }
+func (i *Iterator) Deleted() bool   { return i.parent.Item().IsDeletedOrExpired() }
 func (i *Iterator) Key() (key []byte) {
 	// get the key from the parent
 	key = i.parent.Item().Key()
@@ -137,4 +181,21 @@ var (
 // prefixEnd() returns the end key for a given prefix by appending max possible bytes
 func prefixEnd(prefix []byte) []byte {
 	return append(prefix, endBytes...)
+}
+
+// newEntry() creates a new badgerDB entry
+func newEntry(key, value []byte, meta byte) (e *badger.Entry) {
+	e = &badger.Entry{Key: append(key), Value: value}
+	setMeta(e, meta)
+	return
+}
+
+// setMeta() accesses the private field 'meta' of badgerDB's `Entry`
+// badger doesn't yet allow users to explicitly set keys as *do not discard*
+// https://github.com/hypermodeinc/badger/issues/2192
+func setMeta(e *badger.Entry, value byte) {
+	v := reflect.ValueOf(e).Elem()
+	f := v.FieldByName(badgerMetaFieldName)
+	ptr := unsafe.Pointer(f.UnsafeAddr())
+	*(*byte)(ptr) = value
 }

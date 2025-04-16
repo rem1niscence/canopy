@@ -305,7 +305,7 @@ const (
 	CodeInvalidMerkleTree      ErrorCode   = 10
 	CodeInvalidMerkleTreeProof ErrorCode   = 11
 	CodeGarbageCollectDB       ErrorCode   = 12
-	CodeSetBatch               ErrorCode   = 13
+	CodeSetEntry               ErrorCode   = 13
 
 	RPCModule             ErrorModule = "rpc"
 	CodeRPCTimeout        ErrorCode   = 1
