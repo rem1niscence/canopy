@@ -190,7 +190,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 // PARTITIONING CODE BELOW
 
 // ShouldPartition() determines if it is time to partition
-func (s *Store) ShouldPartition() bool {
+func (s *Store) ShouldPartition() (timeToPartition bool) {
 	// check if it's time to partition (1001, 2001, 3001...)
 	if (s.version-partitionHeight(s.version))%10 != 1 {
 		return false
@@ -202,7 +202,14 @@ func (s *Store) ShouldPartition() bool {
 		return false
 	}
 	// check if the value is set <key is the value>
-	return !bytes.Equal(value, []byte(partitionExistsKey))
+	timeToPartition = !bytes.Equal(value, []byte(partitionExistsKey))
+	// log the result
+	if !timeToPartition {
+		s.log.Debug("Not partitioning, partition key already exists")
+	} else {
+		s.log.Debug("Should partition! No partition key exists")
+	}
+	return
 }
 
 // Partition()
@@ -246,7 +253,7 @@ func (s *Store) Partition() {
 			return ErrSetEntry(e)
 		}
 		// create a variable to de-duplicate the calls
-		deDuplicator := lib.DeDuplicator[string]{}
+		deDuplicator := lib.NewDeDuplicator[string]()
 		// for each key in the state at the partition height
 		for ; it.Valid(); it.Next() {
 			// get the key from the iterator item
@@ -292,7 +299,11 @@ func (s *Store) Partition() {
 		// exit
 		return nil
 	}(); err != nil {
-		sc.log.Errorf("Partitioning failed with error: %s", err.Error())
+		if err != badger.ErrNoRewrite {
+			sc.log.Warn(err.Error()) // nothing collected
+		} else {
+			sc.log.Errorf("Partitioning failed with error: %s", err.Error())
+		}
 	}
 	sc.log.Info("Partitioning complete ✅")
 }
@@ -456,7 +467,12 @@ func historicalPrefix(height uint64) string {
 
 // partitionHeight() returns the height of the partition given some height
 // (ex. 45000 -> 40000 and 57550 -> 50000)
-func partitionHeight(height uint64) uint64 { return (height / partitionFrequency) * partitionFrequency }
+func partitionHeight(height uint64) uint64 {
+	if height < partitionFrequency {
+		return 1 // not 0
+	}
+	return (height / partitionFrequency) * partitionFrequency
+}
 
 // getLatestCommitID() retrieves the latest CommitID from the database
 func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *lib.CommitID) {
