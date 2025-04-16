@@ -214,7 +214,8 @@ func (s *Store) ShouldPartition() (timeToPartition bool) {
 
 // Partition()
 //  1. SNAPSHOT: for each key in the state store, copy them in the new historical partition to ensure
-//     each partition has a complete snapshot and allows older partitions to safely be pruned
+//     each partition has a complete version of the state at the border -- allowing older partitions to
+//     safely be pruned
 //  2. PRUNE: Drop all versions in the LSS older than the latest @ partition height
 func (s *Store) Partition() {
 	// create a copy of the store for multi-thread safety
@@ -270,7 +271,7 @@ func (s *Store) Partition() {
 				}
 			} else {
 				// set item in the historical partition
-				if e := writer.SetEntryAt(newEntry(append([]byte(partitionPrefix), k...), v, badgerNoDiscardBit), snapshotHeight); e != nil {
+				if e := writer.SetEntryAt(newEntry(append(partitionPrefix, k...), v, badgerNoDiscardBit), snapshotHeight); e != nil {
 					return ErrSetEntry(e)
 				}
 				// re-write the latest version with the 'discard' flag set
@@ -283,9 +284,9 @@ func (s *Store) Partition() {
 		if e := writer.Flush(); e != nil {
 			return ErrFlushBatch(e)
 		}
-		// if the partition height is past the partition frequency, set the discardTs at the partition height-1
+		// if the partition height is past the partition frequency, set the discardTs at the partition height-2
 		if snapshotHeight > partitionFrequency {
-			sc.db.SetDiscardTs(snapshotHeight - 1)
+			sc.db.SetDiscardTs(snapshotHeight - 2)
 		}
 		// if the GC isn't already running
 		if !s.isGarbageCollecting.Swap(true) {
@@ -318,8 +319,8 @@ func (s *Store) Get(key []byte) ([]byte, lib.ErrorI) {
 	return s.lss.Get(key)
 }
 
-// Set() sets the value bytes blob in the StateStore and the value hash in the StateCommitStore
-// referenced by the 'key' and hash('key') respectively
+// Set() sets the value bytes blob in the LatestStateStore and the HistoricalStateStore
+// as well as the value hash in the StateCommitStore referenced by the 'key' and hash('key') respectively
 func (s *Store) Set(k, v []byte) lib.ErrorI {
 	// set in the state store @ latest
 	if err := s.lss.Set(k, v); err != nil {
@@ -333,7 +334,7 @@ func (s *Store) Set(k, v []byte) lib.ErrorI {
 	return s.sc.Set(k, v)
 }
 
-// Delete() removes the key-value pair from both the State and CommitStore
+// Delete() removes the key-value pair from both the LatestStateStore, HistoricalStateStore, and CommitStore
 func (s *Store) Delete(k []byte) lib.ErrorI {
 	// delete from the state store @ latest
 	if err := s.lss.Delete(k); err != nil {
