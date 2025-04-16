@@ -333,7 +333,6 @@ func (b *BFT) StartProposeVotePhase() {
 	b.Block, b.Results = msg.Qc.Block, msg.Qc.Results
 	b.ByzantineEvidence = byzantineEvidence // BE stored in case of round interrupt and replicas locked on a proposal with BE
 	// start the VDF service on this block hash
-	b.log.Infof("PROPOSE VDF enabled %v", b.Config.RunVDF)
 	if err := b.RunVDF(b.GetBlockHash()); err != nil {
 		b.log.Errorf("RunVDF() failed with error, %s", err.Error())
 	}
@@ -752,8 +751,8 @@ func (b *BFT) SelfIsValidator() bool {
 
 // RunVDF() runs the verifiable delay service
 func (b *BFT) RunVDF(seed []byte) (err lib.ErrorI) {
-	b.log.Infof("RunVDF enabled in RunVDF %v %v", b.Config.RunVDF, b.VDFService)
 	if !b.Config.RunVDF {
+		b.log.Infof("RunVDF enabled in RunVDF")
 		return
 	}
 	// if the vdf seed is nil
