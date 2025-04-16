@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"github.com/canopy-network/canopy/lib"
 	"hash"
 )
 
@@ -66,7 +67,7 @@ func MerkleTree(items [][]byte) (root []byte, store [][]byte, err error) {
 		switch {
 		// normal case, parent = hash(concat(left, right))
 		default:
-			store[offset] = Hash(append(store[i], store[i+1]...))
+			store[offset] = Hash(lib.Append(store[i], store[i+1]))
 
 		// no left or right child, so the parent is going to be nil
 		case store[i] == nil:
@@ -74,7 +75,7 @@ func MerkleTree(items [][]byte) (root []byte, store [][]byte, err error) {
 
 		// no right child, parent = hash(concat(left, left))
 		case store[i+1] == nil:
-			store[offset] = Hash(append(store[i], store[i]...))
+			store[offset] = Hash(lib.Append(store[i], store[i]))
 		}
 		offset++
 	}
