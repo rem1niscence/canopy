@@ -231,14 +231,14 @@ func (s *Store) Partition() {
 	if err = func() lib.ErrorI {
 		// calculate the partition height
 		snapshotHeight := partitionHeight(sc.Version())
+		// generate the historical partition prefix
+		partitionPrefix := historicalPrefix(snapshotHeight)
 		// create a reader at the partition height
 		reader := sc.db.NewTransactionAt(snapshotHeight, false)
 		defer reader.Discard()
 		// create a managed batch to do the 'writing'
 		writer := sc.db.NewWriteBatchAt(snapshotHeight)
 		defer writer.Cancel()
-		// generate the historical partition prefix
-		partitionPrefix := historicalPrefix(snapshotHeight)
 		// get the latest store in a transaction wrapper
 		lss := NewTxnWrapper(reader, sc.log, []byte(latestStatePrefix))
 		// create an iterator that traverses the entire latest state store at the partition height
