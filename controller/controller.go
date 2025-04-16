@@ -1,14 +1,15 @@
 package controller
 
 import (
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/p2p"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 /* This file contains the 'Controller' implementation which acts as a bus between the bft, p2p, fsm, and store modules to create the node */
@@ -63,8 +64,9 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, l lib.L
 		RootChainInfo: lib.RootChainInfo{Log: l},
 		Mutex:         sync.Mutex{},
 	}
+	l.Infof("VDF Enabled: %v", c.RunVDF)
 	// initialize the consensus in the controller, passing a reference to itself
-	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, true, l)
+	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, c.RunVDF, l)
 	// if an error occurred initializing the bft module
 	if err != nil {
 		// exit with error
