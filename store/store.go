@@ -191,7 +191,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 
 // ShouldPartition() determines if it is time to partition
 func (s *Store) ShouldPartition() (timeToPartition bool) {
-	// check if it's time to partition (1001, 2001, 3001...)
+	// check if it's time to partition every 10 blocks
 	if (s.version-partitionHeight(s.version))%10 != 1 {
 		return false
 	}
@@ -250,7 +250,7 @@ func (s *Store) Partition() {
 		it := iterator.(*Iterator)
 		defer it.Close()
 		// set a signal the partition was successfully created <only written if batch succeeds>
-		if e := writer.SetEntryAt(&badger.Entry{Key: append(partitionPrefix, []byte(partitionExistsKey)...), Value: []byte(partitionExistsKey)}, snapshotHeight); e != nil {
+		if e := writer.SetEntryAt(&badger.Entry{Key: lib.Append(partitionPrefix, []byte(partitionExistsKey)), Value: []byte(partitionExistsKey)}, snapshotHeight); e != nil {
 			return ErrSetEntry(e)
 		}
 		// create a variable to de-duplicate the calls
@@ -266,16 +266,16 @@ func (s *Store) Partition() {
 			// if the item is 'deleted'
 			if it.Deleted() {
 				// set the item as deleted at the partition height and discard earlier versions
-				if e := writer.SetEntryAt(newEntry(append([]byte(latestStatePrefix), k...), nil, badgerDeleteBit|badgerDiscardEarlierVersions), snapshotHeight); e != nil {
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit|badgerDiscardEarlierVersions), snapshotHeight); e != nil {
 					return ErrSetEntry(e)
 				}
 			} else {
 				// set item in the historical partition
-				if e := writer.SetEntryAt(newEntry(append(partitionPrefix, k...), v, badgerNoDiscardBit), snapshotHeight); e != nil {
+				if e := writer.SetEntryAt(newEntry(lib.Append(partitionPrefix, k), v, badgerNoDiscardBit), snapshotHeight); e != nil {
 					return ErrSetEntry(e)
 				}
 				// re-write the latest version with the 'discard' flag set
-				if e := writer.SetEntryAt(newEntry(append([]byte(latestStatePrefix), k...), v, badgerDiscardEarlierVersions), snapshotHeight); e != nil {
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), v, badgerDiscardEarlierVersions), snapshotHeight); e != nil {
 					return ErrSetEntry(e)
 				}
 			}
@@ -284,7 +284,7 @@ func (s *Store) Partition() {
 		if e := writer.Flush(); e != nil {
 			return ErrFlushBatch(e)
 		}
-		// if the partition height is past the partition frequency, set the discardTs at the partition height-2
+		// if the partition height is past the partition frequency, set the discardTs at the partition height-1
 		if snapshotHeight > partitionFrequency {
 			sc.db.SetDiscardTs(snapshotHeight - 2)
 		}
