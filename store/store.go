@@ -191,8 +191,8 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 
 // ShouldPartition() determines if it is time to partition
 func (s *Store) ShouldPartition() (timeToPartition bool) {
-	// check if it's time to partition every 10 blocks
-	if (s.version-partitionHeight(s.version))%10 != 1 {
+	// check if it's time to partition (1001, 2001, 3001...)
+	if (s.version-partitionHeight(s.version))%(partitionFrequency/10) != 1 {
 		return false
 	}
 	// get the partition exists value from the store at a particular historical partition prefix
