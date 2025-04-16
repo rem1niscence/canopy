@@ -127,6 +127,74 @@ func TestIteratorCommitAndPrefixed(t *testing.T) {
 	it4.Close()
 }
 
+func TestPartitionHeight(t *testing.T) {
+	tests := []struct {
+		name     string
+		height   uint64
+		expected uint64
+	}{
+		{
+			name:     "zero",
+			height:   0,
+			expected: 1,
+		},
+		{
+			name:     "less than partition frequency",
+			height:   9999,
+			expected: 1,
+		},
+		{
+			name:     "greater than partition frequency",
+			height:   10001,
+			expected: 10000,
+		},
+		{
+			name:     "2x partition frequency",
+			height:   27894,
+			expected: 20000,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, partitionHeight(test.height), test.expected)
+		})
+	}
+}
+
+func TestHistoricalPrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		height   uint64
+		expected []byte
+	}{
+		{
+			name:     "zero",
+			height:   0,
+			expected: append([]byte(historicStatePrefix), binary.BigEndian.AppendUint64(nil, 1)...),
+		},
+		{
+			name:     "less than partition frequency",
+			height:   9999,
+			expected: append([]byte(historicStatePrefix), binary.BigEndian.AppendUint64(nil, 1)...),
+		},
+		{
+			name:     "greater than partition frequency",
+			height:   10001,
+			expected: append([]byte(historicStatePrefix), binary.BigEndian.AppendUint64(nil, 10000)...),
+		},
+		{
+			name:     "2x partition frequency",
+			height:   27894,
+			expected: append([]byte(historicStatePrefix), binary.BigEndian.AppendUint64(nil, 20000)...),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, []byte(historicalPrefix(test.height)), test.expected)
+		})
+	}
+}
+
 func testStore(t *testing.T) (*Store, *badger.DB, func()) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").
 		WithInMemory(true).WithLoggingLevel(badger.ERROR))

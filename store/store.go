@@ -116,10 +116,10 @@ func NewStoreWithDB(db *badger.DB, log lib.LoggerI, write bool) (*Store, lib.Err
 		log:     log,
 		db:      db,
 		writer:  writer,
-		lss:     NewTxnWrapper(writer, log, latestStatePrefix),
+		lss:     NewTxnWrapper(writer, log, []byte(latestStatePrefix)),
 		hss:     NewTxnWrapper(writer, log, historicalPrefix(id.Height)),
-		sc:      NewDefaultSMT(NewTxnWrapper(writer, log, stateCommitmentPrefix)),
-		Indexer: &Indexer{NewTxnWrapper(writer, log, indexerPrefix)},
+		sc:      NewDefaultSMT(NewTxnWrapper(writer, log, []byte(stateCommitmentPrefix))),
+		Indexer: &Indexer{NewTxnWrapper(writer, log, []byte(indexerPrefix))},
 		root:    id.Root,
 	}, nil
 }
@@ -140,10 +140,10 @@ func (s *Store) NewReadOnly(queryVersion uint64) (lib.StoreI, lib.ErrorI) {
 		log:           s.log,
 		db:            s.db,
 		writer:        reader,
-		lss:           NewTxnWrapper(reader, s.log, latestStatePrefix),
+		lss:           NewTxnWrapper(reader, s.log, []byte(latestStatePrefix)),
 		hss:           NewTxnWrapper(reader, s.log, historicalPrefix(queryVersion)),
-		sc:            NewDefaultSMT(NewTxnWrapper(reader, s.log, stateCommitmentPrefix)),
-		Indexer:       &Indexer{NewTxnWrapper(reader, s.log, indexerPrefix)},
+		sc:            NewDefaultSMT(NewTxnWrapper(reader, s.log, []byte(stateCommitmentPrefix))),
+		Indexer:       &Indexer{NewTxnWrapper(reader, s.log, []byte(indexerPrefix))},
 		useHistorical: useHistorical,
 		root:          bytes.Clone(s.root),
 	}, nil
@@ -159,10 +159,10 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 		log:     s.log,
 		db:      s.db,
 		writer:  writer,
-		lss:     NewTxnWrapper(writer, s.log, latestStatePrefix),
+		lss:     NewTxnWrapper(writer, s.log, []byte(latestStatePrefix)),
 		hss:     NewTxnWrapper(writer, s.log, historicalPrefix(s.version)),
-		sc:      NewDefaultSMT(NewTxnWrapper(writer, s.log, stateCommitmentPrefix)),
-		Indexer: &Indexer{NewTxnWrapper(writer, s.log, indexerPrefix)},
+		sc:      NewDefaultSMT(NewTxnWrapper(writer, s.log, []byte(stateCommitmentPrefix))),
+		Indexer: &Indexer{NewTxnWrapper(writer, s.log, []byte(indexerPrefix))},
 		root:    bytes.Clone(s.root),
 	}, nil
 }
@@ -239,7 +239,7 @@ func (s *Store) Partition() {
 		// generate the historical partition prefix
 		partitionPrefix := historicalPrefix(snapshotHeight)
 		// get the latest store in a transaction wrapper
-		lss := NewTxnWrapper(reader, sc.log, latestStatePrefix)
+		lss := NewTxnWrapper(reader, sc.log, []byte(latestStatePrefix))
 		// create an iterator that traverses the entire latest state store at the partition height
 		iterator, er := lss.ArchiveIterator(nil)
 		if er != nil {
@@ -249,7 +249,7 @@ func (s *Store) Partition() {
 		it := iterator.(*Iterator)
 		defer it.Close()
 		// set a signal the partition was successfully created <only written if batch succeeds>
-		if e := writer.SetEntryAt(&badger.Entry{Key: []byte(partitionPrefix + partitionExistsKey), Value: []byte(partitionExistsKey)}, snapshotHeight); e != nil {
+		if e := writer.SetEntryAt(&badger.Entry{Key: append(partitionPrefix, []byte(partitionExistsKey)...), Value: []byte(partitionExistsKey)}, snapshotHeight); e != nil {
 			return ErrSetEntry(e)
 		}
 		// create a variable to de-duplicate the calls
@@ -419,10 +419,10 @@ func (s *Store) Close() lib.ErrorI {
 func (s *Store) resetWriter() {
 	s.writer.Discard()
 	s.writer = s.db.NewTransactionAt(s.version, true)
-	s.lss = NewTxnWrapper(s.writer, s.log, latestStatePrefix)
+	s.lss = NewTxnWrapper(s.writer, s.log, []byte(latestStatePrefix))
 	s.hss = NewTxnWrapper(s.writer, s.log, historicalPrefix(s.version))
-	s.sc = NewDefaultSMT(NewTxnWrapper(s.writer, s.log, stateCommitmentPrefix))
-	s.Indexer.setDB(NewTxnWrapper(s.writer, s.log, indexerPrefix))
+	s.sc = NewDefaultSMT(NewTxnWrapper(s.writer, s.log, []byte(stateCommitmentPrefix)))
+	s.Indexer.setDB(NewTxnWrapper(s.writer, s.log, []byte(indexerPrefix)))
 }
 
 // commitIDKey() returns the key for the commitID at a specific version
@@ -433,7 +433,7 @@ func (s *Store) commitIDKey(version uint64) []byte {
 // getCommitID() retrieves the CommitID value for the specified version from the database
 func (s *Store) getCommitID(version uint64) (id lib.CommitID, err lib.ErrorI) {
 	var bz []byte
-	bz, err = NewTxnWrapper(s.writer, s.log, "").Get(s.commitIDKey(version))
+	bz, err = NewTxnWrapper(s.writer, s.log, nil).Get(s.commitIDKey(version))
 	if err != nil {
 		return
 	}
@@ -445,7 +445,7 @@ func (s *Store) getCommitID(version uint64) (id lib.CommitID, err lib.ErrorI) {
 
 // setCommitID() stores the CommitID for the specified version and root in the database
 func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
-	w := NewTxnWrapper(s.writer, s.log, "")
+	w := NewTxnWrapper(s.writer, s.log, nil)
 	value, err := lib.Marshal(&lib.CommitID{
 		Height: version,
 		Root:   root,
@@ -461,8 +461,8 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 }
 
 // historicalPrefix() calculates the prefix for a particular historical partition given the block height
-func historicalPrefix(height uint64) string {
-	return historicStatePrefix + string(binary.BigEndian.AppendUint64(nil, partitionHeight(height)))
+func historicalPrefix(height uint64) []byte {
+	return append([]byte(historicStatePrefix), binary.BigEndian.AppendUint64(nil, partitionHeight(height))...)
 }
 
 // partitionHeight() returns the height of the partition given some height
@@ -476,7 +476,7 @@ func partitionHeight(height uint64) uint64 {
 
 // getLatestCommitID() retrieves the latest CommitID from the database
 func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *lib.CommitID) {
-	tx := NewTxnWrapper(db.NewTransactionAt(math.MaxUint64, false), log, "")
+	tx := NewTxnWrapper(db.NewTransactionAt(math.MaxUint64, false), log, nil)
 	defer tx.Close()
 	id = new(lib.CommitID)
 	bz, err := tx.Get([]byte(lastCommitIDPrefix))

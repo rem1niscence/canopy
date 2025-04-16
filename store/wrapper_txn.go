@@ -23,11 +23,11 @@ var _ lib.RWStoreI = &TxnWrapper{}
 type TxnWrapper struct {
 	logger lib.LoggerI
 	db     *badger.Txn
-	prefix string
+	prefix []byte
 }
 
 // NewTxnWrapper() creates a new TxnWrapper with the provided params
-func NewTxnWrapper(db *badger.Txn, logger lib.LoggerI, prefix string) *TxnWrapper {
+func NewTxnWrapper(db *badger.Txn, logger lib.LoggerI, prefix []byte) *TxnWrapper {
 	return &TxnWrapper{
 		logger: logger,
 		db:     db,
@@ -37,7 +37,7 @@ func NewTxnWrapper(db *badger.Txn, logger lib.LoggerI, prefix string) *TxnWrappe
 
 // Get() retrieves the value associated with the key from the BadgerDB transaction
 func (t *TxnWrapper) Get(k []byte) ([]byte, lib.ErrorI) {
-	item, err := t.db.Get(append([]byte(t.prefix), k...))
+	item, err := t.db.Get(append(t.prefix, k...))
 	if err != nil {
 		if err == badger.ErrKeyNotFound {
 			return nil, nil
@@ -53,7 +53,7 @@ func (t *TxnWrapper) Get(k []byte) ([]byte, lib.ErrorI) {
 
 // Set() stores the key-value pair in the BadgerDB transaction
 func (t *TxnWrapper) Set(k, v []byte) lib.ErrorI {
-	if err := t.db.Set(append([]byte(t.prefix), k...), v); err != nil {
+	if err := t.db.Set(append(t.prefix, k...), v); err != nil {
 		return ErrStoreSet(err)
 	}
 	return nil
@@ -61,7 +61,7 @@ func (t *TxnWrapper) Set(k, v []byte) lib.ErrorI {
 
 // Delete() removes the key-value pair from the BadgerDB transaction
 func (t *TxnWrapper) Delete(k []byte) lib.ErrorI {
-	if err := t.db.Delete(append([]byte(t.prefix), k...)); err != nil {
+	if err := t.db.Delete(append(t.prefix, k...)); err != nil {
 		return ErrStoreDelete(err)
 	}
 	return nil
@@ -70,7 +70,7 @@ func (t *TxnWrapper) Delete(k []byte) lib.ErrorI {
 // Set() stores the key-value pair in the BadgerDB transaction
 func (t *TxnWrapper) SetNonPruneable(k, v []byte) lib.ErrorI {
 	// set an entry with a bit that prevents it from being discarded
-	if err := t.db.SetEntry(newEntry(append([]byte(t.prefix), k...), v, badgerNoDiscardBit)); err != nil {
+	if err := t.db.SetEntry(newEntry(append(t.prefix, k...), v, badgerNoDiscardBit)); err != nil {
 		return ErrStoreSet(err)
 	}
 	return nil
@@ -79,7 +79,7 @@ func (t *TxnWrapper) SetNonPruneable(k, v []byte) lib.ErrorI {
 // DeleteNonPrunable() removes the key-value pair from the BadgerDB transaction but prevents it from being garbage collected
 func (t *TxnWrapper) DeleteNonPrunable(k []byte) lib.ErrorI {
 	// set an entry with a bit that marks it as deleted and prevents it from being discarded
-	if err := t.db.SetEntry(newEntry(append([]byte(t.prefix), k...), nil, badgerDeleteBit|badgerNoDiscardBit)); err != nil {
+	if err := t.db.SetEntry(newEntry(append(t.prefix, k...), nil, badgerDeleteBit|badgerNoDiscardBit)); err != nil {
 		return ErrStoreDelete(err)
 	}
 	return nil
@@ -92,7 +92,7 @@ func (t *TxnWrapper) setDB(p *badger.Txn) { t.db = p }
 // Iterator() creates a new iterator for the given prefix in the BadgerDB transaction
 func (t *TxnWrapper) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	parent := t.db.NewIterator(badger.IteratorOptions{
-		Prefix: append([]byte(t.prefix), prefix...),
+		Prefix: append(t.prefix, prefix...),
 	})
 	parent.Rewind()
 	return &Iterator{
@@ -104,7 +104,7 @@ func (t *TxnWrapper) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 
 // RevIterator() creates a new reverse iterator for the given prefix in the BadgerDB transaction
 func (t *TxnWrapper) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
-	newPrefix := append([]byte(t.prefix), prefix...)
+	newPrefix := append(t.prefix, prefix...)
 	parent := t.db.NewIterator(badger.IteratorOptions{
 		Reverse: true,
 		Prefix:  newPrefix,
@@ -120,7 +120,7 @@ func (t *TxnWrapper) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 // ArchiveIterator() creates a new iterator for all versions under the given prefix in the BadgerDB transaction
 func (t *TxnWrapper) ArchiveIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	parent := t.db.NewIterator(badger.IteratorOptions{
-		Prefix:      append([]byte(t.prefix), prefix...),
+		Prefix:      append(t.prefix, prefix...),
 		AllVersions: true,
 	})
 	parent.Rewind()
@@ -143,7 +143,7 @@ var _ lib.IteratorI = &Iterator{}
 type Iterator struct {
 	logger lib.LoggerI
 	parent *badger.Iterator
-	prefix string
+	prefix []byte
 	err    error
 }
 
