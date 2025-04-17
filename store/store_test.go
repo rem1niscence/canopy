@@ -161,6 +161,55 @@ func TestPartitionHeight(t *testing.T) {
 	}
 }
 
+func TestShouldPartition(t *testing.T) {
+	tests := []struct {
+		name            string
+		version         uint64
+		partitionExists bool
+		expected        bool
+	}{
+		{
+			name:     "too early to partition",
+			version:  10000,
+			expected: false,
+		},
+		{
+			name:            "ready for partition",
+			version:         10001,
+			partitionExists: false,
+			expected:        true,
+		},
+		{
+			name:            "partition already exists",
+			version:         10001,
+			partitionExists: true,
+			expected:        false,
+		},
+		{
+			name:            "not partition boundary",
+			version:         10002,
+			partitionExists: false,
+			expected:        false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			store, _, cleanup := testStore(t)
+			defer cleanup()
+
+			store.version = test.version
+			if test.partitionExists {
+				err := store.hss.Set([]byte(partitionExistsKey), []byte(partitionExistsKey))
+				require.NoError(t, err)
+			}
+
+			result := store.ShouldPartition()
+			require.Equal(t, test.expected, result)
+		})
+	}
+}
+
 func TestHistoricalPrefix(t *testing.T) {
 	tests := []struct {
 		name     string
