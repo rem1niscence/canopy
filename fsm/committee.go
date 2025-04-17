@@ -349,7 +349,7 @@ func (s *StateMachine) DeleteCommittees(address crypto.AddressI, totalStake uint
 
 // SetCommitteeMember() sets the address as a 'member' of the committee in the state
 func (s *StateMachine) SetCommitteeMember(address crypto.AddressI, chainId, stakeForCommittee uint64) lib.ErrorI {
-	return s.Set(KeyForCommittee(chainId, address, stakeForCommittee), bytes.Repeat([]byte("F"), 1000000))
+	return s.Set(KeyForCommittee(chainId, address, stakeForCommittee), nil)
 }
 
 // DeleteCommitteeMember() removes the address from being a 'member' of the committee in the state
