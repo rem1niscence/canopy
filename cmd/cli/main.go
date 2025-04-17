@@ -268,6 +268,7 @@ func WriteDefaultGenesisFile(validatorPrivateKey crypto.PrivateKeyI, genesisFile
 			NetAddress:   "tcp://localhost",
 			StakedAmount: 1000000000000,
 			Output:       addr.Bytes(),
+			Compound:     true,
 		}},
 		Params: fsm.DefaultParams(),
 	}

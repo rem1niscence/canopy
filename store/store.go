@@ -13,15 +13,15 @@ import (
 )
 
 const (
-	latestStatePrefix     = "s/"          // prefix designated for the LatestStateStore where the most recent blobs of state data are held
-	historicStatePrefix   = "h/"          // prefix designated for the HistoricalStateStore where the historical blobs of state data are held
-	stateCommitmentPrefix = "c/"          // prefix designated for the StateCommitmentStore (immutable, tree DB) built of hashes of state store data
-	indexerPrefix         = "i/"          // prefix designated for indexer (transactions, blocks, and quorum certificates)
-	stateCommitIDPrefix   = "x/"          // prefix designated for the commit ID (height and state merkle root)
-	lastCommitIDPrefix    = "a/"          // prefix designated for the latest commit ID for easy access (latest height and latest state merkle root)
-	partitionExistsKey    = "e/"          // to check if partition exists
-	partitionFrequency    = uint64(10000) // blocks
-	maxKeyBytes           = 256           // maximum size of a key
+	latestStatePrefix     = "s/"      // prefix designated for the LatestStateStore where the most recent blobs of state data are held
+	historicStatePrefix   = "h/"      // prefix designated for the HistoricalStateStore where the historical blobs of state data are held
+	stateCommitmentPrefix = "c/"      // prefix designated for the StateCommitmentStore (immutable, tree DB) built of hashes of state store data
+	indexerPrefix         = "i/"      // prefix designated for indexer (transactions, blocks, and quorum certificates)
+	stateCommitIDPrefix   = "x/"      // prefix designated for the commit ID (height and state merkle root)
+	lastCommitIDPrefix    = "a/"      // prefix designated for the latest commit ID for easy access (latest height and latest state merkle root)
+	partitionExistsKey    = "e/"      // to check if partition exists
+	partitionFrequency    = uint64(5) // blocks
+	maxKeyBytes           = 256       // maximum size of a key
 )
 
 var _ lib.StoreI = &Store{} // enforce the Store interface
@@ -86,8 +86,8 @@ func NewStore(path string, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	// memTableSize is set to 1.28GB (max) to allow 128MB (10%) of writes in a
 	// single batch. It is seemingly unknown why the 10% limit is set
 	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
-	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt64).
-		WithLoggingLevel(badger.ERROR).WithMemTableSize(int64(1*units.GB + 280*units.MB)))
+	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt).WithLoggingLevel(badger.ERROR).
+		WithMemTableSize(int64(100 * units.Kilobyte)).WithValueThreshold(0).WithValueLogFileSize(int64(2 * units.Megabyte)))
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
@@ -130,7 +130,7 @@ func (s *Store) NewReadOnly(queryVersion uint64) (lib.StoreI, lib.ErrorI) {
 	var useHistorical bool
 	// if the query version is older than the partition frequency
 	if queryVersion+1 < partitionHeight(s.version) {
-		useHistorical = true
+		useHistorical = true // REMOVE THIS
 	}
 	// make a reader for the specified version
 	reader := s.db.NewTransactionAt(queryVersion, false)
@@ -192,7 +192,10 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 // ShouldPartition() determines if it is time to partition
 func (s *Store) ShouldPartition() (timeToPartition bool) {
 	// check if it's time to partition (1001, 2001, 3001...)
-	if (s.version-partitionHeight(s.version))%(partitionFrequency/10) != 1 {
+	//if (s.version-partitionHeight(s.version))%(partitionFrequency/10) != 1 {
+	//	return false
+	//}
+	if s.version%2 != 1 {
 		return false
 	}
 	// get the partition exists value from the store at a particular historical partition prefix
