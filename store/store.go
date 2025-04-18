@@ -59,29 +59,30 @@ lexicographically ordered prefix keys to facilitate easy and efficient iteration
 */
 
 type Store struct {
-	version             uint64      // version of the store
-	root                []byte      // root associated with the CommitID at this version
-	db                  *badger.DB  // underlying database
-	writer              *badger.Txn // the batch writer that allows committing it all at once
-	lss                 *TxnWrapper // reference to the 'latest' state store
-	hss                 *TxnWrapper // references the 'historical' state store
-	sc                  *SMT        // reference to the state commitment store
-	*Indexer                        // reference to the indexer store
-	useHistorical       bool        // signals to use the historical state store for query
-	isGarbageCollecting atomic.Bool // protect garbage collector (only 1 at a time)
-	log                 lib.LoggerI // logger
+	version             uint64       // version of the store
+	root                []byte       // root associated with the CommitID at this version
+	db                  *badger.DB   // underlying database
+	writer              *badger.Txn  // the batch writer that allows committing it all at once
+	lss                 *TxnWrapper  // reference to the 'latest' state store
+	hss                 *TxnWrapper  // references the 'historical' state store
+	sc                  *SMT         // reference to the state commitment store
+	*Indexer                         // reference to the indexer store
+	useHistorical       bool         // signals to use the historical state store for query
+	isGarbageCollecting atomic.Bool  // protect garbage collector (only 1 at a time)
+	metrics             *lib.Metrics // telemetry
+	log                 lib.LoggerI  // logger
 }
 
 // New() creates a new instance of a StoreI either in memory or an actual disk DB
-func New(config lib.Config, l lib.LoggerI) (lib.StoreI, lib.ErrorI) {
+func New(config lib.Config, metrics *lib.Metrics, l lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	if config.StoreConfig.InMemory {
 		return NewStoreInMemory(l)
 	}
-	return NewStore(filepath.Join(config.DataDirPath, config.DBName), l)
+	return NewStore(filepath.Join(config.DataDirPath, config.DBName), metrics, l)
 }
 
 // NewStore() creates a new instance of a disk DB
-func NewStore(path string, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
+func NewStore(path string, metrics *lib.Metrics, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	// use badger DB in managed mode to allow easy versioning
 	// memTableSize is set to 1.28GB (max) to allow 128MB (10%) of writes in a
 	// single batch. It is seemingly unknown why the 10% limit is set
@@ -91,7 +92,7 @@ func NewStore(path string, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
-	return NewStoreWithDB(db, log, true)
+	return NewStoreWithDB(db, metrics, log, true)
 }
 
 // NewStoreInMemory() creates a new instance of a mem DB
@@ -101,11 +102,11 @@ func NewStoreInMemory(log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
-	return NewStoreWithDB(db, log, true)
+	return NewStoreWithDB(db, nil, log, true)
 }
 
 // NewStoreWithDB() returns a Store object given a DB and a logger
-func NewStoreWithDB(db *badger.DB, log lib.LoggerI, write bool) (*Store, lib.ErrorI) {
+func NewStoreWithDB(db *badger.DB, metrics *lib.Metrics, log lib.LoggerI, write bool) (*Store, lib.ErrorI) {
 	// get the latest CommitID (height and hash)
 	id := getLatestCommitID(db, log)
 	// make a writable tx that reads from the last height
@@ -120,6 +121,7 @@ func NewStoreWithDB(db *badger.DB, log lib.LoggerI, write bool) (*Store, lib.Err
 		hss:     NewTxnWrapper(writer, log, historicalPrefix(id.Height)),
 		sc:      NewDefaultSMT(NewTxnWrapper(writer, log, []byte(stateCommitmentPrefix))),
 		Indexer: &Indexer{NewTxnWrapper(writer, log, []byte(indexerPrefix))},
+		metrics: metrics,
 		root:    id.Root,
 	}, nil
 }
@@ -145,6 +147,7 @@ func (s *Store) NewReadOnly(queryVersion uint64) (lib.StoreI, lib.ErrorI) {
 		sc:            NewDefaultSMT(NewTxnWrapper(reader, s.log, []byte(stateCommitmentPrefix))),
 		Indexer:       &Indexer{NewTxnWrapper(reader, s.log, []byte(indexerPrefix))},
 		useHistorical: useHistorical,
+		metrics:       s.metrics,
 		root:          bytes.Clone(s.root),
 	}, nil
 }
@@ -163,6 +166,7 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 		hss:     NewTxnWrapper(writer, s.log, historicalPrefix(s.version)),
 		sc:      NewDefaultSMT(NewTxnWrapper(writer, s.log, []byte(stateCommitmentPrefix))),
 		Indexer: &Indexer{NewTxnWrapper(writer, s.log, []byte(indexerPrefix))},
+		metrics: s.metrics,
 		root:    bytes.Clone(s.root),
 	}, nil
 }

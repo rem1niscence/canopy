@@ -753,7 +753,7 @@ func (s *Server) pageIndexer(w http.ResponseWriter, r *http.Request, callback fu
 // setupStore creates a new store from the state machine's database. This store must be closed safely with Discard()
 func (s *Server) setupStore(w http.ResponseWriter) (lib.StoreI, bool) {
 	db := s.controller.FSM.Store().(lib.StoreI).DB()
-	st, err := store.NewStoreWithDB(db, s.logger, false)
+	st, err := store.NewStoreWithDB(db, nil, s.logger, false)
 	if err != nil {
 		write(w, lib.ErrNewStore(err), http.StatusInternalServerError)
 		return nil, false

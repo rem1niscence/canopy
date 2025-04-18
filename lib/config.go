@@ -38,6 +38,7 @@ type Config struct {
 	P2PConfig          // peer-to-peer options
 	ConsensusConfig    // bft options
 	MempoolConfig      // mempool options
+	MetricsConfig      // telemetry options
 }
 
 // DefaultConfig() returns a Config with developer set options
@@ -50,6 +51,7 @@ func DefaultConfig() Config {
 		P2PConfig:          DefaultP2PConfig(),
 		ConsensusConfig:    DefaultConsensusConfig(),
 		MempoolConfig:      DefaultMempoolConfig(),
+		MetricsConfig:      DefaultMetricsConfig(),
 	}
 }
 
@@ -252,6 +254,20 @@ func DefaultMempoolConfig() MempoolConfig {
 		IndividualMaxTxSize: uint32(4 * units.Kilobyte), // 4 KB max individual tx size
 		MaxTransactionCount: 5000,                       // 5000 max transactions
 		DropPercentage:      35,                         // drop 35% if limits are reached
+	}
+}
+
+// MetricsConfig represents the configuration for the metrics server
+type MetricsConfig struct {
+	Enabled           bool   `json:"enabled"`           // if the metrics are enabled
+	PrometheusAddress string `json:"prometheusAddress"` // the address of the server
+}
+
+// DefaultMetricsConfig() returns the default metrics configuration
+func DefaultMetricsConfig() MetricsConfig {
+	return MetricsConfig{
+		Enabled:           true,           // enabled by default
+		PrometheusAddress: "0.0.0.0:9090", // the default prometheus address
 	}
 }
 
