@@ -210,6 +210,69 @@ func TestShouldPartition(t *testing.T) {
 	}
 }
 
+func TestPartition(t *testing.T) {
+	// initialize store
+	store, _, cleanup := testStore(t)
+	defer cleanup()
+
+	// Set the store version just before the partition boundary (9999)
+	store.version = partitionFrequency - 1
+
+	// set up test data at the initial version (9999)
+	testData := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+	}
+
+	// insert test data
+	for k, v := range testData {
+		err := store.Set([]byte(k), []byte(v))
+		require.NoError(t, err)
+	}
+
+	// Commit the data to finalize the version
+	_, err := store.Commit()
+	require.NoError(t, err)
+
+	// set the store version to trigger partition (10001)
+	store.version++
+	require.NoError(t, err)
+
+	// check whether the partition should run
+	require.True(t, store.ShouldPartition())
+
+	// disable GC for test (as BadgerDB doesn't support GC in In-Memory mode)
+	store.isGarbageCollecting.Store(true)
+	defer store.isGarbageCollecting.Store(false)
+
+	// perform partition
+	store.Partition()
+
+	// calculate partition height
+	snapshotHeight := partitionHeight(store.Version())
+
+	// verify partition exists key is set in the correct partition
+	reader := store.db.NewTransactionAt(snapshotHeight, false)
+	defer reader.Discard()
+	partitionPrefix := historicalPrefix(partitionHeight(store.Version()))
+	hss := NewTxnWrapper(reader, store.log, []byte(partitionPrefix))
+	value, err := hss.Get([]byte(partitionExistsKey))
+	require.NoError(t, err)
+	require.Equal(t, []byte(partitionExistsKey), value)
+
+	// Verify data in historical partition
+	for k, v := range testData {
+		value, err := hss.Get([]byte(k))
+		require.NoError(t, err)
+		require.Equal(t, []byte(v), value)
+	}
+
+	// verify garbage collection flags are set
+	discardTs := store.db.MaxVersion()
+	require.Equal(t, snapshotHeight, discardTs)
+}
+
 func TestHistoricalPrefix(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/alecthomas/units"
-	"github.com/canopy-network/canopy/lib"
-	"github.com/dgraph-io/badger/v4"
 	"math"
 	"path/filepath"
 	"sync/atomic"
+
+	"github.com/alecthomas/units"
+	"github.com/canopy-network/canopy/lib"
+	"github.com/dgraph-io/badger/v4"
 )
 
 const (
