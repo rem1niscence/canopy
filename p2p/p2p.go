@@ -12,7 +12,6 @@ import (
 
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"github.com/canopy-network/canopy/metrics"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/phuslu/iploc"
 	"golang.org/x/net/netutil"
@@ -44,11 +43,12 @@ type P2P struct {
 	maxMembersPerCommittee int
 	bannedIPs              []net.IPAddr // banned IPs (non-string)
 	config                 lib.Config
+	metrics                *lib.Metrics
 	log                    lib.LoggerI
 }
 
 // New() creates an initialized pointer instance of a P2P object
-func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l lib.LoggerI) *P2P {
+func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, m *lib.Metrics, c lib.Config, l lib.LoggerI) *P2P {
 	// initialize the peer book
 	peerBook := NewPeerBook(p.PublicKey().Bytes(), c, l)
 	// make inbound multiplexed channels
@@ -73,9 +73,10 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l li
 	return &P2P{
 		privateKey:             p,
 		channels:               channels,
+		metrics:                m,
 		config:                 c,
 		meta:                   meta.Sign(p),
-		PeerSet:                NewPeerSet(c, p, l),
+		PeerSet:                NewPeerSet(c, p, m, l),
 		book:                   peerBook,
 		MustConnectsReceiver:   make(chan []*lib.PeerAddress, maxChanSize),
 		maxMembersPerCommittee: int(maxMembersPerCommittee),
@@ -87,8 +88,7 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l li
 // Start() begins the P2P service
 func (p *P2P) Start() {
 	p.log.Info("Starting P2P 🤝 ")
-	// Listens for 'must connect peer ids' from the 
-  internal controller
+	// Listens for 'must connect peer ids' from the main internal controller
 	go p.ListenForMustConnects()
 	// Starts the peer address book exchange service
 	go p.StartPeerBookService()
@@ -283,8 +283,6 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err l
 	}); err != nil {
 		connection.Stop()
 	}
-	// Update peer metrics
-	metrics.UpdatePeerMetrics(p.PeerSet.PeerCount(), p.PeerSet.inbound, p.PeerSet.outbound)
 	return
 }
 

@@ -149,7 +149,7 @@ func TestRollback(t *testing.T) { // TODO fix this functionality
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := NewStore(filepath.Join(s, ".canopy/canopy"), logger)
+	store, err := NewStore(filepath.Join(s, ".canopy/canopy"), nil, logger)
 	if err != nil {
 		t.Fatal(err)
 	}

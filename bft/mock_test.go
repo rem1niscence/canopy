@@ -35,7 +35,7 @@ func newTestConsensus(t *testing.T, phase Phase, numValidators int) (tc *testCon
 		sendToReplicasChan: make(chan lib.Signable),
 	}
 	// create the bft object using the mocks
-	tc.bft, err = New(lib.DefaultConfig(), tc.valKeys[0], 1, 1, tc.cont, false, lib.NewDefaultLogger())
+	tc.bft, err = New(lib.DefaultConfig(), tc.valKeys[0], 1, 1, tc.cont, false, nil, lib.NewDefaultLogger())
 	tc.bft.ValidatorSet = tc.valSet
 	require.NoError(t, err)
 	// set the bft phase

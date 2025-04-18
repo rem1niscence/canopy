@@ -7,7 +7,6 @@ import (
 
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"github.com/canopy-network/canopy/metrics"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -23,18 +22,20 @@ type PeerSet struct {
 	inbound      int                // inbound count
 	outbound     int                // outbound count
 	sync.RWMutex                    // read / write mutex
+	metrics      *lib.Metrics       // telemetry
 	config       lib.P2PConfig      // p2p configuration
 	publicKey    []byte             // self public key
 	logger       lib.LoggerI
 }
 
-func NewPeerSet(c lib.Config, priv crypto.PrivateKeyI, logger lib.LoggerI) PeerSet {
+func NewPeerSet(c lib.Config, priv crypto.PrivateKeyI, metrics *lib.Metrics, logger lib.LoggerI) PeerSet {
 	return PeerSet{
 		m:           make(map[string]*Peer),
 		mustConnect: make([]*lib.PeerAddress, 0),
 		inbound:     0,
 		outbound:    0,
 		RWMutex:     sync.RWMutex{},
+		metrics:     metrics,
 		config:      c.P2PConfig,
 		publicKey:   priv.PublicKey().Bytes(),
 		logger:      logger,
@@ -78,10 +79,8 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 	}
 	// set the peer
 	ps.set(p)
-
-	// Update metrics
-	metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
-
+	// update metrics
+	ps.metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
 	return nil
 }
 
@@ -94,10 +93,8 @@ func (ps *PeerSet) Remove(publicKey []byte) (peer *Peer, err lib.ErrorI) {
 		return
 	}
 	ps.remove(peer)
-
-	// Update metrics
-	metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
-
+	// update metrics
+	ps.metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
 	return
 }
 
@@ -298,6 +295,7 @@ func (ps *PeerSet) changeIOCount(increment, outbound bool) {
 			ps.inbound--
 		}
 	}
+	ps.metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
 }
 
 // map based CRUD operations below

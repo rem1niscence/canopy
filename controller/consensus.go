@@ -10,7 +10,6 @@ import (
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"github.com/canopy-network/canopy/metrics"
 	"github.com/canopy-network/canopy/p2p"
 )
 
@@ -29,8 +28,6 @@ func (c *Controller) Sync() {
 	c.log.Infof("Sync started 🔄 for committee %d", c.Config.ChainId)
 	// set the Controller as 'syncing'
 	c.isSyncing.Store(true)
-	// Update syncing status metric
-	metrics.UpdateNodeSyncingStatus(true)
 	// check if node is alone in the validator set
 	if c.singleNodeNetwork() {
 		// complete syncing
@@ -494,8 +491,6 @@ func (c *Controller) finishSyncing() {
 	c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(c.LoadLastCommitTime(c.FSM.Height()))}
 	// set syncing to false
 	c.isSyncing.Store(false)
-	// Update syncing status metric
-	metrics.UpdateNodeSyncingStatus(false)
 	// enable listening for a block
 	go c.ListenForBlock()
 }

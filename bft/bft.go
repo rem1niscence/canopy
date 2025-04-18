@@ -9,7 +9,6 @@ import (
 
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"github.com/canopy-network/canopy/metrics"
 )
 
 // BFT is a structure that holds data for a Hotstuff BFT instance
@@ -40,12 +39,12 @@ type BFT struct {
 	PublicKey  []byte             // self consensus public key
 	PrivateKey crypto.PrivateKeyI // self consensus private key
 	Config     lib.Config         // self configuration
+	Metrics    *lib.Metrics       // telemetry
 	log        lib.LoggerI        // logging
 }
 
 // New() creates a new instance of HotstuffBFT for a specific Committee
-func New(c lib.Config, valKey crypto.PrivateKeyI, rootHeight, height uint64,
-	con Controller, vdfEnabled bool, l lib.LoggerI) (*BFT, lib.ErrorI) {
+func New(c lib.Config, valKey crypto.PrivateKeyI, rootHeight, height uint64, con Controller, vdfEnabled bool, m *lib.Metrics, l lib.LoggerI) (*BFT, lib.ErrorI) {
 	// determine if using a Verifiable Delay Function for long-range-attack protection
 	var vdf *lib.VDFService
 	// calculate the targetTime from commitProcess and set the VDF
@@ -76,6 +75,7 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, rootHeight, height uint64,
 		syncing:           con.Syncing(),
 		PhaseTimer:        lib.NewTimer(),
 		VDFService:        vdf,
+		Metrics:           m,
 		HighVDF:           new(crypto.VDF),
 	}, nil
 }
@@ -596,7 +596,7 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	// update canopy height
 	b.RootHeight = b.Controller.RootChainHeight()
 	// Update BFT metrics
-	metrics.UpdateBFTMetrics(b.Height, b.RootHeight)
+	b.Metrics.UpdateBFTMetrics(b.Height, b.RootHeight)
 	// update the validator set
 	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.Height), b.RootHeight)
 	if err != nil {
