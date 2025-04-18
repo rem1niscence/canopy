@@ -80,7 +80,16 @@ func NewMetricsServer(nodeAddress crypto.AddressI, config MetricsConfig) *Metric
 		config:      config,
 		nodeAddress: nodeAddress.Bytes(),
 		log:         NewDefaultLogger(),
-		NodeMetrics: NodeMetrics{},
+		NodeMetrics: NodeMetrics{
+			NodeStatus: promauto.NewGauge(prometheus.GaugeOpts{
+				Name: "canopy_node_status",
+				Help: "The node is alive and processing blocks",
+			}),
+			BlockProcessingTime: promauto.NewHistogram(prometheus.HistogramOpts{
+				Name: "canopy_block_processing_time",
+				Help: "Time to process a block in seconds",
+			}),
+		},
 		PeerMetrics: PeerMetrics{
 			TotalPeers: promauto.NewGauge(prometheus.GaugeOpts{
 				Name: "canopy_peer_total",
@@ -166,11 +175,15 @@ func (m *Metrics) Start() {
 	}
 	// if the metrics server is enabled
 	if m.config.Enabled {
-		// run the server
-		if err := m.server.ListenAndServe(); err != nil {
-			m.log.Errorf("Metrics server failed with err: %s", err.Error())
-		}
-		m.log.Infof("Metrics server started on %s", m.config.PrometheusAddress)
+		go func() {
+			m.log.Infof("Starting metrics server on %s", m.config.PrometheusAddress)
+			// run the server
+			if err := m.server.ListenAndServe(); err != nil {
+				if err != http.ErrServerClosed {
+					m.log.Errorf("Metrics server failed with err: %s", err.Error())
+				}
+			}
+		}()
 	}
 }
 
