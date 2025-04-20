@@ -30,7 +30,7 @@ import (
 	- Message dissemination: gossip [x]
 */
 
-const transport, dialTimeout = "tcp", time.Second
+const transport, dialTimeout, minPeerTick = "tcp", time.Second, 100 * time.Millisecond
 
 type P2P struct {
 	privateKey             crypto.PrivateKeyI
@@ -96,6 +96,8 @@ func (p *P2P) Start() {
 	go p.ListenForInboundPeers(&lib.PeerAddress{NetAddress: p.config.ListenAddress})
 	// Dials external outbound peers
 	go p.DialForOutboundPeers()
+	// Wait until peers reaches minimum count
+	p.WaitForMinimumPeers()
 }
 
 // Stop() stops the P2P service
@@ -384,6 +386,21 @@ func (p *P2P) ID() *lib.PeerAddress {
 		PublicKey:  p.privateKey.PublicKey().Bytes(),
 		NetAddress: p.config.ExternalAddress,
 		PeerMeta:   p.meta,
+	}
+}
+
+// WaitForMinimumPeers() doesn't return until the minimum peer count is reached
+// This may be useful when coordinating network starts
+func (p *P2P) WaitForMinimumPeers() {
+	ticker := time.NewTicker(minPeerTick)
+	defer ticker.Stop()
+	// every 'tick'
+	for range ticker.C {
+		// if reached the minimum number of peers
+		if p.PeerCount() >= p.config.MinimumPeersToStart {
+			// exit
+			return
+		}
 	}
 }
 

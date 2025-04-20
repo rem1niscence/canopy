@@ -185,24 +185,26 @@ func (c *ConsensusConfig) BlockTimeMS() int {
 
 // P2PConfig defines peering compatibility and limits as well as actions on specific peering IPs / IDs
 type P2PConfig struct {
-	NetworkID       uint64   `json:"networkID"`       // the ID for the peering network
-	ListenAddress   string   `json:"listenAddress"`   // listen for incoming connection
-	ExternalAddress string   `json:"externalAddress"` // advertise for external dialing
-	MaxInbound      int      `json:"maxInbound"`      // max inbound peers
-	MaxOutbound     int      `json:"maxOutbound"`     // max outbound peers
-	TrustedPeerIDs  []string `json:"trutedPeersIDs"`  // trusted public keys
-	DialPeers       []string `json:"dialPeers"`       // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
-	BannedPeerIDs   []string `json:"bannedPeersIDs"`  // banned public keys
-	BannedIPs       []string `json:"bannedIPs"`       // banned IPs
+	NetworkID           uint64   `json:"networkID"`           // the ID for the peering network
+	ListenAddress       string   `json:"listenAddress"`       // listen for incoming connection
+	ExternalAddress     string   `json:"externalAddress"`     // advertise for external dialing
+	MaxInbound          int      `json:"maxInbound"`          // max inbound peers
+	MaxOutbound         int      `json:"maxOutbound"`         // max outbound peers
+	TrustedPeerIDs      []string `json:"trutedPeersIDs"`      // trusted public keys
+	DialPeers           []string `json:"dialPeers"`           // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
+	BannedPeerIDs       []string `json:"bannedPeersIDs"`      // banned public keys
+	BannedIPs           []string `json:"bannedIPs"`           // banned IPs
+	MinimumPeersToStart int      `json:"minimumPeersToStart"` // the minimum connections required to start consensus
 }
 
 func DefaultP2PConfig() P2PConfig {
 	return P2PConfig{
-		NetworkID:       CanopyMainnetNetworkId,
-		ListenAddress:   "0.0.0.0:9001", // default TCP address is 9001 for chain 1 (9002 for chain 2 etc.)
-		ExternalAddress: "",             // should be populated by the user
-		MaxInbound:      21,             // inbounds should be close to 3x greater than outbounds
-		MaxOutbound:     7,              // to ensure 'new joiners' have slots to take
+		NetworkID:           CanopyMainnetNetworkId,
+		ListenAddress:       "0.0.0.0:9001", // default TCP address is 9001 for chain 1 (9002 for chain 2 etc.)
+		ExternalAddress:     "",             // should be populated by the user
+		MaxInbound:          21,             // inbounds should be close to 3x greater than outbounds
+		MaxOutbound:         7,              // to ensure 'new joiners' have slots to take
+		MinimumPeersToStart: 0,              // requires no peers to start consensus by default (suitable for 1 node network)
 	}
 }
 

@@ -80,12 +80,10 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 
 // Start() begins the Controller service
 func (c *Controller) Start() {
-	// start the P2P module
-	c.P2P.Start()
-	// start internal Controller listeners for P2P
-	c.StartListeners()
 	// in a non-blocking sub-function
 	go func() {
+		// start the P2P module
+		c.P2P.Start()
 		// log the beginning of the root-chain API connection
 		c.log.Warnf("Attempting to connect to the root-chain")
 		// set a timer to go off once per second
