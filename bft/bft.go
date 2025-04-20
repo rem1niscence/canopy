@@ -88,6 +88,8 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, rootHeight, height uint64, con
 //   - (b) Target chainId <mission accomplished, move to next height>
 func (b *BFT) Start() {
 	var err lib.ErrorI
+	// create variables to track BFTResets
+	var reset, rcReset bool
 	// load the committee from the base chain
 	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.ChainHeight()), b.Controller.RootChainHeight())
 	if err != nil {
@@ -95,12 +97,23 @@ func (b *BFT) Start() {
 	}
 	for {
 		select {
-		// PHASE TIMEOUT
+		// EXECUTE PHASE
 		// - This triggers when the phase's sleep time has expired, indicating that all expected messages for this phase should have already been received
 		case <-b.PhaseTimer.C:
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
+				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
+				// else increment the height and don't maintain locks
+				switch {
+				case reset:
+					b.NewHeight(false)
+					reset = false
+				case rcReset:
+					b.NewHeight(true)
+					rcReset = false
+				}
+				// handle the phase
 				b.HandlePhase()
 			}()
 
@@ -108,22 +121,18 @@ func (b *BFT) Start() {
 		// - This triggers when receiving a new Commit Block (QC) from either root-chainId (a) or the Target-ChainId (b)
 		case resetBFT := <-b.ResetBFT:
 			func() {
-				defer lib.TimeTrack(fmt.Sprintf("BFT.Start.Reset(), %d", len(b.ResetBFT)), time.Now())
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
-				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
-				// else increment the height and don't maintain locks
-				b.NewHeight(resetBFT.IsRootChainUpdate)
-				// if not a base chain update, reset the timers
+				// log if a root-chain update
 				if !resetBFT.IsRootChainUpdate {
 					b.log.Info("Reset BFT (NEW_HEIGHT)")
-					// start BFT over
+					reset = true
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
-					// start BFT over after sleeping RootChainPollMS
-					// add poll ms wait here to ensure ample time for all nested chains to be updated
+					rcReset = true
 				}
-				b.SetWaitTimers(time.Duration(b.Config.RootChainPollMS)*time.Millisecond, resetBFT.ProcessTime)
+				// set the wait timers to start consensus
+				b.SetWaitTimers(resetBFT.WaitTime, resetBFT.ProcessTime)
 			}()
 		}
 	}
@@ -870,6 +879,7 @@ type (
 
 type ResetBFT struct {
 	IsRootChainUpdate bool
+	WaitTime          time.Duration
 	ProcessTime       time.Duration
 }
 

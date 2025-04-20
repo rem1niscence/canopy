@@ -151,11 +151,11 @@ func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 	// if the last validator set is empty
 	if info.LastValidatorSet.NumValidators == 0 {
 		// signal to reset consensus and start a new height
-		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: false}
+		c.Consensus.ResetBFT <- bft.ResetBFT{WaitTime: time.Duration(c.Config.RootChainPollMS) * time.Millisecond, IsRootChainUpdate: false}
 	} else {
 		c.log.Debugf("UpdateRootChainInfo -> Reset BFT: %d", len(c.Consensus.ResetBFT))
 		// signal to reset consensus
-		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: true}
+		c.Consensus.ResetBFT <- bft.ResetBFT{WaitTime: time.Duration(c.Config.RootChainPollMS) * time.Millisecond, IsRootChainUpdate: true}
 	}
 	// update the peer 'must connect'
 	c.UpdateP2PMustConnect()
