@@ -647,7 +647,7 @@ func (b *BFT) SetTimerForNextPhase(processTime time.Duration) {
 	default:
 		b.Phase++
 	case CommitProcess:
-		// no op
+		return // don't set a timer
 	case Pacemaker:
 		b.Phase = Election
 	}
