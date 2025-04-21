@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -294,8 +295,13 @@ func (s *Store) Partition() {
 			// unset isGarbageCollecting once complete
 			defer s.isGarbageCollecting.Store(false)
 			// trigger garbage collector to prune keys
-			if e := sc.db.RunValueLogGC(badgerGCRatio); e != nil {
-				return ErrGarbageCollectDB(e)
+			if gcErr := sc.db.RunValueLogGC(badgerGCRatio); gcErr != nil {
+				if errors.Is(gcErr, badger.ErrNoRewrite) {
+					sc.log.Debugf("%v - this is normal", gcErr)
+					// Don't return an error here - this is an expected condition
+				} else {
+					return ErrGarbageCollectDB(gcErr)
+				}
 			}
 		}
 		// exit
