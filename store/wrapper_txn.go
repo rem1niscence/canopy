@@ -10,11 +10,22 @@ import (
 )
 
 const (
-	badgerMetaFieldName               = "meta"    // badgerDB Entry 'meta' field name
-	badgerDiscardEarlierVersions byte = 1 << 2    // badgerDB 'discard earlier versions' flag
-	badgerDeleteBit              byte = 1 << 0    // badgerDB 'tombstoned' flag
-	badgerNoDiscardBit           byte = 1 << 3    // badgerDB 'never discard'  bit
-	badgerGCRatio                     = .00000001 // the ratio when badgerDB will run the garbage collector
+	// BadgerDB garbage collector behavior is not well documented leading to many open issues in their repository
+	// However, here is our current understanding based on experimentation
+	// ----------------------------------------------------------------------------------------------------------
+	// BadgerDB Garbage Collection Rules listed by priority
+	// 1. MergeOp Bit prevents garbage collection of a key regardless
+	// 2. Nothing above DiscardTs will be garbage collected
+	// 3. Deleting, expiring, and setting ‘Discard earlier versions’ signals the removal of older versions of a key
+	// 4. Deleting or expiring a key makes it eligible for GC
+	// 5. If KeepNumVersions is set to max int it will prevent automatic GC of older versions
+	// ------------------------------------------------------------------------------
+	// Bits source: https://github.com/hypermodeinc/badger/blob/85389e88bf308c1dc271383b77b67f4ef4a85194/value.go#L37
+	badgerMetaFieldName               = "meta" // badgerDB Entry 'meta' field name
+	badgerDiscardEarlierVersions byte = 1 << 2 // badgerDB 'discard earlier versions' flag
+	badgerDeleteBit              byte = 1 << 0 // badgerDB 'tombstoned' flag
+	badgerNoDiscardBit           byte = 1 << 3 // badgerDB 'never discard'  bit
+	badgerGCRatio                     = .15    // the ratio when badgerDB will run the garbage collector
 )
 
 // RWStoreI interface enforcement
