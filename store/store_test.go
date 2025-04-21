@@ -271,7 +271,6 @@ func TestPartition(t *testing.T) {
 		require.Equal(t, []byte(v), value)
 	}
 
-	// verify garbage collection flags are set
 	discardTs := store.db.MaxVersion()
 	require.Equal(t, snapshotHeight+1, discardTs)
 }
@@ -295,7 +294,7 @@ func TestPartitionIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	// set up the store
-	store, err := NewStoreWithDB(db, lib.NewDefaultLogger(), true)
+	store, err := NewStoreWithDB(db, nil, lib.NewDefaultLogger(), true)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, store.Close())
