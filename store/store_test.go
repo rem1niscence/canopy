@@ -347,7 +347,7 @@ func TestPartitionIntegration(t *testing.T) {
 
 	// verify some keys from the dataset and delete them for the last prune
 	deletedKeys := make([]string, 0, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		key := fmt.Appendf(nil, "%s%d", keyPrefix, i)
 		val, err := hss.Get(key)
 		require.NoError(t, err)
@@ -357,7 +357,7 @@ func TestPartitionIntegration(t *testing.T) {
 	}
 
 	// Force additional commits until the partition boundary is reached
-	for i := 0; i < int(partitionFrequency); i++ {
+	for range int(partitionFrequency) {
 		_, err = store.Commit()
 		require.NoError(t, err)
 	}
@@ -387,7 +387,7 @@ func TestPartitionIntegration(t *testing.T) {
 		}
 	}
 
-	// confirm all the keys we're actually kept
+	// confirm all the deleted items were found in the archive store
 	require.Len(t, deletedKeys, 0)
 }
 

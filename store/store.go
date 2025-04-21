@@ -302,7 +302,7 @@ func (s *Store) Partition() {
 			if gcErr := sc.db.RunValueLogGC(badgerGCRatio); gcErr != nil {
 				if errors.Is(gcErr, badger.ErrNoRewrite) {
 					sc.log.Debugf("%v - this is normal", gcErr)
-					// Don't return an error here - this is an expected condition
+					// don't return an error here - this is an expected condition
 				} else {
 					return ErrGarbageCollectDB(gcErr)
 				}
