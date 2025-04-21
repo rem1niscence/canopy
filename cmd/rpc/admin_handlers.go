@@ -352,18 +352,24 @@ func (s *Server) TransactionLockOrder(w http.ResponseWriter, r *http.Request, _ 
 	})
 }
 
+// TransactionCloseOrder completes a swap
 func (s *Server) TransactionCloseOrder(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	s.txHandler(w, r, func(p crypto.PrivateKeyI, ptr *txRequest) (lib.TransactionI, error) {
 		// Retrieve the fee required for this type of transaction
 		if err := s.getFeeFromState(w, ptr, fsm.MessageSendName, true); err != nil {
 			return nil, err
 		}
-		// If the remote callbacks not yet set
-		if s.remoteCallbacks == nil {
-			return nil, lib.ErrServerTimeout()
+		// create a variable for the root chain id
+		var rootChainId uint64
+		// get a read only state
+		if err := s.readOnlyState(0, func(s *fsm.StateMachine) (err lib.ErrorI) {
+			rootChainId, err = s.GetRootChainId()
+			return
+		}); err != nil {
+			return nil, err
 		}
 		// Execute rpc call to the root chain
-		order, err := s.remoteCallbacks.Order(0, ptr.OrderId, s.config.ChainId)
+		order, err := s.rcManager.GetOrder(rootChainId, 0, ptr.OrderId, s.config.ChainId)
 		if err != nil {
 			return nil, err
 		}

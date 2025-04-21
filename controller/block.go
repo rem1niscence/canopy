@@ -300,6 +300,17 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
+	// publish the root chain info to the nested chain subscribers
+	for _, id := range c.RCManager.ChainIds() {
+		// get the root chain info
+		info, e := c.FSM.GetRootChainInfo(id)
+		if e != nil {
+			c.log.Error(e.Error())
+			continue
+		}
+		// publish root chain information
+		c.RCManager.Publish(id, info)
+	}
 	// update telemetry
 	c.UpdateTelemetry(block, time.Since(start))
 	// exit
@@ -368,7 +379,7 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 		// use checkpoints to protect against long-range attacks
 		if qc.Header.Height%CheckpointFrequency == 0 {
 			// get the checkpoint from the base chain (or file if independent)
-			checkpoint, err := c.RootChainInfo.GetCheckpoint(c.LoadRootChainId(qc.Header.Height), qc.Header.Height, c.Config.ChainId)
+			checkpoint, err := c.RCManager.GetCheckpoint(c.LoadRootChainId(qc.Header.Height), qc.Header.Height, c.Config.ChainId)
 			// if getting the checkpoint failed
 			if err != nil {
 				// warn of the inability to get the checkpoint

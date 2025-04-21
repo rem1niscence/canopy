@@ -1,0 +1,470 @@
+package rpc
+
+import (
+	"fmt"
+	"github.com/canopy-network/canopy/controller"
+	"github.com/canopy-network/canopy/lib"
+	"github.com/gorilla/websocket"
+	"github.com/julienschmidt/httprouter"
+	"net/http"
+	"net/url"
+	"strconv"
+	"sync"
+	"time"
+)
+
+/* This file implements the client & server logic for the 'root-chain info' and corresponding 'on-demand' calls to the rpc */
+
+var _ lib.RCManagerI = new(RCManager)
+
+// RCManager handles a group of root-chain sock clients
+type RCManager struct {
+	c             lib.Config                   // the global node config
+	subscriptions map[uint64]*RCSubscription   // chainId -> subscription
+	subscribers   map[uint64]*RCSubscriber     // chainId -> subscriber
+	l             sync.Mutex                   // thread safety
+	afterRCUpdate func(info lib.RootChainInfo) // callback after the root chain info update
+	upgrader      websocket.Upgrader           // upgrade http connection to ws
+	log           lib.LoggerI                  // stout log
+}
+
+// NewRCManager() constructs a new instance of a RCManager
+func NewRCManager(controller *controller.Controller, c lib.Config, l lib.LoggerI) (man *RCManager) {
+	// create the manager
+	man = &RCManager{
+		c:             c,
+		subscriptions: make(map[uint64]*RCSubscription),
+		subscribers:   make(map[uint64]*RCSubscriber),
+		l:             sync.Mutex{},
+		afterRCUpdate: controller.UpdateRootChainInfo,
+		upgrader:      websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }},
+		log:           l,
+	}
+	// set the manager in the controller
+	controller.RCManager = man
+	// exit
+	return
+}
+
+// Start() attempts to establish a websocket connection with each root chain
+func (r *RCManager) Start() {
+	// for each rc in the config
+	for _, rc := range r.c.RootChain {
+		// dial each root chain
+		r.NewSubscription(rc)
+	}
+}
+
+// Publish() writes the root-chain info to each client
+func (r *RCManager) Publish(chainId uint64, info *lib.RootChainInfo) {
+	// convert the root-chain info to bytes
+	protoBytes, err := lib.Marshal(info)
+	if err != nil {
+		return
+	}
+	// thread safety
+	r.l.Lock()
+	defer r.l.Unlock()
+	// for each ws client
+	for _, subscriber := range r.subscribers {
+		// skip if not this chain id
+		if subscriber.chainId != chainId {
+			continue
+		}
+		// publish to each client
+		if e := subscriber.conn.WriteMessage(websocket.BinaryMessage, protoBytes); e != nil {
+			subscriber.Stop(err)
+		}
+	}
+}
+
+// ChainIds() returns a list of chainIds for subscribers
+func (r *RCManager) ChainIds() (list []uint64) {
+	r.l.Lock()
+	defer r.l.Unlock()
+	// de-duplicate the results
+	deDupe := lib.NewDeDuplicator[uint64]()
+	// for each client
+	for _, client := range r.subscribers {
+		// if the client chain id isn't empty and not duplicate
+		if client.chainId != 0 && !deDupe.Found(client.chainId) {
+			list = append(list, client.chainId)
+		}
+	}
+	return
+}
+
+// GetHeight() returns the height from the root-chain
+func (r *RCManager) GetHeight(rootChainId uint64) uint64 {
+	// lock for thread safety
+	r.l.Lock()
+	defer r.l.Unlock()
+	// check the map to see if the info exists
+	if sub, found := r.subscriptions[rootChainId]; found {
+		// exit with the height of the root-chain-info
+		return sub.Info.Height
+	}
+	return 0
+}
+
+// GetRootChainInfo() retrieves the root chain info from the root chain 'on-demain'
+func (r *RCManager) GetRootChainInfo(rootChainId, chainId uint64) (rootChainInfo *lib.RootChainInfo, err lib.ErrorI) {
+	// lock for thread safety
+	r.l.Lock()
+	defer r.l.Unlock()
+	// if the root chain id is the same as the info
+	sub, found := r.subscriptions[rootChainId]
+	if !found {
+		// exit with 'not subscribed' error
+		return nil, lib.ErrNotSubscribed()
+	}
+	// get the info
+	info, err := sub.RootChainInfo(0, chainId)
+	if err != nil {
+		return nil, err
+	}
+	// update the info
+	sub.Info = *info
+	// exit with the info
+	return
+}
+
+// GetValidatorSet() returns the validator set from the root-chain
+func (r *RCManager) GetValidatorSet(rootChainId, id, rootHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
+	// lock for thread safety
+	r.l.Lock()
+	defer r.l.Unlock()
+	// if the root chain id is the same as the info
+	sub, found := r.subscriptions[rootChainId]
+	if !found {
+		// exit with 'not subscribed' error
+		return lib.ValidatorSet{}, lib.ErrNotSubscribed()
+	}
+	// if rootHeight is the same as the RootChainInfo height
+	if rootHeight == sub.Info.Height || rootHeight == 0 {
+		// exit with a copy the validator set
+		return lib.NewValidatorSet(sub.Info.ValidatorSet)
+	}
+	// if rootHeight is 1 before the RootChainInfo height
+	if rootHeight == sub.Info.Height-1 {
+		// exit with a copy of the previous validator set
+		return lib.NewValidatorSet(sub.Info.LastValidatorSet)
+	}
+	// warn of the remote RPC call to the root chain API
+	r.log.Warnf("Executing remote GetValidatorSet call with requested height=%d for rootChainId=%d", rootHeight, rootChainId)
+	// execute the remote RPC call to the root chain API
+	return sub.ValidatorSet(rootHeight, id)
+}
+
+// GetOrders() returns the order book from the root-chain
+func (r *RCManager) GetOrders(rootChainId, rootHeight, id uint64) (*lib.OrderBook, lib.ErrorI) {
+	// lock for thread safety
+	r.l.Lock()
+	defer r.l.Unlock()
+	// if the root chain id is the same as the info
+	sub, found := r.subscriptions[rootChainId]
+	if !found {
+		// exit with 'not subscribed' error
+		return nil, lib.ErrNotSubscribed()
+	}
+	// if the root chain id and height is the same as the info
+	if sub.Info.Height == rootHeight {
+		// exit with the order books from memory
+		return sub.Info.Orders, nil
+	}
+	// warn of the remote RPC call to the root chain API
+	r.log.Warnf("Executing remote GetOrders call with requested height=%d for rootChainId=%d", rootHeight, rootChainId)
+	// execute the remote call
+	books, err := sub.Orders(rootHeight, id)
+	// if an error occurred during the remote call
+	if err != nil {
+		// exit with error
+		return nil, err
+	}
+	// ensure the order book isn't empty
+	if books == nil || len(books.OrderBooks) == 0 {
+		// exit with error
+		return nil, lib.ErrEmptyOrderBook()
+	}
+	// exit with the first (and only) order book in the list
+	return books.OrderBooks[0], nil
+}
+
+// Order() returns a specific order from the root order book
+func (r *RCManager) GetOrder(rootChainId, height, orderId, chainId uint64) (*lib.SellOrder, lib.ErrorI) {
+	// if the root chain id is the same as the info
+	sub, found := r.subscriptions[rootChainId]
+	if !found {
+		// exit with 'not subscribed' error
+		return nil, lib.ErrNotSubscribed()
+	}
+	return sub.Order(height, orderId, chainId)
+}
+
+// IsValidDoubleSigner() returns if an address is a valid double signer for a specific 'double sign height'
+func (r *RCManager) IsValidDoubleSigner(rootChainId, height uint64, address string) (*bool, lib.ErrorI) {
+	// if the root chain id is the same as the info
+	sub, found := r.subscriptions[rootChainId]
+	if !found {
+		// exit with 'not subscribed' error
+		return nil, lib.ErrNotSubscribed()
+	}
+	// warn of the remote RPC call to the API of the 'root chain'
+	r.log.Warnf("Executing remote IsValidDoubleSigner call for address=%s at double sign height=%d and rootChainId=%d", address, height, rootChainId)
+	// exit with the results of the remote RPC call to the API of the 'root chain'
+	return sub.IsValidDoubleSigner(height, address)
+}
+
+// GetCheckpoint() returns the checkpoint if any for a specific chain height
+// TODO should be able to get these from the file or the root-chain upon independence
+func (r *RCManager) GetCheckpoint(rootChainId, height, chainId uint64) (blockHash lib.HexBytes, err lib.ErrorI) {
+	// if the root chain id is the same as the info
+	sub, found := r.subscriptions[rootChainId]
+	if !found {
+		// exit with 'not subscribed' error
+		return nil, lib.ErrNotSubscribed()
+	}
+	// warn of the remote RPC call to the API of the 'root chain'
+	r.log.Warnf("Executing remote GetCheckpoint call for height=%d and chainId=%d and rootChainId=%d", height, chainId, rootChainId)
+	// exit with the results of the remote RPC call to the API of the 'root chain'
+	return sub.Checkpoint(height, chainId)
+}
+
+// GetLotteryWinner() returns the winner of the delegate lottery from the root-chain
+func (r *RCManager) GetLotteryWinner(rootChainId, height, id uint64) (*lib.LotteryWinner, lib.ErrorI) {
+	// lock for thread safety
+	r.l.Lock()
+	defer r.l.Unlock()
+	// if the root chain id is the same as the info
+	sub, found := r.subscriptions[rootChainId]
+	if !found {
+		// exit with 'not subscribed' error
+		return nil, lib.ErrNotSubscribed()
+	}
+	// if the root chain id and height is the same as the info
+	if sub.Info.Height == height {
+		// exit with the lottery winner
+		return sub.Info.LotteryWinner, nil
+	}
+	// warn of the remote RPC call to the API of the 'root chain'
+	r.log.Warnf("Executing remote Lottery call with requested height=%d and rootChainId=%d", height, rootChainId)
+	// exit with the results of the remote RPC call to the API of the 'root chain'
+	return sub.Lottery(height, id)
+}
+
+// Transaction() executes a transaction on the root chain
+func (r *RCManager) Transaction(rootChainId uint64, tx lib.TransactionI) (hash *string, err lib.ErrorI) {
+	// if the root chain id is the same as the info
+	sub, found := r.subscriptions[rootChainId]
+	if !found {
+		// exit with 'not subscribed' error
+		return nil, lib.ErrNotSubscribed()
+	}
+	return sub.Transaction(tx)
+}
+
+// SUBSCRIPTION CODE BELOW (OUTBOUND)
+
+// RCSubscription (Root Chain Subscription) implements an efficient subscription to root chain info
+type RCSubscription struct {
+	chainId uint64            // the chain id of the subscription
+	Info    lib.RootChainInfo // root-chain info cached from the publisher
+	manager *RCManager        // a reference to the manager of the ws clients
+	conn    *websocket.Conn   // the underlying ws connection
+	*Client                   // use http for 'on-demand' requests
+	log     lib.LoggerI       // stdout log
+}
+
+// Dial() dials a root chain via ws
+func (r *RCManager) NewSubscription(rc lib.RootChain) {
+	// create a new web socket client
+	client := &RCSubscription{
+		chainId: rc.ChainId,
+		Info:    lib.RootChainInfo{},
+		manager: r,
+		Client:  NewClient(rc.Url, rc.Url),
+		log:     r.log,
+	}
+	// start to connect with backoff
+	go client.dialWithBackoff(r.c.ChainId, rc)
+}
+
+// dialWithBackoff() establishes a websocket connection given a root chain configuration
+func (r *RCSubscription) dialWithBackoff(chainId uint64, config lib.RootChain) {
+	// parse the config
+	parsedUrl, err := url.Parse(config.Url)
+	if err != nil {
+		r.log.Fatal(err.Error())
+	}
+	// get the host
+	host := parsedUrl.Host
+	// if the host is empty
+	if host == "" {
+		// fallback if url didn't have a scheme and was treated as a path
+		host = parsedUrl.Path
+	}
+	// create a URL to connect to the root chain with
+	u := url.URL{Scheme: "ws", Host: host, Path: SubscribeRCInfoPath, RawQuery: fmt.Sprintf("%s=%d", chainIdParamName, chainId)}
+	// create a new retry for backoff
+	retry := lib.NewRetry(uint64(time.Second.Milliseconds()), 25)
+	// until backoff fails or connection succeeds
+	for retry.WaitAndDoRetry() {
+		// log the connection
+		r.log.Infof("Connecting to rootChainId=%d @ %s", config.ChainId, u.String())
+		// dial the url
+		conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+		if err == nil {
+			// set the connection
+			r.conn = conn
+			// start the listener
+			go r.Listen()
+			// add to the manager
+			r.manager.AddSubscription(r)
+			// exit
+			return
+		}
+		r.log.Error(err.Error())
+	}
+}
+
+// Listen() begins listening on the websockets client
+func (r *RCSubscription) Listen() {
+	for {
+		// get the message from the buffer
+		_, bz, err := r.conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		// read the message into a rootChainInfo struct
+		newInfo := lib.RootChainInfo{}
+		// unmarshal proto bytes into the message
+		if err = lib.Unmarshal(bz, &newInfo); err != nil {
+			return
+		}
+		// log the receipt of the root-chain info
+		r.log.Infof("Received new root chain info height=%d", newInfo.Height)
+		// thread safety
+		r.manager.l.Lock()
+		// update the root chain info
+		r.Info = newInfo
+		// execute the callback
+		r.manager.afterRCUpdate(newInfo)
+		// release
+		r.manager.l.Unlock()
+	}
+}
+
+// Add() adds the client to the manager
+func (r *RCManager) AddSubscription(subscription *RCSubscription) {
+	// lock for thread safety
+	r.l.Lock()
+	defer r.l.Unlock()
+	// add to the map
+	r.subscriptions[subscription.chainId] = subscription
+}
+
+// RemoveSubscription() gracefully deletes a RC subscription
+func (r *RCManager) RemoveSubscription(chainId uint64) {
+	// lock for thread safety
+	r.l.Lock()
+	defer r.l.Unlock()
+	// remove from the map
+	delete(r.subscriptions, chainId)
+	// check if the chainId == a configured root chain
+	for _, rc := range r.c.RootChain {
+		// if found
+		if rc.ChainId == chainId {
+			// re-dial
+			r.NewSubscription(rc)
+			// exit
+			return
+		}
+	}
+}
+
+// Stop() stops the client
+func (r *RCSubscription) Stop(err error) {
+	// log the error
+	r.log.Errorf("WS Failed with err: %s", err.Error())
+	// close the connection
+	if err = r.conn.Close(); err != nil {
+		r.log.Error(err.Error())
+	}
+	// remove from the manager
+	r.manager.RemoveSubscription(r.chainId)
+}
+
+// SUBSCRIBER CODE BELOW (INBOUND)
+
+// RCSubscriber (Root Chain Subscriber) implements an efficient publishing service to nested chain subscribers
+type RCSubscriber struct {
+	chainId uint64          // the chain id of the publisher
+	manager *RCManager      // a reference to the manager of the ws clients
+	conn    *websocket.Conn // the underlying ws connection
+	log     lib.LoggerI     // stdout log
+}
+
+// WebSocket() upgrades a http request to a websockets connection
+func (s *Server) WebSocket(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	_ = w.(http.Hijacker)
+	// upgrade the connection to websockets
+	conn, err := s.rcManager.upgrader.Upgrade(w, r, nil)
+	// if an error occurred during the upgrade
+	if err != nil {
+		// write the internal server error
+		write(w, err, http.StatusInternalServerError)
+		// log the issue
+		s.logger.Error(err.Error())
+		// exit
+		return
+	}
+	// get chain id string from the parameter
+	chainIdStr := r.URL.Query().Get(chainIdParamName)
+	// get the chain id from the string
+	chainId, err := strconv.ParseUint(chainIdStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid chain id", http.StatusBadRequest)
+		return
+	}
+	// create a new web sockets client
+	client := &RCSubscriber{
+		chainId: chainId,
+		conn:    conn,
+		manager: s.rcManager,
+		log:     s.logger,
+	}
+	// add the connection to the manager
+	s.rcManager.AddSubscriber(client)
+}
+
+// Add() adds the client to the manager
+func (r *RCManager) AddSubscriber(subscriber *RCSubscriber) {
+	// lock for thread safety
+	r.l.Lock()
+	defer r.l.Unlock()
+	// add to the map
+	r.subscribers[subscriber.chainId] = subscriber
+}
+
+// RemoveSubscriber() gracefully deletes a RC subscriber
+func (r *RCManager) RemoveSubscriber(chainId uint64) {
+	// lock for thread safety
+	r.l.Lock()
+	defer r.l.Unlock()
+	// remove from the map
+	delete(r.subscribers, chainId)
+}
+
+// Stop() stops the client
+func (r *RCSubscriber) Stop(err error) {
+	// log the error
+	r.log.Errorf("WS Failed with err: %s", err.Error())
+	// close the connection
+	if err = r.conn.Close(); err != nil {
+		r.log.Error(err.Error())
+	}
+	// remove from the manager
+	r.manager.RemoveSubscriber(r.chainId)
+}
+
+const chainIdParamName = "chainId"

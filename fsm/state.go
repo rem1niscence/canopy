@@ -330,6 +330,42 @@ func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
 	return consParams.BlockSize, nil
 }
 
+// GetRootChainInfo() returns the 'need-to-know' information for a nested chain
+func (s *StateMachine) GetRootChainInfo(id uint64) (*lib.RootChainInfo, lib.ErrorI) {
+	// get the previous state machine height
+	lastSM, err := s.TimeMachine(s.Height() - 1)
+	if err != nil {
+		return nil, err
+	}
+	// get the committee
+	validatorSet, err := s.GetCommitteeMembers(id)
+	if err != nil {
+		return nil, err
+	}
+	// get the previous committee
+	// allow an error here to have size 0 validator sets
+	lastValidatorSet, _ := lastSM.GetCommitteeMembers(id)
+	// get the delegate lottery winner
+	lotteryWinner, err := s.LotteryWinner(id)
+	if err != nil {
+		return nil, err
+	}
+	// get the order book
+	orders, err := s.GetOrderBook(id)
+	if err != nil {
+		return nil, err
+	}
+	// return the root chain info
+	return &lib.RootChainInfo{
+		RootChainId:      s.Config.ChainId,
+		Height:           s.height,
+		ValidatorSet:     validatorSet.ValidatorSet,
+		LastValidatorSet: lastValidatorSet.ValidatorSet,
+		LotteryWinner:    lotteryWinner,
+		Orders:           orders,
+	}, nil
+}
+
 // Copy() makes a clone of the state machine
 // this feature is used in mempool operation to be able to maintain a parallel ephemeral state without affecting the underlying state machine
 func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {

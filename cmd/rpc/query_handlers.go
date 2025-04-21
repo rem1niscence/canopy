@@ -215,37 +215,7 @@ func (s *Server) Checkpoint(w http.ResponseWriter, r *http.Request, _ httprouter
 func (s *Server) RootChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	// Invoke helper with the HTTP request, response writer and an inline callback
 	s.heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
-		// get the previous state machine height
-		lastSM, err := s.TimeMachine(s.Height() - 1)
-		if err != nil {
-			return nil, err
-		}
-		// get the committee
-		validatorSet, err := s.GetCommitteeMembers(id)
-		if err != nil {
-			return nil, err
-		}
-		// get the previous committee
-		// allow an error here to have size 0 validator sets
-		lastValidatorSet, _ := lastSM.GetCommitteeMembers(id)
-		// get the delegate lottery winner
-		lotteryWinner, err := s.LotteryWinner(id)
-		if err != nil {
-			return nil, err
-		}
-		// get the order book
-		orders, err := s.GetOrderBook(id)
-		if err != nil {
-			return nil, err
-		}
-		return &lib.RootChainInfo{
-			RootChainId:      s.Config.ChainId,
-			Height:           s.Height(),
-			ValidatorSet:     validatorSet,
-			LastValidatorSet: lastValidatorSet,
-			LotteryWinner:    lotteryWinner,
-			Orders:           orders,
-		}, nil
+		return s.GetRootChainInfo(id)
 	})
 }
 
