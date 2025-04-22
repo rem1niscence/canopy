@@ -883,5 +883,5 @@ const (
 	RoundInterrupt = lib.Phase_ROUND_INTERRUPT
 	Pacemaker      = lib.Phase_PACEMAKER
 
-	BlockTimeToVDFTargetCoefficient = .65 // how much the commit process time is reduced for VDF processing
+	BlockTimeToVDFTargetCoefficient = .50 // how much the commit process time is reduced for VDF processing
 )
