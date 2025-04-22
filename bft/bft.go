@@ -88,8 +88,6 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, rootHeight, height uint64, con
 //   - (b) Target chainId <mission accomplished, move to next height>
 func (b *BFT) Start() {
 	var err lib.ErrorI
-	// create variables to track BFTResets
-	var reset, rcReset bool
 	// load the committee from the base chain
 	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.ChainHeight()), b.Controller.RootChainHeight())
 	if err != nil {
@@ -120,9 +118,7 @@ func (b *BFT) Start() {
 					b.NewHeight(false)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
-					if !reset {
-						b.NewHeight(true)
-					}
+					b.NewHeight(true)
 				}
 				// set the wait timers to start consensus
 				b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
