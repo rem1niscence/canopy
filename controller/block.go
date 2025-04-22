@@ -81,7 +81,7 @@ func (c *Controller) ListenForBlock() {
 			c.GossipBlock(qc, sender)
 			c.log.Debugf("ListenForBlock -> Reset BFT: %d", len(c.Consensus.ResetBFT))
 			// signal a reset to the bft module
-			c.Consensus.ResetBFT <- bft.ResetBFT{WaitTime: time.Duration(c.Config.RootChainPollMS) * time.Millisecond, ProcessTime: time.Since(startTime)}
+			c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
 		}()
 		// if quit signaled
 		if quit {
@@ -309,7 +309,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 			continue
 		}
 		// publish root chain information
-		c.RCManager.Publish(id, info)
+		go c.RCManager.Publish(id, info)
 	}
 	// update telemetry
 	c.UpdateTelemetry(block, time.Since(start))

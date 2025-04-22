@@ -35,7 +35,7 @@ func NewRCManager(controller *controller.Controller, c lib.Config, l lib.LoggerI
 		c:             c,
 		subscriptions: make(map[uint64]*RCSubscription),
 		subscribers:   make(map[uint64]*RCSubscriber),
-		l:             sync.Mutex{},
+		l:             controller.Mutex,
 		afterRCUpdate: controller.UpdateRootChainInfo,
 		upgrader:      websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }},
 		log:           l,
@@ -62,9 +62,6 @@ func (r *RCManager) Publish(chainId uint64, info *lib.RootChainInfo) {
 	if err != nil {
 		return
 	}
-	// thread safety
-	r.l.Lock()
-	defer r.l.Unlock()
 	// for each ws client
 	for _, subscriber := range r.subscribers {
 		// skip if not this chain id
@@ -80,8 +77,6 @@ func (r *RCManager) Publish(chainId uint64, info *lib.RootChainInfo) {
 
 // ChainIds() returns a list of chainIds for subscribers
 func (r *RCManager) ChainIds() (list []uint64) {
-	r.l.Lock()
-	defer r.l.Unlock()
 	// de-duplicate the results
 	deDupe := lib.NewDeDuplicator[uint64]()
 	// for each client
@@ -96,9 +91,6 @@ func (r *RCManager) ChainIds() (list []uint64) {
 
 // GetHeight() returns the height from the root-chain
 func (r *RCManager) GetHeight(rootChainId uint64) uint64 {
-	// lock for thread safety
-	r.l.Lock()
-	defer r.l.Unlock()
 	// check the map to see if the info exists
 	if sub, found := r.subscriptions[rootChainId]; found {
 		// exit with the height of the root-chain-info
@@ -131,9 +123,6 @@ func (r *RCManager) GetRootChainInfo(rootChainId, chainId uint64) (rootChainInfo
 
 // GetValidatorSet() returns the validator set from the root-chain
 func (r *RCManager) GetValidatorSet(rootChainId, id, rootHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
-	// lock for thread safety
-	r.l.Lock()
-	defer r.l.Unlock()
 	// if the root chain id is the same as the info
 	sub, found := r.subscriptions[rootChainId]
 	if !found {
@@ -158,9 +147,6 @@ func (r *RCManager) GetValidatorSet(rootChainId, id, rootHeight uint64) (lib.Val
 
 // GetOrders() returns the order book from the root-chain
 func (r *RCManager) GetOrders(rootChainId, rootHeight, id uint64) (*lib.OrderBook, lib.ErrorI) {
-	// lock for thread safety
-	r.l.Lock()
-	defer r.l.Unlock()
 	// if the root chain id is the same as the info
 	sub, found := r.subscriptions[rootChainId]
 	if !found {
@@ -232,9 +218,6 @@ func (r *RCManager) GetCheckpoint(rootChainId, height, chainId uint64) (blockHas
 
 // GetLotteryWinner() returns the winner of the delegate lottery from the root-chain
 func (r *RCManager) GetLotteryWinner(rootChainId, height, id uint64) (*lib.LotteryWinner, lib.ErrorI) {
-	// lock for thread safety
-	r.l.Lock()
-	defer r.l.Unlock()
 	// if the root chain id is the same as the info
 	sub, found := r.subscriptions[rootChainId]
 	if !found {
@@ -333,16 +316,18 @@ func (r *RCSubscription) Listen() {
 		// get the message from the buffer
 		_, bz, err := r.conn.ReadMessage()
 		if err != nil {
+			r.Stop(err)
 			return
 		}
 		// read the message into a rootChainInfo struct
 		newInfo := lib.RootChainInfo{}
 		// unmarshal proto bytes into the message
 		if err = lib.Unmarshal(bz, &newInfo); err != nil {
+			r.Stop(err)
 			return
 		}
 		// log the receipt of the root-chain info
-		r.log.Infof("Received new root chain info height=%d", newInfo.Height)
+		r.log.Infof("Received info from RootChainId=%d and Height=%d", newInfo.RootChainId, newInfo.Height)
 		// thread safety
 		r.manager.l.Lock()
 		// update the root chain info

@@ -143,24 +143,21 @@ func (c *Controller) Stop() {
 func (c *Controller) UpdateRootChainInfo(info lib.RootChainInfo) {
 	c.log.Debugf("Updating root chain info")
 	defer lib.TimeTrack("UpdateRootChainInfo", time.Now())
-	// lock the controller for thread safety
-	c.Lock()
-	// unlock when the function completes
-	defer c.Unlock()
 	// ensure this root chain is active
 	activeRootChainId, _ := c.FSM.GetRootChainId()
 	// if inactive
 	if activeRootChainId != info.RootChainId {
+		c.log.Debugf("Detected inactive root-chain update at rootChainId=%d", info.RootChainId)
 		return
 	}
 	// if the last validator set is empty
 	if info.LastValidatorSet == nil || len(info.LastValidatorSet.ValidatorSet) == 0 {
 		// signal to reset consensus and start a new height
-		c.Consensus.ResetBFT <- bft.ResetBFT{WaitTime: time.Duration(c.Config.RootChainPollMS) * time.Millisecond, IsRootChainUpdate: false}
+		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: false}
 	} else {
 		c.log.Debugf("UpdateRootChainInfo -> Reset BFT: %d", len(c.Consensus.ResetBFT))
 		// signal to reset consensus
-		c.Consensus.ResetBFT <- bft.ResetBFT{WaitTime: time.Duration(c.Config.RootChainPollMS) * time.Millisecond, IsRootChainUpdate: true}
+		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: true}
 	}
 	// update the peer 'must connect'
 	c.UpdateP2PMustConnect(info.ValidatorSet)
