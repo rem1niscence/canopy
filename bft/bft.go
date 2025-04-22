@@ -103,16 +103,6 @@ func (b *BFT) Start() {
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
-				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
-				// else increment the height and don't maintain locks
-				switch {
-				case reset:
-					b.NewHeight(false)
-					reset = false
-				case rcReset:
-					b.NewHeight(true)
-					rcReset = false
-				}
 				// handle the phase
 				b.HandlePhase()
 			}()
@@ -123,20 +113,19 @@ func (b *BFT) Start() {
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
-				// log if a root-chain update
+				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
+				// else increment the height and don't maintain locks
 				if !resetBFT.IsRootChainUpdate {
 					b.log.Info("Reset BFT (NEW_HEIGHT)")
-					// ensure only a NH reset exists
-					rcReset, reset = false, true
+					b.NewHeight(false)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
-					// only flag a NC reset if no NH reset triggered
 					if !reset {
-						rcReset = true
+						b.NewHeight(true)
 					}
 				}
 				// set the wait timers to start consensus
-				b.SetWaitTimers(resetBFT.WaitTime, resetBFT.ProcessTime)
+				b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
 			}()
 		}
 	}
@@ -883,7 +872,6 @@ type (
 
 type ResetBFT struct {
 	IsRootChainUpdate bool
-	WaitTime          time.Duration
 	ProcessTime       time.Duration
 }
 

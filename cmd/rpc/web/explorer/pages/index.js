@@ -44,6 +44,7 @@ export default function Home() {
         }
 
         const consensusDuration =
+          settledValues[2].newHeightTimeoutMS +
           settledValues[2].electionTimeoutMS +
           settledValues[2].electionVoteTimeoutMS +
           settledValues[2].proposeTimeoutMS +
