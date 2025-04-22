@@ -126,10 +126,14 @@ func (b *BFT) Start() {
 				// log if a root-chain update
 				if !resetBFT.IsRootChainUpdate {
 					b.log.Info("Reset BFT (NEW_HEIGHT)")
-					reset = true
+					// ensure only a NH reset exists
+					rcReset, reset = false, true
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
-					rcReset = true
+					// only flag a NC reset if no NH reset triggered
+					if !reset {
+						rcReset = true
+					}
 				}
 				// set the wait timers to start consensus
 				b.SetWaitTimers(resetBFT.WaitTime, resetBFT.ProcessTime)
