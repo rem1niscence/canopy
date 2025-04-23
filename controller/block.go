@@ -306,7 +306,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		info, e := c.FSM.GetRootChainInfo(id)
 		if e != nil {
 			// don't log 'no-validators' error as this is possible
-			if e != lib.ErrNoValidators() {
+			if e.Error() != lib.ErrNoValidators().Error() {
 				c.log.Error(e.Error())
 			}
 			continue
