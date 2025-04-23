@@ -25,7 +25,7 @@ type RCManager struct {
 	l             sync.Mutex                   // thread safety
 	afterRCUpdate func(info lib.RootChainInfo) // callback after the root chain info update
 	upgrader      websocket.Upgrader           // upgrade http connection to ws
-	log           lib.LoggerI                  // stout log
+	log           lib.LoggerI                  // stdout log
 }
 
 // NewRCManager() constructs a new instance of a RCManager
