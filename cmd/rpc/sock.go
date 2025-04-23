@@ -293,8 +293,8 @@ func (r *RCSubscription) dialWithBackoff(chainId uint64, config lib.RootChain) {
 		// log the connection
 		r.log.Infof("Connecting to rootChainId=%d @ %s", config.ChainId, u.String())
 		// dial the url
-		conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
-		if err == nil {
+		conn, _, e := websocket.DefaultDialer.Dial(u.String(), nil)
+		if e == nil {
 			// set the connection
 			r.conn = conn
 			// start the listener
@@ -304,7 +304,7 @@ func (r *RCSubscription) dialWithBackoff(chainId uint64, config lib.RootChain) {
 			// exit
 			return
 		}
-		r.log.Error(err.Error())
+		r.log.Error(e.Error())
 	}
 }
 
