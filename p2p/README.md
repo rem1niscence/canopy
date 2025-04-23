@@ -118,6 +118,8 @@ The P2P system uses multiplexing to allow multiple independent communication cha
 
 This approach is similar to how a single phone line can carry multiple conversations using different frequencies. By multiplexing, the system can efficiently handle different types of messages without needing separate connections for each type, reducing overhead and improving performance.
 
+It's important to note that this multiplexing is implemented entirely in our application code logic, not relying on transport-level multiplexing like HTTP/2. This gives us complete control over the multiplexing behavior and allows us to optimize it specifically for our blockchain network requirements.
+
 ### Encryption Protocol
 
 The P2P system uses a robust encryption protocol to secure all communications:
