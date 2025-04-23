@@ -305,7 +305,10 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// get the root chain info
 		info, e := c.FSM.GetRootChainInfo(id)
 		if e != nil {
-			c.log.Error(e.Error())
+			// don't log 'no-validators' error as this is possible
+			if e != lib.ErrNoValidators() {
+				c.log.Error(e.Error())
+			}
 			continue
 		}
 		// publish root chain information

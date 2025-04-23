@@ -430,7 +430,6 @@ func ErrNewMultiPubKey(err error) ErrorI {
 }
 
 func ErrNoValidators() ErrorI {
-	PrintStackTrace()
 	return NewError(CodeNoValidators, MainModule, fmt.Sprintf("there are no validators in the set"))
 }
 
