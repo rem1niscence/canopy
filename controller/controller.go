@@ -29,10 +29,10 @@ type Controller struct {
 	Consensus *bft.BFT          // the async consensus process between the committee members for the chain
 	P2P       *p2p.P2P          // the P2P module the node uses to connect to the network
 
-	RCManager  lib.RCManagerI // the rpc client for the 'root chain'
-	isSyncing  *atomic.Bool   // is the chain currently being downloaded from peers
-	log        lib.LoggerI    // object for logging
-	sync.Mutex                // mutex for thread safety
+	RCManager   lib.RCManagerI // the data manager for the 'root chain'
+	isSyncing   *atomic.Bool   // is the chain currently being downloaded from peers
+	log         lib.LoggerI    // object for logging
+	*sync.Mutex                // mutex for thread safety
 }
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
@@ -64,7 +64,7 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 		P2P:        p2p.New(valKey, maxMembersPerCommittee, metrics, c, l),
 		isSyncing:  &atomic.Bool{},
 		log:        l,
-		Mutex:      sync.Mutex{},
+		Mutex:      &sync.Mutex{},
 	}
 	// initialize the consensus in the controller, passing a reference to itself
 	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, c.RunVDF, metrics, l)
@@ -140,7 +140,7 @@ func (c *Controller) Stop() {
 // ROOT CHAIN CALLS BELOW
 
 // UpdateRootChainInfo() receives updates from the root-chain thread
-func (c *Controller) UpdateRootChainInfo(info lib.RootChainInfo) {
+func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 	c.log.Debugf("Updating root chain info")
 	defer lib.TimeTrack("UpdateRootChainInfo", time.Now())
 	// ensure this root chain is active

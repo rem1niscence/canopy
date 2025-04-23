@@ -17,31 +17,33 @@ import (
 
 var _ lib.RCManagerI = new(RCManager)
 
+const chainIdParamName = "chainId"
+
 // RCManager handles a group of root-chain sock clients
 type RCManager struct {
-	c             lib.Config                   // the global node config
-	subscriptions map[uint64]*RCSubscription   // chainId -> subscription
-	subscribers   map[uint64]*RCSubscriber     // chainId -> subscriber
-	l             sync.Mutex                   // thread safety
-	afterRCUpdate func(info lib.RootChainInfo) // callback after the root chain info update
-	upgrader      websocket.Upgrader           // upgrade http connection to ws
-	log           lib.LoggerI                  // stout log
+	c             lib.Config                    // the global node config
+	subscriptions map[uint64]*RCSubscription    // chainId -> subscription
+	subscribers   map[uint64]*RCSubscriber      // chainId -> subscriber
+	l             *sync.Mutex                   // thread safety
+	afterRCUpdate func(info *lib.RootChainInfo) // callback after the root chain info update
+	upgrader      websocket.Upgrader            // upgrade http connection to ws
+	log           lib.LoggerI                   // stout log
 }
 
 // NewRCManager() constructs a new instance of a RCManager
-func NewRCManager(controller *controller.Controller, c lib.Config, l lib.LoggerI) (man *RCManager) {
+func NewRCManager(controller *controller.Controller, config lib.Config, logger lib.LoggerI) (manager *RCManager) {
 	// create the manager
-	man = &RCManager{
-		c:             c,
+	manager = &RCManager{
+		c:             config,
 		subscriptions: make(map[uint64]*RCSubscription),
 		subscribers:   make(map[uint64]*RCSubscriber),
 		l:             controller.Mutex,
 		afterRCUpdate: controller.UpdateRootChainInfo,
 		upgrader:      websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }},
-		log:           l,
+		log:           logger,
 	}
 	// set the manager in the controller
-	controller.RCManager = man
+	controller.RCManager = manager
 	// exit
 	return
 }
@@ -116,7 +118,7 @@ func (r *RCManager) GetRootChainInfo(rootChainId, chainId uint64) (rootChainInfo
 		return nil, err
 	}
 	// update the info
-	sub.Info = *info
+	sub.Info = info
 	// exit with the info
 	return
 }
@@ -195,8 +197,6 @@ func (r *RCManager) IsValidDoubleSigner(rootChainId, height uint64, address stri
 		// exit with 'not subscribed' error
 		return nil, lib.ErrNotSubscribed()
 	}
-	// warn of the remote RPC call to the API of the 'root chain'
-	r.log.Warnf("Executing remote IsValidDoubleSigner call for address=%s at double sign height=%d and rootChainId=%d", address, height, rootChainId)
 	// exit with the results of the remote RPC call to the API of the 'root chain'
 	return sub.IsValidDoubleSigner(height, address)
 }
@@ -210,8 +210,6 @@ func (r *RCManager) GetCheckpoint(rootChainId, height, chainId uint64) (blockHas
 		// exit with 'not subscribed' error
 		return nil, lib.ErrNotSubscribed()
 	}
-	// warn of the remote RPC call to the API of the 'root chain'
-	r.log.Warnf("Executing remote GetCheckpoint call for height=%d and chainId=%d and rootChainId=%d", height, chainId, rootChainId)
 	// exit with the results of the remote RPC call to the API of the 'root chain'
 	return sub.Checkpoint(height, chainId)
 }
@@ -250,12 +248,12 @@ func (r *RCManager) Transaction(rootChainId uint64, tx lib.TransactionI) (hash *
 
 // RCSubscription (Root Chain Subscription) implements an efficient subscription to root chain info
 type RCSubscription struct {
-	chainId uint64            // the chain id of the subscription
-	Info    lib.RootChainInfo // root-chain info cached from the publisher
-	manager *RCManager        // a reference to the manager of the ws clients
-	conn    *websocket.Conn   // the underlying ws connection
-	*Client                   // use http for 'on-demand' requests
-	log     lib.LoggerI       // stdout log
+	chainId uint64             // the chain id of the subscription
+	Info    *lib.RootChainInfo // root-chain info cached from the publisher
+	manager *RCManager         // a reference to the manager of the ws clients
+	conn    *websocket.Conn    // the underlying ws connection
+	*Client                    // use http for 'on-demand' requests
+	log     lib.LoggerI        // stdout log
 }
 
 // Dial() dials a root chain via ws
@@ -263,7 +261,7 @@ func (r *RCManager) NewSubscription(rc lib.RootChain) {
 	// create a new web socket client
 	client := &RCSubscription{
 		chainId: rc.ChainId,
-		Info:    lib.RootChainInfo{},
+		Info:    new(lib.RootChainInfo),
 		manager: r,
 		Client:  NewClient(rc.Url, rc.Url),
 		log:     r.log,
@@ -320,9 +318,9 @@ func (r *RCSubscription) Listen() {
 			return
 		}
 		// read the message into a rootChainInfo struct
-		newInfo := lib.RootChainInfo{}
+		newInfo := new(lib.RootChainInfo)
 		// unmarshal proto bytes into the message
-		if err = lib.Unmarshal(bz, &newInfo); err != nil {
+		if err = lib.Unmarshal(bz, newInfo); err != nil {
 			r.Stop(err)
 			return
 		}
@@ -451,5 +449,3 @@ func (r *RCSubscriber) Stop(err error) {
 	// remove from the manager
 	r.manager.RemoveSubscriber(r.chainId)
 }
-
-const chainIdParamName = "chainId"
