@@ -70,7 +70,7 @@ func (r *RCManager) Publish(chainId uint64, info *lib.RootChainInfo) {
 		}
 		// publish to each client
 		if e := subscriber.conn.WriteMessage(websocket.BinaryMessage, protoBytes); e != nil {
-			subscriber.Stop(err)
+			subscriber.Stop(e)
 		}
 	}
 }
