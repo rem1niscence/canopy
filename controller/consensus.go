@@ -60,11 +60,12 @@ func getRandomAllowedPeer(peers []string, limiter *lib.SimpleLimiter) string {
 // Sync() downloads the blockchain from peers until 'synced' to the latest 'height'
 // 1) Get the height and begin block params from the state_machine
 // 2) Get peer max_height from P2P
-// 3) Ask peers for a block at a time
-// 4) CheckBasic each block by checking if cert was signed by +2/3 maj (COMMIT message)
-// 5) Commit block against the state machine, if error fatal
-// 5) Do this until reach the max-peer-height
-// 6) Stay on top by listening to incoming cert messages
+// 3) Fill a queue of blocks by requesting them from randomly chosen peers
+// 4) When available, process next block from queue
+// 5) CheckBasic each block by checking if cert was signed by +2/3 maj (COMMIT message)
+// 6) Commit block against the state machine, if error fatal
+// 7) Do this until reach the max-peer-height
+// 8) Stay on top by listening to incoming cert messages
 func (c *Controller) Sync() {
 	// log the initialization of the syncing process
 	c.log.Infof("Sync started 🔄 for committee %d", c.Config.ChainId)
