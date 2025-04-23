@@ -129,7 +129,7 @@ const (
 	CodeInvalidValidatorIndex           ErrorCode = 31
 	CodeUnableToAddSigner               ErrorCode = 32
 	CodeEmptyMessage                    ErrorCode = 33
-	CodeInvalidBlockTime                ErrorCode = 34
+	CodeNotSubscribed                   ErrorCode = 34
 	CodeInvalidEvidence                 ErrorCode = 35
 	CodeMismatchEvidenceAndHeader       ErrorCode = 36
 	CodeInvalidTxTime                   ErrorCode = 37
@@ -505,8 +505,8 @@ func ErrInvalidValidatorIndex() ErrorI {
 	return NewError(CodeInvalidValidatorIndex, ConsensusModule, "invalid validator index")
 }
 
-func ErrInvalidBlockTime() ErrorI {
-	return NewError(CodeInvalidBlockTime, ConsensusModule, "invalid block time")
+func ErrNotSubscribed() ErrorI {
+	return NewError(CodeNotSubscribed, ConsensusModule, "not subscribed")
 }
 
 func ErrInvalidTxHeight() ErrorI {

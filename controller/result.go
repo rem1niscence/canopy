@@ -51,17 +51,8 @@ func (c *Controller) SendCertificateResultsTx(qc *lib.QuorumCertificate) {
 		// exit
 		return
 	}
-	// get a rpc client for the root chain id
-	rpcClient, err := c.RootChainInfo.GetRemoteCallbacks(rootChainId)
-	// if an error occurred getting the callback
-	if err != nil {
-		// log the error
-		c.log.Errorf("Creating auto-certificate-results-txn failed with err: %s", err.Error())
-		// exit
-		return
-	}
 	// handle the transaction on the root-chain
-	hash, err := rpcClient.Transaction(tx)
+	hash, err := c.RCManager.Transaction(rootChainId, tx)
 	// if an error occurred during the tx submission
 	if err != nil {
 		// log the error

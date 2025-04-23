@@ -94,8 +94,6 @@ func Start() {
 	}
 	// initialize the rpc server
 	rpcServer := rpc.NewServer(app, config, l)
-	// set the remote callbacks
-	app.RootChainInfo.GetRemoteCallbacks = rpcServer.RemoteCallbacks
 	// start the metrics server
 	metrics.Start()
 	// start the application

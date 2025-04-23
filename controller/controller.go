@@ -29,10 +29,10 @@ type Controller struct {
 	Consensus *bft.BFT          // the async consensus process between the committee members for the chain
 	P2P       *p2p.P2P          // the P2P module the node uses to connect to the network
 
-	RootChainInfo lib.RootChainInfo // the latest information from the 'root chain'
-	isSyncing     *atomic.Bool      // is the chain currently being downloaded from peers
-	log           lib.LoggerI       // object for logging
-	sync.Mutex                      // mutex for thread safety
+	RCManager   lib.RCManagerI // the data manager for the 'root chain'
+	isSyncing   *atomic.Bool   // is the chain currently being downloaded from peers
+	log         lib.LoggerI    // object for logging
+	*sync.Mutex                // mutex for thread safety
 }
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
@@ -53,19 +53,18 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 	}
 	// create the controller
 	controller = &Controller{
-		Address:       valKey.PublicKey().Address().Bytes(),
-		PublicKey:     valKey.PublicKey().Bytes(),
-		PrivateKey:    valKey,
-		Config:        c,
-		Metrics:       metrics,
-		FSM:           fsm,
-		Mempool:       mempool,
-		Consensus:     nil,
-		P2P:           p2p.New(valKey, maxMembersPerCommittee, metrics, c, l),
-		RootChainInfo: lib.RootChainInfo{Log: l},
-		isSyncing:     &atomic.Bool{},
-		log:           l,
-		Mutex:         sync.Mutex{},
+		Address:    valKey.PublicKey().Address().Bytes(),
+		PublicKey:  valKey.PublicKey().Bytes(),
+		PrivateKey: valKey,
+		Config:     c,
+		Metrics:    metrics,
+		FSM:        fsm,
+		Mempool:    mempool,
+		Consensus:  nil,
+		P2P:        p2p.New(valKey, maxMembersPerCommittee, metrics, c, l),
+		isSyncing:  &atomic.Bool{},
+		log:        l,
+		Mutex:      &sync.Mutex{},
 	}
 	// initialize the consensus in the controller, passing a reference to itself
 	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, c.RunVDF, metrics, l)
@@ -80,6 +79,10 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 
 // Start() begins the Controller service
 func (c *Controller) Start() {
+	rootChainId, err := c.FSM.GetRootChainId()
+	if err != nil {
+		c.log.Fatal(err.Error())
+	}
 	// in a non-blocking sub-function
 	go func() {
 		// start the P2P module
@@ -92,10 +95,12 @@ func (c *Controller) Start() {
 		defer t.Stop()
 		// each time the timer fires
 		for range t.C {
-			// if the root chain height is updated
-			if c.RootChainInfo.GetHeight() != 0 {
+			// get the root chain info from the rpc
+			_, e := c.RCManager.GetRootChainInfo(rootChainId, c.Config.ChainId)
+			if e == nil {
 				break
 			}
+			c.log.Error(e.Error()) // log error but continue
 		}
 		// start internal Controller listeners for P2P
 		c.StartListeners()
@@ -138,18 +143,15 @@ func (c *Controller) Stop() {
 func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 	c.log.Debugf("Updating root chain info")
 	defer lib.TimeTrack("UpdateRootChainInfo", time.Now())
-	// lock the controller for thread safety
-	c.Lock()
-	// unlock when the function completes
-	defer c.Unlock()
-	// use the logger from the controller
-	info.Log = c.RootChainInfo.Log
-	// use the get remote callback 'callback' from the controller
-	info.GetRemoteCallbacks = c.RootChainInfo.GetRemoteCallbacks
-	// update the root chain info
-	c.RootChainInfo = *info
+	// ensure this root chain is active
+	activeRootChainId, _ := c.FSM.GetRootChainId()
+	// if inactive
+	if activeRootChainId != info.RootChainId {
+		c.log.Debugf("Detected inactive root-chain update at rootChainId=%d", info.RootChainId)
+		return
+	}
 	// if the last validator set is empty
-	if info.LastValidatorSet.NumValidators == 0 {
+	if info.LastValidatorSet == nil || len(info.LastValidatorSet.ValidatorSet) == 0 {
 		// signal to reset consensus and start a new height
 		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: false}
 	} else {
@@ -158,17 +160,17 @@ func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: true}
 	}
 	// update the peer 'must connect'
-	c.UpdateP2PMustConnect()
+	c.UpdateP2PMustConnect(info.ValidatorSet)
 }
 
 // LoadCommittee() gets the ValidatorSet that is authorized to come to Consensus agreement on the Proposal for a specific height/chainId
 func (c *Controller) LoadCommittee(rootChainId, rootHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
-	return c.RootChainInfo.GetValidatorSet(rootChainId, c.Config.ChainId, rootHeight)
+	return c.RCManager.GetValidatorSet(rootChainId, c.Config.ChainId, rootHeight)
 }
 
 // LoadRootChainOrderBook() gets the order book from the root-chain
 func (c *Controller) LoadRootChainOrderBook(rootHeight uint64) (*lib.OrderBook, lib.ErrorI) {
-	return c.RootChainInfo.GetOrders(c.LoadRootChainId(c.ChainHeight()), rootHeight, c.Config.ChainId)
+	return c.RCManager.GetOrders(c.LoadRootChainId(c.ChainHeight()), rootHeight, c.Config.ChainId)
 }
 
 // GetRootChainLotteryWinner() gets the pseudorandomly selected delegate to reward and their cut
@@ -181,13 +183,13 @@ func (c *Controller) GetRootChainLotteryWinner(rootHeight uint64) (winner *lib.L
 		return nil, err
 	}
 	// execute the remote call
-	return c.RootChainInfo.GetLotteryWinner(rootChainId, rootHeight, c.Config.ChainId)
+	return c.RCManager.GetLotteryWinner(rootChainId, rootHeight, c.Config.ChainId)
 }
 
 // IsValidDoubleSigner() checks if the double signer is valid at a certain double sign height
 func (c *Controller) IsValidDoubleSigner(rootHeight uint64, address []byte) bool {
 	// do a remote call to the root chain to see if the double signer is valid
-	isValidDoubleSigner, err := c.RootChainInfo.IsValidDoubleSigner(c.LoadRootChainId(c.ChainHeight()), rootHeight, lib.BytesToString(address))
+	isValidDoubleSigner, err := c.RCManager.IsValidDoubleSigner(c.LoadRootChainId(c.ChainHeight()), rootHeight, lib.BytesToString(address))
 	// if an error occurred during the remote call
 	if err != nil {
 		// log the error
@@ -294,7 +296,10 @@ func (c *Controller) LoadCommitteeData() (data *lib.CommitteeData, err lib.Error
 func (c *Controller) Syncing() *atomic.Bool { return c.isSyncing }
 
 // RootChainHeight() returns the height of the canopy root-chain
-func (c *Controller) RootChainHeight() uint64 { return c.RootChainInfo.GetHeight() }
+func (c *Controller) RootChainHeight() uint64 {
+	chainId, _ := c.FSM.GetRootChainId()
+	return c.RCManager.GetHeight(chainId)
+}
 
 // ChainHeight() returns the height of this target chain
 func (c *Controller) ChainHeight() uint64 { return c.FSM.Height() }

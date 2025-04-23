@@ -95,12 +95,13 @@ func (b *BFT) Start() {
 	}
 	for {
 		select {
-		// PHASE TIMEOUT
+		// EXECUTE PHASE
 		// - This triggers when the phase's sleep time has expired, indicating that all expected messages for this phase should have already been received
 		case <-b.PhaseTimer.C:
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
+				// handle the phase
 				b.HandlePhase()
 			}()
 
@@ -108,22 +109,19 @@ func (b *BFT) Start() {
 		// - This triggers when receiving a new Commit Block (QC) from either root-chainId (a) or the Target-ChainId (b)
 		case resetBFT := <-b.ResetBFT:
 			func() {
-				defer lib.TimeTrack(fmt.Sprintf("BFT.Start.Reset(), %d", len(b.ResetBFT)), time.Now())
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
 				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
 				// else increment the height and don't maintain locks
-				b.NewHeight(resetBFT.IsRootChainUpdate)
-				// if not a base chain update, reset the timers
 				if !resetBFT.IsRootChainUpdate {
 					b.log.Info("Reset BFT (NEW_HEIGHT)")
-					// start BFT over
+					b.NewHeight(false)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
-					// start BFT over after sleeping RootChainPollMS
-					// add poll ms wait here to ensure ample time for all nested chains to be updated
+					b.NewHeight(true)
 				}
-				b.SetWaitTimers(time.Duration(b.Config.RootChainPollMS)*time.Millisecond, resetBFT.ProcessTime)
+				// set the wait timers to start consensus
+				b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
 			}()
 		}
 	}
@@ -647,7 +645,7 @@ func (b *BFT) SetTimerForNextPhase(processTime time.Duration) {
 	default:
 		b.Phase++
 	case CommitProcess:
-		// no op
+		return // don't set a timer
 	case Pacemaker:
 		b.Phase = Election
 	}
@@ -755,7 +753,7 @@ func (b *BFT) SelfIsValidator() bool {
 // RunVDF() runs the verifiable delay service
 func (b *BFT) RunVDF(seed []byte) (err lib.ErrorI) {
 	if !b.Config.RunVDF {
-		b.log.Infof("RunVDF enabled in RunVDF")
+		b.log.Infof("VDF enabled")
 		return
 	}
 	// if the vdf seed is nil
@@ -885,5 +883,5 @@ const (
 	RoundInterrupt = lib.Phase_ROUND_INTERRUPT
 	Pacemaker      = lib.Phase_PACEMAKER
 
-	BlockTimeToVDFTargetCoefficient = .65 // how much the commit process time is reduced for VDF processing
+	BlockTimeToVDFTargetCoefficient = .50 // how much the commit process time is reduced for VDF processing
 )
