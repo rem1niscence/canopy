@@ -142,7 +142,7 @@ func (c *Controller) Stop() {
 // UpdateRootChainInfo() receives updates from the root-chain thread
 func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 	c.log.Debugf("Updating root chain info")
-	defer lib.TimeTrack("UpdateRootChainInfo", time.Now())
+	//defer lib.TimeTrack(c.log, time.Now())
 	// ensure this root chain is active
 	activeRootChainId, _ := c.FSM.GetRootChainId()
 	// if inactive
@@ -155,7 +155,6 @@ func (c *Controller) UpdateRootChainInfo(info *lib.RootChainInfo) {
 		// signal to reset consensus and start a new height
 		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: false}
 	} else {
-		c.log.Debugf("UpdateRootChainInfo -> Reset BFT: %d", len(c.Consensus.ResetBFT))
 		// signal to reset consensus
 		c.Consensus.ResetBFT <- bft.ResetBFT{IsRootChainUpdate: true}
 	}

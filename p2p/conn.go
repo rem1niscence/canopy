@@ -174,7 +174,7 @@ func (c *MultiConn) startSendService() {
 		case packet = <-c.streams[lib.Topic_PEERS_REQUEST].sendQueue:
 			c.sendPacket(packet, m)
 		case <-ping.C: // fires every 'pingInterval'
-			c.log.Debugf("Send Ping to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
+			//c.log.Debugf("Send Ping to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 			// send a ping to the peer
 			if err = c.sendWireBytes(new(Ping), m); err != nil {
 				break
@@ -196,7 +196,7 @@ func (c *MultiConn) startSendService() {
 				return
 			}
 			// log the pong sending
-			c.log.Debugf("Send Pong to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
+			//c.log.Debugf("Send Pong to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 			// send a pong
 			c.sendWireBytes(new(Pong), m)
 		case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
@@ -257,10 +257,10 @@ func (c *MultiConn) startReceiveService() {
 					return
 				}
 			case *Ping: // receive ping message notifies the "send" service to respond with a 'pong' message
-				c.log.Debugf("Received ping from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
+				//c.log.Debugf("Received ping from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 				c.sendPong <- struct{}{}
 			case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
-				c.log.Debugf("Received pong from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
+				//c.log.Debugf("Received pong from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 				c.receivedPong <- struct{}{}
 			default: // unknown type results in slash and exiting the service
 				c.Error(ErrUnknownP2PMsg(x), UnknownMessageSlash)
@@ -329,13 +329,12 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) (er
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
 	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
-	startTime := time.Now()
+	// debug log to remove
+	//defer lib.TimeTrack(c.log, time.Now())
 	// send the proto message wrapped in an Envelope over the wire
 	if err = sendProtoMsg(c.conn, &Envelope{Payload: a}); err != nil {
 		c.Error(err)
 	}
-	// debug log to remove
-	lib.TimeTrack("MultiConn.sendPacket's c.conn.Write", startTime)
 	// update the rate limiter with how many bytes were written
 	//m.Update(n)
 	return
@@ -414,7 +413,7 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 			Sender:  peerInfo,
 		}).WithHash()
 		// add to inbox for other parts of the app to read
-		s.logger.Debugf("inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
+		//s.logger.Debugf("Inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
 		s.inbox <- m
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]

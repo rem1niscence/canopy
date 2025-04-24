@@ -28,7 +28,7 @@ func (c *Controller) ListenForBlock() {
 		// wrap in a function call to use 'defer' functionality
 		func() {
 			c.log.Debug("Handling block message")
-			defer lib.TimeTrack("ListenForBlock", time.Now())
+			//defer lib.TimeTrack(c.log, time.Now())
 			// lock the controller to prevent multi-thread conflicts
 			c.Lock()
 			// when iteration completes, unlock
@@ -79,7 +79,6 @@ func (c *Controller) ListenForBlock() {
 			}
 			// gossip the block to our peers
 			c.GossipBlock(qc, sender)
-			c.log.Debugf("ListenForBlock -> Reset BFT: %d", len(c.Consensus.ResetBFT))
 			// signal a reset to the bft module
 			c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
 		}()
