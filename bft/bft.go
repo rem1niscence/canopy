@@ -753,7 +753,7 @@ func (b *BFT) SelfIsValidator() bool {
 // RunVDF() runs the verifiable delay service
 func (b *BFT) RunVDF(seed []byte) (err lib.ErrorI) {
 	if !b.Config.RunVDF {
-		b.log.Infof("VDF enabled")
+		b.log.Infof("VDF disabled")
 		return
 	}
 	// if the vdf seed is nil
