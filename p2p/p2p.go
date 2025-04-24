@@ -415,7 +415,6 @@ var blockedCountries = []string{
 	"LY", // Libya
 	"ML", // Mali
 	"NI", // Nicaragua
-	"PR", // Puerto Rico
 	"RU", // Russia
 	"SD", // Sudan
 	"SS", // South Sudan

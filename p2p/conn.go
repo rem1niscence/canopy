@@ -26,8 +26,8 @@ const (
 	dataFlowRatePerS       = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
 	maxMessageSize         = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
 	maxChanSize            = 1                       // maximum number of items in a channel before blocking
-	maxInboxQueueSize      = 15                      // maxinum number of items in inbox queue before blocking
-	maxStreamSendQueueSize = 15                      // maximum number of items in a stream send queue before blocking
+	maxInboxQueueSize      = 100                     // maximum number of items in inbox queue before blocking
+	maxStreamSendQueueSize = 100                     // maximum number of items in a stream send queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
@@ -50,9 +50,7 @@ const (
 	UnknownMessageSlash     = -3  // unknown message type is received
 	BadStreamSlash          = -3  // unknown stream id is received
 	InvalidTxRep            = -3  // rep slash for sending us an invalid transaction
-	NotValRep               = -3  // rep slash for sending us a validator only message but not being a validator
 	InvalidBlockRep         = -3  // rep slash for sending an invalid block (certificate) message
-	InvalidJustifyRep       = -3  // rep slash for sending an invalid certificate justification
 	BlockReqExceededRep     = -3  // rep slash for over-requesting blocks (certificates)
 	MaxMessageExceededSlash = -10 // slash for sending a 'Message (sum of Packets)' above the allowed maximum size
 )
@@ -154,7 +152,7 @@ func (c *MultiConn) startSendService() {
 		}
 	}()
 	m := limiter.New(0, 0)
-	ping, err := time.NewTicker(pingInterval), lib.ErrorI(nil)
+	ping := time.NewTicker(pingInterval)
 	pongTimer := time.NewTimer(pongTimeoutDuration)
 	var packet *Packet
 	defer func() { lib.StopTimer(pongTimer); ping.Stop(); m.Done() }()
@@ -174,11 +172,8 @@ func (c *MultiConn) startSendService() {
 		case packet = <-c.streams[lib.Topic_PEERS_REQUEST].sendQueue:
 			c.sendPacket(packet, m)
 		case <-ping.C: // fires every 'pingInterval'
-			//c.log.Debugf("Send Ping to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 			// send a ping to the peer
-			if err = c.sendWireBytes(new(Ping), m); err != nil {
-				break
-			}
+			c.sendWireBytes(new(Ping), m)
 			// reset the pong timer
 			lib.StopTimer(pongTimer)
 			// set the pong timer to execute an Error function if the timer expires before receiving a pong
@@ -195,8 +190,6 @@ func (c *MultiConn) startSendService() {
 				// exit
 				return
 			}
-			// log the pong sending
-			//c.log.Debugf("Send Pong to: %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 			// send a pong
 			c.sendWireBytes(new(Pong), m)
 		case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
@@ -257,10 +250,9 @@ func (c *MultiConn) startReceiveService() {
 					return
 				}
 			case *Ping: // receive ping message notifies the "send" service to respond with a 'pong' message
-				//c.log.Debugf("Received ping from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
+
 				c.sendPong <- struct{}{}
 			case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
-				//c.log.Debugf("Received pong from %s", lib.BytesToTruncatedString(c.Address.PublicKey))
 				c.receivedPong <- struct{}{}
 			default: // unknown type results in slash and exiting the service
 				c.Error(ErrUnknownP2PMsg(x), UnknownMessageSlash)
@@ -302,7 +294,7 @@ func (c *MultiConn) waitForAndHandleWireBytes(m *limiter.Monitor) (proto.Message
 // wraps a proto.Message into a universal Envelope, then converts to bytes and
 // sends them across the wire without violating the data flow rate limits
 // message may be a Packet, a Ping or a Pong
-func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) (err lib.ErrorI) {
+func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) {
 	c.log.Debugf("Send Packet to %s (ID:%s, L:%d, E:%t), hash: %s",
 		lib.BytesToTruncatedString(c.Address.PublicKey),
 		lib.Topic_name[int32(packet.StreamId)],
@@ -311,7 +303,7 @@ func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) (err lib.Erro
 		crypto.ShortHashString(packet.Bytes),
 	)
 	// send packet as message over the wire
-	err = c.sendWireBytes(packet, m)
+	c.sendWireBytes(packet, m)
 	return
 }
 
@@ -319,11 +311,11 @@ func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) (err lib.Erro
 // wraps a proto.Message into a universal Envelope, then converts to bytes and
 // sends them across the wire without violating the data flow rate limits
 // message may be a Packet, a Ping or a Pong
-func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) (err lib.ErrorI) {
+func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) {
 	// convert the proto.Message into a proto.Any
 	a, err := lib.NewAny(message)
 	if err != nil {
-		return err
+		c.Error(err)
 	}
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
