@@ -578,7 +578,6 @@ func (b *BFT) NewRound(newHeight bool) {
 // NewHeight() initializes / resets consensus variables preparing for the NewHeight
 func (b *BFT) NewHeight(keepLocks ...bool) {
 	var err lib.ErrorI
-	b.log.Debugf("NewHeight: KeepLocks: %v", keepLocks)
 	// reset VotesForHeight
 	b.Votes = make(VotesForHeight)
 	// reset ProposalsForHeight
