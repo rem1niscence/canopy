@@ -23,8 +23,8 @@ const (
 	maxPacketSize          = 1024                    // maximum size of the full packet
 	packetHeaderSize       = 47                      // the overhead of the protobuf packet header
 	queueSendTimeout       = 10 * time.Second        // how long a message waits to be queued before throwing an error
-	dataFlowRatePerS       = 500 * units.KB          // the maximum number of bytes that may be sent or received per second per MultiConn
 	maxMessageSize         = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
+	dataFlowRatePerS       = maxMessageSize          // the maximum number of bytes that may be sent or received per second per MultiConn
 	maxChanSize            = 1                       // maximum number of items in a channel before blocking
 	maxInboxQueueSize      = 100                     // maximum number of items in inbox queue before blocking
 	maxStreamSendQueueSize = 100                     // maximum number of items in a stream send queue before blocking
@@ -281,7 +281,7 @@ func (c *MultiConn) waitForAndHandleWireBytes(m *limiter.Monitor) (proto.Message
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
-	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
+	m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
 	// read the proto message from the wire
 	if err := receiveProtoMsg(c.conn, msg); err != nil {
 		return nil, err
@@ -320,8 +320,7 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) {
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
-	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
-	// debug log to remove
+	m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
 	//defer lib.TimeTrack(c.log, time.Now())
 	// send the proto message wrapped in an Envelope over the wire
 	if err = sendProtoMsg(c.conn, &Envelope{Payload: a}); err != nil {
