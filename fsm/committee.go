@@ -10,6 +10,34 @@ import (
 
 /* This file contains logic for 'committees' or validator sets responsible for 'nestedChain' consensus */
 
+// FundCommitteeRewardPools() mints newly created tokens to protocol subsidized committees
+func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
+	daoCut, _, mintAmountPerCommittee, err := s.GetBlockMintStats(s.Config.ChainId)
+	if err != nil {
+		if err == lib.ErrNoSubsidizedCommittees(s.Config.ChainId) {
+			return nil
+		}
+		return err
+	}
+	// mint to the DAO account
+	if err = s.MintToPool(lib.DAOPoolID, daoCut); err != nil {
+		return err
+	}
+	// get the committees that `qualify` for subsidization
+	subsidizedChainIds, err := s.GetSubsidizedCommittees()
+	if err != nil {
+		return err
+	}
+	// issue that amount to each subsidized committee
+	for _, chainId := range subsidizedChainIds {
+		if err = s.MintToPool(chainId, mintAmountPerCommittee); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetBlockMintStats() gets the latest minting information for the blockchain
 func (s *StateMachine) GetBlockMintStats(chainId uint64) (daoCut uint64, totalMint uint64, mintAmountPerCommittee uint64, err lib.ErrorI) {
 	// get governance params that are needed to complete this operation
 	govParams, err := s.GetParamsGov()
@@ -48,33 +76,6 @@ func (s *StateMachine) GetBlockMintStats(chainId uint64) (daoCut uint64, totalMi
 	mintAmountPerCommittee = mintAmountAfterDAOCut / subsidizedCount
 
 	return daoCut, totalMintAmount, mintAmountPerCommittee, nil
-}
-
-// FundCommitteeRewardPools() mints newly created tokens to protocol subsidized committees
-func (s *StateMachine) FundCommitteeRewardPools() lib.ErrorI {
-	daoCut, _, mintAmountPerCommittee, err := s.GetBlockMintStats(s.Config.ChainId)
-	if err != nil {
-		if err == lib.ErrNoSubsidizedCommittees(s.Config.ChainId) {
-			return nil
-		}
-		return err
-	}
-	// mint to the DAO account
-	if err = s.MintToPool(lib.DAOPoolID, daoCut); err != nil {
-		return err
-	}
-	// get the committees that `qualify` for subsidization
-	subsidizedChainIds, err := s.GetSubsidizedCommittees()
-	if err != nil {
-		return err
-	}
-	// issue that amount to each subsidized committee
-	for _, chainId := range subsidizedChainIds {
-		if err = s.MintToPool(chainId, mintAmountPerCommittee); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // GetSubsidizedCommittees() returns a list of chainIds that receive a portion of the 'block reward'
