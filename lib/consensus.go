@@ -157,7 +157,7 @@ func (x *AggregateSignature) Check(sb SignByte, vs ValidatorSet) (isPartialQC bo
 	}
 	// get the total power and the min +2/3 majority from the bitmap and ValSet
 	_, totalSignedPower, err := x.GetSigners(vs)
-	// if an error occured when retrieving the signers
+	// if an error occurred when retrieving the signers
 	if err != nil {
 		// exit with error
 		return false, err

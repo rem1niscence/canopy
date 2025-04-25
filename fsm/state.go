@@ -3,6 +3,7 @@ package fsm
 import (
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -155,6 +156,7 @@ func (s *StateMachine) ApplyTransactions(block *lib.Block) (txResultsList []*lib
 	// define vars to track the bytes of the transaction results and the size of a block
 	var (
 		txResultsBytes [][]byte
+		largestTxSize  uint64
 		blockSize      uint64
 	)
 	// use a map to check for 'same-block' duplicate transactions
@@ -181,8 +183,15 @@ func (s *StateMachine) ApplyTransactions(block *lib.Block) (txResultsList []*lib
 		txResultsList = append(txResultsList, result)
 		// add the bytes to the list of transactions results
 		txResultsBytes = append(txResultsBytes, txResultBz)
+		// get the tx size
+		txSize := uint64(len(tx))
 		// add to the size of the block
-		blockSize += uint64(len(tx))
+		blockSize += txSize
+		// see if the size is the largest
+		if txSize > largestTxSize {
+			// set as largest
+			largestTxSize = txSize
+		}
 		// update the transaction count
 		n++
 	}
@@ -197,6 +206,8 @@ func (s *StateMachine) ApplyTransactions(block *lib.Block) (txResultsList []*lib
 	}
 	// create a transaction root for the block header
 	root, _, err = lib.MerkleTree(txResultsBytes)
+	// update metrics
+	s.Metrics.UpdateLargestTxSize(largestTxSize)
 	// return and exit
 	return txResultsList, root, n, err
 }
@@ -332,6 +343,8 @@ func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
 
 // GetRootChainInfo() returns the 'need-to-know' information for a nested chain
 func (s *StateMachine) GetRootChainInfo(id uint64) (*lib.RootChainInfo, lib.ErrorI) {
+	// update the metrics once complete
+	defer s.Metrics.UpdateGetRootChainInfo(time.Now())
 	// get the previous state machine height
 	lastSM, err := s.TimeMachine(s.Height() - 1)
 	if err != nil {

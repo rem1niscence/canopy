@@ -314,7 +314,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		go c.RCManager.Publish(id, info)
 	}
 	// update telemetry
-	c.UpdateTelemetry(block, time.Since(start))
+	defer c.UpdateTelemetry(qc, block, time.Since(start))
 	// exit
 	return
 }
@@ -411,6 +411,8 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 			// exit with error
 			return nil, lib.ErrNoMaj23()
 		}
+		// update the non signer percent for the validators
+		c.Metrics.UpdateNonSignerPercent(qc.Signature, v)
 	}
 	// ensure the proposal inside the quorum certificate is valid at a stateless level
 	block, err := qc.CheckProposalBasic(c.FSM.Height(), c.Config.NetworkID, c.Config.ChainId)
@@ -505,13 +507,17 @@ func (c *Controller) SetFSMInConsensusModeForProposals() (reset func()) {
 }
 
 // UpdateTelemetry() updates the prometheus metrics after 'committing' a block
-func (c *Controller) UpdateTelemetry(block *lib.Block, blockProcessingTime time.Duration) {
-	// get the address of this node
-	address := crypto.NewAddressFromBytes(c.Address)
+func (c *Controller) UpdateTelemetry(qc *lib.QuorumCertificate, block *lib.Block, blockProcessingTime time.Duration) {
+	// create convenience variables
+	address, vdfIterations := crypto.NewAddressFromBytes(c.Address), uint64(0)
+	// attempt to get VDF iterations
+	if block.BlockHeader.Vdf != nil {
+		vdfIterations = block.BlockHeader.Vdf.Iterations
+	}
 	// update node metrics
 	c.Metrics.UpdateNodeMetrics(c.isSyncing.Load())
 	// update the block metrics
-	c.Metrics.UpdateBlockMetrics(block.BlockHeader.ProposerAddress, len(block.Transactions), blockProcessingTime)
+	c.Metrics.UpdateBlockMetrics(block.BlockHeader.ProposerAddress, uint64(len(qc.Block)), block.BlockHeader.NumTxs, vdfIterations, blockProcessingTime)
 	// update validator metric
 	if v, _ := c.FSM.GetValidator(address); v != nil && v.StakedAmount != 0 {
 		c.Metrics.UpdateValidator(address.String(), v.StakedAmount, v.UnstakingHeight != 0, v.MaxPausedHeight != 0, v.Delegate, v.Compound)

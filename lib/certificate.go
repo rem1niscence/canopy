@@ -156,6 +156,7 @@ func (x *QuorumCertificate) CheckProposalBasic(height, networkId, chainId uint64
 	if err != nil {
 		return nil, err
 	}
+	// ensure the block hash is equal
 	if !bytes.Equal(x.BlockHash, blockHash) {
 		return nil, ErrMismatchHeaderBlockHash()
 	}

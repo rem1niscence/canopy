@@ -8,6 +8,7 @@ import (
 	"math"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib"
@@ -183,6 +184,10 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	if err = s.setCommitID(s.version, s.root); err != nil {
 		return nil, err
 	}
+	// extract the internal metrics from the badger Txn
+	size, entries := getSizeAndCount(s.writer)
+	// update the metrics once complete
+	defer s.metrics.UpdateStoreMetrics(size, entries, time.Time{}, time.Now())
 	// finally commit the entire Transaction to the actual DB under the proper version (height) number
 	if e := s.writer.CommitAt(s.version, nil); e != nil {
 		return nil, ErrCommitDB(e)
@@ -224,6 +229,7 @@ func (s *Store) ShouldPartition() (timeToPartition bool) {
 //     safely be pruned
 //  2. PRUNE: Drop all versions in the LSS older than the latest keys @ partition height
 func (s *Store) Partition() {
+	start := time.Now()
 	// create a copy of the store for multi-thread safety
 	sCopy, err := s.Copy()
 	if err != nil {
@@ -286,6 +292,10 @@ func (s *Store) Partition() {
 				}
 			}
 		}
+		// extract the internal metrics from the badger Txn
+		size, entries := getSizeAndCountFromBatch(writer)
+		// update the metrics once complete
+		defer s.metrics.UpdateStoreMetrics(size, entries, start, time.Now())
 		// commit the batch
 		if e := writer.Flush(); e != nil {
 			return ErrFlushBatch(e)

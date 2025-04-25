@@ -101,6 +101,8 @@ func (b *BFT) Start() {
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
+				// Update BFT metrics
+				defer b.Metrics.UpdateBFTMetrics(b.Height, b.RootHeight, b.Round, b.Phase, time.Now())
 				// handle the phase
 				b.HandlePhase()
 			}()
@@ -592,8 +594,6 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.Height = b.Controller.ChainHeight()
 	// update canopy height
 	b.RootHeight = b.Controller.RootChainHeight()
-	// Update BFT metrics
-	b.Metrics.UpdateBFTMetrics(b.Height, b.RootHeight)
 	// update the validator set
 	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.Height), b.RootHeight)
 	if err != nil {
