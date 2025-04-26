@@ -9,7 +9,7 @@ import (
 /*
 	ELECTION SORTITION:
 
-		1) Practical VRF: Hash(BLS.Signature(Last Proposers Addresses + CreatedHeight + Round)): a cryptographic
+		1) Practical VRF: Hash(BLS.Signature(Last Proposers Addresses + Height + Round)): a cryptographic
 		function that produces a random output that can be publicly verified. In BFT, each participant in
 		the network uses their private key to create a digital signature against Sortition seed data which
 		may be publicly verified using their Public Key.
