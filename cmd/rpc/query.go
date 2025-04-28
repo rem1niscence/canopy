@@ -67,6 +67,10 @@ func (s *Server) EcoParameters(w http.ResponseWriter, r *http.Request, _ httprou
 		if err != nil {
 			return err
 		}
+		// ensure non-nil delegate
+		if delegate == nil {
+			return lib.ErrEmptyLotteryWinner()
+		}
 		// find proposer cut
 		proposerCut := 100 - delegate.Cut
 		// remove sub-validator and sub-delegate cuts if requested chain id is non-root id

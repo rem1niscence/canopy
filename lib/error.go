@@ -254,6 +254,7 @@ const (
 	CodeSlashNonValidator        ErrorCode = 90
 	CodeEmptyOrderBook           ErrorCode = 91
 	CodeNoSubsidizedCommittees   ErrorCode = 92
+	CodeEmptyLotteryWinner       ErrorCode = 93
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -776,5 +777,8 @@ func ErrStringToCommittee(s string) ErrorI {
 
 func ErrNoSubsidizedCommittees(chainId uint64) ErrorI {
 	return NewError(CodeNoSubsidizedCommittees, StateMachineModule, fmt.Sprintf("Chain ID %d has no subsidized committees", chainId))
+}
 
+func ErrEmptyLotteryWinner() ErrorI {
+	return NewError(CodeEmptyLotteryWinner, StateMachineModule, "Lottery winner is empty")
 }
