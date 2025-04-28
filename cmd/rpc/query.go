@@ -47,39 +47,42 @@ func (s *Server) Height(w http.ResponseWriter, _ *http.Request, _ httprouter.Par
 
 // Height response with the latest block
 func (s *Server) EcoParameters(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	// Unmarshal the requested chain id
+	// unmarshal the requested chain id
 	post := new(chainRequest)
 	if ok := unmarshal(w, r, post); !ok {
 		return
 	}
-	// Create a read-only state for the latest block and determine economic parameters
+	// create a read-only state for the latest block and determine economic parameters
 	s.readOnlyState(0, func(state *fsm.StateMachine) lib.ErrorI {
-		// Get the lottery winner
-		delegate, err := s.controller.GetRootChainLotteryWinner(state.Height())
-		// if an error occurred
-		if err != nil {
-			return err
-		}
-
-		// Get the root id
+		// get the root id
 		rootChainId, err := state.GetRootChainId()
 		if err != nil {
 			return err
 		}
-		// Find proposer cut
-		proposerCut := uint64(100 - delegate.Cut)
-		// Remove sub-validator and sub-delegate cuts if requested chain id is non-root id
+		// get the lottery winner
+		s.rcManager.l.Lock()
+		delegate, err := s.rcManager.GetLotteryWinner(rootChainId, 0, s.config.ChainId)
+		s.rcManager.l.Unlock()
+		// if an error occurred
+		if err != nil {
+			return err
+		}
+		// ensure non-nil delegate
+		if delegate == nil {
+			return lib.ErrEmptyLotteryWinner()
+		}
+		// find proposer cut
+		proposerCut := 100 - delegate.Cut
+		// remove sub-validator and sub-delegate cuts if requested chain id is non-root id
 		if post.ChainId != rootChainId {
 			proposerCut -= delegate.Cut // sub-validator
 			proposerCut -= delegate.Cut // sub-delegate
 		}
-
 		daoCut, totalMint, committeeMint, err := state.GetBlockMintStats(post.ChainId)
 		if err != nil {
 			write(w, err.Error(), http.StatusBadRequest)
 			return nil
 		}
-
 		write(w, economicParameterResponse{
 			DAOCut:           daoCut,
 			MintPerBlock:     totalMint,
