@@ -190,12 +190,12 @@ func (p *P2P) DialForOutboundPeers() {
 			if (p.PeerSet.outbound+dialing >= p.config.MaxOutbound) || p.book.GetBookSize() == 0 {
 				return
 			}
-			p.log.Debugf("Executing P2P Dial for more outbound peers")
 			// get random peer for chain
 			rand := p.book.GetRandom()
 			if rand == nil || p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) {
 				return
 			}
+			p.log.Debugf("Executing P2P Dial for more outbound peers")
 			// sequential operation means we'll never be dialing more than 1 peer at a time
 			// the peer should be added before the next execution of the loop
 			dialing++

@@ -352,15 +352,12 @@ func (s *Stream) queueSends(packets []*Packet) bool {
 			s.logger.Errorf("Packet(ID:%s, L:%d, E:%t) packet failed in queue", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 			return false
 		}
-		s.logger.Debugf("Packet(ID:%s, L:%d, E:%t) packet queued", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 	}
 	return true
 }
 
 // queueSend() schedules the packet to be sent
 func (s *Stream) queueSend(p *Packet) bool {
-	s.logger.Debugf("Queuing packet (ID:%s, Q:%d, C:%d)",
-		lib.Topic_name[int32(p.StreamId)], len(s.sendQueue), cap(s.sendQueue))
 	select {
 	case s.sendQueue <- p: // enqueue to the back of the line
 		return true
