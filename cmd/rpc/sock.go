@@ -227,8 +227,6 @@ func (r *RCManager) GetLotteryWinner(rootChainId, height, id uint64) (*lib.Lotte
 		// exit with the lottery winner
 		return sub.Info.LotteryWinner, nil
 	}
-	// warn of the remote RPC call to the API of the 'root chain'
-	r.log.Warnf("Executing remote Lottery call with requested height=%d and rootChainId=%d", height, rootChainId)
 	// exit with the results of the remote RPC call to the API of the 'root chain'
 	return sub.Lottery(height, id)
 }
