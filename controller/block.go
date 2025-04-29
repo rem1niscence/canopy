@@ -2,9 +2,10 @@ package controller
 
 import (
 	"bytes"
-	"github.com/canopy-network/canopy/p2p"
 	"math/rand"
 	"time"
+
+	"github.com/canopy-network/canopy/p2p"
 
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
@@ -26,6 +27,8 @@ func (c *Controller) ListenForBlock() {
 		var quit bool
 		// wrap in a function call to use 'defer' functionality
 		func() {
+			c.log.Debug("Handling block message")
+			//defer lib.TimeTrack(c.log, time.Now())
 			// lock the controller to prevent multi-thread conflicts
 			c.Lock()
 			// when iteration completes, unlock
@@ -220,6 +223,7 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 // - atomically writes all to the underlying db
 // - sets up the controller for the next height
 func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block) (err lib.ErrorI) {
+	start := time.Now()
 	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
 	defer func() { c.FSM.Reset() }()
 	// log the beginning of the commit
@@ -267,10 +271,20 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
+	// check if the store should partition
+	if storeI.ShouldPartition() {
+		// if syncing, run the partition synchronously
+		if c.isSyncing.Load() {
+			storeI.Partition() // TODO: make async design during syncing; worried this may create a temporary P2P deadlock in the future
+		} else {
+			// execute the partition as a background process to not interrupt consensus
+			go storeI.Partition()
+		}
+	}
 	// log to signal finishing the commit
 	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToTruncatedString(qc.BlockHash), block.BlockHeader.Height)
 	// set up the finite state machine for the next height
-	c.FSM, err = fsm.New(c.Config, storeI, c.log)
+	c.FSM, err = fsm.New(c.Config, storeI, c.Metrics, c.log)
 	if err != nil {
 		// exit with error
 		return
@@ -285,6 +299,22 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
+	// publish the root chain info to the nested chain subscribers
+	for _, id := range c.RCManager.ChainIds() {
+		// get the root chain info
+		info, e := c.FSM.GetRootChainInfo(id)
+		if e != nil {
+			// don't log 'no-validators' error as this is possible
+			if e.Error() != lib.ErrNoValidators().Error() {
+				c.log.Error(e.Error())
+			}
+			continue
+		}
+		// publish root chain information
+		go c.RCManager.Publish(id, info)
+	}
+	// update telemetry
+	c.UpdateTelemetry(block, time.Since(start))
 	// exit
 	return
 }
@@ -351,7 +381,7 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 		// use checkpoints to protect against long-range attacks
 		if qc.Header.Height%CheckpointFrequency == 0 {
 			// get the checkpoint from the base chain (or file if independent)
-			checkpoint, err := c.RootChainInfo.GetCheckpoint(c.LoadRootChainId(qc.Header.Height), qc.Header.Height, c.Config.ChainId)
+			checkpoint, err := c.RCManager.GetCheckpoint(c.LoadRootChainId(qc.Header.Height), qc.Header.Height, c.Config.ChainId)
 			// if getting the checkpoint failed
 			if err != nil {
 				// warn of the inability to get the checkpoint
@@ -364,7 +394,6 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 			}
 		}
 	} else {
-		// TODO improve logging for LoadCommittee
 		// load the committee from the root chain using the root height embedded in the certificate message
 		v, err := c.Consensus.LoadCommittee(c.LoadRootChainId(qc.Header.Height), qc.Header.RootHeight)
 		if err != nil {
@@ -473,4 +502,22 @@ func (c *Controller) SetFSMInConsensusModeForProposals() (reset func()) {
 		c.Mempool.FSM.SetProposalVoteConfig(fsm.AcceptAllProposals)
 	}
 	return
+}
+
+// UpdateTelemetry() updates the prometheus metrics after 'committing' a block
+func (c *Controller) UpdateTelemetry(block *lib.Block, blockProcessingTime time.Duration) {
+	// get the address of this node
+	address := crypto.NewAddressFromBytes(c.Address)
+	// update node metrics
+	c.Metrics.UpdateNodeMetrics(c.isSyncing.Load())
+	// update the block metrics
+	c.Metrics.UpdateBlockMetrics(block.BlockHeader.ProposerAddress, len(block.Transactions), blockProcessingTime)
+	// update validator metric
+	if v, _ := c.FSM.GetValidator(address); v != nil && v.StakedAmount != 0 {
+		c.Metrics.UpdateValidator(address.String(), v.StakedAmount, v.UnstakingHeight != 0, v.MaxPausedHeight != 0, v.Delegate, v.Compound)
+	}
+	// update account metrics
+	if a, _ := c.FSM.GetAccount(address); a.Amount != 0 {
+		c.Metrics.UpdateAccount(address.String(), a.Amount)
+	}
 }

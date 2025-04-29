@@ -25,13 +25,13 @@ type StateMachine struct {
 	totalVDFIterations uint64                // the number of 'verifiable delay iterations' in the blockchain up to this version
 	slashTracker       *SlashTracker         // tracks total slashes across multiple blocks
 	proposeVoteConfig  GovProposalVoteConfig // the configuration of how the state machine behaves with governance proposals
-	valsCache          map[string]*Validator // cache the validator structure
 	Config             lib.Config            // the main configuration as defined by the 'config.json' file
+	Metrics            *lib.Metrics          // the telemetry module
 	log                lib.LoggerI           // the logger for standard output and debugging
 }
 
 // New() creates a new instance of a StateMachine
-func New(c lib.Config, store lib.StoreI, log lib.LoggerI) (*StateMachine, lib.ErrorI) {
+func New(c lib.Config, store lib.StoreI, metrics *lib.Metrics, log lib.LoggerI) (*StateMachine, lib.ErrorI) {
 	// create the state machine object reference
 	sm := &StateMachine{
 		store:             nil,
@@ -39,8 +39,8 @@ func New(c lib.Config, store lib.StoreI, log lib.LoggerI) (*StateMachine, lib.Er
 		NetworkID:         uint32(c.P2PConfig.NetworkID),
 		slashTracker:      NewSlashTracker(),
 		proposeVoteConfig: AcceptAllProposals,
-		valsCache:         make(map[string]*Validator),
 		Config:            c,
+		Metrics:           metrics,
 		log:               log,
 	}
 	// initialize the state machine and exit
@@ -76,7 +76,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block) (header *lib.BlockHeader, txResu
 	// catch in case there's a panic
 	defer func() {
 		if r := recover(); r != nil {
-			s.log.Errorf(string(debug.Stack()))
+			s.log.Errorf("panic recovered, err: %s, stack: %s", r, string(debug.Stack()))
 			// handle the panic and set the error
 			err = lib.ErrPanic()
 		}
@@ -223,7 +223,7 @@ func (s *StateMachine) TimeMachine(height uint64) (*StateMachine, lib.ErrorI) {
 		return nil, err
 	}
 	// initialize a new state machine
-	return New(s.Config, heightStore, s.log)
+	return New(s.Config, heightStore, s.Metrics, s.log)
 }
 
 // LoadCommittee() loads the committee validators for a particular committee at a particular height
@@ -328,6 +328,42 @@ func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
 	}
 	// return the max block size
 	return consParams.BlockSize, nil
+}
+
+// GetRootChainInfo() returns the 'need-to-know' information for a nested chain
+func (s *StateMachine) GetRootChainInfo(id uint64) (*lib.RootChainInfo, lib.ErrorI) {
+	// get the previous state machine height
+	lastSM, err := s.TimeMachine(s.Height() - 1)
+	if err != nil {
+		return nil, err
+	}
+	// get the committee
+	validatorSet, err := s.GetCommitteeMembers(id)
+	if err != nil {
+		return nil, err
+	}
+	// get the previous committee
+	// allow an error here to have size 0 validator sets
+	lastValidatorSet, _ := lastSM.GetCommitteeMembers(id)
+	// get the delegate lottery winner
+	lotteryWinner, err := s.LotteryWinner(id)
+	if err != nil {
+		return nil, err
+	}
+	// get the order book
+	orders, err := s.GetOrderBook(id)
+	if err != nil {
+		return nil, err
+	}
+	// return the root chain info
+	return &lib.RootChainInfo{
+		RootChainId:      s.Config.ChainId,
+		Height:           s.height,
+		ValidatorSet:     validatorSet.ValidatorSet,
+		LastValidatorSet: lastValidatorSet.ValidatorSet,
+		LotteryWinner:    lotteryWinner,
+		Orders:           orders,
+	}, nil
 }
 
 // Copy() makes a clone of the state machine
@@ -450,8 +486,6 @@ func (s *StateMachine) catchPanic() {
 func (s *StateMachine) Reset() {
 	// reset the slash tracker
 	s.slashTracker = NewSlashTracker()
-	// reset the slash tracker
-	s.valsCache = make(map[string]*Validator)
 	// reset the state store
 	s.store.(lib.StoreI).Reset()
 }

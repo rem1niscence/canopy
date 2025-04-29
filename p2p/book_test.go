@@ -2,10 +2,11 @@ package p2p
 
 import (
 	"bytes"
-	"github.com/canopy-network/canopy/lib"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/canopy-network/canopy/lib"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStartPeerBookService(t *testing.T) {

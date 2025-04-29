@@ -38,6 +38,7 @@ type Config struct {
 	P2PConfig          // peer-to-peer options
 	ConsensusConfig    // bft options
 	MempoolConfig      // mempool options
+	MetricsConfig      // telemetry options
 }
 
 // DefaultConfig() returns a Config with developer set options
@@ -50,6 +51,7 @@ func DefaultConfig() Config {
 		P2PConfig:          DefaultP2PConfig(),
 		ConsensusConfig:    DefaultConsensusConfig(),
 		MempoolConfig:      DefaultMempoolConfig(),
+		MetricsConfig:      DefaultMetricsConfig(),
 	}
 }
 
@@ -99,14 +101,13 @@ func (m *MainConfig) GetLogLevel() int32 {
 // RPC CONFIG BELOW
 
 type RPCConfig struct {
-	WalletPort      string `json:"walletPort"`      // the port where the web wallet is hosted
-	ExplorerPort    string `json:"explorerPort"`    // the port where the block explorer is hosted
-	RPCPort         string `json:"rpcPort"`         // the port where the rpc server is hosted
-	AdminPort       string `json:"adminPort"`       // the port where the admin rpc server is hosted
-	RPCUrl          string `json:"rpcURL"`          // the url where the rpc server is hosted
-	AdminRPCUrl     string `json:"adminRPCUrl"`     // the url where the admin rpc server is hosted
-	RootChainPollMS uint64 `json:"rootChainPollMS"` // how often to poll the base chain in milliseconds
-	TimeoutS        int    `json:"timeoutS"`        // the rpc request timeout in seconds
+	WalletPort   string `json:"walletPort"`   // the port where the web wallet is hosted
+	ExplorerPort string `json:"explorerPort"` // the port where the block explorer is hosted
+	RPCPort      string `json:"rpcPort"`      // the port where the rpc server is hosted
+	AdminPort    string `json:"adminPort"`    // the port where the admin rpc server is hosted
+	RPCUrl       string `json:"rpcURL"`       // the url where the rpc server is hosted
+	AdminRPCUrl  string `json:"adminRPCUrl"`  // the url where the admin rpc server is hosted
+	TimeoutS     int    `json:"timeoutS"`     // the rpc request timeout in seconds
 }
 
 // RootChain defines a rpc url to a possible 'root chain' which is used if the governance parameter RootChainId == ChainId
@@ -118,14 +119,13 @@ type RootChain struct {
 // DefaultRPCConfig() sets rpc url to localhost and sets wallet, explorer, rpc, and admin ports from [50000-50003]
 func DefaultRPCConfig() RPCConfig {
 	return RPCConfig{
-		WalletPort:      "50000",                  // find the wallet on localhost:50000
-		ExplorerPort:    "50001",                  // find the explorer on localhost:50001
-		RPCPort:         "50002",                  // the rpc is served on localhost:50002
-		AdminPort:       "50003",                  // the admin rpc is served on localhost:50003
-		RPCUrl:          "http://localhost:50002", // use a local rpc by default
-		AdminRPCUrl:     "http://localhost:50003", // use a local admin rpc by default
-		RootChainPollMS: 333,                      // poll the root chain every 1/3 second
-		TimeoutS:        3,                        // the rpc timeout is 3 seconds
+		WalletPort:   "50000",                  // find the wallet on localhost:50000
+		ExplorerPort: "50001",                  // find the explorer on localhost:50001
+		RPCPort:      "50002",                  // the rpc is served on localhost:50002
+		AdminPort:    "50003",                  // the admin rpc is served on localhost:50003
+		RPCUrl:       "http://localhost:50002", // use a local rpc by default
+		AdminRPCUrl:  "http://localhost:50003", // use a local admin rpc by default
+		TimeoutS:     3,                        // the rpc timeout is 3 seconds
 	}
 }
 
@@ -145,6 +145,7 @@ func DefaultStateMachineConfig() StateMachineConfig { return StateMachineConfig{
 // - async faults may lead to extended block time
 // - social consensus dictates BlockTime for the protocol - being too fast or too slow can lead to Non-Signing and Consensus failures
 type ConsensusConfig struct {
+	NewHeightTimeoutMs      int `json:"newHeightTimeoutMS"`      // how long (in milliseconds) the replica sleeps before moving to the ELECTION phase
 	ElectionTimeoutMS       int `json:"electionTimeoutMS"`       // minus VRF creation time (if Candidate), is how long (in milliseconds) the replica sleeps before moving to ELECTION-VOTE phase
 	ElectionVoteTimeoutMS   int `json:"electionVoteTimeoutMS"`   // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to PROPOSE phase
 	ProposeTimeoutMS        int `json:"proposeTimeoutMS"`        // minus Proposal creation time (if Leader), is how long (in milliseconds) the replica sleeps before moving to PROPOSE-VOTE phase
@@ -152,46 +153,59 @@ type ConsensusConfig struct {
 	PrecommitTimeoutMS      int `json:"precommitTimeoutMS"`      // minus Proposal-QC aggregation time (if Leader), how long (in milliseconds) the replica sleeps before moving to the PRECOMMIT-VOTE phase
 	PrecommitVoteTimeoutMS  int `json:"precommitVoteTimeoutMS"`  // minus QC validation + vote time, is how long (in milliseconds) the replica sleeps before moving to COMMIT phase
 	CommitTimeoutMS         int `json:"commitTimeoutMS"`         // minus Precommit-QC aggregation time (if Leader), how long (in milliseconds) the replica sleeps before moving to the COMMIT-PROCESS phase
-	CommitProcessMS         int `json:"commitProcessMS"`         // minus Commit Proposal time, how long (in milliseconds) the replica sleeps before 'NewHeight' (NOTE: this is the majority of the block time)
 	RoundInterruptTimeoutMS int `json:"roundInterruptTimeoutMS"` // minus gossiping current Round time, how long (in milliseconds) the replica sleeps before moving to PACEMAKER phase
 }
 
 // DefaultConsensusConfig() configures the block time
 func DefaultConsensusConfig() ConsensusConfig {
 	return ConsensusConfig{
+		NewHeightTimeoutMs:     2000, // 2 seconds
 		ElectionTimeoutMS:      2000, // 2 seconds
 		ElectionVoteTimeoutMS:  2000, // 2 seconds
-		ProposeTimeoutMS:       3000, // 3 seconds
-		ProposeVoteTimeoutMS:   3000, // 3 seconds
+		ProposeTimeoutMS:       4000, // 4 seconds
+		ProposeVoteTimeoutMS:   4000, // 4 seconds
 		PrecommitTimeoutMS:     2000, // 2 seconds
 		PrecommitVoteTimeoutMS: 2000, // 2 seconds
 		CommitTimeoutMS:        2000, // 2 seconds
-		CommitProcessMS:        3000, // 3 seconds
 	}
+}
+
+// BlockTimeMS() returns the expected block time in milliseconds
+func (c *ConsensusConfig) BlockTimeMS() int {
+	return c.NewHeightTimeoutMs +
+		c.ElectionTimeoutMS +
+		c.ElectionVoteTimeoutMS +
+		c.ProposeTimeoutMS +
+		c.ProposeVoteTimeoutMS +
+		c.PrecommitTimeoutMS +
+		c.PrecommitVoteTimeoutMS +
+		c.CommitTimeoutMS
 }
 
 // P2P CONFIG BELOW
 
 // P2PConfig defines peering compatibility and limits as well as actions on specific peering IPs / IDs
 type P2PConfig struct {
-	NetworkID       uint64   `json:"networkID"`       // the ID for the peering network
-	ListenAddress   string   `json:"listenAddress"`   // listen for incoming connection
-	ExternalAddress string   `json:"externalAddress"` // advertise for external dialing
-	MaxInbound      int      `json:"maxInbound"`      // max inbound peers
-	MaxOutbound     int      `json:"maxOutbound"`     // max outbound peers
-	TrustedPeerIDs  []string `json:"trutedPeersIDs"`  // trusted public keys
-	DialPeers       []string `json:"dialPeers"`       // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
-	BannedPeerIDs   []string `json:"bannedPeersIDs"`  // banned public keys
-	BannedIPs       []string `json:"bannedIPs"`       // banned IPs
+	NetworkID           uint64   `json:"networkID"`           // the ID for the peering network
+	ListenAddress       string   `json:"listenAddress"`       // listen for incoming connection
+	ExternalAddress     string   `json:"externalAddress"`     // advertise for external dialing
+	MaxInbound          int      `json:"maxInbound"`          // max inbound peers
+	MaxOutbound         int      `json:"maxOutbound"`         // max outbound peers
+	TrustedPeerIDs      []string `json:"trutedPeersIDs"`      // trusted public keys
+	DialPeers           []string `json:"dialPeers"`           // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
+	BannedPeerIDs       []string `json:"bannedPeersIDs"`      // banned public keys
+	BannedIPs           []string `json:"bannedIPs"`           // banned IPs
+	MinimumPeersToStart int      `json:"minimumPeersToStart"` // the minimum connections required to start consensus
 }
 
 func DefaultP2PConfig() P2PConfig {
 	return P2PConfig{
-		NetworkID:       CanopyMainnetNetworkId,
-		ListenAddress:   "0.0.0.0:9001", // default TCP address is 9001 for chain 1 (9002 for chain 2 etc.)
-		ExternalAddress: "",             // should be populated by the user
-		MaxInbound:      21,             // inbounds should be close to 3x greater than outbounds
-		MaxOutbound:     7,              // to ensure 'new joiners' have slots to take
+		NetworkID:           CanopyMainnetNetworkId,
+		ListenAddress:       "0.0.0.0:9001", // default TCP address is 9001 for chain 1 (9002 for chain 2 etc.)
+		ExternalAddress:     "",             // should be populated by the user
+		MaxInbound:          21,             // inbounds should be close to 3x greater than outbounds
+		MaxOutbound:         7,              // to ensure 'new joiners' have slots to take
+		MinimumPeersToStart: 0,              // requires no peers to start consensus by default (suitable for 1 node network)
 	}
 }
 
@@ -243,6 +257,20 @@ func DefaultMempoolConfig() MempoolConfig {
 		IndividualMaxTxSize: uint32(4 * units.Kilobyte), // 4 KB max individual tx size
 		MaxTransactionCount: 5000,                       // 5000 max transactions
 		DropPercentage:      35,                         // drop 35% if limits are reached
+	}
+}
+
+// MetricsConfig represents the configuration for the metrics server
+type MetricsConfig struct {
+	Enabled           bool   `json:"enabled"`           // if the metrics are enabled
+	PrometheusAddress string `json:"prometheusAddress"` // the address of the server
+}
+
+// DefaultMetricsConfig() returns the default metrics configuration
+func DefaultMetricsConfig() MetricsConfig {
+	return MetricsConfig{
+		Enabled:           true,           // enabled by default
+		PrometheusAddress: "0.0.0.0:9090", // the default prometheus address
 	}
 }
 

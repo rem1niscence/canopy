@@ -29,6 +29,7 @@ const (
 	GovParamRoutePath              = "/v1/query/gov-params"
 	ConParamsRoutePath             = "/v1/query/con-params"
 	ValParamRoutePath              = "/v1/query/val-params"
+	EcoParamRoutePath              = "/v1/query/eco-params"
 	StateRoutePath                 = "/v1/query/state"
 	StateDiffRoutePath             = "/v1/query/state-diff"
 	StateDiffGetRoutePath          = "/v1/query/state-diff"
@@ -54,6 +55,7 @@ const (
 	RootChainInfoRoutePath         = "/v1/query/root-Chain-info"
 	ValidatorSetRoutePath          = "/v1/query/validator-set"
 	CheckpointRoutePath            = "/v1/query/checkpoint"
+	SubscribeRCInfoPath            = "/v1/subscribe-rc-info"
 	// debug
 	DebugBlockedRoutePath = "/debug/blocked"
 	DebugHeapRoutePath    = "/debug/heap"
@@ -109,6 +111,7 @@ const (
 	GovParamRouteName              = "gov-params"
 	ConParamsRouteName             = "con-params"
 	ValParamRouteName              = "val-params"
+	EcoParamRouteName              = "eco-params"
 	StateRouteName                 = "state"
 	StateDiffRouteName             = "state-diff"
 	StateDiffGetRouteName          = "state-diff-get"
@@ -175,6 +178,7 @@ const (
 	LogsRouteName              = "logs"
 	AddVoteRouteName           = "add-vote"
 	DelVoteRouteName           = "del-vote"
+	SubscribeRCInfoName        = "subscribe-rc-info"
 )
 
 // routes contains the method and path for a canopy command
@@ -206,6 +210,7 @@ var routePaths = routes{
 	GovParamRouteName:              {Method: http.MethodPost, Path: GovParamRoutePath},
 	ConParamsRouteName:             {Method: http.MethodPost, Path: ConParamsRoutePath},
 	ValParamRouteName:              {Method: http.MethodPost, Path: ValParamRoutePath},
+	EcoParamRouteName:              {Method: http.MethodPost, Path: EcoParamRoutePath},
 	StateRouteName:                 {Method: http.MethodGet, Path: StateRoutePath},
 	StateDiffRouteName:             {Method: http.MethodPost, Path: StateDiffRoutePath},
 	StateDiffGetRouteName:          {Method: http.MethodGet, Path: StateDiffGetRoutePath},
@@ -267,6 +272,7 @@ var routePaths = routes{
 	LogsRouteName:              {Method: http.MethodGet, Path: LogsRoutePath},
 	AddVoteRouteName:           {Method: http.MethodPost, Path: AddVoteRoutePath},
 	DelVoteRouteName:           {Method: http.MethodPost, Path: DelVoteRoutePath},
+	SubscribeRCInfoName:        {Method: http.MethodGet, Path: SubscribeRCInfoPath},
 }
 
 // httpRouteHandlers is a custom type that maps strings to httprouter handle functions
@@ -296,6 +302,7 @@ func createRouter(s *Server) *httprouter.Router {
 		GovParamRouteName:              s.GovParams,
 		ConParamsRouteName:             s.ConParams,
 		ValParamRouteName:              s.ValParams,
+		EcoParamRouteName:              s.EcoParameters,
 		StateRouteName:                 s.State,
 		StateDiffRouteName:             s.StateDiff,
 		StateDiffGetRouteName:          s.StateDiff,
@@ -321,6 +328,7 @@ func createRouter(s *Server) *httprouter.Router {
 		RootChainInfoRouteName:         s.RootChainInfo,
 		ValidatorSetRouteName:          s.ValidatorSet,
 		CheckpointRouteName:            s.Checkpoint,
+		SubscribeRCInfoName:            s.WebSocket,
 	}
 
 	// Initialize a new router using the httprouter package.

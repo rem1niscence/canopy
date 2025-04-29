@@ -2,11 +2,12 @@ package p2p
 
 import (
 	"bytes"
+	"slices"
+	"sync"
+
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
-	"slices"
-	"sync"
 )
 
 const (
@@ -21,18 +22,20 @@ type PeerSet struct {
 	inbound      int                // inbound count
 	outbound     int                // outbound count
 	sync.RWMutex                    // read / write mutex
+	metrics      *lib.Metrics       // telemetry
 	config       lib.P2PConfig      // p2p configuration
 	publicKey    []byte             // self public key
 	logger       lib.LoggerI
 }
 
-func NewPeerSet(c lib.Config, priv crypto.PrivateKeyI, logger lib.LoggerI) PeerSet {
+func NewPeerSet(c lib.Config, priv crypto.PrivateKeyI, metrics *lib.Metrics, logger lib.LoggerI) PeerSet {
 	return PeerSet{
 		m:           make(map[string]*Peer),
 		mustConnect: make([]*lib.PeerAddress, 0),
 		inbound:     0,
 		outbound:    0,
 		RWMutex:     sync.RWMutex{},
+		metrics:     metrics,
 		config:      c.P2PConfig,
 		publicKey:   priv.PublicKey().Bytes(),
 		logger:      logger,
@@ -76,6 +79,8 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 	}
 	// set the peer
 	ps.set(p)
+	// update metrics
+	ps.metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
 	return nil
 }
 
@@ -88,6 +93,8 @@ func (ps *PeerSet) Remove(publicKey []byte) (peer *Peer, err lib.ErrorI) {
 		return
 	}
 	ps.remove(peer)
+	// update metrics
+	ps.metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
 	return
 }
 
@@ -164,6 +171,19 @@ func (ps *PeerSet) PeerCount() int {
 	ps.RLock()
 	defer ps.RUnlock()
 	return len(ps.m)
+}
+
+// IsMustConnect() checks if a peer is on the must-connect list
+func (ps *PeerSet) IsMustConnect(publicKey []byte) bool {
+	ps.RLock()
+	defer ps.RUnlock()
+	// check if is must connect
+	for _, item := range ps.mustConnect {
+		if bytes.Equal(item.PublicKey, publicKey) {
+			return true
+		}
+	}
+	return false
 }
 
 // GetAllInfos() returns the information on connected peers and the total inbound / outbound counts
@@ -275,6 +295,7 @@ func (ps *PeerSet) changeIOCount(increment, outbound bool) {
 			ps.inbound--
 		}
 	}
+	ps.metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
 }
 
 // map based CRUD operations below

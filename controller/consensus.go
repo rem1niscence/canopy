@@ -3,13 +3,14 @@ package controller
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
+	"strings"
+	"time"
+
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/p2p"
-	"math/rand"
-	"strings"
-	"time"
 )
 
 /* This file contains the high level functionality of the continued agreement on the blocks of the chain */
@@ -43,7 +44,7 @@ func (c *Controller) Sync() {
 		// log the initialization of the block request
 		c.log.Infof("Syncing height %d 🔄 from %s", c.FSM.Height(), lib.BytesToTruncatedString(requested))
 		// send the request to the
-		c.RequestBlock(false, requested)
+		go c.RequestBlock(false, requested)
 		// block until one of the two cases happens
 		select {
 		// a) got a block in the inbox
@@ -122,6 +123,8 @@ func (c *Controller) ListenForConsensus() {
 		}
 		// execute in a sub-function to unify error handling and enable 'defer' functionality
 		if err := func() (err lib.ErrorI) {
+			c.log.Debugf("Handling consensus message")
+			//defer lib.TimeTrack(c.log, time.Now())
 			// lock the controller for thread safety
 			c.Lock()
 			// once the handler completes, unlock
@@ -168,6 +171,8 @@ func (c *Controller) ListenForBlockRequests() {
 		case msg := <-c.P2P.Inbox(BlockRequest):
 			// wrap in a sub-function to enable 'defer' functionality
 			func() {
+				c.log.Debug("Handing block request message")
+				//defer lib.TimeTrack(c.log, time.Now())
 				// lock the controller for thread safety
 				c.Lock()
 				// unlock once the message handling completes
@@ -342,7 +347,7 @@ func (c *Controller) SendBlock(maxHeight, vdfIterations uint64, blockAndCert *li
 // INTERNAL HELPERS BELOW
 
 // UpdateP2PMustConnect() tells the P2P module which nodes are *required* to be connected to (usually fellow committee members or none if not in committee)
-func (c *Controller) UpdateP2PMustConnect() {
+func (c *Controller) UpdateP2PMustConnect(v *lib.ConsensusValidators) {
 	// resolve the port to append based on the 'chain id'
 	port, err := lib.ResolvePort(c.Config.ChainId)
 	// if an error occurred
@@ -353,14 +358,14 @@ func (c *Controller) UpdateP2PMustConnect() {
 		return
 	}
 	// handle empty validator set
-	if c.RootChainInfo.ValidatorSet.ValidatorSet == nil {
+	if v.ValidatorSet == nil {
 		// exit
 		return
 	}
 	// define tracking variables for the 'must connect' peer list and if 'self' is a validator
 	mustConnects, selfIsValidator := make([]*lib.PeerAddress, 0), false
 	// for each member of the committee
-	for _, member := range c.RootChainInfo.ValidatorSet.ValidatorSet.ValidatorSet {
+	for _, member := range v.ValidatorSet {
 		// if self is a validator
 		if bytes.Equal(member.PublicKey, c.PublicKey) {
 			// update the variable
@@ -395,7 +400,7 @@ func (c *Controller) pollMaxHeight(backoff int) (max, minVDF uint64, syncingPeer
 	// initialize the syncing peers list
 	syncingPeerList = make([]string, 0)
 	// ask only for 'max height' from all peers
-	c.RequestBlock(true)
+	go c.RequestBlock(true)
 	// debug log the current status
 	c.log.Debug("Waiting for peer max heights")
 	// loop until timeout case
@@ -452,9 +457,20 @@ func (c *Controller) pollMaxHeight(backoff int) (max, minVDF uint64, syncingPeer
 
 // singleNodeNetwork() returns true if there are no other participants in the committee besides self
 func (c *Controller) singleNodeNetwork() bool {
+	c.Lock()
+	defer c.Unlock()
+	// get the root chain id from state
+	id, err := c.FSM.GetRootChainId()
+	if err != nil {
+		c.log.Fatalf(err.Error())
+	}
+	// get the validator set
+	v, err := c.RCManager.GetValidatorSet(id, c.Config.ChainId, 0)
+	if err != nil {
+		c.log.Fatalf(err.Error())
+	}
 	// if self is the only validator, return true
-	return c.RootChainInfo.ValidatorSet.NumValidators == 0 || c.RootChainInfo.ValidatorSet.NumValidators == 1 &&
-		bytes.Equal(c.RootChainInfo.ValidatorSet.ValidatorSet.ValidatorSet[0].PublicKey, c.PublicKey)
+	return v.NumValidators == 0 || (v.NumValidators == 1 && bytes.Equal(v.ValidatorSet.ValidatorSet[0].PublicKey, c.PublicKey))
 }
 
 // syncingDone() checks if the syncing loop may complete for a specific chainId
@@ -475,6 +491,8 @@ func (c *Controller) syncingDone(maxHeight, minVDFIterations uint64) bool {
 
 // finishSyncing() is called when the syncing loop is completed for a specific chainId
 func (c *Controller) finishSyncing() {
+	c.log.Debug("Finish syncing")
+	//defer lib.TimeTrack(c.log, time.Now())
 	// lock the controller for thread safety
 	c.Lock()
 	// when function completes, unlock

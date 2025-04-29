@@ -3,17 +3,17 @@ package p2p
 import (
 	"crypto/cipher"
 	"encoding/binary"
-	"github.com/alecthomas/units"
-	"github.com/canopy-network/canopy/lib"
-	"github.com/canopy-network/canopy/lib/crypto"
-	pool "github.com/libp2p/go-buffer-pool"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
 	"io"
 	"math"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/canopy-network/canopy/lib"
+	"github.com/canopy-network/canopy/lib/crypto"
+	pool "github.com/libp2p/go-buffer-pool"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 )
 
 /*
@@ -31,9 +31,10 @@ import (
 // EncryptedConn is made of the underlying tcp connection, send and receive AEAD ciphers, and the peer address
 // NOTE: receiving and sending have two distinct AEAD state objects for key / nonce management and simultaneous send/receive
 type EncryptedConn struct {
-	conn    net.Conn  // underlying connection
-	receive aeadState // encryption state for receiving messages
-	send    aeadState // encryption state for sending messages
+	conn    net.Conn   // underlying connection
+	receive aeadState  // encryption state for receiving messages
+	send    aeadState  // encryption state for sending messages
+	mu      sync.Mutex // mutex to prevent unsafe use of net conn
 
 	Address *lib.PeerAddress // authenticated remote peer information
 }
@@ -47,12 +48,13 @@ type aeadState struct {
 }
 
 // NewHandshake() executes the authentication protocol between two tcp connections to result in an encryption connection
-func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKeyI) (c *EncryptedConn, e lib.ErrorI) {
+func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKeyI) (encryptedConn *EncryptedConn, e lib.ErrorI) {
 	// create a temporary keypair to establish a shared secret
 	tempPrivateKey, _ := crypto.NewEd25519PrivateKey()
 	tempPublicKey := tempPrivateKey.PublicKey().Bytes()
+	encryptedConn = &EncryptedConn{conn: conn}
 	// swap temporary keys
-	peerTempPublicKey, e := keySwap(conn, tempPublicKey)
+	peerTempPublicKey, e := keySwap(encryptedConn, tempPublicKey)
 	if e != nil {
 		return
 	}
@@ -70,14 +72,11 @@ func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKe
 	if err != nil {
 		return nil, ErrFailedHKDF(err)
 	}
-	c = &EncryptedConn{
-		conn:    conn,
-		receive: newInternalState(receiveAEAD),
-		send:    newInternalState(sendAEAD),
-	}
+	encryptedConn.receive = newInternalState(receiveAEAD)
+	encryptedConn.send = newInternalState(sendAEAD)
 	// using the newly created encrypted connection, discard the temporary keys and
 	// swap signatures with the peer to establish the true public key identity
-	peerSig, err := signatureSwap(c, &lib.Signature{
+	peerSig, err := signatureSwap(encryptedConn, &lib.Signature{
 		PublicKey: privateKey.PublicKey().Bytes(),
 		Signature: privateKey.Sign(challenge[:]),
 	})
@@ -93,7 +92,7 @@ func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKe
 		return nil, ErrFailedChallenge()
 	}
 	// swap peer metadata using the encrypted channel
-	peerMeta, err := peerMetaSwap(c, meta.Sign(privateKey))
+	peerMeta, err := peerMetaSwap(encryptedConn, meta.Sign(privateKey))
 	if err != nil {
 		return nil, ErrFailedMetaSwap(err)
 	}
@@ -110,7 +109,7 @@ func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKe
 		return nil, ErrIncompatiblePeer()
 	}
 	// finalize the encrypted connection by setting the exchanged information
-	c.Address = &lib.PeerAddress{
+	encryptedConn.Address = &lib.PeerAddress{
 		PublicKey:  peerSig.PublicKey,
 		NetAddress: conn.RemoteAddr().String(),
 		PeerMeta:   peerMeta,
@@ -120,6 +119,10 @@ func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKe
 
 // Write() writes the data bytes to the encrypted connection
 func (c *EncryptedConn) Write(data []byte) (n int, err error) {
+	// fallback to regular conn in case encrypted conn is not yet set
+	if c.send.aead == nil {
+		return c.conn.Write(data)
+	}
 	// thread safety sends
 	c.send.Lock()
 	defer c.send.Unlock()
@@ -162,6 +165,10 @@ func (c *EncryptedConn) Write(data []byte) (n int, err error) {
 // Read() checks the connection for cipher data bytes, if found,
 // the func decrypts and loads them into the 'data' buffer
 func (c *EncryptedConn) Read(data []byte) (n int, err error) {
+	// fallback to regular conn in case encrypted conn is not yet set
+	if c.receive.aead == nil {
+		return c.conn.Read(data)
+	}
 	// read thread safety
 	c.receive.Lock()
 	defer c.receive.Unlock()
@@ -259,39 +266,6 @@ func parallelSendReceive(conn net.Conn, a, b proto.Message) lib.ErrorI {
 	g.Go(func() error { return receiveProtoMsg(conn, b) })
 	if er := g.Wait(); er != nil {
 		return ErrErrorGroup(er)
-	}
-	return nil
-}
-
-// receiveProtoMsg() encodes and sends a proto message to a net.Conn
-// NOTE: this function is only used before establishing the encrypted conn
-func sendProtoMsg(conn net.Conn, ptr proto.Message) lib.ErrorI {
-	bz, err := lib.Marshal(ptr)
-	if err != nil {
-		return err
-	}
-	if e := conn.SetWriteDeadline(time.Now().Add(time.Second)); e != nil {
-		return ErrFailedWrite(e)
-	}
-	if _, er := conn.Write(bz); er != nil {
-		return ErrFailedWrite(er)
-	}
-	return nil
-}
-
-// receiveProtoMsg() receives and decodes a proto message from a net.Conn
-// NOTE: this function is only used before establishing the encrypted conn
-func receiveProtoMsg(conn net.Conn, ptr proto.Message) lib.ErrorI {
-	buffer := make([]byte, units.KB)
-	if err := conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
-		return ErrFailedRead(err)
-	}
-	n, err := conn.Read(buffer)
-	if err != nil {
-		return ErrFailedRead(err)
-	}
-	if e := lib.Unmarshal(buffer[:n], ptr); e != nil {
-		return e
 	}
 	return nil
 }

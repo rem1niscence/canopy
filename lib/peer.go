@@ -117,6 +117,8 @@ func ResolveAndReplacePort(netAddress *string, chainId uint64) ErrorI {
 	if err != nil {
 		return err
 	}
+	// remove the colon
+	newPort = strings.Replace(newPort, ":", "", 1)
 	// find the index of the final colon in the address
 	i := strings.LastIndex(*netAddress, ":")
 	// if no colon found

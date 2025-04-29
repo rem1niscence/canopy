@@ -2,6 +2,7 @@ syntax = "proto3";
 package types;
 
 option go_package = "github.com/canopy-network/canopy/lib";
+import "swap.proto";
 // *****************************************************************************************************
 // This file is auto-generated from source files in `/lib/.proto/*` using Protocol Buffers (protobuf)
 //
@@ -140,4 +141,29 @@ message ConsensusValidator {
 message ConsensusValidators {
   // validator_set: is the actual list of Validators and their respective
   repeated ConsensusValidator ValidatorSet = 1; // @gotags: json:"validatorSet"
+}
+
+// LotteryWinner is a structure that holds the subject of a pseudorandom selection and their % cut of the reward
+// This is used for delegation + sub-delegation + sub-validator earnings
+message LotteryWinner {
+  // winner: the 20 byte address of the selected actor
+  bytes winner = 1; // @gotags: json:"winner"
+  // cut: the percent cut of the rewards
+  uint64 cut = 2; // @gotags json:"cut"
+}
+
+// RootChainInfo maintains root-chain data needed for consensus
+message RootChainInfo {
+  // root_chain_id: the chain id of the root chain
+  uint64 root_chain_id = 1; // @gotags: json:"rootChainId"
+  // height: the block height of the root chain
+  uint64 height = 2; // @gotags: json:"height"
+  // validator_set: the current validator set
+  ConsensusValidators validator_set = 3; // @gotags: json:"validatorSet"
+  // last_validator_set: the validator set of the previous height
+  ConsensusValidators last_validator_set = 4; // @gotags: json:"lastValidatorSet"
+  // lottery_winner: the selected delegate/pseudo-validator who receives rewards
+  LotteryWinner lottery_winner = 5;
+  // orders: the swap order book from the 'root chain' for the 'nested chain'
+  OrderBook orders = 6; // @gotags: json:"orders"
 }

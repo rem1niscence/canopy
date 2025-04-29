@@ -34,7 +34,6 @@ const (
 	SoftwareVersion = "0.0.0-alpha"
 	ContentType     = "Content-MessageType"
 	ApplicationJSON = "application/json; charset=utf-8"
-	localhost       = "localhost"
 
 	walletStaticDir   = "web/wallet/out"
 	explorerStaticDir = "web/explorer/out"
@@ -54,8 +53,8 @@ type Server struct {
 	// Mutex for Poll handler
 	pollMux *sync.RWMutex
 
-	// RemoteCallbacks to the root chain rpc
-	remoteCallbacks *lib.RemoteCallbacks
+	// handles interactions with the root chain rpc
+	rcManager *RCManager
 
 	logger lib.LoggerI
 }
@@ -66,6 +65,7 @@ func NewServer(controller *controller.Controller, config lib.Config, logger lib.
 		controller: controller,
 		config:     config,
 		logger:     logger,
+		rcManager:  NewRCManager(controller, config, logger),
 		poll:       make(fsm.Poll),
 		pollMux:    &sync.RWMutex{},
 	}
@@ -79,8 +79,7 @@ func (s *Server) Start() {
 
 	// Start tasks to update poll results and poll root chain information
 	go s.updatePollResults()
-	go s.pollRootChainInfo()
-
+	go s.rcManager.Start()
 	go func() { // TODO remove DEBUG ONLY
 		fileName := "heap1.out"
 		for range time.Tick(time.Second * 10) {
@@ -120,8 +119,11 @@ func (s *Server) startRPC(router *httprouter.Router, port string) {
 	// Start RPC server
 	s.logger.Infof("Starting RPC server at 0.0.0.0:%s", port)
 	s.logger.Fatal((&http.Server{
-		Addr:    colon + port,
-		Handler: cor.Handler(http.TimeoutHandler(router, timeout, lib.ErrServerTimeout().Error())),
+		Addr:              colon + port,
+		ReadHeaderTimeout: timeout,
+		ReadTimeout:       timeout,
+		WriteTimeout:      timeout,
+		Handler:           cor.Handler(router),
 	}).ListenAndServe().Error())
 }
 
@@ -160,111 +162,6 @@ func (s *Server) updatePollResults() {
 		}
 		time.Sleep(time.Second * 3)
 	}
-}
-
-// updateRootChainHeight queries and updates the root chain height
-func (s *Server) updateRootChainHeight(state *fsm.StateMachine, rootChainHeight *uint64) (err lib.ErrorI) {
-	// get the consensus params from the app
-	consParams, err := state.GetParamsCons()
-	if err != nil {
-		return
-	}
-	// get the remote callbacks for the root chain id
-	s.remoteCallbacks, err = s.RemoteCallbacks(consParams.RootChainId)
-	if err != nil {
-		s.logger.Errorf("callbacks failed with err: %s")
-		return err
-	}
-	// query the base chain height
-	height, err := s.remoteCallbacks.Height()
-	if err != nil {
-		s.logger.Errorf("GetRootChainHeight failed with err")
-		return err
-	}
-	// check if a new height was received
-	if *height <= *rootChainHeight {
-		return
-	}
-	// update the root chain height
-	*rootChainHeight = *height
-	// if a new height received
-	s.logger.Infof("New RootChain height %d detected!", *rootChainHeight)
-	// execute the requests to get the base chain information
-	for retry := lib.NewRetry(s.config.RootChainPollMS, 3); retry.WaitAndDoRetry(); {
-		s.logger.Infof("Retrieved root height info for %d!", *rootChainHeight)
-		// retrieve the root-Chain info
-		rootChainInfo, e := s.remoteCallbacks.RootChainInfo(*rootChainHeight, s.config.ChainId)
-		if e == nil {
-			// update the controller with new root-Chain info
-			s.controller.UpdateRootChainInfo(rootChainInfo)
-			s.logger.Info("Updated RootChain information")
-			break
-		}
-		s.logger.Errorf("GetRootChainInfo failed with err %s", e.Error())
-		// update with empty root-chain info to stop consensus
-		s.controller.UpdateRootChainInfo(&lib.RootChainInfo{
-			RootChainId:      consParams.RootChainId,
-			Height:           *rootChainHeight,
-			ValidatorSet:     lib.ValidatorSet{},
-			LastValidatorSet: lib.ValidatorSet{},
-			LotteryWinner:    &lib.LotteryWinner{},
-			Orders:           &lib.OrderBook{},
-		})
-	}
-	return
-}
-
-// pollRootChainInfo() retrieves information from the root-Chain required for consensus
-func (s *Server) pollRootChainInfo() {
-	// Track the root chain height
-	rootChainHeight := uint64(0)
-	// execute the loop every conf.RootChainPollMS duration
-	ticker := time.NewTicker(time.Duration(s.config.RootChainPollMS) * time.Millisecond)
-	for range ticker.C {
-		if err := func() (err error) {
-			// Create a read-only state machine context
-			err = s.readOnlyState(0, func(state *fsm.StateMachine) (err lib.ErrorI) {
-				// Update the root chain height
-				return s.updateRootChainHeight(state, &rootChainHeight)
-			})
-			return
-		}(); err != nil {
-			s.logger.Warnf(err.Error())
-		}
-	}
-}
-
-// RemoteCallbacks() enables the retrieval of remote RPC API calls for a certain root chain id
-func (s *Server) RemoteCallbacks(rootChainId uint64) (*lib.RemoteCallbacks, lib.ErrorI) {
-	// get the url for the root chain as set by the state
-	var rootChainUrl string
-	// for each item in the root chain config
-	for _, chain := range s.config.RootChain {
-		// if the chain id matches
-		if chain.ChainId == rootChainId {
-			// use that root chain url
-			rootChainUrl = chain.Url
-		}
-	}
-	// check if root chain url isn't empty
-	if rootChainUrl == "" {
-		s.logger.Errorf("Config.JSON missing RootChainID=%d failed with", rootChainId)
-		return nil, lib.ErrEmptyChainId()
-	}
-	// create a rpc client
-	rpcClient := NewClient(rootChainUrl, "")
-	// set the remote callbacks
-	return &lib.RemoteCallbacks{
-		Height:              rpcClient.Height,
-		RootChainInfo:       rpcClient.RootChainInfo,
-		ValidatorSet:        rpcClient.ValidatorSet,
-		IsValidDoubleSigner: rpcClient.IsValidDoubleSigner,
-		Lottery:             rpcClient.Lottery,
-		Orders:              rpcClient.Orders,
-		Order:               rpcClient.Order,
-		Checkpoint:          rpcClient.Checkpoint,
-		Transaction:         rpcClient.Transaction,
-	}, nil
 }
 
 // startStaticFileServers starts a file server for the wallet and explorer

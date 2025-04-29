@@ -45,6 +45,55 @@ func (s *Server) Height(w http.ResponseWriter, _ *http.Request, _ httprouter.Par
 	})
 }
 
+// Height response with the latest block
+func (s *Server) EcoParameters(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	// unmarshal the requested chain id
+	post := new(chainRequest)
+	if ok := unmarshal(w, r, post); !ok {
+		return
+	}
+	// create a read-only state for the latest block and determine economic parameters
+	s.readOnlyState(0, func(state *fsm.StateMachine) lib.ErrorI {
+		// get the root id
+		rootChainId, err := state.GetRootChainId()
+		if err != nil {
+			return err
+		}
+		// get the lottery winner
+		s.rcManager.l.Lock()
+		delegate, err := s.rcManager.GetLotteryWinner(rootChainId, 0, s.config.ChainId)
+		s.rcManager.l.Unlock()
+		// if an error occurred
+		if err != nil {
+			return err
+		}
+		// ensure non-nil delegate
+		if delegate == nil {
+			return lib.ErrEmptyLotteryWinner()
+		}
+		// find proposer cut
+		proposerCut := 100 - delegate.Cut
+		// remove sub-validator and sub-delegate cuts if requested chain id is non-root id
+		if post.ChainId != rootChainId {
+			proposerCut -= delegate.Cut // sub-validator
+			proposerCut -= delegate.Cut // sub-delegate
+		}
+		daoCut, totalMint, committeeMint, err := state.GetBlockMintStats(post.ChainId)
+		if err != nil {
+			write(w, err.Error(), http.StatusBadRequest)
+			return nil
+		}
+		write(w, economicParameterResponse{
+			DAOCut:           daoCut,
+			MintPerBlock:     totalMint,
+			MintPerCommittee: committeeMint,
+			ProposerCut:      proposerCut,
+			DelegateCut:      delegate.Cut,
+		}, http.StatusOK)
+		return nil
+	})
+}
+
 // BlockByHeight responds with the block data found at a specific height
 func (s *Server) BlockByHeight(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	// Invoke helper with the HTTP request, response writer and an inline callback
@@ -169,37 +218,7 @@ func (s *Server) Checkpoint(w http.ResponseWriter, r *http.Request, _ httprouter
 func (s *Server) RootChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	// Invoke helper with the HTTP request, response writer and an inline callback
 	s.heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
-		// get the previous state machine height
-		lastSM, err := s.TimeMachine(s.Height() - 1)
-		if err != nil {
-			return nil, err
-		}
-		// get the committee
-		validatorSet, err := s.GetCommitteeMembers(id)
-		if err != nil {
-			return nil, err
-		}
-		// get the previous committee
-		// allow an error here to have size 0 validator sets
-		lastValidatorSet, _ := lastSM.GetCommitteeMembers(id)
-		// get the delegate lottery winner
-		lotteryWinner, err := s.LotteryWinner(id)
-		if err != nil {
-			return nil, err
-		}
-		// get the order book
-		orders, err := s.GetOrderBook(id)
-		if err != nil {
-			return nil, err
-		}
-		return &lib.RootChainInfo{
-			RootChainId:      s.Config.ChainId,
-			Height:           s.Height(),
-			ValidatorSet:     validatorSet,
-			LastValidatorSet: lastValidatorSet,
-			LotteryWinner:    lotteryWinner,
-			Orders:           orders,
-		}, nil
+		return s.GetRootChainInfo(id)
 	})
 }
 
@@ -707,7 +726,7 @@ func (s *Server) pageIndexer(w http.ResponseWriter, r *http.Request, callback fu
 // setupStore creates a new store from the state machine's database. This store must be closed safely with Discard()
 func (s *Server) setupStore(w http.ResponseWriter) (lib.StoreI, bool) {
 	db := s.controller.FSM.Store().(lib.StoreI).DB()
-	st, err := store.NewStoreWithDB(db, s.logger, false)
+	st, err := store.NewStoreWithDB(db, nil, s.logger, false)
 	if err != nil {
 		write(w, lib.ErrNewStore(err), http.StatusInternalServerError)
 		return nil, false

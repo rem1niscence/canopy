@@ -31,6 +31,8 @@ func (c *Controller) ListenForTx() {
 			continue
 		}
 		func() {
+			c.log.Debug("Handling transaction")
+			//defer lib.TimeTrack(c.log, time.Now())
 			// lock the controller for thread safety
 			c.Lock()
 			// unlock when this iteration completes

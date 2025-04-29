@@ -129,7 +129,7 @@ const (
 	CodeInvalidValidatorIndex           ErrorCode = 31
 	CodeUnableToAddSigner               ErrorCode = 32
 	CodeEmptyMessage                    ErrorCode = 33
-	CodeInvalidBlockTime                ErrorCode = 34
+	CodeNotSubscribed                   ErrorCode = 34
 	CodeInvalidEvidence                 ErrorCode = 35
 	CodeMismatchEvidenceAndHeader       ErrorCode = 36
 	CodeInvalidTxTime                   ErrorCode = 37
@@ -253,6 +253,8 @@ const (
 	CodeEmptyCertificateResults  ErrorCode = 89
 	CodeSlashNonValidator        ErrorCode = 90
 	CodeEmptyOrderBook           ErrorCode = 91
+	CodeNoSubsidizedCommittees   ErrorCode = 92
+	CodeEmptyLotteryWinner       ErrorCode = 93
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -299,11 +301,13 @@ const (
 	CodeStoreGet               ErrorCode   = 4
 	CodeStoreDelete            ErrorCode   = 5
 	CodeCommitDB               ErrorCode   = 6
-	CodeCompactProof           ErrorCode   = 7
+	CodeFlushBatch             ErrorCode   = 7
 	CodeInvalidKey             ErrorCode   = 8
 	CodeReserveKeyWrite        ErrorCode   = 9
 	CodeInvalidMerkleTree      ErrorCode   = 10
 	CodeInvalidMerkleTreeProof ErrorCode   = 11
+	CodeGarbageCollectDB       ErrorCode   = 12
+	CodeSetEntry               ErrorCode   = 13
 
 	RPCModule             ErrorModule = "rpc"
 	CodeRPCTimeout        ErrorCode   = 1
@@ -502,8 +506,8 @@ func ErrInvalidValidatorIndex() ErrorI {
 	return NewError(CodeInvalidValidatorIndex, ConsensusModule, "invalid validator index")
 }
 
-func ErrInvalidBlockTime() ErrorI {
-	return NewError(CodeInvalidBlockTime, ConsensusModule, "invalid block time")
+func ErrNotSubscribed() ErrorI {
+	return NewError(CodeNotSubscribed, ConsensusModule, "not subscribed")
 }
 
 func ErrInvalidTxHeight() ErrorI {
@@ -769,4 +773,12 @@ func ErrReadBody(err error) ErrorI {
 
 func ErrStringToCommittee(s string) ErrorI {
 	return NewError(CodeStringToCommittee, RPCModule, fmt.Sprintf("committee arg %s is invalid, requires a comma separated list of <chainId>=<percent> ex. 0=50,21=25,99=25", s))
+}
+
+func ErrNoSubsidizedCommittees(chainId uint64) ErrorI {
+	return NewError(CodeNoSubsidizedCommittees, StateMachineModule, fmt.Sprintf("Chain ID %d has no subsidized committees", chainId))
+}
+
+func ErrEmptyLotteryWinner() ErrorI {
+	return NewError(CodeEmptyLotteryWinner, StateMachineModule, "Lottery winner is empty")
 }

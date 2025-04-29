@@ -4,17 +4,18 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
+	"runtime/debug"
+	"slices"
+	"sync"
+	"time"
+
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/phuslu/iploc"
 	"golang.org/x/net/netutil"
 	"google.golang.org/protobuf/proto"
-	"net"
-	"runtime/debug"
-	"slices"
-	"sync"
-	"time"
 )
 
 /*
@@ -29,7 +30,7 @@ import (
 	- Message dissemination: gossip [x]
 */
 
-const transport, dialTimeout = "tcp", time.Second
+const transport, dialTimeout, minPeerTick = "tcp", time.Second, 100 * time.Millisecond
 
 type P2P struct {
 	privateKey             crypto.PrivateKeyI
@@ -42,19 +43,20 @@ type P2P struct {
 	maxMembersPerCommittee int
 	bannedIPs              []net.IPAddr // banned IPs (non-string)
 	config                 lib.Config
+	metrics                *lib.Metrics
 	log                    lib.LoggerI
 }
 
 // New() creates an initialized pointer instance of a P2P object
-func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l lib.LoggerI) *P2P {
-	// Initialize the peer book
+func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, m *lib.Metrics, c lib.Config, l lib.LoggerI) *P2P {
+	// initialize the peer book
 	peerBook := NewPeerBook(p.PublicKey().Bytes(), c, l)
-	// Make inbound multiplexed channels
+	// make inbound multiplexed channels
 	channels := make(lib.Channels)
 	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
-		channels[i] = make(chan *lib.MessageAndMetadata, maxChanSize)
+		channels[i] = make(chan *lib.MessageAndMetadata, maxInboxQueueSize)
 	}
-	// Load banned IPs
+	// load banned IPs
 	var bannedIPs []net.IPAddr
 	for _, ip := range c.BannedIPs {
 		i, err := net.ResolveIPAddr("", ip)
@@ -63,13 +65,18 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, c lib.Config, l li
 		}
 		bannedIPs = append(bannedIPs, *i)
 	}
+	// set the read/write timeout to be 2 x the block time
+	ReadWriteTimeout = time.Duration(2*c.BlockTimeMS()) * time.Millisecond
+	// set the peer meta
 	meta := &lib.PeerMeta{ChainId: c.ChainId}
+	// return the p2p structure
 	return &P2P{
 		privateKey:             p,
 		channels:               channels,
+		metrics:                m,
 		config:                 c,
 		meta:                   meta.Sign(p),
-		PeerSet:                NewPeerSet(c, p, l),
+		PeerSet:                NewPeerSet(c, p, m, l),
 		book:                   peerBook,
 		MustConnectsReceiver:   make(chan []*lib.PeerAddress, maxChanSize),
 		maxMembersPerCommittee: int(maxMembersPerCommittee),
@@ -89,6 +96,8 @@ func (p *P2P) Start() {
 	go p.ListenForInboundPeers(&lib.PeerAddress{NetAddress: p.config.ListenAddress})
 	// Dials external outbound peers
 	go p.DialForOutboundPeers()
+	// Wait until peers reaches minimum count
+	p.WaitForMinimumPeers()
 }
 
 // Stop() stops the P2P service
@@ -121,7 +130,11 @@ func (p *P2P) ListenForInboundPeers(listenAddress *lib.PeerAddress) {
 		// create a thread to prevent front-of-the-line blocking
 		go func(c net.Conn) {
 			// ephemeral connections are basic, inbound tcp connections
-			defer p.catchPanic()
+			defer func() {
+				if r := recover(); r != nil {
+					p.log.Errorf("panic recovered, err: %s, stack: %s", r, string(debug.Stack()))
+				}
+			}()
 			p.log.Debugf("Received ephemeral connection %s", c.RemoteAddr().String())
 			// begin to create a peer address using the inbound tcp conn while filtering any bad ips
 			netAddress, e := p.filterBadIPs(c)
@@ -177,12 +190,12 @@ func (p *P2P) DialForOutboundPeers() {
 			if (p.PeerSet.outbound+dialing >= p.config.MaxOutbound) || p.book.GetBookSize() == 0 {
 				return
 			}
-			p.log.Debugf("Executing P2P Dial for more outbound peers")
 			// get random peer for chain
 			rand := p.book.GetRandom()
 			if rand == nil || p.IsSelf(rand.Address) || p.Has(rand.Address.PublicKey) {
 				return
 			}
+			p.log.Debugf("Executing P2P Dial for more outbound peers")
 			// sequential operation means we'll never be dialing more than 1 peer at a time
 			// the peer should be added before the next execution of the loop
 			dialing++
@@ -214,13 +227,17 @@ func (p *P2P) Dial(address *lib.PeerAddress, disconnect bool) lib.ErrorI {
 // create a E2E encrypted channel with a fully authenticated peer and save it to
 // the peer set and the peer book
 func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err lib.ErrorI) {
-	p.Lock()
-	defer p.Unlock()
 	// create the e2e encrypted connection while establishing a full peer info object
 	connection, err := p.NewConnection(conn)
 	if err != nil {
 		return err
 	}
+	// replace the peer's port with the resolved port
+	if err = lib.ResolveAndReplacePort(&info.Address.NetAddress, p.config.ChainId); err != nil {
+		p.log.Error(err.Error())
+		return
+	}
+	// log the peer add attempt
 	p.log.Debugf("Try Add peer: %s@%s", lib.BytesToString(connection.Address.PublicKey), info.Address.NetAddress)
 	// if peer is outbound, ensure the public key matches who we expected to dial
 	if info.IsOutbound {
@@ -239,6 +256,8 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect bool) (err l
 		connection.Stop()
 		return nil
 	}
+	p.Lock()
+	defer p.Unlock()
 	// check if is must connect
 	for _, item := range p.mustConnect {
 		if bytes.Equal(item.PublicKey, info.Address.PublicKey) {
@@ -297,10 +316,6 @@ func (p *P2P) OnPeerError(err error, publicKey []byte, remoteAddr string) {
 	peer, _ := p.PeerSet.Remove(publicKey)
 	if peer != nil {
 		peer.stop.Do(peer.conn.Stop)
-		// if peer is a 'must connect' try to connect back
-		if peer.IsMustConnect {
-			go p.DialWithBackoff(peer.Address)
-		}
 	}
 }
 
@@ -311,7 +326,7 @@ func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 		streams[i] = &Stream{
 			topic:        i,
 			msgAssembler: make([]byte, 0, maxMessageSize),
-			sendQueue:    make(chan []byte, maxQueueSize),
+			sendQueue:    make(chan *Packet, maxStreamSendQueueSize),
 			inbox:        p.Inbox(i),
 			logger:       p.log,
 		}
@@ -374,6 +389,21 @@ func (p *P2P) ID() *lib.PeerAddress {
 	}
 }
 
+// WaitForMinimumPeers() doesn't return until the minimum peer count is reached
+// This may be useful when coordinating network starts
+func (p *P2P) WaitForMinimumPeers() {
+	ticker := time.NewTicker(minPeerTick)
+	defer ticker.Stop()
+	// every 'tick'
+	for range ticker.C {
+		// if reached the minimum number of peers
+		if p.PeerCount() >= p.config.MinimumPeersToStart {
+			// exit
+			return
+		}
+	}
+}
+
 var blockedCountries = []string{
 	"AF", // Afghanistan
 	"BY", // Belarus
@@ -385,7 +415,6 @@ var blockedCountries = []string{
 	"LY", // Libya
 	"ML", // Mali
 	"NI", // Nicaragua
-	"PR", // Puerto Rico
 	"RU", // Russia
 	"SD", // Sudan
 	"SS", // South Sudan

@@ -7,7 +7,6 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"log"
 	"math"
 	"math/big"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -722,16 +722,21 @@ func (d *DeDuplicator[T]) Delete(k T) { delete(d.m, k) }
 func (d *DeDuplicator[T]) Map() map[T]struct{} { return d.m }
 
 // TimeTrack() a utility function to benchmark the time of caller function
-func TimeTrack(start time.Time) {
-	elapsed := time.Since(start)
-	// Skip this function, and fetch the PC and file for its parent
-	pc, _, _, _ := runtime.Caller(1)
-	// Retrieve a function object this functions parent
-	funcObj := runtime.FuncForPC(pc)
-	// Regex to extract just the function name (and not the module path)
-	runtimeFunc := regexp.MustCompile(`^.*\.(.*)$`)
-	name := runtimeFunc.ReplaceAllString(funcObj.Name(), "$1")
-	log.Println(fmt.Sprintf("%s took %s", name, elapsed))
+func TimeTrack(l LoggerI, start time.Time) {
+	elapsed, functionName := time.Since(start), "unknown"
+	pcs := make([]uintptr, 10)
+	n := runtime.Callers(2, pcs)
+	for _, pc := range pcs[:n] {
+		fn := runtime.FuncForPC(pc)
+		// skip anon functions
+		if fn != nil && !strings.Contains(fn.Name(), ".func") {
+			fullName := fn.Name()
+			parts := strings.Split(fullName, ".")
+			functionName = parts[len(parts)-1]
+			break
+		}
+	}
+	l.Debugf("%s took %s", functionName, elapsed)
 }
 
 func PrintStackTrace() {
@@ -747,4 +752,12 @@ func PrintStackTrace() {
 			break
 		}
 	}
+}
+
+// Append() is a 'safe append' when the caller wants to re-use the 'a' slice
+func Append(a, b []byte) []byte {
+	out := make([]byte, len(a)+len(b))
+	copy(out, a)
+	copy(out[len(a):], b)
+	return out
 }

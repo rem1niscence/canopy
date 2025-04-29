@@ -44,15 +44,14 @@ export default function Home() {
         }
 
         const consensusDuration =
+          settledValues[2].newHeightTimeoutMS +
           settledValues[2].electionTimeoutMS +
           settledValues[2].electionVoteTimeoutMS +
           settledValues[2].proposeTimeoutMS +
           settledValues[2].proposeVoteTimeoutMS +
           settledValues[2].precommitTimeoutMS +
           settledValues[2].precommitVoteTimeoutMS +
-          settledValues[2].commitTimeoutMS +
-          settledValues[2].commitProcessMS +
-          settledValues[2].roundInterruptTimeoutMS;
+          settledValues[2].commitTimeoutMS;
 
         if (setLoading) {
           return setState({

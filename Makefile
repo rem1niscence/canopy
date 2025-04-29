@@ -17,7 +17,7 @@ help:
 
 # Targets, this is a list of all available commands which can be executed using the make command.
 .PHONY: build/canopy build/canopy-full build/wallet build/explorer test/all dev/deps docker/up \
-	docker/down docker/up-fast docker/down docker/logs
+	docker/down docker/build docker/up-fast docker/down docker/logs
 
 # ==================================================================================== #
 # BUILDING
@@ -32,11 +32,11 @@ build/canopy-full: build/wallet build/explorer build/canopy
 
 ## build/wallet: build the canopy's wallet project
 build/wallet:
-	npm install --prefix $(WALLET_DIR) && npm run build --prefix $(WALLET_DIR)
+	WALLET_BASE_PATH=$$WALLET_BASE_PATH npm install --prefix $(WALLET_DIR) && npm run build --prefix $(WALLET_DIR)
 
 ## build/explorer: build the canopy's explorer project
 build/explorer:
-	npm install --prefix $(EXPLORER_DIR) && npm run build --prefix $(EXPLORER_DIR)
+	EXPLORER_BASE_PATH=$$EXPLORER_BASE_PATH npm install --prefix $(EXPLORER_DIR) && npm run build --prefix $(EXPLORER_DIR)
 
 # ==================================================================================== #
 # TESTING
@@ -68,6 +68,10 @@ ifeq ($(shell uname -s),Darwin)
 else
     DOCKER_COMPOSE_CMD = docker compose
 endif
+
+## docker/build: build the compose containers
+docker/build:
+	$(DOCKER_COMPOSE_CMD) -f $(DOCKER_DIR) build
 
 ## docker/up: build and start the compose containers in detached mode
 docker/up:
