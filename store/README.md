@@ -528,4 +528,66 @@ The Indexer uses the following key encoding strategy:
 
 This structured approach to data indexing and storage enables efficient querying and iteration over blockchain data while maintaining data integrity and accessibility.
 
-## Store struct and how it adds up all together
+## `Store` struct: Putting it all together
+
+The `Store` struct serves as the central coordinator for Canopy's storage system, integrating all previously described components into a cohesive whole. It provides a clean, high-level API that abstracts away the complexity of the underlying storage components.
+
+## Core Integration
+
+The `Store` struct brings together three main components:
+
+1. **State Store**: Manages the actual data blobs representing blockchain state
+2. **State Commit Store**: Maintains a Sparse Merkle Tree of state hashes
+3. **Indexer**: Organizes blockchain elements for efficient retrieval
+
+## Atomic Operations
+
+The `Store` ensures atomicity through BadgerDB's transaction system:
+
+1. All operations across components occur within a single BadgerDB transaction
+2. The `Commit()` method finalizes changes with a single atomic write
+3. Failed operations are automatically rolled back to maintain data integrity
+
+### Latest State and Historical State Stores
+
+Canopy separates the data of the state into two types of stores: the Latest State Store (LSS) and the Historical State Store (HSS).
+
+#### Latest State Store (LSS)
+
+The Latest State Store maintains the most current version of all state data, using the prefix `s/` for all keys. It:
+
+1. **Provides Fast Access**: Optimized for frequent read/write operations on current state (i.e., latest heights)
+2. **Supports Iteration**: Enables efficient traversal of current state data
+3. **Maintains Versioning**: Uses BadgerDB's version capabilities to track state changes
+
+#### Historical State Store (HSS)
+
+The Historical State Store maintains historical state data in partition-based snapshots, using the prefix `h/{partition_height}/` (e.g., `h/10000/`). It:
+
+1. **Preserves History**: Maintains complete state snapshots at regular intervals
+2. **Enables Time Travel**: Allows querying state at any historical block height
+3. **Supports Efficient Queries**: Optimized for historical data retrieval
+4. **Supports Safe Pruning**: Partitioning enables safe deletion of older state data
+
+#### Partitioning Strategy
+
+The partitioning approach works as follows:
+
+1. **Partition Creation**: At regular intervals (every `partitionFrequency` blocks, e.g., 10,000), a complete state snapshot is created in a new HSS partition
+2. **Complete Snapshots**: Each partition contains the full state as it existed at that height
+3. **Automatic Switching**: The `Store` automatically determines whether to use LSS or HSS based on the query height
+
+## Versioning and State Roots
+
+The Store maintains two critical pieces of information:
+
+1. **Version**: The current blockchain height
+2. **Root**: The Merkle root hash of the current state
+
+These are tracked in the `CommitIDStore`, enabling:
+
+1. **State Verification**: Other nodes can verify state consistency using just the root hash
+2. **Historical Access**: Previous states can be accessed by version number
+3. **Synchronization**: New nodes can verify they've correctly synchronized state
+
+This comprehensive approach to storage management provides Canopy with a robust, efficient, and secure foundation for blockchain state handling, enabling both high-performance current operations and flexible historical data access.
