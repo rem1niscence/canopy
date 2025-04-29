@@ -18,7 +18,8 @@ const (
 	blockSyncQueueSize = uint64(80)
 	// How often the queue is checked and more block requests sent
 	blockRequestInterval = 100 * time.Millisecond
-	blockRequestTimeout  = 1 * time.Second
+	// How long to wait until a block request times out
+	blockRequestTimeout = 5 * time.Second
 	// Increase or decrease the block request rate relative to the default
 	// Increase this to try to sync faster at the risk of hitting rate limits
 	rateScaleFactor = 1.00
@@ -201,10 +202,6 @@ func (c *Controller) processQueue(startHeight, stopHeight uint64, queue map[uint
 func (c *Controller) sendBlockRequests(start, stop uint64, queue map[uint64]blockSyncRequest, limiter *lib.SimpleLimiter, peers []string) {
 	// Send requests to populate the queue
 	for height := start; height < stop; height++ {
-		// Reached the specified stop height
-		if height >= stop {
-			break
-		}
 		// A block request has already been sent for this height
 		if _, ok := queue[height]; ok {
 			continue
@@ -238,7 +235,7 @@ func (c *Controller) sendBlockRequests(start, stop uint64, queue map[uint64]bloc
 	}
 }
 
-// applyTimeouts removes reuqests from the queue that have timed out
+// applyTimeouts removes requests from the queue that have timed out
 func (c *Controller) applyTimeouts(queue map[uint64]blockSyncRequest) []blockSyncRequest {
 	expired := make([]blockSyncRequest, 0)
 	// Find expired requests
