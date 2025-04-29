@@ -132,15 +132,17 @@ type Mempool struct {
 	FSM             *fsm.StateMachine  // the ephemeral finite state machine used to validate inbound transactions
 	cachedResults   lib.TxResults      // a memory cache of transaction results for efficient verification
 	cachedFailedTxs *lib.FailedTxCache // a memory cache of failed transactions for tracking
+	metrics         *lib.Metrics       // telemetry
 	log             lib.LoggerI        // the logger
 }
 
 // NewMempool() creates a new instance of a Mempool structure
-func NewMempool(fsm *fsm.StateMachine, config lib.MempoolConfig, log lib.LoggerI) (m *Mempool, err lib.ErrorI) {
+func NewMempool(fsm *fsm.StateMachine, config lib.MempoolConfig, metrics *lib.Metrics, log lib.LoggerI) (m *Mempool, err lib.ErrorI) {
 	// initialize the structure
 	m = &Mempool{
 		Mempool:         lib.NewMempool(config),
 		cachedFailedTxs: lib.NewFailedTxCache(),
+		metrics:         metrics,
 		log:             log,
 	}
 	// make an 'mempool (ephemeral copy) state' so the mempool can maintain only 'valid' transactions despite dependencies and conflicts
@@ -238,6 +240,8 @@ func (m *Mempool) checkMempool() {
 		// delete the transaction
 		m.DeleteTransaction(tx)
 	}
+	// update the mempool metrics
+	m.metrics.UpdateMempoolMetrics(m.Mempool.TxCount(), m.Mempool.TxsBytes())
 }
 
 // applyAndWriteTx() checks the validity of a transaction by playing it against the mempool (ephemeral copy) state machine

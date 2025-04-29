@@ -910,7 +910,7 @@ type MessageEditOrder struct {
 	// not modifiable, used for order identification only
 	ChainId uint64 `protobuf:"varint,2,opt,name=ChainId,proto3" json:"chainID"` // @gotags: json:"chainID"
 	// amount_for_sale: the updated amount of uCNPY listed for sale, a reduction will return escrowed tokens to the seller's
-	// receive address
+	// send address
 	AmountForSale uint64 `protobuf:"varint,3,opt,name=AmountForSale,proto3" json:"amountForSale"` // @gotags: json:"amountForSale"
 	// requested_amount: the updated amount of the 'counter asset' the buyer must send in order to complete a swap
 	RequestedAmount uint64 `protobuf:"varint,4,opt,name=RequestedAmount,proto3" json:"requestedAmount"` // @gotags: json:"requestedAmount"

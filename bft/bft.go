@@ -13,12 +13,12 @@ import (
 
 // BFT is a structure that holds data for a Hotstuff BFT instance
 type BFT struct {
-	*lib.View                            // the current period during which the BFT is occurring (CreatedHeight/Round/Phase)
+	*lib.View                            // the current period during which the BFT is occurring (Height/Round/Phase)
 	Votes         VotesForHeight         // 'votes' received from Replica (non-leader) Validators
 	Proposals     ProposalsForHeight     // 'proposals' received from the Leader Validator(s)
 	ProposerKey   []byte                 // the public key of the proposer
 	ValidatorSet  ValSet                 // the current set of Validators
-	HighQC        *QC                    // the highest PRECOMMIT quorum certificate the node is aware of for this CreatedHeight
+	HighQC        *QC                    // the highest PRECOMMIT quorum certificate the node is aware of for this Height
 	Block         []byte                 // the current Block being voted on (the foundational unit of the blockchain)
 	BlockHash     []byte                 // the current hash of the block being voted on
 	Results       *lib.CertificateResult // the current Result being voted on (reward and slash recipients)
@@ -101,6 +101,8 @@ func (b *BFT) Start() {
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
+				// Update BFT metrics
+				defer b.Metrics.UpdateBFTMetrics(b.Height, b.RootHeight, b.Round, b.Phase, time.Now())
 				// handle the phase
 				b.HandlePhase()
 			}()
@@ -240,7 +242,7 @@ func (b *BFT) StartElectionVotePhase() {
 			Header:      b.View.Copy(),
 			ProposerKey: b.ProposerKey, // using voting power, authorizes Candidate to act as the 'Leader'
 		},
-		HighQc:                 b.HighQC,                         // forward highest known 'Lock' for this CreatedHeight, so the new Proposer may satisfy SAFE-NODE-PREDICATE
+		HighQc:                 b.HighQC,                         // forward highest known 'Lock' for this Height, so the new Proposer may satisfy SAFE-NODE-PREDICATE
 		LastDoubleSignEvidence: b.ByzantineEvidence.DSE.Evidence, // forward any evidence of DoubleSigning
 		Vdf:                    b.HighVDF,                        // forward local VDF to the candidate
 	})
@@ -249,7 +251,7 @@ func (b *BFT) StartElectionVotePhase() {
 // StartProposePhase() begins the ProposePhase after the ELECTION-VOTE phase timeout
 // PROPOSE PHASE:
 // - Leader reviews the collected vote messages from Replicas
-//   - Determines the highest 'lock' (HighQC) if one exists for this CreatedHeight
+//   - Determines the highest 'lock' (HighQC) if one exists for this Height
 //   - Combines any ByzantineEvidence sent from Replicas into their own
 //   - Aggregates the signatures from the Replicas to form a +2/3 threshold multi-signature
 //
@@ -292,7 +294,7 @@ func (b *BFT) StartProposePhase() {
 // StartProposeVotePhase() begins the ProposeVote after the PROPOSE phase timeout
 // PROPOSE-VOTE PHASE:
 // - Replica reviews the message from the Leader by validating the justification (+2/3 multi-sig) proving that they are in-fact the leader
-// - If the Replica is currently Locked on a previous Proposal for this CreatedHeight, the new Proposal must pass the SAFE-NODE-PREDICATE
+// - If the Replica is currently Locked on a previous Proposal for this Height, the new Proposal must pass the SAFE-NODE-PREDICATE
 // - Replica Validates the proposal using the byzantine evidence and the specific plugin
 // - Replicas send a signed (aggregable) PROPOSE vote to the Leader
 func (b *BFT) StartProposeVotePhase() {
@@ -592,8 +594,6 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.Height = b.Controller.ChainHeight()
 	// update canopy height
 	b.RootHeight = b.Controller.RootChainHeight()
-	// Update BFT metrics
-	b.Metrics.UpdateBFTMetrics(b.Height, b.RootHeight)
 	// update the validator set
 	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.Height), b.RootHeight)
 	if err != nil {

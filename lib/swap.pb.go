@@ -67,7 +67,7 @@ type SellOrder struct {
 	// committee: the id of the committee that is in-charge of escrow for the swap
 	Committee uint64 `protobuf:"varint,2,opt,name=Committee,proto3" json:"committee"` // @gotags: json:"committee"
 	// amount_for_sale: amount of CNPY for sale
-	AmountForSale uint64 `protobuf:"varint,3,opt,name=AmountForSale,proto3" json:"amountForSalee"` // @gotags: json:"amountForSalee"
+	AmountForSale uint64 `protobuf:"varint,3,opt,name=AmountForSale,proto3" json:"amountForSale"` // @gotags: json:"amountForSale"
 	// requested_amount: amount of 'counter-asset' to receive
 	RequestedAmount uint64 `protobuf:"varint,4,opt,name=RequestedAmount,proto3" json:"requestedAmount"` // @gotags: json:"requestedAmount"
 	// seller_receive_address: the external chain address to receive the 'counter-asset'

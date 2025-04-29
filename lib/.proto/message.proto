@@ -193,7 +193,7 @@ message MessageEditOrder {
   // not modifiable, used for order identification only
   uint64 ChainId = 2; // @gotags: json:"chainID"
   // amount_for_sale: the updated amount of uCNPY listed for sale, a reduction will return escrowed tokens to the seller's
-  // receive address
+  // send address
   uint64 AmountForSale = 3; // @gotags: json:"amountForSale"
   // requested_amount: the updated amount of the 'counter asset' the buyer must send in order to complete a swap
   uint64 RequestedAmount = 4; // @gotags: json:"requestedAmount"

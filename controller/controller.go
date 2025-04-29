@@ -45,7 +45,7 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 		return
 	}
 	// initialize the mempool using the FSM copy and the mempool config
-	mempool, err := NewMempool(fsm, c.MempoolConfig, l)
+	mempool, err := NewMempool(fsm, c.MempoolConfig, metrics, l)
 	// if an error occurred when creating a new mempool
 	if err != nil {
 		// exit with error

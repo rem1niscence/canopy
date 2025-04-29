@@ -47,7 +47,7 @@ message SellOrder {
   // committee: the id of the committee that is in-charge of escrow for the swap
   uint64 Committee = 2; // @gotags: json:"committee"
   // amount_for_sale: amount of CNPY for sale
-  uint64 AmountForSale = 3; // @gotags: json:"amountForSalee"
+  uint64 AmountForSale = 3; // @gotags: json:"amountForSale"
   // requested_amount: amount of 'counter-asset' to receive
   uint64 RequestedAmount = 4; // @gotags: json:"requestedAmount"
   // seller_receive_address: the external chain address to receive the 'counter-asset'

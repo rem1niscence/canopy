@@ -21,11 +21,14 @@ const (
 	// 5. If KeepNumVersions is set to max int it will prevent automatic GC of older versions
 	// ------------------------------------------------------------------------------
 	// Bits source: https://github.com/hypermodeinc/badger/blob/85389e88bf308c1dc271383b77b67f4ef4a85194/value.go#L37
-	badgerMetaFieldName               = "meta" // badgerDB Entry 'meta' field name
-	badgerDiscardEarlierVersions byte = 1 << 2 // badgerDB 'discard earlier versions' flag
-	badgerDeleteBit              byte = 1 << 0 // badgerDB 'tombstoned' flag
-	badgerNoDiscardBit           byte = 1 << 3 // badgerDB 'never discard'  bit
-	badgerGCRatio                     = .15    // the ratio when badgerDB will run the garbage collector
+	badgerMetaFieldName               = "meta"  // badgerDB Entry 'meta' field name
+	badgerDiscardEarlierVersions byte = 1 << 2  // badgerDB 'discard earlier versions' flag
+	badgerDeleteBit              byte = 1 << 0  // badgerDB 'tombstoned' flag
+	badgerNoDiscardBit           byte = 1 << 3  // badgerDB 'never discard'  bit
+	badgerGCRatio                     = .15     // the ratio when badgerDB will run the garbage collector
+	badgerSizeFieldName               = "size"  // badgerDB Txn 'size' field name
+	badgerCountFieldName              = "count" // badgerDB Txn 'count' field name
+	badgerTxnFieldName                = "txn"   // badgerDB WriteBatch 'txn' field name
 )
 
 // RWStoreI interface enforcement
@@ -35,6 +38,7 @@ var _ lib.RWStoreI = &TxnWrapper{}
 type TxnWrapper struct {
 	logger lib.LoggerI
 	db     *badger.Txn
+	size   uint64
 	prefix []byte
 }
 
@@ -210,4 +214,32 @@ func setMeta(e *badger.Entry, value byte) {
 	f := v.FieldByName(badgerMetaFieldName)
 	ptr := unsafe.Pointer(f.UnsafeAddr())
 	*(*byte)(ptr) = value
+}
+
+// getTxnFromBatch() accesses the private field 'size/count' of badgerDB's `Txn` inside a 'WriteBatch'
+// badger doesn't yet allow users to access this info - though it allows users to avoid
+// TxnTooBig errors
+func getSizeAndCountFromBatch(batch *badger.WriteBatch) (size, count int64) {
+	v := reflect.ValueOf(batch).Elem()
+	f := v.FieldByName(badgerTxnFieldName)
+	if f.Kind() != reflect.Ptr || f.IsNil() {
+		return 0, 0
+	}
+	// f.Pointer() is the uintptr of the actual *Txn
+	txPtr := (*badger.Txn)(unsafe.Pointer(f.Pointer()))
+	return getSizeAndCount(txPtr)
+}
+
+// getSizeAndCount() accesses the private field 'size/count' of badgerDB's `Txn`
+// badger doesn't yet allow users to access this info - though it allows users to avoid
+// TxnTooBig errors
+func getSizeAndCount(txn *badger.Txn) (size, count int64) {
+	v := reflect.ValueOf(txn).Elem()
+	sizeF, countF := v.FieldByName(badgerSizeFieldName), v.FieldByName(badgerCountFieldName)
+	if !sizeF.IsValid() || !countF.IsValid() {
+		return 0, 0
+	}
+	sizePtr, countPtr := unsafe.Pointer(sizeF.UnsafeAddr()), unsafe.Pointer(countF.UnsafeAddr())
+	size, count = *(*int64)(sizePtr), *(*int64)(countPtr)
+	return
 }
