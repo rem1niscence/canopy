@@ -16,15 +16,67 @@ In the context of blockchain, an FSM manages the transition from one blockchain 
 
 ## The Role of FSM in Canopy
 
-In the Canopy blockchain, the FSM module serves as the "brain" of the system, responsible for:
+In the Canopy blockchain, the FSM module serves as the rules by which the blockchain ledger changes. It is the entry point and the only mechanism through which the blockchain state (ledger) can be modified. The FSM:
 
-1. **State Management**: Maintaining the current state of all accounts, validators, and other blockchain data
-2. **Transaction Processing**: Validating and applying transactions to modify the state
-3. **Rule Enforcement**: Ensuring all operations follow the protocol rules
+1. **State Management**: Maintains the current state of all accounts, validators, and other blockchain data
+2. **Transaction Processing**: Validates and applies transactions to modify the state
+3. **Rule Enforcement**: Ensures all operations follow the protocol rules
 4. **Consensus Support**: Providing the state information needed for consensus mechanisms
 5. **Governance Implementation**: Executing governance decisions that affect the blockchain state
 
 The FSM ensures deterministic execution - given the same input (transactions) and starting state, all nodes will arrive at the identical resulting state, which is crucial for blockchain consensus.
+
+## State Transitions and Block Processing
+
+The FSM handles state transitions through a well-defined process centered around block application:
+
+### Block Application Process
+
+1. **BeginBlock**: Executes automatic state changes at the beginning of each block, including:
+   - Funding committee reward pools (minting new cryptocurrency)
+   - Checking protocol versions to enforce upgrades
+   - Handling certificate results for the chain
+
+2. **Transaction Application**: Processes all transactions within the block:
+   - Validates each transaction (signatures, replay protection)
+   - Deducts transaction fees
+   - Routes messages to appropriate handlers
+   - Updates state according to transaction type
+   - Generates transaction results and a Merkle root
+
+3. **EndBlock**: Executes automatic state changes at the end of each block:
+   - Distributes committee rewards based on certificate results
+   - Updates the last proposer for election seed refreshing
+   - Handles validator stake management (forced unstaking, returning tokens)
+
+4. **State Finalization**: Generates the block header containing:
+   - State root (Merkle root of the resulting state)
+   - Transaction root (Merkle root of all transactions)
+   - Validator roots (for current and next validator sets)
+   - Other metadata (height, time, hash, etc.)
+
+This process ensures that all nodes in the network can independently apply the same rules to the same inputs and arrive at an identical state.
+
+## Key Components
+
+The StateMachine struct is the central component of the FSM package:
+
+```go
+type StateMachine struct {
+    store lib.RWStoreI
+    ProtocolVersion    uint64
+    NetworkID          uint32
+    height             uint64
+    totalVDFIterations uint64
+    slashTracker       *SlashTracker
+    proposeVoteConfig  GovProposalVoteConfig
+    Config             lib.Config
+    Metrics            *lib.Metrics
+    log                lib.LoggerI
+}
+```
+
+This structure maintains the entire state of the blockchain and provides methods for interacting with and modifying that state according to the protocol rules.
 
 ## Core Components and Their Relationships
 
