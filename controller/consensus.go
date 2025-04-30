@@ -13,16 +13,60 @@ import (
 	"github.com/canopy-network/canopy/p2p"
 )
 
+const (
+	// Maximum size of the block sync request queue
+	blockSyncQueueSize = uint64(80)
+	// How often the queue is checked and more block requests sent
+	blockRequestInterval = 100 * time.Millisecond
+	// How long to wait until a block request times out
+	blockRequestTimeout = 5 * time.Second
+	// Increase or decrease the block request rate relative to the default
+	// Increase this to try to sync faster at the risk of hitting rate limits
+	rateScaleFactor = 1.00
+)
+
 /* This file contains the high level functionality of the continued agreement on the blocks of the chain */
+
+// blockSyncRequest tracks each block request that has been sent
+type blockSyncRequest struct {
+	timestamp     time.Time
+	height        uint64
+	peerPublicKey []byte
+	message       *lib.MessageAndMetadata
+	blockMessage  *lib.BlockMessage
+}
+
+// getRandomAllowedPeer randomizes the provided peer list and chooses the first one that is not rate-limited
+func getRandomAllowedPeer(peers []string, limiter *lib.SimpleLimiter) string {
+	// Create a copy of the peer list
+	copy := make([]string, 0, len(peers))
+	for i := range peers {
+		copy = append(copy, peers[i])
+	}
+	// Shuffle the list in order to try all peers in a random order
+	rand.Shuffle(len(copy), func(i, j int) {
+		copy[i], copy[j] = copy[j], copy[i]
+	})
+	// Find a peer that is not rate limited
+	for _, peer := range copy {
+		blocked, allBlocked := limiter.NewRequest(peer)
+		if !blocked && !allBlocked {
+			return peer
+		}
+	}
+	// No peers were allowed to send
+	return ""
+}
 
 // Sync() downloads the blockchain from peers until 'synced' to the latest 'height'
 // 1) Get the height and begin block params from the state_machine
 // 2) Get peer max_height from P2P
-// 3) Ask peers for a block at a time
-// 4) CheckBasic each block by checking if cert was signed by +2/3 maj (COMMIT message)
-// 5) Commit block against the state machine, if error fatal
-// 5) Do this until reach the max-peer-height
-// 6) Stay on top by listening to incoming cert messages
+// 3) Fill a queue of blocks by requesting them from randomly chosen peers
+// 4) When available, process next block from queue
+// 5) CheckBasic each block by checking if cert was signed by +2/3 maj (COMMIT message)
+// 6) Commit block against the state machine, if error fatal
+// 7) Do this until reach the max-peer-height
+// 8) Stay on top by listening to incoming cert messages
 func (c *Controller) Sync() {
 	// log the initialization of the syncing process
 	c.log.Infof("Sync started 🔄 for committee %d", c.Config.ChainId)
@@ -35,79 +79,206 @@ func (c *Controller) Sync() {
 		// exit
 		return
 	}
-	// poll max height of all peers
-	maxHeight, minVDFIterations, syncingPeers := c.pollMaxHeight(1)
-	// while still below the latest height
+	// Find the height the FSM is expecting to receive next
+	fsmHeight := c.FSM.Height()
+	// queue contains block requests either in-flight or completed
+	queue := map[uint64]blockSyncRequest{}
+	// How often to send block requests to maintain the queue
+	requestTicker := time.NewTicker(blockRequestInterval)
+	defer requestTicker.Stop()
+	// Get an initial max height, min vdf iterations and syncing peers
+	maxHeight, minVDFIterations, _ := c.pollMaxHeight(1)
+	c.log.Infof("Starting sync 🔄 at height %d", fsmHeight)
+	// Create a limiter to prevent peers from disconnecting and slashing rep
+	limiter := lib.NewLimiter(p2p.MaxBlockReqPerWindow*rateScaleFactor, c.P2P.MaxPossiblePeers()*p2p.MaxBlockReqPerWindow, p2p.BlockReqWindowS)
+
+	// Loop until the sync is complete
+	// The purpose is to keep the queue full and hand the next block to the FSM
+	// - List of current peers queried from P2P module
+	// - Block requests are sent to a peer if there is room available in the queue
+	// - Peers are chosen randomly from ones which are not rate-limited
+	// - Block responses are verified and given to the FSM in the expected order
 	for !c.syncingDone(maxHeight, minVDFIterations) {
-		// get a random peer to send a 'block request' to
-		requested, _ := lib.StringToBytes(syncingPeers[rand.Intn(len(syncingPeers))])
-		// log the initialization of the block request
-		c.log.Infof("Syncing height %d 🔄 from %s", c.FSM.Height(), lib.BytesToTruncatedString(requested))
-		// send the request to the
-		go c.RequestBlock(false, requested)
-		// block until one of the two cases happens
 		select {
-		// a) got a block in the inbox
+		case <-limiter.TimeToReset():
+			limiter.Reset()
+		case <-requestTicker.C:
+			// Get current chain height
+			fsmHeight := c.FSM.Height()
+			// Get an updated list of available peers
+			peers, _, _ := c.P2P.PeerSet.GetAllInfos()
+			// Update syncing peers list
+			syncingPeers := make([]string, len(peers))
+			for _, peer := range peers {
+				syncingPeers = append(syncingPeers, lib.BytesToString(peer.Address.PublicKey))
+			}
+			// Remove requests that have timed out
+			c.applyTimeouts(queue)
+			// Calculate the height to stop at when updating queue
+			stopHeight := min(fsmHeight+blockSyncQueueSize, maxHeight)
+			// Send block requests for any missing heights in the queue
+			c.sendBlockRequests(fsmHeight, stopHeight, queue, limiter, syncingPeers)
 		case msg := <-c.P2P.Inbox(Block):
-			// if the responder does not equal the requester
-			responder := msg.Sender.Address.PublicKey
-			// log the receipt of a 'block response'
-			c.log.Debugf("Received a block response msg from %s", lib.BytesToTruncatedString(responder))
-			// check to see if the 'responder' is who was 'requested'
-			if !bytes.Equal(responder, requested) {
-				// log this unexpected behavior
-				c.log.Warn("unexpected sender")
-				// slash the reputation of the unexpected responder
-				c.P2P.ChangeReputation(responder, p2p.UnexpectedBlockRep)
-				// exit the select to re-poll
-				break
+			// verify the response
+			blockMsg, height := c.verifyResponse(msg, queue)
+			// Update queued request with this response
+			if blockMsg != nil {
+				c.log.Debugf("Received height %d from %s", height, lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
+				// find the queued request for this height
+				// verifyResponse() confirms this height is present in the queue
+				req := queue[height]
+				// update request with the response data
+				req.blockMessage = blockMsg
+				req.message = msg
+				// add to queue waiting for handing to the FSM
+				queue[height] = req
 			}
-			// cast the message to a block message
-			blockMessage, ok := msg.Message.(*lib.BlockMessage)
-			// if the cast fails
-			if !ok {
-				// log this unexpected behavior
-				c.log.Warn("Not a block response msg")
-				// slash the reputation of the peer
-				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
-				// exit the select to re-poll
-				break
-			}
-			// process the block message received from the peer
-			if _, err := c.HandlePeerBlock(blockMessage, true); err != nil {
-				// log this unexpected behavior
-				c.log.Warnf("Syncing peer block invalid:\n%s", err.Error())
-				// slash the reputation of the peer
-				c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
-				// exit the select to re-poll
-				break
-			}
-			// each peer is individually polled for 'max height' in each request
-			// if the max height has grown, we accept that as the new max height
-			if blockMessage.MaxHeight > maxHeight && blockMessage.TotalVdfIterations >= minVDFIterations {
-				// log the update
-				c.log.Debugf("Updated chain %d with max height: %d and iterations %d", c.Config.ChainId, maxHeight, minVDFIterations)
+			// process queued response messages
+			m, v := c.processQueue(c.FSM.Height(), maxHeight, queue)
+			// check if max height and min vdf needs updating
+			if m >= maxHeight && v >= minVDFIterations {
 				// update the max height and vdf iterations
-				maxHeight, minVDFIterations = blockMessage.MaxHeight, blockMessage.TotalVdfIterations
+				maxHeight, minVDFIterations = m, v
+				c.log.Debugf("Updated chain %d with max height: %d and iterations %d", c.Config.ChainId, maxHeight, minVDFIterations)
 			}
-			// success, increase the peer reputation
-			c.P2P.ChangeReputation(responder, p2p.GoodBlockRep)
-			// execute another iteration without polling peers
-			continue
-		// b) a timeout occurred before a block landed in the inbox
-		case <-time.After(p2p.SyncTimeoutS * time.Second):
-			// log the timeout
-			c.log.Warnf("Timeout waiting for sync block")
-			// slash the peer reputation
-			c.P2P.ChangeReputation(requested, p2p.TimeoutRep)
 		}
-		// update the syncing peers and poll the peers for their max height + minimum vdf iterations
-		maxHeight, minVDFIterations, syncingPeers = c.pollMaxHeight(1)
 	}
-	// log 'sync complete'
+	// Syncing complete
 	c.log.Info("Synced to top ✅")
 	// signal that the node is synced to top
 	c.finishSyncing()
+}
+
+func (c *Controller) processQueue(startHeight, stopHeight uint64, queue map[uint64]blockSyncRequest) (maxReceivedHeight, minVDFIterations uint64) {
+	for height := startHeight; height < stopHeight; height++ {
+		// Get the next height to be sent to FSM. This height is the required next height
+		req, success := queue[height]
+		// If required block not present, break and keep waiting
+		if !success {
+			c.log.Debugf("Height %d not found in queue, queue size: %d", height, len(queue))
+			break
+		}
+		// Request has been sent but response yet to be received
+		if req.blockMessage == nil {
+			break
+		}
+		// remove request from queue
+		delete(queue, height)
+		// convenience variable
+		blockMsg := req.blockMessage
+		// start timing the HandlePeerBlock call
+		start := time.Now()
+		// process the block message received from the peer
+		if _, err := c.HandlePeerBlock(blockMsg, true); err != nil {
+			h := blockMsg.BlockAndCertificate.Header.Height
+			// log this unexpected behavior
+			c.log.Warnf("Syncing peer block height %d invalid:\n%s", h, err.Error())
+			// slash the reputation of the peer
+			c.P2P.ChangeReputation(req.message.Sender.Address.PublicKey, p2p.InvalidBlockRep)
+			break
+		}
+		// calculate and log the elapsed time
+		elapsed := time.Since(start)
+		c.log.Infof("Block %d sync complete. HandlePeerBlock took %s", height, elapsed)
+		// calculate and log the elapsed time
+		// success, increase the peer reputation
+		c.P2P.ChangeReputation(req.message.Sender.Address.PublicKey, p2p.GoodBlockRep)
+		// check if max height and minimum vdf iterations should be updated
+		if blockMsg.MaxHeight > maxReceivedHeight && blockMsg.TotalVdfIterations >= minVDFIterations {
+			// update the max height and vdf iterations
+			maxReceivedHeight, minVDFIterations = blockMsg.MaxHeight, blockMsg.TotalVdfIterations
+		}
+	}
+	return
+}
+
+// Send requests for heights missing in the queue
+// They can be missing because:
+//   - Sync has just started and queue isn't full yet
+//   - A previous request for a height timed out and was removed from queue
+//   - A previous request for a height was removed from the queue for processing
+//     Failure in processing leaves that height missing in the queue, triggering another request
+//   - Block height has advanced and there's room at the end of the queue
+func (c *Controller) sendBlockRequests(start, stop uint64, queue map[uint64]blockSyncRequest, limiter *lib.SimpleLimiter, peers []string) {
+	// Send requests to populate the queue
+	for height := start; height < stop; height++ {
+		// A block request has already been sent for this height
+		if _, ok := queue[height]; ok {
+			continue
+		}
+		// Find a random peer that is not rate limited
+		allowedPeer := getRandomAllowedPeer(peers, limiter)
+		if allowedPeer == "" {
+			// All peers rate-limited, cannot send any more requests
+			return
+		}
+		peerPublicKey, _ := lib.StringToBytes(allowedPeer)
+
+		c.log.Debugf("Requesting block for height %d 🔄 from %s", height, lib.BytesToTruncatedString(peerPublicKey))
+
+		// Send block request to selected peer
+		err := c.P2P.SendTo(peerPublicKey, BlockRequest, &lib.BlockRequestMessage{
+			ChainId:    c.Config.ChainId,
+			Height:     height,
+			HeightOnly: false,
+		})
+		if err != nil {
+			c.log.Errorf("Error requesting block for height %d 🔄 from %s", height, lib.BytesToTruncatedString(peerPublicKey))
+			break
+		}
+
+		// Add new request to queue
+		queue[height] = blockSyncRequest{
+			height:        height,
+			peerPublicKey: peerPublicKey,
+		}
+	}
+}
+
+// applyTimeouts removes requests from the queue that have timed out
+func (c *Controller) applyTimeouts(queue map[uint64]blockSyncRequest) []blockSyncRequest {
+	expired := make([]blockSyncRequest, 0)
+	// Find expired requests
+	for _, req := range queue {
+		elapsed := time.Since(req.timestamp)
+		if elapsed > blockRequestTimeout {
+			c.log.Warnf("Request for height %d timed out: %s", req.height, elapsed)
+			expired = append(expired, req)
+		}
+	}
+	// Delete expired requests
+	for _, req := range expired {
+		delete(queue, req.height)
+	}
+	return expired
+}
+
+// verifyResponse validates the block response is ready for the FSM
+// - Response is a proper blockResponse type
+// - A request for it exists in the queue
+// - Response is from the expected peer
+func (c *Controller) verifyResponse(msg *lib.MessageAndMetadata, queue map[uint64]blockSyncRequest) (blockMessage *lib.BlockMessage, height uint64) {
+	blockMessage, ok := msg.Message.(*lib.BlockMessage)
+	if !ok {
+		c.log.Warn("Not a block response msg")
+		c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidBlockRep)
+		return nil, 0
+	}
+	// Get the height in the message
+	msgHeight := blockMessage.BlockAndCertificate.GetHeader().GetHeight()
+	// Check for height in queue
+	if _, ok := queue[msgHeight]; !ok {
+		c.log.Warnf("Request not found for height %d, sent from %s", msgHeight, lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
+		return nil, 0
+	}
+	// Get responder and verify proper sender
+	responder := msg.Sender.Address.PublicKey
+	if !bytes.Equal(responder, queue[msgHeight].peerPublicKey) {
+		c.log.Warnf("unexpected sender %s for height %d", lib.BytesToTruncatedString(responder), msgHeight)
+		c.P2P.ChangeReputation(responder, p2p.UnexpectedBlockRep)
+		return nil, 0
+	}
+	return blockMessage, msgHeight
 }
 
 // SUBSCRIBERS BELOW
