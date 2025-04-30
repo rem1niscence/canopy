@@ -32,303 +32,455 @@ The FSM ensures deterministic execution - given the same input (transactions) an
 
 ### State
 
-The State component is the foundational element of the FSM, representing the collective data of the blockchain at any given point in time. It encompasses all accounts, validators, committees, pools, and other critical information that defines the current status of the blockchain network.
+The State component is the fundamental backbone of the Canopy blockchain, responsible for maintaining and updating the collective state as the blockchain progresses. It represents a comprehensive snapshot of the entire blockchain at any given moment, including all accounts, validators, pools, and other critical data structures.
 
-The State component acts as a persistent database that tracks every change to the blockchain's condition. It maintains a record of all account balances, validator stakes, governance parameters, and other essential data points. This comprehensive record allows the blockchain to maintain consistency and integrity across all nodes in the network.
+The State component acts as a persistent database that tracks every change that occurs on the blockchain. When transactions are processed or blocks are finalized, the State component updates accordingly, ensuring that all nodes in the network maintain an identical view of the blockchain's current condition.
 
-When transactions are processed or blocks are finalized, the State component is updated to reflect these changes. It serves as the source of truth for the entire blockchain, providing a reliable reference point for all operations and queries. The State's integrity is paramount, as any inconsistency could lead to network splits or consensus failures.
+What makes the State component particularly powerful is its ability to provide a deterministic representation of the blockchain. This means that given the same sequence of transactions and starting from the same initial state, any node in the network will arrive at exactly the same resulting state. This property is essential for achieving consensus in a distributed system.
+
+The State component also provides mechanisms for querying current values, such as account balances, validator information, or governance parameters. These queries allow applications built on top of Canopy to access the information they need without having to process the entire blockchain history.
 
 Key aspects of this component include:
+- Deterministic state transitions ensuring network-wide consistency
 - Persistent storage of all blockchain data
-- Versioning to track changes over time
-- Efficient retrieval mechanisms for quick access to data
-- Atomicity guarantees for state transitions
-- Snapshot capabilities for backup and recovery
-- Deterministic execution to ensure network-wide consistency
-
-### Transactions
-
-Transactions are the primary mechanism through which users interact with the blockchain and initiate state changes. They represent user-initiated actions such as transferring tokens, staking, voting on governance proposals, or interacting with smart contracts.
-
-Each transaction in Canopy contains a payload (message), a fee allocation, and cryptographic signatures to verify authenticity. When a transaction is submitted to the network, it undergoes rigorous validation before being included in a block. This validation ensures that the transaction adheres to the protocol rules, the sender has sufficient funds for the operation and fees, and the cryptographic signatures are valid.
-
-Once validated, transactions are processed by the FSM, which interprets the contained messages and applies the corresponding state changes. This processing is deterministic, meaning that given the same transaction and starting state, all nodes will produce identical resulting states. This property is crucial for maintaining consensus across the network.
-
-Key aspects of this component include:
-- Cryptographic verification of transaction authenticity
-- Fee calculation and deduction mechanisms
-- Message interpretation and execution
-- Atomic state updates to ensure consistency
-- Transaction indexing for historical queries
-- Error handling and failure recovery
-- Transaction result generation for client feedback
-
-### Accounts
-
-Accounts are fundamental entities within the Canopy blockchain that represent participants in the network. Each account is identified by a unique 20-byte address (160 bits for collision resistance) and maintains a balance of tokens that can be used for various operations.
-
-Accounts serve as the entry point for user interaction with the blockchain. They can send and receive transactions, participate in governance, delegate to validators, and perform other protocol-defined actions. Each account's state is tracked within the FSM, including its balance, transaction history, and any associated metadata.
-
-The account system in Canopy is designed to be flexible and extensible, allowing for different types of accounts with varying capabilities. This design enables the protocol to support a wide range of use cases while maintaining security and consistency.
-
-Key aspects of this component include:
-- Unique addressing scheme for account identification
-- Balance tracking and management
-- Transaction authorization through cryptographic signatures
-- Account metadata storage and retrieval
-- Support for different account types and capabilities
-- Efficient state updates during transaction processing
-- Account enumeration and querying capabilities
+- Efficient querying mechanisms for accessing current state values
+- Support for complex data structures beyond simple key-value pairs
+- Atomic updates that maintain data integrity during state changes
+- Versioning capabilities that allow for historical state access
 
 ### Committees
 
-Committees are specialized validator sets responsible for consensus on nested chains within the Canopy ecosystem. They represent groups of validators who have been selected to participate in the Byzantine Fault Tolerant (BFT) consensus process for specific chains.
+The Committees component manages the validator sets responsible for consensus across the Canopy network. Committees represent quorums of validators that participate in the Byzantine Fault Tolerant (BFT) consensus process for specific chains within the Canopy ecosystem.
 
-When a validator stakes tokens, they become eligible to provide shared security services to any Nested Chain they choose. The quorum of validators that participate in the BFT process for a particular nested chain forms a committee. Once staked for a committee, validators connect with other committee members via the P2P layer to execute consensus, producing immediately final nested-chain blocks.
+In Canopy's architecture, validators can provide shared security services to any Nested Chain they choose to participate in. When a validator stakes for a particular Committee, they connect with other Committee members through the P2P layer. Together, these validators execute consensus for their designated Nested Chain, producing immediately final blocks.
 
-Committees play a crucial role in Canopy's shared security model, allowing multiple chains to benefit from the security provided by a common set of validators. This approach enhances the overall security of the ecosystem while enabling specialized chains to focus on their specific use cases.
+The Committee structure is particularly powerful because it enables specialized security for different chains without requiring validators to secure the entire network. The Root Chain itself functions as just another Nested Chain, leveraging the network's shared security model. This design allows validators to secure specific sub-chains without being required to validate the Root Chain itself.
+
+For each Nested Chain block, the elected leader within a Committee submits a Certificate Result Transaction to the Canopy Root Chain, encapsulating the results of the quorum's consensus process. This certificate serves as proof that the Committee has reached agreement on the state of their Nested Chain.
+
+The Committees component handles the formation, management, and dissolution of these validator quorums, ensuring that each Committee maintains sufficient security properties while allowing validators the flexibility to participate in multiple Committees simultaneously.
 
 Key aspects of this component include:
-- Validator selection and committee formation
-- Reward distribution for consensus participation
-- Committee-specific staking and unstaking mechanisms
-- Cross-committee coordination and communication
-- Security guarantees through BFT consensus
-- Committee membership tracking and updates
-- Performance monitoring and accountability measures
+- Management of validator sets for different chains within the Canopy ecosystem
+- Tracking of Committee membership and voting power distribution
+- Handling of validator staking and unstaking processes for Committees
+- Distribution of rewards to Committee members for their consensus participation
+- Implementation of slashing conditions for Byzantine behavior within Committees
+- Support for cross-Committee communication and coordination
 
 ### Pools
 
-Pools are specialized account-like structures that hold funds managed directly by the blockchain protocol rather than individual users. Unlike regular accounts, pools don't have an owner with private keys; instead, they have a unique identifier and operate based on predefined blockchain rules.
+The Pools component manages special fund repositories that operate based on predefined blockchain rules rather than individual control. Unlike accounts which are controlled by private keys, pools are controlled directly by the protocol itself, making them crucial for automated token distribution and protocol-level fund management.
 
-Pools serve as repositories for protocol-managed funds, such as rewards, treasury allocations, and escrow holdings. They play a crucial role in Canopy's tokenomics by facilitating the controlled distribution of tokens according to protocol rules. Importantly, new tokens are never minted directly to accounts but are first minted to pools and then distributed according to protocol-defined mechanisms.
+Pools serve as the primary mechanism for token minting and distribution in the Canopy ecosystem. Rather than minting tokens directly to accounts, new tokens are always minted to pools first, and then distributed according to protocol rules. This approach provides a clear audit trail and ensures that token creation follows governance-approved mechanisms.
 
-The pool system enables transparent and predictable token distribution while maintaining protocol security. By separating protocol-managed funds from user accounts, pools provide a clear distinction between user-controlled and protocol-controlled assets.
+Each pool has a unique identifier and maintains a balance of funds, similar to an account but without an associated address. The protocol defines specific rules for how funds enter and exit each pool, creating a transparent and predictable system for token economics.
 
-Key aspects of this component include:
-- Protocol-controlled fund management
-- Transparent token distribution mechanisms
-- Support for different pool types (DAO Treasury, Committee Funds, Committee Escrow)
-- Automated distribution based on protocol rules
-- Balance tracking and reporting
-- Governance-controlled fund allocation
-- Integration with reward and incentive systems
+Canopy implements several important pools, including the DAO Treasury Pool for governance-controlled funds, Committee Funds Pool for validator rewards, and Committee Escrow Pool for staked tokens. These pools work together to create a balanced economic system that incentivizes desired behaviors while maintaining protocol security.
 
-### Governance
-
-Governance is the mechanism through which the Canopy blockchain can evolve and adapt over time through community decision-making. Canopy implements two distinct on-chain governance mechanisms: Polling and Proposals.
-
-Polling allows the community to gather sentiment by executing on-chain votes involving both accounts and validators. While polls don't directly execute actions, they serve as valuable tools for gauging community opinion on potential changes or initiatives.
-
-Proposals, on the other hand, enable concrete changes to the blockchain's operation. Canopy supports two types of proposals: Change Parameter proposals that update governance parameters without software changes, and DAO Transfer proposals that distribute treasury funds from the DAO pool to specified accounts. Proposals require approval from two-thirds of the voting power of the Root-Chain committee to be finalized.
-
-This dual governance approach allows for both informal community input and formal protocol changes, creating a balanced system that can respond to community needs while maintaining stability and security.
+The Pools component interacts closely with governance mechanisms, allowing the community to influence how funds are distributed from certain pools. For example, governance proposals can trigger transfers from the DAO Treasury Pool to fund community initiatives or protocol improvements.
 
 Key aspects of this component include:
-- On-chain voting mechanisms for both polling and proposals
-- Parameter change implementation without software updates
-- Treasury fund distribution through governance
-- Voting power calculation based on stake
-- Proposal lifecycle management (submission, voting, execution)
-- Governance parameter storage and retrieval
-- Voting record maintenance for transparency
+- Protocol-controlled fund repositories without individual ownership
+- Structured token minting and distribution pathways
+- Support for multiple specialized pools with different purposes
+- Integration with governance for community-directed fund allocation
+- Transparent accounting of protocol funds and their movements
+- Automated distribution mechanisms based on protocol rules
+
+### Transactions
+
+The Transactions component is the primary mechanism through which changes are made to the blockchain state. Transactions represent user-initiated actions that modify the state according to predefined rules, serving as the interface between users and the blockchain.
+
+Each transaction in Canopy contains specific instructions for how the state should change, along with cryptographic signatures that prove the transaction was authorized by the appropriate parties. When a transaction is included in a block and processed by the FSM, it triggers a series of state transitions that update account balances, validator information, or other relevant data.
+
+Transactions in Canopy support various operations, including token transfers between accounts, validator staking and unstaking, governance actions, and interactions with nested chains. Each transaction type follows specific validation rules to ensure it can be executed correctly and securely.
+
+The transaction processing flow involves several steps: validation to ensure the transaction is well-formed and properly signed, execution to apply the transaction's effects to the state, and finalization to commit the changes permanently. This process is deterministic, meaning that all nodes processing the same transaction will arrive at identical state changes.
+
+Fee mechanisms are built into the transaction system to prevent spam and compensate validators for their work in processing transactions. These fees are automatically deducted from the sender's account and distributed according to protocol rules.
+
+Key aspects of this component include:
+- Cryptographically secured user instructions for state changes
+- Support for multiple transaction types with different purposes
+- Deterministic execution ensuring network-wide consistency
+- Fee mechanisms to prevent spam and compensate validators
+- Validation rules to ensure transactions are well-formed and authorized
+- Atomic execution to maintain state integrity during processing
+
+### Validators
+
+The Validators component manages the entities responsible for securing the Canopy network through participation in consensus. Validators stake tokens as collateral, process transactions, produce blocks, and maintain network security in exchange for rewards.
+
+In Canopy's architecture, validators play a crucial role in the Byzantine Fault Tolerant (BFT) consensus process. They verify transactions, propose and vote on blocks, and ensure that the network reaches agreement on the state of the blockchain. The security of the entire system depends on having a sufficient number of honest validators with adequate stake.
+
+Validators in Canopy have the flexibility to participate in multiple committees, providing security to different nested chains based on their preferences and capabilities. This allows for specialization while maintaining the overall security of the network. Validators stake tokens as a form of economic security, putting their own assets at risk if they behave maliciously.
+
+The validator lifecycle includes several states: staking to join the validator set, active participation in consensus, optional pausing for maintenance, and unstaking to exit completely. During the unstaking period, validators must wait for a governance-controlled number of blocks before their bond is fully returned, during which they remain eligible for slashing if evidence of past misbehavior is discovered.
+
+The Validators component tracks important metrics for each validator, including their voting power (proportional to their stake), uptime, and participation in consensus. These metrics influence reward distribution and help users make informed decisions about which validators to delegate to.
+
+Key aspects of this component include:
+- Management of validator registration, staking, and unstaking processes
+- Tracking of validator participation and performance metrics
+- Implementation of slashing conditions for Byzantine behavior
+- Support for validator pausing and maintenance operations
+- Distribution of rewards based on validator contributions
+- Governance mechanisms for adjusting validator parameters
+
+### Subsidization
+
+The Subsidization component manages the creation and distribution of newly minted tokens to support various protocol functions and incentivize desired behaviors. It implements the token emission schedule and ensures that subsidies are distributed according to governance-approved parameters.
+
+In Canopy, subsidization serves multiple purposes: it provides rewards for validators securing the network, funds the DAO treasury for community initiatives, and supports other protocol-level incentives. Rather than minting tokens directly to recipients, all newly created tokens first flow through designated pools, creating a transparent and auditable path for token distribution.
+
+The subsidization rate follows a predetermined schedule that may include gradual reduction over time, similar to Bitcoin's halving mechanism. This approach creates predictable token economics while allowing for some flexibility through governance adjustments to distribution parameters.
+
+Committee subsidization is particularly important, as it provides the economic incentives for validators to secure nested chains. The subsidization component calculates appropriate reward amounts based on factors like committee size, total stake, and network parameters, then distributes these rewards to the relevant committee pools.
+
+Governance plays a crucial role in the subsidization process, allowing the community to adjust parameters like distribution percentages between different pools or modify the overall emission schedule within predefined bounds. This creates a balance between predictability and adaptability in the token economic system.
+
+Key aspects of this component include:
+- Implementation of token emission schedules and distribution rules
+- Management of subsidy flows through designated protocol pools
+- Support for committee-specific reward calculations and distributions
+- Integration with governance for parameter adjustments
+- Transparent accounting of all subsidization activities
+- Mechanisms for adjusting incentives to maintain network security
+
+### Rewards
+
+The Rewards component handles the distribution of incentives to participants in the Canopy ecosystem, particularly validators who contribute to network security through consensus participation. It ensures that rewards are calculated fairly and distributed according to protocol rules.
+
+In Canopy, rewards come from multiple sources: newly minted tokens through subsidization, transaction fees collected from users, and other protocol-level incentives. These rewards are first collected in designated pools, then distributed to eligible validators based on their contributions and stake.
+
+The reward distribution process follows a deterministic algorithm that considers factors like validator uptime, voting power, and participation in specific committees. This creates a predictable and fair system that properly incentivizes desired behaviors while maintaining transparency.
+
+Committee rewards are particularly important in Canopy's multi-chain architecture. Validators receive rewards for participating in committee consensus, with reward amounts varying based on the specific committee and its importance to the network. This allows for specialized incentives that align with the security needs of different nested chains.
+
+The Rewards component works closely with the Automatic component to ensure that reward distributions occur at predetermined intervals, typically at the end of each block or at other protocol-defined boundaries. This automation ensures that rewards are distributed promptly and consistently without requiring manual intervention.
+
+Governance mechanisms allow the community to adjust reward parameters, such as the distribution percentages between different validator activities or the relative reward weights for different committees. This creates flexibility while maintaining the core incentive structure of the network.
+
+Key aspects of this component include:
+- Calculation of rewards based on validator contributions and stake
+- Distribution of rewards from designated pools to eligible participants
+- Support for committee-specific reward structures
+- Integration with the Automatic component for timely distributions
+- Transparent accounting of all reward activities
+- Governance mechanisms for adjusting reward parameters
+
+### Slashes
+
+The Slashes component implements the penalty mechanisms that discourage malicious or negligent behavior by validators. It detects violations of protocol rules, calculates appropriate penalties, and executes the slashing of stake as a consequence for these violations.
+
+In Canopy, slashing serves as a critical security mechanism that creates economic consequences for behaviors that could harm the network. When a validator engages in activities like double-signing (voting for conflicting blocks), extended downtime, or other protocol violations, the Slashes component identifies these infractions and imposes penalties proportional to their severity.
+
+The slashing process involves several steps: detection of the violation through evidence submission or automatic monitoring, verification that the violation occurred and is attributable to a specific validator, calculation of the appropriate penalty amount based on governance parameters, and execution of the slash by removing tokens from the validator's stake.
+
+Slashed tokens may be burned (removed from circulation) or redirected to designated pools like the DAO Treasury, depending on governance decisions. This creates additional economic consequences beyond the direct loss to the validator and ensures that the slashing mechanism contributes to the overall token economics of the network.
+
+To protect against long-range attacks, validators remain subject to slashing for a governance-defined period even after they begin the unstaking process. This ensures that validators cannot escape penalties for past misbehavior by quickly unstaking their tokens.
+
+Governance plays an important role in the slashing mechanism, allowing the community to adjust parameters like slash amounts for different violations or the duration of the slashing liability period. This creates a balance between deterrence and fairness in the penalty system.
+
+Key aspects of this component include:
+- Detection and verification of protocol violations by validators
+- Calculation of penalties based on violation type and severity
+- Execution of slashes by removing tokens from validator stakes
+- Management of slashed token destinations (burning or redirection)
+- Extended slashing liability during the unstaking period
+- Governance mechanisms for adjusting slashing parameters
+
+### Supply Tracker
+
+The Supply Tracker component maintains accurate accounting of all tokens in the Canopy ecosystem, tracking their creation, destruction, and movement between different parts of the system. It provides a comprehensive view of the token supply and its distribution across accounts and pools.
+
+In Canopy, the Supply Tracker serves as the authoritative source of information about the total token supply, including circulating supply (tokens available for transactions), staked supply (tokens bonded by validators), and reserved supply (tokens held in protocol pools). This information is crucial for understanding the token economics of the network and verifying that token creation and destruction follow protocol rules.
+
+The tracking process involves monitoring all operations that affect the token supply, including minting through subsidization, burning through slashing or fee mechanisms, and transfers between accounts and pools. Each of these operations is recorded with appropriate metadata to maintain a complete audit trail.
+
+The Supply Tracker provides important metrics for network participants, including the current inflation rate, the percentage of tokens staked versus circulating, and the distribution of tokens across different protocol pools. These metrics help users make informed decisions about participation in the network.
+
+By maintaining accurate supply information, the Supply Tracker also supports governance processes that depend on understanding the current state of the token economy. This includes decisions about adjusting subsidization rates, modifying fee structures, or allocating funds from protocol pools.
+
+Key aspects of this component include:
+- Tracking of total, circulating, staked, and reserved token supplies
+- Monitoring of all token creation and destruction events
+- Recording of token movements between accounts and pools
+- Calculation of key economic metrics like inflation rate and stake ratio
+- Support for governance decisions related to token economics
+- Verification that token operations follow protocol rules
+
+### Accounts
+
+The Accounts component manages the fundamental entities that hold and transfer value within the Canopy blockchain. Each account represents a participant in the network with the ability to hold tokens and initiate transactions.
+
+In Canopy, accounts are identified by unique 20-byte addresses (160 bits) derived from public keys, providing strong collision resistance. This addressing scheme ensures that each account is uniquely identifiable while maintaining a practical address length for use in transactions and user interfaces.
+
+Each account maintains a balance of tokens that can be increased through receiving transfers or rewards, and decreased through sending transfers, paying fees, or other protocol interactions. The account balance is a core part of the blockchain state and is updated atomically during transaction processing to maintain consistency.
+
+Accounts serve as the primary interface through which users interact with the Canopy blockchain. They can initiate various transaction types, including token transfers to other accounts, staking operations for validator participation, governance actions like voting on proposals, and interactions with nested chains.
+
+The security of accounts is maintained through public-key cryptography, with transactions requiring valid signatures from the private key corresponding to the account's address. This ensures that only the legitimate owner of an account can authorize transactions that affect its balance or state.
+
+The Accounts component provides efficient querying mechanisms to retrieve account information, including current balances and transaction histories. These queries support applications built on top of Canopy and allow users to verify their account status.
+
+Key aspects of this component include:
+- Unique 20-byte addressing scheme with strong collision resistance
+- Secure transaction authorization through cryptographic signatures
+- Atomic balance updates during transaction processing
+- Support for multiple transaction types and protocol interactions
+- Efficient querying mechanisms for account information
+- Integration with other components like Validators and Governance
 
 ### Genesis
 
-The Genesis component defines the initial state of the blockchain at its creation. It establishes the starting point from which all subsequent state transitions occur, setting the foundation for the entire blockchain's operation.
+The Genesis component defines the initial state of the Canopy blockchain at its launch, establishing the starting point from which all subsequent state transitions occur. It represents the foundation of the blockchain and encodes the fundamental parameters and initial distribution of resources.
 
-Genesis configuration includes the initial token distribution, validator set, governance parameters, and other critical protocol settings. This initial state is agreed upon by all participants before the blockchain launches, ensuring that all nodes start from the same baseline.
+In Canopy, the genesis state includes several critical elements: initial accounts and their token balances, the initial validator set with their stakes and powers, protocol pools with their starting balances, and governance parameters that control various aspects of the network's operation. This comprehensive initial state ensures that the blockchain begins with a well-defined configuration.
 
-The Genesis component is particularly important because it establishes the economic and governance models that will guide the blockchain's development. It sets the initial conditions that influence how the network will grow and evolve over time.
+The genesis process involves creating a special "genesis block" that does not reference any previous blocks and contains the complete initial state. This block serves as the anchor for the blockchain and is agreed upon by all participants before the network launches. Once the network is live, the genesis state cannot be altered except through the normal state transition rules defined by the protocol.
+
+Genesis configuration is particularly important for establishing the economic and governance foundations of the network. It defines the initial token distribution, which influences the decentralization and power dynamics of the network from the start. It also sets baseline parameters for important protocol functions like staking requirements, reward rates, and governance thresholds.
+
+For testing and development purposes, Canopy supports the creation of custom genesis states that can be used to launch test networks with specific configurations. This allows developers to experiment with different initial conditions and parameter settings without affecting the main network.
 
 Key aspects of this component include:
-- Initial token allocation and distribution
-- Founding validator set configuration
-- Baseline governance parameter establishment
-- Protocol constants definition
-- Network identifier and metadata
-- Starting block height and timestamp
-- Bootstrap mechanism for network initialization
+- Definition of the initial blockchain state at network launch
+- Configuration of initial accounts, validators, and token distribution
+- Establishment of baseline protocol parameters and governance settings
+- Creation of the genesis block as the anchor for the blockchain
+- Support for custom genesis configurations for testing and development
+- Immutability of genesis state after network launch
+
+### Governance
+
+The Governance component enables on-chain decision-making processes that allow the Canopy community to control protocol parameters and resource allocation without requiring software upgrades. It implements mechanisms for proposal submission, voting, and execution of approved changes.
+
+Canopy features two distinct on-chain governance mechanisms: Polling for gathering community sentiment, and Proposals for making binding changes to the protocol. These mechanisms work together to create a comprehensive governance system that balances efficiency with community input.
+
+Polling serves as a non-binding sentiment gathering tool, allowing any account or validator to initiate an on-chain vote on any topic. Polls have a defined end block and require a higher fee to prevent spam. While polls don't directly execute any actions, they provide valuable signals about community preferences that can inform subsequent binding proposals.
+
+Proposals come in two varieties: Change Parameter proposals for updating governance parameters without software changes, and DAO Transfer proposals for distributing funds from the DAO Treasury pool. Proposals require approval from two-thirds of the voting power of the Root-Chain committee to be finalized and executed.
+
+The governance process follows a structured flow: proposal submission with a deposit to prevent spam, a voting period during which eligible participants can cast their votes, a tallying phase to determine the outcome, and execution of approved proposals through automatic state changes. This process ensures that governance actions are transparent, fair, and follow predetermined rules.
+
+Governance parameters themselves can be adjusted through the governance process, allowing the system to evolve over time based on community needs. This creates a flexible framework that can adapt to changing circumstances while maintaining stability through well-defined processes.
+
+Key aspects of this component include:
+- Dual governance mechanisms for sentiment gathering and binding decisions
+- Support for parameter changes and treasury fund distribution
+- Structured proposal lifecycle from submission to execution
+- Voting mechanisms with appropriate security and weight calculations
+- Automatic execution of approved governance actions
+- Self-modifying capability through governance parameter adjustments
 
 ### Swap
 
-The Swap component facilitates token exchanges between different assets within the Canopy ecosystem. It provides a mechanism for users to convert between various token types, enhancing liquidity and enabling more complex financial interactions.
+The Swap component facilitates the exchange of tokens between different accounts or between accounts and pools within the Canopy ecosystem. It implements the rules and mechanisms for these exchanges, ensuring they occur atomically and according to protocol-defined parameters.
 
-Swaps are executed through specialized transactions that specify the input token, output token, and desired exchange parameters. The FSM processes these transactions by interacting with liquidity pools, calculating exchange rates, and executing the token transfers according to predefined formulas.
+In Canopy, swaps serve multiple purposes: they enable direct peer-to-peer token exchanges, support protocol-level operations like staking and unstaking, and facilitate interactions with liquidity pools or other financial primitives built into the protocol. Each swap operation follows specific validation rules to ensure it can be executed correctly and securely.
 
-This component enables decentralized exchange functionality directly within the blockchain protocol, eliminating the need for trusted intermediaries. By incorporating swap functionality into the core protocol, Canopy provides a seamless and secure trading experience while maintaining the benefits of decentralization.
+The swap process involves several steps: validation to ensure the swap is well-formed and authorized by the relevant parties, execution to move tokens between the specified accounts or pools, and finalization to commit the changes permanently to the blockchain state. This process is atomic, meaning that either the entire swap succeeds or it fails completely, preventing partial or inconsistent state changes.
+
+Swaps can be initiated through various transaction types, including direct transfer transactions, staking operations, governance actions, or specialized swap transactions. Each type follows its own rules while leveraging the common swap infrastructure to ensure consistent and secure token movements.
+
+The Swap component works closely with the Accounts and Pools components to manage the actual token movements, updating balances atomically and ensuring that all operations follow protocol rules. It also interacts with other components like Validators and Governance that depend on token movements for their operations.
 
 Key aspects of this component include:
-- Automated market maker (AMM) functionality
-- Liquidity pool management and incentives
-- Price discovery and slippage calculation
-- Fee collection and distribution
-- Multi-asset swap routing
-- Oracle integration for price feeds
-- Swap history tracking and reporting
+- Atomic token exchange operations between accounts and pools
+- Support for various swap types with different purposes and rules
+- Validation mechanisms to ensure swaps are authorized and valid
+- Integration with other components that depend on token movements
+- Deterministic execution ensuring network-wide consistency
+- Transaction fee handling for swap operations
 
 ### Automatic
 
-The Automatic component encompasses processes that occur without manual intervention, operating according to predefined protocol rules at specific blockchain events. These automated processes ensure that certain critical functions are performed consistently and reliably without requiring user action.
+The Automatic component handles processes that occur without manual intervention, executing predetermined operations at specific blockchain events like block beginnings and endings. It ensures that critical protocol functions continue reliably without requiring explicit transactions.
 
-Examples of automatic processes include fee deductions during transaction processing, reward distributions at the end of epochs, validator set updates, and slashing for protocol violations. These operations occur at predetermined points in the blockchain's operation, such as at block boundaries or epoch transitions.
+In Canopy, automatic processes serve several important purposes: they distribute rewards to validators at regular intervals, apply inflation through token minting according to the emission schedule, execute approved governance decisions when their time comes, and perform housekeeping operations like pruning expired data or updating cumulative metrics.
 
-The Automatic component plays a crucial role in maintaining the blockchain's economic model and security guarantees. By automating critical functions, it ensures that the protocol operates predictably and consistently, even as the network scales and evolves.
+The begin-block and end-block functionality is particularly important, as it defines operations that occur automatically at the boundaries of each block. Begin-block operations typically include setup tasks for the new block, while end-block operations handle finalization tasks like reward distribution, validator set updates, and parameter changes from executed governance proposals.
+
+Automatic processes follow deterministic rules, ensuring that all nodes in the network will execute exactly the same operations given the same blockchain state. This determinism is crucial for maintaining consensus across the network, as automatic operations modify the blockchain state just like regular transactions.
+
+The Automatic component interacts with nearly all other components of the FSM, as it may need to update accounts, validators, pools, governance state, or other elements as part of its operations. This makes it a central coordination mechanism for protocol-level state changes that aren't directly triggered by user transactions.
 
 Key aspects of this component include:
-- Begin and end block functionality
-- Automated reward calculation and distribution
-- Scheduled parameter updates
-- Epoch transition handling
-- Validator set rotation and updates
-- Slashing for protocol violations
-- System maintenance operations
+- Execution of predetermined operations at block boundaries
+- Distribution of rewards and application of inflation
+- Implementation of approved governance decisions
+- Housekeeping operations for blockchain maintenance
+- Deterministic execution ensuring network-wide consistency
+- Coordination with other components for state updates
 
 ### Byzantine
 
-The Byzantine component addresses the challenges of achieving consensus in a distributed system where some participants may behave maliciously or fail unpredictably. Named after the Byzantine Generals Problem, this component implements mechanisms to ensure that the network can reach agreement even in the presence of faulty or malicious nodes.
+The Byzantine component implements mechanisms to handle Byzantine behavior - actions by validators or other participants that deviate from the protocol rules, whether due to malicious intent or technical failures. It ensures that the network can maintain consensus and security even in the presence of such behavior.
 
-Canopy's Byzantine fault tolerance is achieved through its consensus mechanism, which allows the network to continue operating correctly as long as a certain threshold of validators (typically two-thirds) remain honest. This resilience is crucial for maintaining the integrity and security of the blockchain in a permissionless environment.
+In Canopy, Byzantine fault tolerance is a critical property that allows the network to function correctly as long as no more than one-third of the validator voting power is compromised. The Byzantine component supports this property through detection mechanisms for common Byzantine behaviors, evidence handling for proven violations, and penalty systems to discourage such behaviors.
 
-The Byzantine component includes mechanisms for detecting and penalizing malicious behavior, such as double-signing blocks or prolonged unavailability. These mechanisms, collectively known as "slashing," create economic disincentives for validators to violate protocol rules.
+Common Byzantine behaviors addressed by this component include double-signing (voting for conflicting blocks), equivocation (sending different messages to different peers), extended downtime (failing to participate in consensus), and various forms of censorship or selective message propagation. Each of these behaviors has specific detection mechanisms and appropriate penalties.
+
+The evidence handling process involves collecting cryptographic proof of Byzantine behavior, validating this evidence to ensure it's legitimate, and processing it to apply the appropriate penalties through the Slashes component. Evidence can be submitted by any validator who observes Byzantine behavior, creating a distributed detection system.
+
+To protect against long-range attacks, the Byzantine component implements mechanisms like the slashing liability period during unstaking, ensuring that validators cannot escape penalties for past misbehavior by quickly exiting the network. It also supports various threshold mechanisms that require multiple independent confirmations before certain critical operations are considered valid.
 
 Key aspects of this component include:
-- Byzantine Fault Tolerant consensus implementation
-- Fault detection and evidence handling
-- Slashing conditions and penalty calculation
-- Validator jailing and unbonding mechanisms
-- Network partition resilience
-- Liveness and safety guarantees
-- Recovery procedures for consensus failures
+- Detection mechanisms for various forms of Byzantine behavior
+- Evidence collection, validation, and processing workflows
+- Integration with the Slashes component for penalty application
+- Protection against long-range and other sophisticated attacks
+- Threshold mechanisms for critical operations
+- Contribution to the overall Byzantine fault tolerance of the network
 
 ## Component Interactions
 
-### Transaction Processing Flow
+### How Transactions Modify Accounts
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Network
+    participant Transaction
     participant FSM
-    participant Accounts
-    participant State
+    participant Account
+    participant Fee
     
-    User->>Network: Submit Transaction
-    Network->>FSM: Deliver Transaction
-    FSM->>FSM: Validate Transaction
-    FSM->>Accounts: Deduct Fees
-    FSM->>FSM: Process Message
-    FSM->>State: Update State
-    FSM->>Network: Return Result
-    Network->>User: Confirm Transaction
+    User->>Transaction: Create and sign transaction
+    Transaction->>FSM: Submit transaction
+    FSM->>Transaction: Validate transaction
+    Transaction->>Fee: Calculate fee
+    Fee->>Account: Deduct fee from sender
+    Transaction->>Account: Modify account state
+    Account->>FSM: Update state
+    FSM->>User: Return transaction result
 ```
 
-When a user initiates a transaction, it follows a structured path through the FSM:
+When a user initiates a transaction in Canopy, it triggers a series of interactions between components that ultimately modify account states. The process begins when a user creates and cryptographically signs a transaction, which is then submitted to the FSM for processing.
 
-1. The user creates and signs a transaction containing a message and fee allocation
-2. The transaction is submitted to the network and included in a block
-3. The FSM validates the transaction, checking signatures and format
-4. If valid, the FSM deducts fees from the sender's account
-5. The FSM processes the message contained in the transaction
-6. State changes resulting from the message are applied atomically
-7. A transaction result is generated and returned to the user
+Upon receiving the transaction, the FSM first validates it to ensure it's well-formed and properly signed. This validation includes checking that the sender has sufficient funds for both the transaction amount and the associated fee. The fee is calculated based on transaction complexity and current network parameters.
 
-This process ensures that all state changes are validated, consistent, and properly recorded in the blockchain's history.
+Once validated, the transaction processing begins by deducting the fee from the sender's account. These fees may be distributed to validators or directed to protocol pools according to governance parameters. After fee deduction, the transaction's specific operations are executed, which could involve transferring tokens between accounts, staking tokens for validation, or other state changes.
 
-### Staking and Delegation Flow
+For a simple token transfer, the FSM deducts the specified amount from the sender's account and adds it to the recipient's account in an atomic operation. This ensures that the total supply remains consistent and that neither account can be left in an invalid state if the transaction is interrupted.
 
-```mermaid
-sequenceDiagram
-    participant Delegator
-    participant FSM
-    participant Validator
-    participant Committee
-    participant Pools
-    
-    Delegator->>FSM: Submit Delegation Tx
-    FSM->>Validator: Increase Stake
-    FSM->>Pools: Lock Delegated Tokens
-    
-    Note over Committee,Pools: At epoch boundary
-    FSM->>Committee: Update Committee Membership
-    
-    Note over Committee,Pools: After block production
-    Committee->>Pools: Generate Rewards
-    Pools->>Validator: Distribute Validator Portion
-    Pools->>Delegator: Distribute Delegator Portion
-```
+Throughout this process, the FSM maintains strict checks to ensure that account balances never go negative and that all operations follow protocol rules. Once all operations are complete, the account states are updated in the blockchain's persistent storage, and the transaction result is returned to the user.
 
-The staking and delegation process illustrates how multiple components interact:
+This entire sequence happens deterministically across all nodes in the network, ensuring that everyone arrives at the same final state after processing the transaction.
 
-1. A delegator submits a delegation transaction to stake tokens with a validator
-2. The FSM processes the transaction, increasing the validator's total stake
-3. The delegated tokens are locked in a pool to secure the network
-4. At epoch boundaries, committee memberships are updated based on stake
-5. When committees produce blocks, rewards are generated in committee pools
-6. Rewards are distributed to validators and their delegators according to their stake
-
-This flow demonstrates how accounts, validators, committees, and pools work together to implement Canopy's proof-of-stake consensus and reward system.
-
-### Governance Parameter Change
+### How Governance Affects Distribution via Pools
 
 ```mermaid
 flowchart TD
-    A[Proposer] -->|Submit Parameter Change Proposal| B[Governance]
-    B -->|Store Proposal| C[State]
-    D[Validators] -->|Vote on Proposal| B
-    B -->|If Approved| E{Parameter Type}
-    E -->|Fee Parameters| F[Update Fee Structure]
-    E -->|Staking Parameters| G[Update Staking Rules]
-    E -->|Distribution Parameters| H[Update Reward Distribution]
-    F & G & H -->|Apply Changes| I[Updated State]
+    A[Governance Proposal] --> B{Voting Period}
+    B -->|Approved| C[Execute Proposal]
+    B -->|Rejected| D[Proposal Failed]
+    C --> E[Update Parameters]
+    C --> F[Transfer from DAO Pool]
+    E --> G[Modified Distribution Rules]
+    F --> H[Funds to Recipient Account]
+    G --> I[Future Reward Distributions]
+    I --> J[Committee Pools]
+    J --> K[Validator Rewards]
 ```
 
-Governance parameter changes showcase the interaction between governance and other components:
+Governance plays a crucial role in controlling how tokens are distributed throughout the Canopy ecosystem, particularly through its influence on protocol pools. This relationship creates a powerful mechanism for community-directed economic policy.
 
-1. A proposer submits a parameter change proposal
-2. The proposal is stored in the state and enters the voting period
-3. Validators vote on the proposal using their staked voting power
-4. If approved by a sufficient majority, the FSM identifies the parameter type
-5. The relevant parameters are updated in the state
-6. Future operations use the new parameters without requiring a software update
+The process begins when a governance proposal is submitted, which can either suggest parameter changes affecting distribution rules or propose direct transfers from the DAO Treasury pool. After submission, the proposal enters a voting period during which eligible validators (typically those staked for the Root-Chain committee) cast their votes.
 
-This process allows the blockchain to evolve its economic and governance rules based on community decisions, demonstrating the flexibility of the FSM architecture.
+If approved by a two-thirds majority of voting power, parameter change proposals modify how tokens flow between different pools in the system. For example, governance might adjust the percentage of newly minted tokens that go to validator rewards versus the DAO Treasury, or modify the distribution formula between different committees. These changes take effect automatically at a predetermined block height after approval.
 
-### Committee Reward Distribution
+DAO Transfer proposals work differently, triggering immediate one-time movements of tokens from the DAO Treasury pool to specified recipient accounts. This mechanism allows the community to fund development initiatives, marketing efforts, or other activities that benefit the ecosystem.
+
+The modified distribution rules affect how future rewards are calculated and distributed to various committee pools, which in turn determine the rewards individual validators receive. This creates a chain of influence from governance decisions to validator incentives, allowing the community to shape the economic behavior of the network.
+
+Importantly, all these operations follow strict rules enforced by the FSM, ensuring that governance cannot exceed its authority or create tokens beyond what the protocol allows. This creates a balance between flexibility and security in the economic management of the network.
+
+### Staking Sequence
 
 ```mermaid
 sequenceDiagram
-    participant Blocks
+    participant Validator
     participant FSM
-    participant Committees
-    participant Pools
-    participant Validators
-    participant Delegators
+    participant Account
+    participant Pool
+    participant Committee
     
-    Blocks->>FSM: End Block Signal
-    FSM->>Committees: Calculate Committee Rewards
-    Committees->>Pools: Fund Committee Reward Pools
+    Validator->>FSM: Submit stake transaction
+    FSM->>Account: Verify sufficient funds
+    FSM->>Pool: Transfer tokens to Committee Escrow Pool
+    FSM->>Committee: Register validator
+    Committee->>Committee: Calculate new voting power
+    Committee->>Validator: Confirm staking
     
-    Note over Pools,Delegators: For each committee
-    Pools->>Validators: Distribute Validator Portion
-    Validators->>Delegators: Distribute Delegator Rewards
+    Note over Validator,Committee: Validator now participates in consensus
     
-    FSM->>State: Update Balances
+    Validator->>FSM: Submit unstake transaction
+    FSM->>Committee: Mark validator as unstaking
+    FSM->>Committee: Calculate unstaking completion block
+    
+    Note over Validator,Committee: Waiting period for security
+    
+    FSM->>Committee: Check if unstaking period complete
+    FSM->>Pool: Transfer tokens from Escrow to Account
+    FSM->>Committee: Remove validator
+    Committee->>Committee: Recalculate voting powers
 ```
 
-The committee reward distribution process demonstrates automatic operations:
+The staking process in Canopy involves a carefully orchestrated sequence of interactions between validators and several FSM components. This sequence ensures secure validator participation while maintaining the economic security of the network.
 
-1. At the end of each block, the FSM triggers reward calculations
-2. Committee rewards are calculated based on participation and performance
-3. Reward pools are funded with newly minted tokens
-4. For each committee, rewards are distributed to validators based on their stake
-5. Validators share rewards with their delegators according to commission rates
-6. All balance changes are atomically updated in the state
+When a validator decides to stake tokens and join a committee, they submit a stake transaction to the FSM. The FSM first verifies that the validator's account has sufficient funds for the stake amount. Once verified, the tokens are transferred from the validator's account to the Committee Escrow Pool, where they remain locked as collateral against Byzantine behavior.
 
-This automatic process ensures that network participants are properly incentivized for their contributions to consensus and security.
+After the tokens are escrowed, the validator is registered with the appropriate committee, and their voting power is calculated based on their stake amount. The committee then confirms the staking, and the validator begins participating in consensus for that committee's chain. This might involve connecting to other committee members via the P2P layer and starting to propose and vote on blocks.
 
-## Conclusion
+If a validator needs temporary maintenance, they can submit a pause transaction, which temporarily removes them from consensus participation without unstaking their tokens. This status can continue for a governance-defined maximum period before automatic unstaking occurs.
 
-The FSM package is the heart of the Canopy blockchain, managing state transitions and enforcing protocol rules. Its components work together to provide a secure, flexible, and efficient platform for decentralized applications and financial services. By understanding the FSM's architecture and component interactions, developers can better leverage Canopy's capabilities and contribute to its ecosystem.
+When a validator decides to exit completely, they submit an unstake transaction. The committee marks the validator as unstaking and calculates the completion block based on governance parameters. During this waiting period (which might be several days or weeks), the validator no longer participates in consensus but their tokens remain escrowed and subject to slashing for any previously committed violations.
 
-The deterministic nature of the FSM ensures that all nodes in the network reach the same state given the same inputs, which is essential for blockchain consensus. This property, combined with the modular design of the FSM components, creates a robust foundation for building a scalable and adaptable blockchain platform.
+Once the unstaking period completes, the FSM transfers the tokens from the Escrow Pool back to the validator's account (minus any slashes that occurred), and removes the validator from the committee. The committee then recalculates voting powers for the remaining validators to maintain proper consensus weights.
+
+This entire sequence balances the need for flexible validator participation with the security requirements of a Byzantine-resistant consensus system.
+
+### Relationship Between Components
+
+```mermaid
+graph TD
+    A[Accounts] <--> B[Transactions]
+    B --> C[FSM]
+    C --> D[State]
+    E[Validators] <--> F[Committees]
+    E --> G[Slashes]
+    H[Pools] <--> I[Rewards]
+    H <--> J[Subsidization]
+    K[Governance] --> H
+    K --> L[Parameters]
+    M[Automatic] --> I
+    M --> J
+    N[Byzantine] --> G
+    F --> I
+    G --> H
+    B --> A
+    E --> A
+    I --> A
+    J --> H
+    D --> A
+    D --> E
+    D --> H
+    D --> K
+```
+
+The FSM components in Canopy form a complex, interconnected system where each part plays a specific role while maintaining relationships with multiple other components. Understanding these relationships is key to grasping how the blockchain functions as a cohesive whole.
+
+At the center of this system is the State component, which maintains the current status of all other components. Accounts interact primarily with Transactions, which modify account balances and properties. These transactions are processed by the FSM, which updates the State accordingly.
+
+Validators form the backbone of the consensus system, organizing into Committees that secure different chains within the Canopy ecosystem. When validators misbehave, the Byzantine component detects this behavior and triggers the Slashes component to apply penalties, which affects both the Validators themselves and the Pools that hold their staked tokens.
+
+Pools serve as the central hubs for token movements, receiving funds from Subsidization (new token creation) and distributing them through Rewards to validators and other participants. The flow of tokens between pools is influenced by Governance decisions, which can modify Parameters controlling distribution percentages and other economic factors.
+
+The Automatic component ensures that critical processes like reward distribution and subsidization occur at regular intervals without requiring manual intervention. This component interacts with nearly all other parts of the system, applying time-based changes according to protocol rules.
+
+These interconnections create a self-regulating system where economic incentives, security mechanisms, and governance processes work together to maintain the integrity and functionality of the blockchain. Changes in one component ripple through to others, creating a dynamic but deterministic system that evolves according to both protocol rules and community decisions.
+
+The beauty of this design is that while each component has a specific responsibility, their interactions create emergent properties that make the system as a whole more powerful and resil
