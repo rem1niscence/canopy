@@ -4,10 +4,6 @@ The FSM package is the core protocol component responsible for maintaining and u
 
 The FSM can be best understood as the rules by which the blockchain ledger changes. If you think of transactions as commands and the blockchain database as the ledger, the FSM is the protocol that interprets those commands to change the ledger. It serves as both the entry point and the only mechanism through which the blockchain state can be modified, with the exception of automatic state changes that occur at block boundaries.
 
-As stated in the state.go file: "This is the 'main' file of the state machine store, with the structure definition and other high level operations." The StateMachine struct is the central component that orchestrates all state transitions through a well-defined process of applying blocks, processing transactions, and executing begin/end block operations.
-
-The relevance of the FSM extends beyond backend developers; it applies universally to anyone working with the Canopy blockchain, as it defines how transactions affect the ledger and maintains consensus across the network.
-
 ## What is a Finite State Machine?
 
 A Finite State Machine (FSM) is a computational model used to represent and control execution flow. It consists of:
