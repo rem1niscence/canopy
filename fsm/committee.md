@@ -1,68 +1,73 @@
-# committee.go
+# committee.go - Committee Management in Canopy Blockchain
 
-The committee.go file contains essential logic for managing committees or validator sets integral to the nested chain consensus mechanism in the Canopy Network. This functionality is pivotal for maintaining the decentralized and secure operation of the blockchain.
+This file contains the logic for managing committees, which are validator sets responsible for consensus on nested chains within the Canopy blockchain. It handles committee rewards, membership, delegation, and the distribution of block rewards to qualifying committees.
 
 ## Overview
 
-The file encompasses various components, including mechanisms for:
-- Minting rewards for committees
-- Managing the association of validators and their respective committees
-- Handling the subsidization of committees based on governance parameters
-- Distributing rewards proportionately based on validator performance
+This file is designed to handle:
+
+- Committee membership and validator selection
+- Block reward distribution to subsidized committees
+- Committee reward distribution based on participation
+- Delegation management for committees
+- Committee retirement and lifecycle management
+- Lottery-based validator selection for rewards
+- Committee data storage and retrieval
 
 ## Core Components
 
-### Committee Management
+### Committee Subsidization
 
-This component is responsible for maintaining the relationships between validators and their corresponding committees. It ensures that:
-- Validators are appropriately updated when their committee affiliations change.
-- New committees are formed, and outdated affiliations are removed seamlessly.
-- The overall structure of committees is kept consistent with the current validator landscape.
+Committees in Canopy can be "subsidized" by the protocol, meaning they receive a portion of the block rewards. A committee qualifies for subsidization when the percentage of stake committed to it exceeds a threshold defined in the validator parameters. This mechanism works like a popularity contest or vote, where validators and delegators can "re-stake" their tokens to support specific committees without additional cost (beyond the risk of slashing).
 
-### Reward Distribution
+The system automatically includes the root chain as a subsidized committee, ensuring it always receives native token payments to its pool. When a committee is marked as "retired," it becomes permanently ineligible for subsidization.
 
-The reward distribution logic manages the minting of rewards and their allocation to the committees:
-- It calculates how much each committee should receive based on various parameters, such as governance settings and the total available mint.
-- Rewards are distributed in accordance with the proportional stake each committee holds within the network, ensuring fairness and incentivizing performance.
+### Block Rewards and Halvenings
 
-### Subsidization Mechanism
+The protocol implements a halving mechanism similar to Bitcoin, where the block reward is reduced by half at regular intervals (defined by `BlocksPerHalvening`). The total mint amount for each block is calculated based on the initial token amount and the number of halvenings that have occurred.
 
-This section defines how certain committees qualify for subsidy under specific conditions:
-- It evaluates whether committees meet predefined staking thresholds to ensure only active and engaged committees receive rewards.
-- The logic incorporates mechanisms to ensure that even if there are no validators, specific committees remain eligible for payment.
+From this total mint amount, a percentage is allocated to the DAO (Decentralized Autonomous Organization) based on governance parameters. The remaining amount is distributed equally among all subsidized committees.
 
-### Committee Data Handling
+### Committee Rewards Distribution
 
-The committee data component collects and aggregates performance metrics from various sources:
-- It maintains historical records to allow retrieval of committee performance over time, ensuring transparency and accountability.
-- Data is structured to provide insights into payment distributions and committee performance, aiding in governance and decision-making processes.
+When committees earn rewards, they are stored in a reward pool specific to each committee. These rewards are distributed based on "payment percents" that are determined through Quorum Certificate results. The distribution process:
 
-## Technical Details
+1. Retrieves the committee data and reward pool
+2. Distributes rewards according to payment percentages
+3. Burns any undistributed rewards by removing them from total supply
+4. Clears the committee data while preserving essential information
 
-### Minting Process
+### Validator and Delegate Management
 
-The minting and reward allocation processes are tightly integrated:
-- The system defines distinct steps to monitor the available rewards and eligibility of each committee.
-- It employs a systematic approach to ensure that all eligible parties are fairly compensated, adhering to the overarching governance rules.
+The system maintains two types of participants in committees:
+1. Committee members - validators directly participating in consensus
+2. Delegates - users who stake tokens to support validators
 
-### Performance Metrics
+Both validators and delegates can be part of multiple committees by "re-staking" their tokens. The system tracks membership and stake amounts for both types of participants, allowing for efficient committee operations and reward distribution.
 
-The reward distribution logic utilizes detailed performance metrics to ensure that funds are allocated appropriately:
-- Metrics such as the amount of stake held by each committee are pivotal in determining allocation.
-- By implementing a robust system that constantly evaluates these metrics, the network ensures efficient and transparent committee funding.
+### Lottery-Based Reward Selection
 
-## Committee Interaction
+The protocol implements a lottery system to select validators or delegates for rewards. The selection is weighted based on stake, using an "un-grindable" pseudorandom mechanism that relies on previous block proposers to ensure fairness. This prevents manipulation of the selection process.
 
-### Validator and Committee Interaction
+## Processes
 
-When a validator's stake or committee membership changes:
-- The system is designed to efficiently handle updates without impacting the overall security or performance of the network.
-- Communication and administrative functions exist to update the committee list dynamically, reflecting real-time changes and enhancing the operational integrity of the network.
+```mermaid
+flowchart TD
+    A[Block Production] --> B[Calculate Block Rewards]
+    B --> C{Are there subsidized committees?}
+    C -->|Yes| D[Mint tokens to DAO]
+    C -->|No| Z[End Process]
+    D --> E[Mint tokens to each subsidized committee]
+    E --> F[Store in committee reward pools]
+    F --> G[Distribute rewards based on payment percents]
+    G --> H[Burn undistributed rewards]
+    H --> I[Clear committee data]
+```
 
-### Governance Influence
+## Security & Integrity Mechanisms
 
-The entire framework operates under governance-defined parameters that shape committee operations:
-- These parameters guide decisions on subsidy eligibility and reward distributions.
-- The governance framework allows for adjustments in response to evolving conditions within the network, ensuring sustainability and adaptability.
-
-In summary, the committee.go file implements crucial functions to manage and incentivize validators and their committees, which are integral to the efficient operation of the Canopy Network's decentralized consensus mechanism.
+- Stake-weighted pseudorandom selection prevents manipulation of the lottery system.
+- Committee retirement mechanism allows graceful shutdown of committees that are no longer needed.
+- Validation of committee data heights prevents replay attacks or outdated data submission.
+- Automatic burning of undistributed rewards prevents inflation.
+- Slashing risk for validators provides economic security for the re-staking mechanism.

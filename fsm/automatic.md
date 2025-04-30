@@ -1,37 +1,69 @@
-# automatic.go
+# automatic.go - Automatic State Changes in Blockchain Blocks
 
-The automatic.go file handles automatic state changes that occur at the beginning and end of a block within the blockchain application. These changes are crucial for maintaining the integrity and functionality of the blockchain as it processes new blocks.
+This file handles automatic state changes that occur at the beginning and end of a block in the Canopy blockchain. Unlike transaction-induced changes, these are system-level operations that happen automatically as part of the block processing lifecycle.
 
 ## Overview
 
-This file is designed to manage state changes that are not induced by transactions but are essential for block operations. Key functionalities include starting the block application process and finalizing the block once applied.
+The automatic.go file implements critical functions that:
+- Execute state changes at block boundaries
+- Enforce protocol upgrades
+- Manage validator rewards and punishments
+- Handle certificate results from consensus
+- Maintain validator participation records
 
 ## Core Components
 
-### BeginBlock
+### Block Lifecycle Handlers
 
-At the start of a block application, the BeginBlock function is responsible for checking the current protocol version, managing rewards for committees, and processing the results of last block certificates. It ensures that certain conditions are met—like protocol compliance and valid certificates—before proceeding with the state updates. If any validations fail, appropriate errors are returned.
+The file contains two primary functions that bookend block processing: BeginBlock and EndBlock. These functions handle state changes that must occur automatically at specific points in the block lifecycle, rather than being triggered by user transactions.
 
-### EndBlock
+BeginBlock runs before any transactions are processed and handles protocol version enforcement, committee reward pool funding, and certificate result processing. EndBlock executes after all transactions have been applied and manages proposer tracking, reward distribution, and validator unstaking.
 
-Once the block has been processed, the EndBlock function executes. It updates the list of last proposers, distributes committee rewards, and unstakes any validators who have reached their maximum paused state. It also cleans up by removing any validators that have finished unstaking. This function ensures that all relevant state changes are applied before closing the block application.
+This separation ensures that certain critical blockchain operations happen in a predictable order regardless of what transactions are included in a block.
 
-### CheckProtocolVersion
+### Protocol Version Management
 
-The CheckProtocolVersion function ensures that the protocol version aligns with the governance requirements. It validates that the software version in use is appropriate for the current height of the blockchain, preventing out-of-date or incompatible versions from continuing.
+The blockchain enforces protocol upgrades through version checking. When a new protocol version is activated through governance parameters, all nodes must upgrade their software to remain compatible with the network.
 
-### HandleCertificateResults
+The system checks if the current height has reached the activation height for a new protocol version. If so, nodes running older software versions will be unable to process blocks, forcing them to upgrade to maintain consensus with the network.
 
-As part of the block processing logic, the HandleCertificateResults function manages the results from quorum certificates. It checks the integrity of the committee results and ensures that they reflect the correct state of the blockchain, allowing for secure operation amid the decentralized network.
+### Certificate Result Processing
 
-### ForceUnstakeMaxPaused
+Certificate results represent the outcome of Byzantine Fault Tolerance (BFT) consensus rounds. The system handles these results differently depending on whether the current chain is the root chain or a nested chain.
 
-This functionality addresses validators who have been inactive for a predetermined period. The ForceUnstakeMaxPaused function allows the blockchain to unpause and remove those validators to maintain network efficiency and security. 
+For the root chain, certificate results are processed automatically during BeginBlock. For nested chains, certificate results are handled through explicit transactions. This design allows the root chain to coordinate the security of multiple nested chains while maintaining separation between them.
 
-### UpdateLastProposers
+### Validator Management
 
-To support the leader election process, the UpdateLastProposers function tracks the addresses of the last block proposers. It updates this information as blocks are finalized, maintaining a dynamic record of validator participation.
+The system automatically manages validator participation through several mechanisms:
 
-## Technical Details
+1. Tracking proposers who created recent blocks to ensure fair leader election
+2. Distributing rewards to committees based on their participation
+3. Force-unstaking validators who have been paused for too long
+4. Removing validators who have completed the unstaking process
 
-The automatic.go file plays a pivotal role in ensuring that state transitions during block applications are handled smoothly and securely. It provides mechanisms for error handling, state validation, and necessary updates to maintain the blockchain's integrity. By automating these processes, the file contributes significantly to the overall effectiveness of the blockchain application.
+These automatic processes ensure that validators who aren't actively participating are eventually removed, maintaining the health and security of the network.
+
+### Checkpoint Handling
+
+The system provides "checkpoint-as-a-service" functionality, allowing both the root chain and nested chains to record checkpoints. These checkpoints serve as verifiable records of blockchain state at specific heights, which can be used for various security and recovery purposes.
+
+The checkpoint system ensures that only newer checkpoints can be recorded, preventing potential attacks that might try to rewrite history with older checkpoints.
+
+### Committee Retirement
+
+Committees (groups of validators securing a specific chain) can be retired when they're no longer needed. This can happen automatically when a nested chain signals that it wants to retire its committee, or through governance decisions.
+
+When a committee is retired, it stops receiving subsidies and rewards, effectively ending its role in securing that particular chain.
+
+### Forced Unstaking
+
+Validators who pause their participation for too long (exceeding MaxPauseBlocks) are automatically unstaked by the system. This prevents validators from indefinitely pausing to avoid responsibilities while still holding their stake.
+
+The system maintains a record of paused validators and their pause duration. When the maximum pause duration is reached, the validator is force-unstaked and their pause record is deleted.
+
+### Last Proposer Tracking
+
+The system maintains a record of the last five block proposers. This information is used in the leader election process to ensure fair distribution of block production opportunities and to prevent any single validator from dominating block production.
+
+The proposer addresses are stored in a circular buffer, with the position determined by the current block height modulo 5. This creates a rolling window of recent proposers that can be used in the leader election algorithm.

@@ -1,72 +1,107 @@
-# swap.go
+# swap.go - Token Swapping in the Canopy Blockchain
 
-The `swap.go` file contains essential logic related to the state machine changes within the Canopy Network, specifically focusing on the processes involved in token swapping. This document details how the state machine handles various operations associated with orders on the blockchain, particularly those involving buy and sell transactions.
+This file contains the state machine changes related to token swapping functionality in the Canopy blockchain. It implements a cross-chain token exchange mechanism that allows users to trade tokens between different chains in a secure, deterministic way.
 
 ## Overview
 
-The `swap.go` file coordinates the following key operations:
-- Handling committee swaps for sell orders
-- Managing lock orders and reset orders for transactions
-- Closing orders that are successfully completed
-- Processing the root chain order book and ensuring the correct association between transactions and orders
+The token swapping system enables:
+- Creating sell orders for tokens on the Root Chain
+- Locking orders when a buyer commits to the exchange
+- Completing swaps when payment is confirmed
+- Resetting orders if deadlines are missed
+- Monitoring cross-chain transactions to validate swap completion
 
 ## Core Components
 
-### StateMachine
-
-The core component of the `swap.go` file is the `StateMachine`, which governs the lifecycle of orders based on the state of transactions in the blockchain. It maintains consistency by observing the committee's decisions and updating the order book accordingly.
-
-### Order Management
-
-This component oversees the creation, modification, locking, resetting, and closing of orders:
-- **Lock Orders**: Represents orders that are temporarily reserved by a buyer, allowing them time to fulfill the transaction before the deadline.
-- **Reset Orders**: Orders that need to be re-listed if the buyer does not perform the necessary actions before the deadline, ensuring the marketplace remains active.
-- **Close Orders**: Orders that are finalized when the buyer satisfactorily sends the required tokens, allowing the seller to receive their payment.
-
-### Transaction Processing
-
-The file handles transactions specifically labeled as "send" types, adhering to the protocol defined by the network. It scrutinizes each transaction to determine if it affects existing orders, ensuring that the system accurately reflects the current state of the order book.
-
 ### Order Book Management
 
-The order book component enables the system to maintain a clear record of all active sell orders. It includes functionalities to:
-- Track the amount sent for each order
-- Identify whether orders are still locked or have expired
-- Confirm whether an order should be classified as closed, based on received transactions matching the expected amounts
+The order book is a central component that tracks all sell orders for a specific chain. It maintains information about:
+- Available tokens for sale
+- Requested amounts for exchange
+- Seller and buyer addresses
+- Deadlines for transaction completion
 
-## Technical Details
+The system provides functions to create, edit, lock, reset, and close orders within the order book. Each order has a unique ID and contains details about the assets being exchanged, the parties involved, and the current status of the swap.
 
-### Committee Swaps
+### Cross-Chain Transaction Monitoring
 
-The swapping mechanism is triggered when the committee submits a certificate results transaction, indicating different statuses for orders:
-- **Buy**: Claiming or reserving the rights to a sell order.
-- **Reset**: Re-opening orders that buyers did not complete before their deadlines.
-- **Close**: Finalizing orders where buyers successfully sent tokens to sellers within the stipulated time frames.
+The system monitors transactions across different chains to verify when buyers have sent the requested tokens to sellers. This involves:
+- Parsing transaction memos for embedded commands
+- Verifying payment amounts match the order requirements
+- Checking that payments are sent to the correct addresses
+- Confirming transactions occur before deadlines
 
-### Parsing Transaction Data
+When a valid payment is detected, the system can close the order and release the escrowed tokens to the buyer.
 
-The system employs functions to extract and validate embedded orders within transactions. By parsing transaction memos, it identifies critical information necessary for processing lock and close orders, ensuring that the appropriate actions are executed.
+### Escrow Management
 
-### Handling Expired and Incomplete Orders
+To ensure secure exchanges, the Root Chain holds tokens in escrow until the swap is completed:
+- When a sell order is created, tokens are moved to an escrow pool
+- When a swap is completed, tokens are released from escrow to the buyer
+- If an order is deleted or reset, tokens can be returned to the seller
 
-In order to efficiently manage the order lifecycle, the logic includes checks to identify and reset expired orders while ensuring that completed transactions are recognized. This keeps the order book responsive to real-time changes within the network's state.
+This escrow mechanism provides security for both parties in the exchange.
 
-## Component Interactions
+### Token Swap Workflow
 
-### Processing Transactions
+The token swap process follows these steps:
 
-Transactions are processed by first filtering relevant "send" transactions and then verifying them against existing orders. The outcomes of these verifications drive the updates to both the transferred amounts and the overall state of the associated orders.
+1. **Order Creation**: A seller creates a sell order, specifying the amount of Root Chain tokens for sale and the amount of buyer-chain tokens requested in return. The Root Chain tokens are placed in escrow.
 
-### Cross-Referencing with Blockchain
+2. **Order Locking**: A buyer locks an order by providing their receive address and setting a deadline by which they must complete the payment. This reserves the order for that specific buyer.
 
-The interactions with the blockchain occur through reading block results and transaction data, which include:
-- Confirmation of transactions and their effects on the order book.
-- Historical checks against previous blocks to ensure the integrity of transactions that may result from asynchronous actions.
+3. **Payment**: The buyer sends the requested tokens directly to the seller's address on the buyer chain, including a CloseOrder message in the transaction memo.
 
-### Error Handling
+4. **Verification**: The Committee (validators) witnesses the payment transaction on the buyer chain and verifies that the correct amount was sent to the correct address before the deadline.
 
-In scenarios where transactions do not conform to expectations (e.g., malformed messages or failed order retrievals), appropriate logging and error management strategies are employed to maintain system reliability.
+5. **Order Closing**: If verification is successful, the Committee closes the order and releases the escrowed Root Chain tokens to the buyer's address.
 
-## Conclusion
+6. **Order Reset**: If the buyer fails to send payment before the deadline, the order is reset and becomes available for other buyers.
 
-The `swap.go` file plays a critical role in the functionality of the Canopy Network by managing token swaps, maintaining order integrity, and facilitating a seamless transaction process. The designed structure ensures that all market actions are efficiently handled, supporting a robust and responsive trading environment within the blockchain.
+This workflow ensures that tokens are exchanged securely without requiring trust between the parties.
+
+### Deadline Management
+
+The system uses blockchain heights as deadlines rather than timestamps:
+- When an order is locked, a deadline is set based on the current height plus a configurable number of blocks
+- The system checks if orders have expired by comparing the current height to the deadline
+- Expired orders are automatically reset to be available again
+
+Using block heights provides a deterministic way to measure time that all validators can agree on.
+
+### Order Creation and Management
+
+When a user wants to sell tokens:
+1. They create a sell order specifying the amount to sell and the amount they want in return
+2. The tokens are moved to an escrow pool associated with the specific chain ID
+3. The order is added to the order book and becomes visible to potential buyers
+4. The seller can edit or delete the order as long as it hasn't been locked by a buyer
+
+### Committee Validation
+
+The Committee (validators) plays a crucial role in the token swap process:
+1. It witnesses lock orders on the buyer chain and updates the Root Chain order book
+2. It monitors for payment transactions on the buyer chain
+3. It verifies that payments match the order requirements
+4. It processes close orders when payments are confirmed
+5. It resets orders when deadlines are missed
+
+This validation ensures that the swap process is secure and that both parties fulfill their obligations.
+
+### Cross-Chain Communication
+
+The token swap system enables communication between different chains:
+1. The Root Chain maintains the order book and escrows the seller's tokens
+2. The buyer chain is where the payment transaction occurs
+3. The Committee observes both chains and updates the Root Chain state based on buyer chain events
+4. Special messages embedded in transaction memos (LockOrder, CloseOrder) facilitate cross-chain communication
+
+This cross-chain communication allows for secure token exchanges without requiring direct integration between the chains.
+
+## Security & Integrity Mechansisms
+
+- **Escrow**: Seller tokens are held in escrow until the swap is completed
+- **Deadlines**: Time-limited transactions prevent indefinite locks on orders
+- **Verification**: Multiple validators verify payment transactions
+- **Deterministic Parsing**: Transaction parsing follows strict rules to ensure all validators reach the same conclusion
+- **Historical Checking**: The system can check previous blocks to confirm order status
