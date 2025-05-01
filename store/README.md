@@ -165,104 +165,54 @@ These prefixes are only used internally and never exposed to the user.
 
 ## Txn: Ad Hoc Nested Transactions Implementation
 
-The `Txn` type provides a transaction-like interface for the store, allowing for atomic operations and rollbacks. This is particularly useful for testing block proposals and managing ephemeral states.
+The `Txn` type provides a transaction-like interface for the store, allowing for atomic operations and rollbacks. This is particularly useful for testing block proposals and managing ephemeral states. 
+One of its features is the ability to create nested transactions, enabling complex multi-level state modifications while maintaining atomicity.
 
-### Core Components
+### Nested Transactions
 
-#### Txn Structure
-The `Txn` type consists of three main structures:
+Nested transactions in Canopy's `Txn` implementation provide a code-level abstraction for managing hierarchical state modifications. 
+Unlike database-level nested transactions, these are implemented entirely in memory and provide a way to group operations that can be independently committed or rolled back. 
+This creates an abstraction for managing complex state changes that need to be atomic at different levels, while maintaining the simplicity of BadgerDB's single-level transaction model.
 
-1. **Txn**: The main transaction type that embeds both the parent store interface and internal transaction state
-2. **txn**: Internal state structure containing:
-   - A map of pending operations (set/delete)
-   - A sorted list of keys for efficient iteration
-   - A length counter for the sorted list
-3. **op**: Operation type that represents either a set or delete operation with its associated value
+#### Key Features of Nested Transactions
+
+1. **Hierarchical Structure**
+   Transactions form a hierarchy where child transactions inherit parent state but keep their own changes isolated until committed. Parents can roll back child changes atomically.
+
+2. **Independent Commit/Rollback**
+   Each transaction level can be committed or rolled back independently. Child changes affect the parent only when committed, and parent rollbacks undo all nested changes.
+
+3. **State Isolation**
+   Changes are confined to the transaction level where they occur. Parents don't see uncommitted child changes; children can access committed parent state.
+
+4. **Atomic Operations**
+   All changes within a transaction level are atomic. Commits and rollbacks affect only that level and its children, preserving integrity and consistency.
+
+### What `Txn` Does
+
+1. **Wraps a Parent Store**: Acts as a temporary overlay on top of an existing store, enabling nested transaction hierarchies
+2. **Stores Changes in Memory**: All operations (set/delete) are kept in memory until explicitly written, allowing child transactions to maintain isolated state
+3. **Supports Atomic Writes**: All in-memory changes can be committed at once or discarded, maintaining atomicity at each transaction level
+4. **Enables Rollbacks**: Discarding reverts all uncommitted operations, including those from child transactions
+5. **Supports Iteration**: Provides forward and reverse iteration with in-memory and base-store merging, respecting transaction hierarchy
+
+### How It Works
+
+The `Txn` system has three key internal parts that work together to support nested transactions:
+
+- **`Txn`**: The main transaction object exposed to users, capable of creating child transactions
+- **`txn`**: A struct that holds:
+  - A map of pending operations, maintaining isolation between transaction levels
+  - A sorted list of keys for fast iteration across the transaction hierarchy
+- **`op`**: Represents an individual operation (Set or Delete) that can be committed or rolled back at any transaction level
 
 ### Key Features
 
-- **In-Memory Operations**: 
-  - All write operations (Set/Delete) are stored in memory until explicitly written to the parent store
-  - Provides fast access to pending changes without disk I/O
-  - Enables efficient rollback of operations before they're committed
-
-- **Atomic Operations**: 
-  - Write() method ensures all operations are applied atomically to the parent store
-  - Either all operations succeed or none are applied
-  - Maintains data consistency even during concurrent access
-
-- **Rollback Support**: 
-  - Discard() method allows rolling back all pending operations
-  - Useful for testing block proposals or handling failed operations
-  - Cleans up memory resources associated with pending operations
-
-- **Efficient Iteration**: 
-  - Maintains sorted keys for efficient iteration and merging with parent store
-  - Supports both forward and reverse iteration patterns
-  - Enables efficient range queries and prefix-based filtering
-
-- **Prefix-Based Iteration**: 
-  - Supports both forward and reverse iteration with prefix filtering
-  - Enables efficient scanning of related data
-  - Useful for batch operations on related keys
-
-### Performance Considerations
-
-- **Memory Usage**: 
-  - All operations are kept in memory until Write() or Discard()
-  - Memory footprint grows linearly with the number of pending operations
-  - Efficient memory management through buffer pooling and automatic cleanup
-
-- **Iteration Efficiency**: 
-  - Uses binary search for O(log n) key lookups in sorted list
-  - Maintains sorted order for efficient range queries
-  - Optimized merging of in-memory and parent store data during iteration
-
-- **Write Performance**: 
-  - Write() operation is O(n) where n is the number of pending operations
-  - Batch operations are more efficient than individual writes
-  - Memory operations are significantly faster than disk operations
-
-- **Read Performance**: 
-  - Get() is O(1) for in-memory operations, falls back to parent store
-  - In-memory operations take precedence over parent store data
-  - Efficient key lookup through hash map and sorted list combination
-
-### Implementation Details
-
-#### Write Operations
-- Set() and Delete() operations are stored in an in-memory map
-- Keys are automatically added to a sorted list for efficient iteration
-- Operations are not applied to the parent store until Write() is called
-- The sorted list enables efficient binary search for key lookups
-
-#### Read Operations
-- Get() first checks the in-memory operations, then falls back to the parent store
-- Iterator() and RevIterator() merge in-memory operations with parent store data
-- Deleted keys are properly handled during iteration
-- Prefix-based filtering is supported for both forward and reverse iteration
-
-#### Memory Management
-- Uses a map for O(1) operation lookups
-- Maintains a sorted slice for efficient iteration
-- Implements buffer pooling for memory efficiency
-- Automatically manages memory for pending operations
-
-### Usage Example
-
-The Txn type is typically used in scenarios requiring atomic operations or rollback capabilities:
-
-1. Create a new transaction with a parent store
-2. Perform multiple Set() and Delete() operations
-3. Either commit the changes using Write() or rollback using Discard()
-4. The transaction maintains all operations in memory until explicitly committed
-
-### Limitations
-
-- Not thread-safe (should not be used across multiple goroutines)
-- Write() is not atomic when writing to another memory store
-- Keys must be smaller than 128 bytes
-- Nested transactions are supported but iteration becomes increasingly inefficient with depth
+- **In-Memory Speed**: Fast reads/writes with no disk access, enabling efficient nested transaction operations
+- **Efficient Iteration**: Maintains sorted keys for quick scanning and merging across transaction levels
+- **Read Precedence**: Reads prioritize in-memory updates over the underlying store, respecting transaction hierarchy
+- **Atomic Commit**: `Write()` commits all changes at once to the parent store, maintaining atomicity at each level
+- **Safe Rollback**: `Discard()` wipes all uncommitted changes, including those from child transactions
 
 ## Canopy's Optimized Sparse Merkle Tree
 
