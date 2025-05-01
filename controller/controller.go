@@ -96,11 +96,15 @@ func (c *Controller) Start() {
 		// each time the timer fires
 		for range t.C {
 			// get the root chain info from the rpc
-			_, e := c.RCManager.GetRootChainInfo(rootChainId, c.Config.ChainId)
-			if e == nil {
+			rootChainInfo, e := c.RCManager.GetRootChainInfo(rootChainId, c.Config.ChainId)
+			if e != nil {
+				c.log.Error(e.Error()) // log error but continue
+			} else if rootChainInfo != nil {
+				// update the peer 'must connect'
+				c.UpdateP2PMustConnect(rootChainInfo.ValidatorSet)
+				// exit the loop
 				break
 			}
-			c.log.Error(e.Error()) // log error but continue
 		}
 		// start internal Controller listeners for P2P
 		c.StartListeners()
