@@ -144,9 +144,9 @@ This encryption approach provides end-to-end security, meaning that even if some
 
 When a node starts up, the P2P system initializes with these steps:
 
-- **Creating the Foundation**: The P2P system creates a PeerSet to manage active connections and a PeerBook to keep track of potential peers.
-- **Setting Up Communication Channels**: It establishes channels for different types of messages (like blocks, transactions, or peer discovery).
-- **Loading Configuration**: It applies settings like maximum connections, timeouts, and security parameters.
+- **Creating the Foundation**: The P2P system creates a PeerSet to manage active connections and a PeerBook to keep track of potential peers. The PeerSet uses a thread-safe map to store active connections, while the PeerBook maintains a persistent database of known peers.
+- **Setting Up Communication Channels**: It establishes channels for different types of messages (like blocks, transactions, or peer discovery). Each channel is implemented as a buffered Go channel with a configurable capacity to prevent memory overflow.
+- **Loading Configuration**: It applies settings like maximum connections, timeouts, and security parameters. The configuration includes parameters for connection limits, timeouts, and security thresholds that are enforced throughout the system.
 
 Think of this like setting up a phone system - you need a phone book (PeerBook), a list of active calls (PeerSet), and different lines for different types of conversations (channels).
 
@@ -154,10 +154,10 @@ Think of this like setting up a phone system - you need a phone book (PeerBook),
 
 When nodes connect to each other, several layers of security and functionality are added:
 
-- **Listening for Calls**: The P2P system listens for incoming connection requests from other nodes.
-- **Making Outgoing Calls**: It also proactively connects to other nodes it knows about.
-- **Secure Handshake**: When a connection is established, nodes perform a cryptographic handshake to verify each other's identity and establish encrypted communication.
-- **Multiplexing Setup**: The connection is then set up to handle multiple independent communication channels.
+- **Listening for Calls**: The P2P system listens for incoming connection requests from other nodes using a TCP listener with rate limiting to prevent connection flooding.
+- **Making Outgoing Calls**: It also proactively connects to other nodes it knows about, using exponential backoff for retry attempts when connections fail.
+- **Secure Handshake**: When a connection is established, nodes perform a cryptographic handshake using X25519 for key exchange and HKDF for key derivation, establishing unique encryption keys for each direction of communication.
+- **Multiplexing Setup**: The connection is then set up to handle multiple independent communication channels using a custom protocol that includes topic identifiers and sequence numbers in packet headers.
 
 This is similar to how a phone call works - you dial a number (or receive a call), verify who's on the other end, and then can have a secure conversation.
 
@@ -165,12 +165,12 @@ This is similar to how a phone call works - you dial a number (or receive a call
 
 When a node wants to send information to another node:
 
-- **Topic Selection**: The message is assigned to a specific topic (like "new blocks" or "peer discovery").
-- **Message Queuing**: The message is queued in the appropriate communication channel.
-- **Packetization**: Large messages are broken down into smaller packets for efficient transmission.
-- **Encryption**: Each packet is encrypted for security.
-- **Transmission**: Packets are sent over the TCP connection.
-- **Reassembly**: On the receiving end, packets are reassembled into the complete message.
+- **Topic Selection**: The message is assigned to a specific topic (like `BLOCK` or `PEERS_REQUEST`) using a predefined enum that maps to specific message types.
+- **Message Queuing**: The message is queued in the appropriate communication channel with priority handling for critical messages.
+- **Packetization**: Large messages are broken down into smaller packets with a maximum size limit, each containing a header with topic ID, sequence number, and packet count.
+- **Encryption**: Each packet is encrypted using ChaCha20-Poly1305 with a unique nonce to prevent replay attacks.
+- **Transmission**: Packets are sent over the TCP connection with flow control to prevent overwhelming the receiver.
+- **Reassembly**: On the receiving end, packets are reassembled into the complete message using sequence numbers and packet counts, with timeout handling for missing packets.
 
 This is like sending a letter - you write your message, put it in an envelope (packet), seal it (encrypt it), and send it through the mail (TCP connection). The recipient opens the envelope and reads the message.
 
@@ -178,10 +178,10 @@ This is like sending a letter - you write your message, put it in an envelope (p
 
 The P2P system uses several techniques to discover and manage peers:
 
-- **Peer Book Exchange**: Nodes periodically exchange lists of known peers with each other.
-- **Gossip Protocol**: When a node learns about a new peer or receives a message, it immediately forwards that information to all of its connected peers except the one who sent it. This creates a rapid propagation effect where information spreads throughout the network. For example, if Node A tells Node B about a new block, Node B will tell Nodes C, D, and E (but not Node A), and each of those nodes will tell their other peers, creating an exponential spread of information.
-- **Churn Management**: The system handles peers joining and leaving the network gracefully.
-- **Reputation System**: It tracks how well peers behave (sending valid data, responding quickly) and can disconnect problematic peers.
+- **Peer Book Exchange**: Nodes periodically exchange lists of known peers with each other using a compact binary format that includes peer metadata and connection statistics.
+- **Gossip Protocol**: When a node learns about a new peer or receives a message, it immediately forwards that information to all of its connected peers except the one who sent it. The gossip protocol includes a hop count to prevent infinite propagation and uses bloom filters to track recently seen messages.
+- **Churn Management**: The system handles peers joining and leaving the network gracefully using connection timeouts and heartbeat messages to detect disconnections.
+- **Reputation System**: It tracks how well peers behave using metrics like message delivery success rate, response times, and protocol compliance, with automatic disconnection for peers that fall below thresholds.
 
 The gossip protocol is particularly interesting - it's like how rumors spread in a social network. If you hear something interesting, you tell all your friends except the one who told you, and they tell all their friends except you, and soon many people know about it. This is an efficient way to disseminate information in a decentralized network without a central authority, ensuring that important updates reach all nodes quickly.
 
@@ -189,20 +189,40 @@ The gossip protocol is particularly interesting - it's like how rumors spread in
 
 The P2P system implements several security techniques:
 
-- **Encryption**: All communication is encrypted using ChaCha20-Poly1305, which provides both confidentiality and authenticity.
-- **Rate Limiting**: Messages are rate-limited to prevent denial-of-service attacks.
-- **IP Filtering**: Known bad IPs and countries can be blocked.
-- **Connection Limits**: The number of connections is limited to prevent resource exhaustion.
+- **Encryption**: All communication is encrypted using ChaCha20-Poly1305 with unique nonces for each message, providing both confidentiality and authenticity.
+- **Rate Limiting**: Messages are rate-limited using a token bucket algorithm that allows for burst handling while maintaining long-term rate limits.
+- **IP Filtering**: Known bad IPs and countries can be blocked using a combination of static lists and dynamic reputation scoring.
+- **Connection Limits**: The number of connections is limited using a configurable maximum that considers both inbound and outbound connections, with priority given to trusted peers.
 
 These measures work together to create a secure and resilient network that can operate even when some participants are malicious.
 
 ## Security Features
 
-- **Encryption**: All communication is encrypted using ChaCha20-Poly1305
-- **Authentication**: Peers are authenticated during the handshake process
-- **DOS Mitigation**: Rate limiting and connection limits prevent denial of service attacks
-- **IP Filtering**: Bad IPs and countries can be filtered out
-- **Reputation System**: Peers with bad behavior can be disconnected
+- **Encryption**: All communication is encrypted using ChaCha20-Poly1305 with unique nonces for each message, providing both confidentiality and authenticity. The encryption keys are derived using HKDF from a shared secret established through X25519 key exchange during the initial handshake. Each message includes an authentication tag to prevent tampering.
+
+- **Authentication**: Peers are authenticated during the handshake process using their public keys, which are verified against a trusted list or through a chain of trust. The handshake includes a challenge-response mechanism to prove possession of the private key without revealing it. Failed authentication attempts are logged and can trigger temporary IP bans.
+
+- **DOS Mitigation**: Rate limiting and connection limits prevent denial of service attacks through multiple layers:
+  - Token bucket algorithm for message rate limiting with configurable burst sizes
+  - Connection rate limiting using a sliding window counter
+  - Maximum connection limits per IP with dynamic adjustment based on reputation
+  - Automatic blacklisting of IPs that exceed thresholds
+  - SYN cookie protection for TCP connections
+
+- **IP Filtering**: Bad IPs and countries can be filtered out using:
+  - Static blacklists of known malicious IPs
+  - Dynamic reputation scoring based on behavior
+  - Geographic filtering using IP geolocation
+  - Automatic updates of threat intelligence feeds
+  - Rate-based blocking of suspicious IP ranges
+
+- **Reputation System**: Peers with bad behavior can be disconnected based on:
+  - Message delivery success rate and latency
+  - Protocol compliance and message validity
+  - Resource usage patterns
+  - Connection stability and uptime
+  - Historical behavior tracking with decay over time
+  - Automatic scoring adjustments based on observed behavior
 
 ## Usage
 
