@@ -6,7 +6,7 @@
 The store package serves as the storage layer for the Canopy blockchain, utilizing
 **[BadgerDB](https://github.com/hypermodeinc/badger)** as its underlying key-value store. It offers
 structured abstractions for nested transactions, state management, and indexed blockchain data
-storage. This document provides a comprehensive overview of the package’s core components and their
+storage. This document provides a comprehensive overview of the package's core components and their
 functionalities, introducing key concepts while progressively building each component into a
 complete storage solution.
 
@@ -163,7 +163,106 @@ store, "c/" for commitment store) to achieve two main purposes:
 
 These prefixes are only used internally and never exposed to the user.
 
-## Txn ad hoc nested transactions implementation
+## Txn: Ad Hoc Nested Transactions Implementation
+
+The `Txn` type provides a transaction-like interface for the store, allowing for atomic operations and rollbacks. This is particularly useful for testing block proposals and managing ephemeral states.
+
+### Core Components
+
+#### Txn Structure
+The `Txn` type consists of three main structures:
+
+1. **Txn**: The main transaction type that embeds both the parent store interface and internal transaction state
+2. **txn**: Internal state structure containing:
+   - A map of pending operations (set/delete)
+   - A sorted list of keys for efficient iteration
+   - A length counter for the sorted list
+3. **op**: Operation type that represents either a set or delete operation with its associated value
+
+### Key Features
+
+- **In-Memory Operations**: 
+  - All write operations (Set/Delete) are stored in memory until explicitly written to the parent store
+  - Provides fast access to pending changes without disk I/O
+  - Enables efficient rollback of operations before they're committed
+
+- **Atomic Operations**: 
+  - Write() method ensures all operations are applied atomically to the parent store
+  - Either all operations succeed or none are applied
+  - Maintains data consistency even during concurrent access
+
+- **Rollback Support**: 
+  - Discard() method allows rolling back all pending operations
+  - Useful for testing block proposals or handling failed operations
+  - Cleans up memory resources associated with pending operations
+
+- **Efficient Iteration**: 
+  - Maintains sorted keys for efficient iteration and merging with parent store
+  - Supports both forward and reverse iteration patterns
+  - Enables efficient range queries and prefix-based filtering
+
+- **Prefix-Based Iteration**: 
+  - Supports both forward and reverse iteration with prefix filtering
+  - Enables efficient scanning of related data
+  - Useful for batch operations on related keys
+
+### Performance Considerations
+
+- **Memory Usage**: 
+  - All operations are kept in memory until Write() or Discard()
+  - Memory footprint grows linearly with the number of pending operations
+  - Efficient memory management through buffer pooling and automatic cleanup
+
+- **Iteration Efficiency**: 
+  - Uses binary search for O(log n) key lookups in sorted list
+  - Maintains sorted order for efficient range queries
+  - Optimized merging of in-memory and parent store data during iteration
+
+- **Write Performance**: 
+  - Write() operation is O(n) where n is the number of pending operations
+  - Batch operations are more efficient than individual writes
+  - Memory operations are significantly faster than disk operations
+
+- **Read Performance**: 
+  - Get() is O(1) for in-memory operations, falls back to parent store
+  - In-memory operations take precedence over parent store data
+  - Efficient key lookup through hash map and sorted list combination
+
+### Implementation Details
+
+#### Write Operations
+- Set() and Delete() operations are stored in an in-memory map
+- Keys are automatically added to a sorted list for efficient iteration
+- Operations are not applied to the parent store until Write() is called
+- The sorted list enables efficient binary search for key lookups
+
+#### Read Operations
+- Get() first checks the in-memory operations, then falls back to the parent store
+- Iterator() and RevIterator() merge in-memory operations with parent store data
+- Deleted keys are properly handled during iteration
+- Prefix-based filtering is supported for both forward and reverse iteration
+
+#### Memory Management
+- Uses a map for O(1) operation lookups
+- Maintains a sorted slice for efficient iteration
+- Implements buffer pooling for memory efficiency
+- Automatically manages memory for pending operations
+
+### Usage Example
+
+The Txn type is typically used in scenarios requiring atomic operations or rollback capabilities:
+
+1. Create a new transaction with a parent store
+2. Perform multiple Set() and Delete() operations
+3. Either commit the changes using Write() or rollback using Discard()
+4. The transaction maintains all operations in memory until explicitly committed
+
+### Limitations
+
+- Not thread-safe (should not be used across multiple goroutines)
+- Write() is not atomic when writing to another memory store
+- Keys must be smaller than 128 bytes
+- Nested transactions are supported but iteration becomes increasingly inefficient with depth
 
 ## Canopy's Optimized Sparse Merkle Tree
 
