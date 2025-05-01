@@ -9,11 +9,7 @@
   "rootChain": [
     {
       "chainID": 1,
-      "url": "http://node-1:50002"
-    },
-    {
-      "chainID": 2,
-      "url": "http://localhost:40002"
+      "url": "http://node-2:40002"
     }
   ],
   "rootChainPollMS": 333,
