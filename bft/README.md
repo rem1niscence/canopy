@@ -47,9 +47,7 @@ graph TD
     I --> J[Block Committed]
     J --> A
 
-    B -- Failure --> K[Round Interrupt]
-    C -- Failure --> K
-    D -- Failure --> K
+    D -- Failure --> K[Round Interrupt]
     E -- Failure --> K
     F -- Failure --> K
     G -- Failure --> K
