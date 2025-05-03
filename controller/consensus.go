@@ -229,6 +229,7 @@ func (c *Controller) sendBlockRequests(start, stop uint64, queue map[uint64]bloc
 
 		// Add new request to queue
 		queue[height] = blockSyncRequest{
+			timestamp:     time.Now(),
 			height:        height,
 			peerPublicKey: peerPublicKey,
 		}
