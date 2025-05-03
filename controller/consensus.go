@@ -168,8 +168,14 @@ func (c *Controller) processQueue(startHeight, stopHeight uint64, queue map[uint
 		blockMsg := req.blockMessage
 		// start timing the HandlePeerBlock call
 		start := time.Now()
+		// lock the controller
+		c.Lock()
 		// process the block message received from the peer
-		if _, err := c.HandlePeerBlock(blockMsg, true); err != nil {
+		_, err := c.HandlePeerBlock(blockMsg, true)
+		// unlock controller
+		c.Unlock()
+		// check error from HandlePeerBlock
+		if err != nil {
 			h := blockMsg.BlockAndCertificate.Header.Height
 			// log this unexpected behavior
 			c.log.Warnf("Syncing peer block height %d invalid:\n%s", h, err.Error())
@@ -177,6 +183,8 @@ func (c *Controller) processQueue(startHeight, stopHeight uint64, queue map[uint
 			c.P2P.ChangeReputation(req.message.Sender.Address.PublicKey, p2p.InvalidBlockRep)
 			break
 		}
+		// unlock controller
+		c.Unlock()
 		// calculate and log the elapsed time
 		elapsed := time.Since(start)
 		c.log.Infof("Block %d sync complete. HandlePeerBlock took %s", height, elapsed)
