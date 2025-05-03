@@ -275,7 +275,7 @@ func (s *Store) Partition() {
 			// skip items that are already marked for Garbage Collection
 			if deDuplicator.Found(lib.BytesToString(k)) {
 				// set the item as prunable
-				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit|badgerDiscardEarlierVersions), it.Version()); e != nil {
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit), it.Version()); e != nil {
 					return ErrSetEntry(e)
 				}
 				continue
@@ -283,7 +283,7 @@ func (s *Store) Partition() {
 			// if the item is 'deleted'
 			if it.Deleted() {
 				// set the item as deleted at the partition height and discard earlier versions
-				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit|badgerDiscardEarlierVersions), it.Version()); e != nil {
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit), it.Version()); e != nil {
 					return ErrSetEntry(e)
 				}
 			} else {
@@ -292,7 +292,7 @@ func (s *Store) Partition() {
 					return ErrSetEntry(e)
 				}
 				// re-write the latest version with the 'discard' flag set
-				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), v, badgerDiscardEarlierVersions), snapshotHeight); e != nil {
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), v, badgerDeleteBit), snapshotHeight); e != nil {
 					return ErrSetEntry(e)
 				}
 			}
