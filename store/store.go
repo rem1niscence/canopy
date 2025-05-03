@@ -292,7 +292,7 @@ func (s *Store) Partition() {
 					return ErrSetEntry(e)
 				}
 				// re-write the latest version with the 'discard' flag set
-				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), v, badgerDeleteBit), snapshotHeight); e != nil {
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), v, badgerNoDiscardBit), snapshotHeight); e != nil {
 					return ErrSetEntry(e)
 				}
 			}
