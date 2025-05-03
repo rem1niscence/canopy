@@ -25,7 +25,7 @@ const (
 	badgerDiscardEarlierVersions byte = 1 << 2  // badgerDB 'discard earlier versions' flag
 	badgerDeleteBit              byte = 1 << 0  // badgerDB 'tombstoned' flag
 	badgerNoDiscardBit           byte = 1 << 3  // badgerDB 'never discard'  bit
-	badgerGCRatio                     = .15     // the ratio when badgerDB will run the garbage collector
+	badgerGCRatio                     = .000001 // the ratio when badgerDB will run the garbage collector
 	badgerSizeFieldName               = "size"  // badgerDB Txn 'size' field name
 	badgerCountFieldName              = "count" // badgerDB Txn 'count' field name
 	badgerTxnFieldName                = "txn"   // badgerDB WriteBatch 'txn' field name

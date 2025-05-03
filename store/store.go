@@ -3,7 +3,6 @@ package store
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -91,7 +90,7 @@ func NewStore(path string, metrics *lib.Metrics, log lib.LoggerI) (lib.StoreI, l
 	// single batch. It is seemingly unknown why the 10% limit is set
 	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt64).
-		WithLoggingLevel(badger.ERROR).WithMemTableSize(int64(1*units.GB + 280*units.MB)))
+		WithLoggingLevel(badger.DEBUG).WithMemTableSize(int64(1*units.GB + 280*units.MB)))
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
@@ -203,9 +202,10 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 // ShouldPartition() determines if it is time to partition
 func (s *Store) ShouldPartition() (timeToPartition bool) {
 	// check if it's time to partition (1001, 2001, 3001...)
-	if (s.version-partitionHeight(s.version))%(partitionFrequency/10) != 1 {
+	if (s.version-partitionHeight(s.version))%(partitionFrequency/100) != 1 { // TODO change back to /10 , debug only
 		return false
 	}
+	return true // TODO change back
 	// get the partition exists value from the store at a particular historical partition prefix
 	value, err := s.hss.Get([]byte(partitionExistsKey))
 	if err != nil {
@@ -302,6 +302,7 @@ func (s *Store) Partition() {
 		}
 		// if the partition height is past the partition frequency, set the discardTs at the partition height-1
 		if snapshotHeight > partitionFrequency {
+			fmt.Println("SETTING DISCARD TS @", snapshotHeight-2)
 			sc.db.SetDiscardTs(snapshotHeight - 2)
 		}
 		// if the GC isn't already running
@@ -310,7 +311,7 @@ func (s *Store) Partition() {
 			defer s.isGarbageCollecting.Store(false)
 			// trigger garbage collector to prune keys
 			if gcErr := sc.db.RunValueLogGC(badgerGCRatio); gcErr != nil {
-				if errors.Is(gcErr, badger.ErrNoRewrite) {
+				if err != badger.ErrNoRewrite {
 					sc.log.Debugf("%v - this is normal", gcErr)
 					// don't return an error here - this is an expected condition
 				} else {
@@ -321,11 +322,7 @@ func (s *Store) Partition() {
 		// exit
 		return nil
 	}(); err != nil {
-		if err != badger.ErrNoRewrite {
-			sc.log.Warn(err.Error()) // nothing collected
-		} else {
-			sc.log.Errorf("Partitioning failed with error: %s", err.Error())
-		}
+		sc.log.Errorf("Partitioning failed with error: %s", err.Error())
 	}
 	sc.log.Info("Partitioning complete ✅")
 }
