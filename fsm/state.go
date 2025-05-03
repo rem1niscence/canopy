@@ -341,17 +341,31 @@ func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
 	return consParams.BlockSize, nil
 }
 
-// GetRootChainInfo() returns the 'need-to-know' information for a nested chain
-func (s *StateMachine) GetRootChainInfo(id uint64) (*lib.RootChainInfo, lib.ErrorI) {
+// LoadRootChainInfo() returns the 'need-to-know' information for a nested chain
+func (s *StateMachine) LoadRootChainInfo(id, height uint64) (*lib.RootChainInfo, lib.ErrorI) {
+	lastHeight := uint64(1)
 	// update the metrics once complete
 	defer s.Metrics.UpdateGetRootChainInfo(time.Now())
+	// if height is 0; use the latest height
+	if height == 0 {
+		height = s.height
+	}
+	// ensure lastHeight is not < 0
+	if height != 1 {
+		lastHeight = height - 1
+	}
+	// get the latest state machine
+	sm, err := s.TimeMachine(height)
+	if err != nil {
+		return nil, err
+	}
 	// get the previous state machine height
-	lastSM, err := s.TimeMachine(s.Height() - 1)
+	lastSM, err := s.TimeMachine(lastHeight)
 	if err != nil {
 		return nil, err
 	}
 	// get the committee
-	validatorSet, err := s.GetCommitteeMembers(id)
+	validatorSet, err := sm.GetCommitteeMembers(id)
 	if err != nil {
 		return nil, err
 	}
@@ -359,19 +373,19 @@ func (s *StateMachine) GetRootChainInfo(id uint64) (*lib.RootChainInfo, lib.Erro
 	// allow an error here to have size 0 validator sets
 	lastValidatorSet, _ := lastSM.GetCommitteeMembers(id)
 	// get the delegate lottery winner
-	lotteryWinner, err := s.LotteryWinner(id)
+	lotteryWinner, err := sm.LotteryWinner(id)
 	if err != nil {
 		return nil, err
 	}
 	// get the order book
-	orders, err := s.GetOrderBook(id)
+	orders, err := sm.GetOrderBook(id)
 	if err != nil {
 		return nil, err
 	}
 	// return the root chain info
 	return &lib.RootChainInfo{
 		RootChainId:      s.Config.ChainId,
-		Height:           s.height,
+		Height:           sm.height,
 		ValidatorSet:     validatorSet.ValidatorSet,
 		LastValidatorSet: lastValidatorSet.ValidatorSet,
 		LotteryWinner:    lotteryWinner,

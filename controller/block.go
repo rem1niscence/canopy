@@ -302,7 +302,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	// publish the root chain info to the nested chain subscribers
 	for _, id := range c.RCManager.ChainIds() {
 		// get the root chain info
-		info, e := c.FSM.GetRootChainInfo(id)
+		info, e := c.FSM.LoadRootChainInfo(id, 0)
 		if e != nil {
 			// don't log 'no-validators' error as this is possible
 			if e.Error() != lib.ErrNoValidators().Error() {

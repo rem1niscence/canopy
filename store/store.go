@@ -134,6 +134,7 @@ func (s *Store) NewReadOnly(queryVersion uint64) (lib.StoreI, lib.ErrorI) {
 	var useHistorical bool
 	// if the query version is older than the partition frequency
 	if queryVersion+1 < partitionHeight(s.version) {
+		fmt.Println("USING HISTORICAL")
 		useHistorical = true
 	}
 	// make a reader for the specified version
@@ -273,12 +274,16 @@ func (s *Store) Partition() {
 			k, v := it.Key(), it.Value()
 			// skip items that are already marked for Garbage Collection
 			if deDuplicator.Found(lib.BytesToString(k)) {
+				// set the item as prunable
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit|badgerDiscardEarlierVersions), it.Version()); e != nil {
+					return ErrSetEntry(e)
+				}
 				continue
 			}
 			// if the item is 'deleted'
 			if it.Deleted() {
 				// set the item as deleted at the partition height and discard earlier versions
-				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit|badgerDiscardEarlierVersions), snapshotHeight); e != nil {
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit|badgerDiscardEarlierVersions), it.Version()); e != nil {
 					return ErrSetEntry(e)
 				}
 			} else {

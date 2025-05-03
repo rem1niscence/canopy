@@ -206,7 +206,7 @@ func (s *Server) ValidatorSet(w http.ResponseWriter, r *http.Request, _ httprout
 	})
 }
 
-// Checkpoint retreives the checkpoint block hash for a certain committee and height combination
+// Checkpoint retrieves the checkpoint block hash for a certain committee and height combination
 func (s *Server) Checkpoint(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	// Invoke helper with the HTTP request, response writer and an inline callback
 	s.heightAndIdIndexer(w, r, func(s lib.StoreI, height, id uint64) (interface{}, lib.ErrorI) {
@@ -214,12 +214,20 @@ func (s *Server) Checkpoint(w http.ResponseWriter, r *http.Request, _ httprouter
 	})
 }
 
-// RootChainInfo retreives the root chain info for the specified chain
+// RootChainInfo retrieves the root chain info for the specified chain
 func (s *Server) RootChainInfo(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	// Invoke helper with the HTTP request, response writer and an inline callback
-	s.heightAndIdParams(w, r, func(s *fsm.StateMachine, id uint64) (interface{}, lib.ErrorI) {
-		return s.GetRootChainInfo(id)
-	})
+	req := new(heightAndIdRequest)
+	// unmarshal request parameters
+	if ok := unmarshal(w, r, req); !ok {
+		return
+	}
+	// load the root chain info directly
+	got, err := s.controller.FSM.LoadRootChainInfo(req.ID, req.Height)
+	if err != nil {
+		write(w, err, http.StatusBadRequest)
+		return
+	}
+	write(w, got, http.StatusOK)
 }
 
 // CommitteeData retrieves the committee data for the specified chain id
