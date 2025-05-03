@@ -291,6 +291,10 @@ func (s *Store) Partition() {
 				if e := writer.SetEntryAt(newEntry(lib.Append(partitionPrefix, k), v, badgerNoDiscardBit), snapshotHeight); e != nil {
 					return ErrSetEntry(e)
 				}
+				// set the item as prunable
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit), it.Version()); e != nil {
+					return ErrSetEntry(e)
+				}
 				// re-write the latest version with the 'discard' flag set
 				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), v, badgerNoDiscardBit), snapshotHeight); e != nil {
 					return ErrSetEntry(e)
