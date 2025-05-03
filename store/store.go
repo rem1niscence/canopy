@@ -311,8 +311,8 @@ func (s *Store) Partition() {
 		}
 		// if the partition height is past the partition frequency, set the discardTs at the partition height-1
 		if snapshotHeight > partitionFrequency {
-			fmt.Println("SETTING DISCARD TS @", snapshotHeight-2)
-			sc.db.SetDiscardTs(snapshotHeight - 2)
+			fmt.Println("SETTING DISCARD TS @", sc.Version()-2)
+			sc.db.SetDiscardTs(sc.Version() - 2)
 		}
 		// if the GC isn't already running
 		if !s.isGarbageCollecting.Swap(true) {
