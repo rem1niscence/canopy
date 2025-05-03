@@ -49,7 +49,7 @@ process:
 
 ### Block Commitment
 
-Once a block has been validated by a quorum of validators (a supermajority of the network), it can
+Once a block has been validated by a quorum of validators (a supermajority of two-thirds of the network), it can
 be committed to the blockchain. The commitment process:
 
 - Applies the block to the state machine
@@ -112,5 +112,6 @@ The block processing system includes several security features:
 - Reputation System: Penalizes peers that send invalid blocks
 - Verifiable Delay Functions (VDF): Provides unpredictable but verifiable randomness
 - Checkpoints: Protects against long-range attacks during synchronization
-- Quorum Certificates: Ensures blocks are only committed when validated by a supermajority
+- Quorum Certificates: Ensures blocks are only committed when validated by a supermajority of
+  two-thirds of the network
 - Committee Validation: Ensures only authorized validators participate in consensus
