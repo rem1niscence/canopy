@@ -320,6 +320,10 @@ func (s *Store) Partition() {
 			if fe := sc.db.Flatten(32); fe != nil {
 				return ErrGarbageCollectDB(fe)
 			}
+			// call db.Sync() to sync both the logs, the active memtable's WAL and the vLog
+			if se := sc.db.Sync(); se != nil {
+				return ErrGarbageCollectDB(se)
+			}
 			// unset isGarbageCollecting once complete
 			defer s.isGarbageCollecting.Store(false)
 			// trigger garbage collector to prune keys
