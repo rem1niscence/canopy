@@ -307,6 +307,10 @@ func (s *Store) Partition() {
 		}
 		// if the GC isn't already running
 		if !s.isGarbageCollecting.Swap(true) {
+			// run LSM compaction
+			if fe := sc.db.Flatten(32); fe != nil {
+				return ErrGarbageCollectDB(fe)
+			}
 			// unset isGarbageCollecting once complete
 			defer s.isGarbageCollecting.Store(false)
 			// trigger garbage collector to prune keys
