@@ -112,8 +112,6 @@ func (c *Controller) Sync() {
 			for _, peer := range peers {
 				syncingPeers = append(syncingPeers, lib.BytesToString(peer.Address.PublicKey))
 			}
-			// Remove requests that have timed out
-			c.applyTimeouts(queue)
 			// Calculate the height to stop at when updating queue
 			stopHeight := min(fsmHeight+blockSyncQueueSize, maxHeight)
 			// Send block requests for any missing heights in the queue
@@ -141,6 +139,8 @@ func (c *Controller) Sync() {
 				maxHeight, minVDFIterations = m, v
 				c.log.Debugf("Updated chain %d with max height: %d and iterations %d", c.Config.ChainId, maxHeight, minVDFIterations)
 			}
+			// Remove any block requests that have timed out
+			c.applyTimeouts(queue)
 		}
 	}
 	// Syncing complete
