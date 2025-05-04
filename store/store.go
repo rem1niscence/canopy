@@ -133,7 +133,7 @@ func (s *Store) NewReadOnly(queryVersion uint64) (lib.StoreI, lib.ErrorI) {
 	// create a variable to signal if the historical state store should be utilized
 	var useHistorical bool
 	// if the query version is older than the partition frequency
-	if queryVersion+1 < partitionHeight(s.version) {
+	if queryVersion < partitionHeight(s.version) {
 		useHistorical = true
 	}
 	// make a reader for the specified version
