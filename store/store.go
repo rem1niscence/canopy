@@ -205,7 +205,6 @@ func (s *Store) ShouldPartition() (timeToPartition bool) {
 	if (s.version-partitionHeight(s.version))%(partitionFrequency/10) != 1 {
 		return false
 	}
-	return true // TODO change back
 	// get the partition exists value from the store at a particular historical partition prefix
 	value, err := s.hss.Get([]byte(partitionExistsKey))
 	if err != nil {
