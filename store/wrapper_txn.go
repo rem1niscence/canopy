@@ -12,16 +12,29 @@ import (
 )
 
 const (
+	// ----------------------------------------------------------------------------------------------------------------
 	// BadgerDB garbage collector behavior is not well documented leading to many open issues in their repository
 	// However, here is our current understanding based on experimentation
-	// ----------------------------------------------------------------------------------------------------------
-	// BadgerDB Garbage Collection Rules listed by priority
-	// 1. MergeOp Bit prevents garbage collection of a key regardless
-	// 2. Nothing above DiscardTs will be garbage collected
-	// 3. Deleting, expiring, and setting ‘Discard earlier versions’ signals the removal of older versions of a key
-	// 4. Deleting or expiring a key makes it eligible for GC
-	// 5. If KeepNumVersions is set to max int it will prevent automatic GC of older versions
-	// ------------------------------------------------------------------------------
+	// ----------------------------------------------------------------------------------------------------------------
+	// 1. Manual Keep (Protection)
+	//    - `badgerNoDiscardBit` prevents automatic GC of a key version.
+	//    - However, it can be manually superseded by a manual removal
+	//
+	// 2. Manual Remove (Explicit Deletion or Pruning)
+	//    - Deleting a key at a higher ts removes earlier versions once `discardTs >= ts`.
+	//    - Setting `badgerDiscardEarlierVersions` is similar, except it retains the current version.
+	//
+	// 3. Auto Remove – Tombstones
+	//    - Deleted keys (tombstoned) <= `discardTs` are automatically purged unless protected by `badgerNoDiscardBit`
+	//
+	// 4. Auto Remove – Set Entries
+	//    - For non-deleted (live) keys, Badger retains the number of versions to retain is defined by `KeepNumVersions`.
+	//    - Older versions exceeding this count are automatically eligible for GC.
+	//
+	//   Note:
+	// - The first GC pass after updating `discardTs` and flushing memtable is deterministic
+	// - Subsequent GC runs are probabilistic, depending on reclaimable space and value log thresholds
+	// ----------------------------------------------------------------------------------------------------------------
 	// Bits source: https://github.com/hypermodeinc/badger/blob/85389e88bf308c1dc271383b77b67f4ef4a85194/value.go#L37
 	badgerMetaFieldName               = "meta"  // badgerDB Entry 'meta' field name
 	badgerDiscardEarlierVersions byte = 1 << 2  // badgerDB 'discard earlier versions' flag
@@ -85,17 +98,8 @@ func (t *TxnWrapper) Delete(k []byte) lib.ErrorI {
 	return nil
 }
 
-// Set() stores the key-value pair in the BadgerDB transaction
-func (t *TxnWrapper) SetNonPruneable(k, v []byte) lib.ErrorI {
-	// set an entry with a bit that prevents it from being discarded
-	if err := t.db.SetEntry(newEntry(lib.Append(t.prefix, k), v, badgerNoDiscardBit)); err != nil {
-		return ErrStoreSet(err)
-	}
-	return nil
-}
-
-// DeleteNonPrunable() removes the key-value pair from the BadgerDB transaction but prevents it from being garbage collected
-func (t *TxnWrapper) DeleteNonPrunable(k []byte) lib.ErrorI {
+// Tombstone() removes the key-value pair from the BadgerDB transaction but prevents it from being garbage collected
+func (t *TxnWrapper) Tombstone(k []byte) lib.ErrorI {
 	// set an entry with a bit that marks it as deleted and prevents it from being discarded
 	if err := t.db.SetEntry(newEntry(lib.Append(t.prefix, k), nil, badgerDeleteBit|badgerNoDiscardBit)); err != nil {
 		return ErrStoreDelete(err)

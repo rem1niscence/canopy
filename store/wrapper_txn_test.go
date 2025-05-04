@@ -28,52 +28,6 @@ func TestGetSetDelete(t *testing.T) {
 	require.Contains(t, er.Error(), badger.ErrKeyNotFound.Error())
 }
 
-func TestSetDeleteNonPruneable(t *testing.T) {
-	db, store, cleanup := newTestTxnWrapper(t)
-	defer cleanup()
-	// first set 'a' and 'b' at height 1
-	require.NoError(t, store.SetNonPruneable([]byte("a"), []byte("a")))
-	require.NoError(t, store.SetNonPruneable([]byte("b"), []byte("b")))
-	require.NoError(t, store.db.CommitAt(1, nil))
-	// delete 'b' at height 2
-	tx := db.NewTransactionAt(1, true)
-	nextStore := NewTxnWrapper(tx, lib.NewDefaultLogger(), []byte(latestStatePrefix))
-	require.NoError(t, nextStore.DeleteNonPrunable([]byte("b")))
-	require.NoError(t, nextStore.db.CommitAt(2, nil))
-	// read at height 2
-	tx2 := db.NewTransactionAt(2, true)
-	nextStore2 := NewTxnWrapper(tx2, lib.NewDefaultLogger(), []byte(latestStatePrefix))
-	defer nextStore2.Close()
-	// use an archive iterator
-	iterator, err := nextStore2.ArchiveIterator(nil)
-	require.NoError(t, err)
-	it := iterator.(*Iterator)
-	defer it.Close()
-	var count int
-	// check the expected values of each item of the archive iterator and the order
-	// including the pruning and delete bits
-	for ; it.Valid(); it.Next() {
-		require.True(t, getMeta(it.parent.Item())&badgerNoDiscardBit != 0)
-		switch count {
-		case 0:
-			require.Equal(t, it.Key(), []byte("a"))
-			require.Equal(t, it.Value(), []byte("a"))
-			require.False(t, getMeta(it.parent.Item())&badgerDeleteBit != 0)
-		case 1:
-			require.Equal(t, it.Key(), []byte("b"))
-			require.Equal(t, it.Value(), []byte(nil))
-			require.True(t, getMeta(it.parent.Item())&badgerDeleteBit != 0)
-		case 2:
-			require.Equal(t, it.Key(), []byte("b"))
-			require.Equal(t, it.Value(), []byte("b"))
-			require.False(t, getMeta(it.parent.Item())&badgerDeleteBit != 0)
-		}
-		count++
-	}
-	// ensure 3 keys
-	require.Equal(t, count, 3)
-}
-
 func TestIteratorBasic(t *testing.T) {
 	_, parent, cleanup := newTestTxnWrapper(t)
 	defer cleanup()

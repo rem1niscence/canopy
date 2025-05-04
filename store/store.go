@@ -90,7 +90,7 @@ func NewStore(path string, metrics *lib.Metrics, log lib.LoggerI) (lib.StoreI, l
 	// single batch. It is seemingly unknown why the 10% limit is set
 	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt64).
-		WithLoggingLevel(badger.DEBUG).WithMemTableSize(int64(1*units.GB + 280*units.MB)))
+		WithLoggingLevel(badger.ERROR).WithMemTableSize(int64(1*units.GB + 280*units.MB)))
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
@@ -272,25 +272,17 @@ func (s *Store) Partition() {
 			k, v := it.Key(), it.Value()
 			// skip items that are already marked for Garbage Collection
 			if deDuplicator.Found(lib.BytesToString(k)) {
-				// set the item as prunable
-				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit), it.Version()); e != nil {
-					return ErrSetEntry(e)
-				}
 				continue
 			}
 			// if the item is 'deleted'
 			if it.Deleted() {
 				// set the item as deleted at the partition height and discard earlier versions
-				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit|badgerDiscardEarlierVersions), it.Version()); e != nil {
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit|badgerDiscardEarlierVersions), snapshotHeight); e != nil {
 					return ErrSetEntry(e)
 				}
 			} else {
 				// set item in the historical partition
 				if e := writer.SetEntryAt(newEntry(lib.Append(partitionPrefix, k), v, badgerNoDiscardBit), snapshotHeight); e != nil {
-					return ErrSetEntry(e)
-				}
-				// set the item as prunable
-				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit), it.Version()); e != nil {
 					return ErrSetEntry(e)
 				}
 				// re-write the latest version with the 'discard' flag set
@@ -363,7 +355,7 @@ func (s *Store) Set(k, v []byte) lib.ErrorI {
 		return err
 	}
 	// set in the state store @ historical partition
-	if err := s.hss.SetNonPruneable(k, v); err != nil {
+	if err := s.hss.Set(k, v); err != nil {
 		return err
 	}
 	// set in the state commit store
@@ -377,7 +369,7 @@ func (s *Store) Delete(k []byte) lib.ErrorI {
 		return err
 	}
 	// delete from the state store @ historical partition
-	if err := s.hss.DeleteNonPrunable(k); err != nil {
+	if err := s.hss.Tombstone(k); err != nil {
 		return err
 	}
 	// delete from the state commit store
