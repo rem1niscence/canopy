@@ -134,7 +134,6 @@ func (s *Store) NewReadOnly(queryVersion uint64) (lib.StoreI, lib.ErrorI) {
 	var useHistorical bool
 	// if the query version is older than the partition frequency
 	if queryVersion+1 < partitionHeight(s.version) {
-		fmt.Println("USING HISTORICAL")
 		useHistorical = true
 	}
 	// make a reader for the specified version
@@ -283,7 +282,7 @@ func (s *Store) Partition() {
 			// if the item is 'deleted'
 			if it.Deleted() {
 				// set the item as deleted at the partition height and discard earlier versions
-				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit), it.Version()); e != nil {
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit|badgerDiscardEarlierVersions), it.Version()); e != nil {
 					return ErrSetEntry(e)
 				}
 			} else {
@@ -296,7 +295,7 @@ func (s *Store) Partition() {
 					return ErrSetEntry(e)
 				}
 				// re-write the latest version with the 'discard' flag set
-				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), v, badgerNoDiscardBit), snapshotHeight); e != nil {
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), v, badgerDiscardEarlierVersions), snapshotHeight); e != nil {
 					return ErrSetEntry(e)
 				}
 			}
@@ -311,11 +310,14 @@ func (s *Store) Partition() {
 		}
 		// if the partition height is past the partition frequency, set the discardTs at the partition height-1
 		if snapshotHeight > partitionFrequency {
-			fmt.Println("SETTING DISCARD TS @", snapshotHeight-2)
 			sc.db.SetDiscardTs(snapshotHeight - 2)
 		}
 		// if the GC isn't already running
 		if !s.isGarbageCollecting.Swap(true) {
+			// force the mem table to flush to the LSM
+			if err = FlushMemTable(sc.db); err != nil {
+				return err
+			}
 			// run LSM compaction
 			if fe := sc.db.Flatten(32); fe != nil {
 				return ErrGarbageCollectDB(fe)

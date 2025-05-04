@@ -2,6 +2,8 @@ package store
 
 import (
 	"bytes"
+	"crypto/rand"
+	"math"
 	"reflect"
 	"unsafe"
 
@@ -25,7 +27,7 @@ const (
 	badgerDiscardEarlierVersions byte = 1 << 2  // badgerDB 'discard earlier versions' flag
 	badgerDeleteBit              byte = 1 << 0  // badgerDB 'tombstoned' flag
 	badgerNoDiscardBit           byte = 1 << 3  // badgerDB 'never discard'  bit
-	badgerGCRatio                     = .000001 // the ratio when badgerDB will run the garbage collector
+	badgerGCRatio                     = .15     // the ratio when badgerDB will run the garbage collector
 	badgerSizeFieldName               = "size"  // badgerDB Txn 'size' field name
 	badgerCountFieldName              = "count" // badgerDB Txn 'count' field name
 	badgerTxnFieldName                = "txn"   // badgerDB WriteBatch 'txn' field name
@@ -204,6 +206,32 @@ func newEntry(key, value []byte, meta byte) (e *badger.Entry) {
 	e = &badger.Entry{Key: key, Value: value}
 	setMeta(e, meta)
 	return
+}
+
+// FlushMemTable() ensures badgerDB is flushing its mem table before running flatten
+// IMPORTANT - discardTs must be set before this
+func FlushMemTable(db *badger.DB) lib.ErrorI {
+	// get random 32 bytes
+	randomPrefix := make([]byte, 32)
+	if _, err := rand.Read(randomPrefix); err != nil {
+		return ErrReadBytes(err)
+	}
+	// create a new transaction to write to the database
+	tx := db.NewTransactionAt(math.MaxUint64, true)
+	// write the random prefix to the database
+	if err := tx.Set(randomPrefix, nil); err != nil {
+		return ErrSetEntry(err)
+	}
+	// commit the transaction
+	if err := tx.CommitAt(math.MaxUint64, nil); err != nil {
+		return ErrCommitDB(err)
+	}
+	// call drop prefix which triggers the mempool flush
+	// NOTE: this only works if an actual prefix exists
+	if err := db.DropPrefix(randomPrefix); err != nil {
+		return ErrFlushMemTable(err)
+	}
+	return nil
 }
 
 // setMeta() accesses the private field 'meta' of badgerDB's `Entry`

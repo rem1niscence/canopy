@@ -391,6 +391,71 @@ func TestPartitionIntegration(t *testing.T) {
 	require.Len(t, deletedKeys, 0)
 }
 
+func TestFlushMemtable(t *testing.T) {
+	// create temp directory for test db
+	tempDir := t.TempDir()
+	path := filepath.Join(tempDir, "test-db")
+
+	// set up db with a configuration that will trigger a GC after multiple partitions
+	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt64).
+		WithValueThreshold(1).WithLoggingLevel(badger.INFO).WithMemTableSize(int64(units.GB)))
+	require.NoError(t, err)
+	// set up the store
+	store, err := NewStoreWithDB(db, nil, lib.NewDefaultLogger(), true)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, store.Close())
+	}()
+
+	// insert large dataset at various heights before partition boundary
+	var k []byte
+	keys := [][]byte{
+		bytes.Repeat([]byte("0"), 32),
+		bytes.Repeat([]byte("1"), 32),
+		bytes.Repeat([]byte("2"), 32),
+		bytes.Repeat([]byte("3"), 32),
+		bytes.Repeat([]byte("4"), 32),
+		bytes.Repeat([]byte("5"), 32),
+		bytes.Repeat([]byte("6"), 32),
+		bytes.Repeat([]byte("7"), 32),
+		bytes.Repeat([]byte("8"), 32),
+		bytes.Repeat([]byte("9"), 32),
+	}
+	iterations := 1000
+	for i := 1; i < iterations; i++ {
+		// if not the first iteration
+		if i != 0 {
+			// delete the last key in the db
+			require.NoError(t, store.Delete(k))
+		}
+		// use a key to be updated repeatedly to generate versions
+		k = keys[i%10]
+
+		// set the value in the db
+		require.NoError(t, store.Set(k, nil))
+
+		// commit regularly to create multiple versions
+		_, err = store.Commit()
+		require.NoError(t, err)
+	}
+	db.SetDiscardTs(uint64(iterations - 1))
+	require.NoError(t, FlushMemTable(db))
+	require.NoError(t, db.Flatten(32))
+
+	// use an archive iterator to iterate through the deleted keys
+	iterator, err := store.lss.ArchiveIterator(nil)
+	require.NoError(t, err)
+	it := iterator.(*Iterator)
+	defer it.Close()
+
+	numKeys := 0
+	for ; it.Valid(); it.Next() {
+		numKeys++
+	}
+
+	require.True(t, numKeys == 1)
+}
+
 func TestHistoricalPrefix(t *testing.T) {
 	tests := []struct {
 		name     string
