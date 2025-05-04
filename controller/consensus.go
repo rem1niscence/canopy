@@ -112,8 +112,6 @@ func (c *Controller) Sync() {
 			for _, peer := range peers {
 				syncingPeers = append(syncingPeers, lib.BytesToString(peer.Address.PublicKey))
 			}
-			// Remove requests that have timed out
-			c.applyTimeouts(queue)
 			// Calculate the height to stop at when updating queue
 			stopHeight := min(fsmHeight+blockSyncQueueSize, maxHeight)
 			// Send block requests for any missing heights in the queue
@@ -141,6 +139,8 @@ func (c *Controller) Sync() {
 				maxHeight, minVDFIterations = m, v
 				c.log.Debugf("Updated chain %d with max height: %d and iterations %d", c.Config.ChainId, maxHeight, minVDFIterations)
 			}
+			// Remove any block requests that have timed out
+			c.applyTimeouts(queue)
 		}
 	}
 	// Syncing complete
@@ -168,8 +168,14 @@ func (c *Controller) processQueue(startHeight, stopHeight uint64, queue map[uint
 		blockMsg := req.blockMessage
 		// start timing the HandlePeerBlock call
 		start := time.Now()
+		// lock the controller
+		c.Lock()
 		// process the block message received from the peer
-		if _, err := c.HandlePeerBlock(blockMsg, true); err != nil {
+		_, err := c.HandlePeerBlock(blockMsg, true)
+		// unlock controller
+		c.Unlock()
+		// check error from HandlePeerBlock
+		if err != nil {
 			h := blockMsg.BlockAndCertificate.Header.Height
 			// log this unexpected behavior
 			c.log.Warnf("Syncing peer block height %d invalid:\n%s", h, err.Error())
@@ -229,6 +235,7 @@ func (c *Controller) sendBlockRequests(start, stop uint64, queue map[uint64]bloc
 
 		// Add new request to queue
 		queue[height] = blockSyncRequest{
+			timestamp:     time.Now(),
 			height:        height,
 			peerPublicKey: peerPublicKey,
 		}
