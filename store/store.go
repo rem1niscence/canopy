@@ -15,15 +15,15 @@ import (
 )
 
 const (
-	latestStatePrefix     = "s/"          // prefix designated for the LatestStateStore where the most recent blobs of state data are held
-	historicStatePrefix   = "h/"          // prefix designated for the HistoricalStateStore where the historical blobs of state data are held
-	stateCommitmentPrefix = "c/"          // prefix designated for the StateCommitmentStore (immutable, tree DB) built of hashes of state store data
-	indexerPrefix         = "i/"          // prefix designated for indexer (transactions, blocks, and quorum certificates)
-	stateCommitIDPrefix   = "x/"          // prefix designated for the commit ID (height and state merkle root)
-	lastCommitIDPrefix    = "a/"          // prefix designated for the latest commit ID for easy access (latest height and latest state merkle root)
-	partitionExistsKey    = "e/"          // to check if partition exists
-	partitionFrequency    = uint64(10000) // blocks
-	maxKeyBytes           = 256           // maximum size of a key
+	latestStatePrefix     = "s/"         // prefix designated for the LatestStateStore where the most recent blobs of state data are held
+	historicStatePrefix   = "h/"         // prefix designated for the HistoricalStateStore where the historical blobs of state data are held
+	stateCommitmentPrefix = "c/"         // prefix designated for the StateCommitmentStore (immutable, tree DB) built of hashes of state store data
+	indexerPrefix         = "i/"         // prefix designated for indexer (transactions, blocks, and quorum certificates)
+	stateCommitIDPrefix   = "x/"         // prefix designated for the commit ID (height and state merkle root)
+	lastCommitIDPrefix    = "a/"         // prefix designated for the latest commit ID for easy access (latest height and latest state merkle root)
+	partitionExistsKey    = "e/"         // to check if partition exists
+	partitionFrequency    = uint64(1000) // blocks
+	maxKeyBytes           = 256          // maximum size of a key
 )
 
 var _ lib.StoreI = &Store{} // enforce the Store interface
@@ -202,7 +202,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 // ShouldPartition() determines if it is time to partition
 func (s *Store) ShouldPartition() (timeToPartition bool) {
 	// check if it's time to partition (1001, 2001, 3001...)
-	if (s.version-partitionHeight(s.version))%(partitionFrequency/100) != 1 { // TODO change back to /10 , debug only
+	if (s.version-partitionHeight(s.version))%(partitionFrequency/10) != 1 {
 		return false
 	}
 	return true // TODO change back
