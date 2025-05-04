@@ -183,8 +183,6 @@ func (c *Controller) processQueue(startHeight, stopHeight uint64, queue map[uint
 			c.P2P.ChangeReputation(req.message.Sender.Address.PublicKey, p2p.InvalidBlockRep)
 			break
 		}
-		// unlock controller
-		c.Unlock()
 		// calculate and log the elapsed time
 		elapsed := time.Since(start)
 		c.log.Infof("Block %d sync complete. HandlePeerBlock took %s", height, elapsed)
