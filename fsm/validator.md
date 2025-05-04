@@ -45,8 +45,6 @@ Validators go through different states during their lifecycle:
 
 The system tracks these state transitions and ensures proper handling of validator funds and responsibilities throughout the lifecycle.
 
-## Technical Details
-
 ### Validator Staking Process
 
 The staking process involves several steps:
@@ -80,8 +78,6 @@ Validators can be paused either manually or automatically:
 
 This mechanism helps maintain network health by removing non-participating validators while giving them a chance to resolve issues.
 
-## Component Interactions
-
 ### Validator and Supply Tracking
 
 When validators stake or unstake tokens, the system must update various supply trackers:
@@ -111,7 +107,7 @@ The system implements security measures for validator operations:
 
 These security measures protect validators and the network from unauthorized actions.
 
-## Security Features
+## Security & Integry Mechansisms
 
 - **Slashing**: Validators who misbehave can have a portion of their stake taken as punishment
 - **Pausing**: Validators who fail to participate are automatically paused
