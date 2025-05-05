@@ -12,7 +12,7 @@ NestBFT is an innovative consensus algorithm designed specifically for the Canop
 
 Unlike many modern consensus protocols that assume peer-to-peer network messages arrive without delay, NestBFT is designed for unreliable peer-to-peer environments. It incorporates a novel pacemaker mechanism to address validator coordination challenges while offering immediate safety and finality.
 
-NestBFT utilizes a star communication pattern where validators primarily communicate through a designated leader rather than directly with each other. This approach significantly reduces the number of messages that need to be exchanged during consensus, resulting in improved scalability. In traditional BFT algorithms with all-to-all communication, the number of messages grows quadratically with the number of validators (O(n²)). With NestBFT's star pattern, message complexity is reduced to linear (O(n)), allowing the system to support larger validator sets without communication overhead becoming prohibitive.
+NestBFT utilizes a star communication pattern where validators primarily communicate through a designated leader rather than directly with each other. This approach significantly reduces the number of [messages](msg.md) that need to be exchanged during consensus, resulting in improved scalability. In traditional BFT algorithms with all-to-all communication, the number of messages grows quadratically with the number of validators (O(n²)). With NestBFT's star pattern, message complexity is reduced to linear (O(n)), allowing the system to support larger validator sets without communication overhead becoming prohibitive.
 
 ## The Role of NestBFT in the Canopy Blockchain
 
@@ -62,7 +62,7 @@ The NestBFT consensus engine is the central component that orchestrates the enti
 
 The engine maintains the current view of the consensus state, including the current height, round, and phase. It processes incoming messages from other validators, verifies their validity, and updates the consensus state accordingly. When conditions for transitioning to the next phase are met (such as receiving a sufficient number of votes), the engine triggers the appropriate actions.
 
-For leaders, the engine handles proposal creation, vote collection, and quorum certificate generation. For replicas, it manages proposal validation, vote generation, and block commitment. The engine also implements the timeout mechanisms that ensure liveness by allowing the system to progress even when some validators are unresponsive.
+For leaders, the engine handles proposal creation, [vote collection](vote.md), and quorum certificate generation. For replicas, it manages proposal validation, vote generation, and block commitment. The engine also implements the timeout mechanisms that ensure liveness by allowing the system to progress even when some validators are unresponsive.
 
 ### BLS Signatures
 
@@ -78,7 +78,7 @@ Key aspects of BLS Signatures:
 - Supports threshold signatures for distributed key generation
 - Reduces bandwidth consumption in consensus message exchange
 
-### The Election Process
+### The [Election](election.md) Process
 
 The Election Process in NestBFT combines Verifiable Random Functions (VRFs) with sortition to achieve a fair, unpredictable, and Sybil-resistant leader selection mechanism. Validators use VRFs to generate provably random values based on their private keys and consensus state. These values serve as lottery tickets, where lower values increase the chance of becoming a leader candidate. The VRF outputs are verifiable by other validators, ensuring that the randomness cannot be manipulated while maintaining deterministic verification.
 
@@ -97,7 +97,7 @@ Key aspects of the Election Process:
 
 Quorum Certificates (QCs) in NestBFT are cryptographic proofs that a supermajority of validators has endorsed a specific consensus message. These certificates contain the original message along with an aggregated BLS signature representing more than 2/3 of the total voting power. QCs serve as irrefutable evidence that consensus has been reached at a particular phase, enabling validators to safely progress to subsequent phases.
 
-NestBFT uses QCs at multiple points in the consensus process, including after proposal validation, precommit, and commit phases. Each QC builds upon previous ones, creating a chain of cryptographic evidence that ensures both safety and liveness. When a validator receives a valid QC, it can immediately verify the supermajority support without needing to communicate with other validators. This property enables efficient consensus progression and provides the foundation for NestBFT's immediate finality guarantees.
+NestBFT uses QCs at multiple points in the consensus process, including after [proposal validation](prop.md), precommit, and commit phases. Each QC builds upon previous ones, creating a chain of cryptographic evidence that ensures both safety and liveness. When a validator receives a valid QC, it can immediately verify the supermajority support without needing to communicate with other validators. This property enables efficient consensus progression and provides the foundation for NestBFT's immediate finality guarantees.
 
 Key aspects of Quorum Certificates:
 - Cryptographic proof of supermajority validator support
@@ -110,7 +110,7 @@ Key aspects of Quorum Certificates:
 
 ### The Voting Mechanism
 
-The Voting Mechanism in NestBFT enables validators to express their support for proposals through cryptographic signatures. Each vote represents a validator's endorsement of a specific message, with the validator's voting power determined by their staked CNPY tokens. The protocol organizes votes by height, round, phase, and payload hash, ensuring that validators only vote on identical proposals. This structure prevents equivocation and maintains consensus integrity.
+The Voting Mechanism in NestBFT enables validators to express their support for [proposals](prop.md) through cryptographic signatures. Each [vote](vote.md) represents a validator's endorsement of a specific [message](msg.md), with the validator's voting power determined by their staked CNPY tokens. The protocol organizes votes by height, round, phase, and payload hash, ensuring that validators only vote on identical proposals. This structure prevents equivocation and maintains consensus integrity.
 
 NestBFT implements a star communication pattern for voting, where validators send their votes to the current leader rather than broadcasting to all participants. The leader aggregates these votes and, upon collecting a supermajority (more than 2/3 of voting power), creates a quorum certificate that proves sufficient support. This certificate is then broadcast to all validators as evidence of consensus progress. This approach significantly reduces network communication overhead while maintaining Byzantine fault tolerance guarantees.
 
@@ -148,7 +148,7 @@ NestBFT can tolerate up to one-third of validators being Byzantine (malicious or
 
 The stake-weighted leader election process prevents Sybil attacks by ensuring that influence in the consensus process is proportional to economic stake rather than node count.
 
-### Double-Signing Prevention
+### [Double-Signing Prevention](evidence.md)
 
 The protocol includes mechanisms to detect and punish validators who sign conflicting blocks at the same height, protecting against equivocation attacks.
 
@@ -160,9 +160,9 @@ The locking mechanism and quorum certificates ensure that once a block has been 
 
 The star communication pattern reduces the attack surface for DDoS attacks by limiting the number of connections each validator needs to maintain.
 
-### Accountability
+### [Accountability](evidence.md)
 
-All messages in NestBFT are signed, creating an audit trail that can be used to identify and punish misbehaving validators.
+All [messages](msg.md) in NestBFT are signed, creating an audit trail that can be used to identify and punish misbehaving validators.
 
 ### Timing Attack Resistance
 
