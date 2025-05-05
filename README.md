@@ -38,7 +38,7 @@ For more information on the Canopy Network Protocol visit [https://canopynetwork
 
 ## Repository Documentation
 
-Welcome to the Canopy Network reference implementation. This respository can be well understood reading about the core modules:
+Welcome to the Canopy Network reference implementation. This repository can be well understood reading about the core modules:
 
 - [Controller](controller/README.md): Coordinates communication between all the major parts of the Canopy blockchain, like a central hub or "bus" that connects the system together.
 - [Finite State Machine (FSM)](fsm/README.md): Defines the logic for how transactions change the blockchain's state — it decides what’s valid and how state transitions happen from one block to the next.
