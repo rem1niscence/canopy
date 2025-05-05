@@ -1,6 +1,6 @@
 # Finite State Machine (FSM) Package
 
-The FSM package is the core protocol component responsible for maintaining and updating the state of the Canopy blockchain as it progresses. It represents the collective state of all accounts, validators, and other relevant data stored on the blockchain. This document provides a comprehensive overview of the FSM module, its components, and how they interact within the Canopy ecosystem.
+The FSM package is the core protocol component responsible for maintaining and updating the state of the Canopy blockchain as it progresses. It represents the collective state of all accounts, validators, and other relevant data [stored](key.md) on the blockchain. This document provides a comprehensive overview of the FSM module, its components, and how they interact within the Canopy ecosystem.
 
 The FSM can be best understood as the rules by which the blockchain ledger changes. If you think of transactions as commands and the blockchain database as the ledger, the FSM is the protocol that interprets those commands to change the ledger. It serves as both the entry point and the only mechanism through which the blockchain state can be modified, with the exception of automatic state changes that occur at block boundaries.
 
@@ -9,7 +9,7 @@ The FSM can be best understood as the rules by which the blockchain ledger chang
 A Finite State Machine (FSM) is a computational model used to represent and control execution flow. It consists of:
 
 1. A finite set of states
-2. A finite set of inputs (events)
+2. A finite set of [inputs (events)](message.md)
 3. A transition function that maps state-input pairs to states
 4. An initial state
 5. A set of final states (optional)
@@ -30,7 +30,7 @@ The FSM ensures deterministic execution - given the same input (transactions) an
 
 ## Core Components
 
-### The State Machine
+### [The State Machine](state.md)
 
 The state machine type is the fundamental backbone of the Canopy blockchain, responsible for maintaining and updating the collective state as the blockchain progresses. It represents a comprehensive snapshot of the entire blockchain at any given moment, including all accounts, validators, pools, and other critical data structures.
 
@@ -48,7 +48,7 @@ Key aspects of the state machine:
 - Atomic updates that maintain data integrity during state changes
 - Versioning capabilities that allow for historical state access
 
-### Accounts
+### [Accounts](account.md)
 
 Accounts are fundamental entities that hold and transfer value within the Canopy blockchain. Each account represents a participant in the network with the ability to hold tokens and initiate transactions.
 
@@ -60,7 +60,7 @@ Accounts serve as the primary interface through which users interact with the Ca
 
 The security of accounts is maintained through public-key cryptography, with transactions requiring valid signatures from the private key corresponding to the account's address. This ensures that only the legitimate owner of an account can authorize transactions that affect its balance or state.
 
-### Committees
+### [Committees](committee.md)
 
 Committees are validator sets responsible for consensus across the Canopy network. Committees represent quorums of validators that participate in the Byzantine Fault Tolerant (BFT) consensus process for specific chains within the Canopy ecosystem.
 
@@ -80,7 +80,7 @@ Key aspects of Canopy committees:
 - Implementation of slashing conditions for Byzantine behavior within Committees
 - Support for cross-Committee communication and coordination
 
-### Pools
+### [Pools](account.md)
 
 Pools are special fund repositories that operate based on predefined blockchain rules rather than individual control. Unlike accounts which are controlled by private keys, pools are controlled directly by the protocol itself, making them crucial for automated token distribution and protocol-level fund management.
 
@@ -100,7 +100,7 @@ Key aspects of pools include:
 - Transparent accounting of protocol funds and their movements
 - Automated distribution mechanisms based on protocol rules
 
-### Transactions
+### [Transactions](transaction.md)
 
 Transactions are the primary mechanism through which changes are made to the blockchain state. Transactions represent user-initiated actions that modify the state according to predefined rules, serving as the interface between users and the blockchain.
 
@@ -120,7 +120,7 @@ Key aspects transactions in Canopy:
 - Validation rules to ensure transactions are well-formed and authorized
 - Atomic execution to maintain state integrity during processing
 
-### Validators
+### [Validators](validator.md)
 
 Validators are the entities responsible for securing the Canopy network through participation in consensus. Validators stake tokens as collateral, process transactions, produce blocks, and maintain network security in exchange for rewards.
 
@@ -181,7 +181,7 @@ Key aspects of the block reward system:
 - Transparent accounting of all reward activities
 - Governance mechanisms for adjusting reward parameters
 
-### Slashing
+### [Slashing](byzantine.md)
 
 Slashing implements the penalty mechanisms that discourage malicious or negligent behavior by validators. It detects violations of protocol rules, calculates appropriate penalties, and executes the slashing of stake as a consequence for these violations.
 
@@ -203,7 +203,7 @@ Key aspects of slashing in Canopy:
 - Extended slashing liability during the unstaking period
 - Governance mechanisms for adjusting slashing parameters
 
-### Supply Tracking
+### [Supply Tracking](account.md)
 
 The Supply Tracker component maintains accurate accounting of all tokens in the Canopy ecosystem, tracking their creation, destruction, and movement between different parts of the system. It provides a comprehensive view of the token supply and its distribution across accounts and pools.
 
@@ -223,7 +223,7 @@ Key aspects of the supply tracker include:
 - Support for governance decisions related to token economics
 - Verification that token operations follow protocol rules
 
-### Chain Genesis
+### [Chain Genesis](genesis.md)
 
 The Genesis component defines the initial state of the Canopy blockchain at its launch, establishing the starting point from which all subsequent state transitions occur. It represents the foundation of the blockchain and encodes the fundamental parameters and initial distribution of resources.
 
@@ -243,7 +243,7 @@ Key aspects of this component include:
 - Support for custom genesis configurations for testing and development
 - Immutability of genesis state after network launch
 
-### Governance
+### [Governance](gov.md)
 
 The Governance component enables on-chain decision-making processes that allow the Canopy community to control protocol parameters and resource allocation without requiring software upgrades. It implements mechanisms for proposal submission, voting, and execution of approved changes.
 
@@ -265,7 +265,7 @@ Key aspects of governance in Canopy:
 - Automatic execution of approved governance actions
 - Self-modifying capability through governance parameter adjustments
 
-### Swap
+### [Swap](swap.md)
 
 The Swap component facilitates the exchange of tokens between different accounts or between accounts and pools within the Canopy ecosystem. It implements the rules and mechanisms for these exchanges, ensuring they occur atomically and according to protocol-defined parameters.
 
@@ -285,7 +285,7 @@ Key aspects of this component include:
 - Deterministic execution ensuring network-wide consistency
 - Transaction fee handling for swap operations
 
-### Automatic State Changes
+### [Automatic State Changes](automatic.md)
 
 Automatic state changes are processes that occur without manual intervention, executing predetermined operations at specific blockchain events like block beginnings and endings. It ensures that critical protocol functions continue reliably without requiring explicit transactions.
 
@@ -302,7 +302,7 @@ Key aspects of this component include:
 - Housekeeping operations for blockchain maintenance
 - Deterministic execution ensuring network-wide consistency
 
-### Byzantine Behavior Detection
+### [Byzantine Behavior Detection](byzantine.md)
 
 Byzantine behavior is an action by validators or other participants that deviate from the protocol rules, whether due to malicious intent or technical failures. It ensures that the network can maintain consensus and security even in the presence of such behavior.
 
@@ -320,7 +320,7 @@ Key aspects of this component include:
 - Threshold mechanisms for critical operations
 - Contribution to the overall Byzantine fault tolerance of the network
 
-## Component Interactions
+## [Component Interactions](state.md)
 
 ### How Transactions Modify Accounts
 
