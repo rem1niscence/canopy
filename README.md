@@ -18,7 +18,7 @@ _Official golang implementation of the Canopy Network Protocol_
 ### ⫸ **Welcome to the Network that Powers the Peer-to-Peer Launchpad for New Chains**
 
 Built on a recursive architecture, chains bootstrap each other into independence —  
-forming an unstoppable web of utility and security. 
+forming an `unstoppable` web of utility and security. 
 
 **Here you'll find:**
 
