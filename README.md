@@ -1,117 +1,84 @@
-<div align="center">
-  <a href="https://www.canopynetwork.org">
-    <img src="https://github.com/user-attachments/assets/b8d6f342-c18b-492e-b87f-06755f775c5f" alt="canopy_logo_black" width="500"/>
-  </a>
-</div>
-<h6 align="center">Official golang implementation of the Canopy Network Protocol </h6>
-<div align="center">
-  <a href="https://godoc.org/github.com/canopy-network/canopy">
-    <img src="https://img.shields.io/badge/godoc-reference-white.svg"/>
-  </a>
-  <a href="https://canopynetwork.org">
-      <img src="https://img.shields.io/badge/getting started-guide-white"/>
-    </a>
-  <a href="https://golang.org">
-  <img  src="https://img.shields.io/badge/golang-v1.21-white.svg"/>
-    </a>
-  <a href="https://nextjs.org/" >
-    <img src="https://img.shields.io/badge/next js-v14.2.3-white.svg"/>
-  </a>
-</div>
+<img src="https://github.com/user-attachments/assets/b8d6f342-c18b-492e-b87f-06755f775c5f" alt="Canopy Logo" width="300"/>
 
-<h1 align="center"> Overview</h1>
-  <div align="center">
-    <a href="https://opensource.org/licenses/MIT">
-      <img src="https://img.shields.io/badge/License-TBD-white.svg"/>
-    </a>
-     <a href="https://docs.docker.com/compose/">
-      <img src="https://img.shields.io/badge/testing-docker compose-white"/>
-    </a>
-    <a href="https://github.com/canopy-network/canopy/releases">
-      <img src="https://img.shields.io/badge/platform-linux%20%7C%20macos-white.svg"/>
-    </a>
-     <a href="https://docs.docker.com/compose/">
-      <img src="https://img.shields.io/badge/status-prelaunch-white"/>
-    </a>
-  </div>
-<br />
-<p align="center">Connect to mainnet with a `canopy` node. For more information on the Canopy Network Protocol visit <a href="https://canopynetwork.org">canopy network</a> </p>
+_Official golang implementation of the Canopy Network Protocol_
 
-<h1 align="center">How to run it</h1>
+[![GoDoc](https://img.shields.io/badge/godoc-reference-white.svg)](https://godoc.org/github.com/canopy-network/canopy)
+[![Getting Started](https://img.shields.io/badge/getting%20started-guide-white)](https://canopynetwork.org)
+[![Go Version](https://img.shields.io/badge/golang-v1.21-white.svg)](https://golang.org)
+[![Next.js Version](https://img.shields.io/badge/next%20js-v14.2.3-white.svg)](https://nextjs.org/)
 
-<p align="center">To run the Canopy binary you can use the following flags alongside the `canopy` executable:</p>
 
-<pre><code>Usage:
-  canopy [command]
+# Overview
 
-Available Commands:
-  admin       admin only operations for the node
-  help        Help about any command
-  query       query the blockchain rpc
-  start       start the blockchain software
+[![License](https://img.shields.io/badge/License-MIT-white.svg)](https://opensource.org/licenses/MIT)
+[![Testing](https://img.shields.io/badge/testing-docker%20compose-white)](https://docs.docker.com/compose/)
+[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-white.svg)](https://github.com/canopy-network/canopy/releases)
+[![Status](https://img.shields.io/badge/status-prelaunch-white)](https://docs.docker.com/compose/)
 
-Flags:
-      --data-dir string   custom data directory location (default "$HOME/.canopy")
-  -h, --help              help for canopy
-      --version           version for canop
-</code></pre>
+For more information on the Canopy Network Protocol visit [https://canopynetwork.org](https://canopynetwork.org)
 
-<h1 align="center">Running Tests</h1>
+**Canopy is in `Alphanet`** 🚀
 
-<p align="center">To run Canopy unit tests, use the Go testing tools:</p>
+## Protocol Documentation
 
-<pre><code>make test</code></pre>
+➪ Check out the Canopy Network wiki:  [https://canopy-network.gitbook.io/docs](https://canopy-network.gitbook.io/docs)
 
-<h1 align="center">How to contribute</h1>
+## Repository Documentation
 
-<p>Canopy is an open-source project, and we welcome contributions from the community. Here's how you can get involved:</p>
+Welcome to the Canopy Network reference implementation. This code base can be well understood reading about the core modules:
 
-<ol>
-  <li><b>Fork</b> the repository and clone it locally.</li>
-  <li><b>Code</b> your improvements or fixes.</li>
-  <li><b>Submit a Pull Request</b> (PR) for review.</li>
-</ol>
+- [Controller](controller/README.md): Coordinates communication between all the major parts of the Canopy blockchain, like a central hub or "bus" that connects the system together.
+- [Finite State Machine (FSM)](fsm/README.md): Defines the logic for how transactions change the blockchain's state — it decides what’s valid and how state transitions happen from one block to the next.
+- [Byzantine Fault Tolerant (BFT) Consensus](bft/README.md): A consensus mechanism that allows the network to agree on new blocks even if some nodes are unreliable or malicious.
+- [Peer-to-Peer Networking](p2p/README.md): A secure and encrypted communication system that lets nodes talk directly to each other without needing a central server.
+- [Persistence](store/README.md): Manages the blockchain’s storage — it saves the current state (ledger), indexes past transactions, and ensures fast and reliable data verification.
 
-<p>Please follow the guidelines below to help us maintain high-quality contributions:</p>
+## How to Run It
 
-<h3 align="center">High Impact or Architectural Changes</h3>
+To run the Canopy binary, use the following commands:
 
-<p>Before making large changes, we encourage you to discuss them with the Canopy team on <a href="https://discord.gg/pNcSJj7Wdh">Discord</a>. This ensures we're aligned on the direction of the project.</p>
+```bash
+make build canopy-full
+canopy start
+```
 
-<h3 align="center">Coding Style</h3>
+## Running Tests
 
-<ul>
-  <li>Code must adhere to the official Go formatting guidelines (i.e. use <a href="https://golang.org/cmd/gofmt">gofmt</a>).</li>
-  <li>(Optional) Use <a href="https://editorconfig.org">EditorConfig</a> to help your text editor maintain consistent formatting across the project.</li>
-  <li>Code must be documented following the official Go commentary guidelines.</li>
-  <li>Pull requests should be based on and opened against the <b>development</b> branch.</li>
-</ul>
+To run Canopy unit tests, use the Go testing tools:
 
-<h1 align="center">How to build</h1>
+```bash
+make test
+```
 
-<p align="center">To build the project, run the following command:</p>
+## How to Contribute
 
-<pre><code>make build</code></pre>
+Canopy is an open-source project, and we welcome contributions from the community. Here's how to get involved:
 
-<h1 align="center">Contact</h1>
-<div align="center">
-  <a href="https://github.com/canopy-network/canopy/releases">
-      <img src="https://img.shields.io/github/release-pre/canopy-network/canopy.svg"/>
-    </a>
-    <a href="https://goreportcard.com/report/github.com/canopy-network/canopy">
-      <img src="https://goreportcard.com/badge/github.com/canopy-network/canopy"/>
-    </a>
-    <a href="https://github.com/canopy-network/canopy/pulse">
-      <img src="https://img.shields.io/github/contributors/canopy-network/canopy.svg"/>
-    </a>
-    <a href="https://github.com/canopy-network/canopy/pulse">
-      <img src="https://img.shields.io/github/last-commit/canopy-network/canopy.svg"/>
-    </a>
-  <br />
-  <a href="https://x.com/CNPYNetwork">
-    <img src="https://img.shields.io/twitter/url/http/shields.io.svg?style=social">
-  </a>
-  <a href="https://discord.gg/pNcSJj7Wdh">
-    <img src="https://img.shields.io/badge/discord-online-blue.svg">
-  </a>
-</div>
+1. **Fork** the repository and clone it locally.
+2. **Code** your improvements or fixes.
+3. **Submit a Pull Request** (PR) for review.
+
+➣ Please follow these guidelines to maintain high-quality contributions:
+
+### High Impact or Architectural Changes
+
+Before making large changes, discuss them with the Canopy team on [Discord](https://discord.gg/pNcSJj7Wdh) to ensure alignment.
+
+### Coding Style
+
+- Code must adhere to official Go formatting (use [`gofmt`](https://golang.org/cmd/gofmt)).
+- (Optional) Use [EditorConfig](https://editorconfig.org) for consistent formatting.
+- All code should follow Go documentation/commentary guidelines.
+- PRs should be opened against the `development` branch.
+
+[![Pre-Release](https://img.shields.io/github/release-pre/canopy-network/canopy.svg)](https://github.com/canopy-network/canopy/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/canopy-network/canopy)](https://goreportcard.com/report/github.com/canopy-network/canopy)
+[![Contributors](https://img.shields.io/github/contributors/canopy-network/canopy.svg)](https://github.com/canopy-network/canopy/pulse)
+[![Last Commit](https://img.shields.io/github/last-commit/canopy-network/canopy.svg)](https://github.com/canopy-network/canopy/pulse)
+
+## Contact
+
+[![Twitter](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://x.com/CNPYNetwork)
+[![Discord](https://img.shields.io/badge/discord-online-blue.svg)](https://discord.gg/pNcSJj7Wdh)
+
+> Code written by hand with ❤️ by the team, documentation with the help of AI for some of the ESL team
