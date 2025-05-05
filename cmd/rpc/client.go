@@ -194,7 +194,7 @@ func (c *Client) RetiredCommittees(height uint64) (p *[]uint64, err lib.ErrorI) 
 	return
 }
 
-func (c *Client) Order(height, orderId, chainId uint64) (p *lib.SellOrder, err lib.ErrorI) {
+func (c *Client) Order(height uint64, orderId string, chainId uint64) (p *lib.SellOrder, err lib.ErrorI) {
 	p = new(lib.SellOrder)
 	err = c.orderRequest(OrderRouteName, height, orderId, chainId, p)
 	return
@@ -578,7 +578,7 @@ func (c *Client) TxCreateOrder(from AddrOrNickname, sellAmount, receiveAmount, c
 	return c.transactionRequest(TxCreateOrderRouteName, txReq, submit)
 }
 
-func (c *Client) TxEditOrder(from AddrOrNickname, sellAmount, receiveAmount, orderId, chainId uint64, receiveAddress string,
+func (c *Client) TxEditOrder(from AddrOrNickname, sellAmount, receiveAmount uint64, orderId string, chainId uint64, receiveAddress string,
 	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	receiveAddr, err := lib.NewHexBytesFromString(receiveAddress)
 	if err != nil {
@@ -603,7 +603,7 @@ func (c *Client) TxEditOrder(from AddrOrNickname, sellAmount, receiveAmount, ord
 	return c.transactionRequest(TxEditOrderRouteName, txReq, submit)
 }
 
-func (c *Client) TxDeleteOrder(from AddrOrNickname, orderId, chainId uint64,
+func (c *Client) TxDeleteOrder(from AddrOrNickname, orderId string, chainId uint64,
 	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	txReq := txDeleteOrder{
 		Fee:               optFee,
@@ -620,7 +620,7 @@ func (c *Client) TxDeleteOrder(from AddrOrNickname, orderId, chainId uint64,
 	return c.transactionRequest(TxDeleteOrderRouteName, txReq, submit)
 }
 
-func (c *Client) TxLockOrder(from AddrOrNickname, receiveAddress string, orderId uint64,
+func (c *Client) TxLockOrder(from AddrOrNickname, receiveAddress string, orderId string,
 	pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	receiveHex, err := lib.NewHexBytesFromString(receiveAddress)
 	if err != nil {
@@ -640,7 +640,7 @@ func (c *Client) TxLockOrder(from AddrOrNickname, receiveAddress string, orderId
 	return c.transactionRequest(TxLockOrderRouteName, txReq, submit)
 }
 
-func (c *Client) TxCloseOrder(from AddrOrNickname, orderId uint64, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
+func (c *Client) TxCloseOrder(from AddrOrNickname, orderId string, pwd string, submit bool, optFee uint64) (hash *string, tx json.RawMessage, e lib.ErrorI) {
 	txReq := txCloseOrder{
 		Fee:      optFee,
 		OrderId:  orderId,
@@ -850,7 +850,7 @@ func (c *Client) heightRequest(routeName string, height uint64, ptr any) (err li
 	return
 }
 
-func (c *Client) orderRequest(routeName string, height, orderId, chainId uint64, ptr any) (err lib.ErrorI) {
+func (c *Client) orderRequest(routeName string, height uint64, orderId string, chainId uint64, ptr any) (err lib.ErrorI) {
 	bz, err := lib.MarshalJSON(orderRequest{
 		ChainId: chainId,
 		OrderId: orderId,

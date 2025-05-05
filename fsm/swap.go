@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"slices"
+	"sort"
 )
 
 /* This file contains state machine changes related to 'token swapping' */
@@ -43,6 +43,8 @@ func (s *StateMachine) HandleCommitteeSwaps(orders *lib.Orders, chainId uint64) 
 	return
 }
 
+// BUYER SIDE LOGIC
+
 // ParseLockOrder() parses a transaction for an embedded lock order messages in the memo field
 func (s *StateMachine) ParseLockOrder(tx *lib.Transaction, deadlineBlocks uint64) (bo *lib.LockOrder, ok bool) {
 	// check for valid json
@@ -78,10 +80,10 @@ func (s *StateMachine) ParseCloseOrder(tx *lib.Transaction) (co *lib.CloseOrder,
 
 // ProcessRootChainOrderBook() processes the order book from the root-chain and cross-references blocks on this chain to determine
 // actions that warrant committee level changes to the root-chain order book like: ResetOrder and CloseOrder
-func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.BlockResult) (closeOrders, resetOrders []uint64) {
+func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.BlockResult) (closeOrders, resetOrders [][]byte) {
 	// create a variable to track the 'close orders'
 	// map structure is [orderId] -> amount sent
-	transferred := make(map[uint64]uint64)
+	transferred := make(map[string]uint64)
 	// get all the 'Send' transactions from the block
 	for _, tx := range b.Transactions {
 		// ignore non-send, memo-less, or no valid json embedded
@@ -108,7 +110,7 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 			continue
 		}
 		// try to get the close order
-		order, err := book.GetOrder(int(closeOrder.OrderId))
+		order, err := book.GetOrder(closeOrder.OrderId)
 		// if an error occurred during the retrieval
 		if err != nil {
 			s.log.Warnf("An error occurred during the close order retrieval: %s", err.Error())
@@ -117,7 +119,7 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 		// if the 'sent amount' is the same as the order amount
 		if bytes.Equal(send.ToAddress, order.SellerReceiveAddress) && order.RequestedAmount == send.Amount {
 			// update the transferred map using the [order_id] as the key and add send.Amount to the value
-			transferred[closeOrder.OrderId] += send.Amount
+			transferred[lib.BytesToString(closeOrder.OrderId)] += send.Amount
 		}
 	}
 	// for each order in the book
@@ -134,7 +136,7 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 			continue
 		}
 		// check if the order was closed this block
-		if sent := transferred[order.Id]; sent == order.RequestedAmount { // double check on amount for sanity
+		if sent := transferred[lib.BytesToString(order.Id)]; sent == order.RequestedAmount { // double check on amount for sanity
 			// add to the closed order list
 			closeOrders = append(closeOrders, order.Id)
 			// go to the next order
@@ -161,9 +163,9 @@ func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, b *lib.Blo
 				continue
 			}
 			// check if the 'close order' command was issued previously
-			if qc.Results.Orders != nil && slices.Contains(qc.Results.Orders.CloseOrders, order.Id) {
+			if qc.Results.Orders != nil && lib.ContainsByteSlice(qc.Results.Orders.CloseOrders, order.Id) {
 				// ensure no already added to close order
-				if !slices.Contains(closeOrders, order.Id) {
+				if !lib.ContainsByteSlice(closeOrders, order.Id) {
 					// if so, add it to the close orders
 					closeOrders = append(closeOrders, order.Id)
 				}
@@ -187,7 +189,7 @@ func (s *StateMachine) ParseLockOrders(b *lib.BlockResult) (lockOrders []*lib.Lo
 	// calculate the minimum lock order fee
 	minFee := params.Fee.SendFee * params.Validator.LockOrderFeeMultiplier
 	// ensure duplicate actions are skipped
-	deDupeLockOrders := lib.NewDeDuplicator[uint64]()
+	deDupeLockOrders := lib.NewDeDuplicator[string]()
 	// for each transaction in the block
 	for _, tx := range b.Transactions {
 		// skip over any that doesn't have the minimum fee or isn't the correct type
@@ -197,7 +199,7 @@ func (s *StateMachine) ParseLockOrders(b *lib.BlockResult) (lockOrders []*lib.Lo
 		// parse the transaction for embedded 'lock orders'
 		if lockOrder, ok := s.ParseLockOrder(tx.Transaction, params.Validator.BuyDeadlineBlocks); ok {
 			// if not found (non-duplicate)
-			if found := deDupeLockOrders.Found(lockOrder.OrderId); !found {
+			if found := deDupeLockOrders.Found(lib.BytesToString(lockOrder.OrderId)); !found {
 				// add to the 'lock orders' list
 				lockOrders = append(lockOrders, lockOrder)
 			}
@@ -207,74 +209,40 @@ func (s *StateMachine) ParseLockOrders(b *lib.BlockResult) (lockOrders []*lib.Lo
 	return
 }
 
-// CreateOrder() adds an order to the order book for a committee in the state db
-func (s *StateMachine) CreateOrder(order *lib.SellOrder, chainId uint64) (orderId uint64, err lib.ErrorI) {
-	// get the order book for a specific chainId from state
-	orderBook, err := s.GetOrderBook(chainId)
-	if err != nil {
-		return
-	}
-	// add the new sell order to the order book
-	orderId = orderBook.AddOrder(order)
-	// set the order book back in state
-	err = s.SetOrderBook(orderBook)
-	// exit
-	return
-}
-
-// EditOrder() updates an existing order in the order book for a committee in the state db
-func (s *StateMachine) EditOrder(order *lib.SellOrder, chainId uint64) (err lib.ErrorI) {
-	// get the order book for a specific chainId from state
-	orderBook, err := s.GetOrderBook(chainId)
-	if err != nil {
-		return
-	}
-	// update the order at a specific id
-	if err = orderBook.UpdateOrder(int(order.Id), order); err != nil {
-		return
-	}
-	// set the order book back in state
-	err = s.SetOrderBook(orderBook)
-	// exit
-	return
-}
-
 // LockOrder() adds a recipient and a deadline height to an existing order and saves it to the state
-func (s *StateMachine) LockOrder(lockOrder *lib.LockOrder, chainId uint64) (err lib.ErrorI) {
-	// get the order book for a specific chainId from state
-	orderBook, err := s.GetOrderBook(chainId)
+func (s *StateMachine) LockOrder(lock *lib.LockOrder, chainId uint64) (err lib.ErrorI) {
+	// get the order from state
+	order, err := s.GetOrder(lock.OrderId, chainId)
 	if err != nil {
 		return
 	}
-	// 'reserve' the order in the book
-	if err = orderBook.LockOrder(int(lockOrder.OrderId), lockOrder.BuyerReceiveAddress, lockOrder.BuyerSendAddress, lockOrder.BuyerChainDeadline); err != nil {
-		return
+	// if the buyer's receive address isn't nil
+	if order.BuyerReceiveAddress != nil {
+		return lib.ErrOrderLocked()
 	}
+	// set the buyer's receive, send, and deadline height in the order
+	order.BuyerReceiveAddress = lock.BuyerReceiveAddress
+	order.BuyerSendAddress = lock.BuyerSendAddress
+	order.BuyerChainDeadline = lock.BuyerChainDeadline
 	// set the order book back in state
-	err = s.SetOrderBook(orderBook)
-	// exit
-	return
+	return s.SetOrder(order, chainId)
 }
 
 // ResetOrder() removes the recipient and deadline height from an existing order and saves it to the state
-func (s *StateMachine) ResetOrder(orderId, chainId uint64) (err lib.ErrorI) {
-	// get the order book for a specific chainId from state
-	orderBook, err := s.GetOrderBook(chainId)
+func (s *StateMachine) ResetOrder(orderId []byte, chainId uint64) (err lib.ErrorI) {
+	// get the order from state
+	order, err := s.GetOrder(orderId, chainId)
 	if err != nil {
 		return
 	}
-	// reset the order in the book
-	if err = orderBook.ResetOrder(int(orderId)); err != nil {
-		return
-	}
-	// set the order book back in state
-	err = s.SetOrderBook(orderBook)
-	// exit
-	return
+	// reset the buyer's receive, send, and deadline height in the order
+	order.BuyerReceiveAddress, order.BuyerSendAddress, order.BuyerChainDeadline = nil, nil, 0
+	// set the order back in state
+	return s.SetOrder(order, chainId)
 }
 
 // CloseOrder() sends the tokens from escrow to the 'buyer address' and deletes the order
-func (s *StateMachine) CloseOrder(orderId, chainId uint64) (err lib.ErrorI) {
+func (s *StateMachine) CloseOrder(orderId []byte, chainId uint64) (err lib.ErrorI) {
 	// the order is 'closed' and the tokens are moved from escrow to the buyer
 	order, err := s.GetOrder(orderId, chainId)
 	if err != nil {
@@ -296,32 +264,31 @@ func (s *StateMachine) CloseOrder(orderId, chainId uint64) (err lib.ErrorI) {
 	return s.DeleteOrder(orderId, chainId)
 }
 
-// DeleteOrder() deletes an existing order in the order book for a committee in the state db
-func (s *StateMachine) DeleteOrder(orderId, chainId uint64) (err lib.ErrorI) {
-	// get the order book for a specific chainId from state
-	orderBook, err := s.GetOrderBook(chainId)
+// SetOrder() sets the sell order in state
+func (s *StateMachine) SetOrder(order *lib.SellOrder, chainId uint64) (err lib.ErrorI) {
+	// convert the order into proto bytes
+	protoBytes, err := s.marshalOrder(order)
 	if err != nil {
 		return
 	}
-	// update the order with a 'nil' value (delete)
-	if err = orderBook.UpdateOrder(int(orderId), nil); err != nil {
-		return
-	}
-	// set the order book back in state
-	err = s.SetOrderBook(orderBook)
-	// exit
-	return
+	// set the order book in state
+	return s.Set(KeyForOrder(chainId, order.Id), protoBytes)
 }
 
-// GetOrder() sets the order book for a committee in the state db
-func (s *StateMachine) GetOrder(orderId uint64, chainId uint64) (order *lib.SellOrder, err lib.ErrorI) {
-	// get the order book for a specific chainId from state
-	orderBook, err := s.GetOrderBook(chainId)
+// DeleteOrder() deletes an existing order in the order book for a committee in the state db
+func (s *StateMachine) DeleteOrder(orderId []byte, chainId uint64) (err lib.ErrorI) {
+	return s.Delete(KeyForOrder(chainId, orderId))
+}
+
+// GetOrder() gets the sell order from state
+func (s *StateMachine) GetOrder(orderId []byte, chainId uint64) (order *lib.SellOrder, err lib.ErrorI) {
+	// get the order proto bytes from the state
+	protoBytes, err := s.Get(KeyForOrder(chainId, orderId))
 	if err != nil {
 		return
 	}
-	// get the specific order from the book based on its ID
-	return orderBook.GetOrder(int(orderId))
+	// convert the proto bytes into an order object
+	return s.unmarshalOrder(protoBytes)
 }
 
 // SetOrderBook() sets the order book for a committee in the state db
@@ -332,7 +299,7 @@ func (s *StateMachine) SetOrderBook(b *lib.OrderBook) lib.ErrorI {
 		return err
 	}
 	// set the order book in the store
-	return s.store.Set(KeyForOrderBook(b.ChainId), orderBookBz)
+	return s.store.Set(OrderBookPrefix(b.ChainId), orderBookBz)
 }
 
 // SetOrderBooks() sets a series of OrderBooks in the state db
@@ -343,25 +310,22 @@ func (s *StateMachine) SetOrderBooks(list *lib.OrderBooks, supply *Supply) lib.E
 	}
 	// for each book in the order books list
 	for _, book := range list.OrderBooks {
-		// convert the order book into bytes
-		orderBookBz, err := lib.Marshal(book)
-		if err != nil {
-			return err
+		// ensure non nil book
+		if book == nil {
+			continue
 		}
-		// get the state 'key' for the order book
-		key := KeyForOrderBook(book.ChainId)
-		// write the order book for the committee to state under the 'key'
-		if err = s.store.Set(key, orderBookBz); err != nil {
-			return err
-		}
-		// properly mint to the supply pool
+		// for each order in the book
 		for _, order := range book.Orders {
+			// set the order in state
+			if err := s.SetOrder(order, book.ChainId); err != nil {
+				return err
+			}
 			// update the 'supply' tracker
 			supply.Total += order.AmountForSale
 			// calculate the escrow pool id for a specific chainId
 			escrowPoolId := book.ChainId + uint64(EscrowPoolAddend)
 			// add to the 'escrow' pool for the specific id
-			if err = s.PoolAdd(escrowPoolId, order.AmountForSale); err != nil {
+			if err := s.PoolAdd(escrowPoolId, order.AmountForSale); err != nil {
 				return err
 			}
 		}
@@ -376,14 +340,24 @@ func (s *StateMachine) GetOrderBook(chainId uint64) (b *lib.OrderBook, err lib.E
 	b = new(lib.OrderBook)
 	// update the orders and chainId of the newly created object ref
 	b.Orders, b.ChainId = make([]*lib.SellOrder, 0), chainId
-	// get order book bytes from the state using the order book key for a specific chainId
-	bz, err := s.Get(KeyForOrderBook(chainId))
+	// iterate through the order book prefix
+	it, err := s.Iterator(OrderBookPrefix(chainId))
 	if err != nil {
 		return
 	}
-	// convert order book bytes into the order book variable
-	err = lib.Unmarshal(bz, b)
-	// exit
+	defer it.Close()
+	// for each order under this prefix
+	for ; it.Valid(); it.Next() {
+		// get the order from the iterator value bytes
+		order, e := s.unmarshalOrder(it.Value())
+		if e != nil {
+			// shouldn't happen
+			s.log.Error(e.Error())
+			// defensive
+			continue
+		}
+		b.Orders = append(b.Orders, order)
+	}
 	return
 }
 
@@ -392,10 +366,12 @@ func (s *StateMachine) GetOrderBooks() (b *lib.OrderBooks, err lib.ErrorI) {
 	// get the order books from the state
 	b = new(lib.OrderBooks)
 	// create an iterator over the OrderBookPrefix
-	it, err := s.Iterator(OrderBookPrefix())
+	it, err := s.Iterator(lib.JoinLenPrefix(orderBookPrefix))
 	if err != nil {
 		return
 	}
+	// deduplicate committees
+	deDupe := lib.NewDeDuplicator[uint64]()
 	// memory cleanup the iterator
 	defer it.Close()
 	// for each item under the OrderBookPrefix
@@ -405,6 +381,10 @@ func (s *StateMachine) GetOrderBooks() (b *lib.OrderBooks, err lib.ErrorI) {
 		if e != nil {
 			return nil, e
 		}
+		// skip duplicates
+		if deDupe.Found(id) {
+			continue
+		}
 		// get the specific order book for the chainId
 		book, e := s.GetOrderBook(id)
 		if e != nil {
@@ -413,6 +393,31 @@ func (s *StateMachine) GetOrderBooks() (b *lib.OrderBooks, err lib.ErrorI) {
 		// add the book to the list
 		b.OrderBooks = append(b.OrderBooks, book)
 	}
+	// sort by chain id
+	sort.Slice(b.OrderBooks, func(i, j int) bool {
+		return b.OrderBooks[i].ChainId < b.OrderBooks[j].ChainId
+	})
 	// exit
 	return
+}
+
+// marshalOrder() converts the Validator object to bytes
+func (s *StateMachine) marshalOrder(order *lib.SellOrder) ([]byte, lib.ErrorI) {
+	// convert the object ref into bytes
+	return lib.Marshal(order)
+}
+
+// unmarshalOrder() converts bytes into a SellOrder object
+func (s *StateMachine) unmarshalOrder(protoBytes []byte) (*lib.SellOrder, lib.ErrorI) {
+	if protoBytes == nil {
+		return nil, lib.ErrOrderNotFound()
+	}
+	// create a new SellOrder object reference to ensure a non-nil result
+	order := new(lib.SellOrder)
+	// populate the object reference with validator bytes
+	if err := lib.Unmarshal(protoBytes, order); err != nil {
+		return nil, err
+	}
+	// return the object ref
+	return order, nil
 }

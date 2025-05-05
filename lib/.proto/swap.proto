@@ -43,7 +43,7 @@ option go_package = "github.com/canopy-network/canopy/lib";
 // then populated by an 'intent to buy', and finally closed when the committee witnesses the transfer of funds.
 message SellOrder {
   // id: the unique identifier of the order
-  uint64 Id = 1; // @gotags: json:"id"
+  bytes Id = 1; // @gotags: json:"id"
   // committee: the id of the committee that is in-charge of escrow for the swap
   uint64 Committee = 2; // @gotags: json:"committee"
   // amount_for_sale: amount of CNPY for sale

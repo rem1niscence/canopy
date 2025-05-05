@@ -262,7 +262,11 @@ func (s *Server) RetiredCommittees(w http.ResponseWriter, r *http.Request, _ htt
 func (s *Server) Order(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	// Invoke helper with the HTTP request, response writer and an inline callback
 	s.orderParams(w, r, func(s *fsm.StateMachine, p *orderRequest) (any, lib.ErrorI) {
-		return s.GetOrder(p.OrderId, p.ChainId)
+		orderId, err := lib.StringToBytes(p.OrderId)
+		if err != nil {
+			return nil, err
+		}
+		return s.GetOrder(orderId, p.ChainId)
 	})
 }
 

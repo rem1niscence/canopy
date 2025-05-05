@@ -228,7 +228,7 @@ var (
 		Short: "edit an existing sell order - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(6),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxEditOrder(argGetAddrOrNickname(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), uint64(argToInt(args[3])), uint64(argToInt(args[4])), args[5], getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxEditOrder(argGetAddrOrNickname(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), args[3], uint64(argToInt(args[4])), args[5], getPassword(), !sim, fee))
 		},
 	}
 
@@ -237,7 +237,7 @@ var (
 		Short: "delete an existing sell order - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxDeleteOrder(argGetAddrOrNickname(args[0]), uint64(argToInt(args[1])), uint64(argToInt(args[2])), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxDeleteOrder(argGetAddrOrNickname(args[0]), args[1], uint64(argToInt(args[2])), getPassword(), !sim, fee))
 		},
 	}
 
@@ -246,7 +246,16 @@ var (
 		Short: "lock an existing sell order - use the simulate flag to generate json only",
 		Args:  cobra.MinimumNArgs(3),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeTxResultToConsole(client.TxLockOrder(argGetAddrOrNickname(args[0]), argGetAddr(args[1]), uint64(argToInt(args[2])), getPassword(), !sim, fee))
+			writeTxResultToConsole(client.TxLockOrder(argGetAddrOrNickname(args[0]), argGetAddr(args[1]), args[2], getPassword(), !sim, fee))
+		},
+	}
+
+	txCloseOrderCmd = &cobra.Command{
+		Use:   "tx-close-order <address or nickname> <canopy-receive-address> <order-id> --fee=10000 --simulate=true",
+		Short: "closes an existing locked sell order - use the simulate flag to generate json only",
+		Args:  cobra.MinimumNArgs(2),
+		Run: func(cmd *cobra.Command, args []string) {
+			writeTxResultToConsole(client.TxCloseOrder(argGetAddrOrNickname(args[0]), args[1], getPassword(), !sim, fee))
 		},
 	}
 

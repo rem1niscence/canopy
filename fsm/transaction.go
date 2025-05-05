@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -112,21 +113,28 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction, txH
 	for _, authorized := range authorizedSigners {
 		// if the address that signed the transaction matches one of the authorized signers
 		if address.Equals(crypto.NewAddressFromBytes(authorized)) {
-			// populate the signer field for stake
-			if stake, ok := msg.(*MessageStake); ok {
-				stake.Signer = authorized
-			}
-			// populate the signer field for edit-stake
-			if editStake, ok := msg.(*MessageEditStake); ok {
-				editStake.Signer = authorized
-			}
-			// populate the proposal hash for change parameter
-			if changeParam, ok := msg.(*MessageChangeParameter); ok {
-				changeParam.ProposalHash = txHash
-			}
-			// populate the proposal hash for dao transfer
-			if daoTransfer, ok := msg.(*MessageDAOTransfer); ok {
-				daoTransfer.ProposalHash = txHash
+			// handle special fields for transactions
+			switch x := msg.(type) {
+			case *MessageStake:
+				// populate the signer field for stake
+				x.Signer = authorized
+			case *MessageEditStake:
+				// populate the signer field for edit-stake
+				x.Signer = authorized
+			case *MessageChangeParameter:
+				// populate the proposal hash for change parameter
+				x.ProposalHash = txHash
+			case *MessageDAOTransfer:
+				// populate the proposal hash for dao transfer
+				x.ProposalHash = txHash
+			case *MessageCreateOrder:
+				// populate the order id for the create order
+				hash, err := lib.StringToBytes(txHash)
+				if err != nil {
+					return nil, err
+				}
+				fmt.Println("SETTING ID", lib.BytesToString(hash[:20]))
+				x.Hash = hash[:20] // first 20 bytes of the transaction hash
 			}
 			// return the signer address
 			return address, nil
@@ -351,9 +359,13 @@ func NewCreateOrderTx(from crypto.PrivateKeyI, sellAmount, requestAmount, commit
 }
 
 // NewEditOrderTx() creates an EditOrderTransaction object in the interface form of TransactionI
-func NewEditOrderTx(from crypto.PrivateKeyI, orderId, sellAmount, requestAmount, committeeId uint64, receiveAddress []byte, networkId, chainId, fee, height uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+func NewEditOrderTx(from crypto.PrivateKeyI, orderId string, sellAmount, requestAmount, committeeId uint64, receiveAddress []byte, networkId, chainId, fee, height uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+	oId, err := lib.StringToBytes(orderId)
+	if err != nil {
+		return nil, err
+	}
 	return NewTransaction(from, &MessageEditOrder{
-		OrderId:              orderId,
+		OrderId:              oId,
 		ChainId:              committeeId,
 		AmountForSale:        sellAmount,
 		RequestedAmount:      requestAmount,
@@ -362,9 +374,13 @@ func NewEditOrderTx(from crypto.PrivateKeyI, orderId, sellAmount, requestAmount,
 }
 
 // NewDeleteOrderTx() creates an DeleteOrderTransaction object in the interface form of TransactionI
-func NewDeleteOrderTx(from crypto.PrivateKeyI, orderId, committeeId uint64, networkId, chainId, fee, height uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+func NewDeleteOrderTx(from crypto.PrivateKeyI, orderId string, committeeId uint64, networkId, chainId, fee, height uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+	oId, err := lib.StringToBytes(orderId)
+	if err != nil {
+		return nil, err
+	}
 	return NewTransaction(from, &MessageDeleteOrder{
-		OrderId: orderId,
+		OrderId: oId,
 		ChainId: committeeId,
 	}, networkId, chainId, fee, height, memo)
 }

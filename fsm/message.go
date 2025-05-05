@@ -371,14 +371,14 @@ func (s *StateMachine) HandleMessageCreateOrder(msg *MessageCreateOrder) (err li
 		return
 	}
 	// save the order in state
-	_, err = s.CreateOrder(&lib.SellOrder{
+	return s.SetOrder(&lib.SellOrder{
+		Id:                   msg.Hash,
 		Committee:            msg.ChainId,
 		AmountForSale:        msg.AmountForSale,
 		RequestedAmount:      msg.RequestedAmount,
 		SellerReceiveAddress: msg.SellerReceiveAddress,
 		SellersSendAddress:   msg.SellersSendAddress,
 	}, msg.ChainId)
-	return
 }
 
 // HandleMessageEditOrder() is the proper handler for a `EditOrder` message
@@ -387,9 +387,11 @@ func (s *StateMachine) HandleMessageEditOrder(msg *MessageEditOrder) (err lib.Er
 	if err != nil {
 		return
 	}
+	// ensure the order isn't locked
 	if order.BuyerReceiveAddress != nil {
 		return lib.ErrOrderLocked()
 	}
+	// get the validator params from state
 	valParams, err := s.GetParamsVal()
 	if err != nil {
 		return
@@ -398,7 +400,9 @@ func (s *StateMachine) HandleMessageEditOrder(msg *MessageEditOrder) (err lib.Er
 	if msg.AmountForSale < valParams.MinimumOrderSize {
 		return ErrMinimumOrderSize()
 	}
+	// calculate the difference
 	difference, address := int(msg.AmountForSale-order.AmountForSale), crypto.NewAddress(order.SellersSendAddress)
+	// if adding to the order
 	if difference > 0 {
 		amountDifference := uint64(difference)
 		if err = s.AccountSub(address, amountDifference); err != nil {
@@ -408,6 +412,7 @@ func (s *StateMachine) HandleMessageEditOrder(msg *MessageEditOrder) (err lib.Er
 		if err = s.PoolAdd(msg.ChainId+uint64(EscrowPoolAddend), amountDifference); err != nil {
 			return
 		}
+		// if subtracting from the order
 	} else if difference < 0 {
 		amountDifference := uint64(difference * -1)
 		// subtract from the committee escrow pool
@@ -418,7 +423,8 @@ func (s *StateMachine) HandleMessageEditOrder(msg *MessageEditOrder) (err lib.Er
 			return
 		}
 	}
-	err = s.EditOrder(&lib.SellOrder{
+	// set the new order in state
+	return s.SetOrder(&lib.SellOrder{
 		Id:                   order.Id,
 		Committee:            msg.ChainId,
 		AmountForSale:        msg.AmountForSale,
@@ -426,7 +432,6 @@ func (s *StateMachine) HandleMessageEditOrder(msg *MessageEditOrder) (err lib.Er
 		SellerReceiveAddress: msg.SellerReceiveAddress,
 		SellersSendAddress:   order.SellersSendAddress,
 	}, msg.ChainId)
-	return
 }
 
 // HandleMessageDeleteOrder() is the proper handler for a `DeleteOrder` message

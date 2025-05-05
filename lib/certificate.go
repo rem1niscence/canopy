@@ -629,21 +629,21 @@ func (x *Orders) CheckBasic() (err ErrorI) {
 		}
 	}
 	// ensure no duplicates in the resets
-	deDuplicator := NewDeDuplicator[uint64]()
+	deDuplicator := NewDeDuplicator[string]()
 	// for each reset order
 	for _, reset := range x.ResetOrders {
 		// if a duplicate found
-		if deDuplicator.Found(reset) {
+		if deDuplicator.Found(BytesToString(reset)) {
 			// exit with the duplicate reset order
 			return ErrDuplicateResetOrder()
 		}
 	}
 	// ensure no duplicates in the closes
-	deDuplicator = NewDeDuplicator[uint64]()
+	deDuplicator = NewDeDuplicator[string]()
 	// for each close order
 	for _, reset := range x.CloseOrders {
 		// if a duplicate found
-		if deDuplicator.Found(reset) {
+		if deDuplicator.Found(BytesToString(reset)) {
 			// exit with the duplicate close order
 			return ErrDuplicateCloseOrder()
 		}
@@ -665,12 +665,12 @@ func (x *Orders) Equals(y *Orders) bool {
 		return false
 	}
 	// if the close orders lists are not equal
-	if !slices.Equal(x.CloseOrders, y.CloseOrders) {
+	if !EqualByteSlices(x.CloseOrders, y.CloseOrders) {
 		// exit with 'unequal'
 		return false
 	}
 	// if the reset orders lists are not equal
-	if !slices.Equal(x.ResetOrders, y.ResetOrders) {
+	if !EqualByteSlices(x.ResetOrders, y.ResetOrders) {
 		// exit with 'unequal'
 		return false
 	}
@@ -714,7 +714,7 @@ func (x *LockOrder) Equals(y *LockOrder) bool {
 		return false
 	}
 	// if the order ids are not the same
-	if x.OrderId != y.OrderId {
+	if !bytes.Equal(x.OrderId, y.OrderId) {
 		// exit with 'unequal'
 		return false
 	}
@@ -725,14 +725,14 @@ func (x *LockOrder) Equals(y *LockOrder) bool {
 // lockOrderJSON implements the json.Marshaller & json.Unmarshaler interfaces for LockOrder
 type lockOrderJSON struct {
 	// order_id: is the number id that is unique to this committee to identify the order
-	OrderId uint64 `json:"order_id,omitempty"`
+	OrderId HexBytes `json:"orderId,omitempty"`
 	// buyers_send_address: the Canopy address where the tokens may be received
-	BuyersSendAddress HexBytes `json:"buyers_send_address,omitempty"`
+	BuyersSendAddress HexBytes `json:"buyerSendAddress,omitempty"`
 	// buyer_receive_address: the Canopy address where the tokens may be received
-	BuyerReceiveAddress HexBytes `json:"buyer_receive_address,omitempty"`
+	BuyerReceiveAddress HexBytes `json:"buyerReceiveAddress,omitempty"`
 	// buyer_chain_deadline: the 'counter asset' chain height at which the buyer must send the 'counter asset' by
 	// or the 'intent to buy' will be voided
-	BuyerChainDeadline uint64 `json:"buyer_chain_deadline,omitempty"`
+	BuyerChainDeadline uint64 `json:"buyerChainDeadline,omitempty"`
 }
 
 // MarshalJSON() implements the json.Marshaller interface for LockOrder
@@ -761,6 +761,41 @@ func (x *LockOrder) UnmarshalJSON(jsonBytes []byte) (err error) {
 		BuyerReceiveAddress: j.BuyerReceiveAddress,
 		BuyerSendAddress:    j.BuyersSendAddress,
 		BuyerChainDeadline:  j.BuyerChainDeadline,
+	}
+	// exit
+	return
+}
+
+// closeOrderJSON implements the json.Marshaller & json.Unmarshaler interfaces for LockOrder
+type closeOrderJSON struct {
+	// order_id: is the number id that is unique to this committee to identify the order
+	OrderId HexBytes `json:"orderId,omitempty"`
+	// close_order: is the tag to represent the intent to embed a close order
+	CloseOrder bool `json:"closeOrder,omitempty"`
+}
+
+// MarshalJSON() implements the json.Marshaller interface for CloseOrder
+func (x CloseOrder) MarshalJSON() ([]byte, error) {
+	// convert the lock order to json bytes using the json object
+	return json.Marshal(&closeOrderJSON{
+		OrderId:    x.OrderId,
+		CloseOrder: x.CloseOrder,
+	})
+}
+
+// UnmarshalJSON() implements the json.Unmarshaler interface for CloseOrder
+func (x *CloseOrder) UnmarshalJSON(jsonBytes []byte) (err error) {
+	// create a new json object reference to ensure a non nil result
+	j := new(closeOrderJSON)
+	// populate the json object ref with json bytes
+	if err = json.Unmarshal(jsonBytes, j); err != nil {
+		// exit with error
+		return
+	}
+	// populate the underlying structure using the json object
+	*x = CloseOrder{
+		OrderId:    j.OrderId,
+		CloseOrder: j.CloseOrder,
 	}
 	// exit
 	return

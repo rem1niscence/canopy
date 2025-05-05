@@ -127,11 +127,11 @@ func (s *StateMachine) ValidateGenesisState(genesis *GenesisState) (err lib.Erro
 				return InvalidSellOrder()
 			}
 			// ensure there's no duplicate order-ids within the book
-			deDuplicateIds := lib.NewDeDuplicator[uint64]()
+			deDuplicateIds := lib.NewDeDuplicator[string]()
 			// for each order in the book
 			for _, order := range orderBook.Orders {
 				// check if order already found
-				if found := deDuplicateIds.Found(order.Id); found {
+				if found := deDuplicateIds.Found(lib.BytesToString(order.Id)); found {
 					return InvalidSellOrder()
 				}
 			}

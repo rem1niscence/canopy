@@ -20,7 +20,7 @@ type chainRequest struct {
 
 type orderRequest struct {
 	ChainId uint64 `json:"chainId"`
-	OrderId uint64 `json:"orderId"`
+	OrderId string `json:"orderId"`
 	heightRequest
 }
 
@@ -224,7 +224,7 @@ type txEditOrder struct {
 	Submit         bool         `json:"submit"`
 	ReceiveAmount  uint64       `json:"receiveAmount"`
 	ReceiveAddress lib.HexBytes `json:"receiveAddress"`
-	OrderId        uint64       `json:"orderId"`
+	OrderId        string       `json:"orderId"`
 	fromFields
 	txChangeParamRequest
 	committeesRequest
@@ -232,7 +232,7 @@ type txEditOrder struct {
 
 type txDeleteOrder struct {
 	Fee      uint64 `json:"fee"`
-	OrderId  uint64 `json:"orderId"`
+	OrderId  string `json:"orderId"`
 	Password string `json:"password"`
 	fromFields
 	txChangeParamRequest
@@ -241,7 +241,7 @@ type txDeleteOrder struct {
 
 type txLockOrder struct {
 	Fee            uint64       `json:"fee"`
-	OrderId        uint64       `json:"orderId"`
+	OrderId        string       `json:"orderId"`
 	Password       string       `json:"password"`
 	ReceiveAddress lib.HexBytes `json:"receiveAddress"`
 	fromFields
@@ -251,7 +251,7 @@ type txLockOrder struct {
 
 type txCloseOrder struct {
 	Fee      uint64 `json:"fee"`
-	OrderId  uint64 `json:"orderId"`
+	OrderId  string `json:"orderId"`
 	Password string `json:"password"`
 	fromFields
 }
@@ -304,7 +304,7 @@ type txRequest struct {
 	Submit          bool            `json:"submit"`
 	ReceiveAmount   uint64          `json:"receiveAmount"`
 	ReceiveAddress  lib.HexBytes    `json:"receiveAddress"`
-	OrderId         uint64          `json:"orderId"`
+	OrderId         string          `json:"orderId"`
 	Memo            string          `json:"memo"`
 	PollJSON        json.RawMessage `json:"pollJSON"`
 	PollApprove     bool            `json:"pollApprove"`

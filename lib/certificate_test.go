@@ -3,6 +3,7 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -322,7 +323,7 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 				Orders: &Orders{
 					LockOrders: []*LockOrder{
 						{
-							OrderId:             0,
+							OrderId:             newTestOrderId(t, 0),
 							BuyerSendAddress:    nil,
 							BuyerReceiveAddress: nil,
 							BuyerChainDeadline:  0,
@@ -346,7 +347,7 @@ func TestCertificateResultsCheckBasic(t *testing.T) {
 				Orders: &Orders{
 					LockOrders: []*LockOrder{
 						{
-							OrderId:             0,
+							OrderId:             newTestOrderId(t, 0),
 							BuyerSendAddress:    newTestAddressBytes(t),
 							BuyerReceiveAddress: nil,
 							BuyerChainDeadline:  0,
@@ -401,13 +402,13 @@ func TestCheckpointHash(t *testing.T) {
 		Orders: &Orders{
 			LockOrders: []*LockOrder{
 				{
-					OrderId:             0,
+					OrderId:             newTestOrderId(t, 0),
 					BuyerReceiveAddress: newTestAddressBytes(t),
 					BuyerChainDeadline:  0,
 				},
 			},
-			ResetOrders: []uint64{0},
-			CloseOrders: []uint64{1},
+			ResetOrders: [][]byte{newTestOrderId(t, 0)},
+			CloseOrders: [][]byte{newTestOrderId(t, 1)},
 		},
 		Checkpoint: &Checkpoint{
 			Height:    1,
@@ -422,4 +423,8 @@ func TestCheckpointHash(t *testing.T) {
 	got := result.Hash()
 	// compare got vs expected
 	require.Equal(t, expected, got)
+}
+
+func newTestOrderId(_ *testing.T, variant int) []byte {
+	return []byte(fmt.Sprintf("%d", variant))
 }

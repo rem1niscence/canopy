@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -760,4 +761,27 @@ func Append(a, b []byte) []byte {
 	copy(out, a)
 	copy(out[len(a):], b)
 	return out
+}
+
+// EqualByteSlices() performs equality check on two byte slices
+func EqualByteSlices(a, b [][]byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !bytes.Equal(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// ContainsByteSlice() checks to see if the byte slice is within the list
+func ContainsByteSlice(list [][]byte, target []byte) (found bool) {
+	for _, item := range list {
+		if bytes.Equal(item, target) {
+			return
+		}
+	}
+	return
 }
