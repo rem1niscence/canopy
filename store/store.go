@@ -305,12 +305,13 @@ func (s *Store) Partition() {
 		}
 		// if the GC isn't already running
 		if !s.isGarbageCollecting.Swap(true) {
+			sc.log.Info("Started partition GC process")
 			// force the mem table to flush to the LSM
 			if err = FlushMemTable(sc.db); err != nil {
 				return err
 			}
 			// run LSM compaction
-			if fe := sc.db.Flatten(32); fe != nil {
+			if fe := sc.db.Flatten(1); fe != nil {
 				return ErrGarbageCollectDB(fe)
 			}
 			// call db.Sync() to sync both the logs, the active memtable's WAL and the vLog
