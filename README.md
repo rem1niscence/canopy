@@ -24,7 +24,7 @@ forming an `unstoppable` web of utility and security.
 
 ➪ A recursive framework to build blockchains.
 
-➪ The seed chain code that started the recursive cycle.
+➪ The seed chain that started the recursive cycle.
 
 For more information on the Canopy Network Protocol visit [https://canopynetwork.org](https://canopynetwork.org)
 
