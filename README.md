@@ -38,7 +38,7 @@ Welcome to the Canopy Network reference implementation. This code base can be we
 To run the Canopy binary, use the following commands:
 
 ```bash
-make build canopy-full
+make build/canopy-full
 canopy start
 ```
 
