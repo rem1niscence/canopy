@@ -84,7 +84,7 @@ make test
 2. **Code** your improvements or fixes.
 3. **Submit a Pull Request** (PR) for review.
 
-➣ Please follow these guidelines to maintain high-quality contributions:
+➣ Please follow these [guidelines](CONTRIBUTING.md) to maintain high-quality contributions:
 
 ### High Impact or Architectural Changes
 
