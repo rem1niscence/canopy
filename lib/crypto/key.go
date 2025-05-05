@@ -92,6 +92,8 @@ func NewPublicKeyFromBytes(bz []byte) (PublicKeyI, error) {
 	switch len(bz) {
 	case Ed25519PubKeySize:
 		return BytesToED25519Public(bz), nil
+	case ETHSECP256K1PubKeySize, ETHSECP256K1PubKeySize + 1:
+		return BytesToEthSECP256K1Public(bz)
 	case SECP256K1PubKeySize:
 		return BytesToSECP256K1Public(bz)
 	case BLS12381PubKeySize:

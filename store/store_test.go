@@ -5,52 +5,50 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"github.com/alecthomas/units"
+	"github.com/canopy-network/canopy/lib"
+	"github.com/dgraph-io/badger/v4"
+	"github.com/stretchr/testify/require"
 	"math"
 	"os"
 	"path/filepath"
 	"runtime/debug"
 	"slices"
 	"testing"
-	"time"
-
-	"github.com/alecthomas/units"
-	"github.com/canopy-network/canopy/lib"
-	"github.com/dgraph-io/badger/v4"
-	"github.com/stretchr/testify/require"
 )
 
 func TestMaxTransaction(t *testing.T) {
-	t.Skip()
-	db, err := badger.OpenManaged(badger.DefaultOptions("test_temp.db").WithMemTableSize(2 * int64(units.GB)).
+	tempDirector := os.TempDir()
+	db, err := badger.OpenManaged(badger.DefaultOptions(tempDirector).WithMemTableSize(128 * int64(units.MB)).
 		WithNumVersionsToKeep(math.MaxInt).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	defer func() { db.Close(); os.RemoveAll("test_temp.db") }()
+	defer func() { db.Close() }()
 	tx := db.NewTransactionAt(1, true)
+	require.NoError(t, setBatchOptions(db, maxTransactionSize))
 	i := 0
 	totalBytes := 0
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println(string(debug.Stack()))
 			fmt.Println(i)
-			fmt.Println(totalBytes)
+			fmt.Println("TOTAL_MBs", float64(totalBytes)/1000000)
 		}
 	}()
-	for ; i < 10000000; i++ {
+	for ; i < 128000; i++ {
 		k := numberToBytes(i)
-		v := bytes.Repeat([]byte("b"), 60)
+		v := bytes.Repeat([]byte("b"), 1000)
 		totalBytes += len(k) + len(v)
 		if err = tx.Set(k, v); err != nil {
 			fmt.Println(err.Error())
 			fmt.Println(i)
-			fmt.Println(totalBytes)
+			fmt.Println("TOTAL_MBs", float64(totalBytes)/1000000)
 			tx.Discard()
 			return
 		}
 	}
-	fmt.Println(totalBytes)
-	start := time.Now()
 	require.NoError(t, tx.CommitAt(1, nil))
-	fmt.Println(time.Since(start))
+	require.NoError(t, FlushMemTable(db))
+	require.NoError(t, db.Flatten(1))
 }
 
 func numberToBytes(n int) []byte {

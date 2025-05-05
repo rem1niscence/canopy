@@ -10,7 +10,7 @@ func TestNewPublicKeyFromString(t *testing.T) {
 	// pre-generate a secp256k1
 	secp256k1Pk, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
-	secp256k1Public, err := BytesToSECP256K1Public(secp256k1Pk.PubKey().SerializeCompressed())
+	secp256k1Public, err := BytesToEthSECP256K1Public(secp256k1Pk.PubKey().SerializeUncompressed())
 	require.NoError(t, err)
 	// pre-generate a ED25519
 	ed25519Pk, err := NewEd25519PrivateKey()
@@ -66,6 +66,9 @@ func TestNewPublicKeyFromBytes(t *testing.T) {
 	// pre-generate a secp256k1
 	secp256k1Pk, err := NewSECP256K1PrivateKey()
 	require.NoError(t, err)
+	// pre-generate a secp256k1
+	ethSecp256k1, err := NewETHSECP256K1PrivateKey()
+	require.NoError(t, err)
 	// pre-generate a ED25519
 	ed25519Pk, err := NewEd25519PrivateKey()
 	require.NoError(t, err)
@@ -82,6 +85,16 @@ func TestNewPublicKeyFromBytes(t *testing.T) {
 			name:  "not a recognized key",
 			bytes: []byte("abcd"),
 			error: "unrecognized public key format",
+		},
+		{
+			name:     "eth_secp256k1 public key",
+			bytes:    ethSecp256k1.PublicKey().Bytes(),
+			expected: ethSecp256k1.PublicKey(),
+		},
+		{
+			name:     "eth_secp256k1 public key with a SEC1 prefix",
+			bytes:    ethSecp256k1.PublicKey().(*ETHSECP256K1PublicKey).BytesWithPrefix(),
+			expected: ethSecp256k1.PublicKey(),
 		},
 		{
 			name:     "secp256k1 public key",

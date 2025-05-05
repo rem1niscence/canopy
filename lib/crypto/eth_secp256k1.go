@@ -1,0 +1,92 @@
+package crypto
+
+import (
+	"bytes"
+	"crypto/ecdsa"
+	"encoding/hex"
+	"encoding/json"
+	ethCrypto "github.com/ethereum/go-ethereum/crypto"
+)
+
+const (
+	ETHSECP256K1PubKeySize = 64
+)
+
+// ensure ETHSECP256K1PublicKey conforms to the PublicKeyI interface
+var _ PublicKeyI = &ETHSECP256K1PublicKey{}
+var _ PrivateKeyI = &ETHSECP256K1PrivateKey{}
+
+type ETHSECP256K1PrivateKey struct {
+	SECP256K1PrivateKey
+}
+
+// EthPublicKey() returns the ethereum public pair to this private key
+func (s *ETHSECP256K1PrivateKey) PublicKey() PublicKeyI {
+	return &ETHSECP256K1PublicKey{PublicKey: &s.PrivateKey.PublicKey}
+}
+
+// ETHSECP256K1PublicKey is the ethereum variant of the public key of a cryptographic key pair used in elliptic curve signing and verification,
+// based on the SECP256K1 elliptic curve, it is used to verify ownership of the private key as well as validate digital signatures created by the private key
+type ETHSECP256K1PublicKey struct {
+	*ecdsa.PublicKey
+}
+
+// BytesToEthSECP256K1Public() returns ETHSECP256K1PublicKey from bytes
+func BytesToEthSECP256K1Public(b []byte) (*ETHSECP256K1PublicKey, error) {
+	if len(b) == ETHSECP256K1PubKeySize {
+		b = append([]byte{0x04}, b...) // add the SEC1 prefix
+	}
+	pub, err := ethCrypto.UnmarshalPubkey(b)
+	if err != nil {
+		return nil, err
+	}
+	return &ETHSECP256K1PublicKey{PublicKey: pub}, nil
+}
+
+// Bytes() returns the byte representation of the Public Key
+func (s *ETHSECP256K1PublicKey) Bytes() []byte {
+	return s.BytesWithPrefix()[1:]
+}
+
+// Bytes() returns the byte representation of the Public Key
+func (s *ETHSECP256K1PublicKey) BytesWithPrefix() []byte {
+	return ethCrypto.FromECDSAPub(s.PublicKey)
+}
+
+// MarshalJSON() is the json.Marshaller implementation for ETHSECP256K1PublicKey
+func (s *ETHSECP256K1PublicKey) MarshalJSON() ([]byte, error) { return json.Marshal(s.String()) }
+
+// UnmarshalJSON() is the json.Unmarshaler implementation for ETHSECP256K1PublicKey
+func (s *ETHSECP256K1PublicKey) UnmarshalJSON(b []byte) (err error) {
+	var hexString string
+	if err = json.Unmarshal(b, &hexString); err != nil {
+		return
+	}
+	bz, err := hex.DecodeString(hexString)
+	if err != nil {
+		return
+	}
+	pk, err := BytesToEthSECP256K1Public(bz)
+	if err != nil {
+		return
+	}
+	*s = *pk
+	return
+}
+
+// Address() returns the short version of the public key
+func (s *ETHSECP256K1PublicKey) Address() AddressI {
+	a := Address(ethCrypto.PubkeyToAddress(*s.PublicKey).Bytes())
+	return &a
+}
+
+// VerifyBytes() returns true if the digital signature is valid for this public key and the given message
+func (s *ETHSECP256K1PublicKey) VerifyBytes(msg []byte, sig []byte) bool {
+	return ethCrypto.VerifySignature(s.BytesWithPrefix(), Hash(msg), sig)
+}
+
+// String() returns the hex string representation of the public key
+func (s *ETHSECP256K1PublicKey) String() string { return hex.EncodeToString(s.Bytes()) }
+
+// Equals() compares two ETHSECP256K1PublicKey objects and returns true if they're equal
+func (s *ETHSECP256K1PublicKey) Equals(i PublicKeyI) bool { return bytes.Equal(s.Bytes(), i.Bytes()) }

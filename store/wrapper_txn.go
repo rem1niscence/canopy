@@ -3,6 +3,8 @@ package store
 import (
 	"bytes"
 	"crypto/rand"
+	"fmt"
+	"github.com/dgraph-io/badger/v4/skl"
 	"math"
 	"reflect"
 	"unsafe"
@@ -36,14 +38,15 @@ const (
 	// - Subsequent GC runs are probabilistic, depending on reclaimable space and value log thresholds
 	// ----------------------------------------------------------------------------------------------------------------
 	// Bits source: https://github.com/hypermodeinc/badger/blob/85389e88bf308c1dc271383b77b67f4ef4a85194/value.go#L37
-	badgerMetaFieldName               = "meta"  // badgerDB Entry 'meta' field name
-	badgerDiscardEarlierVersions byte = 1 << 2  // badgerDB 'discard earlier versions' flag
-	badgerDeleteBit              byte = 1 << 0  // badgerDB 'tombstoned' flag
-	badgerNoDiscardBit           byte = 1 << 3  // badgerDB 'never discard'  bit
-	badgerGCRatio                     = .15     // the ratio when badgerDB will run the garbage collector
-	badgerSizeFieldName               = "size"  // badgerDB Txn 'size' field name
-	badgerCountFieldName              = "count" // badgerDB Txn 'count' field name
-	badgerTxnFieldName                = "txn"   // badgerDB WriteBatch 'txn' field name
+	badgerMetaFieldName                = "meta"  // badgerDB Entry 'meta' field name
+	badgerDiscardEarlierVersions  byte = 1 << 2  // badgerDB 'discard earlier versions' flag
+	badgerDeleteBit               byte = 1 << 0  // badgerDB 'tombstoned' flag
+	badgerNoDiscardBit            byte = 1 << 3  // badgerDB 'never discard'  bit
+	badgerGCRatio                      = .15     // the ratio when badgerDB will run the garbage collector
+	badgerSizeFieldName                = "size"  // badgerDB Txn 'size' field name
+	badgerCountFieldName               = "count" // badgerDB Txn 'count' field name
+	badgerTxnFieldName                 = "txn"   // badgerDB WriteBatch 'txn' field name
+	badgerDBMaxBatchScalingFactor      = 0.98425 // through experimentation badgerDB's max transaction scaling factor
 )
 
 // RWStoreI interface enforcement
@@ -235,6 +238,34 @@ func FlushMemTable(db *badger.DB) lib.ErrorI {
 	if err := db.DropPrefix(randomPrefix); err != nil {
 		return ErrFlushMemTable(err)
 	}
+	return nil
+}
+
+// setBatchOptions() updates unexported badgerDB batch options
+func setBatchOptions(db *badger.DB, batchSize int64) error {
+	// Access the DB struct's Options field using reflection
+	v := reflect.ValueOf(db).Elem()
+
+	// Access the 'opt' field of DB struct using unsafe
+	optField := v.FieldByName("opt")
+	if !optField.IsValid() {
+		return fmt.Errorf("unable to access 'opt' field")
+	}
+
+	// Use unsafe.Pointer to get a pointer to the unexported field
+	optPtr := unsafe.Pointer(optField.UnsafeAddr())
+	optStruct := reflect.NewAt(optField.Type(), optPtr).Elem()
+
+	maxBatchSizeField := optStruct.FieldByName("maxBatchSize")
+	maxBatchCountField := optStruct.FieldByName("maxBatchCount")
+	// Now, use unsafe.Pointer to modify the unexported fields directly
+	batchSizePtr := unsafe.Pointer(maxBatchSizeField.UnsafeAddr())
+	batchCountPtr := unsafe.Pointer(maxBatchCountField.UnsafeAddr())
+
+	// Set values using unsafe pointer manipulation
+	*(*int64)(batchSizePtr) = batchSize
+	*(*int64)(batchCountPtr) = batchSize / int64(skl.MaxNodeSize)
+
 	return nil
 }
 

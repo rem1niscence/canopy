@@ -26,6 +26,11 @@ const (
 	maxKeyBytes           = 256          // maximum size of a key
 )
 
+// maximum size of the database (batch) transaction
+var maxTransactionSize = int64(
+	math.Ceil(float64(128*units.MB) / badgerDBMaxBatchScalingFactor),
+)
+
 var _ lib.StoreI = &Store{} // enforce the Store interface
 
 /*
@@ -90,9 +95,12 @@ func NewStore(path string, metrics *lib.Metrics, log lib.LoggerI) (lib.StoreI, l
 	// single batch. It is seemingly unknown why the 10% limit is set
 	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt64).
-		WithLoggingLevel(badger.ERROR).WithMemTableSize(int64(1*units.GB + 280*units.MB)))
+		WithLoggingLevel(badger.ERROR).WithMemTableSize(maxTransactionSize))
 	if err != nil {
 		return nil, ErrOpenDB(err)
+	}
+	if e := setBatchOptions(db, 128*int64(units.MB)); e != nil {
+		return nil, ErrOpenDB(e)
 	}
 	return NewStoreWithDB(db, metrics, log, true)
 }
@@ -307,20 +315,19 @@ func (s *Store) Partition() {
 		if !s.isGarbageCollecting.Swap(true) {
 			sc.log.Info("Started partition GC process")
 			// force the mem table to flush to the LSM
+			sc.log.Debug("Partition: Flushing MemTable")
 			if err = FlushMemTable(sc.db); err != nil {
 				return err
 			}
 			// run LSM compaction
+			sc.log.Debug("Partition: Flattening...")
 			if fe := sc.db.Flatten(1); fe != nil {
 				return ErrGarbageCollectDB(fe)
-			}
-			// call db.Sync() to sync both the logs, the active memtable's WAL and the vLog
-			if se := sc.db.Sync(); se != nil {
-				return ErrGarbageCollectDB(se)
 			}
 			// unset isGarbageCollecting once complete
 			defer s.isGarbageCollecting.Store(false)
 			// trigger garbage collector to prune keys
+			sc.log.Debug("Partition: Garbage collecting...")
 			if gcErr := sc.db.RunValueLogGC(badgerGCRatio); gcErr != nil {
 				if err != badger.ErrNoRewrite {
 					sc.log.Debugf("%v - this is normal", gcErr)
