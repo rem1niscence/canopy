@@ -347,8 +347,13 @@ func (s *Server) TransactionLockOrder(w http.ResponseWriter, r *http.Request, _ 
 		if err := s.getFeeFromState(w, ptr, fsm.MessageSendName, true); err != nil {
 			return nil, err
 		}
+		// convert the order id to bytes
+		oId, err := lib.StringToBytes(ptr.OrderId)
+		if err != nil {
+			return nil, err
+		}
 		// Create and return the transaction to be sent
-		return fsm.NewLockOrderTx(p, lib.LockOrder{OrderId: ptr.OrderId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
+		return fsm.NewLockOrderTx(p, lib.LockOrder{OrderId: oId, BuyerSendAddress: p.PublicKey().Address().Bytes(), BuyerReceiveAddress: ptr.ReceiveAddress}, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
 	})
 }
 
@@ -382,8 +387,13 @@ func (s *Server) TransactionCloseOrder(w http.ResponseWriter, r *http.Request, _
 		if int64(order.BuyerChainDeadline)-int64(s.controller.ChainHeight()) < 10 {
 			return nil, fmt.Errorf("too close to buyer chain deadline")
 		}
+		// convert the order id to bytes
+		oId, err := lib.StringToBytes(ptr.OrderId)
+		if err != nil {
+			return nil, err
+		}
 		// Create the close order structure
-		co := lib.CloseOrder{OrderId: ptr.OrderId, CloseOrder: true}
+		co := lib.CloseOrder{OrderId: oId, CloseOrder: true}
 		// Exit with the new CloseOrderTx
 		return fsm.NewCloseOrderTx(p, co, crypto.NewAddress(order.SellerReceiveAddress), order.RequestedAmount, s.config.NetworkID, s.config.ChainId, ptr.Fee, s.controller.ChainHeight())
 	})

@@ -516,7 +516,7 @@ export async function TxCreateOrder(
     newSellOrderTxRequest(
       address,
       chainId,
-      0,
+      "",
       Number(sellAmount),
       Number(receiveAmount),
       receiveAddress,
@@ -532,7 +532,7 @@ export async function TxLockOrder(address, receiveAddress, orderId, fee, passwor
   return POST(
     adminRPCURL,
     txLockOrder,
-    newLockOrderTxRequest(address, receiveAddress, Number(orderId), Number(fee), submit, password),
+    newLockOrderTxRequest(address, receiveAddress, orderId, Number(fee), submit, password),
   );
 }
 
@@ -540,7 +540,7 @@ export async function TxCloseOrder(address, orderId, fee, password, submit) {
   return POST(
     adminRPCURL,
     txCloseOrder,
-    newCloseOrderTxRequest(address, Number(orderId), Number(fee), submit, password),
+    newCloseOrderTxRequest(address, orderId, Number(fee), submit, password),
   );
 }
 
@@ -562,7 +562,7 @@ export async function TxEditOrder(
     newSellOrderTxRequest(
       address,
       chainId,
-      Number(orderId),
+      orderId,
       Number(sellAmount),
       Number(receiveAmount),
       receiveAddress,
@@ -578,7 +578,7 @@ export async function TxDeleteOrder(address, chainId, orderId, memo, fee, passwo
   return POST(
     adminRPCURL,
     txDeleteOrder,
-    newSellOrderTxRequest(address, chainId, Number(orderId), 0, 0, "", memo, Number(fee), submit, password),
+    newSellOrderTxRequest(address, chainId, orderId, 0, 0, "", memo, Number(fee), submit, password),
   );
 }
 

@@ -643,7 +643,7 @@ func (x *MessageEditOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageEditOrder struct {
-	OrderId              uint64       `json:"orderID"`
+	OrderId              lib.HexBytes `json:"orderID"`
 	ChainId              uint64       `json:"chainID"`
 	AmountForSale        uint64       `json:"amountForSale"`
 	RequestedAmount      uint64       `json:"requestedAmount"`
@@ -681,8 +681,8 @@ func (x *MessageDeleteOrder) UnmarshalJSON(b []byte) (err error) {
 }
 
 type jsonMessageDeleteOrder struct {
-	OrderId uint64 `json:"orderID"`
-	ChainId uint64 `json:"chainID"`
+	OrderId lib.HexBytes `json:"orderID"`
+	ChainId uint64       `json:"chainID"`
 }
 
 // checkAmount() validates the amount sent in the Message
@@ -790,14 +790,16 @@ func checkStartEndHeight(proposal GovProposal) lib.ErrorI {
 	return nil
 }
 
+// checkOrders() validates the (swap) orders within the transaction
 func checkOrders(orders *lib.Orders) lib.ErrorI {
 	if orders != nil {
-		deDupe := lib.NewDeDuplicator[uint64]()
+		// ensure no duplicate lock orders
+		deDupe := lib.NewDeDuplicator[string]()
 		for _, lockOrder := range orders.LockOrders {
 			if lockOrder == nil {
 				return ErrInvalidLockOrder()
 			}
-			if found := deDupe.Found(lockOrder.OrderId); found {
+			if found := deDupe.Found(lib.BytesToString(lockOrder.OrderId)); found {
 				return ErrDuplicateLockOrder()
 			}
 			if err := checkAddress(lockOrder.BuyerReceiveAddress); err != nil {
@@ -807,15 +809,17 @@ func checkOrders(orders *lib.Orders) lib.ErrorI {
 				return ErrInvalidBuyerDeadline()
 			}
 		}
-		deDupe = lib.NewDeDuplicator[uint64]()
+		// ensure no duplicate reset orders
+		deDupe = lib.NewDeDuplicator[string]()
 		for _, resetOrder := range orders.ResetOrders {
-			if found := deDupe.Found(resetOrder); found {
+			if found := deDupe.Found(lib.BytesToString(resetOrder)); found {
 				return ErrInvalidCloseOrder()
 			}
 		}
-		deDupe = lib.NewDeDuplicator[uint64]()
+		// ensure no duplicate close orders
+		deDupe = lib.NewDeDuplicator[string]()
 		for _, closeOrder := range orders.CloseOrders {
-			if found := deDupe.Found(closeOrder); found {
+			if found := deDupe.Found(lib.BytesToString(closeOrder)); found {
 				return ErrInvalidCloseOrder()
 			}
 		}

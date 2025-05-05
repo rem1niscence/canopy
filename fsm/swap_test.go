@@ -1,6 +1,8 @@
 package fsm
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
@@ -22,6 +24,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			detail: "the lock order cannot be claimed as its already reserved",
 			preset: []*lib.SellOrder{
 				{
+					Id:                  newTestOrderId(t, 0),
 					Committee:           lib.CanopyChainId,
 					AmountForSale:       100,
 					RequestedAmount:     100,
@@ -32,7 +35,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			orders: &lib.Orders{
 				LockOrders: []*lib.LockOrder{
 					{
-						OrderId:             0,
+						OrderId:             newTestOrderId(t, 0),
 						BuyerReceiveAddress: newTestAddressBytes(t, 1),
 						BuyerChainDeadline:  100,
 					},
@@ -53,7 +56,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				},
 			},
 			orders: &lib.Orders{
-				ResetOrders: []uint64{1},
+				ResetOrders: [][]byte{newTestOrderId(t, 1)},
 			},
 			notFound: true,
 		},
@@ -62,6 +65,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			detail: "can't close an order that doesn't have a buyer",
 			preset: []*lib.SellOrder{
 				{
+					Id:                 newTestOrderId(t, 0),
 					Committee:          lib.CanopyChainId,
 					AmountForSale:      100,
 					RequestedAmount:    100,
@@ -69,7 +73,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 				},
 			},
 			orders: &lib.Orders{
-				CloseOrders: []uint64{0},
+				CloseOrders: [][]byte{newTestOrderId(t, 0)},
 			},
 			noBuyer: true,
 		},
@@ -78,12 +82,14 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			detail: "test buy, reset, and sell without error",
 			preset: []*lib.SellOrder{
 				{
+					Id:                 newTestOrderId(t, 0),
 					Committee:          lib.CanopyChainId,
 					AmountForSale:      100,
 					RequestedAmount:    100,
 					SellersSendAddress: newTestAddressBytes(t),
 				},
 				{
+					Id:                  newTestOrderId(t, 1),
 					Committee:           lib.CanopyChainId,
 					AmountForSale:       100,
 					RequestedAmount:     100,
@@ -91,6 +97,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 					SellersSendAddress:  newTestAddressBytes(t),
 				},
 				{
+					Id:                  newTestOrderId(t, 2),
 					Committee:           lib.CanopyChainId,
 					AmountForSale:       100,
 					RequestedAmount:     100,
@@ -101,13 +108,13 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			orders: &lib.Orders{
 				LockOrders: []*lib.LockOrder{
 					{
-						OrderId:             0,
+						OrderId:             newTestOrderId(t, 0),
 						BuyerReceiveAddress: newTestAddressBytes(t, 1),
 						BuyerChainDeadline:  100,
 					},
 				},
-				ResetOrders: []uint64{1},
-				CloseOrders: []uint64{2},
+				ResetOrders: [][]byte{newTestOrderId(t, 1)},
+				CloseOrders: [][]byte{newTestOrderId(t, 2)},
 			},
 		},
 	}
@@ -118,7 +125,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// preset the sell orders
 			for _, preset := range test.preset {
-				_, err := sm.CreateOrder(preset, lib.CanopyChainId)
+				err := sm.SetOrder(preset, lib.CanopyChainId)
 				require.NoError(t, err)
 				// simulate the escrow supply
 				escrowPoolBalance += preset.AmountForSale
@@ -157,8 +164,6 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 			var balanceRemovedFromPool uint64
 			// validate the close orders
 			for _, closeOrder := range test.orders.CloseOrders {
-				// define convenience variable for order
-				order := test.preset[closeOrder]
 				// validate the deletion of the order
 				_, e := sm.GetOrder(closeOrder, lib.CanopyChainId)
 				// if order no buyer to close
@@ -166,11 +171,15 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 					require.NoError(t, e)
 				} else {
 					require.ErrorContains(t, e, "not found")
-					// validate the addition of funds to the buyer
-					accountBalance, e := sm.GetAccountBalance(crypto.NewAddress(order.BuyerReceiveAddress))
-					require.NoError(t, e)
-					require.Equal(t, order.AmountForSale, accountBalance)
-					balanceRemovedFromPool += order.AmountForSale
+					for _, order := range test.preset {
+						if bytes.Equal(order.Id, closeOrder) {
+							// validate the addition of funds to the buyer
+							accountBalance, e := sm.GetAccountBalance(crypto.NewAddress(order.BuyerReceiveAddress))
+							require.NoError(t, e)
+							require.Equal(t, order.AmountForSale, accountBalance)
+							balanceRemovedFromPool += order.AmountForSale
+						}
+					}
 				}
 			}
 			// validate the removal of funds from the escrow pool
@@ -181,7 +190,7 @@ func TestHandleCommitteeSwaps(t *testing.T) {
 	}
 }
 
-func TestCreateOrder(t *testing.T) {
+func TestSetOrder(t *testing.T) {
 	tests := []struct {
 		name     string
 		detail   string
@@ -192,7 +201,7 @@ func TestCreateOrder(t *testing.T) {
 			detail: "create sell order",
 			expected: []*lib.SellOrder{
 				{
-					Id:                   0,
+					Id:                   newTestOrderId(t, 0),
 					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -206,7 +215,7 @@ func TestCreateOrder(t *testing.T) {
 			detail: "create sell order for another committee",
 			expected: []*lib.SellOrder{
 				{
-					Id:                   0,
+					Id:                   newTestOrderId(t, 0),
 					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -214,7 +223,7 @@ func TestCreateOrder(t *testing.T) {
 					SellersSendAddress:   newTestAddressBytes(t),
 				},
 				{
-					Id:                   0,
+					Id:                   newTestOrderId(t, 0),
 					Committee:            lib.CanopyChainId + 1,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -228,7 +237,7 @@ func TestCreateOrder(t *testing.T) {
 			detail: "test the id creation order",
 			expected: []*lib.SellOrder{
 				{
-					Id:                   0,
+					Id:                   newTestOrderId(t, 0),
 					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -236,7 +245,7 @@ func TestCreateOrder(t *testing.T) {
 					SellersSendAddress:   newTestAddressBytes(t),
 				},
 				{
-					Id:                   0,
+					Id:                   newTestOrderId(t, 0),
 					Committee:            lib.CanopyChainId + 1,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -244,7 +253,7 @@ func TestCreateOrder(t *testing.T) {
 					SellersSendAddress:   newTestAddressBytes(t),
 				},
 				{
-					Id:                   1, // only used for validation
+					Id:                   newTestOrderId(t, 1), // only used for validation
 					Committee:            lib.CanopyChainId + 1,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -252,7 +261,7 @@ func TestCreateOrder(t *testing.T) {
 					SellersSendAddress:   newTestAddressBytes(t),
 				},
 				{
-					Id:                   1, // only used for validation
+					Id:                   newTestOrderId(t, 1), // only used for validation
 					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -268,7 +277,7 @@ func TestCreateOrder(t *testing.T) {
 			sm := newTestStateMachine(t)
 			for _, expected := range test.expected {
 				// execute the function call
-				_, err := sm.CreateOrder(expected, expected.Committee)
+				err := sm.SetOrder(expected, expected.Committee)
 				require.NoError(t, err)
 				// get the order
 				got, err := sm.GetOrder(expected.Id, expected.Committee)
@@ -288,19 +297,6 @@ func TestEditOrder(t *testing.T) {
 		expected *lib.SellOrder
 		error    string
 	}{
-		{
-			name:   "order not found",
-			detail: "order not preset so no order id is found",
-			expected: &lib.SellOrder{
-				Id:                   0,
-				Committee:            lib.CanopyChainId,
-				AmountForSale:        101,
-				RequestedAmount:      100,
-				SellerReceiveAddress: newTestAddressBytes(t),
-				SellersSendAddress:   newTestAddressBytes(t),
-			},
-			error: "not found",
-		},
 		{
 			name:   "update amount",
 			detail: "update the amount for sale without error",
@@ -326,11 +322,11 @@ func TestEditOrder(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// preset the order
 			if test.preset != nil {
-				_, err := sm.CreateOrder(test.preset, test.preset.Committee)
+				err := sm.SetOrder(test.preset, test.preset.Committee)
 				require.NoError(t, err)
 			}
 			// execute the function call
-			err := sm.EditOrder(test.expected, lib.CanopyChainId)
+			err := sm.SetOrder(test.expected, lib.CanopyChainId)
 			// validate the expected error
 			require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {
@@ -359,7 +355,7 @@ func TestLockOrder(t *testing.T) {
 			detail: "the lock order cannot be found",
 			order: &lib.LockOrder{
 
-				OrderId:             0,
+				OrderId:             newTestOrderId(t, 0),
 				BuyerReceiveAddress: newTestAddressBytes(t, 1),
 				BuyerChainDeadline:  100,
 			},
@@ -369,6 +365,7 @@ func TestLockOrder(t *testing.T) {
 			name:   "lock order locked",
 			detail: "the lock order cannot be claimed as its already reserved",
 			preset: &lib.SellOrder{
+				Id:                  newTestOrderId(t, 0),
 				Committee:           lib.CanopyChainId,
 				AmountForSale:       100,
 				RequestedAmount:     100,
@@ -377,7 +374,7 @@ func TestLockOrder(t *testing.T) {
 			},
 			order: &lib.LockOrder{
 
-				OrderId:             0,
+				OrderId:             newTestOrderId(t, 0),
 				BuyerReceiveAddress: newTestAddressBytes(t, 1),
 				BuyerChainDeadline:  100,
 			},
@@ -387,13 +384,14 @@ func TestLockOrder(t *testing.T) {
 			name:   "lock order",
 			detail: "successful lock order without error",
 			preset: &lib.SellOrder{
+				Id:                 newTestOrderId(t, 0),
 				Committee:          lib.CanopyChainId,
 				AmountForSale:      100,
 				RequestedAmount:    100,
 				SellersSendAddress: newTestAddressBytes(t),
 			},
 			order: &lib.LockOrder{
-				OrderId:             0,
+				OrderId:             newTestOrderId(t, 0),
 				BuyerReceiveAddress: newTestAddressBytes(t, 1),
 				BuyerChainDeadline:  100,
 			},
@@ -405,7 +403,7 @@ func TestLockOrder(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// preset the order
 			if test.preset != nil {
-				_, err := sm.CreateOrder(test.preset, lib.CanopyChainId)
+				err := sm.SetOrder(test.preset, lib.CanopyChainId)
 				require.NoError(t, err)
 			}
 			// execute the function call
@@ -431,26 +429,27 @@ func TestResetOrder(t *testing.T) {
 		name   string
 		detail string
 		preset *lib.SellOrder
-		order  uint64
+		order  []byte
 		error  string
 	}{
 		{
 			name:   "reset order not found",
 			detail: "the buy reset cannot be found",
-			order:  0,
+			order:  newTestOrderId(t, 0),
 			error:  "not found",
 		},
 		{
 			name:   "reset order",
 			detail: "successful reset order without error",
 			preset: &lib.SellOrder{
+				Id:                  newTestOrderId(t, 0),
 				Committee:           lib.CanopyChainId,
 				AmountForSale:       100,
 				RequestedAmount:     100,
 				BuyerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:  newTestAddressBytes(t),
 			},
-			order: 0,
+			order: newTestOrderId(t, 0),
 		},
 	}
 	for _, test := range tests {
@@ -459,7 +458,7 @@ func TestResetOrder(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// preset the order
 			if test.preset != nil {
-				_, err := sm.CreateOrder(test.preset, lib.CanopyChainId)
+				err := sm.SetOrder(test.preset, lib.CanopyChainId)
 				require.NoError(t, err)
 			}
 			// execute the function call
@@ -485,32 +484,34 @@ func TestCloseOrder(t *testing.T) {
 		name   string
 		detail string
 		preset *lib.SellOrder
-		order  uint64
+		order  []byte
 		error  string
 	}{
 		{
 			name:   "close order not already accepted",
 			detail: "there's no existing buyer for the close order",
 			preset: &lib.SellOrder{
+				Id:                 newTestOrderId(t, 0),
 				Committee:          lib.CanopyChainId,
 				AmountForSale:      100,
 				RequestedAmount:    100,
 				SellersSendAddress: newTestAddressBytes(t),
 			},
-			order: 0,
+			order: newTestOrderId(t, 0),
 			error: "lock order invalid",
 		},
 		{
 			name:   "close order",
 			detail: "successful reset order without error",
 			preset: &lib.SellOrder{
+				Id:                  newTestOrderId(t, 0),
 				Committee:           lib.CanopyChainId,
 				AmountForSale:       100,
 				RequestedAmount:     100,
 				BuyerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:  newTestAddressBytes(t),
 			},
-			order: 0,
+			order: newTestOrderId(t, 0),
 		},
 	}
 	for _, test := range tests {
@@ -519,7 +520,7 @@ func TestCloseOrder(t *testing.T) {
 			sm := newTestStateMachine(t)
 			// preset the order
 			if test.preset != nil {
-				_, err := sm.CreateOrder(test.preset, lib.CanopyChainId)
+				err := sm.SetOrder(test.preset, lib.CanopyChainId)
 				require.NoError(t, err)
 				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+EscrowPoolAddend, test.preset.AmountForSale))
 			}
@@ -557,23 +558,11 @@ func TestDeleteOrder(t *testing.T) {
 		error    string
 	}{
 		{
-			name:   "order not found",
-			detail: "order not found because it wasn't preset",
-			preset: []*lib.SellOrder{},
-			toDelete: []*lib.SellOrder{
-				{
-					Id:        0,
-					Committee: 0,
-				},
-			},
-			error: "not found",
-		},
-		{
 			name:   "delete sell order",
 			detail: "delete sell order",
 			preset: []*lib.SellOrder{
 				{
-					Id:                   0,
+					Id:                   newTestOrderId(t, 0),
 					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -587,7 +576,7 @@ func TestDeleteOrder(t *testing.T) {
 			detail: "delete sell order for another committee",
 			preset: []*lib.SellOrder{
 				{
-					Id:                   0,
+					Id:                   newTestOrderId(t, 0),
 					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -595,7 +584,7 @@ func TestDeleteOrder(t *testing.T) {
 					SellersSendAddress:   newTestAddressBytes(t),
 				},
 				{
-					Id:                   0,
+					Id:                   newTestOrderId(t, 0),
 					Committee:            lib.CanopyChainId + 1,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -611,7 +600,7 @@ func TestDeleteOrder(t *testing.T) {
 			sm := newTestStateMachine(t)
 			for _, expected := range test.preset {
 				// execute the function call
-				_, err := sm.CreateOrder(expected, expected.Committee)
+				err := sm.SetOrder(expected, expected.Committee)
 				require.NoError(t, err)
 				// get the order
 				got, err := sm.GetOrder(expected.Id, expected.Committee)
@@ -652,16 +641,16 @@ func TestGetSetOrderBooks(t *testing.T) {
 					ChainId: 0,
 					Orders: []*lib.SellOrder{
 						{
-							Id:                   1,
-							Committee:            2,
+							Id:                   newTestOrderId(t, 0),
+							Committee:            0,
 							AmountForSale:        100,
 							RequestedAmount:      100,
 							SellerReceiveAddress: newTestAddressBytes(t, 1),
 							SellersSendAddress:   newTestAddressBytes(t),
 						},
 						{
-							Id:                   0,
-							Committee:            1,
+							Id:                   newTestOrderId(t, 1),
+							Committee:            0,
 							AmountForSale:        100,
 							RequestedAmount:      100,
 							SellerReceiveAddress: newTestAddressBytes(t, 1),
@@ -673,15 +662,15 @@ func TestGetSetOrderBooks(t *testing.T) {
 					ChainId: 1,
 					Orders: []*lib.SellOrder{
 						{
-							Id:                   1,
-							Committee:            2,
+							Id:                   newTestOrderId(t, 2),
+							Committee:            1,
 							AmountForSale:        100,
 							RequestedAmount:      100,
 							SellerReceiveAddress: newTestAddressBytes(t, 1),
 							SellersSendAddress:   newTestAddressBytes(t),
 						},
 						{
-							Id:                   0,
+							Id:                   newTestOrderId(t, 3),
 							Committee:            1,
 							AmountForSale:        100,
 							RequestedAmount:      100,
@@ -719,4 +708,8 @@ func TestGetSetOrderBooks(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newTestOrderId(_ *testing.T, variant int) []byte {
+	return []byte(fmt.Sprintf("%d", variant))
 }

@@ -137,6 +137,7 @@ input::placeholder {
 }
 
 .table {
+  table-layout: auto;
   background-color: #d2d2d2;
   border: 1px solid #d2d2d2;
   border-radius: 5px !important;
@@ -364,10 +365,6 @@ h5 {
   margin-bottom: 25px !important;
 }
 
-th {
-  font-family: var(--font-heading);
-}
-
 .detail-table-title {
   white-space: nowrap;
   font-weight: 600;
@@ -409,6 +406,18 @@ th {
 
 .pagination {
   float: right;
+}
+
+td, th {
+  font-family: var(--font-heading);
+}
+
+.large-table-col {
+  max-width: 1000px !important;
+  font-size: 13px !important;
+  padding-left: 10px !important;
+  padding-top: 15px !important;
+  padding-bottom: 15px !important;
 }
 
 .table-col {

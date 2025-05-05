@@ -143,18 +143,18 @@ func TestPartitionHeight(t *testing.T) {
 		},
 		{
 			name:     "less than partition frequency",
-			height:   9999,
+			height:   999,
 			expected: 1,
 		},
 		{
 			name:     "greater than partition frequency",
-			height:   10001,
-			expected: 10000,
+			height:   1001,
+			expected: 1000,
 		},
 		{
 			name:     "2x partition frequency",
-			height:   27894,
-			expected: 20000,
+			height:   2789,
+			expected: 2000,
 		},
 	}
 	for _, test := range tests {
@@ -551,18 +551,18 @@ func TestHistoricalPrefix(t *testing.T) {
 		},
 		{
 			name:     "less than partition frequency",
-			height:   9999,
+			height:   999,
 			expected: append([]byte(historicStatePrefix), binary.BigEndian.AppendUint64(nil, 1)...),
 		},
 		{
 			name:     "greater than partition frequency",
-			height:   10001,
-			expected: append([]byte(historicStatePrefix), binary.BigEndian.AppendUint64(nil, 10000)...),
+			height:   1001,
+			expected: append([]byte(historicStatePrefix), binary.BigEndian.AppendUint64(nil, 1000)...),
 		},
 		{
 			name:     "2x partition frequency",
-			height:   27894,
-			expected: append([]byte(historicStatePrefix), binary.BigEndian.AppendUint64(nil, 20000)...),
+			height:   2794,
+			expected: append([]byte(historicStatePrefix), binary.BigEndian.AppendUint64(nil, 2000)...),
 		},
 	}
 	for _, test := range tests {

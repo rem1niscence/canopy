@@ -728,8 +728,8 @@ func ErrOrderLocked() ErrorI {
 	return NewError(CodeOrderLocked, StateMachineModule, "order locked")
 }
 
-func ErrOrderNotFound(id int) ErrorI {
-	return NewError(CodeOrderNotFound, StateMachineModule, fmt.Sprintf("order with id %d not found", id))
+func ErrOrderNotFound() ErrorI {
+	return NewError(CodeOrderNotFound, StateMachineModule, "order not found")
 }
 
 func ErrPanic() ErrorI {

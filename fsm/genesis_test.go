@@ -119,7 +119,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					OrderBooks: []*lib.OrderBook{{
 						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
-							Id:                   1,
+							Id:                   newTestOrderId(t, 1),
 							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
@@ -127,7 +127,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 							BuyerReceiveAddress:  newTestAddressBytes(t, 1),
 							BuyerChainDeadline:   100, SellersSendAddress: newTestAddressBytes(t, 2),
 						}, {
-							Id:                 2,
+							Id:                 newTestOrderId(t, 2),
 							Committee:          2,
 							AmountForSale:      100,
 							RequestedAmount:    100,
@@ -147,7 +147,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 					OrderBooks: []*lib.OrderBook{{
 						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
-							Id:                   1,
+							Id:                   newTestOrderId(t, 1),
 							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
@@ -155,7 +155,7 @@ func TestNewFromGenesisFile(t *testing.T) {
 							BuyerReceiveAddress:  newTestAddressBytes(t, 1),
 							BuyerChainDeadline:   100, SellersSendAddress: newTestAddressBytes(t, 2),
 						}, {
-							Id:                 2,
+							Id:                 newTestOrderId(t, 2),
 							Committee:          2,
 							AmountForSale:      100,
 							RequestedAmount:    100,
@@ -291,7 +291,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					OrderBooks: []*lib.OrderBook{{
 						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
-							Id:                   1,
+							Id:                   newTestOrderId(t, 1),
 							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
@@ -300,7 +300,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 							BuyerChainDeadline:   100,
 							SellersSendAddress:   newTestAddressBytes(t, 2),
 						}, {
-							Id:                 2,
+							Id:                 newTestOrderId(t, 2),
 							Committee:          2,
 							AmountForSale:      100,
 							RequestedAmount:    100,
@@ -334,7 +334,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					OrderBooks: []*lib.OrderBook{{
 						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
-							Id:                   1,
+							Id:                   newTestOrderId(t, 1),
 							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
@@ -342,7 +342,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 							BuyerReceiveAddress:  newTestAddressBytes(t, 1),
 							BuyerChainDeadline:   100, SellersSendAddress: newTestAddressBytes(t, 2),
 						}, {
-							Id:                 2,
+							Id:                 newTestOrderId(t, 2),
 							Committee:          2,
 							AmountForSale:      100,
 							RequestedAmount:    100,
@@ -461,7 +461,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					OrderBooks: []*lib.OrderBook{{
 						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
-							Id:                   1,
+							Id:                   newTestOrderId(t, 1),
 							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
@@ -469,7 +469,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 							BuyerReceiveAddress:  newTestAddressBytes(t, 1),
 							BuyerChainDeadline:   100, SellersSendAddress: newTestAddressBytes(t, 2),
 						}, {
-							Id:                 2,
+							Id:                 newTestOrderId(t, 2),
 							Committee:          1,
 							AmountForSale:      100,
 							RequestedAmount:    100,
@@ -488,7 +488,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 					OrderBooks: []*lib.OrderBook{{
 						ChainId: lib.CanopyChainId,
 						Orders: []*lib.SellOrder{{
-							Id:                   1,
+							Id:                   newTestOrderId(t, 1),
 							Committee:            lib.CanopyChainId,
 							AmountForSale:        100,
 							RequestedAmount:      100,
@@ -496,7 +496,7 @@ func TestNewStateFromGenesisFile(t *testing.T) {
 							BuyerReceiveAddress:  newTestAddressBytes(t, 1),
 							BuyerChainDeadline:   100, SellersSendAddress: newTestAddressBytes(t, 2),
 						}, {
-							Id:                 2,
+							Id:                 newTestOrderId(t, 2),
 							Committee:          1,
 							AmountForSale:      100,
 							RequestedAmount:    100,
@@ -621,7 +621,7 @@ func TestValidateGenesisState(t *testing.T) {
 							ChainId: 0,
 							Orders: []*lib.SellOrder{
 								{
-									Id:                 1,
+									Id:                 newTestOrderId(t, 1),
 									Committee:          0,
 									AmountForSale:      100,
 									SellersSendAddress: newTestAddressBytes(t),
@@ -632,7 +632,7 @@ func TestValidateGenesisState(t *testing.T) {
 							ChainId: 0,
 							Orders: []*lib.SellOrder{
 								{
-									Id:                 2,
+									Id:                 newTestOrderId(t, 2),
 									Committee:          0,
 									AmountForSale:      101,
 									SellersSendAddress: newTestAddressBytes(t, 1),
@@ -655,13 +655,13 @@ func TestValidateGenesisState(t *testing.T) {
 							ChainId: 0,
 							Orders: []*lib.SellOrder{
 								{
-									Id:                 1,
+									Id:                 newTestOrderId(t, 1),
 									Committee:          0,
 									AmountForSale:      100,
 									SellersSendAddress: newTestAddressBytes(t),
 								},
 								{
-									Id:                 1,
+									Id:                 newTestOrderId(t, 1),
 									Committee:          0,
 									AmountForSale:      101,
 									SellersSendAddress: newTestAddressBytes(t, 2),
@@ -712,7 +712,7 @@ func newTestGenesisState(t *testing.T) *GenesisState {
 			OrderBooks: []*lib.OrderBook{{
 				ChainId: lib.CanopyChainId,
 				Orders: []*lib.SellOrder{{
-					Id:                   1,
+					Id:                   newTestOrderId(t, 1),
 					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -721,7 +721,7 @@ func newTestGenesisState(t *testing.T) *GenesisState {
 					BuyerChainDeadline:   100,
 					SellersSendAddress:   newTestAddressBytes(t, 2),
 				}, {
-					Id:                 2,
+					Id:                 newTestOrderId(t, 2),
 					Committee:          2,
 					AmountForSale:      100,
 					RequestedAmount:    100,
@@ -759,7 +759,7 @@ func newTestValidateGenesisState(t *testing.T) *GenesisState {
 			OrderBooks: []*lib.OrderBook{{
 				ChainId: lib.CanopyChainId,
 				Orders: []*lib.SellOrder{{
-					Id:                   1,
+					Id:                   newTestOrderId(t, 1),
 					Committee:            lib.CanopyChainId,
 					AmountForSale:        100,
 					RequestedAmount:      100,
@@ -768,7 +768,7 @@ func newTestValidateGenesisState(t *testing.T) *GenesisState {
 					BuyerChainDeadline:   100,
 					SellersSendAddress:   newTestAddressBytes(t, 2),
 				}, {
-					Id:                 2,
+					Id:                 newTestOrderId(t, 2),
 					Committee:          2,
 					AmountForSale:      100,
 					RequestedAmount:    100,

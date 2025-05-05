@@ -15,6 +15,7 @@ import {
 
 // convertValue() converts the value based on its key and handles different types
 function convertValue(k, v, openModal) {
+  if (k === "Id") return v;
   if (k === "publicKey") return <Truncate text={v} />;
   if (isHex(v) || k === "height") {
     const content = isNumber(v) ? v : <Truncate text={v} />;
@@ -122,7 +123,7 @@ function convertGovernanceParams(v) {
 function convertOrder(v) {
   const exchangeRate = v.requestedAmount / v.amountForSale;
   return {
-    Id: v.id ?? 0,
+    Id: v.id ?? "error",
     Chain: v.committee,
     AmountForSale: toCNPY(v.amountForSale),
     Rate: exchangeRate.toFixed(2),
@@ -226,7 +227,7 @@ export default function DTable(props) {
           {sortedData.map((val, idx) => (
             <tr key={idx}>
               {Object.keys(val).map((k, i) => (
-                <td key={i} className="table-col">
+                <td key={i} className={k === 'Id' ? 'large-table-col' : 'table-col'}>
                   {convertValue(k, val[k], props.openModal)}
                 </td>
               ))}

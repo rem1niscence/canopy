@@ -179,7 +179,7 @@ func (r *RCManager) GetOrders(rootChainId, rootHeight, id uint64) (*lib.OrderBoo
 }
 
 // Order() returns a specific order from the root order book
-func (r *RCManager) GetOrder(rootChainId, height, orderId, chainId uint64) (*lib.SellOrder, lib.ErrorI) {
+func (r *RCManager) GetOrder(rootChainId, height uint64, orderId string, chainId uint64) (*lib.SellOrder, lib.ErrorI) {
 	// if the root chain id is the same as the info
 	sub, found := r.subscriptions[rootChainId]
 	if !found {

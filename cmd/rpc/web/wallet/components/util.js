@@ -132,9 +132,9 @@ export function getFormInputs(type, keyGroup, account, validator, keyStore) {
       inputText: "order-id",
       feedback: "please input an order id",
       required: true,
-      type: "number",
-      minLength: 1,
-      maxLength: 100,
+      type: "text",
+      minLength: 40,
+      maxLength: 40,
     },
     chainId: {
       placeholder: "the id of the committee / counter asset",
