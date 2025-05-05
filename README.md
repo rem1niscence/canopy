@@ -15,9 +15,22 @@ _Official golang implementation of the Canopy Network Protocol_
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-white.svg)](https://github.com/canopy-network/canopy/releases)
 [![Status](https://img.shields.io/badge/status-prelaunch-white)](https://docs.docker.com/compose/)
 
+### ⫸ **Welcome to the Network that Powers the Peer-to-Peer Launchpad for New Chains**
+
+Built on a recursive architecture, chains bootstrap each other into independence —  
+forming an unstoppable web of utility and security. 
+
+**Here you'll find:**
+
+➪ A recursive framework to build blockchains.
+
+➪ The seed chain code that started the recursive cycle.
+
 For more information on the Canopy Network Protocol visit [https://canopynetwork.org](https://canopynetwork.org)
 
-**Canopy is in `Alphanet`** 🚀
+## Network Status
+
+⪢ Canopy is in `Alphanet` 🚀 ➝ learn more about the [road-to-mainnet](https://www.canopynetwork.org/learn-more/road-to-mainnet)
 
 ## Protocol Documentation
 
@@ -35,16 +48,29 @@ Welcome to the Canopy Network reference implementation. This code base can be we
 
 ## How to Run It
 
-To run the Canopy binary, use the following commands:
+➪ To run the Canopy binary, use the following commands:
 
 ```bash
 make build/canopy-full
 canopy start
 ```
 
+## How to Run It With 🐳 Docker
+
+➪ To run a Canopy `Localnet` in a *containerized* environment, use the following commands:
+```bash
+make docker/build
+make docker/up-fast
+make docker/logs
+
+or simply
+
+make docker/up && make docker/logs
+```
+
 ## Running Tests
 
-To run Canopy unit tests, use the Go testing tools:
+➪ To run Canopy unit tests, use the Go testing tools:
 
 ```bash
 make test
@@ -52,7 +78,7 @@ make test
 
 ## How to Contribute
 
-Canopy is an open-source project, and we welcome contributions from the community. Here's how to get involved:
+➪ Canopy is an open-source project, and we welcome contributions from the community. Here's how to get involved:
 
 1. **Fork** the repository and clone it locally.
 2. **Code** your improvements or fixes.
@@ -62,7 +88,7 @@ Canopy is an open-source project, and we welcome contributions from the communit
 
 ### High Impact or Architectural Changes
 
-Before making large changes, discuss them with the Canopy team on [Discord](https://discord.gg/pNcSJj7Wdh) to ensure alignment.
+➪ Before making large changes, discuss them with the Canopy team on [Discord](https://discord.gg/pNcSJj7Wdh) to ensure alignment.
 
 ### Coding Style
 
