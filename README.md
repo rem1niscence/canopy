@@ -13,7 +13,7 @@ _Official golang implementation of the Canopy Network Protocol_
 [![License](https://img.shields.io/badge/License-MIT-white.svg)](https://opensource.org/licenses/MIT)
 [![Testing](https://img.shields.io/badge/testing-docker%20compose-white)](https://docs.docker.com/compose/)
 [![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos-white.svg)](https://github.com/canopy-network/canopy/releases)
-[![Status](https://img.shields.io/badge/status-prelaunch-white)](https://docs.docker.com/compose/)
+[![Status](https://img.shields.io/badge/status-alphanet-white)](https://docs.docker.com/compose/)
 
 ### ⫸ **Welcome to the Network that Powers the Peer-to-Peer Launchpad for New Chains**
 
