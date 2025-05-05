@@ -23,7 +23,7 @@ blockchain consensus, process transactions, and communicate with peers and paren
 
 ## Core Components
 
-### Controller Structure
+### [Controller Structure](controller.md)
 
 The Controller contains references to all major subsystems and coordinates their interactions:
 
@@ -48,7 +48,7 @@ graph TD
     FSM -- Blockchain State --> Controller
 ```
 
-### Block Processing System
+### [Block Processing System](block.md)
 
 The block processing system handles how blocks are:
 
@@ -59,7 +59,7 @@ The block processing system handles how blocks are:
 
 This system ensures all nodes maintain consensus on the blockchain state through BFT consensus.
 
-### Consensus Management
+### [Consensus Management](consensus.md)
 
 The consensus management system:
 
@@ -69,7 +69,7 @@ The consensus management system:
 - Handles block requests and responses
 - Reports on consensus status
 
-### Transaction System
+### [Transaction System](tx.md)
 
 The transaction system:
 
@@ -79,7 +79,7 @@ The transaction system:
 - Gossips valid transactions to peers
 - Tracks failed transactions for reporting
 
-### Certificate Result System
+### [Certificate Result System](result.md)
 
 The Certificate Result system handles the post-consensus outcomes:
 
