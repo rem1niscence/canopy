@@ -56,12 +56,14 @@ func PausedPrefix(height uint64) []byte { return lib.JoinLenPrefix(pausedPrefix,
 func LastProposersPrefix() []byte       { return lib.JoinLenPrefix(lastProposersPrefix) }
 func CommitteePrefix(id uint64) []byte  { return lib.JoinLenPrefix(committeePrefix, formatUint64(id)) }
 func DelegatePrefix(id uint64) []byte   { return lib.JoinLenPrefix(delegatePrefix, formatUint64(id)) }
-func OrderBookPrefix() []byte           { return lib.JoinLenPrefix(orderBookPrefix) }
 func CommitteesDataPrefix() []byte      { return lib.JoinLenPrefix(committeesDataPrefix) }
 func RetiredCommitteesPrefix() []byte   { return lib.JoinLenPrefix(retiredCommitteePrefix) }
 func KeyForPool(n uint64) []byte        { return lib.JoinLenPrefix(poolPrefix, formatUint64(n)) }
 func KeyForNonSigner(a []byte) []byte   { return lib.JoinLenPrefix(nonSignerPrefix, a) }
-func KeyForOrderBook(id uint64) []byte  { return lib.JoinLenPrefix(orderBookPrefix, formatUint64(id)) }
+func OrderBookPrefix(cId uint64) []byte { return lib.JoinLenPrefix(orderBookPrefix, formatUint64(cId)) }
+func KeyForOrder(chainId uint64, orderId []byte) []byte {
+	return append(OrderBookPrefix(chainId), lib.JoinLenPrefix(orderId)...)
+}
 func KeyForUnstaking(height uint64, address crypto.AddressI) []byte {
 	return append(UnstakingPrefix(height), lib.JoinLenPrefix(address.Bytes())...)
 }
@@ -94,7 +96,7 @@ func AddressFromKey(k []byte) (crypto.AddressI, lib.ErrorI) {
 
 func IdFromKey(k []byte) (uint64, lib.ErrorI) {
 	segments := lib.DecodeLengthPrefixed(k)
-	if len(segments) != 2 {
+	if len(segments) < 2 {
 		return 0, ErrInvalidKey(k)
 	}
 	return binary.BigEndian.Uint64(segments[1]), nil

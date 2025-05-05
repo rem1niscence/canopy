@@ -260,6 +260,7 @@ func TestHandleMessage(t *testing.T) {
 				RequestedAmount:      1000,
 				SellerReceiveAddress: newTestPublicKeyBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
+				Hash:                 newTestOrderId(t, 0),
 			},
 			validate: func(sm StateMachine) {
 				// ensure the account was subtracted from
@@ -271,7 +272,7 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, e)
 				require.Equal(t, amount, got)
 				// ensure the order was created
-				order, e := sm.GetOrder(0, lib.CanopyChainId)
+				order, e := sm.GetOrder(newTestOrderId(t, 0), lib.CanopyChainId)
 				require.NoError(t, e)
 				require.Equal(t, amount, order.AmountForSale)
 			},
@@ -292,7 +293,8 @@ func TestHandleMessage(t *testing.T) {
 				// add to the pool
 				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+EscrowPoolAddend, amount))
 				// save the order in state
-				_, err = sm.CreateOrder(&lib.SellOrder{
+				err = sm.SetOrder(&lib.SellOrder{
+					Id:                   newTestOrderId(t, 0),
 					Committee:            lib.CanopyChainId,
 					AmountForSale:        amount,
 					RequestedAmount:      1000,
@@ -302,7 +304,7 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, err)
 			},
 			msg: &MessageEditOrder{
-				OrderId:              0,
+				OrderId:              newTestOrderId(t, 0),
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        amount * 2,
 				RequestedAmount:      2000,
@@ -318,7 +320,7 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, e)
 				require.Equal(t, amount*2, got)
 				// ensure the order was edited
-				order, e := sm.GetOrder(0, lib.CanopyChainId)
+				order, e := sm.GetOrder(newTestOrderId(t, 0), lib.CanopyChainId)
 				require.NoError(t, e)
 				require.Equal(t, amount*2, order.AmountForSale)
 			},
@@ -330,7 +332,8 @@ func TestHandleMessage(t *testing.T) {
 				// add to the pool
 				require.NoError(t, sm.PoolAdd(lib.CanopyChainId+EscrowPoolAddend, amount))
 				// save the order in state
-				_, err = sm.CreateOrder(&lib.SellOrder{
+				err = sm.SetOrder(&lib.SellOrder{
+					Id:                   newTestOrderId(t, 0),
 					Committee:            lib.CanopyChainId,
 					AmountForSale:        amount,
 					RequestedAmount:      1000,
@@ -340,7 +343,7 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, err)
 			},
 			msg: &MessageDeleteOrder{
-				OrderId: 0,
+				OrderId: newTestOrderId(t, 0),
 				ChainId: lib.CanopyChainId,
 			},
 			validate: func(sm StateMachine) {
@@ -353,7 +356,7 @@ func TestHandleMessage(t *testing.T) {
 				require.NoError(t, e)
 				require.Zero(t, got)
 				// ensure the order was deleted
-				_, e = sm.GetOrder(0, lib.CanopyChainId)
+				_, e = sm.GetOrder(newTestOrderId(t, 0), lib.CanopyChainId)
 				require.ErrorContains(t, e, "not found")
 			},
 		},
@@ -595,7 +598,7 @@ func TestGetAuthorizedSignersFor(t *testing.T) {
 			// preset a committee member
 			require.NoError(t, sm.SetCommitteeMember(newTestAddress(t), lib.CanopyChainId, 100))
 			// preset an order
-			_, err := sm.CreateOrder(&lib.SellOrder{
+			err := sm.SetOrder(&lib.SellOrder{
 				Committee:          lib.CanopyChainId,
 				SellersSendAddress: newTestAddressBytes(t),
 			}, lib.CanopyChainId)
@@ -1892,13 +1895,13 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 		},
 		Orders: &lib.Orders{
 			LockOrders: []*lib.LockOrder{{
-				OrderId:             0,
+				OrderId:             newTestOrderId(t, 0),
 				BuyerSendAddress:    newTestAddressBytes(t),
 				BuyerReceiveAddress: newTestAddressBytes(t),
 				BuyerChainDeadline:  100,
 			}},
-			ResetOrders: []uint64{1},
-			CloseOrders: []uint64{2},
+			ResetOrders: [][]byte{newTestOrderId(t, 1)},
+			CloseOrders: [][]byte{newTestOrderId(t, 2)},
 		},
 		Checkpoint: &lib.Checkpoint{Height: 1, BlockHash: crypto.Hash([]byte("block_hash"))},
 	}
@@ -2059,7 +2062,8 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 					buyerAddress = newTestAddressBytes(t)
 				}
 				// upsert each order in state
-				_, err = sm.CreateOrder(&lib.SellOrder{
+				err = sm.SetOrder(&lib.SellOrder{
+					Id:                  newTestOrderId(t, i),
 					Committee:           lib.CanopyChainId + 1,
 					BuyerReceiveAddress: buyerAddress,
 					BuyerChainDeadline:  0,
@@ -2078,7 +2082,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			}
 			// 1) validate the 'lock order'
 			func() {
-				order, e := sm.GetOrder(0, lib.CanopyChainId+1)
+				order, e := sm.GetOrder(newTestOrderId(t, 0), lib.CanopyChainId+1)
 				require.NoError(t, e)
 				// convenience variable for lock order
 				lockOrder := test.msg.Qc.Results.Orders.LockOrders[0]
@@ -2089,7 +2093,7 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 			}()
 			// 2) validate the 'reset order'
 			func() {
-				order, e := sm.GetOrder(1, lib.CanopyChainId+1)
+				order, e := sm.GetOrder(newTestOrderId(t, 1), lib.CanopyChainId+1)
 				require.NoError(t, e)
 				// validate the receipt address was reset
 				require.Len(t, order.BuyerReceiveAddress, 0)
@@ -2099,8 +2103,8 @@ func TestHandleMessageCertificateResults(t *testing.T) {
 
 			// 3) validate the 'close order'
 			func() {
-				_, err = sm.GetOrder(2, lib.CanopyChainId+1)
-				require.ErrorContains(t, err, "order with id 2 not found")
+				_, err = sm.GetOrder(newTestOrderId(t, 2), lib.CanopyChainId+1)
+				require.ErrorContains(t, err, "not found")
 			}()
 
 			// 4) validate the 'checkpoint' service
@@ -2229,6 +2233,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
+				Hash:                 newTestOrderId(t, 0),
 			},
 			error: "minimum order size",
 		},
@@ -2242,6 +2247,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
+				Hash:                 newTestOrderId(t, 0),
 			},
 			error: "insufficient funds",
 		},
@@ -2256,6 +2262,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
+				Hash:                 newTestOrderId(t, 0),
 			},
 		},
 	}
@@ -2293,10 +2300,11 @@ func TestMessageCreateOrder(t *testing.T) {
 			// validate the addition to the pool
 			require.Equal(t, test.msg.AmountForSale, got)
 			// get the order in state
-			order, err := sm.GetOrder(0, test.msg.ChainId)
+			order, err := sm.GetOrder(newTestOrderId(t, 0), test.msg.ChainId)
 			require.NoError(t, err)
 			// validate the creation of the order
 			require.EqualExportedValues(t, &lib.SellOrder{
+				Id:                   newTestOrderId(t, 0),
 				Committee:            test.msg.ChainId,
 				AmountForSale:        test.msg.AmountForSale,
 				RequestedAmount:      test.msg.RequestedAmount,
@@ -2322,7 +2330,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			name:   "no order found",
 			detail: "there exists no order",
 			msg: &MessageEditOrder{
-				OrderId:              0,
+				OrderId:              newTestOrderId(t, 0),
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
@@ -2334,7 +2342,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			name:   "order locked",
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
 			preset: &lib.SellOrder{
-				Id:                   0,
+				Id:                   newTestOrderId(t, 0),
 				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
@@ -2344,7 +2352,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &MessageEditOrder{
-				OrderId:              0,
+				OrderId:              newTestOrderId(t, 0),
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
@@ -2357,7 +2365,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			detail:           "the edited order does not satisfy the minimum order size",
 			minimumOrderSize: 2,
 			preset: &lib.SellOrder{
-				Id:                   0,
+				Id:                   newTestOrderId(t, 0),
 				Committee:            lib.CanopyChainId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
@@ -2365,7 +2373,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &MessageEditOrder{
-				OrderId:              0,
+				OrderId:              newTestOrderId(t, 0),
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
@@ -2376,7 +2384,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			name:   "insufficient funds",
 			detail: "the account does not have the balance to cover the edit",
 			preset: &lib.SellOrder{
-				Id:                   0,
+				Id:                   newTestOrderId(t, 0),
 				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
@@ -2384,7 +2392,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &MessageEditOrder{
-				OrderId:              0,
+				OrderId:              newTestOrderId(t, 0),
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
@@ -2396,7 +2404,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			name:   "edit receive address",
 			detail: "the order simply updates the receive address but the amount stays the same",
 			preset: &lib.SellOrder{
-				Id:                   0,
+				Id:                   newTestOrderId(t, 0),
 				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
@@ -2404,14 +2412,14 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &MessageEditOrder{
-				OrderId:              0,
+				OrderId:              newTestOrderId(t, 0),
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
 			expected: &lib.SellOrder{
-				Id:                   0,
+				Id:                   newTestOrderId(t, 0),
 				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
@@ -2424,7 +2432,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			presetAccount:    1,
 			minimumOrderSize: 0,
 			preset: &lib.SellOrder{
-				Id:                   0,
+				Id:                   newTestOrderId(t, 0),
 				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
@@ -2432,14 +2440,14 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &MessageEditOrder{
-				OrderId:              0,
+				OrderId:              newTestOrderId(t, 0),
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
 			expected: &lib.SellOrder{
-				Id:                   0,
+				Id:                   newTestOrderId(t, 0),
 				Committee:            lib.CanopyChainId,
 				AmountForSale:        2,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
@@ -2450,7 +2458,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			name:   "decrease sell amount",
 			detail: "the order has a decreased the sell amount",
 			preset: &lib.SellOrder{
-				Id:                   0,
+				Id:                   newTestOrderId(t, 0),
 				Committee:            lib.CanopyChainId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
@@ -2458,14 +2466,14 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &MessageEditOrder{
-				OrderId:              0,
+				OrderId:              newTestOrderId(t, 0),
 				ChainId:              lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
 			},
 			expected: &lib.SellOrder{
-				Id:                   0,
+				Id:                   newTestOrderId(t, 0),
 				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				SellerReceiveAddress: newTestAddressBytes(t, 2),
@@ -2490,13 +2498,8 @@ func TestHandleMessageEditOrder(t *testing.T) {
 				require.NoError(t, sm.SetParamsVal(valParams))
 				// preset the account with tokens
 				require.NoError(t, sm.AccountAdd(address, test.presetAccount))
-				// get the proper order book
-				orderBook, err := sm.GetOrderBook(lib.CanopyChainId)
-				require.NoError(t, err)
 				// preset the sell order
-				_ = orderBook.AddOrder(test.preset)
-				// set it back in state
-				require.NoError(t, sm.SetOrderBook(orderBook))
+				require.NoError(t, sm.SetOrder(test.preset, lib.CanopyChainId))
 				// preset the pool with the amount to sell
 				require.NoError(t, sm.PoolAdd(test.preset.Committee+EscrowPoolAddend, test.preset.AmountForSale))
 			}
@@ -2519,7 +2522,7 @@ func TestHandleMessageEditOrder(t *testing.T) {
 			// validate the subtraction/addition to/from the pool
 			require.Equal(t, test.preset.AmountForSale-(test.preset.AmountForSale-test.msg.AmountForSale), got)
 			// get the order in state
-			order, err := sm.GetOrder(0, test.msg.ChainId)
+			order, err := sm.GetOrder(newTestOrderId(t, 0), test.msg.ChainId)
 			require.NoError(t, err)
 			// validate the creation of the order
 			require.EqualExportedValues(t, test.expected, order)
@@ -2540,7 +2543,7 @@ func TestHandleMessageDelete(t *testing.T) {
 			name:   "no order found",
 			detail: "there exists no order",
 			msg: &MessageDeleteOrder{
-				OrderId: 0,
+				OrderId: newTestOrderId(t, 0),
 				ChainId: lib.CanopyChainId,
 			},
 			error: "not found",
@@ -2549,7 +2552,7 @@ func TestHandleMessageDelete(t *testing.T) {
 			name:   "order locked",
 			detail: "a buyer has already accepted the order, thus it cannot be edited",
 			preset: &lib.SellOrder{
-				Id:                   0,
+				Id:                   newTestOrderId(t, 0),
 				Committee:            lib.CanopyChainId,
 				AmountForSale:        1,
 				RequestedAmount:      0,
@@ -2559,7 +2562,7 @@ func TestHandleMessageDelete(t *testing.T) {
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &MessageDeleteOrder{
-				OrderId: 0,
+				OrderId: newTestOrderId(t, 0),
 				ChainId: lib.CanopyChainId,
 			},
 			error: "order locked",
@@ -2568,7 +2571,7 @@ func TestHandleMessageDelete(t *testing.T) {
 			name:   "successful delete",
 			detail: "the order delete was successful",
 			preset: &lib.SellOrder{
-				Id:                   0,
+				Id:                   newTestOrderId(t, 0),
 				Committee:            lib.CanopyChainId,
 				AmountForSale:        2,
 				RequestedAmount:      0,
@@ -2576,7 +2579,7 @@ func TestHandleMessageDelete(t *testing.T) {
 				SellersSendAddress:   newTestAddressBytes(t),
 			},
 			msg: &MessageDeleteOrder{
-				OrderId: 0,
+				OrderId: newTestOrderId(t, 0),
 				ChainId: lib.CanopyChainId,
 			},
 		},
@@ -2591,13 +2594,8 @@ func TestHandleMessageDelete(t *testing.T) {
 				address = crypto.NewAddress(test.preset.SellersSendAddress)
 				// preset the account with tokens
 				require.NoError(t, sm.AccountAdd(address, test.presetAccount))
-				// get the proper order book
-				orderBook, err := sm.GetOrderBook(lib.CanopyChainId)
-				require.NoError(t, err)
 				// preset the sell order
-				_ = orderBook.AddOrder(test.preset)
-				// set it back in state
-				require.NoError(t, sm.SetOrderBook(orderBook))
+				require.NoError(t, sm.SetOrder(test.preset, lib.CanopyChainId))
 				// preset the pool with the amount to sell
 				require.NoError(t, sm.PoolAdd(test.preset.Committee+EscrowPoolAddend, test.preset.AmountForSale))
 			}
@@ -2620,7 +2618,7 @@ func TestHandleMessageDelete(t *testing.T) {
 			// validate the subtraction from the pool
 			require.Zero(t, got)
 			// validate the delete
-			_, err = sm.GetOrder(0, test.msg.ChainId)
+			_, err = sm.GetOrder(newTestOrderId(t, 0), test.msg.ChainId)
 			require.ErrorContains(t, err, "not found")
 		})
 	}

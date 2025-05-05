@@ -100,17 +100,17 @@ func (vs *ValidatorSet) GetValidatorAndIdx(targetPublicKey []byte) (val *Consens
 
 // RootChainClient executes 'on-demand' calls to the root-chain
 type RCManagerI interface {
-	Publish(chainId uint64, info *RootChainInfo)                                             // publish the root chain info to nested chain listeners
-	ChainIds() []uint64                                                                      // get the list of chain ids of the nested chain subscribers
-	GetHeight(rootChainId uint64) uint64                                                     // get the height of the root chain
-	GetRootChainInfo(rootChainId, chainId uint64) (rootChainInfo *RootChainInfo, err ErrorI) // get root-chain info 'on-demand'
-	GetValidatorSet(rootChainId, height, id uint64) (ValidatorSet, ErrorI)                   // get the validator set for a chain id using the RPC API
-	GetLotteryWinner(rootChainId, height, id uint64) (p *LotteryWinner, err ErrorI)          // get the delegate 'lottery winner' for a chain id
-	GetOrders(rootChainId, rootHeight, id uint64) (*OrderBook, ErrorI)                       // get the order book for a specific 'chain id'
-	GetOrder(rootChainId, height, orderId, chainId uint64) (*SellOrder, ErrorI)              // get a specific order from the order book
-	IsValidDoubleSigner(rootChainId, height uint64, address string) (p *bool, err ErrorI)    // check if a double signer is valid for an address for a specific 'double sign height'
-	GetCheckpoint(rootChainId, height, id uint64) (blockHash HexBytes, i ErrorI)             // get a checkpoint at a height and chain id combination
-	Transaction(rootChainId uint64, tx TransactionI) (hash *string, err ErrorI)              // submit a transaction to the 'root chain'
+	Publish(chainId uint64, info *RootChainInfo)                                              // publish the root chain info to nested chain listeners
+	ChainIds() []uint64                                                                       // get the list of chain ids of the nested chain subscribers
+	GetHeight(rootChainId uint64) uint64                                                      // get the height of the root chain
+	GetRootChainInfo(rootChainId, chainId uint64) (rootChainInfo *RootChainInfo, err ErrorI)  // get root-chain info 'on-demand'
+	GetValidatorSet(rootChainId, height, id uint64) (ValidatorSet, ErrorI)                    // get the validator set for a chain id using the RPC API
+	GetLotteryWinner(rootChainId, height, id uint64) (p *LotteryWinner, err ErrorI)           // get the delegate 'lottery winner' for a chain id
+	GetOrders(rootChainId, rootHeight, id uint64) (*OrderBook, ErrorI)                        // get the order book for a specific 'chain id'
+	GetOrder(rootChainId, height uint64, orderId string, chainId uint64) (*SellOrder, ErrorI) // get a specific order from the order book
+	IsValidDoubleSigner(rootChainId, height uint64, address string) (p *bool, err ErrorI)     // check if a double signer is valid for an address for a specific 'double sign height'
+	GetCheckpoint(rootChainId, height, id uint64) (blockHash HexBytes, i ErrorI)              // get a checkpoint at a height and chain id combination
+	Transaction(rootChainId uint64, tx TransactionI) (hash *string, err ErrorI)               // submit a transaction to the 'root chain'
 }
 
 // CheckBasic() validates the basic structure and length of the AggregateSignature

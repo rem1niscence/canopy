@@ -2,23 +2,24 @@ import {
   KeystoreGet,
   KeystoreImport,
   KeystoreNew,
-  TxLockOrder,
   TxCloseOrder,
   TxCreateOrder,
   TxDeleteOrder,
   TxEditOrder,
   TxEditStake,
+  TxLockOrder,
   TxPause,
   TxSend,
   TxStake,
   TxUnpause,
-  TxUnstake,
+  TxUnstake
 } from "@/components/api";
 import FormInputs from "@/components/form_inputs";
 import {
   copy,
   downloadJSON,
   formatNumber,
+  getActionFee,
   getFormInputs,
   numberFromCommas,
   onFormSubmit,
@@ -26,23 +27,22 @@ import {
   retryWithDelay,
   toCNPY,
   toUCNPY,
-  withTooltip,
-  getActionFee,
+  withTooltip
 } from "@/components/util";
 import { KeystoreContext } from "@/pages";
 import {
-  LockIcon,
+  CloseIcon,
   CopyIcon,
+  DeleteOrderIcon,
   EditOrderIcon,
   EditStakeIcon,
-  DeleteOrderIcon,
+  LockIcon,
   PauseIcon,
-  UnpauseIcon,
   SendIcon,
   StakeIcon,
   SwapIcon,
-  UnstakeIcon,
-  CloseIcon,
+  UnpauseIcon,
+  UnstakeIcon
 } from "@/components/svg_icons";
 import { useContext, useEffect, useRef, useState } from "react";
 import { Button, Card, Col, Form, Modal, Row, Spinner, Table } from "react-bootstrap";
@@ -67,7 +67,7 @@ const transactionButtons = [
   { title: "LOCK", name: "lock_order", src: LockIcon },
   { title: "CLOSE", name: "close_order", src: CloseIcon },
   { title: "REPRICE", name: "edit_order", src: EditOrderIcon },
-  { title: "VOID", name: "delete_order", src: DeleteOrderIcon },
+  { title: "VOID", name: "delete_order", src: DeleteOrderIcon }
 ];
 
 // Accounts() returns the main component of this file
@@ -89,7 +89,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey, p
       showAlert: false,
       alertMsg: "",
       primaryColor: "",
-      greyColor: "",
+      greyColor: ""
     }),
     acc = account.account;
 
@@ -124,7 +124,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey, p
     setState((prevState) => ({
       ...prevState,
       primaryColor,
-      greyColor,
+      greyColor
     }));
   }, []);
 
@@ -138,7 +138,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey, p
       showModal: false,
       showPKModal: false,
       showNewModal: false,
-      showPKImportModal: false,
+      showPKImportModal: false
     });
   }
 
@@ -200,7 +200,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey, p
       resetState,
       10,
       1000,
-      false,
+      false
     );
   }
 
@@ -209,7 +209,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey, p
     onFormSubmit(state, e, ks, (r) =>
       KeystoreGet(r.sender, r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
-      }),
+      })
     );
   }
 
@@ -219,7 +219,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey, p
       KeystoreNew(r.password, r.nickname).then((r) => {
         setState({ ...state, showSubmit: Object.keys(state.txResult).length === 0, pk: r });
         setActivePrivateKey(r.nickname);
-      }),
+      })
     );
   }
 
@@ -266,7 +266,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey, p
             r.memo,
             fee,
             r.password,
-            submit,
+            submit
           ),
         "edit-stake": () =>
           TxEditStake(
@@ -280,29 +280,29 @@ export default function Accounts({ keygroup, account, validator, setActiveKey, p
             r.memo,
             fee,
             r.password,
-            submit,
+            submit
           ),
         unstake: () => TxUnstake(r.sender, r.signer, r.memo, fee, r.password, submit),
         pause: () => TxPause(r.sender, r.signer, r.memo, fee, r.password, submit),
         unpause: () => TxUnpause(r.sender, r.signer, r.memo, fee, r.password, submit),
         create_order: () =>
           TxCreateOrder(r.sender, r.chainId, amount, receiveAmount, r.receiveAddress, r.memo, fee, r.password, submit),
-        close_order: () => TxCloseOrder(r.sender, numberFromCommas(r.orderId), fee, r.password, submit),
-        lock_order: () => TxLockOrder(r.sender, r.receiveAddress, numberFromCommas(r.orderId), fee, r.password, submit),
+        close_order: () => TxCloseOrder(r.sender, r.orderId, fee, r.password, submit),
+        lock_order: () => TxLockOrder(r.sender, r.receiveAddress, r.orderId, fee, r.password, submit),
         edit_order: () =>
           TxEditOrder(
             r.sender,
             r.chainId,
-            numberFromCommas(r.orderId),
+            r.orderId,
             amount,
             receiveAmount,
             r.receiveAddress,
             r.memo,
             fee,
             r.password,
-            submit,
+            submit
           ),
-        delete_order: () => TxDeleteOrder(r.sender, r.chainId, r.orderId, r.memo, fee, r.password, submit),
+        delete_order: () => TxDeleteOrder(r.sender, r.chainId, r.orderId, r.memo, fee, r.password, submit)
       };
 
       const txFunction = txMap[state.txType];
@@ -316,7 +316,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey, p
             setState({
               ...state,
               showAlert: true,
-              alertMsg: "Transaction failed. Please verify the fields and try again.",
+              alertMsg: "Transaction failed. Please verify the fields and try again."
             });
           });
       }
@@ -379,7 +379,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey, p
         {[
           { title: "Account Type", info: getAccountType() },
           { title: "Stake Amount", info: getValidatorAmount(), after: " cnpy" },
-          { title: "Staked Status", info: getStakedStatus() },
+          { title: "Staked Status", info: getStakedStatus() }
         ].map((v, i) => (
           <RenderAccountInfo key={i} v={v} i={i} color={state.primaryColor} />
         ))}
@@ -389,7 +389,7 @@ export default function Accounts({ keygroup, account, validator, setActiveKey, p
       {[
         { title: "Nickname", info: keygroup.keyNickname },
         { title: "Address", info: keygroup.keyAddress },
-        { title: "Public Key", info: keygroup.publicKey },
+        { title: "Public Key", info: keygroup.publicKey }
       ].map((v, i) => (
         <KeyDetail key={i} title={v.title} info={v.info} state={state} setState={setState} />
       ))}
@@ -496,7 +496,7 @@ function AccSumTabCol({ detail, i, state, setState }) {
     </td>,
     detail,
     i,
-    "top",
+    "top"
   );
 }
 
@@ -566,25 +566,25 @@ function RenderButtons({ type, state, closeOnClick }) {
 
 // RenderModal() returns the transaction modal
 function RenderModal({
-  show,
-  title,
-  txType,
-  onFormSub,
-  keyGroup,
-  account,
-  validator,
-  onHide,
-  btnType,
-  setState,
-  state,
-  closeOnClick,
-  keystore,
-  showAlert = false,
-  alertMsg,
-  JsonViewVariant,
-  onFormFieldChange,
-  params,
-}) {
+                       show,
+                       title,
+                       txType,
+                       onFormSub,
+                       keyGroup,
+                       account,
+                       validator,
+                       onHide,
+                       btnType,
+                       setState,
+                       state,
+                       closeOnClick,
+                       keystore,
+                       showAlert = false,
+                       alertMsg,
+                       JsonViewVariant,
+                       onFormFieldChange,
+                       params
+                     }) {
   return (
     <Modal show={show} size="lg" onHide={onHide}>
       <Form onSubmit={onFormSub}>
@@ -608,7 +608,7 @@ function RenderModal({
               }
               return input;
             })}
-            account={(function () {
+            account={(function() {
               // copy accounts and extract the fee if any
               let accountCopy = Object.assign({}, account);
               accountCopy.amount -= getActionFee(txType, params?.fee) ?? 0;
@@ -672,23 +672,23 @@ function RenderTransactions({ account, state, setState }) {
       <span class="table-label">RECENT TRANSACTIONS</span>
       <Table className="table-fixed" bordered hover style={{ marginTop: "10px" }}>
         <thead>
-          <tr>
-            {["Height", "Amount", "Recipient", "Type", "Hash", "Status"].map((k, i) => (
-              <th key={i}>{k}</th>
-            ))}
-          </tr>
+        <tr>
+          {["Height", "Amount", "Recipient", "Type", "Hash", "Status"].map((k, i) => (
+            <th key={i}>{k}</th>
+          ))}
+        </tr>
         </thead>
         <tbody>
-          {account.combined.slice(0, 5).map((v, i) => (
-            <tr key={i}>
-              <td>{v.height || "N/A"}</td>
-              <td>{toCNPY(v.transaction.msg.amount) || toCNPY(v.transaction.msg.amountForSale) || "N/A"}</td>
-              <AccSumTabCol detail={v.recipient ?? v.sender ?? v.address} i={i} state={state} setState={setState} />
-              <td>{v.messageType || v.transaction.type}</td>
-              <AccSumTabCol detail={v.txHash} i={i + 1} state={state} setState={setState} />
-              <td>{v.status ?? ""}</td>
-            </tr>
-          ))}
+        {account.combined.slice(0, 5).map((v, i) => (
+          <tr key={i}>
+            <td>{v.height || "N/A"}</td>
+            <td>{toCNPY(v.transaction.msg.amount) || toCNPY(v.transaction.msg.amountForSale) || "N/A"}</td>
+            <AccSumTabCol detail={v.recipient ?? v.sender ?? v.address} i={i} state={state} setState={setState} />
+            <td>{v.messageType || v.transaction.type}</td>
+            <AccSumTabCol detail={v.txHash} i={i + 1} state={state} setState={setState} />
+            <td>{v.status ?? ""}</td>
+          </tr>
+        ))}
         </tbody>
       </Table>
     </div>

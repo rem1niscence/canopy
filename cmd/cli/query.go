@@ -173,7 +173,7 @@ var (
 		Short: "query a specific sell order",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			writeToConsole(client.Order(height, uint64(argToInt(args[0])), committee))
+			writeToConsole(client.Order(height, args[0], committee))
 		},
 	}
 
