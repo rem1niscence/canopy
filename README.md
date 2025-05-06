@@ -55,7 +55,7 @@ make build/canopy-full
 canopy start
 ```
 
-## How to Run It With 🐳 Docker
+## How to Run It with 🐳 Docker
 
 ➪ To run a Canopy `Localnet` in a *containerized* environment, use the following commands:
 ```bash
