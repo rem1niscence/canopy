@@ -24,7 +24,7 @@ forming an `unstoppable` web of utility and security.
 
 ➪ A recursive framework to build blockchains.
 
-➪ The seed chain code that started the recursive cycle.
+➪ The seed chain that started the recursive cycle.
 
 For more information on the Canopy Network Protocol visit [https://canopynetwork.org](https://canopynetwork.org)
 
@@ -38,7 +38,7 @@ For more information on the Canopy Network Protocol visit [https://canopynetwork
 
 ## Repository Documentation
 
-Welcome to the Canopy Network reference implementation. This code base can be well understood reading about the core modules:
+Welcome to the Canopy Network reference implementation. This repository can be well understood reading about the core modules:
 
 - [Controller](controller/README.md): Coordinates communication between all the major parts of the Canopy blockchain, like a central hub or "bus" that connects the system together.
 - [Finite State Machine (FSM)](fsm/README.md): Defines the logic for how transactions change the blockchain's state — it decides what’s valid and how state transitions happen from one block to the next.
@@ -55,7 +55,7 @@ make build/canopy-full
 canopy start
 ```
 
-## How to Run It With 🐳 Docker
+## How to Run It with 🐳 Docker
 
 ➪ To run a Canopy `Localnet` in a *containerized* environment, use the following commands:
 ```bash
