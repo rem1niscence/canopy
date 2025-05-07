@@ -553,7 +553,7 @@ func (c *Controller) UpdateP2PMustConnect(v *lib.ConsensusValidators) {
 		mustConnects = append(mustConnects, &lib.PeerAddress{
 			PublicKey:  member.PublicKey,
 			NetAddress: strings.ReplaceAll(member.NetAddress, "tcp://", "") + port,
-			PeerMeta:   &lib.PeerMeta{ChainId: c.Config.ChainId},
+			PeerMeta:   &lib.PeerMeta{NetworkId: c.Config.NetworkID, ChainId: c.Config.ChainId},
 		})
 	}
 	// if this node 'is validator'

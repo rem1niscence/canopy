@@ -68,7 +68,7 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, m *lib.Metrics, c 
 	// set the read/write timeout to be 2 x the block time
 	ReadWriteTimeout = time.Duration(2*c.BlockTimeMS()) * time.Millisecond
 	// set the peer meta
-	meta := &lib.PeerMeta{ChainId: c.ChainId}
+	meta := &lib.PeerMeta{NetworkId: c.NetworkID, ChainId: c.ChainId}
 	// return the p2p structure
 	return &P2P{
 		privateKey:             p,
