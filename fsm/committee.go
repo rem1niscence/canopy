@@ -212,7 +212,7 @@ func (s *StateMachine) LotteryWinner(id uint64, validators ...bool) (lottery *li
 	// define a convenience variable for the 'cut' of the lottery winner
 	winnerCut := valParams.DelegateRewardPercentage
 	// if there are no validators in the set - return
-	if p.NumValidators == 0 {
+	if p.NumValidators == 0 || p.TotalPower == 0 {
 		return &lib.LotteryWinner{Winner: nil, Cut: winnerCut}, nil
 	}
 	// get the last proposers
@@ -370,6 +370,7 @@ func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err
 	defer it.Close()
 	// create a variable to hold the committee members
 	members := make([]*lib.ConsensusValidator, 0)
+	var totalPower uint64
 	// loop through the iterator
 	for ; it.Valid(); it.Next() {
 		// get the address from the iterator key
@@ -386,6 +387,8 @@ func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err
 		if val.MaxPausedHeight != 0 || val.UnstakingHeight != 0 {
 			continue
 		}
+		// increment the total power
+		totalPower += val.StakedAmount
 		// add the member to the list
 		members = append(members, &lib.ConsensusValidator{
 			PublicKey:   val.PublicKey,
@@ -393,7 +396,12 @@ func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err
 			NetAddress:  val.NetAddress,
 		})
 	}
-	return lib.NewValidatorSet(&lib.ConsensusValidators{ValidatorSet: members})
+	return lib.ValidatorSet{
+		ValidatorSet:  &lib.ConsensusValidators{ValidatorSet: members},
+		TotalPower:    totalPower,
+		MinimumMaj23:  (2*totalPower)/3 + 1,
+		NumValidators: uint64(len(members)),
+	}, nil
 }
 
 // GetDelegatesPaginated() returns a page of delegates

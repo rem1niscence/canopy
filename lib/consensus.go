@@ -748,13 +748,13 @@ func WeightedPseudorandom(p *PseudorandomParams) (publicKey crypto.PublicKeyI) {
 		// if exceed the powerIndex, that Validator has the exact 'token'
 		if powerCount > powerIndex {
 			// set the winner and exit
-			publicKey, _ = crypto.BytesToBLS12381Public(v.PublicKey)
+			publicKey, _ = crypto.NewPublicKeyFromBytes(v.PublicKey)
 			// exit
 			return
 		}
 	}
 	// failsafe: should not happen - use the last validator from the set as the winner
-	publicKey, _ = crypto.BytesToBLS12381Public(p.ValidatorSet.ValidatorSet[len(p.ValidatorSet.ValidatorSet)-1].PublicKey)
+	publicKey, _ = crypto.NewPublicKeyFromBytes(p.ValidatorSet.ValidatorSet[len(p.ValidatorSet.ValidatorSet)-1].PublicKey)
 	// exit
 	return
 }
