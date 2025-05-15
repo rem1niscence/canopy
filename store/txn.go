@@ -2,13 +2,17 @@ package store
 
 import (
 	"bytes"
-	"github.com/canopy-network/canopy/lib"
 	"sort"
 	"strings"
+
+	"github.com/canopy-network/canopy/lib"
+	"github.com/dgraph-io/badger/v4"
 )
 
 // enforce the StoreTxnI interface
-var _ lib.StoreTxnI = &Txn{}
+// var _ lib.StoreTxnI = &Txn{}
+// enforce the Iterator Interface
+var _ lib.IteratorI = &Iterator{}
 
 /*
 	Txn acts like a database transaction
@@ -28,8 +32,11 @@ var _ lib.StoreTxnI = &Txn{}
 */
 
 type Txn struct {
-	lib.StoreI // memory store to Write() to
-	txn
+	reader *badger.Txn        // memory store to Read() from
+	writer *badger.WriteBatch // memory store to Write() to
+	prefix []byte             // prefix for keys in this txn
+	logger lib.LoggerI        // logger for this txn
+	cache  txn
 }
 
 // internal txn structure maintains the write operations sorted lexicographically by keys
@@ -45,85 +52,125 @@ type op struct {
 	delete bool   // is operation delete
 }
 
-// NewTxn() creates a new instance of a Txn with the specified parent store
-func NewTxn(parent lib.StoreI) *Txn {
-	return &Txn{StoreI: parent, txn: txn{ops: make(map[string]op), sorted: make([]string, 0)}}
+// NewTxn() creates a new instance of a Txn with the specified readers/writers and prefix
+func NewTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte) *Txn {
+	return &Txn{
+		reader: reader,
+		writer: writer,
+		prefix: prefix,
+		cache: txn{
+			ops:    make(map[string]op),
+			sorted: make([]string, 0),
+		},
+	}
 }
 
-// Get() retrieves the value for a given key from either the in-memory operations or the parent store
-func (c *Txn) Get(key []byte) ([]byte, lib.ErrorI) {
-	if v, found := c.ops[lib.BytesToString(key)]; found {
+// Get() retrieves the value for a given key from either the cache operations or the reader store
+func (t *Txn) Get(key []byte) ([]byte, lib.ErrorI) {
+	// append the prefix to the key
+	prefixedKey := lib.Append(t.prefix, key)
+	// first retrieve from the in-memory cache
+	if v, found := t.cache.ops[lib.BytesToString(prefixedKey)]; found {
 		return v.value, nil
 	}
-	return c.StoreI.Get(key)
+	// if not found, retrieve from the parent reader
+	item, err := t.reader.Get(prefixedKey)
+	if err != nil {
+		if err == badger.ErrKeyNotFound {
+			return nil, nil
+		}
+		return nil, ErrStoreGet(err)
+	}
+	val, err := item.ValueCopy(nil)
+	if err != nil {
+		return nil, ErrStoreGet(err)
+	}
+	return val, nil
 }
 
-// Set() adds or updates the value for a key in the in-memory operations
-func (c *Txn) Set(key, value []byte) lib.ErrorI {
-	c.update(lib.BytesToString(key), value, false);
+// Set() adds or updates the value for a key in the cache operations
+func (t *Txn) Set(key, value []byte) lib.ErrorI {
+	t.update(lib.BytesToString(lib.Append(t.prefix, key)), value, false)
 	return nil
 }
 
 // Delete() marks a key for deletion in the in-memory operations
-func (c *Txn) Delete(key []byte) lib.ErrorI { c.update(lib.BytesToString(key), nil, true); return nil }
+func (t *Txn) Delete(key []byte) lib.ErrorI {
+	t.update(lib.BytesToString(lib.Append(t.prefix, key)), nil, true)
+	return nil
+}
 
-// update() modifies or adds an operation for a key in the in-memory operations and maintains order
-func (c *Txn) update(key string, v []byte, delete bool) {
-	if _, found := c.ops[key]; !found {
-		c.addToSorted(key)
+// update() modifies or adds an operation for a key in the in-memory operations and maintains the
+// lexicographical order.
+// NOTE: update() won't modify the key itself, any key prefixing must be done before calling this
+func (t *Txn) update(key string, v []byte, delete bool) {
+	if _, found := t.cache.ops[key]; !found {
+		t.addToSorted(key)
 	}
-	c.ops[key] = op{value: v, delete: delete}
+	t.cache.ops[key] = op{value: v, delete: delete}
 }
 
 // addToSorted() inserts a key into the sorted list of operations maintaining lexicographical order
-func (c *Txn) addToSorted(key string) {
-	i := sort.Search(c.sortedLen, func(i int) bool { return c.sorted[i] >= key })
-	c.sorted = append(c.sorted, "")
-	copy(c.sorted[i+1:], c.sorted[i:])
-	c.sorted[i] = key
-	c.sortedLen++
+func (t *Txn) addToSorted(key string) {
+	i := sort.Search(t.cache.sortedLen, func(i int) bool { return t.cache.sorted[i] >= key })
+	t.cache.sorted = append(t.cache.sorted, "")
+	copy(t.cache.sorted[i+1:], t.cache.sorted[i:])
+	t.cache.sorted[i] = key
+	t.cache.sortedLen++
 }
 
 // Iterator() returns a new iterator for merged iteration of both the in-memory operations and parent store with the given prefix
-func (c *Txn) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
-	parent, err := c.StoreI.Iterator(prefix)
-	if err != nil {
-		return nil, err
+func (t *Txn) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
+	parent := t.reader.NewIterator(badger.IteratorOptions{
+		Prefix: lib.Append(t.prefix, prefix),
+	})
+	parent.Rewind()
+	it := &Iterator{
+		logger: t.logger,
+		parent: parent,
+		prefix: prefix,
 	}
-	return newTxnIterator(parent, c.txn, prefix, false), nil
+	return newTxnIterator(it, t.cache, prefix, false), nil
 }
 
 // RevIterator() returns a new reverse iterator for merged iteration of both the in-memory operations and parent store with the given prefix
-func (c *Txn) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
-	parent, err := c.StoreI.RevIterator(prefix)
-	if err != nil {
-		return nil, err
+func (t *Txn) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
+	newPrefix := lib.Append(t.prefix, prefix)
+	parent := t.reader.NewIterator(badger.IteratorOptions{
+		Reverse: true,
+		Prefix:  newPrefix,
+	})
+	seekLast(parent, newPrefix)
+	it := &Iterator{
+		logger: t.logger,
+		parent: parent,
+		prefix: t.prefix,
 	}
-	return newTxnIterator(parent, c.txn, prefix, true), nil
+	return newTxnIterator(it, t.cache, prefix, true), nil
 }
 
 // Discard() clears all in-memory operations and resets the sorted key list
-func (c *Txn) Discard() { c.ops, c.sorted, c.sortedLen = nil, nil, 0 }
+func (t *Txn) Discard() { t.cache.ops, t.cache.sorted, t.cache.sortedLen = nil, nil, 0 }
 
-// Write() flushes the in-memory operations to the parent store and clears in-memory changes
-func (c *Txn) Write() (err lib.ErrorI) {
-	for k, v := range c.ops {
+// Write() flushes the in-memory operations to the batch writer and clears in-memory changes
+func (t *Txn) Write() lib.ErrorI {
+	for k, v := range t.cache.ops {
 		sk, er := lib.StringToBytes(k)
 		if er != nil {
 			return er
 		}
 		if v.delete {
-			if err = c.StoreI.Delete(sk); err != nil {
-				return
+			if err := t.writer.Delete(sk); err != nil {
+				return ErrStoreDelete(err)
 			}
 		} else {
-			if err = c.StoreI.Set(sk, v.value); err != nil {
-				return
+			if err := t.writer.Set(sk, v.value); err != nil {
+				return ErrStoreSet(err)
 			}
 		}
 	}
-	c.ops, c.sorted, c.sortedLen = make(map[string]op), make([]string, 0), 0
-	return
+	t.cache.ops, t.cache.sorted, t.cache.sortedLen = make(map[string]op), make([]string, 0), 0
+	return nil
 }
 
 // enforce the Iterator interface
@@ -146,163 +193,206 @@ func newTxnIterator(parent lib.IteratorI, t txn, prefix []byte, reverse bool) *T
 }
 
 // First() positions the iterator at the first valid entry based on the traversal direction
-func (c *TxnIterator) First() *TxnIterator {
-	if c.reverse {
-		return c.revSeek() // seek to the end
+func (ti *TxnIterator) First() *TxnIterator {
+	if ti.reverse {
+		return ti.revSeek() // seek to the end
 	}
-	return c.seek() // seek to the beginning
+	return ti.seek() // seek to the beginning
 }
 
 // Close() closes the merged iterator
-func (c *TxnIterator) Close() { c.parent.Close() }
+func (ti *TxnIterator) Close() { ti.parent.Close() }
 
 // Next() advances the iterator to the next entry, choosing between in-memory and parent store entries
-func (c *TxnIterator) Next() {
+func (ti *TxnIterator) Next() {
 	// if parent is not usable any more then txn.Next()
 	// if txn is not usable any more then parent.Next()
-	if !c.parent.Valid() {
-		c.txnNext()
+	if !ti.parent.Valid() {
+		ti.txnNext()
 		return
 	}
-	if c.txnInvalid() {
-		c.parent.Next()
+	if ti.txnInvalid() {
+		ti.parent.Next()
 		return
 	}
 	// compare the keys of the in memory option and the parent option
-	switch c.compare(c.txnKey(), c.parent.Key()) {
+	switch ti.compare(ti.txnKey(), ti.parent.Key()) {
 	case 1: // use parent
-		c.parent.Next()
+		ti.parent.Next()
 	case 0: // use both
-		c.parent.Next()
-		c.txnNext()
+		ti.parent.Next()
+		ti.txnNext()
 	case -1: // use txn
-		c.txnNext()
+		ti.txnNext()
 	}
 }
 
 // Key() returns the current key from either the in-memory operations or the parent store
-func (c *TxnIterator) Key() []byte {
-	if c.useTxn {
-		return c.txnKey()
+func (ti *TxnIterator) Key() []byte {
+	if ti.useTxn {
+		return ti.txnKey()
 	}
-	return c.parent.Key()
+	return ti.parent.Key()
 }
 
 // Value() returns the current value from either the in-memory operations or the parent store
-func (c *TxnIterator) Value() []byte {
-	if c.useTxn {
-		return c.txnValue().value
+func (ti *TxnIterator) Value() []byte {
+	if ti.useTxn {
+		return ti.txnValue().value
 	}
-	return c.parent.Value()
+	return ti.parent.Value()
 }
 
 // Valid() checks if the current position of the iterator is valid, considering both the parent and in-memory entries
-func (c *TxnIterator) Valid() bool {
+func (ti *TxnIterator) Valid() bool {
 	for {
-		if !c.parent.Valid() {
+		if !ti.parent.Valid() {
 			// only using cache; call txn.next until invalid or !deleted
-			c.txnFastForward()
-			c.useTxn = true
+			ti.txnFastForward()
+			ti.useTxn = true
 			break
 		}
-		if c.txnInvalid() {
+		if ti.txnInvalid() {
 			// parent is valid; txn is not
-			c.useTxn = false
+			ti.useTxn = false
 			break
 		}
 		// both are valid; key comparison matters
-		cKey, pKey := c.txnKey(), c.parent.Key()
-		switch c.compare(cKey, pKey) {
+		cKey, pKey := ti.txnKey(), ti.parent.Key()
+		switch ti.compare(cKey, pKey) {
 		case 1: // use parent
-			c.useTxn = false
+			ti.useTxn = false
 		case 0: // when equal txn shadows parent
-			if c.txnValue().delete {
-				c.parent.Next()
-				c.txnNext()
+			if ti.txnValue().delete {
+				ti.parent.Next()
+				ti.txnNext()
 				continue
 			}
-			c.useTxn = true
+			ti.useTxn = true
 		case -1: // use txn
-			if c.txnValue().delete {
-				c.txnNext()
+			if ti.txnValue().delete {
+				ti.txnNext()
 				continue
 			}
-			c.useTxn = true
+			ti.useTxn = true
 		}
 		break
 	}
-	return !c.txnInvalid() || c.parent.Valid()
+	return !ti.txnInvalid() || ti.parent.Valid()
 }
 
 // txnFastForward() skips over deleted entries in the in-memory operations
 // return when invalid or !deleted
-func (c *TxnIterator) txnFastForward() {
+func (ti *TxnIterator) txnFastForward() {
 	for {
-		if c.txnInvalid() || !c.txnValue().delete {
+		if ti.txnInvalid() || !ti.txnValue().delete {
 			return
 		}
-		c.txnNext()
+		ti.txnNext()
 	}
 }
 
 // txnInvalid() determines if the current in-memory entry is invalid
-func (c *TxnIterator) txnInvalid() bool {
-	if c.invalid {
-		return c.invalid
+func (ti *TxnIterator) txnInvalid() bool {
+	if ti.invalid {
+		return ti.invalid
 	}
-	c.invalid = true
-	if c.reverse {
-		if c.index < 0 {
-			return c.invalid
+	ti.invalid = true
+	if ti.reverse {
+		if ti.index < 0 {
+			return ti.invalid
 		}
 	} else {
-		if c.index >= c.sortedLen {
-			return c.invalid
+		if ti.index >= ti.sortedLen {
+			return ti.invalid
 		}
 	}
-	if !strings.HasPrefix(c.sorted[c.index], c.prefix) {
-		return c.invalid
+	if !strings.HasPrefix(ti.sorted[ti.index], ti.prefix) {
+		return ti.invalid
 	}
-	c.invalid = false
-	return c.invalid
+	ti.invalid = false
+	return ti.invalid
 }
 
 // txnKey() returns the key of the current in-memory operation
-func (c *TxnIterator) txnKey() []byte {
-	bz, _ := lib.StringToBytes(c.sorted[c.index])
+func (ti *TxnIterator) txnKey() []byte {
+	bz, _ := lib.StringToBytes(ti.sorted[ti.index])
 	return bz
 }
 
 // txnValue() returns the value of the current in-memory operation
-func (c *TxnIterator) txnValue() op { return c.ops[c.sorted[c.index]] }
+func (ti *TxnIterator) txnValue() op { return ti.ops[ti.sorted[ti.index]] }
 
 // compare() compares two byte slices, adjusting for reverse iteration if needed
-func (c *TxnIterator) compare(a, b []byte) int {
-	if c.reverse {
+func (ti *TxnIterator) compare(a, b []byte) int {
+	if ti.reverse {
 		return bytes.Compare(a, b) * -1
 	}
 	return bytes.Compare(a, b)
 }
 
 // txnNext() advances the index of the in-memory operations based on the iteration direction
-func (c *TxnIterator) txnNext() {
-	if c.reverse {
-		c.index--
+func (ti *TxnIterator) txnNext() {
+	if ti.reverse {
+		ti.index--
 	} else {
-		c.index++
+		ti.index++
 	}
 }
 
 // seek() positions the iterator at the first entry that matches or exceeds the prefix.
-func (c *TxnIterator) seek() *TxnIterator {
-	c.index = sort.Search(c.sortedLen, func(i int) bool { return c.sorted[i] >= c.prefix })
-	return c
+func (ti *TxnIterator) seek() *TxnIterator {
+	ti.index = sort.Search(ti.sortedLen, func(i int) bool { return ti.sorted[i] >= ti.prefix })
+	return ti
 }
 
 // revSeek() positions the iterator at the last entry that matches the prefix in reverse order.
-func (c *TxnIterator) revSeek() *TxnIterator {
-	bz, _ := lib.StringToBytes(c.prefix)
+func (ti *TxnIterator) revSeek() *TxnIterator {
+	bz, _ := lib.StringToBytes(ti.prefix)
 	endPrefix := lib.BytesToString(prefixEnd(bz))
-	c.index = sort.Search(c.sortedLen, func(i int) bool { return c.sorted[i] >= endPrefix }) - 1
-	return c
+	ti.index = sort.Search(ti.sortedLen, func(i int) bool { return ti.sorted[i] >= endPrefix }) - 1
+	return ti
+}
+
+type Iterator struct {
+	logger lib.LoggerI
+	parent *badger.Iterator
+	prefix []byte
+	err    error
+}
+
+func (i *Iterator) Valid() bool     { return i.parent.Valid() }
+func (i *Iterator) Next()           { i.parent.Next() }
+func (i *Iterator) Close()          { i.parent.Close() }
+func (i *Iterator) Version() uint64 { return i.parent.Item().Version() }
+func (i *Iterator) Deleted() bool   { return i.parent.Item().IsDeletedOrExpired() }
+func (i *Iterator) Key() (key []byte) {
+	// get the key from the parent
+	key = i.parent.Item().Key()
+	// make a copy of the key
+	c := make([]byte, len(key))
+	copy(c, key)
+	// remove the prefix and return
+	return removePrefix(c, []byte(i.prefix))
+}
+
+// removePrefix() removes the prefix from the key
+func removePrefix(b, prefix []byte) []byte { return b[len(prefix):] }
+
+// Value() retrieves the current value from the iterator
+func (i *Iterator) Value() (value []byte) {
+	value, err := i.parent.Item().ValueCopy(nil)
+	if err != nil {
+		i.err = err
+	}
+	return
+}
+
+var (
+	endBytes = bytes.Repeat([]byte{0xFF}, maxKeyBytes+1)
+)
+
+// prefixEnd() returns the end key for a given prefix by appending max possible bytes
+func prefixEnd(prefix []byte) []byte {
+	return lib.Append(prefix, endBytes)
 }

@@ -1,13 +1,13 @@
 package store
 
 import (
-	"bytes"
 	"crypto/rand"
 	"fmt"
-	"github.com/dgraph-io/badger/v4/skl"
 	"math"
 	"reflect"
 	"unsafe"
+
+	"github.com/dgraph-io/badger/v4/skl"
 
 	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
@@ -165,48 +165,6 @@ func seekLast(it *badger.Iterator, prefix []byte) {
 var _ lib.IteratorI = &Iterator{}
 
 // Iterator implements a wrapper around BadgerDB's iterator but satisfies the IteratorI interface
-type Iterator struct {
-	logger lib.LoggerI
-	parent *badger.Iterator
-	prefix []byte
-	err    error
-}
-
-func (i *Iterator) Valid() bool     { return i.parent.Valid() }
-func (i *Iterator) Next()           { i.parent.Next() }
-func (i *Iterator) Close()          { i.parent.Close() }
-func (i *Iterator) Version() uint64 { return i.parent.Item().Version() }
-func (i *Iterator) Deleted() bool   { return i.parent.Item().IsDeletedOrExpired() }
-func (i *Iterator) Key() (key []byte) {
-	// get the key from the parent
-	key = i.parent.Item().Key()
-	// make a copy of the key
-	c := make([]byte, len(key))
-	copy(c, key)
-	// remove the prefix and return
-	return removePrefix(c, []byte(i.prefix))
-}
-
-// removePrefix() removes the prefix from the key
-func removePrefix(b, prefix []byte) []byte { return b[len(prefix):] }
-
-// Value() retrieves the current value from the iterator
-func (i *Iterator) Value() (value []byte) {
-	value, err := i.parent.Item().ValueCopy(nil)
-	if err != nil {
-		i.err = err
-	}
-	return
-}
-
-var (
-	endBytes = bytes.Repeat([]byte{0xFF}, maxKeyBytes+1)
-)
-
-// prefixEnd() returns the end key for a given prefix by appending max possible bytes
-func prefixEnd(prefix []byte) []byte {
-	return lib.Append(prefix, endBytes)
-}
 
 // newEntry() creates a new badgerDB entry
 func newEntry(key, value []byte, meta byte) (e *badger.Entry) {
