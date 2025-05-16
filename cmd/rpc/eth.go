@@ -402,7 +402,7 @@ func (s *Server) EthCall(args []any) (any, error) {
 	// get the sender address hex
 	fromHex, ok := callParams["from"].(string)
 	if !ok {
-		return nil, errors.New("invalid or missing 'from' field")
+		fromHex = "0x" + strings.Repeat("0", 20)
 	}
 	// parse the `data` field from the call data
 	dataHex, ok := callParams["data"].(string)
@@ -426,16 +426,15 @@ func (s *Server) EthCall(args []any) (any, error) {
 	// parse the selector
 	selector := lib.BytesToString(data[:4])
 	// create a read-only state for the block tag and write the height
-	var encoded []byte
-
-	return "0x" + hex.EncodeToString(encoded), s.readOnlyState(height, func(state *fsm.StateMachine) lib.ErrorI {
+	var encoded hexutil.Bytes
+	return encoded, s.readOnlyState(height, func(state *fsm.StateMachine) lib.ErrorI {
 		switch selector {
 		case "95d89b41": // symbol()
 			encoded, err = pack(ABIStringType, "CNPY")
 		case "06fdde03": // name()
 			encoded, err = pack(ABIStringType, "Canopy")
 		case "313ce567": // decimals()
-			encoded, err = pack(ABIUint8Type, 6)
+			encoded, err = pack(ABIUint8Type, uint8(6))
 		case "18160ddd": // totalSupply()
 			supply, e := state.GetSupply()
 			if e != nil {
