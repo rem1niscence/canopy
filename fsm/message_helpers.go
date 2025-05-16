@@ -98,7 +98,7 @@ func (x *MessageStake) Check() lib.ErrorI {
 	if err := checkOutputAddress(x.OutputAddress); err != nil {
 		return err
 	}
-	if err := checkPubKey(x.PublicKey); err != nil {
+	if err := checkPubKey(x.PublicKey, x.Delegate); err != nil {
 		return err
 	}
 	if err := checkCommittees(x.Committees); err != nil {
@@ -744,12 +744,16 @@ func checkOutputAddress(output []byte) lib.ErrorI {
 }
 
 // checkPubKey() validates the public key in the Message
-func checkPubKey(publicKey []byte) lib.ErrorI {
+func checkPubKey(publicKey []byte, delegate bool) lib.ErrorI {
 	if publicKey == nil {
 		return ErrPublicKeyEmpty()
 	}
-	if len(publicKey) != crypto.BLS12381PubKeySize {
-		return ErrPublicKeySize()
+	// if actively participating in consensus
+	if !delegate {
+		// ensure the public key is a BLS key
+		if len(publicKey) != crypto.BLS12381PubKeySize {
+			return ErrPublicKeySize()
+		}
 	}
 	return nil
 }
