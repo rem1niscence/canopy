@@ -20,20 +20,20 @@ import (
 
 // CNPYContractAddress: (CNPY) a fake contract address that allows tools to send/receive CNPY as if it's an ERC20
 const CNPYContractAddress = `0x0000000000000000000000000000000000000001`
-const SendSelector = "a9059cbb"    // transfer(address,uint256)
-const SubsidySelector = "5b82335c" // subsidy(bytes msgSubsidyProtoBytes)
+const SendSelector = "a9059cbb"    // transfer(address,uint256) # Canopy expects valid ABI encoding to be 100% compatible with send tooling
+const SubsidySelector = "16d68b09" // while the signature is subsidy(bytes), Canopy expects (selector + proto-bytes)
 
 // StakedCNPYContractAddress: (stCNPY) a fake contract address that allows tools to stake, edit, and unstake CNPY as a delegator
 const StakedCNPYContractAddress = `0x0000000000000000000000000000000000000002`
-const StakeSelector = "b3de648b"     // stake(bytes msgStakeProtoBytes)
-const EditStakeSelector = "ec8ac4b9" // editStake(bytes msgEditStakeBytes)
-const UnstakeSelector = "89d8c832"   // unstake(bytes msgUnstakeBytes)
+const StakeSelector = "2d1e0c02"     // while the signature is stake(bytes), Canopy expects (selector + proto-bytes)
+const EditStakeSelector = "8c71a515" // while the signature is editStake(bytes), Canopy expects (selector + proto-bytes)
+const UnstakeSelector = "3c3653e2"   // while the signature is unstake(bytes), Canopy expects (selector + proto-bytes)
 
 // SwapCNPYContractAddress: (swCNPY) a fake contract address that allows tools to create a sell order, edit a sell order, and delete a sell order
 const SwapCNPYContractAddress = `0x0000000000000000000000000000000000000003`
-const CreateOrderSelector = "2f6c493c" // createOrder(bytes msgCreateOrderProtoBytes)
-const EditOrderSelector = "04d4ee2e"   // editOrder(bytes msgEditOrderProtoBytes)
-const DeleteOrderSelector = "af2cf05c" // deleteOrder(bytes msgDeleteOrderProtoBytes)
+const CreateOrderSelector = "bc2e8e5f" // while the signature is createOrder(bytes), Canopy expects (selector + proto-bytes)
+const EditOrderSelector = "74e78d6f"   // while the signature is editOrder(bytes), Canopy expects (selector + proto-bytes)
+const DeleteOrderSelector = "6c4650e7" // while the signature is deleteOrder(bytes), Canopy expects (selector + proto-bytes)
 
 // RLPIndicator is a human-readable indicator the tx is translated from RLP
 const RLPIndicator = "RLP"
@@ -107,36 +107,29 @@ func rlpToMessage(publicKey crypto.PublicKeyI, transaction *lib.Transaction, tx 
 		case StakeSelector:
 			m := new(MessageStake)
 			msg, e = ethDataToMsg(MessageStakeName, transaction, m, data, func() {
+				// allow the omission of the public key because it may be difficult to get the public key from the wallet
 				if len(m.PublicKey) == 0 {
 					m.PublicKey = publicKey.Bytes()
 				}
 			})
 		case EditStakeSelector:
 			m := new(MessageEditStake)
-			msg, e = ethDataToMsg(MessageEditStakeName, transaction, m, data, func() {
-				if len(m.Address) == 0 {
-					m.Address = from
-				}
-			})
+			msg, e = ethDataToMsg(MessageEditStakeName, transaction, m, data, nil)
 		case UnstakeSelector:
 			m := new(MessageUnstake)
-			msg, e = ethDataToMsg(MessageUnstakeName, transaction, m, data, func() {
-				if len(m.Address) == 0 {
-					m.Address = from
-				}
-			})
+			msg, e = ethDataToMsg(MessageUnstakeName, transaction, m, data, nil)
 		case CreateOrderSelector:
 			m := new(MessageCreateOrder)
-			msg, e = ethDataToMsg(MessageCreateOrderName, transaction, m, data, func() { m.SellersSendAddress = from })
+			msg, e = ethDataToMsg(MessageCreateOrderName, transaction, m, data, nil)
 		case EditOrderSelector:
-			msg, e = ethDataToMsg(MessageEditOrderName, transaction, new(MessageEditOrder), data, func() {})
+			msg, e = ethDataToMsg(MessageEditOrderName, transaction, new(MessageEditOrder), data, nil)
 		case DeleteOrderSelector:
-			msg, e = ethDataToMsg(MessageDeleteOrderName, transaction, new(MessageDeleteOrder), data, func() {})
+			msg, e = ethDataToMsg(MessageDeleteOrderName, transaction, new(MessageDeleteOrder), data, nil)
 		case SubsidySelector:
 			m := new(MessageSubsidy)
-			msg, e = ethDataToMsg(MessageSubsidyName, transaction, m, data, func() { m.Address = from })
+			msg, e = ethDataToMsg(MessageSubsidyName, transaction, m, data, nil)
 		default:
-			return nil, ErrInvalidERC20Tx(fmt.Errorf("unsupported selector: 0x%s", selector))
+			e = ErrInvalidERC20Tx(fmt.Errorf("unsupported selector: 0x%s", selector))
 		}
 	default: // non-contract call (transfer() only)
 		msg = &MessageSend{
@@ -178,7 +171,9 @@ func ethDataToMsg(messageType string, transaction *lib.Transaction, msg lib.Mess
 		return nil, err
 	}
 	// execute the callback
-	callback()
+	if callback != nil {
+		callback()
+	}
 	// sanity check the message
 	return msg, msg.Check()
 }

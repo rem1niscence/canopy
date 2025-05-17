@@ -139,9 +139,7 @@ func TestRLPToSendTxDynamic(t *testing.T) {
 			input: func() *types.Transaction {
 				tx := types.NewTransaction(nonce, to, amount, gas, gasPrice, data)
 				signedTx, e := types.SignTx(tx, types.NewEIP155Signer(chainID), privKey)
-				if e != nil {
-					panic(e)
-				}
+				require.NoError(t, e)
 				return signedTx
 			},
 		},
@@ -160,9 +158,7 @@ func TestRLPToSendTxDynamic(t *testing.T) {
 						{Address: to, StorageKeys: []common.Hash{}},
 					},
 				})
-				if e != nil {
-					panic(e)
-				}
+				require.NoError(t, e)
 				return signedTx
 			},
 		}, {
@@ -178,9 +174,7 @@ func TestRLPToSendTxDynamic(t *testing.T) {
 					Value:     amount,
 					Data:      data,
 				})
-				if e != nil {
-					panic(e)
-				}
+				require.NoError(t, e)
 				return signedTx
 			},
 		},
@@ -266,9 +260,7 @@ func TestRLPToSendTxERC20(t *testing.T) {
 			input: func() *types.Transaction {
 				tx := types.NewTransaction(nonce, contractAddress, big.NewInt(0), gas, gasPrice, data)
 				signedTx, e := types.SignTx(tx, types.NewEIP155Signer(chainID), privKey)
-				if e != nil {
-					panic(e)
-				}
+				require.NoError(t, e)
 				return signedTx
 			},
 		},
@@ -287,9 +279,7 @@ func TestRLPToSendTxERC20(t *testing.T) {
 						{Address: to, StorageKeys: []common.Hash{}},
 					},
 				})
-				if e != nil {
-					panic(e)
-				}
+				require.NoError(t, e)
 				return signedTx
 			},
 		}, {
@@ -305,9 +295,7 @@ func TestRLPToSendTxERC20(t *testing.T) {
 					Value:     big.NewInt(0),
 					Data:      data,
 				})
-				if e != nil {
-					panic(e)
-				}
+				require.NoError(t, e)
 				return signedTx
 			},
 		},
@@ -331,8 +319,372 @@ func TestRLPToSendTxERC20(t *testing.T) {
 	}
 }
 
-func msg(t *testing.T, send *MessageSend) *anypb.Any {
-	a, err := lib.NewAny(send)
+func TestRLPStaking(t *testing.T) {
+	// create the identity / chain fields
+	privKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	pub := crypto.FromECDSAPub(&privKey.PublicKey)[1:]
+	from := crypto.PubkeyToAddress(privKey.PublicKey)
+	networkId, chainId := uint64(1), uint64(1)
+	evmChainId := big.NewInt(int64(CanopyIdsToEVMChainId(chainId, networkId)))
+	// create the transaction fields
+	contractAddress := common.HexToAddress(StakedCNPYContractAddress)
+	gas := uint64(21_000)
+	gasPrice := UpscaleTo18Decimals(10)
+	amount := big.NewInt(20)
+	nonce := uint64(3)
+	// create the expected transaction
+	expected := &lib.Transaction{
+		Signature:     &lib.Signature{PublicKey: pub},
+		CreatedHeight: nonce,
+		Time:          uint64(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(21_000) * time.Second).Unix()),
+		Fee:           DownscaleTo6Decimals(gasPrice) * gas,
+		Memo:          RLPIndicator,
+		NetworkId:     networkId,
+		ChainId:       chainId,
+	}
+	tests := []struct {
+		name     string
+		input    func() *types.Transaction
+		expected lib.TransactionI
+	}{
+		{
+			name: "message stake",
+			input: func() *types.Transaction {
+				// set up the message
+				m := &MessageStake{
+					PublicKey:     pub,
+					Amount:        amount.Uint64(),
+					Committees:    []uint64{1, 2, 3},
+					NetAddress:    "tcp://fake",
+					OutputAddress: from.Bytes(),
+					Delegate:      true,
+					Compound:      true,
+				}
+				// set the message as expected
+				expected.MessageType = MessageStakeName
+				expected.Msg = msg(t, m)
+				// marshal the message to bytes
+				protoBytes, er := lib.Marshal(m)
+				require.NoError(t, er)
+				// sign the transaction
+				signedTx, e := types.SignNewTx(privKey, types.LatestSignerForChainID(evmChainId), &types.DynamicFeeTx{
+					ChainID:   evmChainId,
+					Nonce:     nonce,
+					GasTipCap: big.NewInt(1e9),
+					GasFeeCap: gasPrice,
+					Gas:       gas,
+					To:        &contractAddress,
+					Value:     amount,
+					Data:      append(crypto.Keccak256([]byte("stake(bytes)"))[:4], protoBytes...),
+				})
+				require.NoError(t, e)
+				// return the transaction
+				return signedTx
+			},
+		},
+		{
+			name: "message empty public key stake",
+			input: func() *types.Transaction {
+				// set up the message
+				m := &MessageStake{
+					Amount:        amount.Uint64(),
+					Committees:    []uint64{1, 2, 3},
+					NetAddress:    "tcp://fake",
+					OutputAddress: from.Bytes(),
+					Delegate:      true,
+					Compound:      true,
+				}
+				// marshal the message to bytes
+				protoBytes, er := lib.Marshal(m)
+				require.NoError(t, er)
+				// set the message as expected
+				m.PublicKey = pub
+				expected.MessageType = MessageStakeName
+				expected.Msg = msg(t, m)
+				// sign the transaction
+				signedTx, e := types.SignNewTx(privKey, types.LatestSignerForChainID(evmChainId), &types.DynamicFeeTx{
+					ChainID:   evmChainId,
+					Nonce:     nonce,
+					GasTipCap: big.NewInt(1e9),
+					GasFeeCap: gasPrice,
+					Gas:       gas,
+					To:        &contractAddress,
+					Value:     amount,
+					Data:      append(crypto.Keccak256([]byte("stake(bytes)"))[:4], protoBytes...),
+				})
+				require.NoError(t, e)
+				// return the transaction
+				return signedTx
+			},
+		},
+		{
+			name: "message edit-stake",
+			input: func() *types.Transaction {
+				// set up the message
+				m := &MessageEditStake{
+					Address:       from.Bytes(),
+					Amount:        amount.Uint64(),
+					Committees:    []uint64{1, 2, 3},
+					NetAddress:    "tcp://fake",
+					OutputAddress: from.Bytes(),
+					Compound:      true,
+				}
+				// set the message as expected
+				expected.MessageType = MessageEditStakeName
+				expected.Msg = msg(t, m)
+				// marshal the message to bytes
+				protoBytes, er := lib.Marshal(m)
+				require.NoError(t, er)
+				// sign the transaction
+				signedTx, e := types.SignNewTx(privKey, types.LatestSignerForChainID(evmChainId), &types.DynamicFeeTx{
+					ChainID:   evmChainId,
+					Nonce:     nonce,
+					GasTipCap: big.NewInt(1e9),
+					GasFeeCap: gasPrice,
+					Gas:       gas,
+					To:        &contractAddress,
+					Value:     amount,
+					Data:      append(crypto.Keccak256([]byte("editStake(bytes)"))[:4], protoBytes...),
+				})
+				require.NoError(t, e)
+				// return the transaction
+				return signedTx
+			},
+		},
+		{
+			name: "message unstake",
+			input: func() *types.Transaction {
+				// set up the message
+				m := &MessageUnstake{
+					Address: from.Bytes(),
+				}
+				// set the message as expected
+				expected.MessageType = MessageUnstakeName
+				expected.Msg = msg(t, m)
+				// marshal the message to bytes
+				protoBytes, er := lib.Marshal(m)
+				require.NoError(t, er)
+				// sign the transaction
+				signedTx, e := types.SignNewTx(privKey, types.LatestSignerForChainID(evmChainId), &types.DynamicFeeTx{
+					ChainID:   evmChainId,
+					Nonce:     nonce,
+					GasTipCap: big.NewInt(1e9),
+					GasFeeCap: gasPrice,
+					Gas:       gas,
+					To:        &contractAddress,
+					Value:     amount,
+					Data:      append(crypto.Keccak256([]byte("unstake(bytes)"))[:4], protoBytes...),
+				})
+				require.NoError(t, e)
+				// return the transaction
+				return signedTx
+			},
+		},
+		{
+			name: "message createOrder",
+			input: func() *types.Transaction {
+				// set up the message
+				m := &MessageCreateOrder{
+					ChainId:              1,
+					AmountForSale:        123,
+					RequestedAmount:      456,
+					SellerReceiveAddress: crypto.Keccak256([]byte("test"))[:20],
+					SellersSendAddress:   from.Bytes(),
+				}
+				// set the message as expected
+				expected.MessageType = MessageCreateOrderName
+				expected.Msg = msg(t, m)
+				// marshal the message to bytes
+				protoBytes, er := lib.Marshal(m)
+				require.NoError(t, er)
+				// sign the transaction
+				signedTx, e := types.SignNewTx(privKey, types.LatestSignerForChainID(evmChainId), &types.DynamicFeeTx{
+					ChainID:   evmChainId,
+					Nonce:     nonce,
+					GasTipCap: big.NewInt(1e9),
+					GasFeeCap: gasPrice,
+					Gas:       gas,
+					To:        &contractAddress,
+					Value:     amount,
+					Data:      append(crypto.Keccak256([]byte("createOrder(bytes)"))[:4], protoBytes...),
+				})
+				require.NoError(t, e)
+				// return the transaction
+				return signedTx
+			},
+		},
+		{
+			name: "message editOrder",
+			input: func() *types.Transaction {
+				// set up the message
+				m := &MessageEditOrder{
+					OrderId:              crypto.Keccak256([]byte("test")),
+					ChainId:              1,
+					AmountForSale:        123,
+					RequestedAmount:      456,
+					SellerReceiveAddress: crypto.Keccak256([]byte("test"))[:20],
+				}
+				// set the message as expected
+				expected.MessageType = MessageEditOrderName
+				expected.Msg = msg(t, m)
+				// marshal the message to bytes
+				protoBytes, er := lib.Marshal(m)
+				require.NoError(t, er)
+				// sign the transaction
+				signedTx, e := types.SignNewTx(privKey, types.LatestSignerForChainID(evmChainId), &types.DynamicFeeTx{
+					ChainID:   evmChainId,
+					Nonce:     nonce,
+					GasTipCap: big.NewInt(1e9),
+					GasFeeCap: gasPrice,
+					Gas:       gas,
+					To:        &contractAddress,
+					Value:     amount,
+					Data:      append(crypto.Keccak256([]byte("editOrder(bytes)"))[:4], protoBytes...),
+				})
+				require.NoError(t, e)
+				// return the transaction
+				return signedTx
+			},
+		},
+		{
+			name: "message deleteOrder",
+			input: func() *types.Transaction {
+				// set up the message
+				m := &MessageDeleteOrder{
+					OrderId: crypto.Keccak256([]byte("test")),
+					ChainId: 1,
+				}
+				// set the message as expected
+				expected.MessageType = MessageDeleteOrderName
+				expected.Msg = msg(t, m)
+				// marshal the message to bytes
+				protoBytes, er := lib.Marshal(m)
+				require.NoError(t, er)
+				// sign the transaction
+				signedTx, e := types.SignNewTx(privKey, types.LatestSignerForChainID(evmChainId), &types.DynamicFeeTx{
+					ChainID:   evmChainId,
+					Nonce:     nonce,
+					GasTipCap: big.NewInt(1e9),
+					GasFeeCap: gasPrice,
+					Gas:       gas,
+					To:        &contractAddress,
+					Value:     amount,
+					Data:      append(crypto.Keccak256([]byte("deleteOrder(bytes)"))[:4], protoBytes...),
+				})
+				require.NoError(t, e)
+				// return the transaction
+				return signedTx
+			},
+		},
+		{
+			name: "message subsidy",
+			input: func() *types.Transaction {
+				// set up the message
+				m := &MessageSubsidy{
+					Address: from.Bytes(),
+					ChainId: 1,
+					Amount:  123,
+					Opcode:  "test",
+				}
+				// set the message as expected
+				expected.MessageType = MessageSubsidyName
+				expected.Msg = msg(t, m)
+				// marshal the message to bytes
+				protoBytes, er := lib.Marshal(m)
+				require.NoError(t, er)
+				// sign the transaction
+				signedTx, e := types.SignNewTx(privKey, types.LatestSignerForChainID(evmChainId), &types.DynamicFeeTx{
+					ChainID:   evmChainId,
+					Nonce:     nonce,
+					GasTipCap: big.NewInt(1e9),
+					GasFeeCap: gasPrice,
+					Gas:       gas,
+					To:        &contractAddress,
+					Value:     amount,
+					Data:      append(crypto.Keccak256([]byte("subsidy(bytes)"))[:4], protoBytes...),
+				})
+				require.NoError(t, e)
+				// return the transaction
+				return signedTx
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// marshal the transaction to (rlp) binary
+			rlpBytes, e := test.input().MarshalBinary()
+			require.NoError(t, e)
+			// add to expected
+			expected.Signature.Signature = rlpBytes
+			// execute the function call
+			got, e := RLPToCanopyTransaction(expected.Signature.Signature)
+			require.NoError(t, e)
+			j1, e := lib.MarshalJSONIndentString(got)
+			require.NoError(t, e)
+			j2, e := lib.MarshalJSONIndentString(expected)
+			require.NoError(t, e)
+			require.Equal(t, expected, got, fmt.Sprintf("%s\nt%s", j1, j2))
+		})
+	}
+}
+
+func TestSelectors(t *testing.T) {
+	tests := []struct {
+		name      string
+		signature string
+		expected  string
+	}{
+		{
+			name:      "send",
+			signature: "transfer(address,uint256)",
+			expected:  SendSelector,
+		},
+		{
+			name:      "stake",
+			signature: "stake(bytes)",
+			expected:  StakeSelector,
+		},
+		{
+			name:      "editStake",
+			signature: "editStake(bytes)",
+			expected:  EditStakeSelector,
+		},
+		{
+			name:      "unstake",
+			signature: "unstake(bytes)",
+			expected:  UnstakeSelector,
+		},
+		{
+			name:      "createOrder",
+			signature: "createOrder(bytes)",
+			expected:  CreateOrderSelector,
+		},
+		{
+			name:      "editOrder",
+			signature: "editOrder(bytes)",
+			expected:  EditOrderSelector,
+		},
+		{
+			name:      "deleteOrder",
+			signature: "deleteOrder(bytes)",
+			expected:  DeleteOrderSelector,
+		},
+		{
+			name:      "subsidy",
+			signature: "subsidy(bytes)",
+			expected:  SubsidySelector,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.expected, lib.BytesToString(crypto.Keccak256([]byte(test.signature))[:4]))
+		})
+	}
+}
+
+func msg(t *testing.T, msg lib.MessageI) *anypb.Any {
+	a, err := lib.NewAny(msg)
 	require.NoError(t, err)
 	return a
 }
