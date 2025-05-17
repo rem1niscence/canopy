@@ -401,6 +401,25 @@ func (s *StateMachine) GetOrderBooks() (b *lib.OrderBooks, err lib.ErrorI) {
 	return
 }
 
+// GetTotalEscrowed() checks all order books for escrowed funds for a specific address
+func (s *StateMachine) GetTotalEscrowed(address crypto.AddressI) (total uint64, err lib.ErrorI) {
+	orderBooks, err := s.GetOrderBooks()
+	if err != nil {
+		return
+	}
+	// for each order book
+	for _, book := range orderBooks.OrderBooks {
+		// for each order
+		for _, order := range book.Orders {
+			if address == nil || bytes.Equal(order.SellersSendAddress, address.Bytes()) {
+				total += order.AmountForSale
+			}
+		}
+	}
+	// exit
+	return
+}
+
 // marshalOrder() converts the Validator object to bytes
 func (s *StateMachine) marshalOrder(order *lib.SellOrder) ([]byte, lib.ErrorI) {
 	// convert the object ref into bytes

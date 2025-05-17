@@ -333,9 +333,10 @@ func (s *Server) EthGetCode(args []any) (any, error) {
 		return nil, err
 	}
 	// get the string for the address
-	addressString := "0x" + strings.ToLower(address.String())
+	addressString := "0x" + address.String()
 	// if asking about the canopy pseudo-contract address
-	if addressString == strings.ToLower(fsm.CNPYContractAddress) {
+	switch addressString {
+	case fsm.CNPYContractAddress, fsm.SwapCNPYContractAddress, fsm.StakedCNPYContractAddress:
 		return CanopyPseudoContractByteCode, nil
 	}
 	return "0x", nil
@@ -414,9 +415,13 @@ func (s *Server) EthCall(args []any) (any, error) {
 		return nil, errors.New("invalid or missing 'data' field")
 	}
 	// parse the `to` field from the call data
-	toHex, ok := callParams["to"].(string)
-	if ok && strings.ToLower(toHex) != fsm.CNPYContractAddress {
+	toHex, _ := callParams["to"].(string)
+	switch toHex {
+	default:
+		// exit as it's a non-contract call
 		return "0x", nil
+	case fsm.CNPYContractAddress, fsm.StakedCNPYContractAddress, fsm.SwapCNPYContractAddress:
+		// continue
 	}
 	// get the sender address
 	fromAddress, err := crypto.NewAddressFromString(cleanHex(fromHex))
@@ -439,9 +444,23 @@ func (s *Server) EthCall(args []any) (any, error) {
 	return encoded, s.readOnlyState(height, func(state *fsm.StateMachine) lib.ErrorI {
 		switch selector {
 		case "95d89b41": // symbol()
-			encoded, err = pack(ABIStringType, "CNPY")
+			switch toHex {
+			case fsm.CNPYContractAddress:
+				encoded, err = pack(ABIStringType, "CNPY")
+			case fsm.StakedCNPYContractAddress:
+				encoded, err = pack(ABIStringType, "stCNPY")
+			case fsm.SwapCNPYContractAddress:
+				encoded, err = pack(ABIStringType, "swCNPY")
+			}
 		case "06fdde03": // name()
-			encoded, err = pack(ABIStringType, "Canopy")
+			switch toHex {
+			case fsm.CNPYContractAddress:
+				encoded, err = pack(ABIStringType, "Canopy")
+			case fsm.StakedCNPYContractAddress:
+				encoded, err = pack(ABIStringType, "Staked Canopy")
+			case fsm.SwapCNPYContractAddress:
+				encoded, err = pack(ABIStringType, "Swap Canopy")
+			}
 		case "313ce567": // decimals()
 			encoded, err = pack(ABIUint8Type, uint8(6))
 		case "18160ddd": // totalSupply()
@@ -449,18 +468,47 @@ func (s *Server) EthCall(args []any) (any, error) {
 			if e != nil {
 				return e
 			}
-			encoded, err = pack(ABIUint256Type, new(big.Int).SetUint64(supply.Total))
+			switch toHex {
+			case fsm.CNPYContractAddress:
+				encoded, err = pack(ABIUint256Type, new(big.Int).SetUint64(supply.Total))
+			case fsm.StakedCNPYContractAddress:
+				encoded, err = pack(ABIUint256Type, new(big.Int).SetUint64(supply.Staked))
+			case fsm.SwapCNPYContractAddress:
+				escrowed, er := state.GetTotalEscrowed(nil)
+				if er != nil {
+					return er
+				}
+				encoded, err = pack(ABIUint256Type, new(big.Int).SetUint64(escrowed))
+			}
 		case "70a08231": // balanceOf(address)
 			address, e := parseAddressFromABI(data)
 			if e != nil {
 				return e
 			}
-			balance, e := state.GetAccountBalance(address)
-			if e != nil {
-				return e
+			var balance uint64
+			switch toHex {
+			case fsm.CNPYContractAddress:
+				balance, e = state.GetAccountBalance(address)
+				if e != nil {
+					return e
+				}
+			case fsm.StakedCNPYContractAddress:
+				val, e := state.GetValidator(address)
+				if e != nil {
+					return e
+				}
+				balance = val.StakedAmount
+			case fsm.SwapCNPYContractAddress:
+				balance, e = state.GetTotalEscrowed(address)
+				if e != nil {
+					return e
+				}
 			}
 			encoded, err = pack(ABIUint256Type, new(big.Int).SetUint64(balance))
 		case "a9059cbb": // transfer(address,uint256)
+			if toHex == fsm.StakedCNPYContractAddress || toHex == fsm.SwapCNPYContractAddress {
+				return lib.NewError(1, "ethereum", fmt.Sprintf("unsupported selector: 0x%s", selector))
+			}
 			_, amount, e := parseAddressAndAmountFromABI(data)
 			if e != nil {
 				return e
