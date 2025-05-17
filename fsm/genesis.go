@@ -97,7 +97,7 @@ func (s *StateMachine) ValidateGenesisState(genesis *GenesisState) (err lib.Erro
 			return ErrAddressSize()
 		}
 		// ensure the validator public key is the proper length
-		if len(val.PublicKey) != crypto.BLS12381PubKeySize {
+		if !val.Delegate && len(val.PublicKey) != crypto.BLS12381PubKeySize {
 			return ErrPublicKeySize()
 		}
 		// ensure the validator output address is the proper length

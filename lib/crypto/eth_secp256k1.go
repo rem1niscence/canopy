@@ -26,6 +26,15 @@ func (s *ETHSECP256K1PrivateKey) PublicKey() PublicKeyI {
 	return &ETHSECP256K1PublicKey{PublicKey: &s.PrivateKey.PublicKey}
 }
 
+// BytesToEthSECP256K1Private() converts bytes to SECP256K1 private key using go-ethereum
+func BytesToEthSECP256K1Private(b []byte) (*ETHSECP256K1PrivateKey, error) {
+	pk, err := ethCrypto.ToECDSA(b)
+	if err != nil {
+		return nil, err
+	}
+	return &ETHSECP256K1PrivateKey{SECP256K1PrivateKey{PrivateKey: pk}}, nil
+}
+
 // ETHSECP256K1PublicKey is the ethereum variant of the public key of a cryptographic key pair used in elliptic curve signing and verification,
 // based on the SECP256K1 elliptic curve, it is used to verify ownership of the private key as well as validate digital signatures created by the private key
 type ETHSECP256K1PublicKey struct {
