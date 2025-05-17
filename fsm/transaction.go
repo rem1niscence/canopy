@@ -142,7 +142,7 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction, txH
 				if err != nil {
 					return nil, err
 				}
-				x.Hash = hash[:20] // first 20 bytes of the transaction hash
+				x.OrderId = hash[:20] // first 20 bytes of the transaction hash
 			}
 			// return the signer address
 			return address, nil

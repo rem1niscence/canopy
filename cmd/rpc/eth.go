@@ -335,7 +335,7 @@ func (s *Server) EthGetCode(args []any) (any, error) {
 	// get the string for the address
 	addressString := "0x" + strings.ToLower(address.String())
 	// if asking about the canopy pseudo-contract address
-	if addressString == strings.ToLower(fsm.CanopyPseudoContractAddress) {
+	if addressString == strings.ToLower(fsm.CNPYContractAddress) {
 		return CanopyPseudoContractByteCode, nil
 	}
 	return "0x", nil
@@ -350,7 +350,7 @@ func (s *Server) EthSendRawTransaction(args []any) (any, error) {
 		return nil, err
 	}
 	// convert it to a Canopy send transaction
-	sendTransaction, err := fsm.RLPToSendTransaction(rawTx)
+	sendTransaction, err := fsm.RLPToCanopyTransaction(rawTx)
 	if err != nil {
 		return nil, err
 	}
@@ -415,7 +415,7 @@ func (s *Server) EthCall(args []any) (any, error) {
 	}
 	// parse the `to` field from the call data
 	toHex, ok := callParams["to"].(string)
-	if ok && strings.ToLower(toHex) != fsm.CanopyPseudoContractAddress {
+	if ok && strings.ToLower(toHex) != fsm.CNPYContractAddress {
 		return "0x", nil
 	}
 	// get the sender address
@@ -868,7 +868,7 @@ func (s *Server) txToGetLogsResp(blockHash []byte, tx *lib.TxResult) (ethGetLogs
 		BlockHash:             fmt.Sprintf("0x%s", lib.BytesToString(blockHash)),
 		TransactionHash:       fmt.Sprintf("0x%s", tx.TxHash),
 		TransactionIndex:      fmt.Sprintf("0x%x", tx.Index),
-		PseudoContractAddress: strings.ToLower(fsm.CanopyPseudoContractAddress),
+		PseudoContractAddress: strings.ToLower(fsm.CNPYContractAddress),
 		Amount:                fmt.Sprintf("0x%x", sendMessage.Amount),
 		Topics: []string{transferEventFilterHash,
 			fmt.Sprintf("0x%064s", lib.BytesToString(sendMessage.FromAddress)),

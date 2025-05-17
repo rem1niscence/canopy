@@ -38,7 +38,7 @@ func TestRLPToSendTxEtherscan(t *testing.T) {
 				Time:          uint64(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(23_100) * time.Second).Unix()),
 				Fee:           DownscaleTo6Decimals(big.NewInt(8010000000 * 23_100)),
 				Memo:          RLPIndicator,
-				NetworkId:     uint64(1),
+				NetworkId:     uint64(0),
 				ChainId:       1,
 			},
 		},
@@ -59,7 +59,7 @@ func TestRLPToSendTxEtherscan(t *testing.T) {
 				Time:          uint64(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(23_100) * time.Second).Unix()),
 				Fee:           DownscaleTo6Decimals(big.NewInt(8010000000 * 23_100)),
 				Memo:          RLPIndicator,
-				NetworkId:     uint64(1),
+				NetworkId:     uint64(0),
 				ChainId:       1,
 			},
 		}, {
@@ -79,7 +79,7 @@ func TestRLPToSendTxEtherscan(t *testing.T) {
 				Time:          uint64(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(21_000) * time.Second).Unix()),
 				Fee:           DownscaleTo6Decimals(big.NewInt(6190058747 * 21_000)),
 				Memo:          RLPIndicator,
-				NetworkId:     uint64(1),
+				NetworkId:     uint64(0),
 				ChainId:       1,
 			},
 		},
@@ -87,7 +87,7 @@ func TestRLPToSendTxEtherscan(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// execute the function call
-			got, err := RLPToSendTransaction(test.expected.Signature.Signature)
+			got, err := RLPToCanopyTransaction(test.expected.Signature.Signature)
 			require.NoError(t, err)
 			j1, err := lib.MarshalJSONIndentString(got)
 			require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestRLPToSendTxDynamic(t *testing.T) {
 	require.NoError(t, err)
 	pub := crypto.FromECDSAPub(&privKey.PublicKey)[1:]
 	from := crypto.PubkeyToAddress(privKey.PublicKey)
-	chainID := big.NewInt(1)
+	chainID := big.NewInt(int64(CanopyIdsToEVMChainId(1, 1)))
 	// create the transaction fields
 	to := common.HexToAddress("0x000000000000000000000000000000000000dead")
 	gas := uint64(21_000)
@@ -193,7 +193,7 @@ func TestRLPToSendTxDynamic(t *testing.T) {
 			// add to expected
 			expected.Signature.Signature = rlpBytes
 			// execute the function call
-			got, e := RLPToSendTransaction(expected.Signature.Signature)
+			got, e := RLPToCanopyTransaction(expected.Signature.Signature)
 			require.NoError(t, err)
 			j1, e := lib.MarshalJSONIndentString(got)
 			require.NoError(t, e)
@@ -210,9 +210,9 @@ func TestRLPToSendTxERC20(t *testing.T) {
 	require.NoError(t, err)
 	pub := crypto.FromECDSAPub(&privKey.PublicKey)[1:]
 	from := crypto.PubkeyToAddress(privKey.PublicKey)
-	chainID := big.NewInt(1)
+	chainID := big.NewInt(int64(CanopyIdsToEVMChainId(1, 1)))
 	// create the transaction fields
-	contractAddress := common.HexToAddress(CanopyPseudoContractAddress)
+	contractAddress := common.HexToAddress(CNPYContractAddress)
 	gas := uint64(21_000)
 	gasPrice := UpscaleTo18Decimals(10)
 	amount := big.NewInt(20)
@@ -320,7 +320,7 @@ func TestRLPToSendTxERC20(t *testing.T) {
 			// add to expected
 			expected.Signature.Signature = rlpBytes
 			// execute the function call
-			got, e := RLPToSendTransaction(expected.Signature.Signature)
+			got, e := RLPToCanopyTransaction(expected.Signature.Signature)
 			require.NoError(t, err)
 			j1, e := lib.MarshalJSONIndentString(got)
 			require.NoError(t, e)
