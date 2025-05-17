@@ -211,8 +211,8 @@ const (
 	CodeInvalidCertificateResults ErrorCode = 46
 	CodePaymentRecipientsCount    ErrorCode = 47
 	CodeInvalidPercentAllocation  ErrorCode = 48
-
-	CodeInvalidParam ErrorCode = 50
+	CodeErrNotEmpty               ErrorCode = 49
+	CodeInvalidParam              ErrorCode = 50
 
 	CodeInvalidProtocolVersion ErrorCode = 52
 	CodeInvalidDBKey           ErrorCode = 53

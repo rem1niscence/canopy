@@ -104,6 +104,9 @@ func (x *MessageStake) Check() lib.ErrorI {
 	if err := checkCommittees(x.Committees); err != nil {
 		return err
 	}
+	if err := ensureEmpty(x.Signer); err != nil {
+		return err
+	}
 	return checkAmount(x.Amount)
 }
 
@@ -163,6 +166,9 @@ func (x *MessageEditStake) Check() lib.ErrorI {
 		return err
 	}
 	if err := checkCommittees(x.Committees); err != nil {
+		return err
+	}
+	if err := ensureEmpty(x.Signer); err != nil {
 		return err
 	}
 	return checkAmount(x.Amount)
@@ -560,6 +566,9 @@ func (x *MessageCreateOrder) Check() lib.ErrorI {
 	if x.AmountForSale == 0 || x.RequestedAmount == 0 {
 		return ErrInvalidAmount()
 	}
+	if err := ensureEmpty(x.OrderId); err != nil {
+		return err
+	}
 	return checkExternalAddress(x.SellerReceiveAddress)
 }
 
@@ -683,6 +692,13 @@ func (x *MessageDeleteOrder) UnmarshalJSON(b []byte) (err error) {
 type jsonMessageDeleteOrder struct {
 	OrderId lib.HexBytes `json:"orderID"`
 	ChainId uint64       `json:"chainID"`
+}
+
+func ensureEmpty(b []byte) lib.ErrorI {
+	if len(b) != 0 {
+		return ErrNotEmpty()
+	}
+	return nil
 }
 
 // checkAmount() validates the amount sent in the Message

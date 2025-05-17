@@ -266,3 +266,7 @@ func ErrInvalidRLPTx(err error) lib.ErrorI {
 func ErrInvalidERC20Tx(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeInvalidERC20Tx, lib.StateMachineModule, fmt.Sprintf("erc20 decode failed: %s", err.Error()))
 }
+
+func ErrNotEmpty() lib.ErrorI {
+	return lib.NewError(lib.CodeErrNotEmpty, lib.StateMachineModule, "a field that should be empty isn't")
+}
