@@ -164,7 +164,9 @@ func (s *Server) Web3Sha3(args []any) (any, error) {
 }
 
 // NetVersion() returns the network id
-func (s *Server) NetVersion(_ []any) (any, error) { return strconv.Itoa(int(s.config.NetworkID)), nil }
+func (s *Server) NetVersion(_ []any) (any, error) {
+	return strconv.FormatUint(fsm.CanopyIdsToEVMChainId(s.config.ChainId, s.config.NetworkID), 10), nil
+}
 
 // NetListening() canopy is always listening for peers
 func (s *Server) NetListening(_ []any) (any, error) { return true, nil }
@@ -188,7 +190,9 @@ func (s *Server) EthSyncing(_ []any) (any, error) {
 }
 
 // EthChainId() returns the chain id of this node
-func (s *Server) EthChainId(_ []any) (any, error) { return hexutil.Uint64(s.config.ChainId), nil }
+func (s *Server) EthChainId(_ []any) (any, error) {
+	return hexutil.Uint64(fsm.CanopyIdsToEVMChainId(s.config.ChainId, s.config.NetworkID)), nil
+}
 
 // ethMinimumGas is a tooling safe, easy divisor value for minimum gas
 var ethMinimumGas = big.NewInt(25000)
@@ -233,7 +237,7 @@ func (s *Server) EthBlobBaseFee(a []any) (any, error) { return s.EthGasPrice(a) 
 func (s *Server) EthBlockNumber(_ []any) (result any, err error) {
 	// create a read-only state for the latest block
 	_ = s.readOnlyState(0, func(state *fsm.StateMachine) lib.ErrorI {
-		result = hexutil.Uint64(state.Height())
+		result = hexutil.Uint64(state.Height() - 1)
 		return nil
 	})
 	return
@@ -334,7 +338,7 @@ func (s *Server) EthGetCode(args []any) (any, error) {
 	if addressString == strings.ToLower(fsm.CanopyPseudoContractAddress) {
 		return CanopyPseudoContractByteCode, nil
 	}
-	return addressString, nil
+	return "0x", nil
 }
 
 // EthSendRawTransaction() converts the RLP transaction into a Canopy compatible transaction and submits it
@@ -346,7 +350,7 @@ func (s *Server) EthSendRawTransaction(args []any) (any, error) {
 		return nil, err
 	}
 	// convert it to a Canopy send transaction
-	sendTransaction, err := fsm.RLPToSendTransaction(rawTx, s.config.NetworkID)
+	sendTransaction, err := fsm.RLPToSendTransaction(rawTx)
 	if err != nil {
 		return nil, err
 	}
@@ -408,6 +412,11 @@ func (s *Server) EthCall(args []any) (any, error) {
 	dataHex, ok := callParams["data"].(string)
 	if !ok {
 		return nil, errors.New("invalid or missing 'data' field")
+	}
+	// parse the `to` field from the call data
+	toHex, ok := callParams["to"].(string)
+	if ok && strings.ToLower(toHex) != fsm.CanopyPseudoContractAddress {
+		return "0x", nil
 	}
 	// get the sender address
 	fromAddress, err := crypto.NewAddressFromString(cleanHex(fromHex))
@@ -1319,6 +1328,9 @@ func msgToSend(msg *anypb.Any) (*fsm.MessageSend, error) {
 // cleanHex() strips the 0x prefix from a hex string
 func cleanHex(s string) string {
 	s, _ = strings.CutPrefix(s, "0x")
+	if s == "0" {
+		s = "00"
+	}
 	return s
 }
 

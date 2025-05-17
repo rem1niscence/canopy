@@ -87,7 +87,7 @@ func TestRLPToSendTxEtherscan(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// execute the function call
-			got, err := RLPToSendTransaction(test.expected.Signature.Signature, 1)
+			got, err := RLPToSendTransaction(test.expected.Signature.Signature)
 			require.NoError(t, err)
 			j1, err := lib.MarshalJSONIndentString(got)
 			require.NoError(t, err)
@@ -193,7 +193,7 @@ func TestRLPToSendTxDynamic(t *testing.T) {
 			// add to expected
 			expected.Signature.Signature = rlpBytes
 			// execute the function call
-			got, e := RLPToSendTransaction(expected.Signature.Signature, 1)
+			got, e := RLPToSendTransaction(expected.Signature.Signature)
 			require.NoError(t, err)
 			j1, e := lib.MarshalJSONIndentString(got)
 			require.NoError(t, e)
@@ -320,7 +320,7 @@ func TestRLPToSendTxERC20(t *testing.T) {
 			// add to expected
 			expected.Signature.Signature = rlpBytes
 			// execute the function call
-			got, e := RLPToSendTransaction(expected.Signature.Signature, 1)
+			got, e := RLPToSendTransaction(expected.Signature.Signature)
 			require.NoError(t, err)
 			j1, e := lib.MarshalJSONIndentString(got)
 			require.NoError(t, e)

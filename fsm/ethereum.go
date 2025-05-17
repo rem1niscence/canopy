@@ -23,7 +23,7 @@ const CanopyPseudoContractAddress = `0x837F636655dFa9B32663f30424F92aBb1Af40308`
 const RLPIndicator = "RLP"
 
 // RLPToSendTransaction() converts an RLP encoded transaction into a Canopy send transaction
-func RLPToSendTransaction(txBytes []byte, networkId uint64) (transaction *lib.Transaction, e lib.ErrorI) {
+func RLPToSendTransaction(txBytes []byte) (transaction *lib.Transaction, e lib.ErrorI) {
 	// protect against spam
 	if len(txBytes) >= 400 {
 		return nil, ErrInvalidRLPTx(fmt.Errorf("max transaction size"))
@@ -34,7 +34,7 @@ func RLPToSendTransaction(txBytes []byte, networkId uint64) (transaction *lib.Tr
 		return nil, ErrInvalidRLPTx(err)
 	}
 	// get the signer type (supports: Legacy, EIP-155, EIP-1559, EIP-2930, EIP-4844, EIP-7702)
-	signer := ethTypes.LatestSignerForChainID(big.NewInt(1))
+	signer := ethTypes.LatestSignerForChainID(tx.ChainId())
 	// recover sender (from address)
 	from, err := signer.Sender(&tx)
 	if err != nil {
@@ -45,6 +45,8 @@ func RLPToSendTransaction(txBytes []byte, networkId uint64) (transaction *lib.Tr
 	if err != nil {
 		return nil, ErrInvalidPublicKey(err)
 	}
+	// extract chain id and network id from the evm chain id
+	chainId, networkId := EvmChainIdToCanopyIds(tx.ChainId().Uint64())
 	// generate the transaction boject
 	transaction = &lib.Transaction{
 		MessageType: MessageSendName,
@@ -57,7 +59,7 @@ func RLPToSendTransaction(txBytes []byte, networkId uint64) (transaction *lib.Tr
 		Fee:           DownscaleTo6Decimals(new(big.Int).Mul(big.NewInt(int64(tx.Gas())), tx.GasPrice())),
 		NetworkId:     networkId,
 		Memo:          RLPIndicator,
-		ChainId:       tx.ChainId().Uint64(),
+		ChainId:       chainId,
 	}
 	// generate a variable to hold message send
 	msg := &MessageSend{
@@ -105,7 +107,7 @@ func ParseERC20EthereumTransfer(fromAddress []byte, input string) (*MessageSend,
 // VerifyRLPBytes() implements special 'signature verification logic' that allows a MessageSend to be authenticated using a signed RLP transaction
 func (s *StateMachine) VerifyRLPBytes(tx *lib.Transaction) lib.ErrorI {
 	// create a compare transaction from the signature field
-	compare, err := RLPToSendTransaction(tx.Signature.Signature, s.Config.NetworkID)
+	compare, err := RLPToSendTransaction(tx.Signature.Signature)
 	if err != nil {
 		return err
 	}
@@ -130,6 +132,23 @@ func (s *StateMachine) VerifyRLPBytes(tx *lib.Transaction) lib.ErrorI {
 // pseudoEthereumTimestamp() creates a fake timestamp to ensure collision resistance using the gas limit variable
 func pseudoEthereumTimestamp(gasLimit uint64) uint64 {
 	return uint64(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(gasLimit) * time.Second).Unix())
+}
+
+// ChainId translation design:
+// evmChainId is High 32 bits = networkId and Low 32 bits = chainId
+// - avoids conflicts with existing Ethereum chain IDs
+// - merges Canopy's dual network ID scheme into a single combined identifier
+
+// evmChainIdToCaonpyIds() converts an EVM chainId to a Canopy chain id
+func EvmChainIdToCanopyIds(evmChainId uint64) (chainId, networkId uint64) {
+	networkId = evmChainId >> 32
+	chainId = evmChainId & 0xFFFFFFFF
+	return
+}
+
+// CanopyIdsToEVMChainId() converts a chainId and networkId to an evm chain ID
+func CanopyIdsToEVMChainId(chainId, networkId uint64) uint64 {
+	return (networkId << 32) | (chainId & 0xFFFFFFFF)
 }
 
 var scaleFactor = big.NewInt(1_000_000_000_000) // 10^12
