@@ -102,7 +102,7 @@ There are **2 ways** to execute an RLP send:
 ##### 1. EOA Style:
 - `to` is the recipient's 20 byte address in hex format
 - `value` is the amount of CNPY in 18 decimal format (anything below 1e12 is 0)
-```json
+```c
 {
     "to": "0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead",
     "value": "0x0de0b6b3a7640000"  // 1 CNPY transfer (minimum is 6 decimals or 1 × 10¹²)
@@ -113,7 +113,7 @@ Importantly, **EOA style uses 18 decimals for values** where `1,000,000,000,000`
 ##### 2. ERC20 Style:
 - `to` is the pseudo contract address `0x0000000000000000000000000000000000000001`
 - `input` is a standard ABI encoded `transfer(address,uint256)`
-```json
+```c
 {
     "to": "0x0000000000000000000000000000000000000001",
     "value": "" // omit
@@ -140,7 +140,7 @@ There are 2 additional pseudo-contracts:
 ##### 1. stCNPY (stake, edit-stake, unstake):
 - `to` is the pseudo contract address `0x0000000000000000000000000000000000000002`
 - `input` is a standard ABI selector + ⚠️ **protobuf-encoded-message**
-```json
+```c
 {
     "to": "0x0000000000000000000000000000000000000002",
     "value": "" // omit
@@ -186,7 +186,7 @@ message MessageStake {
 ##### 2. swCNPY (create-order, edit-order, delete-order):
 - `to` is the pseudo contract address `0x0000000000000000000000000000000000000003`
 - `input` is a standard ABI selector + ⚠️ **protobuf-encoded-message**
-```json
+```c
 {
     "to": "0x0000000000000000000000000000000000000003",
     "value": "" // omit
