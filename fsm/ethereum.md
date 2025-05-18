@@ -1,6 +1,6 @@
 # ethereum.go - Ethereum translation layer for Canopy
 
-[fsm/ethereum.go](./ethereum.go) + and [rpc/eth.go](../rpc/eth.go) implements the ethereum translation layer for Canopy.
+[fsm/ethereum.go](./ethereum.go) + and [rpc/eth.go](../cmd/rpc/eth.go) implements the ethereum translation layer for Canopy.
 
 ## Overview
 Canopy implements an **Ethereum translation layer** that allows popular Ethereum tools (like wallets and explorers) to interact with the Canopy blockchain.
