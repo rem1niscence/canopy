@@ -351,33 +351,23 @@ func (s *Server) EthSendRawTransaction(args []any) (any, error) {
 		return nil, err
 	}
 	// convert it to a Canopy send transaction
-	sendTransaction, err := fsm.RLPToCanopyTransaction(rawTx)
+	transaction, err := fsm.RLPToCanopyTransaction(rawTx)
 	if err != nil {
 		return nil, err
 	}
-	// double check fee
-	req := new(txRequest)
-	// get the fee from state
-	if err = s.getFeeFromState(req, fsm.MessageSendName); err != nil {
-		return nil, err
-	}
-	// ensure fee isn't lower than the minimum
-	if sendTransaction.Fee < req.Fee {
-		return nil, fsm.ErrTxFeeBelowStateLimit()
-	}
 	// ensure created height isn't too close to the limit
-	if int64(sendTransaction.CreatedHeight) < int64(s.controller.ChainHeight())-fsm.BlockAcceptanceRange/2 {
+	if int64(transaction.CreatedHeight) < int64(s.controller.ChainHeight())-fsm.BlockAcceptanceRange/2 {
 		return nil, lib.ErrInvalidTxHeight()
 	}
-	// validate the message type
-	sendMsg, err := msgToSend(sendTransaction.Msg)
+	// extract the public key from the message
+	pubKey, err := crypto.NewPublicKeyFromBytes(transaction.Signature.PublicKey)
 	if err != nil {
 		return nil, err
 	}
 	// increment the pseudo-nonce
-	incPseudoNonce(lib.BytesToString(sendMsg.FromAddress))
+	incPseudoNonce(pubKey.Address().String())
 	// marshal the transaction to protobuf
-	bz, err := lib.Marshal(sendTransaction)
+	bz, err := lib.Marshal(transaction)
 	if err != nil {
 		return nil, err
 	}
