@@ -105,11 +105,12 @@ type valueOp struct {
 }
 
 // NewTxn() creates a new instance of a Txn with the specified readers/writers and prefix
-func NewTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte) *Txn {
+func NewTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, logger lib.LoggerI) *Txn {
 	return &Txn{
 		reader: reader,
 		writer: writer,
 		prefix: prefix,
+		logger: logger,
 		cache: txn{
 			ops:    make(map[string]valueOp),
 			sorted: make([]string, 0),
@@ -148,7 +149,7 @@ func (t *Txn) Set(key, value []byte) lib.ErrorI {
 
 // Delete() marks a key for deletion in the in-memory operations
 func (t *Txn) Delete(key []byte) lib.ErrorI {
-	t.update(lib.BytesToString(lib.Append(t.prefix, key)), nil, opSet)
+	t.update(lib.BytesToString(lib.Append(t.prefix, key)), nil, opDelete)
 	return nil
 }
 
@@ -179,13 +180,14 @@ func (t *Txn) addToSorted(key string) {
 
 // Iterator() returns a new iterator for merged iteration of both the in-memory operations and parent store with the given prefix
 func (t *Txn) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
+	newPrefix := lib.Append(t.prefix, prefix)
 	parent := t.reader.NewIterator(badger.IteratorOptions{
-		Prefix: lib.Append(t.prefix, prefix),
+		Prefix: newPrefix,
 	})
 	parent.Rewind()
 	it := &Iterator{
 		logger: t.logger,
-		parent: parent,
+		reader: parent,
 		prefix: prefix,
 	}
 	return newTxnIterator(it, t.cache, prefix, false), nil
@@ -201,8 +203,8 @@ func (t *Txn) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	seekLast(parent, newPrefix)
 	it := &Iterator{
 		logger: t.logger,
-		parent: parent,
-		prefix: t.prefix,
+		reader: parent,
+		prefix: prefix,
 	}
 	return newTxnIterator(it, t.cache, prefix, true), nil
 }
@@ -216,7 +218,7 @@ func (t *Txn) ArchiveIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	parent.Rewind()
 	return &Iterator{
 		logger: t.logger,
-		parent: parent,
+		reader: parent,
 		prefix: t.prefix,
 	}, nil
 }
@@ -341,14 +343,14 @@ func (ti *TxnIterator) Valid() bool {
 		case 1: // use parent
 			ti.useTxn = false
 		case 0: // when equal txn shadows parent
-			if ti.txnValue().op == opDelete {
+			if ti.txnValue().op == opDelete || ti.txnValue().op == opTombstone {
 				ti.parent.Next()
 				ti.txnNext()
 				continue
 			}
 			ti.useTxn = true
 		case -1: // use txn
-			if ti.txnValue().op == opDelete {
+			if ti.txnValue().op == opDelete || ti.txnValue().op == opTombstone {
 				ti.txnNext()
 				continue
 			}
@@ -444,19 +446,22 @@ func (ti *TxnIterator) revSeek() *TxnIterator {
 // Iterator implements a wrapper around BadgerDB's iterator with the in-memory store but satisfies the IteratorI interface
 type Iterator struct {
 	logger lib.LoggerI
-	parent *badger.Iterator
+	reader *badger.Iterator
 	prefix []byte
 	err    error
 }
 
-func (i *Iterator) Valid() bool     { return i.parent.Valid() }
-func (i *Iterator) Next()           { i.parent.Next() }
-func (i *Iterator) Close()          { i.parent.Close() }
-func (i *Iterator) Version() uint64 { return i.parent.Item().Version() }
-func (i *Iterator) Deleted() bool   { return i.parent.Item().IsDeletedOrExpired() }
+func (i *Iterator) Valid() bool {
+	valid := i.reader.Valid()
+	return valid
+}
+func (i *Iterator) Next()           { i.reader.Next() }
+func (i *Iterator) Close()          { i.reader.Close() }
+func (i *Iterator) Version() uint64 { return i.reader.Item().Version() }
+func (i *Iterator) Deleted() bool   { return i.reader.Item().IsDeletedOrExpired() }
 func (i *Iterator) Key() (key []byte) {
 	// get the key from the parent
-	key = i.parent.Item().Key()
+	key = i.reader.Item().Key()
 	// make a copy of the key
 	c := make([]byte, len(key))
 	copy(c, key)
@@ -469,7 +474,7 @@ func removePrefix(b, prefix []byte) []byte { return b[len(prefix):] }
 
 // Value() retrieves the current value from the iterator
 func (i *Iterator) Value() (value []byte) {
-	value, err := i.parent.Item().ValueCopy(nil)
+	value, err := i.reader.Item().ValueCopy(nil)
 	if err != nil {
 		i.err = err
 	}
