@@ -317,6 +317,25 @@ Also, Canopy combines the Ethereum transaction and receipt structures. In practi
 }
 ```
 
+##### Ethereum-Compatible Pending Transaction Simulation
+
+Canopy only includes valid transactions in blocks, so to maintain compatibility with Ethereum tooling (e.g., MetaMask, Hardhat, ethers.js), a pseudo-pending transaction cache is used to simulate mempool behavior.
+
+#### Design Goals
+
+- Expose "pending" transactions via `eth_getTransactionReceipt` even if not yet included.
+- Return `status: 0` (failed) after a threshold number of blocks if the transaction was never included in a block.
+- Evict old entries after approximately 6 hours to prevent unbounded memory growth.
+
+#### Logic
+
+- When a transaction hash is first seen (via `eth_sendRawTransaction` or `eth_getTransactionReceipt`), the node maps it to the current block height.
+- If the transaction is queried again and more than 15 blocks have passed without it appearing in the canonical indexer, the RPC layer simulates a failed transaction.
+- Every minute, a background service evicts transactions that are older than 1080 blocks (approximately 6 hours at 20s block times).
+
+This mechanism ensures compatibility with Ethereum clients while maintaining Canopy’s constraint that only valid transactions are saved in blocks.
+
+
 #### eth_getTransactionCount
 ➪ Canopy implements a non-standard Ethereum-compatible mechanism used by Canopy to support transaction replay protection without maintaining full account nonce history.
 

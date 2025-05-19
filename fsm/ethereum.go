@@ -132,10 +132,14 @@ func rlpToMessage(publicKey crypto.PublicKeyI, transaction *lib.Transaction, tx 
 			e = ErrInvalidERC20Tx(fmt.Errorf("unsupported selector: 0x%s", selector))
 		}
 	default: // non-contract call (transfer() only)
+		amount := DownscaleTo6Decimals(tx.Value())
+		if amount == 0 {
+			return nil, ErrInvalidAmount()
+		}
 		msg = &MessageSend{
 			FromAddress: from,
 			ToAddress:   tx.To().Bytes(),
-			Amount:      DownscaleTo6Decimals(tx.Value()),
+			Amount:      amount,
 		}
 	}
 	return
@@ -151,7 +155,7 @@ func ethDataToMsgSend(fromAddress, data []byte) (*MessageSend, lib.ErrorI) {
 	// amount: full 32-byte uint256
 	amount := new(big.Int).SetBytes(data[36:68])
 	// sanity check the amount
-	if !amount.IsUint64() {
+	if !amount.IsUint64() || amount.Uint64() == 0 {
 		return nil, ErrInvalidAmount()
 	}
 	// return the message send type

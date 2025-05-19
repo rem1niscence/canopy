@@ -142,6 +142,7 @@ func (s *Server) EthereumHandler(w http.ResponseWriter, r *http.Request, _ httpr
 // startEthRPCService() runs the needed routines for the eth rpc wrapper
 func (s *Server) startEthRPCService() {
 	go s.startEthPseudoNonceService()
+	go s.startEthPendingTxsExpireService()
 	go s.startEthFilterExpireService()
 }
 
@@ -369,8 +370,12 @@ func (s *Server) EthSendRawTransaction(args []any) (any, error) {
 	if err = s.controller.SendTxMsg(bz); err != nil {
 		return nil, err
 	}
+	// get the tx hash string
+	txHashString := crypto.HashString(bz)
+	// set in pending
+	shouldSimultePending(txHashString)
 	// return the transaction hash
-	return "0x" + crypto.HashString(bz), nil
+	return "0x" + txHashString, nil
 }
 
 // EthCall() simulates a call to a 'smart contract' for Canopy
@@ -610,8 +615,13 @@ func (s *Server) EthGetTransactionByHash(args []any) (any, error) {
 		// get the transaction by hash
 		tx, e := st.GetTxByHash(txHash)
 		if e != nil || tx.TxHash == "" {
+			hashString := lib.BytesToString(txHash)
 			// check mempool
-			if pending := s.controller.Mempool.Contains(lib.BytesToString(txHash)); pending {
+			if pending := s.controller.Mempool.Contains(hashString); pending {
+				return nil, errors.New("tx pending")
+			}
+			// check eth pending cache
+			if isPending := shouldSimultePending(hashString); isPending {
 				return nil, errors.New("tx pending")
 			}
 			// pseudo-failed height
@@ -1074,6 +1084,37 @@ func (s *Server) startEthPseudoNonceService() {
 				return true
 			})
 		}
+	}
+}
+
+// Canopy only saves valid transactions in blocks - so the RPC mocks 'failed or dropped' txs for ethereum tooling compatibility
+//
+// - Node maps a txHash to the latest block height either when queried through eth_getTransactionReceipt or sent through eth_sendRawTransaction
+// - After 15 blocks, if not found in the indexer - return status_failed
+// - After appx 6 hours evict the txHash from the map
+var pseudoPendingTxsMap = sync.Map{} // [hash] -> height
+
+// shouldSimultePending() sets a pending tx in the map and returns the status of the transaction
+func shouldSimultePending(txHash string) (pending bool) {
+	storedHeight, found := pseudoPendingTxsMap.LoadOrStore(txHash, latestHeight.Load())
+	// if not found after 5 minutes
+	if found && storedHeight.(uint64)+15 < latestHeight.Load() {
+		return false
+	}
+	return true
+}
+
+// startEthPendingTxsExpireService() evicts pending txs after 6 hours
+func (s *Server) startEthPendingTxsExpireService() {
+	for range time.Tick(time.Second) {
+		// for each key in the map, decrement the count
+		pseudoPendingTxsMap.Range(func(key, value any) bool {
+			// evict if older than 6 hours
+			if value.(uint64)+1080 < latestHeight.Load() {
+				pseudoPendingTxsMap.Delete(key)
+			}
+			return true
+		})
 	}
 }
 
