@@ -373,10 +373,11 @@ This makes integration with tools like MetaMask and compatibility with EVM RPC i
 
 Canopy uses a simple translation layer to bridge minimum fees into EVM-compatible gas values:
 
+```go
 // gas = tx.Fee * 100  
 // gasPrice = 1e10 (10,000,000,000 wei = 0.01 uCNPY)  
 // fee = gas * gasPrice = tx.Fee * 100 * 1e10 = tx.Fee * 1e12
-
+```
 This keeps the total fee consistent with the Canopy-side tx.Fee (denominated in uCNPY), scaled to Ethereum’s 18-decimal wei units.
 
 Multiplying tx.Fee by 100 ensures that eth_estimateGas() returns values significantly above 21,000 — the lower bound required by many
