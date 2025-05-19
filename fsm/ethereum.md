@@ -341,6 +341,19 @@ Also, Canopy combines the Ethereum transaction and receipt structures. In practi
     - This ensures each new tx from a given address gets a unique pseudo-nonce and avoids reuse within the pruning window.
     - Mimics nonce behavior sufficiently for compatibility with Ethereum tooling.
 
+#### eth_estimateGas
+
+Canopy uses a simple translation layer to bridge minimum fees into EVM-compatible gas values:
+
+// gas = tx.Fee * 100  
+// gasPrice = 1e10 (10,000,000,000 wei = 0.01 uCNPY)  
+// fee = gas * gasPrice = tx.Fee * 100 * 1e10 = tx.Fee * 1e12
+
+This keeps the total fee consistent with the Canopy-side tx.Fee (denominated in uCNPY), scaled to Ethereum’s 18-decimal wei units.
+
+Multiplying tx.Fee by 100 ensures that eth_estimateGas() returns values significantly above 21,000 — the lower bound required by many 
+Ethereum tools like MetaMask. This preserves compatibility while keeping gas price constant and simple to reason about.
+
 
 
 

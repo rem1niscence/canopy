@@ -194,19 +194,13 @@ func (s *Server) EthChainId(_ []any) (any, error) {
 	return hexutil.Uint64(fsm.CanopyIdsToEVMChainId(s.config.ChainId, s.config.NetworkID)), nil
 }
 
-// ethMinimumGas is a tooling safe, easy divisor value for minimum gas
-var ethMinimumGas = big.NewInt(25000)
+// gas = tx.Fee * 100
+// gasPrice = 1e10 (10,000,000,000 wei = 0.01 uCNPY)
+// fee = gas * gasPrice = tx.Fee * 100 * 1e10 = tx.Fee * 1e12
+var ethGasPrice = int64(10_000_000_000)
 
 // EthGasPrice() returns minimum_fee / eth_gas_limit to be compatible with the
-func (s *Server) EthGasPrice(_ []any) (any, error) {
-	// get the minimum send fee
-	fee, err := s.upscaledSendFee()
-	if err != nil {
-		return nil, err
-	}
-	// upscale to 18 dec and convert to hex string
-	return hexutil.Big(*new(big.Int).Div(fee, ethMinimumGas)), nil
-}
+func (s *Server) EthGasPrice(_ []any) (any, error) { return hexutil.Big(*big.NewInt(ethGasPrice)), nil }
 
 // EthAccounts() return all keystore addresses
 func (s *Server) EthAccounts(_ []any) (any, error) {
@@ -524,8 +518,48 @@ func (s *Server) EthCall(args []any) (any, error) {
 	})
 }
 
-// EthEstimateGas() returns a hardcoded minimum gas of 25,000 to be compatible with most tooling
-func (s *Server) EthEstimateGas(_ []any) (any, error) { return "0x" + ethMinimumGas.Text(16), nil }
+// EthEstimateGas() returns the corresponding Canopy fee for the message
+func (s *Server) EthEstimateGas(args []any) (any, error) {
+	if len(args) < 1 {
+		return nil, errors.New("missing call arguments")
+	}
+	// extract the call data
+	callParams, ok := args[0].(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid call argument format")
+	}
+	// parse the `data` field from the call data
+	dataHex, _ := callParams["data"].(string)
+	// create a txRequest
+	req, err := new(txRequest), error(nil)
+	// if invalid selector data return send
+	if len(dataHex) < 10 {
+		err = s.getFeeFromState(req, fsm.MessageSendName)
+	} else {
+		switch dataHex[2:10] {
+		case fsm.StakeSelector:
+			err = s.getFeeFromState(req, fsm.MessageStakeName)
+		case fsm.EditStakeSelector:
+			err = s.getFeeFromState(req, fsm.MessageEditStakeName)
+		case fsm.UnstakeSelector:
+			err = s.getFeeFromState(req, fsm.MessageUnstakeName)
+		case fsm.CreateOrderSelector:
+			err = s.getFeeFromState(req, fsm.MessageCreateOrderName)
+		case fsm.EditOrderSelector:
+			err = s.getFeeFromState(req, fsm.MessageEditOrderName)
+		case fsm.DeleteOrderSelector:
+			err = s.getFeeFromState(req, fsm.MessageDeleteOrderName)
+		case fsm.SubsidySelector:
+			err = s.getFeeFromState(req, fsm.MessageSubsidyName)
+		default:
+			err = s.getFeeFromState(req, fsm.MessageSendName)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return hexutil.Uint64(req.Fee * 100), nil
+}
 
 // EthGetBlockByHash() returns a dummy-ish block (based on the actual Canopy block) that is EIP-1559 compatible
 func (s *Server) EthGetBlockByHash(args []any) (any, error) {
@@ -576,7 +610,31 @@ func (s *Server) EthGetTransactionByHash(args []any) (any, error) {
 		// get the transaction by hash
 		tx, e := st.GetTxByHash(txHash)
 		if e != nil || tx.TxHash == "" {
-			return nil, errors.New("tx not found")
+			// check mempool
+			if pending := s.controller.Mempool.Contains(lib.BytesToString(txHash)); pending {
+				return nil, errors.New("tx pending")
+			}
+			// pseudo-failed height
+			failedHeight := s.controller.ChainHeight() - 1
+			// get the block associated with the transaction height
+			b, _ := st.GetBlockHeaderByHeight(failedHeight)
+			// return failed to prevent 'resend'
+			return ethRPCTransaction{
+				BlockHash:         common.BytesToHash(b.BlockHeader.Hash),
+				BlockNumber:       hexutil.Big(*big.NewInt(int64(tx.Height))),
+				From:              common.BytesToAddress(tx.Sender),
+				Gas:               hexutil.Uint64(21000),
+				Hash:              common.HexToHash("0x" + lib.BytesToString(txHash)),
+				TxHash:            common.HexToHash("0x" + lib.BytesToString(txHash)),
+				TransactionIndex:  hexutil.Uint64(tx.Index),
+				Type:              types.DynamicFeeTxType,
+				ChainID:           hexutil.Big(*big.NewInt(int64(fsm.CanopyIdsToEVMChainId(s.config.ChainId, s.config.NetworkID)))),
+				Status:            hexutil.Uint64(types.ReceiptStatusFailed),
+				CumulativeGasUsed: hexutil.Uint64(21000 * uint64(math.Min(1, float64(b.BlockHeader.NumTxs)))),
+				Bloom:             make([]byte, 256),
+				ContractAddress:   common.Address{},
+				GasUsed:           hexutil.Uint64(int64(21000)),
+			}, nil
 		}
 		// get the block associated with the transaction height
 		block, _ := st.GetBlockHeaderByHeight(tx.Height)
@@ -735,10 +793,12 @@ func (s *Server) blockToEIP1559Block(block *lib.BlockResult, fullTx bool) (ethRP
 		return ethRPCBlock{}, errors.New("block not found")
 	}
 	// get the minimum send tx fee
-	fee, err := s.upscaledSendFee()
-	if err != nil {
+	tx := new(txRequest)
+	if err := s.getFeeFromState(tx, fsm.MessageSendName); err != nil {
 		return ethRPCBlock{}, err
 	}
+	// tx.Fee x 100 to ensure always above 21,000
+	sendFee := big.NewInt(int64(tx.Fee * 100))
 	// make a structure to capture the EIP-1559 transactions
 	var txs []ethRPCTransaction
 	transactions := make([]interface{}, len(txs))
@@ -763,12 +823,12 @@ func (s *Server) blockToEIP1559Block(block *lib.BlockResult, fullTx bool) (ethRP
 		StateRoot:             common.BytesToHash(block.BlockHeader.StateRoot),
 		Miner:                 common.BytesToAddress(block.BlockHeader.ProposerAddress),
 		ExtraData:             hexutil.Bytes("Canopy EIP1559 Wrapper is for display only"),
-		GasLimit:              30_000_000,
-		GasUsed:               hexutil.Uint64(new(big.Int).Mul(ethMinimumGas, big.NewInt(int64(len(block.Transactions)))).Uint64()),
+		GasLimit:              50_000_000,
+		GasUsed:               hexutil.Uint64(new(big.Int).Mul(sendFee, big.NewInt(int64(len(block.Transactions)))).Uint64()),
 		Timestamp:             hexutil.Uint64(time.UnixMicro(int64(block.BlockHeader.Time)).Unix()),
 		TransactionsRoot:      common.BytesToHash(block.BlockHeader.TransactionRoot),
 		ReceiptsRoot:          common.BytesToHash(block.BlockHeader.TransactionRoot),
-		BaseFeePerGas:         hexutil.Big(*new(big.Int).Div(fee, ethMinimumGas)),
+		BaseFeePerGas:         hexutil.Big(*big.NewInt(ethGasPrice)),
 		WithdrawalsRoot:       types.EmptyWithdrawalsHash,
 		ParentBeaconBlockRoot: common.BytesToHash(block.BlockHeader.ValidatorRoot),
 		RequestsHash:          types.EmptyRequestsHash,
@@ -801,16 +861,14 @@ func (s *Server) txToEIP1559(b *lib.BlockResult, tx *lib.TxResult) (ethRPCTransa
 	if len(tx.Recipient) != 0 {
 		to = common.BytesToAddress(tx.Recipient)
 	}
-	// calculate the gas price
-	gasPrice := new(big.Int).Div(fsm.UpscaleTo18Decimals(tx.Transaction.Fee), ethMinimumGas)
 	// convert to an EIP1559Tx and add to the list
 	return ethRPCTransaction{
 		BlockHash:         common.BytesToHash(b.BlockHeader.Hash),
 		BlockNumber:       hexutil.Big(*big.NewInt(int64(tx.Height))),
 		From:              common.BytesToAddress(tx.Sender),
-		Gas:               hexutil.Uint64(ethMinimumGas.Uint64()),
-		GasPrice:          hexutil.Big(*gasPrice),
-		GasFeeCap:         hexutil.Big(*gasPrice),
+		Gas:               hexutil.Uint64(tx.Transaction.Fee),
+		GasPrice:          hexutil.Big(*big.NewInt(ethGasPrice)),
+		GasFeeCap:         hexutil.Big(*big.NewInt(ethGasPrice)),
 		GasTipCap:         hexutil.Big(*big.NewInt(0)),
 		Hash:              common.HexToHash("0x" + tx.TxHash),
 		TxHash:            common.HexToHash("0x" + tx.TxHash),
@@ -821,12 +879,12 @@ func (s *Server) txToEIP1559(b *lib.BlockResult, tx *lib.TxResult) (ethRPCTransa
 		Type:              types.DynamicFeeTxType,
 		ChainID:           hexutil.Big(*big.NewInt(int64(tx.Transaction.ChainId))),
 		Status:            hexutil.Uint64(types.ReceiptStatusSuccessful),
-		CumulativeGasUsed: hexutil.Uint64(ethMinimumGas.Uint64() * uint64(math.Min(1, float64(b.BlockHeader.NumTxs)))),
+		CumulativeGasUsed: hexutil.Uint64(tx.Transaction.Fee * uint64(math.Min(1, float64(b.BlockHeader.NumTxs)))),
 		Bloom:             make([]byte, 256),
 		Logs:              logs,
 		ContractAddress:   common.Address{},
-		GasUsed:           hexutil.Uint64(ethMinimumGas.Uint64()),
-		EffectiveGasPrice: hexutil.Big(*gasPrice),
+		GasUsed:           hexutil.Uint64(int64(tx.Transaction.Fee)),
+		EffectiveGasPrice: hexutil.Big(*big.NewInt(ethGasPrice)),
 	}, nil
 }
 
@@ -1136,18 +1194,6 @@ type ethSyncingResponse struct {
 }
 
 // HELPERS BELOW
-
-// upscaledSendFee() is a helper to retrieve the minimum fee for the send tx
-func (s *Server) upscaledSendFee() (*big.Int, error) {
-	// create a txRequest
-	req := &txRequest{}
-	// get the fee from state
-	if err := s.getFeeFromState(req, fsm.MessageSendName); err != nil {
-		return nil, err
-	}
-	// return the fee
-	return fsm.UpscaleTo18Decimals(req.Fee), nil
-}
 
 // filterParamsFromArgs() creates newFilterParams from args
 func filterParamsFromArgs(args []any) (params newFilterParams, err error) {
