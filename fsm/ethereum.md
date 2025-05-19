@@ -1,6 +1,6 @@
 # ethereum.go - Ethereum translation layer for Canopy
 
-[fsm/ethereum.go](./ethereum.go) + and [rpc/eth.go](../rpc/eth.go) implements the ethereum translation layer for Canopy.
+[fsm/ethereum.go](./ethereum.go) + and [rpc/eth.go](../cmd/rpc/eth.go) implements the ethereum translation layer for Canopy.
 
 ## Overview
 Canopy implements an **Ethereum translation layer** that allows popular Ethereum tools (like wallets and explorers) to interact with the Canopy blockchain.
@@ -26,6 +26,9 @@ Selectors
 - CreateOrder: `0xbc2e8e5f`
 - EditOrder: `0x74e78d6f`
 - DeleteOrder: `0x6c4650e7`
+
+EVM Chain Id 
+- Mainnet: `4294967297`
 
 RPC
 
@@ -102,7 +105,7 @@ There are **2 ways** to execute an RLP send:
 ##### 1. EOA Style:
 - `to` is the recipient's 20 byte address in hex format
 - `value` is the amount of CNPY in 18 decimal format (anything below 1e12 is 0)
-```json
+```c
 {
     "to": "0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead",
     "value": "0x0de0b6b3a7640000"  // 1 CNPY transfer (minimum is 6 decimals or 1 × 10¹²)
@@ -113,7 +116,7 @@ Importantly, **EOA style uses 18 decimals for values** where `1,000,000,000,000`
 ##### 2. ERC20 Style:
 - `to` is the pseudo contract address `0x0000000000000000000000000000000000000001`
 - `input` is a standard ABI encoded `transfer(address,uint256)`
-```json
+```c
 {
     "to": "0x0000000000000000000000000000000000000001",
     "value": "" // omit
@@ -140,7 +143,7 @@ There are 2 additional pseudo-contracts:
 ##### 1. stCNPY (stake, edit-stake, unstake):
 - `to` is the pseudo contract address `0x0000000000000000000000000000000000000002`
 - `input` is a standard ABI selector + ⚠️ **protobuf-encoded-message**
-```json
+```c
 {
     "to": "0x0000000000000000000000000000000000000002",
     "value": "" // omit
@@ -186,7 +189,7 @@ message MessageStake {
 ##### 2. swCNPY (create-order, edit-order, delete-order):
 - `to` is the pseudo contract address `0x0000000000000000000000000000000000000003`
 - `input` is a standard ABI selector + ⚠️ **protobuf-encoded-message**
-```json
+```c
 {
     "to": "0x0000000000000000000000000000000000000003",
     "value": "" // omit
@@ -341,6 +344,31 @@ Also, Canopy combines the Ethereum transaction and receipt structures. In practi
     - This ensures each new tx from a given address gets a unique pseudo-nonce and avoids reuse within the pruning window.
     - Mimics nonce behavior sufficiently for compatibility with Ethereum tooling.
 
+#### eth_getChainId
+
+The goal of the Canopy ChainID translation design is to establish a consistent and conflict-free way of representing chain identifiers in an EVM-compatible context while preserving Canopy’s internal network model.
+
+⇨ Canopy defines the `evmChainId` as a 64-bit unsigned integer composed of two parts:
+
+- **High 32 bits**: Represents the `networkId`.
+- **Low 32 bits**: Represents the `chainId`.
+
+By encoding both values into a single 64-bit integer, we can seamlessly bridge between EVM-based infrastructure (like MetaMask) and Canopy’s dual-ID model.
+
+
+- **Avoids Ethereum Chain ID Conflicts**  
+  Since Ethereum chain IDs are typically 32-bit or smaller, placing `networkId` in the upper 32 bits ensures that all generated `evmChainId` values lie outside the range of existing Ethereum chain IDs, thereby eliminating the risk of accidental replay attacks or collisions.
+
+- **Combines Canopy's Dual-ID Model**  
+  Canopy internally uses both `networkId` and `chainId` for enhanced replay protection over the Root Chain and Nested Chain design. This scheme allows both values to be packed into one variable, maintaining the integrity of the original model without requiring protocol-level changes to support dual identifiers.
+
+When constructing or interpreting transactions:
+
+- To derive `networkId` and `chainId` from an `evmChainId`, split the 64-bit integer into its upper and lower 32 bits respectively.
+- To encode a Canopy transaction as EVM-compatible, shift the `networkId` 32 bits to the left and OR it with the `chainId`.
+
+This makes integration with tools like MetaMask and compatibility with EVM RPC interfaces straightforward, while preserving the semantics of Canopy's security model.
+
 #### eth_estimateGas
 
 Canopy uses a simple translation layer to bridge minimum fees into EVM-compatible gas values:
@@ -351,11 +379,5 @@ Canopy uses a simple translation layer to bridge minimum fees into EVM-compatibl
 
 This keeps the total fee consistent with the Canopy-side tx.Fee (denominated in uCNPY), scaled to Ethereum’s 18-decimal wei units.
 
-Multiplying tx.Fee by 100 ensures that eth_estimateGas() returns values significantly above 21,000 — the lower bound required by many 
+Multiplying tx.Fee by 100 ensures that eth_estimateGas() returns values significantly above 21,000 — the lower bound required by many
 Ethereum tools like MetaMask. This preserves compatibility while keeping gas price constant and simple to reason about.
-
-
-
-
-
-
