@@ -180,17 +180,16 @@ func (t *Txn) addToSorted(key string) {
 
 // Iterator() returns a new iterator for merged iteration of both the in-memory operations and parent store with the given prefix
 func (t *Txn) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
-	newPrefix := lib.Append(t.prefix, prefix)
 	parent := t.reader.NewIterator(badger.IteratorOptions{
-		Prefix: newPrefix,
+		Prefix: lib.Append(t.prefix, prefix),
 	})
 	parent.Rewind()
 	it := &Iterator{
 		logger: t.logger,
 		reader: parent,
-		prefix: prefix,
+		prefix: t.prefix,
 	}
-	return newTxnIterator(it, t.cache, prefix, false), nil
+	return newTxnIterator(it, t.cache, t.prefix, prefix, false), nil
 }
 
 // RevIterator() returns a new reverse iterator for merged iteration of both the in-memory operations and parent store with the given prefix
@@ -204,9 +203,9 @@ func (t *Txn) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	it := &Iterator{
 		logger: t.logger,
 		reader: parent,
-		prefix: prefix,
+		prefix: t.prefix,
 	}
-	return newTxnIterator(it, t.cache, prefix, true), nil
+	return newTxnIterator(it, t.cache, t.prefix, prefix, true), nil
 }
 
 // ArchiveIterator() creates a new iterator for all versions under the given prefix in the BadgerDB transaction
@@ -260,16 +259,22 @@ var _ lib.IteratorI = &TxnIterator{}
 type TxnIterator struct {
 	parent lib.IteratorI
 	txn
-	prefix  string
-	index   int
-	reverse bool
-	invalid bool
-	useTxn  bool
+	prefix       string
+	parentPrefix string
+	index        int
+	reverse      bool
+	invalid      bool
+	useTxn       bool
 }
 
 // newTxnIterator() initializes a new merged iterator for traversing both the in-memory operations and parent store
-func newTxnIterator(parent lib.IteratorI, t txn, prefix []byte, reverse bool) *TxnIterator {
-	return (&TxnIterator{parent: parent, txn: t, prefix: lib.BytesToString(prefix), reverse: reverse}).First()
+func newTxnIterator(parent lib.IteratorI, t txn, parentPrefix, prefix []byte, reverse bool) *TxnIterator {
+	return (&TxnIterator{
+		parent:       parent,
+		txn:          t,
+		parentPrefix: lib.BytesToString(parentPrefix),
+		prefix:       lib.BytesToString(prefix),
+		reverse:      reverse}).First()
 }
 
 // First() positions the iterator at the first valid entry based on the traversal direction
@@ -396,7 +401,7 @@ func (ti *TxnIterator) txnInvalid() bool {
 			return ti.invalid
 		}
 	}
-	if !strings.HasPrefix(ti.sorted[ti.index], ti.prefix) {
+	if !strings.HasPrefix(ti.sorted[ti.index], ti.parentPrefix+ti.prefix) {
 		return ti.invalid
 	}
 	ti.invalid = false
@@ -405,7 +410,7 @@ func (ti *TxnIterator) txnInvalid() bool {
 
 // txnKey() returns the key of the current in-memory operation
 func (ti *TxnIterator) txnKey() []byte {
-	bz, _ := lib.StringToBytes(ti.sorted[ti.index])
+	bz, _ := lib.StringToBytes(strings.TrimPrefix(ti.sorted[ti.index], ti.parentPrefix))
 	return bz
 }
 
@@ -431,15 +436,19 @@ func (ti *TxnIterator) txnNext() {
 
 // seek() positions the iterator at the first entry that matches or exceeds the prefix.
 func (ti *TxnIterator) seek() *TxnIterator {
-	ti.index = sort.Search(ti.sortedLen, func(i int) bool { return ti.sorted[i] >= ti.prefix })
+	ti.index = sort.Search(ti.sortedLen, func(i int) bool {
+		return ti.sorted[i] >= (ti.parentPrefix + ti.prefix)
+	})
 	return ti
 }
 
 // revSeek() positions the iterator at the last entry that matches the prefix in reverse order.
 func (ti *TxnIterator) revSeek() *TxnIterator {
-	bz, _ := lib.StringToBytes(ti.prefix)
+	bz, _ := lib.StringToBytes(ti.parentPrefix + ti.prefix)
 	endPrefix := lib.BytesToString(prefixEnd(bz))
-	ti.index = sort.Search(ti.sortedLen, func(i int) bool { return ti.sorted[i] >= endPrefix }) - 1
+	ti.index = sort.Search(ti.sortedLen, func(i int) bool {
+		return ti.sorted[i] >= endPrefix
+	}) - 1
 	return ti
 }
 

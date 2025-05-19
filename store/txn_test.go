@@ -1,66 +1,66 @@
 package store
 
 import (
+	"testing"
+
 	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
-func TestTxnWriteSetGet(t *testing.T) {
+func newTxn(t *testing.T, prefix []byte) (*Txn, *badger.DB) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
-	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
-	require.NoError(t, err)
-	test := NewTxn(parent)
-	defer func() { parent.Close(); db.Close(); test.Discard() }()
-	require.NoError(t, test.Set([]byte("1/a"), []byte("a")))
+	var version uint64 = 1
+	reader := db.NewTransactionAt(version, false)
+	writer := db.NewWriteBatchAt(version)
+	return NewTxn(reader, writer, prefix, lib.NewDefaultLogger()), db
+}
+
+func TestTxnWriteSetGet(t *testing.T) {
+	test, db := newTxn(t, []byte("1/"))
+	defer func() { test.Close(); db.Close(); test.Discard() }()
+	key := []byte("a")
+	value := []byte("a")
+	require.NoError(t, test.Set(key, value))
 	// test get from ops before write()
-	val, err := test.Get([]byte("1/a"))
+	val, err := test.Get(key)
 	require.NoError(t, err)
-	require.Equal(t, []byte("a"), val)
-	// test get from parent before write()
-	val, err = parent.Get([]byte("1/a"))
-	require.NoError(t, err)
-	require.Nil(t, val)
+	require.Equal(t, value, val)
+	// test get from reader before write()
+	_, dbErr := test.reader.Get(key)
+	require.Error(t, dbErr)
 	require.NoError(t, test.Write())
-	// test get from parent after write()
-	val, err = parent.Get([]byte("1/a"))
+	require.NoError(t, test.writer.Flush())
+	// test get from reader after write()
+	require.Len(t, test.cache.ops, 0)
+	val, err = test.Get(key)
 	require.NoError(t, err)
-	require.Equal(t, []byte("a"), val)
-	// test get from ops after write()
-	val, err = test.Get([]byte("1/a"))
-	require.NoError(t, err)
-	require.Equal(t, []byte("a"), val)
+	require.Equal(t, value, val)
 }
 
 func TestTxnWriteDelete(t *testing.T) {
-	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
-	require.NoError(t, err)
-	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
-	test := NewTxn(parent)
-	defer func() { parent.Close(); db.Close(); test.Discard() }()
-	require.NoError(t, test.Set([]byte("1/a"), []byte("a")))
-	require.NoError(t, test.Write())
-	require.NoError(t, test.Delete([]byte("1/a")))
-	val, err := test.Get([]byte("1/a"))
+	test, db := newTxn(t, []byte("1/"))
+	defer func() { test.Close(); db.Close(); test.Discard() }()
+	// set value and delete in the ops
+	require.NoError(t, test.Set([]byte("a"), []byte("a")))
+	require.NoError(t, test.Delete([]byte("a")))
+	val, err := test.Get([]byte("a"))
 	require.NoError(t, err)
 	require.Nil(t, val)
-	val, err = parent.Get([]byte("1/a"))
-	require.NoError(t, err)
-	require.Equal(t, []byte("a"), val)
+	// test get value from reader before write()
+	_, dbErr := test.reader.Get([]byte("1/a"))
+	require.ErrorIs(t, dbErr, badger.ErrKeyNotFound)
+	// test get value from reader after write()
 	require.NoError(t, test.Write())
-	val, err = parent.Get([]byte("1/a"))
-	require.NoError(t, err)
-	require.Nil(t, val)
+	require.NoError(t, test.writer.Flush())
+	_, dbErr = test.reader.Get([]byte("1/a"))
+	require.ErrorIs(t, dbErr, badger.ErrKeyNotFound)
 }
 
 func TestTxnIterateNilPrefix(t *testing.T) {
-	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
-	require.NoError(t, err)
-	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
-	test := NewTxn(parent)
-	defer func() { parent.Close(); db.Close(); test.Discard() }()
+	test, db := newTxn(t, []byte(""))
+	defer func() { test.Close(); db.Close(); test.Discard() }()
 	bulkSetKV(t, test, "", "c", "a", "b")
 	it1, err := test.Iterator(nil)
 	require.NoError(t, err)
@@ -103,11 +103,8 @@ func TestTxnIterateNilPrefix(t *testing.T) {
 }
 
 func TestTxnIterateBasic(t *testing.T) {
-	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
-	require.NoError(t, err)
-	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
-	test := NewTxn(parent)
-	defer func() { parent.Close(); db.Close(); test.Discard() }()
+	test, db := newTxn(t, []byte(""))
+	defer func() { test.Close(); db.Close(); test.Discard() }()
 	bulkSetKV(t, test, "0/", "c", "a", "b")
 	bulkSetKV(t, test, "1/", "f", "d", "e")
 	bulkSetKV(t, test, "2/", "i", "h", "g")
@@ -152,16 +149,23 @@ func TestTxnIterateBasic(t *testing.T) {
 }
 
 func TestTxnIterateMixed(t *testing.T) {
-	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
-	require.NoError(t, err)
-	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
-	test := NewTxn(parent)
-	defer func() { parent.Close(); db.Close(); test.Discard() }()
-	bulkSetKV(t, parent, "1/", "f", "e", "d")
+	test, db := newTxn(t, []byte("s/"))
+	defer func() { test.Close(); db.Close(); test.Discard() }()
+	// first write to the memory cache and flush it
+	bulkSetKV(t, test, "1/", "f", "e", "d")
+	require.NoError(t, test.Write())
+	require.NoError(t, test.writer.Flush())
+	// now add new entries to the memory cache.
+	// Since the reader and writer are on the same version,
+	// it's possible to read the previously flushed data
+	// without creating a new transaction
 	bulkSetKV(t, test, "1/", "i", "h", "g")
-	it1, err := test.Iterator([]byte("1/"))
+	// confirm that the only data in the memory cache are the last 3 entries
+	require.Len(t, test.cache.ops, 3)
+	it1, err := test.Iterator([]byte(""))
 	require.NoError(t, err)
-	for i := 0; it1.Valid(); it1.Next() {
+	var i int
+	for ; it1.Valid(); it1.Next() {
 		switch i {
 		case 0:
 			require.Equal(t, []byte("1/d"), it1.Key())
@@ -186,10 +190,12 @@ func TestTxnIterateMixed(t *testing.T) {
 		}
 		i++
 	}
+	require.Equal(t, 6, i, "not all iterator cases tested")
 	it1.Close()
-	it2, err := test.RevIterator([]byte("1"))
+	it2, err := test.RevIterator([]byte(""))
 	require.NoError(t, err)
-	for i := 0; it2.Valid(); it2.Next() {
+	i = 0
+	for ; it2.Valid(); it2.Next() {
 		switch i {
 		case 0:
 			require.Equal(t, []byte("1/i"), it2.Key())
@@ -214,16 +220,22 @@ func TestTxnIterateMixed(t *testing.T) {
 		}
 		i++
 	}
+	require.Equal(t, 6, i, "not all reverse iterator cases tested")
 	it2.Close()
 }
 
 func TestTxnIterateMixedWithDeletedValues(t *testing.T) {
-	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
-	require.NoError(t, err)
-	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
-	test := NewTxn(parent)
-	defer func() { parent.Close(); db.Close(); test.Discard() }()
-	bulkSetKV(t, parent, "1/", "f", "e", "d")
+	test, db := newTxn(t, []byte(""))
+	defer func() { test.Close(); db.Close(); test.Discard() }()
+	// first write to the db writer and flush it
+	bulkSetKV(t, test, "1/", "f", "e", "d")
+	require.NoError(t, test.Write())
+	require.NoError(t, test.writer.Flush())
+	// now add new entries to the memory cache.
+	// Since the reader and writer are on the same version,
+	// it's possible to read the previously flushed data
+	// without creating a new transaction
+	// add the values to the memory cache
 	bulkSetKV(t, test, "1/", "h", "g", "f")
 	require.NoError(t, test.Delete([]byte("1/f"))) // shared and shadowed
 	require.NoError(t, test.Delete([]byte("1/d"))) // first
@@ -262,19 +274,21 @@ func TestTxnIterateMixedWithDeletedValues(t *testing.T) {
 	it2.Close()
 }
 
-func TestTxnIterate(t *testing.T) {
-	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
-	require.NoError(t, err)
-	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
-	compare := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), []byte(latestStatePrefix))
-	test := NewTxn(parent)
-	defer func() { parent.Close(); compare.Close(); db.Close(); test.Discard() }()
-	require.NoError(t, test.Set([]byte("a"), []byte("a")))
-	require.NoError(t, compare.Set([]byte("a"), []byte("a")))
-	revIt, err := test.RevIterator([]byte(prefixEnd([]byte("a"))))
-	require.NoError(t, err)
-	revIt.Close()
-	revIt, err = compare.RevIterator(prefixEnd([]byte("a")))
-	require.NoError(t, err)
-	revIt.Close()
-}
+// TODO: test might not be needed anymore as TxnWrapper is deprecated
+// and txn now performs all the functionalities of TxnWrapper, consider removal
+// func TestTxnIterate(t *testing.T) {
+// 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
+// 	require.NoError(t, err)
+// 	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
+// 	compare := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), []byte(latestStatePrefix))
+// 	test := NewTxn(parent)
+// 	defer func() { parent.Close(); compare.Close(); db.Close(); test.Discard() }()
+// 	require.NoError(t, test.Set([]byte("a"), []byte("a")))
+// 	require.NoError(t, compare.Set([]byte("a"), []byte("a")))
+// 	revIt, err := test.RevIterator([]byte(prefixEnd([]byte("a"))))
+// 	require.NoError(t, err)
+// 	revIt.Close()
+// 	revIt, err = compare.RevIterator(prefixEnd([]byte("a")))
+// 	require.NoError(t, err)
+// 	revIt.Close()
+// }
