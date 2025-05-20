@@ -18,7 +18,32 @@ func newTxn(t *testing.T, prefix []byte) (*Txn, *badger.DB, *badger.WriteBatch) 
 	var version uint64 = 1
 	reader := db.NewTransactionAt(version, false)
 	writer := db.NewWriteBatchAt(version)
-	return NewTxn(reader, writer, prefix, lib.NewDefaultLogger()), db, writer
+	return NewBadgerTxn(reader, writer, prefix, lib.NewDefaultLogger()), db, writer
+}
+
+func TestNestedTxn(t *testing.T) {
+	baseTxn, db, _ := newTxn(t, []byte("1/"))
+	defer func() { baseTxn.Close(); db.Close(); baseTxn.Discard() }()
+	// create a nested transaction
+	nested := NewTxn(baseTxn, baseTxn, []byte("2/"), baseTxn.logger)
+	// set some values in the nested transaction
+	require.NoError(t, nested.Set([]byte("a"), []byte("a")))
+	require.NoError(t, nested.Set([]byte("b"), []byte("b")))
+	require.NoError(t, nested.Delete([]byte("a")))
+	// confirm value is succesfully deleted
+	val, err := nested.Get([]byte("a"))
+	require.NoError(t, err)
+	require.Nil(t, val)
+	// confirm value is not visible in the parent transaction
+	val, err = baseTxn.Get([]byte("2/b"))
+	require.NoError(t, err)
+	require.Nil(t, val)
+	// commit the nested transaction
+	require.NoError(t, nested.Write())
+	// check that the changes are visible in the parent transaction
+	val, err = baseTxn.Get([]byte("2/b"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("b"), val)
 }
 
 func TestTxnWriteSetGet(t *testing.T) {
@@ -32,8 +57,9 @@ func TestTxnWriteSetGet(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, value, val)
 	// test get from reader before write()
-	_, dbErr := test.reader.Get(key)
-	require.Error(t, dbErr)
+	dbVal, dbErr := test.reader.Get(key)
+	require.NoError(t, dbErr)
+	require.Nil(t, dbVal)
 	require.NoError(t, test.Write())
 	require.NoError(t, writer.Flush())
 	// test get from reader after write()
@@ -53,13 +79,15 @@ func TestTxnWriteDelete(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, val)
 	// test get value from reader before write()
-	_, dbErr := test.reader.Get([]byte("1/a"))
-	require.Equal(t, ErrStoreGet(badger.ErrKeyNotFound).Error(), dbErr.Error())
+	dbVal, dbErr := test.reader.Get([]byte("1/a"))
+	require.NoError(t, dbErr)
+	require.Nil(t, dbVal)
 	// test get value from reader after write()
 	require.NoError(t, test.Write())
 	require.NoError(t, writer.Flush())
-	_, dbErr = test.reader.Get([]byte("1/a"))
-	require.Equal(t, ErrStoreGet(badger.ErrKeyNotFound).Error(), dbErr.Error())
+	dbVal, dbErr = test.reader.Get([]byte("1/a"))
+	dbVal, dbErr = test.reader.Get([]byte("1/a"))
+	require.NoError(t, dbErr)
 }
 
 func TestTxnIterateNilPrefix(t *testing.T) {
