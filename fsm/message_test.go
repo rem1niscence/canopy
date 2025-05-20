@@ -259,7 +259,7 @@ func TestHandleMessage(t *testing.T) {
 				RequestedAmount:      1000,
 				SellerReceiveAddress: newTestPublicKeyBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
-				Hash:                 newTestOrderId(t, 0),
+				OrderId:              newTestOrderId(t, 0),
 			},
 			validate: func(sm StateMachine) {
 				// ensure the account was subtracted from
@@ -2232,7 +2232,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
-				Hash:                 newTestOrderId(t, 0),
+				OrderId:              newTestOrderId(t, 0),
 			},
 			error: "minimum order size",
 		},
@@ -2246,7 +2246,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
-				Hash:                 newTestOrderId(t, 0),
+				OrderId:              newTestOrderId(t, 0),
 			},
 			error: "insufficient funds",
 		},
@@ -2261,7 +2261,7 @@ func TestMessageCreateOrder(t *testing.T) {
 				RequestedAmount:      1,
 				SellerReceiveAddress: newTestAddressBytes(t),
 				SellersSendAddress:   newTestAddressBytes(t),
-				Hash:                 newTestOrderId(t, 0),
+				OrderId:              newTestOrderId(t, 0),
 			},
 		},
 	}
