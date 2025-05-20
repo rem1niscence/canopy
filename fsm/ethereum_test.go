@@ -585,7 +585,7 @@ func TestRLPStaking(t *testing.T) {
 					Address: from.Bytes(),
 					ChainId: 1,
 					Amount:  123,
-					Opcode:  "test",
+					Opcode:  []byte("test"),
 				}
 				// set the message as expected
 				expected.MessageType = MessageSubsidyName

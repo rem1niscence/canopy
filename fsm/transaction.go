@@ -344,7 +344,7 @@ func NewCertificateResultsTx(from crypto.PrivateKeyI, qc *lib.QuorumCertificate,
 }
 
 // NewSubsidyTx() creates a SubsidyTransaction object in the interface form of TransactionI
-func NewSubsidyTx(from crypto.PrivateKeyI, amount, committeeId uint64, opCode string, networkId, chainId, fee, height uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+func NewSubsidyTx(from crypto.PrivateKeyI, amount, committeeId uint64, opCode lib.HexBytes, networkId, chainId, fee, height uint64, memo string) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageSubsidy{
 		Address: from.PublicKey().Address().Bytes(),
 		ChainId: committeeId,
@@ -354,9 +354,10 @@ func NewSubsidyTx(from crypto.PrivateKeyI, amount, committeeId uint64, opCode st
 }
 
 // NewCreateOrderTx() creates a CreateOrderTransaction object in the interface form of TransactionI
-func NewCreateOrderTx(from crypto.PrivateKeyI, sellAmount, requestAmount, committeeId uint64, receiveAddress []byte, networkId, chainId, fee, height uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+func NewCreateOrderTx(from crypto.PrivateKeyI, sellAmount, requestAmount, committeeId uint64, data lib.HexBytes, receiveAddress []byte, networkId, chainId, fee, height uint64, memo string) (lib.TransactionI, lib.ErrorI) {
 	return NewTransaction(from, &MessageCreateOrder{
 		ChainId:              committeeId,
+		Data:                 data,
 		AmountForSale:        sellAmount,
 		RequestedAmount:      requestAmount,
 		SellerReceiveAddress: receiveAddress,
@@ -365,7 +366,7 @@ func NewCreateOrderTx(from crypto.PrivateKeyI, sellAmount, requestAmount, commit
 }
 
 // NewEditOrderTx() creates an EditOrderTransaction object in the interface form of TransactionI
-func NewEditOrderTx(from crypto.PrivateKeyI, orderId string, sellAmount, requestAmount, committeeId uint64, receiveAddress []byte, networkId, chainId, fee, height uint64, memo string) (lib.TransactionI, lib.ErrorI) {
+func NewEditOrderTx(from crypto.PrivateKeyI, orderId string, sellAmount, requestAmount, committeeId uint64, data lib.HexBytes, receiveAddress []byte, networkId, chainId, fee, height uint64, memo string) (lib.TransactionI, lib.ErrorI) {
 	oId, err := lib.StringToBytes(orderId)
 	if err != nil {
 		return nil, err
@@ -373,6 +374,7 @@ func NewEditOrderTx(from crypto.PrivateKeyI, orderId string, sellAmount, request
 	return NewTransaction(from, &MessageEditOrder{
 		OrderId:              oId,
 		ChainId:              committeeId,
+		Data:                 data,
 		AmountForSale:        sellAmount,
 		RequestedAmount:      requestAmount,
 		SellerReceiveAddress: receiveAddress,
