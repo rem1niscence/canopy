@@ -1,6 +1,10 @@
 package store
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	math "math/rand"
+	"slices"
 	"testing"
 
 	"github.com/canopy-network/canopy/lib"
@@ -8,17 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTxn(t *testing.T, prefix []byte) (*Txn, *badger.DB) {
+func newTxn(t *testing.T, prefix []byte) (*Txn, *badger.DB, *badger.WriteBatch) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
 	var version uint64 = 1
 	reader := db.NewTransactionAt(version, false)
 	writer := db.NewWriteBatchAt(version)
-	return NewTxn(reader, writer, prefix, lib.NewDefaultLogger()), db
+	return NewTxn(reader, writer, prefix, lib.NewDefaultLogger()), db, writer
 }
 
 func TestTxnWriteSetGet(t *testing.T) {
-	test, db := newTxn(t, []byte("1/"))
+	test, db, writer := newTxn(t, []byte("1/"))
 	defer func() { test.Close(); db.Close(); test.Discard() }()
 	key := []byte("a")
 	value := []byte("a")
@@ -31,7 +35,7 @@ func TestTxnWriteSetGet(t *testing.T) {
 	_, dbErr := test.reader.Get(key)
 	require.Error(t, dbErr)
 	require.NoError(t, test.Write())
-	require.NoError(t, test.writer.Flush())
+	require.NoError(t, writer.Flush())
 	// test get from reader after write()
 	require.Len(t, test.cache.ops, 0)
 	val, err = test.Get(key)
@@ -40,7 +44,7 @@ func TestTxnWriteSetGet(t *testing.T) {
 }
 
 func TestTxnWriteDelete(t *testing.T) {
-	test, db := newTxn(t, []byte("1/"))
+	test, db, writer := newTxn(t, []byte("1/"))
 	defer func() { test.Close(); db.Close(); test.Discard() }()
 	// set value and delete in the ops
 	require.NoError(t, test.Set([]byte("a"), []byte("a")))
@@ -50,16 +54,16 @@ func TestTxnWriteDelete(t *testing.T) {
 	require.Nil(t, val)
 	// test get value from reader before write()
 	_, dbErr := test.reader.Get([]byte("1/a"))
-	require.ErrorIs(t, dbErr, badger.ErrKeyNotFound)
+	require.Equal(t, ErrStoreGet(badger.ErrKeyNotFound).Error(), dbErr.Error())
 	// test get value from reader after write()
 	require.NoError(t, test.Write())
-	require.NoError(t, test.writer.Flush())
+	require.NoError(t, writer.Flush())
 	_, dbErr = test.reader.Get([]byte("1/a"))
-	require.ErrorIs(t, dbErr, badger.ErrKeyNotFound)
+	require.Equal(t, ErrStoreGet(badger.ErrKeyNotFound).Error(), dbErr.Error())
 }
 
 func TestTxnIterateNilPrefix(t *testing.T) {
-	test, db := newTxn(t, []byte(""))
+	test, db, _ := newTxn(t, []byte(""))
 	defer func() { test.Close(); db.Close(); test.Discard() }()
 	bulkSetKV(t, test, "", "c", "a", "b")
 	it1, err := test.Iterator(nil)
@@ -103,7 +107,7 @@ func TestTxnIterateNilPrefix(t *testing.T) {
 }
 
 func TestTxnIterateBasic(t *testing.T) {
-	test, db := newTxn(t, []byte(""))
+	test, db, _ := newTxn(t, []byte(""))
 	defer func() { test.Close(); db.Close(); test.Discard() }()
 	bulkSetKV(t, test, "0/", "c", "a", "b")
 	bulkSetKV(t, test, "1/", "f", "d", "e")
@@ -149,12 +153,12 @@ func TestTxnIterateBasic(t *testing.T) {
 }
 
 func TestTxnIterateMixed(t *testing.T) {
-	test, db := newTxn(t, []byte("s/"))
+	test, db, writer := newTxn(t, []byte("s/"))
 	defer func() { test.Close(); db.Close(); test.Discard() }()
 	// first write to the memory cache and flush it
 	bulkSetKV(t, test, "1/", "f", "e", "d")
 	require.NoError(t, test.Write())
-	require.NoError(t, test.writer.Flush())
+	require.NoError(t, writer.Flush())
 	// now add new entries to the memory cache.
 	// Since the reader and writer are on the same version,
 	// it's possible to read the previously flushed data
@@ -225,12 +229,12 @@ func TestTxnIterateMixed(t *testing.T) {
 }
 
 func TestTxnIterateMixedWithDeletedValues(t *testing.T) {
-	test, db := newTxn(t, []byte(""))
+	test, db, writer := newTxn(t, []byte(""))
 	defer func() { test.Close(); db.Close(); test.Discard() }()
 	// first write to the db writer and flush it
 	bulkSetKV(t, test, "1/", "f", "e", "d")
 	require.NoError(t, test.Write())
-	require.NoError(t, test.writer.Flush())
+	require.NoError(t, writer.Flush())
 	// now add new entries to the memory cache.
 	// Since the reader and writer are on the same version,
 	// it's possible to read the previously flushed data
@@ -292,3 +296,41 @@ func TestTxnIterateMixedWithDeletedValues(t *testing.T) {
 // 	require.NoError(t, err)
 // 	revIt.Close()
 // }
+
+func TestIteratorBasic(t *testing.T) {
+	test, db, writer := newTxn(t, []byte(""))
+	defer func() { test.Close(); db.Close(); test.Discard() }()
+	expectedVals := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
+	expectedValsReverse := []string{"h", "g", "f", "e", "d", "c", "b", "a"}
+	bulkSetKV(t, test, "", expectedVals...)
+	require.NoError(t, test.Write())
+	require.NoError(t, writer.Flush())
+	it, err := test.Iterator(nil)
+	require.NoError(t, err)
+	defer it.Close()
+	validateIterators(t, expectedVals, it)
+	rIt, err := test.RevIterator(nil)
+	require.NoError(t, err)
+	defer rIt.Close()
+	validateIterators(t, expectedValsReverse, rIt)
+}
+
+func TestIteratorWithDelete(t *testing.T) {
+	expectedVals := []string{"a", "b", "c", "d", "e", "f", "g"}
+	test, db, _ := newTxn(t, []byte(""))
+	defer func() { test.Close(); db.Close(); test.Discard() }()
+	bulkSetKV(t, test, "", expectedVals...)
+	for range 10 {
+		randomindex := math.Intn(len(expectedVals))
+		require.NoError(t, test.Delete([]byte(expectedVals[randomindex])))
+		expectedVals = slices.Delete(expectedVals, randomindex, randomindex+1)
+		cIt, err := test.Iterator(nil)
+		require.NoError(t, err)
+		validateIterators(t, expectedVals, cIt)
+		cIt.Close()
+		add := make([]byte, 1)
+		_, er := rand.Read(add)
+		require.NoError(t, er)
+		expectedVals = append(expectedVals, hex.EncodeToString(add))
+	}
+}
