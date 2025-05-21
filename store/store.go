@@ -214,7 +214,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	defer s.metrics.UpdateStoreMetrics(size, entries, time.Time{}, time.Now())
 	// finally commit the entire Transaction to the actual DB under the proper version (height) number
 	if e := s.Write(); e != nil {
-		return nil, ErrCommitDB(e)
+		return nil, err
 	}
 	if e := s.batchWriter.Flush(); e != nil {
 		return nil, ErrCommitDB(e)
@@ -279,113 +279,113 @@ func (s *Store) ShouldPartition() (timeToPartition bool) {
 //     safely be pruned
 //  2. PRUNE: Drop all versions in the LSS older than the latest keys @ partition height
 func (s *Store) Partition() {
-	// start := time.Now()
-	// // create a copy of the store for multi-thread safety
-	// sCopy, err := s.Copy()
-	// if err != nil {
-	// 	s.log.Errorf(err.Error())
-	// 	return
-	// }
-	// // cast to a type Store reference for lower level functionality
-	// sc := sCopy.(*Store)
-	// // log the beginning of the process
-	// sc.log.Info("Started partition process ✂️")
-	// if err = func() lib.ErrorI {
-	// 	// calculate the partition height
-	// 	snapshotHeight := partitionHeight(sc.Version())
-	// 	// create a reader at the partition height
-	// 	reader := sc.db.NewTransactionAt(snapshotHeight, false)
-	// 	defer reader.Discard()
-	// 	// create a managed batch to do the 'writing'
-	// 	writer := sc.db.NewWriteBatchAt(snapshotHeight)
-	// 	defer writer.Cancel()
-	// 	// generate the historical partition prefix
-	// 	partitionPrefix := historicalPrefix(snapshotHeight)
-	// 	// get the latest store in a transaction wrapper
-	// 	lss := NewTxnWrapper(reader, sc.log, []byte(latestStatePrefix))
-	// 	// create an iterator that traverses the entire latest state store at the partition height
-	// 	iterator, er := lss.ArchiveIterator(nil)
-	// 	if er != nil {
-	// 		return er
-	// 	}
-	// 	// convert the iterator to a type Iterator for lower level functionality
-	// 	it := iterator.(*Iterator)
-	// 	defer it.Close()
-	// 	// set a signal the partition was successfully created <only written if batch succeeds>
-	// 	if e := writer.SetEntryAt(&badger.Entry{Key: lib.Append(partitionPrefix, []byte(partitionExistsKey)), Value: []byte(partitionExistsKey)}, snapshotHeight); e != nil {
-	// 		return ErrSetEntry(e)
-	// 	}
-	// 	// create a variable to de-duplicate the calls
-	// 	deDuplicator := lib.NewDeDuplicator[string]()
-	// 	// for each key in the state at the partition height
-	// 	for ; it.Valid(); it.Next() {
-	// 		// get the key from the iterator item
-	// 		k, v := it.Key(), it.Value()
-	// 		// skip items that are already marked for Garbage Collection
-	// 		if deDuplicator.Found(lib.BytesToString(k)) {
-	// 			continue
-	// 		}
-	// 		// if the item is 'deleted'
-	// 		if it.Deleted() {
-	// 			// set the item as deleted at the partition height and discard earlier versions
-	// 			if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit|badgerDiscardEarlierVersions), snapshotHeight); e != nil {
-	// 				return ErrSetEntry(e)
-	// 			}
-	// 		} else {
-	// 			// set item in the historical partition
-	// 			if e := writer.SetEntryAt(newEntry(lib.Append(partitionPrefix, k), v, badgerNoDiscardBit), snapshotHeight); e != nil {
-	// 				return ErrSetEntry(e)
-	// 			}
-	// 			// re-write the latest version with the 'discard' flag set
-	// 			if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), v, badgerDiscardEarlierVersions), snapshotHeight); e != nil {
-	// 				return ErrSetEntry(e)
-	// 			}
-	// 		}
-	// 	}
-	// 	// extract the internal metrics from the badger Txn
-	// 	size, entries := getSizeAndCountFromBatch(writer)
-	// 	// update the metrics once complete
-	// 	defer s.metrics.UpdateStoreMetrics(size, entries, start, time.Now())
-	// 	// commit the batch
-	// 	if e := writer.Flush(); e != nil {
-	// 		return ErrFlushBatch(e)
-	// 	}
-	// 	// if the partition height is past the partition frequency, set the discardTs at the partition height-1
-	// 	if snapshotHeight > partitionFrequency {
-	// 		sc.db.SetDiscardTs(snapshotHeight - 2)
-	// 	}
-	// 	// if the GC isn't already running
-	// 	if !s.isGarbageCollecting.Swap(true) {
-	// 		sc.log.Info("Started partition GC process")
-	// 		// force the mem table to flush to the LSM
-	// 		sc.log.Debug("Partition: Flushing MemTable")
-	// 		if err = FlushMemTable(sc.db); err != nil {
-	// 			return err
-	// 		}
-	// 		// run LSM compaction
-	// 		sc.log.Debug("Partition: Flattening...")
-	// 		if fe := sc.db.Flatten(1); fe != nil {
-	// 			return ErrGarbageCollectDB(fe)
-	// 		}
-	// 		// unset isGarbageCollecting once complete
-	// 		defer s.isGarbageCollecting.Store(false)
-	// 		// trigger garbage collector to prune keys
-	// 		sc.log.Debug("Partition: Garbage collecting...")
-	// 		if gcErr := sc.db.RunValueLogGC(badgerGCRatio); gcErr != nil {
-	// 			if err != badger.ErrNoRewrite {
-	// 				sc.log.Debugf("%v - this is normal", gcErr)
-	// 				// don't return an error here - this is an expected condition
-	// 			} else {
-	// 				return ErrGarbageCollectDB(gcErr)
-	// 			}
-	// 		}
-	// 	}
-	// 	// exit
-	// 	return nil
-	// }(); err != nil {
-	// 	sc.log.Errorf("Partitioning failed with error: %s", err.Error())
-	// }
-	// sc.log.Info("Partitioning complete ✅")
+	start := time.Now()
+	// create a copy of the store for multi-thread safety
+	sCopy, err := s.Copy()
+	if err != nil {
+		s.log.Errorf(err.Error())
+		return
+	}
+	// cast to a type Store reference for lower level functionality
+	sc := sCopy.(*Store)
+	// log the beginning of the process
+	sc.log.Info("Started partition process ✂️")
+	if err = func() lib.ErrorI {
+		// calculate the partition height
+		snapshotHeight := partitionHeight(sc.Version())
+		// create a reader at the partition height
+		reader := sc.db.NewTransactionAt(snapshotHeight, false)
+		defer reader.Discard()
+		// create a managed batch to do the 'writing'
+		writer := sc.db.NewWriteBatchAt(snapshotHeight)
+		defer writer.Cancel()
+		// generate the historical partition prefix
+		partitionPrefix := historicalPrefix(snapshotHeight)
+		// get the latest store in a transaction wrapper
+		lss := NewBadgerTxn(reader, writer, []byte(latestStatePrefix), s.log)
+		// create an iterator that traverses the entire latest state store at the partition height
+		iterator, er := lss.ArchiveIterator(nil)
+		if er != nil {
+			return er
+		}
+		// convert the iterator to a type Iterator for lower level functionality
+		it := iterator.(*Iterator)
+		defer it.Close()
+		// set a signal the partition was successfully created <only written if batch succeeds>
+		if e := writer.SetEntryAt(&badger.Entry{Key: lib.Append(partitionPrefix, []byte(partitionExistsKey)), Value: []byte(partitionExistsKey)}, snapshotHeight); e != nil {
+			return ErrSetEntry(e)
+		}
+		// create a variable to de-duplicate the calls
+		deDuplicator := lib.NewDeDuplicator[string]()
+		// for each key in the state at the partition height
+		for ; it.Valid(); it.Next() {
+			// get the key from the iterator item
+			k, v := it.Key(), it.Value()
+			// skip items that are already marked for Garbage Collection
+			if deDuplicator.Found(lib.BytesToString(k)) {
+				continue
+			}
+			// if the item is 'deleted'
+			if it.Deleted() {
+				// set the item as deleted at the partition height and discard earlier versions
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), nil, badgerDeleteBit|badgerDiscardEarlierVersions), snapshotHeight); e != nil {
+					return ErrSetEntry(e)
+				}
+			} else {
+				// set item in the historical partition
+				if e := writer.SetEntryAt(newEntry(lib.Append(partitionPrefix, k), v, badgerNoDiscardBit), snapshotHeight); e != nil {
+					return ErrSetEntry(e)
+				}
+				// re-write the latest version with the 'discard' flag set
+				if e := writer.SetEntryAt(newEntry(lib.Append([]byte(latestStatePrefix), k), v, badgerDiscardEarlierVersions), snapshotHeight); e != nil {
+					return ErrSetEntry(e)
+				}
+			}
+		}
+		// extract the internal metrics from the badger Txn
+		size, entries := getSizeAndCountFromBatch(writer)
+		// update the metrics once complete
+		defer s.metrics.UpdateStoreMetrics(size, entries, start, time.Now())
+		// commit the batch
+		if e := writer.Flush(); e != nil {
+			return ErrFlushBatch(e)
+		}
+		// if the partition height is past the partition frequency, set the discardTs at the partition height-1
+		if snapshotHeight > partitionFrequency {
+			sc.db.SetDiscardTs(snapshotHeight - 2)
+		}
+		// if the GC isn't already running
+		if !s.isGarbageCollecting.Swap(true) {
+			sc.log.Info("Started partition GC process")
+			// force the mem table to flush to the LSM
+			sc.log.Debug("Partition: Flushing MemTable")
+			if err = FlushMemTable(sc.db); err != nil {
+				return err
+			}
+			// run LSM compaction
+			sc.log.Debug("Partition: Flattening...")
+			if fe := sc.db.Flatten(1); fe != nil {
+				return ErrGarbageCollectDB(fe)
+			}
+			// unset isGarbageCollecting once complete
+			defer s.isGarbageCollecting.Store(false)
+			// trigger garbage collector to prune keys
+			sc.log.Debug("Partition: Garbage collecting...")
+			if gcErr := sc.db.RunValueLogGC(badgerGCRatio); gcErr != nil {
+				if err != badger.ErrNoRewrite {
+					sc.log.Debugf("%v - this is normal", gcErr)
+					// don't return an error here - this is an expected condition
+				} else {
+					return ErrGarbageCollectDB(gcErr)
+				}
+			}
+		}
+		// exit
+		return nil
+	}(); err != nil {
+		sc.log.Errorf("Partitioning failed with error: %s", err.Error())
+	}
+	sc.log.Info("Partitioning complete ✅")
 }
 
 // Get() returns the value bytes blob from the State Store
@@ -478,8 +478,7 @@ func (s *Store) NewTxn() lib.StoreI {
 		hss:         NewTxn(s.hss, s.hss, nil, s.log),
 		// the current implementation uses Txn as the reader and writer for the SMT. so this won't
 		// fail, should be revised if the SMT store is ever changed
-		sc: NewDefaultSMT(NewTxn(s.sc.store.(TxnReaderI), s.sc.store.(TxnWriterI), nil, s.log)),
-		// sc:          NewDefaultSMT(NewTxn(scTxn, scTxn, nil, s.log)),
+		sc:      NewDefaultSMT(NewTxn(s.sc.store.(TxnReaderI), s.sc.store.(TxnWriterI), nil, s.log)),
 		Indexer: &Indexer{NewTxn(s.Indexer.db, s.Indexer.db, nil, s.log)},
 		metrics: s.metrics,
 		root:    bytes.Clone(s.root),
@@ -548,7 +547,7 @@ func (s *Store) commitIDKey(version uint64) []byte {
 // getCommitID() retrieves the CommitID value for the specified version from the database
 func (s *Store) getCommitID(version uint64) (id lib.CommitID, err lib.ErrorI) {
 	var bz []byte
-	bz, err = NewTxnWrapper(s.writer, s.log, nil).Get(s.commitIDKey(version))
+	bz, err = NewBadgerTxn(s.reader, s.batchWriter, nil, s.log).Get(s.commitIDKey(version))
 	if err != nil {
 		return
 	}
@@ -560,7 +559,7 @@ func (s *Store) getCommitID(version uint64) (id lib.CommitID, err lib.ErrorI) {
 
 // setCommitID() stores the CommitID for the specified version and root in the database
 func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
-	w := NewTxnWrapper(s.writer, s.log, nil)
+	w := NewBadgerTxn(s.reader, s.batchWriter, nil, s.log)
 	value, err := lib.Marshal(&lib.CommitID{
 		Height: version,
 		Root:   root,
@@ -591,7 +590,7 @@ func partitionHeight(height uint64) uint64 {
 
 // getLatestCommitID() retrieves the latest CommitID from the database
 func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *lib.CommitID) {
-	tx := NewTxnWrapper(db.NewTransactionAt(math.MaxUint64, false), log, nil)
+	tx := NewBadgerTxn(db.NewTransactionAt(math.MaxUint64, false), db.NewWriteBatchAt(0), nil, log)
 	defer tx.Close()
 	id = new(lib.CommitID)
 	bz, err := tx.Get([]byte(lastCommitIDPrefix))
