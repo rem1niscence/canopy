@@ -412,27 +412,23 @@ func (s *StateMachine) unmarshalValidator(bz []byte) (*Validator, lib.ErrorI) {
 
 // validator is the json.Marshaller and json.Unmarshaler implementation for the Validator object
 type validator struct {
-	Address         *crypto.Address           `json:"address"`
-	PublicKey       *crypto.BLS12381PublicKey `json:"publicKey"`
-	Committees      []uint64                  `json:"committees"`
-	NetAddress      string                    `json:"netAddress"`
-	StakedAmount    uint64                    `json:"stakedAmount"`
-	MaxPausedHeight uint64                    `json:"maxPausedHeight"`
-	UnstakingHeight uint64                    `json:"unstakingHeight"`
-	Output          *crypto.Address           `json:"output"`
-	Delegate        bool                      `json:"delegate"`
-	Compound        bool                      `json:"compound"`
+	Address         *crypto.Address `json:"address"`
+	PublicKey       string          `json:"publicKey"`
+	Committees      []uint64        `json:"committees"`
+	NetAddress      string          `json:"netAddress"`
+	StakedAmount    uint64          `json:"stakedAmount"`
+	MaxPausedHeight uint64          `json:"maxPausedHeight"`
+	UnstakingHeight uint64          `json:"unstakingHeight"`
+	Output          *crypto.Address `json:"output"`
+	Delegate        bool            `json:"delegate"`
+	Compound        bool            `json:"compound"`
 }
 
 // MarshalJSON() is the json.Marshaller implementation for the Validator object
 func (x *Validator) MarshalJSON() ([]byte, error) {
-	publicKey, err := crypto.BytesToBLS12381Public(x.PublicKey)
-	if err != nil {
-		return nil, err
-	}
 	return json.Marshal(validator{
 		Address:         crypto.NewAddressFromBytes(x.Address).(*crypto.Address),
-		PublicKey:       publicKey.(*crypto.BLS12381PublicKey),
+		PublicKey:       lib.BytesToString(x.PublicKey),
 		Committees:      x.Committees,
 		NetAddress:      x.NetAddress,
 		StakedAmount:    x.StakedAmount,
@@ -450,9 +446,13 @@ func (x *Validator) UnmarshalJSON(bz []byte) error {
 	if err := json.Unmarshal(bz, val); err != nil {
 		return err
 	}
+	pub, err := lib.StringToBytes(val.PublicKey)
+	if err != nil {
+		return err
+	}
 	*x = Validator{
 		Address:         val.Address.Bytes(),
-		PublicKey:       val.PublicKey.Bytes(),
+		PublicKey:       pub,
 		NetAddress:      val.NetAddress,
 		StakedAmount:    val.StakedAmount,
 		Committees:      val.Committees,

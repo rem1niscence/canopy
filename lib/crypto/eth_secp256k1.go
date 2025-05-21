@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/ethereum/go-ethereum/core/types"
 	ethCrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -23,6 +24,15 @@ type ETHSECP256K1PrivateKey struct {
 // EthPublicKey() returns the ethereum public pair to this private key
 func (s *ETHSECP256K1PrivateKey) PublicKey() PublicKeyI {
 	return &ETHSECP256K1PublicKey{PublicKey: &s.PrivateKey.PublicKey}
+}
+
+// BytesToEthSECP256K1Private() converts bytes to SECP256K1 private key using go-ethereum
+func BytesToEthSECP256K1Private(b []byte) (*ETHSECP256K1PrivateKey, error) {
+	pk, err := ethCrypto.ToECDSA(b)
+	if err != nil {
+		return nil, err
+	}
+	return &ETHSECP256K1PrivateKey{SECP256K1PrivateKey{PrivateKey: pk}}, nil
 }
 
 // ETHSECP256K1PublicKey is the ethereum variant of the public key of a cryptographic key pair used in elliptic curve signing and verification,
@@ -90,3 +100,48 @@ func (s *ETHSECP256K1PublicKey) String() string { return hex.EncodeToString(s.By
 
 // Equals() compares two ETHSECP256K1PublicKey objects and returns true if they're equal
 func (s *ETHSECP256K1PublicKey) Equals(i PublicKeyI) bool { return bytes.Equal(s.Bytes(), i.Bytes()) }
+
+// RecoverPublicKey() recovers a public key from ethereum the transaction and validates the signature
+func RecoverPublicKey(signer types.Signer, tx types.Transaction) (PublicKeyI, error) {
+	// extract signature values
+	Vb, R, S := tx.RawSignatureValues()
+	if Vb == nil || R == nil || S == nil {
+		return nil, types.ErrInvalidSig
+	}
+	// compute sighash (what was signed)
+	sigHash := signer.Hash(&tx)
+	// normalize V to 0 or 1
+	var recoveryID byte
+	V := Vb.Uint64()
+	switch {
+	case V == 27 || V == 28:
+		recoveryID = byte(V - 27)
+	case V >= 35:
+		recoveryID = byte((V - 35) % 2) // EIP-155 recovery ID
+	case V == 0 || V == 1:
+		recoveryID = byte(V) // Typed txs (EIP-2930, 1559, etc.)
+	default:
+		return nil, types.ErrInvalidSig
+	}
+	// validate signature values
+	if !ethCrypto.ValidateSignatureValues(recoveryID, R, S, true) {
+		return nil, types.ErrInvalidSig
+	}
+	// assemble 65-byte signature: R || S || V (recovery ID)
+	r, s := R.Bytes(), S.Bytes()
+	sig := make([]byte, 65)
+	copy(sig[32-len(r):32], r)
+	copy(sig[64-len(s):64], s)
+	sig[64] = recoveryID
+	// recover the public key
+	pubKeyBytes, err := ethCrypto.Ecrecover(sigHash[:], sig)
+	if err != nil {
+		return nil, err
+	}
+	// verify signature to guard against invalid keys
+	if !ethCrypto.VerifySignature(pubKeyBytes, sigHash[:], sig[:64]) {
+		return nil, types.ErrInvalidSig
+	}
+	// convert to PublicKeyI
+	return NewPublicKeyFromBytes(pubKeyBytes)
+}

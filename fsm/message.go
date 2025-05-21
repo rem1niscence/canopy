@@ -57,11 +57,16 @@ func (s *StateMachine) HandleMessageSend(msg *MessageSend) lib.ErrorI {
 
 // HandleMessageStake() is the proper handler for a `Stake` message (Validator does not yet exist in the state)
 func (s *StateMachine) HandleMessageStake(msg *MessageStake) lib.ErrorI {
-	// convert the message public key bytes into a public key object the public key must be a BLS public
-	// key to be a validator in order to participate in consensus for efficient signature aggregation
-	publicKey, e := crypto.BytesToBLS12381Public(msg.PublicKey)
+	// convert the message public key bytes into a public key object
+	publicKey, e := crypto.NewPublicKeyFromBytes(msg.PublicKey)
 	if e != nil {
 		return ErrInvalidPublicKey(e)
+	}
+	// the public key must be a BLS public key to be a validator in order to participate in consensus for efficient signature aggregation
+	if !msg.Delegate {
+		if _, ok := publicKey.(*crypto.BLS12381PublicKey); !ok {
+			return ErrInvalidPublicKey(e)
+		}
 	}
 	// check the net address of the message
 	if err := CheckNetAddress(msg.NetAddress, msg.Delegate); err != nil {
@@ -372,8 +377,9 @@ func (s *StateMachine) HandleMessageCreateOrder(msg *MessageCreateOrder) (err li
 	}
 	// save the order in state
 	return s.SetOrder(&lib.SellOrder{
-		Id:                   msg.Hash,
+		Id:                   msg.OrderId,
 		Committee:            msg.ChainId,
+		Data:                 msg.Data,
 		AmountForSale:        msg.AmountForSale,
 		RequestedAmount:      msg.RequestedAmount,
 		SellerReceiveAddress: msg.SellerReceiveAddress,
@@ -427,6 +433,7 @@ func (s *StateMachine) HandleMessageEditOrder(msg *MessageEditOrder) (err lib.Er
 	return s.SetOrder(&lib.SellOrder{
 		Id:                   order.Id,
 		Committee:            msg.ChainId,
+		Data:                 msg.Data,
 		AmountForSale:        msg.AmountForSale,
 		RequestedAmount:      msg.RequestedAmount,
 		SellerReceiveAddress: msg.SellerReceiveAddress,

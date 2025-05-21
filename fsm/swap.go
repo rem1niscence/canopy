@@ -56,7 +56,7 @@ func (s *StateMachine) ParseLockOrder(tx *lib.Transaction, deadlineBlocks uint64
 	// attempt to unmarshal the transaction memo into a 'lock order'
 	if err := lib.UnmarshalJSON([]byte(tx.Memo), bo); err == nil {
 		// sanity check some critical fields of the 'lock order' to ensure the unmarshal was successful
-		if len(bo.BuyerSendAddress) != 0 && len(bo.BuyerReceiveAddress) != 0 {
+		if len(bo.BuyerSendAddress) != 0 && len(bo.BuyerReceiveAddress) != 0 && bo.ChainId == s.Config.ChainId {
 			ok = true
 		}
 		// set the 'BuyerChainDeadline' in the 'lock order'
@@ -75,7 +75,7 @@ func (s *StateMachine) ParseCloseOrder(tx *lib.Transaction) (co *lib.CloseOrder,
 		return nil, false
 	}
 	// exit
-	return co, co.CloseOrder // signals if this is a 'close order' or not
+	return co, co.ChainId == s.Config.ChainId && co.CloseOrder // signals if this is a 'close order' or not
 }
 
 // ProcessRootChainOrderBook() processes the order book from the root-chain and cross-references blocks on this chain to determine
@@ -397,6 +397,25 @@ func (s *StateMachine) GetOrderBooks() (b *lib.OrderBooks, err lib.ErrorI) {
 	sort.Slice(b.OrderBooks, func(i, j int) bool {
 		return b.OrderBooks[i].ChainId < b.OrderBooks[j].ChainId
 	})
+	// exit
+	return
+}
+
+// GetTotalEscrowed() checks all order books for escrowed funds for a specific address
+func (s *StateMachine) GetTotalEscrowed(address crypto.AddressI) (total uint64, err lib.ErrorI) {
+	orderBooks, err := s.GetOrderBooks()
+	if err != nil {
+		return
+	}
+	// for each order book
+	for _, book := range orderBooks.OrderBooks {
+		// for each order
+		for _, order := range book.Orders {
+			if address == nil || bytes.Equal(order.SellersSendAddress, address.Bytes()) {
+				total += order.AmountForSale
+			}
+		}
+	}
 	// exit
 	return
 }

@@ -44,7 +44,7 @@ func NewETHSECP256K1PrivateKey() (PrivateKeyI, error) {
 	return &ETHSECP256K1PrivateKey{*priv}, nil
 }
 
-// BytesToSECP256K1Public() converts bytes to SECP256K1 private key using go-ethereum
+// BytesToSECP256K1Private() converts bytes to SECP256K1 private key using go-ethereum
 func BytesToSECP256K1Private(b []byte) (*SECP256K1PrivateKey, error) {
 	pk, err := ethCrypto.ToECDSA(b)
 	if err != nil {
