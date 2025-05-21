@@ -86,8 +86,8 @@ func TestTxnWriteDelete(t *testing.T) {
 	require.NoError(t, test.Write())
 	require.NoError(t, writer.Flush())
 	dbVal, dbErr = test.reader.Get([]byte("1/a"))
-	dbVal, dbErr = test.reader.Get([]byte("1/a"))
 	require.NoError(t, dbErr)
+	require.Nil(t, dbVal)
 }
 
 func TestTxnIterateNilPrefix(t *testing.T) {
@@ -360,5 +360,42 @@ func TestIteratorWithDelete(t *testing.T) {
 		_, er := rand.Read(add)
 		require.NoError(t, er)
 		expectedVals = append(expectedVals, hex.EncodeToString(add))
+	}
+}
+
+func TestTxnIterateWithDeleteDuringIteration(t *testing.T) {
+	test, db, _ := newTxn(t, []byte(""))
+	defer func() { test.Close(); db.Close(); test.Discard() }()
+	// set up initial data
+	bulkSetKV(t, test, "", "a", "b", "c", "d", "e")
+	// get an iterator
+	it, err := test.Iterator(nil)
+	require.NoError(t, err)
+	defer it.Close()
+	// track seen keys
+	seen := make(map[string]int)
+	// first iteration to get some keys
+	keysToDelete := make([][]byte, 0)
+	count := 0
+	for ; it.Valid() && count < 3; it.Next() {
+		key := string(it.Key())
+		seen[key]++
+		keysToDelete = append(keysToDelete, []byte(key))
+		count++
+	}
+	// delete those keys
+	for _, key := range keysToDelete {
+		require.NoError(t, test.Delete(key))
+	}
+	// Continue iterating - shouldn't see deleted keys again
+	for ; it.Valid(); it.Next() {
+		key := string(it.Key())
+		seen[key]++
+		// Each key should be seen exactly once
+		require.Equal(t, 1, seen[key], "key %s was seen multiple times", key)
+	}
+	// Verify all keys were seen exactly once
+	for _, k := range []string{"a", "b", "c", "d", "e"} {
+		require.Equal(t, 1, seen[k], "key %s was not iterated or was seen multiple times", k)
 	}
 }

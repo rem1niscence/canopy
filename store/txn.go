@@ -107,6 +107,21 @@ type txn struct {
 	sortedLen int                // len(sorted)
 }
 
+// txn() returns a copy of the current transaction cache
+func (t txn) copy() txn {
+	sorted := make([]string, t.sortedLen)
+	copy(sorted, t.sorted)
+	ops := make(map[string]valueOp, t.sortedLen)
+	for k, v := range t.ops {
+		ops[k] = v
+	}
+	return txn{
+		ops:       ops,
+		sorted:    sorted,
+		sortedLen: t.sortedLen,
+	}
+}
+
 // op is the type of operation to be performed on the key
 type op uint8
 
@@ -220,7 +235,7 @@ func (t *Txn) addToSorted(key string) {
 // Iterator() returns a new iterator for merged iteration of both the in-memory operations and parent store with the given prefix
 func (t *Txn) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	it := t.reader.NewIterator(prefix, false, false)
-	return newTxnIterator(it, t.cache, t.prefix, prefix, false), nil
+	return newTxnIterator(it, t.cache.copy(), t.prefix, prefix, false), nil
 }
 
 // RevIterator() returns a new reverse iterator for merged iteration of both the in-memory operations and parent store with the given prefix
@@ -315,7 +330,8 @@ func newTxnIterator(parent lib.IteratorI, t txn, parentPrefix, prefix []byte, re
 		txn:          t,
 		parentPrefix: lib.BytesToString(parentPrefix),
 		prefix:       lib.BytesToString(prefix),
-		reverse:      reverse}).First()
+		reverse:      reverse,
+	}).First()
 }
 
 // First() positions the iterator at the first valid entry based on the traversal direction
