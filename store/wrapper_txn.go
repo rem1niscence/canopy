@@ -12,7 +12,6 @@ var _ lib.RWStoreI = &TxnWrapper{}
 type TxnWrapper struct {
 	logger lib.LoggerI
 	db     *badger.Txn
-	size   uint64
 	prefix []byte
 }
 
@@ -76,7 +75,7 @@ func (t *TxnWrapper) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 		Prefix: lib.Append(t.prefix, prefix),
 	})
 	parent.Rewind()
-	return &Iterator{
+	return &Iterator2{
 		logger: t.logger,
 		parent: parent,
 		prefix: t.prefix,
@@ -90,13 +89,67 @@ func (t *TxnWrapper) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 		Reverse: true,
 		Prefix:  newPrefix,
 	})
-	seekLast(parent, newPrefix)
-	return &Iterator{
+	seekLast2(parent, newPrefix)
+	return &Iterator2{
 		logger: t.logger,
 		parent: parent,
 		prefix: t.prefix,
 	}, nil
 }
 
+// ArchiveIterator() creates a new iterator for all versions under the given prefix in the BadgerDB transaction
+func (t *TxnWrapper) ArchiveIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
+	parent := t.db.NewIterator(badger.IteratorOptions{
+		Prefix:      lib.Append(t.prefix, prefix),
+		AllVersions: true,
+	})
+	parent.Rewind()
+	return &Iterator2{
+		logger: t.logger,
+		parent: parent,
+		prefix: t.prefix,
+	}, nil
+}
+
+// seekLast() positions the iterator at the last key for the given prefix
+func seekLast2(it *badger.Iterator, prefix []byte) {
+	it.Seek(prefixEnd(prefix))
+}
+
 // IteratorI interface enforcement
 var _ lib.IteratorI = &Iterator{}
+
+// Iterator implements a wrapper around BadgerDB's iterator but satisfies the IteratorI interface
+type Iterator2 struct {
+	logger lib.LoggerI
+	parent *badger.Iterator
+	prefix []byte
+	err    error
+}
+
+func (i *Iterator2) Valid() bool {
+	valid := i.parent.Valid()
+	return valid
+}
+func (i *Iterator2) Next()           { i.parent.Next() }
+func (i *Iterator2) Close()          { i.parent.Close() }
+func (i *Iterator2) Version() uint64 { return i.parent.Item().Version() }
+func (i *Iterator2) Deleted() bool   { return i.parent.Item().IsDeletedOrExpired() }
+func (i *Iterator2) Key() (key []byte) {
+	// get the key from the parent
+	key = i.parent.Item().Key()
+	// make a copy of the key
+	c := make([]byte, len(key))
+	copy(c, key)
+	// remove the prefix and return
+	return removePrefix(c, []byte(i.prefix))
+}
+
+// Value() retrieves the current value from the iterator
+func (i *Iterator2) Value() (value []byte) {
+	value, err := i.parent.Item().ValueCopy(nil)
+	if err != nil {
+		i.err = err
+	}
+	return
+}
