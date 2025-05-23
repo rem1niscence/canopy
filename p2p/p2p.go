@@ -345,8 +345,11 @@ func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 
 // cleanup releases used memory in stream
 func (s *Stream) cleanup() {
-	s.msgAssembler = nil // Release the buffer
-	close(s.sendQueue)   // Close send channel
+	if !s.isClosed.Load() {
+		s.isClosed.Store(true) // Set isClosed flag to true
+		s.msgAssembler = nil   // Release the buffer
+		close(s.sendQueue)     // Close send channel
+	}
 }
 
 // IsSelf() returns if the peer address public key equals the self public key
