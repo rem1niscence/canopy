@@ -69,7 +69,7 @@ type TxnWriterI interface {
 	Cancel()
 }
 
-// enforce the necessary interfaces
+// enforce the necessary interfaces over Txn
 var _ lib.RWStoreI = &Txn{}
 var _ TxnReaderI = &Txn{}
 var _ TxnWriterI = &Txn{}
@@ -89,7 +89,7 @@ var _ lib.IteratorI = &Iterator{}
 	- not thread safe (can't use 1 txn across multiple threads)
 	- nil values are supported; deleted values are also set to nil
 	- keys must be smaller than 128 bytes
-	- Nested txns are theoretically supported, but iteration becomes increasingly inefficient
+	- Nested txns are supported, but iteration becomes increasingly inefficient
 */
 
 type Txn struct {
@@ -250,7 +250,9 @@ func (t *Txn) ArchiveIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 }
 
 // Discard() clears all in-memory operations and resets the sorted key list
-func (t *Txn) Discard() { t.cache.ops, t.cache.sorted, t.cache.sortedLen = nil, nil, 0 }
+func (t *Txn) Discard() {
+	t.cache.ops, t.cache.sorted, t.cache.sortedLen = make(map[string]valueOp), make([]string, 0), 0
+}
 
 // Cancel() cancels the current transaction. Any new writes won't be committed
 func (t *Txn) Cancel() {
@@ -285,7 +287,8 @@ func (t *Txn) Write() lib.ErrorI {
 			}
 		}
 	}
-	t.cache.ops, t.cache.sorted, t.cache.sortedLen = make(map[string]valueOp), make([]string, 0), 0
+	t.Discard() // clear the in-memory operations after writing
+
 	return nil
 }
 
@@ -535,6 +538,10 @@ func (i *Iterator) Value() (value []byte) {
 }
 
 // BADGERDB TXNWRITER AND TXNREADER INTERFACES IMPLEMENTATION BELOW
+
+// Enforce interface implementations
+var _ TxnReaderI = &BadgerTxnReader{}
+var _ TxnWriterI = &BadgerTxnWriter{}
 
 type BadgerTxnReader struct {
 	*badger.Txn
