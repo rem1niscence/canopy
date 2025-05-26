@@ -95,8 +95,12 @@ func NewStore(path string, metrics *lib.Metrics, log lib.LoggerI) (lib.StoreI, l
 	// memTableSize is set to 1.28GB (max) to allow 128MB (10%) of writes in a
 	// single batch. It is seemingly unknown why the 10% limit is set
 	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
-	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt64).
-		WithLoggingLevel(badger.ERROR).WithMemTableSize(maxTransactionSize))
+	db, err := badger.OpenManaged(
+		badger.DefaultOptions(path).
+			WithNumVersionsToKeep(math.MaxInt64).
+			WithLoggingLevel(badger.ERROR).
+			WithMemTableSize(maxTransactionSize),
+	)
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
@@ -375,6 +379,7 @@ func (s *Store) Partition() {
 	}(); err != nil {
 		sc.log.Errorf("Partitioning failed with error: %s", err.Error())
 	}
+	panic("forced panic to test db")
 	sc.log.Info("Partitioning complete ✅")
 }
 
