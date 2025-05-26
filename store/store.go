@@ -207,11 +207,10 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	if err = s.setCommitID(s.version, s.root); err != nil {
 		return nil, err
 	}
-	// TODO: update metrics to use a badger.WriteBatch instead of a badger.Txn
 	// extract the internal metrics from the badger Txn
-	// size, entries := getSizeAndCount(s.writer)
+	size, entries := getSizeAndCountFromBatch(s.writer)
 	// update the metrics once complete
-	// defer s.metrics.UpdateStoreMetrics(size, entries, time.Time{}, time.Now())
+	defer s.metrics.UpdateStoreMetrics(size, entries, time.Time{}, time.Now())
 	// finally commit the entire Transaction to the actual DB under the proper version (height) number
 	if e := s.Write(); e != nil {
 		return nil, err
