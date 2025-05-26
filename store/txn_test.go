@@ -306,25 +306,6 @@ func TestTxnIterateMixedWithDeletedValues(t *testing.T) {
 	it2.Close()
 }
 
-// TODO: test might not be needed anymore as TxnWrapper is deprecated
-// and txn now performs all the functionalities of TxnWrapper, consider removal
-// func TestTxnIterate(t *testing.T) {
-// 	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
-// 	require.NoError(t, err)
-// 	parent, err := NewStoreInMemory(lib.NewDefaultLogger())
-// 	compare := NewTxnWrapper(db.NewTransactionAt(1, true), lib.NewDefaultLogger(), []byte(latestStatePrefix))
-// 	test := NewTxn(parent)
-// 	defer func() { parent.Close(); compare.Close(); db.Close(); test.Discard() }()
-// 	require.NoError(t, test.Set([]byte("a"), []byte("a")))
-// 	require.NoError(t, compare.Set([]byte("a"), []byte("a")))
-// 	revIt, err := test.RevIterator([]byte(prefixEnd([]byte("a"))))
-// 	require.NoError(t, err)
-// 	revIt.Close()
-// 	revIt, err = compare.RevIterator(prefixEnd([]byte("a")))
-// 	require.NoError(t, err)
-// 	revIt.Close()
-// }
-
 func TestIteratorBasic(t *testing.T) {
 	test, db, writer := newTxn(t, []byte(""))
 	defer func() { test.Close(); db.Close(); test.Discard() }()

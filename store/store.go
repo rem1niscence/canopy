@@ -379,7 +379,6 @@ func (s *Store) Partition() {
 	}(); err != nil {
 		sc.log.Errorf("Partitioning failed with error: %s", err.Error())
 	}
-	panic("forced panic to test db")
 	sc.log.Info("Partitioning complete ✅")
 }
 

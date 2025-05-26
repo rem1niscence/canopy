@@ -274,7 +274,7 @@ func TestPartition(t *testing.T) {
 	}
 
 	discardTs := store.db.MaxVersion()
-	require.Equal(t, snapshotHeight, discardTs)
+	require.Equal(t, snapshotHeight+1, discardTs)
 }
 
 func TestPartitionIntegration(t *testing.T) {
