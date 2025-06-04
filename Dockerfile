@@ -15,6 +15,7 @@ COPY . /go/src/github.com/canopy-network/canopy
 # RUN make build/wallet
 # RUN make build/explorer
 RUN CGO_ENABLED=0 GOOS=linux go build -a -o bin ./auto-update/.
+RUN CGO_ENABLED=0 GOOS=linux go build -a -o cli ./cmd/main/...
 
 
 FROM alpine:3.19

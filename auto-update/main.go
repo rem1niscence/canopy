@@ -193,46 +193,11 @@ func main() {
 	} else {
 		var cmd *exec.Cmd
 		var cmdWg sync.WaitGroup
+		var err error
 		curRelease := rpc.SoftwareVersion
 		newRun := true
+		firstTime := true
 		for {
-			version, url, err := getLatestRelease()
-			if err != nil {
-				newRun = false
-				goto check_run
-			}
-
-			if curRelease != version {
-				curRelease = version
-				log.Println("NEW VERSION FOUND")
-				err := downloadRelease(url)
-				if err != nil {
-					newRun = false
-					goto check_run
-				}
-
-				log.Println("NEW DOWNLOAD DONE")
-
-				if cmd != nil {
-					err = cmd.Process.Signal(syscall.SIGINT)
-					if err != nil {
-						panic(err)
-					}
-				}
-
-				log.Println("SENT KILL SIGNAL")
-
-				cmdWg.Wait()
-
-				log.Println("KILLED OLD PROCESS")
-
-				newRun = true
-			} else {
-				log.Println("NO NEW VERSION FOUND")
-				newRun = false
-			}
-
-		check_run:
 			if newRun {
 				cmdWg.Add(1)
 
@@ -250,8 +215,46 @@ func main() {
 				}()
 			}
 
-			log.Println("Checking for upgrade in 5s...")
-			time.Sleep(5 * time.Second)
+			if !firstTime {
+				log.Println("Checking for upgrade in 5s...")
+				time.Sleep(5 * time.Second)
+			}
+
+			firstTime = false
+
+			version, url, err := getLatestRelease()
+			if err != nil {
+				newRun = false
+				continue
+			}
+
+			if curRelease != version {
+				curRelease = version
+				log.Println("NEW VERSION FOUND")
+				err := downloadRelease(url)
+				if err != nil {
+					newRun = false
+					continue
+				}
+
+				log.Println("NEW DOWNLOAD DONE")
+
+				err = cmd.Process.Signal(syscall.SIGINT)
+				if err != nil {
+					panic(err)
+				}
+
+				log.Println("SENT KILL SIGNAL")
+
+				cmdWg.Wait()
+
+				log.Println("KILLED OLD PROCESS")
+
+				newRun = true
+			} else {
+				log.Println("NO NEW VERSION FOUND")
+				newRun = false
+			}
 		}
 	}
 
