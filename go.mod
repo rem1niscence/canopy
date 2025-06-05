@@ -14,6 +14,7 @@ require (
 	github.com/drand/kyber-bls12381 v0.3.1
 	github.com/ethereum/go-ethereum v1.15.11
 	github.com/fatih/color v1.17.0
+	github.com/google/btree v1.1.3
 	github.com/gorilla/websocket v1.5.3
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/libp2p/go-buffer-pool v0.1.0

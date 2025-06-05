@@ -111,6 +111,7 @@ func (it *BTreeIterator) next() *cacheItem {
 		return it.current
 	}
 
+	it.current = nil
 	// No next item
 	return nil
 }
@@ -146,6 +147,7 @@ func (it *BTreeIterator) prev() *cacheItem {
 		return it.current
 	}
 
+	it.current = nil
 	// No previous item
 	return nil
 }
@@ -541,7 +543,7 @@ func newTxnIterator(parent lib.IteratorI, t txn, parentPrefix, prefix []byte, re
 		parentPrefix: lib.BytesToString(parentPrefix),
 		prefix:       lib.BytesToString(prefix),
 		reverse:      reverse,
-		hasNext:      tree.HasNext(),
+		// hasNext:      tree.HasNext(),
 	}).First()
 }
 
@@ -651,7 +653,9 @@ func (ti *TxnIterator) txnInvalid() bool {
 		return ti.invalid
 	}
 	ti.invalid = true
-	if !ti.hasNext {
+	current := ti.tree.Current()
+	if current == nil || current.key == "" {
+		ti.invalid = true
 		return ti.invalid
 	}
 	if !strings.HasPrefix(ti.tree.Current().key, ti.parentPrefix+ti.prefix) {
