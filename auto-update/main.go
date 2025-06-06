@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -16,6 +18,7 @@ import (
 
 	"github.com/canopy-network/canopy/cmd/cli"
 	"github.com/canopy-network/canopy/cmd/rpc"
+	"github.com/canopy-network/canopy/lib"
 )
 
 const (
@@ -111,24 +114,24 @@ type Release struct {
 }
 
 func getLatestRelease() (string, string, error) {
-	return "v0.0.5", "https://github.com/pablocampogo/canopy/releases/download/v0.0.5/cli", nil
-	// apiURL := "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
-	// resp, err := http.Get(apiURL)
-	// if err != nil {
-	// 	return "", "", err
-	// }
-	// defer resp.Body.Close()
+	// return "v0.0.5", "https://github.com/pablocampogo/canopy/releases/download/v0.0.5/cli", nil
+	apiURL := "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
 
-	// if resp.StatusCode == 200 {
-	// 	var rel Release
-	// 	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-	// 		return "", "", err
-	// 	}
+	if resp.StatusCode == 200 {
+		var rel Release
+		if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+			return "", "", err
+		}
 
-	// 	return rel.TagName, rel.Assets[0].BrowserDownloadURL, nil
-	// }
+		return rel.TagName, rel.Assets[0].BrowserDownloadURL, nil
+	}
 
-	// return "", "", errors.New("NON 200 OK")
+	return "", "", errors.New("NON 200 OK")
 
 	// // Find asset matching OS and ARCH
 	// targetName := repoName + "-" + runtime.GOOS + "-" + runtime.GOARCH
@@ -141,8 +144,6 @@ func getLatestRelease() (string, string, error) {
 }
 
 func downloadRelease(downloadURL string, downloadLock *sync.Mutex) error {
-	downloadLock.Lock()
-	defer downloadLock.Unlock()
 	resp, err := http.Get(downloadURL)
 	if err != nil {
 		return err
@@ -150,6 +151,9 @@ func downloadRelease(downloadURL string, downloadLock *sync.Mutex) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 200 {
+		downloadLock.Lock()
+		defer downloadLock.Unlock()
+
 		err = os.Remove(binPath)
 		if err != nil {
 			return err
@@ -191,7 +195,23 @@ func runBinary() (*exec.Cmd, error) {
 }
 
 func main() {
-	if !autoUpdate {
+	// make the data dir if missing
+	if err := os.MkdirAll(cli.DataDir, os.ModePerm); err != nil {
+		log.Fatal(err.Error())
+	}
+	configFilePath := filepath.Join(cli.DataDir, lib.ConfigFilePath)
+	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
+		log.Printf("Creating %s file", lib.ConfigFilePath)
+		if err = lib.DefaultConfig().WriteToFile(configFilePath); err != nil {
+			log.Fatal(err.Error())
+		}
+	}
+	// load the config object
+	config, err := lib.NewConfigFromFile(configFilePath)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	if !config.AutoUpdate {
 		cli.Start()
 	} else {
 		var cmd *exec.Cmd
