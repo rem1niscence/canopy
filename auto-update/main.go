@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -139,7 +140,9 @@ func getLatestRelease() (string, string, error) {
 	// return "", "", io.EOF
 }
 
-func downloadRelease(downloadURL string) error {
+func downloadRelease(downloadURL string, downloadLock *sync.Mutex) error {
+	downloadLock.Lock()
+	defer downloadLock.Unlock()
 	resp, err := http.Get(downloadURL)
 	if err != nil {
 		return err
@@ -195,12 +198,15 @@ func main() {
 		var cmdWg sync.WaitGroup
 		var err error
 		var uploadingNewVersion atomic.Bool
+		var newRun atomic.Bool
+		newRun.Store(true)
+		downloadLock := new(sync.Mutex)
 		curRelease := rpc.SoftwareVersion
-		newRun := true
 		firstTime := true
 		binPathExists := false
 		for {
-			if newRun {
+			if newRun.Load() {
+				newRun.Store(false)
 				if firstTime {
 					_, err = os.Stat(binPath)
 					if err == nil {
@@ -237,43 +243,54 @@ func main() {
 
 			version, url, err := getLatestRelease()
 			if err != nil {
-				newRun = false
+				log.Fatalf("Failed get latest release: %v", err)
 				continue
 			}
 
 			if curRelease != version {
-				curRelease = version
 				log.Println("NEW VERSION FOUND")
-				err := downloadRelease(url)
+				err := downloadRelease(url, downloadLock)
 				if err != nil {
-					newRun = false
+					log.Fatalf("Failed to download release: %v", err)
 					continue
 				}
+				curRelease = version
 				binPathExists = true
 
 				log.Println("NEW DOWNLOAD DONE")
 
-				uploadingNewVersion.Store(true)
+				go func() {
+					minutes := rand.Intn(30) + 1 // rand.Intn(30) returns [0, 29] so add 1 to get [1, 30]
+					duration := time.Duration(minutes) * time.Minute
 
-				if cmd != nil {
-					err = cmd.Process.Signal(syscall.SIGINT)
-					if err != nil {
-						log.Fatalf("Failed to send syscall to child process: %v", err)
+					log.Printf("Waiting for %v before uploading...\n", duration)
+
+					// Sleep for the random duration
+					time.Sleep(duration)
+
+					downloadLock.Lock()
+					defer downloadLock.Unlock()
+
+					log.Println("Done waiting.")
+
+					uploadingNewVersion.Store(true)
+
+					if cmd != nil {
+						err = cmd.Process.Signal(syscall.SIGINT)
+						if err != nil {
+							log.Fatalf("Failed to send syscall to child process: %v", err)
+						}
 					}
-				}
 
-				log.Println("SENT KILL SIGNAL")
+					log.Println("SENT KILL SIGNAL")
 
-				cmdWg.Wait()
+					cmdWg.Wait()
 
-				uploadingNewVersion.Store(false)
+					log.Println("KILLED OLD PROCESS")
 
-				log.Println("KILLED OLD PROCESS")
-
-				newRun = true
-			} else {
-				log.Println("NO NEW VERSION FOUND")
-				newRun = false
+					uploadingNewVersion.Store(false)
+					newRun.Store(true)
+				}()
 			}
 		}
 	}
