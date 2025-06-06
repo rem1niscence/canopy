@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"log"
@@ -10,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -110,24 +110,24 @@ type Release struct {
 }
 
 func getLatestRelease() (string, string, error) {
-	// return "v0.0.5", "https://github.com/pablocampogo/canopy/releases/download/v0.0.5/cli", nil
-	apiURL := "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
-	resp, err := http.Get(apiURL)
-	if err != nil {
-		return "", "", err
-	}
-	defer resp.Body.Close()
+	return "v0.0.5", "https://github.com/pablocampogo/canopy/releases/download/v0.0.5/cli", nil
+	// apiURL := "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
+	// resp, err := http.Get(apiURL)
+	// if err != nil {
+	// 	return "", "", err
+	// }
+	// defer resp.Body.Close()
 
-	if resp.StatusCode == 200 {
-		var rel Release
-		if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-			return "", "", err
-		}
+	// if resp.StatusCode == 200 {
+	// 	var rel Release
+	// 	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+	// 		return "", "", err
+	// 	}
 
-		return rel.TagName, rel.Assets[0].BrowserDownloadURL, nil
-	}
+	// 	return rel.TagName, rel.Assets[0].BrowserDownloadURL, nil
+	// }
 
-	return "", "", errors.New("NON 200 OK")
+	// return "", "", errors.New("NON 200 OK")
 
 	// // Find asset matching OS and ARCH
 	// targetName := repoName + "-" + runtime.GOOS + "-" + runtime.GOARCH
@@ -194,25 +194,38 @@ func main() {
 		var cmd *exec.Cmd
 		var cmdWg sync.WaitGroup
 		var err error
+		var uploadingNewVersion atomic.Bool
 		curRelease := rpc.SoftwareVersion
 		newRun := true
 		firstTime := true
+		binPathExists := false
 		for {
 			if newRun {
-				cmdWg.Add(1)
-
-				go func() {
-					defer cmdWg.Done()
-					log.Printf("Starting %s...\n", binPath)
-					cmd, err = runBinary()
-					if err != nil {
-						log.Fatalf("Failed to run binary: %v", err)
+				if firstTime {
+					_, err = os.Stat(binPath)
+					if err == nil {
+						binPathExists = true
 					}
+				}
+				if binPathExists {
+					cmdWg.Add(1)
 
-					// Wait for the child process to exit
-					err = cmd.Wait()
-					log.Printf("Process exited: %v", err)
-				}()
+					go func() {
+						defer cmdWg.Done()
+						log.Printf("Starting %s...\n", binPath)
+						cmd, err = runBinary()
+						if err != nil {
+							log.Fatalf("Failed to run binary: %v", err)
+						}
+
+						// Wait for the child process to exit
+						err = cmd.Wait()
+						log.Printf("Process exited: %v", err)
+						if !uploadingNewVersion.Load() {
+							os.Exit(1)
+						}
+					}()
+				}
 			}
 
 			if !firstTime {
@@ -236,17 +249,24 @@ func main() {
 					newRun = false
 					continue
 				}
+				binPathExists = true
 
 				log.Println("NEW DOWNLOAD DONE")
 
-				err = cmd.Process.Signal(syscall.SIGINT)
-				if err != nil {
-					panic(err)
+				uploadingNewVersion.Store(true)
+
+				if cmd != nil {
+					err = cmd.Process.Signal(syscall.SIGINT)
+					if err != nil {
+						log.Fatalf("Failed to send syscall to child process: %v", err)
+					}
 				}
 
 				log.Println("SENT KILL SIGNAL")
 
 				cmdWg.Wait()
+
+				uploadingNewVersion.Store(false)
 
 				log.Println("KILLED OLD PROCESS")
 
