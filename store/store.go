@@ -226,6 +226,9 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 
 // Write() writes the current state to the batch writer without committing it.
 func (s *Store) Write() lib.ErrorI {
+	if er := s.sc.store.(TxnWriterI).Write(); er != nil {
+		return ErrCommitDB(er)
+	}
 	if e := s.lss.Write(); e != nil {
 		return ErrCommitDB(e)
 	}
@@ -234,9 +237,6 @@ func (s *Store) Write() lib.ErrorI {
 	}
 	if e := s.Indexer.db.Write(); e != nil {
 		return ErrCommitDB(e)
-	}
-	if er := s.sc.store.(TxnWriterI).Write(); er != nil {
-		return ErrCommitDB(er)
 	}
 	return nil
 }
