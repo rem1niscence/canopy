@@ -4,15 +4,19 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"math"
 	"reflect"
-	"sort"
 	"strings"
 	"unsafe"
 
 	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/skl"
+
+	"maps"
+
+	"github.com/google/btree"
 )
 
 const (
@@ -49,6 +53,7 @@ const (
 	badgerCountFieldName               = "count" // badgerDB Txn 'count' field name
 	badgerTxnFieldName                 = "txn"   // badgerDB WriteBatch 'txn' field name
 	badgerDBMaxBatchScalingFactor      = 0.98425 // through experimentation badgerDB's max transaction scaling factor
+	estimatedTxnSize                   = 1000000
 )
 
 // TxReaderI() defines the interface to read a TxnTransaction
@@ -100,24 +105,25 @@ type Txn struct {
 	cache  txn
 }
 
+type cache struct {
+	Value string
+}
+
 // txn internal structure maintains the write operations sorted lexicographically by keys
 type txn struct {
-	ops       map[string]valueOp // [string(key)] -> set/del operations saved in memory
-	sorted    []string           // ops keys sorted lexicographically; needed for iteration
-	sortedLen int                // len(sorted)
+	ops map[uint64]valueOp // [hash64(key)] -> set/del operations saved in memory
+	// sorted   []string           // ops keys sorted lexicographically; needed for iteration
+	sorted    *btree.BTreeG[*CacheItem] // sorted btree of keys for fast iteration
+	sortedLen int                       // len(sorted)
 }
 
 // txn() returns a copy of the current transaction cache
 func (t txn) copy() txn {
-	sorted := make([]string, t.sortedLen)
-	copy(sorted, t.sorted)
-	ops := make(map[string]valueOp, t.sortedLen)
-	for k, v := range t.ops {
-		ops[k] = v
-	}
+	ops := make(map[uint64]valueOp, estimatedTxnSize)
+	maps.Copy(ops, t.ops)
 	return txn{
 		ops:       ops,
-		sorted:    sorted,
+		sorted:    t.sorted.Clone(),
 		sortedLen: t.sortedLen,
 	}
 }
@@ -134,6 +140,7 @@ const (
 
 // valueOp has the value portion of the operation and the corresponding operation to perform
 type valueOp struct {
+	key        []byte        // the key of the key value pair
 	value      []byte        // value of key value pair
 	valueEntry *badger.Entry // value of key value pair in case of a custom entry
 	op         op            // is operation delete
@@ -147,8 +154,10 @@ func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, 
 		prefix: prefix,
 		logger: logger,
 		cache: txn{
-			ops:    make(map[string]valueOp),
-			sorted: make([]string, 0),
+			ops: make(map[uint64]valueOp, estimatedTxnSize),
+			sorted: btree.NewG(32, func(a, b *CacheItem) bool {
+				return a.Less(b)
+			}), // need to benchmark this value
 		},
 	}
 }
@@ -161,8 +170,10 @@ func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, logger lib.Logg
 		prefix: prefix,
 		logger: logger,
 		cache: txn{
-			ops:    make(map[string]valueOp),
-			sorted: make([]string, 0),
+			ops: make(map[uint64]valueOp, estimatedTxnSize),
+			sorted: btree.NewG(32, func(a, b *CacheItem) bool {
+				return a.Less(b)
+			}), // need to benchmark this value
 		},
 	}
 }
@@ -172,7 +183,7 @@ func (t *Txn) Get(key []byte) ([]byte, lib.ErrorI) {
 	// append the prefix to the key
 	prefixedKey := lib.Append(t.prefix, key)
 	// first retrieve from the in-memory cache
-	if v, found := t.cache.ops[lib.BytesToString(prefixedKey)]; found {
+	if v, found := t.cache.ops[crypto.Hash64(prefixedKey)]; found {
 		return v.value, nil
 	}
 	// if not found, retrieve from the parent reader
@@ -181,55 +192,52 @@ func (t *Txn) Get(key []byte) ([]byte, lib.ErrorI) {
 
 // Set() adds or updates the value for a key in the cache operations
 func (t *Txn) Set(key, value []byte) lib.ErrorI {
-	t.update(lib.BytesToString(lib.Append(t.prefix, key)), value, opSet)
+	t.update(lib.Append(t.prefix, key), value, opSet)
 	return nil
 }
 
 // Delete() marks a key for deletion in the cache operations
 func (t *Txn) Delete(key []byte) lib.ErrorI {
-	t.update(lib.BytesToString(lib.Append(t.prefix, key)), nil, opDelete)
+	t.update(lib.Append(t.prefix, key), nil, opDelete)
 	return nil
 }
 
 // Tombstone() removes the key-value pair from the BadgerDB transaction but prevents it from being garbage collected
-func (t *Txn) Tombstone(k []byte) lib.ErrorI {
-	t.update(lib.BytesToString(lib.Append(t.prefix, k)), nil, opTombstone)
+func (t *Txn) Tombstone(key []byte) lib.ErrorI {
+	t.update(lib.Append(t.prefix, key), nil, opTombstone)
 	return nil
 }
 
 // SetEntry() adds or updates a custom badger entry in the cache operations
 func (t *Txn) SetEntry(entry *badger.Entry) lib.ErrorI {
-	t.updateEntry(lib.BytesToString(lib.Append(t.prefix, entry.Key)), entry)
+	t.updateEntry(lib.Append(t.prefix, entry.Key), entry)
 	return nil
 }
 
 // update() modifies or adds an operation for a key in the cache operations and maintains the
 // lexicographical order.
 // NOTE: update() won't modify the key itself, any key prefixing must be done before calling this
-func (t *Txn) update(key string, v []byte, opAction op) {
-	if _, found := t.cache.ops[key]; !found {
-		t.addToSorted(key)
-	}
-	t.cache.ops[key] = valueOp{value: v, op: opAction}
+func (t *Txn) update(key []byte, v []byte, opAction op) {
+	//if _, found := t.cache.ops[key]; !found {
+	//	t.addToSorted(key)
+	//}
+	t.cache.ops[crypto.Hash64(key)] = valueOp{key: key, value: v, op: opAction}
 }
 
 // updateEntry() modifies or adds a custom badger entry in the cache operations and maintains the
 // lexicographical order.
 // NOTE: updateEntry() won't modify the key itself, any key prefixing must be done before calling this
-func (t *Txn) updateEntry(key string, v *badger.Entry) {
-	if _, found := t.cache.ops[key]; !found {
-		t.addToSorted(key)
-	}
-	t.cache.ops[key] = valueOp{valueEntry: v, op: opEntry}
+func (t *Txn) updateEntry(key []byte, v *badger.Entry) {
+	//if _, found := t.cache.ops[key]; !found {
+	//	t.addToSorted(key)
+	//}
+	t.cache.ops[crypto.Hash64(key)] = valueOp{key: key, valueEntry: v, op: opEntry}
 }
 
 // addToSorted() inserts a key into the sorted list of operations maintaining lexicographical order
 func (t *Txn) addToSorted(key string) {
-	i := sort.Search(t.cache.sortedLen, func(i int) bool { return t.cache.sorted[i] >= key })
-	t.cache.sorted = append(t.cache.sorted, "")
-	copy(t.cache.sorted[i+1:], t.cache.sorted[i:])
-	t.cache.sorted[i] = key
 	t.cache.sortedLen++
+	t.cache.sorted.ReplaceOrInsert(&CacheItem{Key: key, Exists: true})
 }
 
 // Iterator() returns a new iterator for merged iteration of both the in-memory operations and parent store with the given prefix
@@ -241,7 +249,7 @@ func (t *Txn) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 // RevIterator() returns a new reverse iterator for merged iteration of both the in-memory operations and parent store with the given prefix
 func (t *Txn) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	it := t.reader.NewIterator(prefix, true, false)
-	return newTxnIterator(it, t.cache, t.prefix, prefix, true), nil
+	return newTxnIterator(it, t.cache.copy(), t.prefix, prefix, true), nil
 }
 
 // ArchiveIterator() creates a new iterator for all versions under the given prefix in the BadgerDB transaction
@@ -251,7 +259,8 @@ func (t *Txn) ArchiveIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 
 // Discard() clears all in-memory operations and resets the sorted key list
 func (t *Txn) Discard() {
-	t.cache.ops, t.cache.sorted, t.cache.sortedLen = make(map[string]valueOp), make([]string, 0), 0
+	t.cache.sorted.Clear(false)
+	t.cache.ops, t.cache.sortedLen = make(map[uint64]valueOp, estimatedTxnSize), 0
 }
 
 // Cancel() cancels the current transaction. Any new writes won't be committed
@@ -261,11 +270,8 @@ func (t *Txn) Cancel() {
 
 // Write() flushes the in-memory operations to the batch writer and clears in-memory changes
 func (t *Txn) Write() lib.ErrorI {
-	for k, v := range t.cache.ops {
-		sk, er := lib.StringToBytes(k)
-		if er != nil {
-			return er
-		}
+	for _, v := range t.cache.ops {
+		sk := v.key
 		switch v.op {
 		case opSet:
 			if err := t.writer.Set(sk, v.value); err != nil {
@@ -317,7 +323,9 @@ var _ lib.IteratorI = &TxnIterator{}
 // TxnIterator is a reversible, merged iterator of the parent and the in-memory operations
 type TxnIterator struct {
 	parent lib.IteratorI
+	tree   *BTreeIterator
 	txn
+	hasNext      bool
 	prefix       string
 	parentPrefix string
 	index        int
@@ -328,12 +336,20 @@ type TxnIterator struct {
 
 // newTxnIterator() initializes a new merged iterator for traversing both the in-memory operations and parent store
 func newTxnIterator(parent lib.IteratorI, t txn, parentPrefix, prefix []byte, reverse bool) *TxnIterator {
+	tree := NewBTreeIterator(t.sorted.Clone(),
+		&CacheItem{
+			Key: string(lib.Append(parentPrefix, prefix)),
+		},
+		reverse)
+
 	return (&TxnIterator{
 		parent:       parent,
+		tree:         tree,
 		txn:          t,
-		parentPrefix: lib.BytesToString(parentPrefix),
-		prefix:       lib.BytesToString(prefix),
+		parentPrefix: string(parentPrefix),
+		prefix:       string(prefix),
 		reverse:      reverse,
+		// hasNext:      tree.HasNext(),
 	}).First()
 }
 
@@ -443,16 +459,12 @@ func (ti *TxnIterator) txnInvalid() bool {
 		return ti.invalid
 	}
 	ti.invalid = true
-	if ti.reverse {
-		if ti.index < 0 {
-			return ti.invalid
-		}
-	} else {
-		if ti.index >= ti.sortedLen {
-			return ti.invalid
-		}
+	current := ti.tree.Current()
+	if current == nil || current.Key == "" {
+		ti.invalid = true
+		return ti.invalid
 	}
-	if !strings.HasPrefix(ti.sorted[ti.index], ti.parentPrefix+ti.prefix) {
+	if !strings.HasPrefix(ti.tree.Current().Key, ti.parentPrefix+ti.prefix) {
 		return ti.invalid
 	}
 	ti.invalid = false
@@ -461,12 +473,13 @@ func (ti *TxnIterator) txnInvalid() bool {
 
 // txnKey() returns the key of the current in-memory operation
 func (ti *TxnIterator) txnKey() []byte {
-	bz, _ := lib.StringToBytes(strings.TrimPrefix(ti.sorted[ti.index], ti.parentPrefix))
-	return bz
+	return []byte(strings.TrimPrefix(ti.tree.Current().Key, ti.parentPrefix))
 }
 
 // txnValue() returns the value of the current in-memory operation
-func (ti *TxnIterator) txnValue() valueOp { return ti.ops[ti.sorted[ti.index]] }
+func (ti *TxnIterator) txnValue() valueOp {
+	return ti.ops[crypto.Hash64([]byte(ti.tree.Current().Key))]
+}
 
 // compare() compares two byte slices, adjusting for reverse iteration if needed
 func (ti *TxnIterator) compare(a, b []byte) int {
@@ -478,28 +491,25 @@ func (ti *TxnIterator) compare(a, b []byte) int {
 
 // txnNext() advances the index of the in-memory operations based on the iteration direction
 func (ti *TxnIterator) txnNext() {
-	if ti.reverse {
-		ti.index--
-	} else {
-		ti.index++
-	}
+	ti.hasNext = ti.tree.HasNext()
+	ti.tree.Next()
 }
 
 // seek() positions the iterator at the first entry that matches or exceeds the prefix.
 func (ti *TxnIterator) seek() *TxnIterator {
-	ti.index = sort.Search(ti.sortedLen, func(i int) bool {
-		return ti.sorted[i] >= (ti.parentPrefix + ti.prefix)
+	ti.tree.Move(&CacheItem{
+		Key: ti.parentPrefix + ti.prefix,
 	})
 	return ti
 }
 
 // revSeek() positions the iterator at the last entry that matches the prefix in reverse order.
 func (ti *TxnIterator) revSeek() *TxnIterator {
-	bz, _ := lib.StringToBytes(ti.parentPrefix + ti.prefix)
-	endPrefix := lib.BytesToString(prefixEnd(bz))
-	ti.index = sort.Search(ti.sortedLen, func(i int) bool {
-		return ti.sorted[i] >= endPrefix
-	}) - 1
+	bz := []byte(ti.parentPrefix + ti.prefix)
+	endPrefix := string(prefixEnd(bz))
+	ti.tree.Move(&CacheItem{
+		Key: endPrefix,
+	})
 	return ti
 }
 
@@ -739,4 +749,180 @@ func getSizeAndCount(txn *badger.Txn) (size, count int64) {
 // seekLast() positions the iterator at the last key for the given prefix
 func seekLast(it *badger.Iterator, prefix []byte) {
 	it.Seek(prefixEnd(prefix))
+}
+
+// BTREE ITERATOR CODE BELOW
+
+type CacheItem struct {
+	Key    string
+	Exists bool
+}
+
+func (ti CacheItem) Less(than *CacheItem) bool {
+	// compare the keys lexicographically
+	return ti.Key < than.Key
+}
+
+// BTreeIterator provides external iteration over a btree
+type BTreeIterator struct {
+	tree    *btree.BTreeG[*CacheItem] // the btree to iterate over
+	current *CacheItem                // current item in the iteration
+	reverse bool                      // whether the iteration is in reverse order
+}
+
+// NewBTreeIterator() creates a new iterator starting at the closest item to the given key
+func NewBTreeIterator(tree *btree.BTreeG[*CacheItem], start *CacheItem, reverse bool) *BTreeIterator {
+	// create a new BTreeIterator
+	bt := &BTreeIterator{
+		tree:    tree,
+		reverse: reverse,
+	}
+	// if no start item is provided, set the iterator to the first or last item based on the direction
+	if start == nil || start.Key == "" {
+		if reverse {
+			val, _ := tree.Max()
+			bt.current = val
+		} else {
+			val, _ := tree.Min()
+			bt.current = val
+		}
+		return bt
+	}
+	// otherwise, move the iterator to that item
+	bt.Move(start)
+	return bt
+}
+
+// Move() moves the iterator to the given key or the closest item if the key is not found
+func (bi *BTreeIterator) Move(item *CacheItem) {
+	// reset the current item
+	bi.current = nil
+	// try to get an exact match
+	if exactMatch, ok := bi.tree.Get(item); ok {
+		bi.current = exactMatch
+		return
+	}
+	// if no exact match, find the closest item based on the direction of iteration
+	if bi.reverse {
+		bi.current = &CacheItem{Key: item.Key + string(endBytes)}
+		bi.current = bi.prev()
+	} else {
+		bi.current = &CacheItem{Key: item.Key}
+		bi.current = bi.next()
+	}
+}
+
+// Current() returns the current item in the iteration
+func (bi *BTreeIterator) Current() *CacheItem {
+	// if current is nil, return an empty Item to avoid nil pointer dereference
+	if bi.current == nil {
+		return &CacheItem{Key: "", Exists: false}
+	}
+	return bi.current
+}
+
+// Next() advances to the next item in the tree
+func (bi *BTreeIterator) Next() *CacheItem {
+	// check if current exist, otherwise the iterator is invalid
+	if bi.current == nil {
+		return nil
+	}
+	// go to the next item based on the direction of iteration
+	if bi.reverse {
+		bi.current = bi.prev()
+	} else {
+		bi.current = bi.next()
+	}
+	// return the current item which is the possible next item in the iteration
+	return bi.Current()
+}
+
+// next() finds the next item in the tree based on the current item
+func (bi *BTreeIterator) next() *CacheItem {
+	var nextItem *CacheItem
+	var found bool
+	// find the next item
+	bi.tree.AscendGreaterOrEqual(bi.current, func(item *CacheItem) bool {
+		nextItem = item
+		if nextItem.Key != bi.current.Key {
+			found = true
+			return false
+		}
+		return true
+	})
+	// if the item found, return it
+	if found {
+		return nextItem
+	}
+	// no next item
+	return nil
+}
+
+// Prev() back towards the previous item in the tree
+func (bi *BTreeIterator) Prev() *CacheItem {
+	// check if current exist, otherwise the iterator is invalid
+	if bi.current == nil {
+		return nil
+	}
+	// go to the previous item based on the direction of iteration
+	if bi.reverse {
+		bi.current = bi.next()
+	} else {
+		bi.current = bi.prev()
+	}
+	// return the current item which is the possible previous item in the iteration
+	return bi.Current()
+}
+
+// next() finds the previous item in the tree based on the current item
+func (bi *BTreeIterator) prev() *CacheItem {
+	var prevItem *CacheItem
+	var found bool
+	// find the previous item
+	bi.tree.DescendLessOrEqual(bi.current, func(item *CacheItem) bool {
+		prevItem = item
+		if prevItem.Less(bi.current) {
+			found = true
+			return false
+		}
+		return true
+	})
+	// if the item found, return it
+	if found {
+		return prevItem
+	}
+	// no previous item
+	return nil
+}
+
+// HasNext() returns true if there are more items after current
+func (bi *BTreeIterator) HasNext() bool {
+	if bi.reverse {
+		return bi.hasPrev()
+	}
+	return bi.hasNext()
+}
+
+// hasNext() checks if there is a next item in the iteration
+func (bi *BTreeIterator) hasNext() bool {
+	if bi.current == nil {
+		return false
+	}
+	return bi.next() != nil
+}
+
+// HasPrev() returns true if there are items before current
+func (bi *BTreeIterator) HasPrev() bool {
+	if bi.reverse {
+		return bi.hasNext()
+	}
+	return bi.hasPrev()
+}
+
+// hasPrev() checks if there is a previous item in the iteration
+func (bi *BTreeIterator) hasPrev() bool {
+	if bi.current == nil {
+		return false
+	}
+	return bi.prev() != nil
 }
