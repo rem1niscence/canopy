@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -128,19 +129,17 @@ func getLatestRelease() (string, string, error) {
 			return "", "", err
 		}
 
-		return rel.TagName, rel.Assets[0].BrowserDownloadURL, nil
+		// Find asset matching OS and ARCH
+		targetName := "cli" + "-" + runtime.GOOS + "-" + runtime.GOARCH
+		for _, asset := range rel.Assets {
+			if asset.Name == targetName {
+				return rel.TagName, asset.BrowserDownloadURL, nil
+			}
+		}
+		return "", "", io.EOF
 	}
 
 	return "", "", errors.New("NON 200 OK")
-
-	// // Find asset matching OS and ARCH
-	// targetName := repoName + "-" + runtime.GOOS + "-" + runtime.GOARCH
-	// for _, asset := range rel.Assets {
-	// 	if asset.Name == targetName {
-	// 		return rel.TagName, asset.BrowserDownloadURL, nil
-	// 	}
-	// }
-	// return "", "", io.EOF
 }
 
 func downloadRelease(downloadURL string, downloadLock *sync.Mutex) error {
@@ -197,19 +196,19 @@ func runBinary() (*exec.Cmd, error) {
 func main() {
 	// make the data dir if missing
 	if err := os.MkdirAll(cli.DataDir, os.ModePerm); err != nil {
-		log.Fatal(err.Error())
+		log.Print(err.Error())
 	}
 	configFilePath := filepath.Join(cli.DataDir, lib.ConfigFilePath)
 	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
 		log.Printf("Creating %s file", lib.ConfigFilePath)
 		if err = lib.DefaultConfig().WriteToFile(configFilePath); err != nil {
-			log.Fatal(err.Error())
+			log.Print(err.Error())
 		}
 	}
 	// load the config object
 	config, err := lib.NewConfigFromFile(configFilePath)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Print(err.Error())
 	}
 	if !config.AutoUpdate {
 		cli.Start()
@@ -232,7 +231,7 @@ func main() {
 				log.Printf("Starting %s...\n", binPath)
 				cmd, err = runBinary()
 				if err != nil {
-					log.Fatalf("Failed to run binary: %v", err)
+					log.Printf("Failed to run binary: %v", err)
 				}
 				downloadLock.Unlock()
 
@@ -251,7 +250,7 @@ func main() {
 			for {
 				version, url, err := getLatestRelease()
 				if err != nil {
-					log.Fatalf("Failed get latest release: %v", err)
+					log.Printf("Failed get latest release: %v", err)
 					continue
 				}
 
@@ -259,7 +258,7 @@ func main() {
 					log.Println("NEW VERSION FOUND")
 					err := downloadRelease(url, downloadLock)
 					if err != nil {
-						log.Fatalf("Failed to download release: %v", err)
+						log.Printf("Failed to download release: %v", err)
 						continue
 					}
 					curRelease = version
@@ -291,7 +290,7 @@ func main() {
 
 								err = cmd.Process.Signal(syscall.SIGINT)
 								if err != nil {
-									log.Fatalf("Failed to send syscall to child process: %v", err)
+									log.Printf("Failed to send syscall to child process: %v", err)
 									return
 								}
 
