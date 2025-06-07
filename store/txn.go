@@ -53,7 +53,6 @@ const (
 	badgerCountFieldName               = "count" // badgerDB Txn 'count' field name
 	badgerTxnFieldName                 = "txn"   // badgerDB WriteBatch 'txn' field name
 	badgerDBMaxBatchScalingFactor      = 0.98425 // through experimentation badgerDB's max transaction scaling factor
-	estimatedTxnSize                   = 1000000
 )
 
 // TxReaderI() defines the interface to read a TxnTransaction
@@ -120,7 +119,7 @@ type txn struct {
 
 // txn() returns a copy of the current transaction cache
 func (t txn) copy() txn {
-	ops := make(map[uint64]valueOp, estimatedTxnSize)
+	ops := make(map[uint64]valueOp, t.sortedLen)
 	maps.Copy(ops, t.ops)
 	return txn{
 		ops:       ops,
@@ -156,7 +155,7 @@ func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, 
 		logger: logger,
 		sort:   sort,
 		cache: txn{
-			ops: make(map[uint64]valueOp, estimatedTxnSize),
+			ops: make(map[uint64]valueOp),
 			sorted: btree.NewG(32, func(a, b *CacheItem) bool {
 				return a.Less(b)
 			}), // need to benchmark this value
@@ -173,7 +172,7 @@ func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, sort bool, logg
 		logger: logger,
 		sort:   sort,
 		cache: txn{
-			ops: make(map[uint64]valueOp, estimatedTxnSize),
+			ops: make(map[uint64]valueOp),
 			sorted: btree.NewG(32, func(a, b *CacheItem) bool {
 				return a.Less(b)
 			}), // need to benchmark this value
@@ -269,7 +268,7 @@ func (t *Txn) ArchiveIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 // Discard() clears all in-memory operations and resets the sorted key list
 func (t *Txn) Discard() {
 	t.cache.sorted.Clear(false)
-	t.cache.ops, t.cache.sortedLen = make(map[uint64]valueOp, estimatedTxnSize), 0
+	t.cache.ops, t.cache.sortedLen = make(map[uint64]valueOp), 0
 }
 
 // Cancel() cancels the current transaction. Any new writes won't be committed
