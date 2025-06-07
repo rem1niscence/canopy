@@ -215,104 +215,108 @@ func main() {
 		cli.Start()
 	} else {
 		var cmd *exec.Cmd
-		var cmdWg sync.WaitGroup
 		var err error
 		var uploadingNewVersion atomic.Bool
-		var newRun atomic.Bool
-		newRun.Store(true)
+		var newVersionAlreadyFound atomic.Bool
+		firstTime := true
 		downloadLock := new(sync.Mutex)
 		curRelease := rpc.SoftwareVersion
-		firstTime := true
-		binPathExists := false
-		for {
-			if newRun.Load() {
-				newRun.Store(false)
-				if firstTime {
-					_, err = os.Stat(binPath)
-					if err == nil {
-						binPathExists = true
+		notifyStartRun := make(chan struct{}, 1)
+		notifyEndRun := make(chan struct{}, 1)
+		go func() {
+			for {
+				// Wait for a signal to start
+				<-notifyStartRun
+
+				downloadLock.Lock()
+				log.Printf("Starting %s...\n", binPath)
+				cmd, err = runBinary()
+				if err != nil {
+					log.Fatalf("Failed to run binary: %v", err)
+				}
+				downloadLock.Unlock()
+
+				// Wait for the child process to exit
+				err = cmd.Wait()
+				log.Printf("Process exited: %v", err)
+				if !uploadingNewVersion.Load() {
+					os.Exit(1)
+				}
+
+				// Notify that the process has ended
+				notifyEndRun <- struct{}{}
+			}
+		}()
+		go func() {
+			for {
+				version, url, err := getLatestRelease()
+				if err != nil {
+					log.Fatalf("Failed get latest release: %v", err)
+					continue
+				}
+
+				if curRelease != version {
+					log.Println("NEW VERSION FOUND")
+					err := downloadRelease(url, downloadLock)
+					if err != nil {
+						log.Fatalf("Failed to download release: %v", err)
+						continue
+					}
+					curRelease = version
+
+					log.Println("NEW DOWNLOAD DONE")
+
+					if !newVersionAlreadyFound.Load() {
+						newVersionAlreadyFound.Store(true)
+						go func() {
+							defer newVersionAlreadyFound.Store(false)
+
+							if !firstTime {
+								minutes := rand.Intn(30) + 1 // rand.Intn(30) returns [0, 29] so add 1 to get [1, 30]
+								duration := time.Duration(minutes) * time.Minute
+
+								log.Printf("Waiting for %v before uploading...\n", duration)
+
+								// Sleep for the random duration
+								time.Sleep(duration)
+
+								log.Println("Done waiting.")
+							} else {
+								firstTime = false
+							}
+
+							if cmd != nil {
+								uploadingNewVersion.Store(true)
+								defer uploadingNewVersion.Store(false)
+
+								err = cmd.Process.Signal(syscall.SIGINT)
+								if err != nil {
+									log.Fatalf("Failed to send syscall to child process: %v", err)
+									return
+								}
+
+								log.Println("SENT KILL SIGNAL")
+
+								<-notifyEndRun
+
+								log.Println("KILLED OLD PROCESS")
+							}
+
+							notifyStartRun <- struct{}{}
+						}()
 					}
 				}
-				if binPathExists {
-					cmdWg.Add(1)
 
-					go func() {
-						defer cmdWg.Done()
-						log.Printf("Starting %s...\n", binPath)
-						cmd, err = runBinary()
-						if err != nil {
-							log.Fatalf("Failed to run binary: %v", err)
-						}
-
-						// Wait for the child process to exit
-						err = cmd.Wait()
-						log.Printf("Process exited: %v", err)
-						if !uploadingNewVersion.Load() {
-							os.Exit(1)
-						}
-					}()
-				}
-			}
-
-			if !firstTime {
 				log.Println("Checking for upgrade in 5s...")
 				time.Sleep(5 * time.Second)
 			}
-
-			firstTime = false
-
-			version, url, err := getLatestRelease()
-			if err != nil {
-				log.Fatalf("Failed get latest release: %v", err)
-				continue
-			}
-
-			if curRelease != version {
-				log.Println("NEW VERSION FOUND")
-				err := downloadRelease(url, downloadLock)
-				if err != nil {
-					log.Fatalf("Failed to download release: %v", err)
-					continue
-				}
-				curRelease = version
-				binPathExists = true
-
-				log.Println("NEW DOWNLOAD DONE")
-
-				go func() {
-					minutes := rand.Intn(30) + 1 // rand.Intn(30) returns [0, 29] so add 1 to get [1, 30]
-					duration := time.Duration(minutes) * time.Minute
-
-					log.Printf("Waiting for %v before uploading...\n", duration)
-
-					// Sleep for the random duration
-					time.Sleep(duration)
-
-					downloadLock.Lock()
-					defer downloadLock.Unlock()
-
-					log.Println("Done waiting.")
-
-					uploadingNewVersion.Store(true)
-
-					if cmd != nil {
-						err = cmd.Process.Signal(syscall.SIGINT)
-						if err != nil {
-							log.Fatalf("Failed to send syscall to child process: %v", err)
-						}
-					}
-
-					log.Println("SENT KILL SIGNAL")
-
-					cmdWg.Wait()
-
-					log.Println("KILLED OLD PROCESS")
-
-					uploadingNewVersion.Store(false)
-					newRun.Store(true)
-				}()
-			}
+		}()
+		_, err = os.Stat(binPath)
+		if err == nil {
+			notifyStartRun <- struct{}{}
 		}
+		// Block forever
+		select {}
 	}
 
 }
