@@ -102,6 +102,7 @@ type Txn struct {
 	writer TxnWriterI  // memory store to Write() to
 	prefix []byte      // prefix for keys in this txn
 	logger lib.LoggerI // logger for this txn
+	sort   bool        // whether to sort the keys in the cache; used for iteration
 	cache  txn
 }
 
@@ -147,12 +148,13 @@ type valueOp struct {
 }
 
 // NewBadgerTxn() creates a new instance of Txn from badger Txn and WriteBatch correspondingly
-func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, logger lib.LoggerI) *Txn {
+func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, sort bool, logger lib.LoggerI) *Txn {
 	return &Txn{
 		reader: BadgerTxnReader{reader, prefix},
 		writer: BadgerTxnWriter{writer},
 		prefix: prefix,
 		logger: logger,
+		sort:   sort,
 		cache: txn{
 			ops: make(map[uint64]valueOp, estimatedTxnSize),
 			sorted: btree.NewG(32, func(a, b *CacheItem) bool {
@@ -163,12 +165,13 @@ func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, 
 }
 
 // NewTxn() creates a new instance of Txn with the specified reader and writer
-func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, logger lib.LoggerI) *Txn {
+func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, sort bool, logger lib.LoggerI) *Txn {
 	return &Txn{
 		reader: reader,
 		writer: writer,
 		prefix: prefix,
 		logger: logger,
+		sort:   sort,
 		cache: txn{
 			ops: make(map[uint64]valueOp, estimatedTxnSize),
 			sorted: btree.NewG(32, func(a, b *CacheItem) bool {
@@ -218,20 +221,26 @@ func (t *Txn) SetEntry(entry *badger.Entry) lib.ErrorI {
 // lexicographical order.
 // NOTE: update() won't modify the key itself, any key prefixing must be done before calling this
 func (t *Txn) update(key []byte, v []byte, opAction op) {
-	//if _, found := t.cache.ops[key]; !found {
-	//	t.addToSorted(key)
-	//}
-	t.cache.ops[crypto.Hash64(key)] = valueOp{key: key, value: v, op: opAction}
+	hashKey := crypto.Hash64(key)
+	if t.sort {
+		if _, found := t.cache.ops[hashKey]; !found {
+			t.addToSorted(string(key))
+		}
+	}
+	t.cache.ops[hashKey] = valueOp{key: key, value: v, op: opAction}
 }
 
 // updateEntry() modifies or adds a custom badger entry in the cache operations and maintains the
 // lexicographical order.
 // NOTE: updateEntry() won't modify the key itself, any key prefixing must be done before calling this
 func (t *Txn) updateEntry(key []byte, v *badger.Entry) {
-	//if _, found := t.cache.ops[key]; !found {
-	//	t.addToSorted(key)
-	//}
-	t.cache.ops[crypto.Hash64(key)] = valueOp{key: key, valueEntry: v, op: opEntry}
+	hashKey := crypto.Hash64(key)
+	if t.sort {
+		if _, found := t.cache.ops[hashKey]; !found {
+			t.addToSorted(string(key))
+		}
+	}
+	t.cache.ops[hashKey] = valueOp{key: key, valueEntry: v, op: opEntry}
 }
 
 // addToSorted() inserts a key into the sorted list of operations maintaining lexicographical order
