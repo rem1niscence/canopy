@@ -104,9 +104,6 @@ func NewStore(path string, metrics *lib.Metrics, log lib.LoggerI) (lib.StoreI, l
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
-	if e := setBatchOptions(db, 128*int64(units.MB)); e != nil {
-		return nil, ErrOpenDB(e)
-	}
 	return NewStoreWithDB(db, metrics, log, true)
 }
 
