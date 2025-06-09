@@ -228,7 +228,7 @@ func main() {
 				<-notifyStartRun
 
 				downloadLock.Lock()
-				log.Printf("Starting %s...\n", binPath)
+				log.Printf("Starting version: %s in %s...\n", curRelease, binPath)
 				cmd, err = runBinary()
 				if err != nil {
 					log.Printf("Failed to run binary: %v", err)
