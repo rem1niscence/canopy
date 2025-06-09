@@ -306,8 +306,8 @@ func main() {
 					}
 				}
 
-				log.Println("Checking for upgrade in 5s...")
-				time.Sleep(5 * time.Second)
+				log.Println("Checking for upgrade in 30m...")
+				time.Sleep(30 * time.Minute)
 			}
 		}()
 		_, err = os.Stat(binPath)
