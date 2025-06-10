@@ -313,8 +313,9 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// publish root chain information
 		go c.RCManager.Publish(id, info)
 	}
-	// update telemetry
-	defer c.UpdateTelemetry(qc, block, time.Since(start))
+	// update telemetry (using proper defer to ensure time.Since is evaluated at defer execution)
+	processingTime := time.Since(start)
+	defer c.UpdateTelemetry(qc, block, processingTime)
 	// exit
 	return
 }
