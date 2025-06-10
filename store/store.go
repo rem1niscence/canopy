@@ -272,6 +272,7 @@ func (s *Store) Partition() {
 	start := time.Now()
 	// create a copy of the store for multi-thread safety
 	sCopy, err := s.Copy()
+	defer sCopy.Discard()
 	if err != nil {
 		s.log.Errorf(err.Error())
 		return
@@ -487,8 +488,9 @@ func (s *Store) Reset() {
 	s.resetWriter()
 }
 
-// Discard() closes the writer
+// Discard() closes the reader and writer
 func (s *Store) Discard() {
+	s.reader.Discard()
 	s.writer.Cancel()
 }
 
