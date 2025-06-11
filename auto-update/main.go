@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -23,19 +22,18 @@ import (
 )
 
 const (
-	repoOwner = "pablocampogo"
+	repoOwner = "canopy-network"
 	repoName  = "canopy"
-	binPath   = "./cli"
 )
 
 var (
-	autoUpdate    bool
-	rawAutoUpdate = os.Getenv("AUTO_UPDATE")
+	binPath = os.Getenv("BIN_PATH")
 )
 
 func init() {
-	// is safe to ignore the error and assume false
-	autoUpdate, _ = strconv.ParseBool(rawAutoUpdate)
+	if binPath == "" {
+		binPath = "./cli"
+	}
 }
 
 type Release struct {
@@ -115,7 +113,6 @@ type Release struct {
 }
 
 func getLatestRelease() (string, string, error) {
-	// return "v0.0.5", "https://github.com/pablocampogo/canopy/releases/download/v0.0.5/cli", nil
 	apiURL := "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
 	resp, err := http.Get(apiURL)
 	if err != nil {
