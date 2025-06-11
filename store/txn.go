@@ -356,7 +356,6 @@ func newTxnIterator(parent lib.IteratorI, t txn, parentPrefix, prefix []byte, re
 		parentPrefix: string(parentPrefix),
 		prefix:       string(prefix),
 		reverse:      reverse,
-		// hasNext:      tree.HasNext(),
 	}).First()
 }
 

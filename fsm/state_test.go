@@ -67,6 +67,9 @@ func TestInitialize(t *testing.T) {
 				height: test.height,
 				Config: lib.Config{},
 				log:    log,
+				cache: &cache{
+					validators: make(map[string]*Validator),
+				},
 			}
 			// set the data dir path
 			sm.Config.DataDirPath = dataDirPath
@@ -312,6 +315,9 @@ func newTestStateMachine(t *testing.T) StateMachine {
 			MainConfig: lib.DefaultMainConfig(),
 		},
 		log: log,
+		cache: &cache{
+			validators: make(map[string]*Validator),
+		},
 	}
 	require.NoError(t, sm.SetParams(DefaultParams()))
 	db.Commit()

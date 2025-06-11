@@ -284,11 +284,15 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	// log to signal finishing the commit
 	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToTruncatedString(qc.BlockHash), block.BlockHeader.Height)
 	// set up the finite state machine for the next height
-	c.FSM, err = fsm.New(c.Config, storeI, c.Metrics, c.log)
+	newFSM, err := fsm.New(c.Config, storeI, c.Metrics, c.log)
 	if err != nil {
 		// exit with error
 		return
 	}
+	// set the current fsm cache to the new fsm
+	newFSM.SetCacheFromFSM(c.FSM)
+	// set the new FSM in the controller
+	c.FSM = newFSM
 	// set up the mempool for the next height
 	if c.Mempool.FSM, err = c.FSM.Copy(); err != nil {
 		// exit with error

@@ -378,10 +378,17 @@ func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err
 		if e != nil {
 			return vs, e
 		}
-		// get the validator from the address
-		val, e := s.GetValidator(address)
-		if e != nil {
-			return vs, e
+		// attempt to get validator from the cache
+		var val *Validator
+		val, ok := s.cache.validators[address.String()]
+		if !ok {
+			// if not in cache, get validator from the state
+			val, e = s.GetValidator(address)
+			if e != nil {
+				return vs, e
+			}
+			// set the validator in the cache
+			s.cache.validators[address.String()] = val
 		}
 		// ensure the validator is not included in the committee if it's paused or unstaking
 		if val.MaxPausedHeight != 0 || val.UnstakingHeight != 0 {
