@@ -1,3 +1,5 @@
+// Package main implements an auto-update mechanism for the Canopy CLI application.
+// It periodically checks for new releases and automatically updates the binary when available.
 package main
 
 import (
@@ -21,21 +23,25 @@ import (
 	"github.com/canopy-network/canopy/lib"
 )
 
+// Constants defining the GitHub repository information
 const (
 	repoOwner = "canopy-network"
 	repoName  = "canopy"
 )
 
+// Global variable for the binary path
 var (
 	binPath = os.Getenv("BIN_PATH")
 )
 
+// init initializes the binary path if not set in environment variables
 func init() {
 	if binPath == "" {
 		binPath = "./cli"
 	}
 }
 
+// Release represents a GitHub release with all its associated metadata
 type Release struct {
 	URL       string `json:"url"`
 	AssetsURL string `json:"assets_url"`
@@ -112,6 +118,8 @@ type Release struct {
 	Body       string `json:"body"`
 }
 
+// getLatestRelease fetches the latest release information from GitHub
+// Returns the tag name, download URL for the current platform, and any error
 func getLatestRelease() (string, string, error) {
 	apiURL := "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
 	resp, err := http.Get(apiURL)
@@ -139,6 +147,8 @@ func getLatestRelease() (string, string, error) {
 	return "", "", errors.New("NON 200 OK")
 }
 
+// downloadRelease downloads and replaces the current binary with the new version
+// Uses a mutex to prevent concurrent downloads
 func downloadRelease(downloadURL string, downloadLock *sync.Mutex) error {
 	resp, err := http.Get(downloadURL)
 	if err != nil {
@@ -176,6 +186,8 @@ func downloadRelease(downloadURL string, downloadLock *sync.Mutex) error {
 	return errors.New("NON 200 OK")
 }
 
+// runBinary executes the CLI binary with the 'start' command
+// Returns the command and any error that occurred during startup
 func runBinary() (*exec.Cmd, error) {
 	cmd := exec.Command(binPath, "start")
 	cmd.Stdout = os.Stdout
@@ -190,8 +202,10 @@ func runBinary() (*exec.Cmd, error) {
 	return cmd, nil
 }
 
+// main is the entry point of the application
+// It handles both manual and auto-update modes based on configuration
 func main() {
-	// make the data dir if missing
+	// Initialize data directory and configuration
 	if err := os.MkdirAll(cli.DataDir, os.ModePerm); err != nil {
 		log.Print(err.Error())
 	}
@@ -202,7 +216,7 @@ func main() {
 			log.Print(err.Error())
 		}
 	}
-	// load the config object
+	// Load configuration
 	config, err := lib.NewConfigFromFile(configFilePath)
 	if err != nil {
 		log.Print(err.Error())
@@ -210,15 +224,23 @@ func main() {
 	if !config.AutoUpdate {
 		cli.Start()
 	} else {
-		var cmd *exec.Cmd
-		var err error
-		var uploadingNewVersion atomic.Bool
-		var newVersionAlreadyFound atomic.Bool
-		firstTime := true
-		downloadLock := new(sync.Mutex)
-		curRelease := rpc.SoftwareVersion
-		notifyStartRun := make(chan struct{}, 1)
-		notifyEndRun := make(chan struct{}, 1)
+		// Variables for managing the auto-update process
+		var cmd *exec.Cmd // Pointer to the running CLI process, used to control and monitor the main application
+		var err error     // Standard error variable for capturing and handling errors throughout the process
+
+		// Atomic flags for thread-safe state management
+		var uploadingNewVersion atomic.Bool    // Indicates if a new version is currently being installed
+		var newVersionAlreadyFound atomic.Bool // Prevents multiple goroutines from handling the same update
+
+		firstTime := true                 // Flag to skip random delay on first run
+		downloadLock := new(sync.Mutex)   // Mutex to prevent concurrent binary downloads and replacements
+		curRelease := rpc.SoftwareVersion // Current version of the software for comparison
+
+		// Channels for process coordination
+		notifyStartRun := make(chan struct{}, 1) // Signals when to start the CLI process
+		notifyEndRun := make(chan struct{}, 1)   // Signals when the CLI process has ended
+
+		// Goroutine to handle binary execution and restart
 		go func() {
 			for {
 				// Wait for a signal to start
@@ -243,6 +265,8 @@ func main() {
 				notifyEndRun <- struct{}{}
 			}
 		}()
+
+		// Goroutine to check for updates periodically
 		go func() {
 			for {
 				version, url, err := getLatestRelease()
@@ -268,14 +292,12 @@ func main() {
 							defer newVersionAlreadyFound.Store(false)
 
 							if !firstTime {
-								minutes := rand.Intn(30) + 1 // rand.Intn(30) returns [0, 29] so add 1 to get [1, 30]
+								// Add random delay between 1-30 minutes before updating
+								minutes := rand.Intn(30) + 1
 								duration := time.Duration(minutes) * time.Minute
 
 								log.Printf("Waiting for %v before uploading...\n", duration)
-
-								// Sleep for the random duration
 								time.Sleep(duration)
-
 								log.Println("Done waiting.")
 							} else {
 								firstTime = false
@@ -285,6 +307,7 @@ func main() {
 								uploadingNewVersion.Store(true)
 								defer uploadingNewVersion.Store(false)
 
+								// Gracefully terminate the current process
 								err = cmd.Process.Signal(syscall.SIGINT)
 								if err != nil {
 									log.Printf("Failed to send syscall to child process: %v", err)
@@ -292,9 +315,7 @@ func main() {
 								}
 
 								log.Println("SENT KILL SIGNAL")
-
 								<-notifyEndRun
-
 								log.Println("KILLED OLD PROCESS")
 							}
 
@@ -307,6 +328,8 @@ func main() {
 				time.Sleep(30 * time.Minute)
 			}
 		}()
+
+		// Start the initial binary if it exists
 		_, err = os.Stat(binPath)
 		if err == nil {
 			notifyStartRun <- struct{}{}
@@ -314,5 +337,4 @@ func main() {
 		// Block forever
 		select {}
 	}
-
 }
