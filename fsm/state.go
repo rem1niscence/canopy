@@ -29,12 +29,13 @@ type StateMachine struct {
 	Config             lib.Config            // the main configuration as defined by the 'config.json' file
 	Metrics            *lib.Metrics          // the telemetry module
 	log                lib.LoggerI           // the logger for standard output and debugging
-	cache              *cache                // the cache for storing entities
+	cache              *cache                // the state machine cache
 }
 
-// cache is the set of entities to be cached used by the state machine
+// cache is the set of items to be cached used by the state machine
 type cache struct {
-	validators map[string]*Validator // address->validator cache to speed up access to validator information
+	validators map[string]*Validator                   // address->validator
+	delegates  map[uint64]map[crypto.AddressI]struct{} // chainID->delegates
 }
 
 // New() creates a new instance of a StateMachine
@@ -51,6 +52,7 @@ func New(c lib.Config, store lib.StoreI, metrics *lib.Metrics, log lib.LoggerI) 
 		log:               log,
 		cache: &cache{
 			validators: make(map[string]*Validator),
+			delegates:  make(map[uint64]map[crypto.AddressI]struct{}),
 		},
 	}
 	// initialize the state machine and exit
@@ -527,6 +529,28 @@ func (s *StateMachine) Cache() error {
 	for _, val := range validators {
 		s.cache.validators[crypto.NewAddressFromBytes(val.Address).String()] = val
 	}
+	// retrieve the current list of committees
+	committees, err := s.GetCommitteesData()
+	if err != nil {
+		return err
+	}
+	// iterate over the committees
+	for _, committee := range committees.List {
+		chainID := committee.ChainId
+		// initialize the delegates cache for this chainID
+		vs, err := s.GetAllDelegates(chainID)
+		s.cache.delegates[chainID] = make(map[crypto.AddressI]struct{}, 0)
+		if err != nil {
+			return err
+		}
+		for _, val := range vs.ValidatorSet.ValidatorSet {
+			// get the address from the public key
+			address := crypto.NewAddressFromBytes(crypto.Hash(val.PublicKey)[:crypto.AddressSize])
+			// add the address to the delegates cache for this chainID
+			s.cache.delegates[chainID][address] = struct{}{}
+		}
+	}
+	// exit
 	return nil
 }
 

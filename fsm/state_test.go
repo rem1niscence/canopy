@@ -69,6 +69,7 @@ func TestInitialize(t *testing.T) {
 				log:    log,
 				cache: &cache{
 					validators: make(map[string]*Validator),
+					delegates:  make(map[uint64]map[crypto.AddressI]struct{}),
 				},
 			}
 			// set the data dir path
@@ -317,6 +318,7 @@ func newTestStateMachine(t *testing.T) StateMachine {
 		log: log,
 		cache: &cache{
 			validators: make(map[string]*Validator),
+			delegates:  make(map[uint64]map[crypto.AddressI]struct{}),
 		},
 	}
 	require.NoError(t, sm.SetParams(DefaultParams()))
