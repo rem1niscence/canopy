@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"math/rand"
@@ -186,7 +187,12 @@ func downloadRelease(downloadURL string, downloadLock *sync.Mutex) error {
 		return nil
 	}
 
-	return errors.New("NON 200 OK")
+	// Read response body for error message
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("HTTP %d: failed to read response body", resp.StatusCode)
+	}
+	return fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(bodyBytes))
 }
 
 // runBinary executes the CLI binary with the 'start' command
@@ -250,7 +256,7 @@ func main() {
 				<-notifyStartRun
 
 				downloadLock.Lock()
-				log.Printf("Starting version: %s in %s...\n", curRelease, binPath)
+				log.Printf("Starting version: %s in %s from %s...\n", curRelease, binPath, repoOwner)
 				cmd, err = runBinary()
 				if err != nil {
 					log.Printf("Failed to run binary: %v", err)
@@ -274,7 +280,7 @@ func main() {
 			for {
 				version, url, err := getLatestRelease()
 				if err != nil {
-					log.Printf("Failed get latest release: %v", err)
+					log.Printf("Failed get latest release from %s: %v", repoOwner, err)
 					continue
 				}
 
