@@ -148,7 +148,11 @@ func getLatestRelease() (string, string, error) {
 		return "", "", io.EOF
 	}
 
-	return "", "", errors.New("NON 200 OK")
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", fmt.Errorf("HTTP %d: failed to read response body", resp.StatusCode)
+	}
+	return "", "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(bodyBytes))
 }
 
 // downloadRelease downloads and replaces the current binary with the new version
@@ -288,7 +292,7 @@ func main() {
 					log.Println("NEW VERSION FOUND")
 					err := downloadRelease(url, downloadLock)
 					if err != nil {
-						log.Printf("Failed to download release: %v", err)
+						log.Printf("Failed to download release from %s: %v", repoOwner, err)
 						continue
 					}
 					curRelease = version
