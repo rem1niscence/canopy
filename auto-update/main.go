@@ -25,19 +25,22 @@ import (
 
 // Constants defining the GitHub repository information
 const (
-	repoOwner = "canopy-network"
-	repoName  = "canopy"
+	repoName = "canopy"
 )
 
 // Global variable for the binary path
 var (
-	binPath = os.Getenv("BIN_PATH")
+	binPath   = os.Getenv("BIN_PATH")
+	repoOwner = os.Getenv("REPO_OWNER")
 )
 
 // init initializes the binary path if not set in environment variables
 func init() {
 	if binPath == "" {
 		binPath = "./cli"
+	}
+	if repoOwner == "" {
+		repoOwner = "canopy-network"
 	}
 }
 
