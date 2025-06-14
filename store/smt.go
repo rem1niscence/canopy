@@ -141,8 +141,6 @@ func NewSMT(rootKey []byte, keyBitLen int, store lib.RWStoreI) (smt *SMT) {
 		store:        store,
 		keyBitLength: keyBitLen,
 		nodeCache:    make(map[uint64]*node, MaxCacheSize),
-		operations:   nil,
-		OpData:       OpData{},
 	}
 	// ensure the root key is the proper length based on the bit count
 	rKey := newNodeKey(bytes.Clone(rootKey), keyBitLen)
@@ -170,68 +168,13 @@ func (s *SMT) Set(k, v []byte) (err lib.ErrorI) {
 	// calculate the key and value to upsert
 	n := &node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), Node: lib.Node{Value: crypto.Hash(v)}}
 	// check to make sure the target is valid
-	if err = s.validateNode(n); err != nil {
+	if err = s.validateTarget(n); err != nil {
 		return err
 	}
 	// set the node in the deferred list
 	s.addOperation(n)
 	// exit
 	return
-}
-
-// Delete: removes a target node if exists in the tree
-func (s *SMT) Delete(k []byte) (err lib.ErrorI) {
-	// calculate the key and value to upsert
-	n := &node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), delete: true}
-	// check to make sure the target is valid
-	if err = s.validateNode(n); err != nil {
-		return
-	}
-	// set the node in the deferred list
-	s.addOperation(n)
-	// exit
-	return
-}
-
-// Commit(): executes the deferred operations in order (left-to-right),
-// minimizing the amount of traversals, IOPS, and hash operations
-func (s *SMT) Commit() (err lib.ErrorI) {
-	firstIteration := true
-	for {
-		// if no operations and at root - exit
-		if len(s.operations) == 0 && len(s.traversed.Nodes) == 0 {
-			s.reset()
-			return
-		}
-		// pop head into target
-		s.target, s.operations = s.operations[0], s.operations[1:]
-		if !firstIteration {
-			if len(s.traversed.Nodes) != 0 {
-				// update the greatest common prefix and the bit position based on the new current key
-				s.target.Key.greatestCommonPrefix(&s.bitPos, s.gcp, s.current.Key)
-			}
-		} else {
-			firstIteration = false
-		}
-		// traverse to target
-		if err = s.traverse(); err != nil {
-			return
-		}
-		// execute operation
-		if !s.target.delete {
-			if err = s.set(); err != nil {
-				return
-			}
-		} else {
-			if err = s.delete(); err != nil {
-				return
-			}
-		}
-		// rehash
-		if err = s.rehash(); err != nil {
-			return
-		}
-	}
 }
 
 // set() executes the 'set' logic after traversal
@@ -263,6 +206,20 @@ func (s *SMT) set() lib.ErrorI {
 	return s.setNode(s.target)
 }
 
+// Delete: removes a target node if exists in the tree
+func (s *SMT) Delete(k []byte) (err lib.ErrorI) {
+	// calculate the key and value to upsert
+	n := &node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), delete: true}
+	// check to make sure the target is valid
+	if err = s.validateTarget(n); err != nil {
+		return
+	}
+	// set the node in the deferred list
+	s.addOperation(n)
+	// exit
+	return
+}
+
 // delete() executes the 'delete' logic after traversal
 func (s *SMT) delete() lib.ErrorI {
 	// if gcp != target key then there is no delete because the node does not exist
@@ -285,6 +242,44 @@ func (s *SMT) delete() lib.ErrorI {
 	s.traversed.Pop()
 	// delete the target from the database
 	return s.delNode(targetBytes)
+}
+
+// Commit(): executes the deferred operations in order (left-to-right),
+// minimizing the amount of traversals, IOPS, and hash operations
+func (s *SMT) Commit() (err lib.ErrorI) {
+	for {
+		// if no operations and at root - exit
+		if len(s.operations) == 0 && len(s.traversed.Nodes) == 0 {
+			return
+		}
+		// pop head into target
+		s.target, s.operations = s.operations[0], s.operations[1:]
+		// reset path variables
+		s.resetGCP()
+		// if not at root
+		if len(s.traversed.Nodes) != 0 {
+			// update the greatest common prefix and the bit position based on the new current key
+			s.target.Key.greatestCommonPrefix(&s.bitPos, s.gcp, s.current.Key)
+		}
+		// traverse to target
+		if err = s.traverse(); err != nil {
+			return
+		}
+		// execute operation
+		if !s.target.delete {
+			if err = s.set(); err != nil {
+				return
+			}
+		} else {
+			if err = s.delete(); err != nil {
+				return
+			}
+		}
+		// rehash
+		if err = s.rehash(); err != nil {
+			return
+		}
+	}
 }
 
 // traverse: navigates the tree downward to locate the target or its closest position
@@ -325,9 +320,6 @@ func (s *SMT) traverse() (err lib.ErrorI) {
 // a) the next operation key is LTE the right sibling's key, after truncating it to the right sibling's key length
 // b) traversed list is empty
 func (s *SMT) rehash() (err lib.ErrorI) {
-	// reset path variables
-	s.gcp = new(key)
-	s.pathBit, s.bitPos = 0, 0
 	// iterate the traversed list from end to start
 	for {
 		if len(s.traversed.Nodes) == 0 {
@@ -437,9 +429,14 @@ func (s *SMT) updateParentValue(parent *node) (err lib.ErrorI) {
 
 // reset() resets data for each operation
 func (s *SMT) reset() {
-	s.current, s.gcp = s.root.copy(), &key{}
+	s.current, s.traversed = s.root.copy(), &NodeList{Nodes: make([]*node, 0)}
+	s.resetGCP()
+}
+
+// resetGCP() resets the greatest common prefix and path variables
+func (s *SMT) resetGCP() {
+	s.gcp = &key{}
 	s.pathBit, s.bitPos = 0, 0
-	s.traversed = &NodeList{Nodes: make([]*node, 0)}
 }
 
 // setNode() set a node object in a key value database
@@ -489,7 +486,7 @@ func (s *SMT) getNode(key []byte) (n *node, err lib.ErrorI) {
 }
 
 // validateTarget() checks the target to ensure it's not a reserved key like root, minimum or maximum
-func (s *SMT) validateNode(n *node) lib.ErrorI {
+func (s *SMT) validateTarget(n *node) lib.ErrorI {
 	if bytes.Equal(s.root.Key.bytes(), n.Key.bytes()) {
 		return ErrReserveKeyWrite("root")
 	}
@@ -508,7 +505,7 @@ func (s *SMT) GetMerkleProof(k []byte) ([]*lib.Node, lib.ErrorI) {
 	// calculate the key and value to traverse
 	s.target = &node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength)}
 	// check to make sure the target is valid
-	if err := s.validateNode(s.target); err != nil {
+	if err := s.validateTarget(s.target); err != nil {
 		return nil, err
 	}
 	// make the slice to store the leaf nodes and the intermediate sibling nodes
@@ -656,7 +653,7 @@ func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []by
 	// calculate the key to traverse the tree
 	smt.target = &node{Key: newNodeKey(crypto.Hash(k), smt.keyBitLength)}
 	// make sure the target is valid
-	if err := smt.validateNode(smt.target); err != nil {
+	if err := smt.validateTarget(smt.target); err != nil {
 		return false, err
 	}
 	// reset the traversal variables
