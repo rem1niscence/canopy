@@ -2015,7 +2015,7 @@ func FuzzKeyDecodeEncode(f *testing.F) {
 
 func NewTestSMT(t *testing.T, preset *NodeList, root []byte, keyBitSize int) (*SMT, *Txn) {
 	// create a new memory store to work with
-	db, err := badger.OpenManaged(badger.DefaultOptions("./test").WithLoggingLevel(badger.ERROR))
+	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
 	// make a writable reader that reads from the last height
 	reader := db.NewTransactionAt(1, true)
