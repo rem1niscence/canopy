@@ -88,9 +88,11 @@ type SMT struct {
 	// keyBitLength: the depth of the tree, once set it cannot be changed for a protocol
 	keyBitLength int
 	// nodeCache: an efficient in-memory cache to avoid marshalling and unmarshalling recent nodes
-	nodeCache map[uint64]*node
+	nodeCache map[string]*node
 	// operations: a list of deferred operations to execute
 	operations []*node
+	// unsorted_ops: a list of operations that aren't yet sorted
+	unsortedOps map[string]*node
 	// OpData: data for each operation
 	OpData
 }
@@ -140,7 +142,7 @@ func NewSMT(rootKey []byte, keyBitLen int, store lib.RWStoreI) (smt *SMT) {
 	smt = &SMT{
 		store:        store,
 		keyBitLength: keyBitLen,
-		nodeCache:    make(map[uint64]*node, MaxCacheSize),
+		nodeCache:    make(map[string]*node, MaxCacheSize),
 	}
 	// ensure the root key is the proper length based on the bit count
 	rKey := newNodeKey(bytes.Clone(rootKey), keyBitLen)
@@ -154,7 +156,7 @@ func NewSMT(rootKey []byte, keyBitLen int, store lib.RWStoreI) (smt *SMT) {
 		smt.initializeTree(rKey)
 	}
 	// initialize the operations list
-	smt.operations = make([]*node, 0)
+	smt.unsortedOps = make(map[string]*node)
 	// prepare for traversal
 	smt.reset()
 	return
@@ -247,6 +249,7 @@ func (s *SMT) delete() lib.ErrorI {
 // Commit(): executes the deferred operations in order (left-to-right),
 // minimizing the amount of traversals, IOPS, and hash operations
 func (s *SMT) Commit() (err lib.ErrorI) {
+	s.sortOperations()
 	for {
 		// if no operations and at root - exit
 		if len(s.operations) == 0 && len(s.traversed.Nodes) == 0 {
@@ -347,19 +350,21 @@ func (s *SMT) rehash() (err lib.ErrorI) {
 }
 
 // addOperation() adds a deferred operation to the sorted list
-func (s *SMT) addOperation(n *node) {
-	idx := sort.Search(len(s.operations), func(i int) bool {
-		return s.operations[i].Key.cmp(n.Key) >= 0
-	})
-	// if the value already exists at idx, replace it
-	if idx < len(s.operations) && s.operations[idx].Key.equals(n.Key) {
-		s.operations[idx] = n
-		return
+func (s *SMT) addOperation(n *node) { s.unsortedOps[string(n.Key.bytes())] = n }
+
+// sortOperations() sorts the operations
+func (s *SMT) sortOperations() {
+	s.operations = make([]*node, len(s.unsortedOps))
+	// insert all unsorted operations into the slice
+	i := 0
+	for _, n := range s.unsortedOps {
+		s.operations[i] = n
+		i++
 	}
-	// otherwise, insert at idx
-	s.operations = append(s.operations, nil)
-	copy(s.operations[idx+1:], s.operations[idx:])
-	s.operations[idx] = n
+	// sort the operations
+	sort.Slice(s.operations, func(i, j int) bool {
+		return s.operations[i].Key.cmp(s.operations[j].Key) < 0
+	})
 }
 
 // initializeTree() ensures the tree always has a root with two children
@@ -443,10 +448,10 @@ func (s *SMT) resetGCP() {
 func (s *SMT) setNode(n *node) lib.ErrorI {
 	// check cache max size
 	if len(s.nodeCache) >= MaxCacheSize {
-		s.nodeCache = make(map[uint64]*node, MaxCacheSize)
+		s.nodeCache = make(map[string]*node, MaxCacheSize)
 	}
 	// set in cache
-	s.nodeCache[crypto.Hash64(n.Key.bytes())] = n
+	s.nodeCache[string(n.Key.bytes())] = n
 	// convert the node object to bytes
 	nodeBytes, err := n.bytes()
 	if err != nil {
@@ -458,14 +463,14 @@ func (s *SMT) setNode(n *node) lib.ErrorI {
 
 // delNode() remove a node from the database given its unique identifier
 func (s *SMT) delNode(key []byte) lib.ErrorI {
-	delete(s.nodeCache, crypto.Hash64(key))
+	delete(s.nodeCache, string(key))
 	return s.store.Delete(key)
 }
 
 // getNode() retrieves a node object from the database
 func (s *SMT) getNode(key []byte) (n *node, err lib.ErrorI) {
 	// check cache
-	n, found := s.nodeCache[crypto.Hash64(key)]
+	n, found := s.nodeCache[string(key)]
 	if found {
 		return n, nil
 	}

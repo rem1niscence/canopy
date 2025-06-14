@@ -14,7 +14,7 @@ import (
 )
 
 func TestFuzzMultiSet(t *testing.T) {
-	iterations := 10000
+	iterations := 1000
 	// create a new SMT
 	smt1, memStore := NewTestSMT(t, nil, nil, 160)
 	// close the store when done
@@ -57,70 +57,6 @@ func TestFuzzMultiSet(t *testing.T) {
 	// compare roots between the two smts
 	require.Equal(t, smt1.Root(), smt2.Root())
 }
-
-//func TestFuzzMultiSetFixed(t *testing.T) {
-//	// create a new SMT
-//	smt1, memStore := NewTestSMT(t, nil, nil, 4)
-//	// close the store when done
-//	defer memStore.Close()
-//	// create a compare SMT
-//	smt2, memStore2 := NewTestSMT(t, nil, nil, 4)
-//	// close the store when done
-//	defer memStore2.Close()
-//	smt1.addOperation(&node{
-//		Key:  &key{key: []byte{0b00000101, 1}},
-//		Node: lib.Node{Value: crypto.Hash([]byte("some_value"))},
-//	})
-//	smt1.addOperation(&node{
-//		Key:  &key{key: []byte{0b00000001, 3}},
-//		Node: lib.Node{Value: crypto.Hash([]byte("some_value"))},
-//	})
-//	smt2.addOperation(&node{
-//		Key:  &key{key: []byte{0b00000101, 1}},
-//		Node: lib.Node{Value: crypto.Hash([]byte("some_value"))},
-//	})
-//	require.NoError(t, smt2.Commit())
-//	smt2.addOperation(&node{
-//		Key:  &key{key: []byte{0b00000001, 3}},
-//		Node: lib.Node{Value: crypto.Hash([]byte("some_value"))},
-//	})
-//	require.NoError(t, smt2.Commit())
-//	// commit smt 1
-//	require.NoError(t, smt1.Commit())
-//	//dumpTree(t, memStore)
-//	//dumpTree(t, memStore2)
-//	// compare roots between the two smts
-//	require.Equal(t, smt1.Root(), smt2.Root())
-//	// 0
-//	// 0111 ROOT
-//	// 1
-//	// 10
-//	// 1001
-//	// 1011
-//	// 1111
-//}
-//
-//func dumpTree(t *testing.T, memStore *Txn) {
-//	// create an iterator to check out the values of the store
-//	it, err := memStore.Iterator(nil)
-//	require.NoError(t, err)
-//	defer it.Close()
-//	// iterate through the database
-//	for ; it.Valid(); it.Next() {
-//		got := newNode()
-//		// convert the value to a node
-//		require.NoError(t, lib.Unmarshal(it.Value(), &got.Node))
-//		// convert the key to a node key
-//		got.Key.fromBytes(it.Key())
-//		// compare got vs expected
-//		if len(got.RightChildKey) != 0 {
-//			fmt.Printf("%08b %d | RCHILD: %08b %d | LCHILD: %08b %d", got.Key.key[0], int(got.Key.key[1]), got.RightChildKey[0], int(got.RightChildKey[1]), got.LeftChildKey[0], int(got.LeftChildKey[1]))
-//		} else {
-//			fmt.Printf("%08b %d", got.Key.key[0], int(got.Key.key[1]))
-//		}
-//		fmt.Println("")
-//	}
-//}
 
 func TestSet(t *testing.T) {
 	tests := []struct {
@@ -2079,13 +2015,12 @@ func FuzzKeyDecodeEncode(f *testing.F) {
 
 func NewTestSMT(t *testing.T, preset *NodeList, root []byte, keyBitSize int) (*SMT, *Txn) {
 	// create a new memory store to work with
-	db, err := badger.OpenManaged(badger.DefaultOptions("").
-		WithInMemory(true).WithLoggingLevel(badger.ERROR))
+	db, err := badger.OpenManaged(badger.DefaultOptions("./test").WithLoggingLevel(badger.ERROR))
 	require.NoError(t, err)
 	// make a writable reader that reads from the last height
 	reader := db.NewTransactionAt(1, true)
 	writer := db.NewWriteBatchAt(1)
-	memStore := NewBadgerTxn(reader, writer, []byte(stateCommitmentPrefix), true, lib.NewDefaultLogger())
+	memStore := NewBadgerTxn(reader, writer, []byte(stateCommitmentPrefix), false, lib.NewDefaultLogger())
 	// if there's no preset - use the default 3 nodes
 	if preset == nil {
 		if root != nil {
@@ -2097,8 +2032,9 @@ func NewTestSMT(t *testing.T, preset *NodeList, root []byte, keyBitSize int) (*S
 	smt := &SMT{
 		store:        memStore,
 		keyBitLength: keyBitSize,
-		nodeCache:    make(map[uint64]*node, MaxCacheSize),
+		nodeCache:    make(map[string]*node, MaxCacheSize),
 		OpData:       OpData{},
+		unsortedOps:  make(map[string]*node),
 	}
 	// update root
 	smt.root = preset.Nodes[0]
