@@ -285,6 +285,8 @@ func main() {
 				version, url, err := getLatestRelease()
 				if err != nil {
 					log.Printf("Failed get latest release from %s: %v", repoOwner, err)
+					log.Println("Checking for upgrade in 30m...")
+					time.Sleep(30 * time.Minute)
 					continue
 				}
 
@@ -293,6 +295,8 @@ func main() {
 					err := downloadRelease(url, downloadLock)
 					if err != nil {
 						log.Printf("Failed to download release from %s: %v", repoOwner, err)
+						log.Println("Checking for upgrade in 30m...")
+						time.Sleep(30 * time.Minute)
 						continue
 					}
 					curRelease = version
