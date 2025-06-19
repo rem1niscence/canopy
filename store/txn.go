@@ -106,13 +106,8 @@ type Txn struct {
 	// rather than batching them at commit time. While this adds minimal overhead to
 	// individual set operations, it can significantly improve overall performance when
 	// calling Write() to persist data to the writer by spreading the I/O cost over time.
-	// Fields supporting live writing functionality
-	liveWrite bool
-	mu        sync.Mutex
-	wg        sync.WaitGroup
-	queue     []valueOp
-	sender    chan valueOp
-	err       error
+	liveWrite  bool
+	liveWriter *liveWriter
 }
 
 // txn internal structure maintains the write operations sorted lexicographically by keys
@@ -173,68 +168,12 @@ func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, sort bool, vers
 	}
 
 	if liveWrite {
-		txn.liveWrite = liveWrite
-		txn.queue = []valueOp{}
-		txn.sender = make(chan valueOp, 1000)
-		txn.mu = sync.Mutex{}
-		txn.wg = sync.WaitGroup{}
-		txn.liveWriter()
+		txn.liveWrite = true
+		txn.liveWriter = newLiveWriter(writer, version)
+		txn.liveWriter.start()
 	}
 
 	return txn
-}
-
-// liveWriter is a background goroutine that writes the operations to the writer as soon
-// as they are received
-func (t *Txn) liveWriter() {
-	// processQueue processes the next operation in the queue
-	processQueue := func() {
-		if len(t.queue) > 0 {
-			valueOp := t.queue[0]
-			t.queue = t.queue[1:]
-			if err := t.processOperation(valueOp); err != nil {
-				t.err = errors.Join(t.err, err)
-			}
-			t.wg.Done()
-		}
-	}
-	go func() {
-		for {
-			// check the queue for operations
-			t.mu.Lock()
-			processQueue()
-			t.mu.Unlock()
-			// wait for the next operation to be sent to the channel
-			valueOp, ok := <-t.sender
-			if !ok {
-				break
-			}
-			t.processOperation(valueOp)
-			t.wg.Done()
-		}
-		// process any remaining operations in the queue
-		t.mu.Lock()
-		for len(t.queue) > 0 {
-			processQueue()
-		}
-		t.mu.Unlock()
-	}()
-}
-
-// sendToLiveWriter sends a value operation to the live writer channel and queues it
-// if the channel is full. This allow operations to be non blocking
-func (t *Txn) sendToLiveWriter(valueOp valueOp) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	t.wg.Add(1)
-	// try sending to the channel
-	select {
-	case t.sender <- valueOp:
-	default:
-		// send to queue if channel is full
-		t.queue = append(t.queue, valueOp)
-	}
 }
 
 // Get() retrieves the value for a given key from either the cache operations or the reader store
@@ -281,7 +220,7 @@ func (t *Txn) update(key []byte, v []byte, opAction op) {
 	t.cache.ops[k] = valueOp
 
 	if t.liveWrite {
-		t.sendToLiveWriter(valueOp)
+		t.liveWriter.send(valueOp)
 	}
 }
 
@@ -300,7 +239,7 @@ func (t *Txn) updateEntry(key []byte, v *badger.Entry) {
 	t.cache.ops[k] = valueOp
 
 	if t.liveWrite {
-		t.sendToLiveWriter(valueOp)
+		t.liveWriter.send(valueOp)
 	}
 }
 
@@ -337,71 +276,52 @@ func (t *Txn) Discard() {
 // Any new writes won't be committed
 func (t *Txn) Cancel() {
 	if t.liveWrite {
-		t.liveWrite = false
-		close(t.sender)
-		// clear the queue and decrement the wait group for each pending operation
-		t.mu.Lock()
-		pendingOps := len(t.queue)
-		t.queue = make([]valueOp, 0)
-		t.mu.Unlock()
-		// decrement waitgroup for all pending operations
-		for range pendingOps {
-			t.wg.Done()
-		}
+		t.liveWriter.close()
 	}
 	// close the writer
 	t.writer.Cancel()
 }
 
 // Write() flushes the in-memory operations to the batch writer and clears in-memory changes
-func (t *Txn) Write() lib.ErrorI {
-	if t.liveWrite {
-		// set live writer to false to prevent further writes
-		t.liveWrite = false
-		// close sender channel to signal end of operations
-		close(t.sender)
-		// wait for all pending operations to complete
-		t.wg.Wait()
-		// clear the in-memory operations after writing
-		t.Discard()
-		// return any errors encountered during the write process
-		if t.err != nil {
-			return t.err.(lib.ErrorI)
+func (t *Txn) Write() (err lib.ErrorI) {
+	// if liveWrite is true, flush the liveWriter
+	defer func() {
+		if err == nil {
+			// clear the in-memory operations after writing
+			t.Discard()
 		}
-		// no need to process t.cache.ops again since they have already been applied
-		return nil
+	}()
+	if t.liveWrite {
+		return t.liveWriter.flush()
 	}
 	// flush all operations to the writer
 	for _, v := range t.cache.ops {
-		if err := t.processOperation(v); err != nil {
+		if err := processOperation(t.writer, t.writeVersion, v); err != nil {
 			return err
 		}
 	}
-	// clear the in-memory operations after writing
-	t.Discard()
 	// exit
 	return nil
 }
 
-func (t *Txn) processOperation(vOp valueOp) lib.ErrorI {
+func processOperation(writer TxnWriterI, version uint64, vOp valueOp) lib.ErrorI {
 	switch vOp.op {
 	case opSet:
 		// set an entry with a bit that marks it as deleted and prevents it from being discarded
-		if err := t.writer.SetEntry(&badger.Entry{Key: vOp.key, Value: vOp.value}, t.writeVersion); err != nil {
+		if err := writer.SetEntry(&badger.Entry{Key: vOp.key, Value: vOp.value}, version); err != nil {
 			return ErrStoreDelete(err)
 		}
 	case opDelete:
 		// set an entry with a bit that marks it as deleted and prevents it from being discarded
-		if err := t.writer.SetEntry(newEntry(vOp.key, nil, badgerDeleteBit|badgerNoDiscardBit), t.writeVersion); err != nil {
+		if err := writer.SetEntry(newEntry(vOp.key, nil, badgerDeleteBit|badgerNoDiscardBit), version); err != nil {
 			return ErrStoreDelete(err)
 		}
 	case opEntry:
 		// set the entry in the batch
-		if err := t.writer.SetEntry(vOp.valueEntry, t.writeVersion); err != nil {
+		if err := writer.SetEntry(vOp.valueEntry, version); err != nil {
 			return ErrStoreSet(err)
 		}
 	}
-
 	return nil
 }
 
@@ -1003,4 +923,156 @@ func (bi *BTreeIterator) hasPrev() bool {
 		return false
 	}
 	return bi.prev() != nil
+}
+
+// LIVE WRITER IMPLEMENTATION BELOW
+
+type liveWriter struct {
+	writer  TxnWriterI
+	version uint64
+	queue   queue[valueOp]
+	sender  chan valueOp
+	closed  bool
+	mu      sync.Mutex
+	wg      sync.WaitGroup
+	err     error
+}
+
+func newLiveWriter(writer TxnWriterI, version uint64) *liveWriter {
+	return &liveWriter{
+		writer:  writer,
+		version: version,
+		mu:      sync.Mutex{},
+		wg:      sync.WaitGroup{},
+	}
+}
+
+// start is a background goroutine that writes the operations to the writer as soon
+// as they are received
+func (lv *liveWriter) start() {
+	// init starting values
+	lv.sender = make(chan valueOp, 5000)
+	lv.closed = false
+	lv.queue = newQueue[valueOp]()
+	lv.err = nil
+
+	// process processes the next operation in the queue
+	process := func(valueOp valueOp) {
+		err := processOperation(lv.writer, lv.version, valueOp)
+		if err != nil {
+			lv.err = errors.Join(lv.err, err)
+		}
+		lv.wg.Done()
+	}
+	go func() {
+		for {
+			// process the next operation in the queue
+			if vOp, ok := lv.queue.Pop(); ok {
+				process(vOp)
+			}
+			// wait for the next operation to be sent to the channel
+			valueOp, ok := <-lv.sender
+			if !ok {
+				break
+			}
+			process(valueOp)
+		}
+		// process any remaining operations in the queue
+		for vOp, ok := lv.queue.Pop(); ok; {
+			process(vOp)
+		}
+	}()
+}
+
+// send queues a value operation for asynchronous processing.
+func (lv *liveWriter) send(valueOp valueOp) {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
+	// if the live writer is closed, start a new one
+	if lv.closed {
+		lv.start()
+	}
+	lv.wg.Add(1)
+	select {
+	// try sending to the channel
+	case lv.sender <- valueOp:
+	default:
+		// channel buffer is full, add to overflow queue
+		lv.queue.Add(valueOp)
+	}
+}
+
+// flush waits for all pending operations to complete and returns any errors.
+func (lv *liveWriter) flush() lib.ErrorI {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
+	lv.closeUnlocked()
+	lv.wg.Wait()
+	if lv.err != nil {
+		return lv.err.(lib.ErrorI)
+	}
+	return nil
+}
+
+// close closes the live writer and wont allow any more operations to be sent
+// in a thread-safe manner
+func (lv *liveWriter) close() {
+	lv.mu.Lock()
+	defer lv.mu.Unlock()
+	lv.closeUnlocked()
+}
+
+// closeUnlocked closes the live writer and wont allow any more operations to be sent
+func (lv *liveWriter) closeUnlocked() {
+	if lv.closed {
+		return
+	}
+	lv.closed = true
+	close(lv.sender)
+}
+
+// queue is a generic thread-safe queue
+// This queue is specifically used by liveWriter to buffer operations when
+// its channel buffer is full, ensuring no operations are lost while
+// maintaining non-blocking behavior.
+type queue[T any] struct {
+	items []T
+	mu    sync.Mutex
+}
+
+// New creates a new empty queue
+func newQueue[T any]() queue[T] {
+	return queue[T]{
+		items: make([]T, 0),
+	}
+}
+
+// Add adds an item to the end of the queue
+func (q *queue[T]) Add(item T) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.items = append(q.items, item)
+}
+
+// Pop removes and returns the first item in the queue
+// Returns the zero value of T and false if the queue is empty
+func (q *queue[T]) Pop() (T, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	var zero T
+	if len(q.items) == 0 {
+		return zero, false
+	}
+
+	item := q.items[0]
+	q.items = q.items[1:]
+	return item, true
+}
+
+// Len returns the number of items in the queue
+func (q *queue[T]) Len() int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return len(q.items)
 }
