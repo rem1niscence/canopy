@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	pingInterval           = 30 * time.Second        // how often a ping is to be sent
-	pongTimeoutDuration    = 20 * time.Second        // how long the sender of a ping waits for a pong before throwing an error
+	pingInterval           = 10 * time.Second        // how often a ping is to be sent
+	pongTimeoutDuration    = 10 * time.Second        // how long the sender of a ping waits for a pong before throwing an error
 	maxDataChunkSize       = 1024 - packetHeaderSize // maximum size of the chunk of bytes in a packet
 	maxPacketSize          = 1024                    // maximum size of the full packet
 	packetHeaderSize       = 47                      // the overhead of the protobuf packet header

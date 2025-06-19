@@ -56,7 +56,7 @@ func (c *Controller) ListenForBlock() {
 			// track processing time for consensus module
 			startTime := time.Now()
 			// 'handle' the peer block and certificate appropriately
-			qc, err := c.HandlePeerBlock(blockMessage, false)
+			qc, err := c.HandlePeerBlock(blockMessage, lib.BytesToString(sender), false)
 			// ensure no error
 			if err != nil {
 				// if the node has fallen 'out of sync' with the chain
@@ -366,7 +366,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 }
 
 // HandlePeerBlock() validates and handles an inbound certificate (with a block) from a remote peer
-func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.QuorumCertificate, lib.ErrorI) {
+func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, senderPublicKey string, syncing bool) (*lib.QuorumCertificate, lib.ErrorI) {
 	// log the start of 'peer block handling'
 	c.log.Info("Handling peer block")
 	// define a convenience variable for the certificate
@@ -414,22 +414,30 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 		// update the non signer percent for the validators
 		c.Metrics.UpdateNonSignerPercent(qc.Signature, v)
 	}
-	// ensure the proposal inside the quorum certificate is valid at a stateless level
-	block, err := qc.CheckProposalBasic(c.FSM.Height(), c.Config.NetworkID, c.Config.ChainId)
-	if err != nil {
-		// exit with error
-		return nil, err
-	}
 	// if this certificate isn't finalized
 	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
 		// exit with error
 		return nil, lib.ErrWrongPhase()
 	}
-	// check if the node has fallen out of sync
-	if !syncing && c.FSM.Height() != block.BlockHeader.Height {
+	// ensure the proposal inside the quorum certificate is valid at a stateless level
+	block, err := qc.CheckProposalBasic(c.FSM.Height(), c.Config.NetworkID, c.Config.ChainId)
+	// if new height notified add to the map
+	// if err == lib.ErrNewHeight() && senderPublicKey != "" {
+	// 	c.newBlockPeers[senderPublicKey] = true
+	// }
+	// check if the node has fallen out of sync if at least a third of its peers has notified it
+	// if !syncing && len(c.newBlockPeers) >= c.P2P.PeerCount()/3 && senderPublicKey != "" {
+	// 	// reset map since syncing will start
+	// 	c.newBlockPeers = make(map[string]bool)
+	// 	// exit with error
+	// 	return nil, lib.ErrOutOfSync()
+	// }
+	if err != nil {
 		// exit with error
-		return nil, lib.ErrOutOfSync()
+		return nil, err
 	}
+	// reset map since new height was gotten correctly
+	// c.newBlockPeers = make(map[string]bool)
 	// attempts to commit the QC to persistence of chain by playing it against the state machine
 	if err = c.CommitCertificate(qc, block); err != nil {
 		// exit with error
