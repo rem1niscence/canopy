@@ -2,9 +2,7 @@ package store
 
 import (
 	"bytes"
-	"crypto/rand"
 	"errors"
-	"math"
 	"reflect"
 	"strings"
 	"sync"
@@ -18,40 +16,6 @@ import (
 	"github.com/google/btree"
 )
 
-const (
-	// ----------------------------------------------------------------------------------------------------------------
-	// BadgerDB garbage collector behavior is not well documented leading to many open issues in their repository
-	// However, here is our current understanding based on experimentation
-	// ----------------------------------------------------------------------------------------------------------------
-	// 1. Manual Keep (Protection)
-	//    - `badgerNoDiscardBit` prevents automatic GC of a key version.
-	//    - However, it can be manually superseded by a manual removal
-	//
-	// 2. Manual Remove (Explicit Deletion or Pruning)
-	//    - Deleting a key at a higher ts removes earlier versions once `discardTs >= ts`.
-	//    - Setting `badgerDiscardEarlierVersions` is similar, except it retains the current version.
-	//
-	// 3. Auto Remove – Tombstones
-	//    - Deleted keys (tombstoned) <= `discardTs` are automatically purged unless protected by `badgerNoDiscardBit`
-	//
-	// 4. Auto Remove – Set Entries
-	//    - For non-deleted (live) keys, Badger retains the number of versions to retain is defined by `KeepNumVersions`.
-	//    - Older versions exceeding this count are automatically eligible for GC.
-	//
-	//   Note:
-	// - The first GC pass after updating `discardTs` and flushing memtable is deterministic
-	// - Subsequent GC runs are probabilistic, depending on reclaimable space and value log thresholds
-	// ----------------------------------------------------------------------------------------------------------------
-	// Bits source: https://github.com/hypermodeinc/badger/blob/85389e88bf308c1dc271383b77b67f4ef4a85194/value.go#L37
-	badgerMetaFieldName                = "meta"  // badgerDB Entry 'meta' field name
-	badgerDeleteBit               byte = 1 << 0  // badgerDB 'tombstoned' flag
-	badgerNoDiscardBit            byte = 1 << 3  // badgerDB 'never discard'  bit
-	badgerSizeFieldName                = "size"  // badgerDB Txn 'size' field name
-	badgerCountFieldName               = "count" // badgerDB Txn 'count' field name
-	badgerTxnFieldName                 = "txn"   // badgerDB WriteBatch 'txn' field name
-	badgerDBMaxBatchScalingFactor      = 0.98425 // through experimentation badgerDB's max transaction scaling factor
-)
-
 // TxReaderI() defines the interface to read a TxnTransaction
 // Txn implements this itself to allow for nested transactions
 type TxnReaderI interface {
@@ -63,10 +27,8 @@ type TxnReaderI interface {
 // TxnWriterI() defines the interface to write a TxnTransaction
 // Txn implements this itself to allow for nested transactions
 type TxnWriterI interface {
-	Set(key, value []byte) lib.ErrorI
-	Delete(key []byte) lib.ErrorI
-	SetEntry(entry *badger.Entry, version uint64) lib.ErrorI
-	Write() lib.ErrorI
+	SetEntryAt(entry *badger.Entry, version uint64) error
+	Flush() error
 	Cancel()
 }
 
@@ -78,15 +40,15 @@ var _ lib.IteratorI = &Iterator{}
 
 /*
 	Txn acts like a database transaction
-	It saves set/del operations in memory and allows the caller to Write() to the parent or Discard()
-	When read from, it merges with the parent as if Write() had already been called
+	It saves set/del operations in memory and allows the caller to Flush() to the parent or Discard()
+	When read from, it merges with the parent as if Flush() had already been called
 
 	Txn abstraction is necessary due to the inability of BadgerDB to have nested transactions.
 	Txns allow an easy rollback of write operations within a single Transaction object, which is necessary
 	for ephemeral states and testing the validity of a proposal block / transactions.
 
 	CONTRACT:
-	- only safe when writing to another memory store like a badger.Txn() as Write() is not atomic.
+	- only safe when writing to another memory store like a badger.Txn() as Flush() is not atomic.
 	- not thread safe (can't use 1 txn across multiple threads)
 	- nil values are supported; deleted values are also set to nil
 	- keys must be smaller than 128 bytes
@@ -95,7 +57,7 @@ var _ lib.IteratorI = &Iterator{}
 
 type Txn struct {
 	reader       TxnReaderI  // memory store to Read() from
-	writer       TxnWriterI  // memory store to Write() to
+	writer       TxnWriterI  // memory store to Flush() to
 	prefix       []byte      // prefix for keys in this txn
 	logger       lib.LoggerI // logger for this txn
 	sort         bool        // whether to sort the keys in the cache; used for iteration
@@ -105,7 +67,7 @@ type Txn struct {
 	// liveWrite enables real-time writing of key-values to the writer as they're set,
 	// rather than batching them at commit time. While this adds minimal overhead to
 	// individual set operations, it can significantly improve overall performance when
-	// calling Write() to persist data to the writer by spreading the I/O cost over time.
+	// calling Flush() to persist data to the writer by spreading the I/O cost over time.
 	// Fields supporting live writing functionality
 	liveWrite bool
 	mu        sync.Mutex
@@ -152,7 +114,7 @@ type valueOp struct {
 
 // NewBadgerTxn() creates a new instance of Txn from badger Txn and WriteBatch correspondingly
 func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, sort bool, writeVersion uint64, liveWrite bool, logger lib.LoggerI) *Txn {
-	return NewTxn(BadgerTxnReader{reader, prefix}, BadgerTxnWriter{writer}, prefix, sort, writeVersion, liveWrite, logger)
+	return NewTxn(BadgerTxnReader{reader, prefix}, writer, prefix, sort, writeVersion, liveWrite, logger)
 }
 
 // NewTxn() creates a new instance of Txn with the specified reader and writer
@@ -165,10 +127,8 @@ func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, sort bool, vers
 		sort:         sort,
 		writeVersion: version,
 		cache: txn{
-			ops: make(map[string]valueOp),
-			sorted: btree.NewG(32, func(a, b *CacheItem) bool {
-				return a.Less(b)
-			}), // need to benchmark this value
+			ops:    make(map[string]valueOp),
+			sorted: btree.NewG(32, func(a, b *CacheItem) bool { return a.Less(b) }), // need to benchmark this value
 		},
 	}
 
@@ -262,7 +222,7 @@ func (t *Txn) Delete(key []byte) lib.ErrorI {
 }
 
 // SetEntry() adds or updates a custom badger entry in the cache operations
-func (t *Txn) SetEntry(entry *badger.Entry, _ uint64) lib.ErrorI {
+func (t *Txn) SetEntryAt(entry *badger.Entry, _ uint64) error {
 	t.updateEntry(lib.Append(t.prefix, entry.Key), entry)
 	return nil
 }
@@ -349,12 +309,14 @@ func (t *Txn) Cancel() {
 			t.wg.Done()
 		}
 	}
-	// close the writer
-	t.writer.Cancel()
+	if t.writer != nil {
+		// close the writer
+		t.writer.Cancel()
+	}
 }
 
-// Write() flushes the in-memory operations to the batch writer and clears in-memory changes
-func (t *Txn) Write() lib.ErrorI {
+// Flush() flushes the in-memory operations to the batch writer and clears in-memory changes
+func (t *Txn) Flush() error {
 	if t.liveWrite {
 		// set live writer to false to prevent further writes
 		t.liveWrite = false
@@ -387,17 +349,17 @@ func (t *Txn) processOperation(vOp valueOp) lib.ErrorI {
 	switch vOp.op {
 	case opSet:
 		// set an entry with a bit that marks it as deleted and prevents it from being discarded
-		if err := t.writer.SetEntry(&badger.Entry{Key: vOp.key, Value: vOp.value}, t.writeVersion); err != nil {
+		if err := t.writer.SetEntryAt(&badger.Entry{Key: vOp.key, Value: vOp.value}, t.writeVersion); err != nil {
 			return ErrStoreDelete(err)
 		}
 	case opDelete:
 		// set an entry with a bit that marks it as deleted and prevents it from being discarded
-		if err := t.writer.SetEntry(newEntry(vOp.key, nil, badgerDeleteBit|badgerNoDiscardBit), t.writeVersion); err != nil {
+		if err := t.writer.SetEntryAt(newEntry(vOp.key, nil, badgerDeleteBit|badgerNoDiscardBit), t.writeVersion); err != nil {
 			return ErrStoreDelete(err)
 		}
 	case opEntry:
 		// set the entry in the batch
-		if err := t.writer.SetEntry(vOp.valueEntry, t.writeVersion); err != nil {
+		if err := t.writer.SetEntryAt(vOp.valueEntry, t.writeVersion); err != nil {
 			return ErrStoreSet(err)
 		}
 	}
@@ -419,8 +381,6 @@ func (t *Txn) Close() {
 	t.reader.Discard()
 	t.Cancel()
 }
-func (t *Txn) setDBWriter(w *badger.WriteBatch) { t.writer = BadgerTxnWriter{w} }
-func (t *Txn) setDBReader(r *badger.Txn)        { t.reader = BadgerTxnReader{r, t.prefix} }
 
 // TXN ITERATOR CODE BELOW
 
@@ -655,9 +615,42 @@ func (i *Iterator) Value() (value []byte) {
 
 // BADGERDB TXNWRITER AND TXNREADER INTERFACES IMPLEMENTATION BELOW
 
+const (
+	// ----------------------------------------------------------------------------------------------------------------
+	// BadgerDB garbage collector behavior is not well documented leading to many open issues in their repository
+	// However, here is our current understanding based on experimentation
+	// ----------------------------------------------------------------------------------------------------------------
+	// 1. Manual Keep (Protection)
+	//    - `badgerNoDiscardBit` prevents automatic GC of a key version.
+	//    - However, it can be manually superseded by a manual removal
+	//
+	// 2. Manual Remove (Explicit Deletion or Pruning)
+	//    - Deleting a key at a higher ts removes earlier versions once `discardTs >= ts`.
+	//    - Setting `badgerDiscardEarlierVersions` is similar, except it retains the current version.
+	//
+	// 3. Auto Remove – Tombstones
+	//    - Deleted keys (tombstoned) <= `discardTs` are automatically purged unless protected by `badgerNoDiscardBit`
+	//
+	// 4. Auto Remove – Set Entries
+	//    - For non-deleted (live) keys, Badger retains the number of versions to retain is defined by `KeepNumVersions`.
+	//    - Older versions exceeding this count are automatically eligible for GC.
+	//
+	//   Note:
+	// - The first GC pass after updating `discardTs` and flushing memtable is deterministic
+	// - Subsequent GC runs are probabilistic, depending on reclaimable space and value log thresholds
+	// ----------------------------------------------------------------------------------------------------------------
+	// Bits source: https://github.com/hypermodeinc/badger/blob/85389e88bf308c1dc271383b77b67f4ef4a85194/value.go#L37
+	badgerMetaFieldName                = "meta"  // badgerDB Entry 'meta' field name
+	badgerDeleteBit               byte = 1 << 0  // badgerDB 'tombstoned' flag
+	badgerNoDiscardBit            byte = 1 << 3  // badgerDB 'never discard'  bit
+	badgerSizeFieldName                = "size"  // badgerDB Txn 'size' field name
+	badgerCountFieldName               = "count" // badgerDB Txn 'count' field name
+	badgerTxnFieldName                 = "txn"   // badgerDB WriteBatch 'txn' field name
+	badgerDBMaxBatchScalingFactor      = 0.98425 // through experimentation badgerDB's max transaction scaling factor
+)
+
 // Enforce interface implementations
 var _ TxnReaderI = &BadgerTxnReader{}
-var _ TxnWriterI = &BadgerTxnWriter{}
 
 type BadgerTxnReader struct {
 	*badger.Txn
@@ -697,94 +690,7 @@ func (r BadgerTxnReader) NewIterator(prefix []byte, reverse bool, allVersions bo
 	}
 }
 
-func (r BadgerTxnReader) Discard() {
-	r.Txn.Discard()
-}
-
-type BadgerTxnWriter struct {
-	*badger.WriteBatch
-}
-
-func (w BadgerTxnWriter) Set(key, value []byte) lib.ErrorI {
-	err := w.WriteBatch.Set(key, value)
-	if err != nil {
-		return ErrStoreSet(err)
-	}
-	return nil
-}
-
-func (w BadgerTxnWriter) Delete(key []byte) lib.ErrorI {
-	err := w.WriteBatch.Delete(key)
-	if err != nil {
-		return ErrStoreDelete(err)
-	}
-	return nil
-}
-
-func (w BadgerTxnWriter) SetEntry(entry *badger.Entry, version uint64) lib.ErrorI {
-	err := w.WriteBatch.SetEntryAt(entry, version)
-	if err != nil {
-		return ErrStoreSet(err)
-	}
-	return nil
-}
-
-func (w BadgerTxnWriter) Write() lib.ErrorI {
-	err := w.WriteBatch.Flush()
-	if err != nil {
-		return ErrFlushBatch(err)
-	}
-	return nil
-}
-
-func (w BadgerTxnWriter) Cancel() {
-	w.WriteBatch.Cancel()
-}
-
-var (
-	endBytes = bytes.Repeat([]byte{0xFF}, maxKeyBytes+1)
-)
-
-// removePrefix() removes the prefix from the key
-func removePrefix(b, prefix []byte) []byte { return b[len(prefix):] }
-
-// prefixEnd() returns the end key for a given prefix by appending max possible bytes
-func prefixEnd(prefix []byte) []byte {
-	return lib.Append(prefix, endBytes)
-}
-
-// newEntry() creates a new badgerDB entry
-func newEntry(key, value []byte, meta byte) (e *badger.Entry) {
-	e = &badger.Entry{Key: key, Value: value}
-	setMeta(e, meta)
-	return
-}
-
-// FlushMemTable() ensures badgerDB is flushing its mem table before running flatten
-// IMPORTANT - discardTs must be set before this
-func FlushMemTable(db *badger.DB) lib.ErrorI {
-	// get random 32 bytes
-	randomPrefix := make([]byte, 32)
-	if _, err := rand.Read(randomPrefix); err != nil {
-		return ErrReadBytes(err)
-	}
-	// create a new transaction to write to the database
-	tx := db.NewTransactionAt(math.MaxUint64, true)
-	// write the random prefix to the database
-	if err := tx.Set(randomPrefix, nil); err != nil {
-		return ErrSetEntry(err)
-	}
-	// commit the transaction
-	if err := tx.CommitAt(math.MaxUint64, nil); err != nil {
-		return ErrCommitDB(err)
-	}
-	// call drop prefix which triggers the mempool flush
-	// NOTE: this only works if an actual prefix exists
-	if err := db.DropPrefix(randomPrefix); err != nil {
-		return ErrFlushMemTable(err)
-	}
-	return nil
-}
+func (r BadgerTxnReader) Discard() { r.Txn.Discard() }
 
 // setMeta() accesses the private field 'meta' of badgerDB's `Entry`
 // badger doesn't yet allow users to explicitly set keys as *do not discard*
@@ -825,8 +731,23 @@ func getSizeAndCount(txn *badger.Txn) (size, count int64) {
 }
 
 // seekLast() positions the iterator at the last key for the given prefix
-func seekLast(it *badger.Iterator, prefix []byte) {
-	it.Seek(prefixEnd(prefix))
+func seekLast(it *badger.Iterator, prefix []byte) { it.Seek(prefixEnd(prefix)) }
+
+var (
+	endBytes = bytes.Repeat([]byte{0xFF}, maxKeyBytes+1)
+)
+
+// removePrefix() removes the prefix from the key
+func removePrefix(b, prefix []byte) []byte { return b[len(prefix):] }
+
+// prefixEnd() returns the end key for a given prefix by appending max possible bytes
+func prefixEnd(prefix []byte) []byte { return lib.Append(prefix, endBytes) }
+
+// newEntry() creates a new badgerDB entry
+func newEntry(key, value []byte, meta byte) (e *badger.Entry) {
+	e = &badger.Entry{Key: key, Value: value}
+	setMeta(e, meta)
+	return
 }
 
 // BTREE ITERATOR CODE BELOW
