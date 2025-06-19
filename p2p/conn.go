@@ -185,6 +185,7 @@ func (c *MultiConn) startSendService() {
 			c.sendWireBytes(new(Ping), m)
 			// reset the pong timer
 			lib.StopTimer(pongTimer)
+			c.log.Debugf("Ping sent to  %s", c.Address)
 			// set the pong timer to execute an Error function if the timer expires before receiving a pong
 			pongTimer = time.AfterFunc(pongTimeoutDuration, func() {
 				if e := ErrPongTimeout(); e != nil {
@@ -201,6 +202,7 @@ func (c *MultiConn) startSendService() {
 			}
 			// send a pong
 			c.sendWireBytes(new(Pong), m)
+			c.log.Debugf("Pong sent to  %s", c.Address)
 		case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
 			// if the channel was closed
 			if !open {
@@ -259,9 +261,10 @@ func (c *MultiConn) startReceiveService() {
 					return
 				}
 			case *Ping: // receive ping message notifies the "send" service to respond with a 'pong' message
-
+				c.log.Debugf("Ping received from  %s", c.Address)
 				c.sendPong <- struct{}{}
 			case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
+				c.log.Debugf("Pong received from  %s", c.Address)
 				c.receivedPong <- struct{}{}
 			default: // unknown type results in slash and exiting the service
 				c.Error(ErrUnknownP2PMsg(x), UnknownMessageSlash)

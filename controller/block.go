@@ -414,11 +414,6 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, senderPublicKey stri
 		// update the non signer percent for the validators
 		c.Metrics.UpdateNonSignerPercent(qc.Signature, v)
 	}
-	// if this certificate isn't finalized
-	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
-		// exit with error
-		return nil, lib.ErrWrongPhase()
-	}
 	// ensure the proposal inside the quorum certificate is valid at a stateless level
 	block, err := qc.CheckProposalBasic(c.FSM.Height(), c.Config.NetworkID, c.Config.ChainId)
 	// if new height notified add to the map
@@ -435,6 +430,11 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, senderPublicKey stri
 	if err != nil {
 		// exit with error
 		return nil, err
+	}
+	// if this certificate isn't finalized
+	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
+		// exit with error
+		return nil, lib.ErrWrongPhase()
 	}
 	// reset map since new height was gotten correctly
 	// c.newBlockPeers = make(map[string]bool)
