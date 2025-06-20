@@ -60,7 +60,7 @@ func (c *Controller) ListenForBlock() {
 			// ensure no error
 			if err != nil {
 				// if the node has fallen 'out of sync' with the chain
-				if err == lib.ErrOutOfSync() {
+				if err.Error() == lib.ErrOutOfSync().Error() {
 					// log the 'out of sync' message
 					c.log.Warnf("Node fell out of sync for chainId: %d", blockMessage.ChainId)
 					// revert to syncing mode
@@ -416,28 +416,34 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, senderPublicKey stri
 	}
 	// ensure the proposal inside the quorum certificate is valid at a stateless level
 	block, err := qc.CheckProposalBasic(c.FSM.Height(), c.Config.NetworkID, c.Config.ChainId)
-	// if new height notified add to the map
-	// if err == lib.ErrNewHeight() && senderPublicKey != "" {
-	// 	c.newBlockPeers[senderPublicKey] = true
-	// }
-	// check if the node has fallen out of sync if at least a third of its peers has notified it
-	// if !syncing && len(c.newBlockPeers) >= c.P2P.PeerCount()/3 && senderPublicKey != "" {
-	// 	// reset map since syncing will start
-	// 	c.newBlockPeers = make(map[string]bool)
-	// 	// exit with error
-	// 	return nil, lib.ErrOutOfSync()
-	// }
+	// if this certificate isn't finalized
+	if err == nil && qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
+		// exit with error
+		return nil, lib.ErrWrongPhase()
+	}
+	if !c.Consensus.SelfIsValidator() {
+		if err != nil {
+			// if new height notified add to the map
+			if err.Error() == lib.ErrNewHeight().Error() && senderPublicKey != "" {
+				c.newBlockPeers[senderPublicKey] = true
+			}
+		}
+		// check if the node has fallen out of sync if at least a third of its peers has notified it
+		if !syncing && float64(len(c.newBlockPeers)) >= float64(c.P2P.PeerCount())/float64(3) && senderPublicKey != "" {
+			// reset map since syncing will start
+			c.newBlockPeers = make(map[string]bool)
+			// exit with error
+			return nil, lib.ErrOutOfSync()
+		}
+	}
 	if err != nil {
 		// exit with error
 		return nil, err
 	}
-	// if this certificate isn't finalized
-	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
-		// exit with error
-		return nil, lib.ErrWrongPhase()
+	if !c.Consensus.SelfIsValidator() {
+		// reset map since new height was gotten correctly
+		c.newBlockPeers = make(map[string]bool)
 	}
-	// reset map since new height was gotten correctly
-	// c.newBlockPeers = make(map[string]bool)
 	// attempts to commit the QC to persistence of chain by playing it against the state machine
 	if err = c.CommitCertificate(qc, block); err != nil {
 		// exit with error
