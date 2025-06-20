@@ -190,7 +190,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	// update the version (height) number
 	s.version++
 	// execute operations over the tree and hash upwards to get the new root
-	if e := s.sc.Commit(); e != nil {
+	if e := s.sc.CommitParallel(); e != nil {
 		return nil, e
 	}
 	// get the root from the sparse merkle tree at the current state
@@ -332,7 +332,7 @@ func (s *Store) DB() *badger.DB { return s.db }
 // Root() retrieves the root hash of the StateCommitStore, representing the current root of the
 // Sparse Merkle Tree. This hash is used for verifying the integrity and consistency of the state.
 func (s *Store) Root() (root []byte, err lib.ErrorI) {
-	if err = s.sc.Commit(); err != nil {
+	if err = s.sc.CommitParallel(); err != nil {
 		return nil, err
 	}
 	return s.sc.Root(), nil

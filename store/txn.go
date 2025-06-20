@@ -77,10 +77,14 @@ type txn struct {
 	ops       map[string]valueOp        // [string(key)] -> set/del operations saved in memory
 	sorted    *btree.BTreeG[*CacheItem] // sorted btree of keys for fast iteration
 	sortedLen int                       // len(sorted)
+
+	l sync.Mutex // thread safety
 }
 
 // txn() returns a copy of the current transaction cache
 func (t txn) copy() txn {
+	t.l.Lock()
+	defer t.l.Unlock()
 	ops := make(map[string]valueOp, t.sortedLen)
 	maps.Copy(ops, t.ops)
 	return txn{
@@ -124,6 +128,7 @@ func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, sort bool, vers
 		cache: txn{
 			ops:    make(map[string]valueOp),
 			sorted: btree.NewG(32, func(a, b *CacheItem) bool { return a.Less(b) }), // need to benchmark this value
+			l:      sync.Mutex{},
 		},
 	}
 
@@ -140,6 +145,8 @@ func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, sort bool, vers
 func (t *Txn) Get(key []byte) ([]byte, lib.ErrorI) {
 	// append the prefix to the key
 	prefixedKey := lib.Append(t.prefix, key)
+	t.cache.l.Lock()
+	defer t.cache.l.Unlock()
 	// first retrieve from the in-memory cache
 	if v, found := t.cache.ops[string(prefixedKey)]; found {
 		return v.value, nil
@@ -171,6 +178,8 @@ func (t *Txn) SetEntryAt(entry *badger.Entry, _ uint64) error {
 // NOTE: update() won't modify the key itself, any key prefixing must be done before calling this
 func (t *Txn) update(key []byte, v []byte, opAction op) {
 	k := string(key)
+	t.cache.l.Lock()
+	defer t.cache.l.Unlock()
 	if t.sort {
 		if _, found := t.cache.ops[k]; !found && t.sort {
 			t.addToSorted(string(key))
@@ -189,6 +198,8 @@ func (t *Txn) update(key []byte, v []byte, opAction op) {
 // NOTE: updateEntry() won't modify the key itself, any key prefixing must be done before calling this
 func (t *Txn) updateEntry(key []byte, v *badger.Entry) {
 	k := string(key)
+	t.cache.l.Lock()
+	defer t.cache.l.Unlock()
 	if t.sort {
 		if _, found := t.cache.ops[k]; !found && t.sort {
 			t.addToSorted(string(key))
@@ -256,6 +267,8 @@ func (t *Txn) Flush() (err error) {
 	if t.liveWrite {
 		return t.liveWriter.flush()
 	}
+	t.cache.l.Lock()
+	defer t.cache.l.Unlock()
 	// flush all operations to the writer
 	for _, v := range t.cache.ops {
 		if err := processOperation(t.writer, t.writeVersion, v); err != nil {
@@ -464,6 +477,8 @@ func (ti *TxnIterator) txnKey() []byte {
 
 // txnValue() returns the value of the current in-memory operation
 func (ti *TxnIterator) txnValue() valueOp {
+	ti.l.Lock()
+	defer ti.l.Unlock()
 	return ti.ops[ti.tree.Current().Key]
 }
 

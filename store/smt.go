@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math/bits"
 	"sort"
+	"sync"
 
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -251,10 +252,130 @@ func (s *SMT) delete() lib.ErrorI {
 	return s.delNode(targetBytes)
 }
 
-// Commit(): executes the deferred operations in order (left-to-right),
-// minimizing the amount of traversals, IOPS, and hash operations
+// Commit(): sorts the operations into 8 subtree threads, executes those subtrees in parallel and then combines them into the master tree
 func (s *SMT) Commit() (err lib.ErrorI) {
 	s.sortOperations()
+	return s.commit(false)
+}
+
+func (s *SMT) CommitParallel() (err lib.ErrorI) {
+	// setup borders for prefixes (00, 01, 10, 11)
+	_, high00 := generateSlicesWith2BitPrefix(0, s.keyBitLength)     // 00
+	low01, high01 := generateSlicesWith2BitPrefix(1, s.keyBitLength) // 01
+	low10, high10 := generateSlicesWith2BitPrefix(2, s.keyBitLength) // 10
+	low11, _ := generateSlicesWith2BitPrefix(3, s.keyBitLength)      // 11
+	// setup initialize operations to create borders to allow safe parallelization
+	borders := []*node{{Key: high00, Node: lib.Node{Value: []byte{0}}},
+		{Key: low01, Node: lib.Node{Value: []byte{0}}},
+		{Key: high01, Node: lib.Node{Value: []byte{0}}},
+		{Key: low10, Node: lib.Node{Value: []byte{0}}},
+		{Key: high10, Node: lib.Node{Value: []byte{0}}},
+		{Key: low11, Node: lib.Node{Value: []byte{0}}},
+	}
+	// save the actual ops
+	saved := s.operations
+	// insert the borders
+	s.operations = borders
+	if err = s.commit(false); err != nil {
+		return err
+	}
+	s.reset()
+	s.nodeCache = make(map[string]*node)
+	// collect the roots for each group
+	roots := make([]*node, 4)
+	for i := uint8(0); i < 4; i++ {
+		// get sub-tree roots (00, 01, 10, 11)
+		roots[i], err = s.getNode(newNodeKey([]byte{i << 6}, 2).key)
+		if err != nil {
+			return err
+		}
+	}
+	s.nodeCache = make(map[string]*node)
+	// set operations
+	s.operations = saved
+	// sort operations grouping by prefix
+	groupedByPrefix := s.sortOperationsByPrefix()
+	// for each group
+	var wg sync.WaitGroup
+	errChan := make(chan lib.ErrorI, len(groupedByPrefix))
+	// commit each group in parallel
+	for i := 0; i < len(groupedByPrefix); i++ {
+		idx := i // capture loop variable
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// create the subtree SMT
+			smt := &SMT{
+				store:        s.store,
+				root:         roots[idx],
+				keyBitLength: s.keyBitLength,
+				nodeCache:    make(map[string]*node),
+				operations:   groupedByPrefix[idx],
+				minKey:       s.minKey,
+				maxKey:       s.maxKey,
+			}
+			smt.reset()
+			// commit the subtree
+			if err = smt.commit(true); err != nil {
+				errChan <- err
+			}
+		}()
+	}
+
+	// wait for all goroutines to finish
+	wg.Wait()
+	close(errChan)
+
+	// check if any errors occurred
+	for e := range errChan {
+		if e != nil {
+			return err
+		}
+	}
+	s.reset()
+	// setup cleanup operations to remove borders that allowed safe parallelization
+	s.operations = []*node{
+		{Key: high00, delete: true}, {Key: low01, delete: true}, {Key: high01, delete: true},
+		{Key: low10, delete: true}, {Key: high10, delete: true}, {Key: low11, delete: true},
+	}
+	// execute cleanup operations
+	return s.commit(false)
+}
+
+// sortOperationsByPrefix returns 4 sorted slices grouped by 2-bit prefix: 00, 01, 10, 11
+func (s *SMT) sortOperationsByPrefix() [4][]*node {
+	var groups [4][]*node
+	for _, n := range s.unsortedOps {
+		prefix := n.Key.key[0] >> 6 // first 2 bits
+		groups[prefix] = append(groups[prefix], n)
+	}
+	// sort each group
+	for i := range groups {
+		sort.Slice(groups[i], func(a, b int) bool {
+			return groups[i][a].Key.cmp(groups[i][b].Key) < 0
+		})
+	}
+	return groups
+}
+
+func generateSlicesWith2BitPrefix(prefixBits uint8, bitCount int) (*key, *key) {
+	low := make([]byte, 20)
+	high := make([]byte, 20)
+	// set the 2-bit prefix in the highest 2 bits of the first byte
+	low[0] = prefixBits << 6
+	high[0] = (prefixBits << 6) | 0b00111111 // remaining 6 bits in first byte set to 1
+	// fill remaining bytes
+	for i := 1; i < 20; i++ {
+		low[i] = 0x00
+		high[i] = 0xFF
+	}
+	return newNodeKey(low, bitCount), newNodeKey(high, bitCount)
+}
+
+// commit(): executes the deferred operations in order (left-to-right),
+// // minimizing the amount of traversals, IOPS, and hash operations
+func (s *SMT) commit(subTree bool) (err lib.ErrorI) {
 	for {
 		// if no operations and at root - exit
 		if len(s.operations) == 0 && len(s.traversed.Nodes) == 0 {
@@ -264,8 +385,8 @@ func (s *SMT) Commit() (err lib.ErrorI) {
 		s.target, s.operations = s.operations[0], s.operations[1:]
 		// reset path variables
 		s.resetGCP()
-		// if not at root
-		if len(s.traversed.Nodes) != 0 {
+		// if not at main tree root
+		if subTree || len(s.traversed.Nodes) != 0 {
 			// update the greatest common prefix and the bit position based on the new current key
 			s.target.Key.greatestCommonPrefix(&s.bitPos, s.gcp, s.current.Key)
 		}
