@@ -95,6 +95,9 @@ type SMT struct {
 	unsortedOps map[string]*node
 	// OpData: data for each operation
 	OpData
+	// define reserved keys
+	minKey *key
+	maxKey *key
 }
 
 // node wraps protobuf Node with a key
@@ -143,6 +146,8 @@ func NewSMT(rootKey []byte, keyBitLen int, store lib.RWStoreI) (smt *SMT) {
 		store:        store,
 		keyBitLength: keyBitLen,
 		nodeCache:    make(map[string]*node, MaxCacheSize),
+		minKey:       newNodeKey(bytes.Repeat([]byte{0}, 20), keyBitLen),
+		maxKey:       newNodeKey(bytes.Repeat([]byte{255}, 20), keyBitLen),
 	}
 	// ensure the root key is the proper length based on the bit count
 	rKey := newNodeKey(bytes.Clone(rootKey), keyBitLen)
@@ -495,10 +500,10 @@ func (s *SMT) validateTarget(n *node) lib.ErrorI {
 	if bytes.Equal(s.root.Key.bytes(), n.Key.bytes()) {
 		return ErrReserveKeyWrite("root")
 	}
-	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{0}, 20), s.keyBitLength).bytes(), n.Key.bytes()) {
+	if bytes.Equal(s.minKey.bytes(), n.Key.bytes()) {
 		return ErrReserveKeyWrite("minimum")
 	}
-	if bytes.Equal(newNodeKey(bytes.Repeat([]byte{255}, 20), s.keyBitLength).bytes(), n.Key.bytes()) {
+	if bytes.Equal(s.maxKey.bytes(), n.Key.bytes()) {
 		return ErrReserveKeyWrite("maximum")
 	}
 	return nil

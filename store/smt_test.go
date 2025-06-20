@@ -2034,8 +2034,10 @@ func NewTestSMT(t *testing.T, preset *NodeList, root []byte, keyBitSize int) (*S
 		store:        memStore,
 		keyBitLength: keyBitSize,
 		nodeCache:    make(map[string]*node, MaxCacheSize),
-		OpData:       OpData{},
 		unsortedOps:  make(map[string]*node),
+		OpData:       OpData{},
+		minKey:       newNodeKey(bytes.Repeat([]byte{byte(0)}, 20), keyBitSize),
+		maxKey:       newNodeKey(bytes.Repeat([]byte{byte(255)}, 20), keyBitSize),
 	}
 	// update root
 	smt.root = preset.Nodes[0]
