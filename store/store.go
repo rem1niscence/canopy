@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"fmt"
+	"github.com/dgraph-io/badger/v4/options"
 	"math"
 	"path/filepath"
 	"time"
@@ -91,7 +92,9 @@ func NewStore(path string, metrics *lib.Metrics, log lib.LoggerI) (lib.StoreI, l
 	// single batch. It is seemingly unknown why the 10% limit is set
 	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt64).
-		WithLoggingLevel(badger.ERROR).WithMemTableSize(maxTransactionSize),
+		WithValueThreshold(1024).WithCompression(options.None).WithNumMemtables(16).WithMemTableSize(256 << 20).
+		WithNumLevelZeroTables(10).WithNumLevelZeroTablesStall(20).WithBaseTableSize(128 << 20).WithBaseLevelSize(512 << 20).
+		WithNumCompactors(8).WithCompactL0OnClose(true).WithBypassLockGuard(true).WithDetectConflicts(false),
 	)
 	if err != nil {
 		return nil, ErrOpenDB(err)
