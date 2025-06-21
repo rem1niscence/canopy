@@ -58,15 +58,14 @@ lexicographically ordered prefix keys to facilitate easy and efficient iteration
 */
 
 type Store struct {
-	version       uint64             // version of the store
-	db            *badger.DB         // underlying database
-	writer        *badger.WriteBatch // the shared batch writer that allows committing it all at once
-	ss            *Txn               // reference to the state store
-	sc            *SMT               // reference to the state commitment store
-	*Indexer                         // reference to the indexer store
-	useHistorical bool               // signals to use the historical state store for query
-	metrics       *lib.Metrics       // telemetry
-	log           lib.LoggerI        // logger
+	version  uint64             // version of the store
+	db       *badger.DB         // underlying database
+	writer   *badger.WriteBatch // the shared batch writer that allows committing it all at once
+	ss       *Txn               // reference to the state store
+	sc       *SMT               // reference to the state commitment store
+	*Indexer                    // reference to the indexer store
+	metrics  *lib.Metrics       // telemetry
+	log      lib.LoggerI        // logger
 }
 
 // New() creates a new instance of a StoreI either in memory or an actual disk DB
@@ -80,9 +79,6 @@ func New(config lib.Config, metrics *lib.Metrics, l lib.LoggerI) (lib.StoreI, li
 // NewStore() creates a new instance of a disk DB
 func NewStore(path string, metrics *lib.Metrics, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	// use badger DB in managed mode to allow efficient versioning
-	// memTableSize is set to 1.28GB (max) to allow 128MB (10%) of writes in a
-	// single batch. It is seemingly unknown why the 10% limit is set
-	// https://discuss.dgraph.io/t/discussion-badgerdb-should-offer-arbitrarily-sized-atomic-transactions/8736
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt64).
 		WithValueThreshold(1024).WithCompression(options.None).WithNumMemtables(16).WithMemTableSize(256 << 20).
 		WithNumLevelZeroTables(10).WithNumLevelZeroTablesStall(20).WithBaseTableSize(128 << 20).WithBaseLevelSize(512 << 20).
@@ -194,7 +190,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 		return nil, ErrCommitDB(e)
 	}
 	// reset the writer for the next height
-	s.resetWriter()
+	s.Reset()
 	// return the root
 	return
 }
@@ -280,7 +276,29 @@ func (s *Store) Root() (root []byte, err lib.ErrorI) {
 }
 
 // Reset() discard and re-sets the stores writer
-func (s *Store) Reset() { s.resetWriter() }
+func (s *Store) Reset() {
+	// create new transactions first before discarding old ones
+	newReader := s.db.NewTransactionAt(s.version, false)
+	newLSSReader := s.db.NewTransactionAt(lssVersion, false)
+	// create a new batch writer for the next version as the version cannot
+	// be set at the commit time
+	nextVersion := s.version + 1
+	newWriter := s.db.NewWriteBatchAt(nextVersion)
+	// create all new transaction-dependent objects
+	newLSS := NewBadgerTxn(newLSSReader, newWriter, []byte(latestStatePrefix), true, true, nextVersion, s.log)
+	newIndexer := NewBadgerTxn(newReader, newWriter, []byte(indexerPrefix), false, true, nextVersion, s.log)
+	// only after creating all new objects, discard old transactions
+	s.ss.reader.Discard()
+	s.sc = nil
+	s.Indexer.db.reader.Discard()
+	if s.writer != nil {
+		s.writer.Cancel()
+	}
+	// update all references
+	s.writer = newWriter
+	s.ss = newLSS
+	s.Indexer.setDB(newIndexer)
+}
 
 // Discard() closes the reader and writer
 func (s *Store) Discard() {
@@ -298,29 +316,6 @@ func (s *Store) Close() lib.ErrorI {
 		return ErrCloseDB(s.db.Close())
 	}
 	return nil
-}
-
-// resetWriter() closes the writer, and creates a new writer, and sets the writer to the 3 main abstractions
-func (s *Store) resetWriter() {
-	// create new transactions first before discarding old ones
-	newReader := s.db.NewTransactionAt(s.version, false)
-	newLSSReader := s.db.NewTransactionAt(lssVersion, false)
-	// create a new batch writer for the next version as the version cannot
-	// be set at the commit time
-	nextVersion := s.version + 1
-	newWriter := s.db.NewWriteBatchAt(nextVersion)
-	// create all new transaction-dependent objects
-	newLSS := NewBadgerTxn(newLSSReader, newWriter, []byte(latestStatePrefix), true, true, nextVersion, s.log)
-	newIndexer := NewBadgerTxn(newReader, newWriter, []byte(indexerPrefix), false, true, nextVersion, s.log)
-	// only after creating all new objects, discard old transactions
-	s.ss.reader.Discard()
-	s.sc = nil
-	s.Indexer.db.reader.Discard()
-	s.writer.Cancel()
-	// update all references
-	s.writer = newWriter
-	s.ss = newLSS
-	s.Indexer.setDB(newIndexer)
 }
 
 // commitIDKey() returns the key for the commitID at a specific version
