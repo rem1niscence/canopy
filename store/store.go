@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"github.com/dgraph-io/badger/v4/options"
 	"math"
-	"os"
 	"path/filepath"
 	"runtime"
-	"runtime/pprof"
 	"time"
 
 	"github.com/canopy-network/canopy/lib"
@@ -186,9 +184,6 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	size, entries := getSizeAndCountFromBatch(s.writer)
 	// update the metrics once complete
 	defer s.metrics.UpdateStoreMetrics(size, entries, time.Time{}, time.Now())
-	memProfile, _ := os.Create("mem_opt.prof")
-	pprof.WriteHeapProfile(memProfile)
-	memProfile.Close()
 	// commit the in-memory txn to the badger writer
 	if e := s.Flush(); e != nil {
 		return nil, e
