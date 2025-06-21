@@ -117,7 +117,7 @@ func NewStoreWithDB(db *badger.DB, metrics *lib.Metrics, log lib.LoggerI) (*Stor
 		log:     log,
 		db:      db,
 		writer:  writer,
-		ss:      NewBadgerTxn(db.NewTransactionAt(lssVersion, false), writer, nil, true, true, nextVersion, log),
+		ss:      NewBadgerTxn(db.NewTransactionAt(lssVersion, false), writer, []byte(latestStatePrefix), true, true, nextVersion, log),
 		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, true, nextVersion, log)},
 		metrics: metrics,
 	}, nil
