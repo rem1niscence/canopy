@@ -200,8 +200,10 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 
 // Flush() writes the current state to the batch writer without committing it.
 func (s *Store) Flush() lib.ErrorI {
-	if e := s.sc.store.(TxnWriterI).Flush(); e != nil {
-		return ErrCommitDB(e)
+	if s.sc != nil {
+		if e := s.sc.store.(TxnWriterI).Flush(); e != nil {
+			return ErrCommitDB(e)
+		}
 	}
 	if e := s.ss.Flush(); e != nil {
 		return ErrCommitDB(e)
