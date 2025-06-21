@@ -2,7 +2,6 @@ package store
 
 import (
 	"bytes"
-	"errors"
 	"reflect"
 	"strings"
 	"sync"
@@ -60,16 +59,10 @@ type Txn struct {
 	writer       TxnWriterI  // memory store to Flush() to
 	prefix       []byte      // prefix for keys in this txn
 	logger       lib.LoggerI // logger for this txn
+	state        bool        // whether the flush should go to the HSS and LSS
 	sort         bool        // whether to sort the keys in the cache; used for iteration
 	writeVersion uint64      // the version to commit the data to
 	cache        txn
-
-	// liveWrite enables real-time writing of key-values to the writer as they're set,
-	// rather than batching them at commit time. While this adds minimal overhead to
-	// individual set operations, it can significantly improve overall performance when
-	// calling Write() to persist data to the writer by spreading the I/O cost over time.
-	liveWrite  bool
-	liveWriter *liveWriter
 }
 
 // txn internal structure maintains the write operations sorted lexicographically by keys
@@ -105,24 +98,25 @@ const (
 
 // valueOp has the value portion of the operation and the corresponding operation to perform
 type valueOp struct {
-	key        []byte        // the key of the key value pair
-	value      []byte        // value of key value pair
-	valueEntry *badger.Entry // value of key value pair in case of a custom entry
-	op         op            // is operation delete
+	key   []byte        // the key of the key value pair
+	value []byte        // value of key value pair
+	entry *badger.Entry // value of key value pair in case of a custom entry
+	op    op            // is operation delete
 }
 
 // NewBadgerTxn() creates a new instance of Txn from badger Txn and WriteBatch correspondingly
-func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, sort bool, writeVersion uint64, liveWrite bool, logger lib.LoggerI) *Txn {
-	return NewTxn(BadgerTxnReader{reader, prefix}, writer, prefix, sort, writeVersion, liveWrite, logger)
+func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, state, sort bool, writeVersion uint64, l lib.LoggerI) *Txn {
+	return NewTxn(BadgerTxnReader{reader, prefix}, writer, prefix, state, sort, writeVersion, l)
 }
 
 // NewTxn() creates a new instance of Txn with the specified reader and writer
-func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, sort bool, version uint64, liveWrite bool, logger lib.LoggerI) *Txn {
-	txn := &Txn{
+func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, state, sort bool, version uint64, logger lib.LoggerI) *Txn {
+	return &Txn{
 		reader:       reader,
 		writer:       writer,
 		prefix:       prefix,
 		logger:       logger,
+		state:        state,
 		sort:         sort,
 		writeVersion: version,
 		cache: txn{
@@ -131,87 +125,46 @@ func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, sort bool, vers
 			l:      sync.Mutex{},
 		},
 	}
-
-	if liveWrite {
-		txn.liveWrite = true
-		txn.liveWriter = newLiveWriter(writer, version)
-		txn.liveWriter.start()
-	}
-
-	return txn
 }
 
 // Get() retrieves the value for a given key from either the cache operations or the reader store
 func (t *Txn) Get(key []byte) ([]byte, lib.ErrorI) {
-	// append the prefix to the key
-	prefixedKey := lib.Append(t.prefix, key)
 	t.cache.l.Lock()
 	defer t.cache.l.Unlock()
 	// first retrieve from the in-memory cache
-	if v, found := t.cache.ops[string(prefixedKey)]; found {
+	if v, found := t.cache.ops[string(key)]; found {
 		return v.value, nil
 	}
 	// if not found, retrieve from the parent reader
-	return t.reader.Get(prefixedKey)
+	return t.reader.Get(lib.Append(t.prefix, key))
 }
 
 // Set() adds or updates the value for a key in the cache operations
 func (t *Txn) Set(key, value []byte) lib.ErrorI {
-	t.update(lib.Append(t.prefix, key), value, opSet)
-	return nil
+	return t.update(key, value, nil, opSet)
 }
 
 // Delete() marks a key for deletion in the cache operations
 func (t *Txn) Delete(key []byte) lib.ErrorI {
-	t.update(lib.Append(t.prefix, key), nil, opDelete)
-	return nil
+	return t.update(key, nil, nil, opDelete)
 }
 
 // SetEntry() adds or updates a custom badger entry in the cache operations
-func (t *Txn) SetEntryAt(entry *badger.Entry, _ uint64) error {
-	t.updateEntry(lib.Append(t.prefix, entry.Key), entry)
-	return nil
+func (t *Txn) SetEntryAt(entry *badger.Entry, _ uint64) (e error) {
+	return t.update(entry.Key, entry.Value, entry, opEntry)
 }
 
-// update() modifies or adds an operation for a key in the cache operations and maintains the
-// lexicographical order.
-// NOTE: update() won't modify the key itself, any key prefixing must be done before calling this
-func (t *Txn) update(key []byte, v []byte, opAction op) {
-	k := string(key)
-	t.cache.l.Lock()
-	defer t.cache.l.Unlock()
-	if t.sort {
-		if _, found := t.cache.ops[k]; !found && t.sort {
-			t.addToSorted(string(key))
-		}
-	}
-	valueOp := valueOp{key: key, value: v, op: opAction}
-	t.cache.ops[k] = valueOp
-
-	if t.liveWrite {
-		t.liveWriter.send(valueOp)
-	}
-}
-
-// updateEntry() modifies or adds a custom badger entry in the cache operations and maintains the
-// lexicographical order.
+// update() modifies or adds an operation to the txn
 // NOTE: updateEntry() won't modify the key itself, any key prefixing must be done before calling this
-func (t *Txn) updateEntry(key []byte, v *badger.Entry) {
+func (t *Txn) update(key []byte, val []byte, entry *badger.Entry, opAction op) (e lib.ErrorI) {
 	k := string(key)
 	t.cache.l.Lock()
-	defer t.cache.l.Unlock()
-	if t.sort {
-		if _, found := t.cache.ops[k]; !found && t.sort {
-			t.addToSorted(string(key))
-		}
+	if _, found := t.cache.ops[k]; !found && t.sort {
+		t.addToSorted(k)
 	}
-
-	valueOp := valueOp{key: key, value: v.Value, valueEntry: v, op: opEntry}
-	t.cache.ops[k] = valueOp
-
-	if t.liveWrite {
-		t.liveWriter.send(valueOp)
-	}
+	t.cache.ops[k] = valueOp{key: key, value: val, entry: entry, op: opAction}
+	t.cache.l.Unlock()
+	return
 }
 
 // addToSorted() inserts a key into the sorted list of operations maintaining lexicographical order
@@ -223,13 +176,13 @@ func (t *Txn) addToSorted(key string) {
 // Iterator() returns a new iterator for merged iteration of both the in-memory operations and parent store with the given prefix
 func (t *Txn) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	it := t.reader.NewIterator(prefix, false, false)
-	return newTxnIterator(it, t.cache.copy(), t.prefix, prefix, false), nil
+	return newTxnIterator(it, t.cache.copy(), prefix, false), nil
 }
 
 // RevIterator() returns a new reverse iterator for merged iteration of both the in-memory operations and parent store with the given prefix
 func (t *Txn) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	it := t.reader.NewIterator(prefix, true, false)
-	return newTxnIterator(it, t.cache.copy(), t.prefix, prefix, true), nil
+	return newTxnIterator(it, t.cache.copy(), prefix, true), nil
 }
 
 // ArchiveIterator() creates a new iterator for all versions under the given prefix in the BadgerDB transaction
@@ -246,66 +199,9 @@ func (t *Txn) Discard() {
 // Cancel() cancels the current transaction and clears the live writer queue if enabled.
 // Any new writes won't be committed
 func (t *Txn) Cancel() {
-	if t.liveWrite {
-		t.liveWriter.close()
-	}
 	if t.writer != nil {
-		// close the writer
 		t.writer.Cancel()
 	}
-}
-
-// Flush() flushes the in-memory operations to the batch writer and clears in-memory changes
-func (t *Txn) Flush() (err error) {
-	// if liveWrite is true, flush the liveWriter
-	defer func() {
-		if err == nil {
-			// clear the in-memory operations after writing
-			t.Discard()
-		}
-	}()
-	if t.liveWrite {
-		return t.liveWriter.flush()
-	}
-	t.cache.l.Lock()
-	defer t.cache.l.Unlock()
-	// flush all operations to the writer
-	for _, v := range t.cache.ops {
-		if err := processOperation(t.writer, t.writeVersion, v); err != nil {
-			return err
-		}
-	}
-	// exit
-	return nil
-}
-
-func processOperation(writer TxnWriterI, version uint64, vOp valueOp) lib.ErrorI {
-	switch vOp.op {
-	case opSet:
-		// set an entry with a bit that marks it as deleted and prevents it from being discarded
-		if err := writer.SetEntryAt(&badger.Entry{Key: vOp.key, Value: vOp.value}, version); err != nil {
-			return ErrStoreDelete(err)
-		}
-	case opDelete:
-		// set an entry with a bit that marks it as deleted and prevents it from being discarded
-		if err := writer.SetEntryAt(newEntry(vOp.key, nil, badgerDeleteBit|badgerNoDiscardBit), version); err != nil {
-			return ErrStoreDelete(err)
-		}
-	case opEntry:
-		// set the entry in the batch
-		if err := writer.SetEntryAt(vOp.valueEntry, version); err != nil {
-			return ErrStoreSet(err)
-		}
-	}
-	return nil
-}
-
-func (t *Txn) NewIterator(prefix []byte, reverse bool, allVersions bool) lib.IteratorI {
-	// Combine the current in-memory cache and parent reader (recursively)
-	combinedParentIterator := t.reader.NewIterator(lib.Append(t.prefix, prefix), reverse, allVersions)
-
-	// Create a merged iterator for the parent and in-memory cache
-	return newTxnIterator(combinedParentIterator, t.cache, t.prefix, prefix, reverse)
 }
 
 // Close() cancels the current transaction. Any new writes will result in an error and a new
@@ -313,6 +209,59 @@ func (t *Txn) NewIterator(prefix []byte, reverse bool, allVersions bool) lib.Ite
 func (t *Txn) Close() {
 	t.reader.Discard()
 	t.Cancel()
+}
+
+// Flush() flushes the in-memory operations to the batch writer and clears in-memory changes
+func (t *Txn) Flush() (err error) {
+	t.cache.l.Lock()
+	defer t.cache.l.Unlock()
+	defer t.Discard()
+	// execute special state flush
+	if t.state {
+		for version, prefix := range map[uint64][]byte{lssVersion: []byte(latestStatePrefix), t.writeVersion: []byte(historicStatePrefix)} {
+			if err = t.flush(prefix, version); err != nil {
+				return err
+			}
+		}
+	}
+	// exit
+	return t.flush(t.prefix, t.writeVersion)
+}
+
+// flush() flushes all operations to the underlying writer with a prefix if given
+func (t *Txn) flush(prefix []byte, writeVersion uint64) (err error) {
+	for _, v := range t.cache.ops {
+		k := v.key
+		if prefix != nil {
+			k = lib.Append(prefix, k)
+		}
+		switch v.op {
+		case opSet:
+			// set an entry with a bit that marks it as deleted and prevents it from being discarded
+			if err = t.writer.SetEntryAt(&badger.Entry{Key: k, Value: v.value}, writeVersion); err != nil {
+				return ErrStoreSet(err)
+			}
+		case opDelete:
+			// set an entry with a bit that marks it as deleted and prevents it from being discarded
+			if err = t.writer.SetEntryAt(newEntry(k, nil, badgerDeleteBit|badgerNoDiscardBit), writeVersion); err != nil {
+				return ErrStoreDelete(err)
+			}
+		case opEntry:
+			// set the entry in the batch
+			if err = t.writer.SetEntryAt(&badger.Entry{Key: k, Value: v.value, ExpiresAt: v.entry.ExpiresAt, UserMeta: v.entry.UserMeta}, writeVersion); err != nil {
+				return ErrStoreSet(err)
+			}
+		}
+	}
+	return
+}
+
+// NewIterator() creates a merged iterator with the reader and writer
+func (t *Txn) NewIterator(prefix []byte, reverse bool, allVersions bool) lib.IteratorI {
+	// create an iterator for the parent
+	parentIterator := t.reader.NewIterator(lib.Append(t.prefix, prefix), reverse, allVersions)
+	// create a merged iterator for the parent and in-memory cache
+	return newTxnIterator(parentIterator, t.cache, prefix, reverse)
 }
 
 // TXN ITERATOR CODE BELOW
@@ -335,20 +284,19 @@ type TxnIterator struct {
 }
 
 // newTxnIterator() initializes a new merged iterator for traversing both the in-memory operations and parent store
-func newTxnIterator(parent lib.IteratorI, t txn, parentPrefix, prefix []byte, reverse bool) *TxnIterator {
+func newTxnIterator(parent lib.IteratorI, t txn, prefix []byte, reverse bool) *TxnIterator {
 	tree := NewBTreeIterator(t.sorted.Clone(),
 		&CacheItem{
-			Key: string(lib.Append(parentPrefix, prefix)),
+			Key: string(prefix),
 		},
 		reverse)
 
 	return (&TxnIterator{
-		parent:       parent,
-		tree:         tree,
-		txn:          t,
-		parentPrefix: string(parentPrefix),
-		prefix:       string(prefix),
-		reverse:      reverse,
+		parent:  parent,
+		tree:    tree,
+		txn:     t,
+		prefix:  string(prefix),
+		reverse: reverse,
 	}).First()
 }
 
@@ -463,7 +411,7 @@ func (ti *TxnIterator) txnInvalid() bool {
 		ti.invalid = true
 		return ti.invalid
 	}
-	if !strings.HasPrefix(ti.tree.Current().Key, ti.parentPrefix+ti.prefix) {
+	if !strings.HasPrefix(ti.tree.Current().Key, ti.prefix) {
 		return ti.invalid
 	}
 	ti.invalid = false
@@ -472,7 +420,7 @@ func (ti *TxnIterator) txnInvalid() bool {
 
 // txnKey() returns the key of the current in-memory operation
 func (ti *TxnIterator) txnKey() []byte {
-	return []byte(strings.TrimPrefix(ti.tree.Current().Key, ti.parentPrefix))
+	return []byte(ti.tree.Current().Key)
 }
 
 // txnValue() returns the value of the current in-memory operation
@@ -499,14 +447,14 @@ func (ti *TxnIterator) txnNext() {
 // seek() positions the iterator at the first entry that matches or exceeds the prefix.
 func (ti *TxnIterator) seek() *TxnIterator {
 	ti.tree.Move(&CacheItem{
-		Key: ti.parentPrefix + ti.prefix,
+		Key: ti.prefix,
 	})
 	return ti
 }
 
 // revSeek() positions the iterator at the last entry that matches the prefix in reverse order.
 func (ti *TxnIterator) revSeek() *TxnIterator {
-	bz := []byte(ti.parentPrefix + ti.prefix)
+	bz := []byte(ti.prefix)
 	endPrefix := string(prefixEnd(bz))
 	ti.tree.Move(&CacheItem{
 		Key: endPrefix,
@@ -575,13 +523,12 @@ const (
 	// - Subsequent GC runs are probabilistic, depending on reclaimable space and value log thresholds
 	// ----------------------------------------------------------------------------------------------------------------
 	// Bits source: https://github.com/hypermodeinc/badger/blob/85389e88bf308c1dc271383b77b67f4ef4a85194/value.go#L37
-	badgerMetaFieldName                = "meta"  // badgerDB Entry 'meta' field name
-	badgerDeleteBit               byte = 1 << 0  // badgerDB 'tombstoned' flag
-	badgerNoDiscardBit            byte = 1 << 3  // badgerDB 'never discard'  bit
-	badgerSizeFieldName                = "size"  // badgerDB Txn 'size' field name
-	badgerCountFieldName               = "count" // badgerDB Txn 'count' field name
-	badgerTxnFieldName                 = "txn"   // badgerDB WriteBatch 'txn' field name
-	badgerDBMaxBatchScalingFactor      = 0.98425 // through experimentation badgerDB's max transaction scaling factor
+	badgerMetaFieldName       = "meta"  // badgerDB Entry 'meta' field name
+	badgerDeleteBit      byte = 1 << 0  // badgerDB 'tombstoned' flag
+	badgerNoDiscardBit   byte = 1 << 3  // badgerDB 'never discard'  bit
+	badgerSizeFieldName       = "size"  // badgerDB Txn 'size' field name
+	badgerCountFieldName      = "count" // badgerDB Txn 'count' field name
+	badgerTxnFieldName        = "txn"   // badgerDB WriteBatch 'txn' field name
 )
 
 // Enforce interface implementations
@@ -692,8 +639,8 @@ type CacheItem struct {
 	Exists bool
 }
 
+// Less() compares the keys lexicographically
 func (ti CacheItem) Less(than *CacheItem) bool {
-	// compare the keys lexicographically
 	return ti.Key < than.Key
 }
 
@@ -859,156 +806,4 @@ func (bi *BTreeIterator) hasPrev() bool {
 		return false
 	}
 	return bi.prev() != nil
-}
-
-// LIVE WRITER IMPLEMENTATION BELOW
-
-type liveWriter struct {
-	writer  TxnWriterI
-	version uint64
-	queue   queue[valueOp]
-	sender  chan valueOp
-	closed  bool
-	mu      sync.Mutex
-	wg      sync.WaitGroup
-	err     error
-}
-
-func newLiveWriter(writer TxnWriterI, version uint64) *liveWriter {
-	return &liveWriter{
-		writer:  writer,
-		version: version,
-		mu:      sync.Mutex{},
-		wg:      sync.WaitGroup{},
-	}
-}
-
-// start is a background goroutine that writes the operations to the writer as soon
-// as they are received
-func (lv *liveWriter) start() {
-	// init starting values
-	lv.sender = make(chan valueOp, 5000)
-	lv.closed = false
-	lv.queue = newQueue[valueOp]()
-	lv.err = nil
-
-	// process processes the next operation in the queue
-	process := func(valueOp valueOp) {
-		defer lv.wg.Done()
-		err := processOperation(lv.writer, lv.version, valueOp)
-		if err != nil {
-			lv.err = errors.Join(lv.err, err)
-		}
-	}
-	go func() {
-		for {
-			// process the next operation in the queue
-			if vOp, ok := lv.queue.Pop(); ok {
-				process(vOp)
-			}
-			// wait for the next operation to be sent to the channel
-			valueOp, ok := <-lv.sender
-			if !ok {
-				break
-			}
-			process(valueOp)
-		}
-		// process any remaining operations in the queue
-		for vOp, ok := lv.queue.Pop(); ok; vOp, ok = lv.queue.Pop() {
-			process(vOp)
-		}
-	}()
-}
-
-// send queues a value operation for asynchronous processing.
-func (lv *liveWriter) send(valueOp valueOp) {
-	lv.mu.Lock()
-	defer lv.mu.Unlock()
-	// if the live writer is closed, start a new one
-	if lv.closed {
-		lv.start()
-	}
-	lv.wg.Add(1)
-	select {
-	// try sending to the channel
-	case lv.sender <- valueOp:
-	default:
-		// channel buffer is full, add to overflow queue
-		lv.queue.Add(valueOp)
-	}
-}
-
-// flush waits for all pending operations to complete and returns any errors.
-func (lv *liveWriter) flush() lib.ErrorI {
-	lv.mu.Lock()
-	defer lv.mu.Unlock()
-	lv.closeUnlocked()
-	lv.wg.Wait()
-	if lv.err != nil {
-		return lv.err.(lib.ErrorI)
-	}
-	return nil
-}
-
-// close closes the live writer and wont allow any more operations to be sent
-// in a thread-safe manner
-func (lv *liveWriter) close() {
-	lv.mu.Lock()
-	defer lv.mu.Unlock()
-	lv.closeUnlocked()
-}
-
-// closeUnlocked closes the live writer and wont allow any more operations to be sent
-func (lv *liveWriter) closeUnlocked() {
-	if lv.closed {
-		return
-	}
-	lv.closed = true
-	close(lv.sender)
-}
-
-// queue is a generic thread-safe queue
-// This queue is specifically used by liveWriter to buffer operations when
-// its channel buffer is full, ensuring no operations are lost while
-// maintaining non-blocking behavior.
-type queue[T any] struct {
-	items []T
-	mu    sync.Mutex
-}
-
-// New creates a new empty queue
-func newQueue[T any]() queue[T] {
-	return queue[T]{
-		items: make([]T, 0),
-	}
-}
-
-// Add adds an item to the end of the queue
-func (q *queue[T]) Add(item T) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	q.items = append(q.items, item)
-}
-
-// Pop removes and returns the first item in the queue
-// Returns the zero value of T and false if the queue is empty
-func (q *queue[T]) Pop() (T, bool) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	var zero T
-	if len(q.items) == 0 {
-		return zero, false
-	}
-
-	item := q.items[0]
-	q.items = q.items[1:]
-	return item, true
-}
-
-// Len returns the number of items in the queue
-func (q *queue[T]) Len() int {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	return len(q.items)
 }

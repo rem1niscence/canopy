@@ -261,7 +261,7 @@ func (s *SMT) Commit() (err lib.ErrorI) {
 }
 
 // CommitParallel(): sorts the operations in 8 subtree threads, executes those threads in parallel and combines them into the master tree
-func (s *SMT) CommitParallel() (err lib.ErrorI) {
+func (s *SMT) CommitParallel(unsortedOps map[string]valueOp) (err lib.ErrorI) {
 	// add 16 synthetic borders to the tree
 	cleanup, err := s.addSyntheticBorders()
 	// collect the roots for each group (000, 001, 010, 011...)
@@ -272,7 +272,10 @@ func (s *SMT) CommitParallel() (err lib.ErrorI) {
 		}
 	}
 	// sort operations grouping by prefix
-	groupedByPrefix := s.sortOperationsByPrefix()
+	groupedByPrefix, err := s.sortOperationsByPrefix(unsortedOps)
+	if err != nil {
+		return
+	}
 	// create parallel ops
 	wg, eChan := sync.WaitGroup{}, make(chan lib.ErrorI, 8)
 	// commit each group in parallel
@@ -536,9 +539,17 @@ func (s *SMT) addSyntheticBorders() (cleanup func() lib.ErrorI, err lib.ErrorI) 
 }
 
 // sortOperationsByPrefix returns 8 sorted slices grouped by 3-bit prefix: 000 to 111
-func (s *SMT) sortOperationsByPrefix() [8][]*node {
-	var groups [8][]*node
-	for _, n := range s.unsortedOps {
+func (s *SMT) sortOperationsByPrefix(unsortedOps map[string]valueOp) (groups [8][]*node, err lib.ErrorI) {
+	for _, operation := range unsortedOps {
+		value, del := []byte(nil), true
+		if operation.op != opDelete {
+			value, del = crypto.Hash(operation.value), false
+		}
+		n := &node{Key: newNodeKey(crypto.Hash(operation.key), s.keyBitLength), Node: lib.Node{Value: value}, delete: del}
+		// check to make sure the target is valid
+		if err = s.validateTarget(n); err != nil {
+			return
+		}
 		prefix := n.Key.key[0] >> 5 // extract top 3 bits
 		groups[prefix] = append(groups[prefix], n)
 	}
@@ -548,7 +559,7 @@ func (s *SMT) sortOperationsByPrefix() [8][]*node {
 			return groups[i][a].Key.cmp(groups[i][b].Key) < 0
 		})
 	}
-	return groups
+	return
 }
 
 // generatePrefixRange() generates a 20 byte key that acts as the 'borders' for a 3 bit prefix
