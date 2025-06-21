@@ -252,129 +252,65 @@ func (s *SMT) delete() lib.ErrorI {
 	return s.delNode(targetBytes)
 }
 
-// Commit(): sorts the operations into 8 subtree threads, executes those subtrees in parallel and then combines them into the master tree
+// Commit(): executes deferred operations in order (left-to-right),
+// minimizing the amount of traversals, IOPS, and hash operations over the master tree
+// this is the sequential alternative to 'commit parallel'
 func (s *SMT) Commit() (err lib.ErrorI) {
 	s.sortOperations()
 	return s.commit(false)
 }
 
+// CommitParallel(): sorts the operations in 8 subtree threads, executes those threads in parallel and combines them into the master tree
 func (s *SMT) CommitParallel() (err lib.ErrorI) {
-	// setup borders for prefixes (00, 01, 10, 11)
-	_, high00 := generateSlicesWith2BitPrefix(0, s.keyBitLength)     // 00
-	low01, high01 := generateSlicesWith2BitPrefix(1, s.keyBitLength) // 01
-	low10, high10 := generateSlicesWith2BitPrefix(2, s.keyBitLength) // 10
-	low11, _ := generateSlicesWith2BitPrefix(3, s.keyBitLength)      // 11
-	// setup initialize operations to create borders to allow safe parallelization
-	borders := []*node{{Key: high00, Node: lib.Node{Value: []byte{0}}},
-		{Key: low01, Node: lib.Node{Value: []byte{0}}},
-		{Key: high01, Node: lib.Node{Value: []byte{0}}},
-		{Key: low10, Node: lib.Node{Value: []byte{0}}},
-		{Key: high10, Node: lib.Node{Value: []byte{0}}},
-		{Key: low11, Node: lib.Node{Value: []byte{0}}},
-	}
-	// save the actual ops
-	saved := s.operations
-	// insert the borders
-	s.operations = borders
-	if err = s.commit(false); err != nil {
-		return err
-	}
-	s.reset()
-	s.nodeCache = make(map[string]*node)
-	// collect the roots for each group
-	roots := make([]*node, 4)
-	for i := uint8(0); i < 4; i++ {
-		// get sub-tree roots (00, 01, 10, 11)
-		roots[i], err = s.getNode(newNodeKey([]byte{i << 6}, 2).key)
-		if err != nil {
-			return err
+	// add 16 synthetic borders to the tree
+	cleanup, err := s.addSyntheticBorders()
+	// collect the roots for each group (000, 001, 010, 011...)
+	roots := make([]*node, 8)
+	for i := uint8(0); i < 8; i++ {
+		if roots[i], err = s.getNode(newNodeKey([]byte{i << 5}, 3).key); err != nil {
+			return
 		}
 	}
-	s.nodeCache = make(map[string]*node)
-	// set operations
-	s.operations = saved
 	// sort operations grouping by prefix
 	groupedByPrefix := s.sortOperationsByPrefix()
-	// for each group
-	var wg sync.WaitGroup
-	errChan := make(chan lib.ErrorI, len(groupedByPrefix))
+	// create parallel ops
+	wg, eChan := sync.WaitGroup{}, make(chan lib.ErrorI, 8)
 	// commit each group in parallel
-	for i := 0; i < len(groupedByPrefix); i++ {
-		idx := i // capture loop variable
+	for i := 0; i < 8; i++ {
+		// create the subtree SMT
+		smt := &SMT{
+			store:        s.store,
+			root:         roots[i],
+			keyBitLength: s.keyBitLength,
+			nodeCache:    make(map[string]*node),
+			operations:   groupedByPrefix[i],
+			minKey:       s.minKey,
+			maxKey:       s.maxKey,
+		}
 		wg.Add(1)
-		go func() {
+		go func(smt *SMT) {
 			defer wg.Done()
-
-			// create the subtree SMT
-			smt := &SMT{
-				store:        s.store,
-				root:         roots[idx],
-				keyBitLength: s.keyBitLength,
-				nodeCache:    make(map[string]*node),
-				operations:   groupedByPrefix[idx],
-				minKey:       s.minKey,
-				maxKey:       s.maxKey,
-			}
 			smt.reset()
 			// commit the subtree
 			if err = smt.commit(true); err != nil {
-				errChan <- err
+				eChan <- err
 			}
-		}()
+		}(smt)
 	}
-
 	// wait for all goroutines to finish
 	wg.Wait()
-	close(errChan)
-
+	close(eChan)
 	// check if any errors occurred
-	for e := range errChan {
-		if e != nil {
-			return err
+	for err = range eChan {
+		if err != nil {
+			return
 		}
 	}
-	s.reset()
-	// setup cleanup operations to remove borders that allowed safe parallelization
-	s.operations = []*node{
-		{Key: high00, delete: true}, {Key: low01, delete: true}, {Key: high01, delete: true},
-		{Key: low10, delete: true}, {Key: high10, delete: true}, {Key: low11, delete: true},
-	}
-	// execute cleanup operations
-	return s.commit(false)
-}
-
-// sortOperationsByPrefix returns 4 sorted slices grouped by 2-bit prefix: 00, 01, 10, 11
-func (s *SMT) sortOperationsByPrefix() [4][]*node {
-	var groups [4][]*node
-	for _, n := range s.unsortedOps {
-		prefix := n.Key.key[0] >> 6 // first 2 bits
-		groups[prefix] = append(groups[prefix], n)
-	}
-	// sort each group
-	for i := range groups {
-		sort.Slice(groups[i], func(a, b int) bool {
-			return groups[i][a].Key.cmp(groups[i][b].Key) < 0
-		})
-	}
-	return groups
-}
-
-func generateSlicesWith2BitPrefix(prefixBits uint8, bitCount int) (*key, *key) {
-	low := make([]byte, 20)
-	high := make([]byte, 20)
-	// set the 2-bit prefix in the highest 2 bits of the first byte
-	low[0] = prefixBits << 6
-	high[0] = (prefixBits << 6) | 0b00111111 // remaining 6 bits in first byte set to 1
-	// fill remaining bytes
-	for i := 1; i < 20; i++ {
-		low[i] = 0x00
-		high[i] = 0xFF
-	}
-	return newNodeKey(low, bitCount), newNodeKey(high, bitCount)
+	return cleanup()
 }
 
 // commit(): executes the deferred operations in order (left-to-right),
-// // minimizing the amount of traversals, IOPS, and hash operations
+// minimizing the amount of traversals, IOPS, and hash operations
 func (s *SMT) commit(subTree bool) (err lib.ErrorI) {
 	for {
 		// if no operations and at root - exit
@@ -556,6 +492,73 @@ func (s *SMT) updateParentValue(parent *node) (err lib.ErrorI) {
 		s.root = parent.copy()
 	}
 	return
+}
+
+// addSyntheticBorders() injects 16 'synthetic' border nodes into the tree to allow safe recursion of the commit function
+// the 16 nodes are removed by calling 'cleanup' at the end of the function. This is useful for parallelization
+func (s *SMT) addSyntheticBorders() (cleanup func() lib.ErrorI, err lib.ErrorI) {
+	saved := []*node(nil)
+	// generate borders
+	borders := make([]*node, 0, 16)
+	for i := 0; i < 8; i++ {
+		// add synthetic borders: low and high of each prefix range
+		low, high := s.generatePrefixRange(uint8(i), s.keyBitLength)
+		// don't add low range at 0 (already there during tree initialization)
+		if i != 0 {
+			borders = append(borders, &node{Key: low, Node: lib.Node{Value: []byte{0}}})
+		}
+		// don't add high range at end border (already there during tree initialization)
+		if i != 7 {
+			borders = append(borders, &node{Key: high, Node: lib.Node{Value: []byte{0}}})
+		}
+	}
+	// save actual operations
+	saved, s.operations = s.operations, borders
+	// commit the borders
+	if err = s.commit(false); err != nil {
+		return
+	}
+	// reset the operations
+	s.operations = saved
+	// define a cleanup function to remove the borders
+	cleanup = func() lib.ErrorI {
+		// reset the SMT
+		s.reset()
+		// execute over the borders and create 'delete' operations
+		s.operations, s.nodeCache = make([]*node, len(borders)), make(map[string]*node)
+		for i, n := range borders {
+			s.operations[i] = &node{Key: n.Key, delete: true}
+		}
+		// remove synthetic borders
+		return s.commit(false)
+	}
+	return
+}
+
+// sortOperationsByPrefix returns 8 sorted slices grouped by 3-bit prefix: 000 to 111
+func (s *SMT) sortOperationsByPrefix() [8][]*node {
+	var groups [8][]*node
+	for _, n := range s.unsortedOps {
+		prefix := n.Key.key[0] >> 5 // extract top 3 bits
+		groups[prefix] = append(groups[prefix], n)
+	}
+	// sort each group
+	for i := range groups {
+		sort.Slice(groups[i], func(a, b int) bool {
+			return groups[i][a].Key.cmp(groups[i][b].Key) < 0
+		})
+	}
+	return groups
+}
+
+// generatePrefixRange() generates a 20 byte key that acts as the 'borders' for a 3 bit prefix
+// example: prefix 0 bitCount 4 returns 0000 and 0111
+func (s *SMT) generatePrefixRange(prefix uint8, bitCount int) (*key, *key) {
+	// 3-bit prefix shifted into top bits of first byte
+	base := (prefix & 0x07) << 5
+	low := append([]byte{base}, make([]byte, 19)...)
+	high := append([]byte{base | 0x1F}, bytes.Repeat([]byte{0xFF}, 19)...)
+	return newNodeKey(low, bitCount), newNodeKey(high, bitCount)
 }
 
 // reset() resets data for each operation
