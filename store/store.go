@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"github.com/dgraph-io/badger/v4/options"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"math"
 	"path/filepath"
 	"runtime"
@@ -111,6 +112,9 @@ func NewStoreWithDB(db *badger.DB, metrics *lib.Metrics, log lib.LoggerI) (*Stor
 	// create a new batch writer for the next version
 	// note: version for WriteBatch may be overridden by the setEntryAt(version) code
 	writer := db.NewWriteBatchAt(nextVersion)
+	// create indexer cache
+	blkCache, _ := lru.New[uint64, *lib.BlockResult](128)
+	qcCache, _ := lru.New[uint64, *lib.QuorumCertificate](128)
 	// return the store object
 	return &Store{
 		version: version,
@@ -118,7 +122,7 @@ func NewStoreWithDB(db *badger.DB, metrics *lib.Metrics, log lib.LoggerI) (*Stor
 		db:      db,
 		writer:  writer,
 		ss:      NewBadgerTxn(db.NewTransactionAt(lssVersion, false), writer, []byte(latestStatePrefix), true, true, nextVersion, log),
-		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, true, nextVersion, log)},
+		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, true, nextVersion, log), blkCache, qcCache},
 		metrics: metrics,
 	}, nil
 }
@@ -143,7 +147,7 @@ func (s *Store) NewReadOnly(queryVersion uint64) (lib.StoreI, lib.ErrorI) {
 		writer:  nil,
 		ss:      stateReader,
 		sc:      NewDefaultSMT(NewBadgerTxn(reader, nil, []byte(stateCommitmentPrefix), false, false, 0, s.log)),
-		Indexer: &Indexer{NewBadgerTxn(reader, nil, []byte(indexerPrefix), false, false, 0, s.log)},
+		Indexer: &Indexer{NewBadgerTxn(reader, nil, []byte(indexerPrefix), false, false, 0, s.log), s.blockCache, s.qcCache},
 		metrics: s.metrics,
 	}, nil
 }
@@ -162,7 +166,7 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 		db:      s.db,
 		writer:  writer,
 		ss:      NewBadgerTxn(s.db.NewTransactionAt(lssVersion, false), writer, []byte(latestStatePrefix), true, true, nextVersion, s.log),
-		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, true, nextVersion, s.log)},
+		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, true, nextVersion, s.log), s.blockCache, s.qcCache},
 		metrics: s.metrics,
 	}, nil
 }
@@ -255,7 +259,7 @@ func (s *Store) NewTxn() lib.StoreI {
 		db:      s.db,
 		writer:  s.writer,
 		ss:      NewTxn(s.ss, s.ss, nil, false, true, nextVersion, s.log),
-		Indexer: &Indexer{NewTxn(s.Indexer.db, s.Indexer.db, nil, false, true, nextVersion, s.log)},
+		Indexer: &Indexer{NewTxn(s.Indexer.db, s.Indexer.db, nil, false, true, nextVersion, s.log), s.blockCache, s.qcCache},
 		metrics: s.metrics,
 	}
 }
