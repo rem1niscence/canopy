@@ -62,7 +62,7 @@ type Txn struct {
 	state        bool        // whether the flush should go to the HSS and LSS
 	sort         bool        // whether to sort the keys in the cache; used for iteration
 	writeVersion uint64      // the version to commit the data to
-	cache        txn
+	cache        *txn
 }
 
 // txn internal structure maintains the write operations sorted lexicographically by keys
@@ -75,15 +75,16 @@ type txn struct {
 }
 
 // txn() returns a copy of the current transaction cache
-func (t txn) copy() txn {
+func (t *txn) copy() *txn {
 	t.l.Lock()
 	defer t.l.Unlock()
 	ops := make(map[string]valueOp, t.sortedLen)
 	maps.Copy(ops, t.ops)
-	return txn{
+	return &txn{
 		ops:       ops,
 		sorted:    t.sorted.Clone(),
 		sortedLen: t.sortedLen,
+		l:         sync.Mutex{},
 	}
 }
 
@@ -119,7 +120,7 @@ func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, state, sort boo
 		state:        state,
 		sort:         sort,
 		writeVersion: version,
-		cache: txn{
+		cache: &txn{
 			ops:    make(map[string]valueOp),
 			sorted: btree.NewG(32, func(a, b *CacheItem) bool { return a.Less(b) }), // need to benchmark this value
 			l:      sync.Mutex{},
@@ -273,7 +274,7 @@ var _ lib.IteratorI = &TxnIterator{}
 type TxnIterator struct {
 	parent lib.IteratorI
 	tree   *BTreeIterator
-	txn
+	*txn
 	hasNext      bool
 	prefix       string
 	parentPrefix string
@@ -284,7 +285,7 @@ type TxnIterator struct {
 }
 
 // newTxnIterator() initializes a new merged iterator for traversing both the in-memory operations and parent store
-func newTxnIterator(parent lib.IteratorI, t txn, prefix []byte, reverse bool) *TxnIterator {
+func newTxnIterator(parent lib.IteratorI, t *txn, prefix []byte, reverse bool) *TxnIterator {
 	tree := NewBTreeIterator(t.sorted.Clone(),
 		&CacheItem{
 			Key: string(prefix),
