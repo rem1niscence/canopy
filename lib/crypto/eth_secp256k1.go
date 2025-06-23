@@ -92,7 +92,15 @@ func (s *ETHSECP256K1PublicKey) Address() AddressI {
 
 // VerifyBytes() returns true if the digital signature is valid for this public key and the given message
 func (s *ETHSECP256K1PublicKey) VerifyBytes(msg []byte, sig []byte) bool {
-	return ethCrypto.VerifySignature(s.BytesWithPrefix(), Hash(msg), sig)
+	cached, addToCache := CheckCache(s, msg, sig)
+	if cached {
+		return true
+	}
+	valid := ethCrypto.VerifySignature(s.BytesWithPrefix(), Hash(msg), sig)
+	if valid {
+		addToCache()
+	}
+	return valid
 }
 
 // String() returns the hex string representation of the public key

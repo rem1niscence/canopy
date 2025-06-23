@@ -173,6 +173,8 @@ func (s *StateMachine) ApplyTransactions(block *lib.Block) (txResultsList []*lib
 	)
 	// use a map to check for 'same-block' duplicate transactions
 	deDuplicator := lib.NewDeDuplicator[string]()
+	// use a batch verifier for signatures
+	batchVerifier := crypto.NewBatchVerifier()
 	// iterates over each transaction in the block
 	for index, tx := range block.Transactions {
 		// calculate the hash of the transaction and convert it to a hex string
@@ -182,7 +184,7 @@ func (s *StateMachine) ApplyTransactions(block *lib.Block) (txResultsList []*lib
 			return txResultsList, root, n, lib.ErrDuplicateTx(hashString)
 		}
 		// apply the tx to the state machine, generating a transaction result
-		result, err := s.ApplyTransaction(uint64(index), tx, hashString)
+		result, err := s.ApplyTransaction(uint64(index), tx, hashString, batchVerifier)
 		if err != nil {
 			return nil, nil, 0, err
 		}
@@ -206,6 +208,10 @@ func (s *StateMachine) ApplyTransactions(block *lib.Block) (txResultsList []*lib
 		}
 		// update the transaction count
 		n++
+	}
+	// execute batch verification of the signatures in the block
+	if len(batchVerifier.Verify()) != 0 {
+		return nil, nil, 0, ErrInvalidSignature()
 	}
 	// get the governance parameter for max block size
 	maxBlockSize, err := s.GetMaxBlockSize()

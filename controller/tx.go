@@ -258,7 +258,7 @@ func (m *Mempool) applyAndWriteTx(tx []byte) (result *lib.TxResult, err lib.Erro
 	// at the end of this code, set the state machine store back to the 'ephemeral store' and discard the 'database transaction'
 	defer func() { m.FSM.SetStore(store) }()
 	// apply the transaction to the mempool (ephemeral copy) state machine
-	result, err = m.FSM.ApplyTransaction(uint64(m.TxCount()), tx, crypto.HashString(tx))
+	result, err = m.FSM.ApplyTransaction(uint64(m.TxCount()), tx, crypto.HashString(tx), nil)
 	// if an error occurred when applying the transaction
 	if err != nil {
 		// exit with error

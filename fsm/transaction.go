@@ -13,9 +13,9 @@ import (
 const BlockAcceptanceRange = 4320
 
 // ApplyTransaction() processes the transaction within the state machine, returning the corresponding TxResult.
-func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash string) (*lib.TxResult, lib.ErrorI) {
+func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash string, batchVerifier *crypto.BatchVerifier) (*lib.TxResult, lib.ErrorI) {
 	// validate the transaction and get the check result
-	result, err := s.CheckTx(transaction, txHash)
+	result, err := s.CheckTx(transaction, txHash, batchVerifier)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 }
 
 // CheckTx() validates the transaction object
-func (s *StateMachine) CheckTx(transaction []byte, txHash string) (result *CheckTxResult, err lib.ErrorI) {
+func (s *StateMachine) CheckTx(transaction []byte, txHash string, batchVerifier *crypto.BatchVerifier) (result *CheckTxResult, err lib.ErrorI) {
 	// create a new transaction object reference to ensure a non-nil transaction
 	tx := new(lib.Transaction)
 	// populate the object ref with the bytes of the transaction
@@ -61,7 +61,7 @@ func (s *StateMachine) CheckTx(transaction []byte, txHash string) (result *Check
 		return
 	}
 	// validate the signature of the transaction
-	sender, err := s.CheckSignature(msg, tx, txHash)
+	sender, err := s.CheckSignature(msg, tx, txHash, batchVerifier)
 	if err != nil {
 		return
 	}
@@ -85,7 +85,7 @@ type CheckTxResult struct {
 }
 
 // CheckSignature() validates the signer and the digital signature associated with the transaction object
-func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction, txHash string) (crypto.AddressI, lib.ErrorI) {
+func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction, txHash string, batchSignatureVerifier *crypto.BatchVerifier) (crypto.AddressI, lib.ErrorI) {
 	// validate the actual signature bytes
 	if tx.Signature == nil || len(tx.Signature.Signature) == 0 {
 		return nil, ErrEmptySignature()
@@ -106,9 +106,16 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction, txH
 			return nil, err
 		}
 	} else {
-		// normal case: validate the actual signature
-		if !publicKey.VerifyBytes(signBytes, tx.Signature.Signature) {
-			return nil, ErrInvalidSignature()
+		// if using a batch verifier
+		if batchSignatureVerifier != nil {
+			if e = batchSignatureVerifier.Add(publicKey, tx.Signature.PublicKey, signBytes, tx.Signature.Signature); e != nil {
+				return nil, ErrInvalidPublicKey(e)
+			}
+		} else {
+			// if verifying 1 by 1
+			if !publicKey.VerifyBytes(signBytes, tx.Signature.Signature) {
+				return nil, ErrInvalidSignature()
+			}
 		}
 	}
 	// calculate the corresponding address from the public key

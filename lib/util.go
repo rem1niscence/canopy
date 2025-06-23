@@ -241,7 +241,7 @@ type jsonPage struct {
 // Marshal() serializes a proto.Message into a byte slice
 func Marshal(message any) ([]byte, ErrorI) {
 	// convert the message into proto bytes using the proto marshaller
-	protoBytes, err := proto.Marshal(message.(proto.Message))
+	protoBytes, err := proto.MarshalOptions{Deterministic: true}.Marshal(message.(proto.Message))
 	// if an error occurred during the conversion process
 	if err != nil {
 		// exit with a wrapped error
