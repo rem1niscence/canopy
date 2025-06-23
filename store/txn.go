@@ -55,13 +55,13 @@ var _ lib.IteratorI = &Iterator{}
 */
 
 type Txn struct {
-	reader       TxnReaderI  // memory store to Read() from
-	writer       TxnWriterI  // memory store to Flush() to
-	prefix       []byte      // prefix for keys in this txn
-	logger       lib.LoggerI // logger for this txn
-	state        bool        // whether the flush should go to the HSS and LSS
-	sort         bool        // whether to sort the keys in the cache; used for iteration
-	writeVersion uint64      // the version to commit the data to
+	reader       TxnReaderI // memory store to Read() from
+	writer       TxnWriterI // memory store to Flush() to
+	prefix       []byte     // prefix for keys in this txn
+	state        bool       // whether the flush should go to the HSS and LSS
+	sort         bool       // whether to sort the keys in the cache; used for iteration
+	writeVersion uint64     // the version to commit the data to
+	liveWrite    bool       // whether to flush to the underlying writer on every update
 	cache        *txn
 }
 
@@ -106,20 +106,27 @@ type valueOp struct {
 }
 
 // NewBadgerTxn() creates a new instance of Txn from badger Txn and WriteBatch correspondingly
-func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, state, sort bool, writeVersion uint64, l lib.LoggerI) *Txn {
-	return NewTxn(BadgerTxnReader{reader, prefix}, writer, prefix, state, sort, writeVersion, l)
+func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, state, sort bool, writeVersion uint64, liveWrite bool) *Txn {
+	var writerI TxnWriterI
+	// only assign the writer interface if not nil, otherwise leave it as nil.
+	// This prevents the "nil interface containing nil value" problem where
+	// t.writer != nil would be true even though the actual writer is nil.
+	if writer != nil {
+		writerI = writer
+	}
+	return NewTxn(BadgerTxnReader{reader, prefix}, writerI, prefix, state, sort, writeVersion, liveWrite)
 }
 
 // NewTxn() creates a new instance of Txn with the specified reader and writer
-func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, state, sort bool, version uint64, logger lib.LoggerI) *Txn {
+func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, state, sort bool, version uint64, liveWrite bool) *Txn {
 	return &Txn{
 		reader:       reader,
 		writer:       writer,
 		prefix:       prefix,
-		logger:       logger,
 		state:        state,
 		sort:         sort,
 		writeVersion: version,
+		liveWrite:    liveWrite,
 		cache: &txn{
 			ops:    make(map[string]valueOp),
 			sorted: btree.NewG(32, func(a, b *CacheItem) bool { return a.Less(b) }), // need to benchmark this value
@@ -163,7 +170,15 @@ func (t *Txn) update(key []byte, val []byte, entry *badger.Entry, opAction op) (
 	if _, found := t.cache.ops[k]; !found && t.sort {
 		t.addToSorted(k)
 	}
-	t.cache.ops[k] = valueOp{key: key, value: val, entry: entry, op: opAction}
+	valueOp := valueOp{key: key, value: val, entry: entry, op: opAction}
+	t.cache.ops[k] = valueOp
+	if t.writer != nil && t.liveWrite {
+		for version, prefix := range t.flushTo() {
+			if err := t.write(prefix, version, valueOp); err != nil {
+				return err
+			}
+		}
+	}
 	t.cache.l.Unlock()
 	return
 }
@@ -217,46 +232,67 @@ func (t *Txn) Flush() (err error) {
 	t.cache.l.Lock()
 	defer t.cache.l.Unlock()
 	defer t.Discard()
-	// execute special state flush
-	if t.state {
-		for version, prefix := range map[uint64][]byte{lssVersion: []byte(latestStatePrefix), t.writeVersion: []byte(historicStatePrefix)} {
-			if err = t.flush(prefix, version); err != nil {
-				return err
-			}
-		}
-		// early exit
+	if t.liveWrite {
 		return nil
 	}
+	for version, prefix := range t.flushTo() {
+		if err = t.flush(prefix, version); err != nil {
+			return err
+		}
+	}
 	// exit
-	return t.flush(t.prefix, t.writeVersion)
+	return nil
+}
+
+// flushTo() returns the prefixes to flush to
+func (t *Txn) flushTo() map[uint64][]byte {
+	// special state flush
+	if t.state {
+		return map[uint64][]byte{lssVersion: []byte(latestStatePrefix), t.writeVersion: []byte(historicStatePrefix)}
+	}
+	return map[uint64][]byte{t.writeVersion: t.prefix}
 }
 
 // flush() flushes all operations to the underlying writer with a prefix if given
 func (t *Txn) flush(prefix []byte, writeVersion uint64) (err error) {
 	for _, v := range t.cache.ops {
-		k := v.key
-		if prefix != nil {
-			k = lib.Append(prefix, k)
-		}
-		switch v.op {
-		case opSet:
-			// set an entry with a bit that marks it as deleted and prevents it from being discarded
-			if err = t.writer.SetEntryAt(&badger.Entry{Key: k, Value: v.value}, writeVersion); err != nil {
-				return ErrStoreSet(err)
-			}
-		case opDelete:
-			// set an entry with a bit that marks it as deleted and prevents it from being discarded
-			if err = t.writer.SetEntryAt(newEntry(k, nil, badgerDeleteBit|badgerNoDiscardBit), writeVersion); err != nil {
-				return ErrStoreDelete(err)
-			}
-		case opEntry:
-			// set the entry in the batch
-			if err = t.writer.SetEntryAt(&badger.Entry{Key: k, Value: v.value, ExpiresAt: v.entry.ExpiresAt, UserMeta: v.entry.UserMeta}, writeVersion); err != nil {
-				return ErrStoreSet(err)
-			}
+		if err = t.write(prefix, writeVersion, v); err != nil {
+			return err
 		}
 	}
 	return
+}
+
+// write() writes a value operation to the underlying writer
+func (t *Txn) write(prefix []byte, writeVersion uint64, valueOp valueOp) lib.ErrorI {
+	k := valueOp.key
+	if prefix != nil {
+		k = lib.Append(prefix, k)
+	}
+	switch valueOp.op {
+	case opSet:
+		// set an entry with a bit that marks it as deleted and prevents it from being discarded
+		if err := t.writer.SetEntryAt(&badger.Entry{Key: k, Value: valueOp.value}, writeVersion); err != nil {
+			return ErrStoreSet(err)
+		}
+	case opDelete:
+		// set an entry with a bit that marks it as deleted and prevents it from being discarded
+		if err := t.writer.SetEntryAt(newEntry(k, nil, badgerDeleteBit|badgerNoDiscardBit), writeVersion); err != nil {
+			return ErrStoreDelete(err)
+		}
+	case opEntry:
+		// set the entry in the batch
+		entry := &badger.Entry{
+			Key:       k,
+			Value:     valueOp.value,
+			ExpiresAt: valueOp.entry.ExpiresAt,
+			UserMeta:  valueOp.entry.UserMeta,
+		}
+		if err := t.writer.SetEntryAt(entry, writeVersion); err != nil {
+			return ErrStoreSet(err)
+		}
+	}
+	return nil
 }
 
 // NewIterator() creates a merged iterator with the reader and writer

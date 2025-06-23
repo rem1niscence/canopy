@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/alecthomas/units"
-	"github.com/canopy-network/canopy/lib"
-	"github.com/dgraph-io/badger/v4"
-	"github.com/stretchr/testify/require"
 	"math"
 	"os"
 	"runtime/debug"
 	"testing"
+
+	"github.com/alecthomas/units"
+	"github.com/canopy-network/canopy/lib"
+	"github.com/dgraph-io/badger/v4"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMaxTransaction(t *testing.T) {
