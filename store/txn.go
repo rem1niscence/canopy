@@ -224,6 +224,8 @@ func (t *Txn) Flush() (err error) {
 				return err
 			}
 		}
+		// early exit
+		return nil
 	}
 	// exit
 	return t.flush(t.prefix, t.writeVersion)
