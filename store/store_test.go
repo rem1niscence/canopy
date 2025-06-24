@@ -146,3 +146,47 @@ func bulkSetKV(t *testing.T, store lib.WStoreI, prefix string, keyValue ...strin
 		require.NoError(t, store.Set([]byte(prefix+kv), []byte(kv)))
 	}
 }
+
+func DoublyNestedTxn(t *testing.T) {
+	store, _, cleanup := testStore(t)
+	defer cleanup()
+	// set initial value to the store
+	store.Set([]byte("base"), []byte("base"))
+	// create a nested transaction
+	nested := store.NewTxn()
+	// set nested value
+	nested.Set([]byte("nested"), []byte("nested"))
+	// retrieve parent key
+	value, err := nested.Get([]byte("base"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("base"), value)
+	// create a doubly nested transaction
+	doublyNested := nested.NewTxn()
+	// set doubly nested value
+	doublyNested.Set([]byte("doublyNested"), []byte("doublyNested"))
+	// commit doubly nested transaction
+	_, err = doublyNested.Commit()
+	// retrieve grandparent key
+	value, err = doublyNested.Get([]byte("base"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("base"), value)
+	require.NoError(t, err)
+	// verify value can be retrieved from nested the store but
+	// not from the store itself
+	value, err = nested.Get([]byte("doublyNested"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("doublyNested"), value)
+	value, err = store.Get([]byte("doublyNested"))
+	require.NoError(t, err)
+	require.Equal(t, nil, value)
+	// commit nested transaction
+	_, err = nested.Commit()
+	require.NoError(t, err)
+	// verify both nested and doubly nested values can be retrieved from the store
+	value, err = store.Get([]byte("nested"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("nested"), value)
+	value, err = store.Get([]byte("doublyNested"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("doublyNested"), value)
+}
