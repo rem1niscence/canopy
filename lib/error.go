@@ -213,14 +213,14 @@ const (
 	CodeInvalidPercentAllocation  ErrorCode = 48
 	CodeErrNotEmpty               ErrorCode = 49
 	CodeInvalidParam              ErrorCode = 50
-
-	CodeInvalidProtocolVersion ErrorCode = 52
-	CodeInvalidDBKey           ErrorCode = 53
-	CodeWrongStoreType         ErrorCode = 54
-	CodeUnmarshalGenesis       ErrorCode = 55
-	CodeInsufficientSupply     ErrorCode = 56
-	CodeUnknownMsgName         ErrorCode = 57
-	CodeUnknownPageable        ErrorCode = 58
+	CodeErrFailedTransactions     ErrorCode = 51
+	CodeInvalidProtocolVersion    ErrorCode = 52
+	CodeInvalidDBKey              ErrorCode = 53
+	CodeWrongStoreType            ErrorCode = 54
+	CodeUnmarshalGenesis          ErrorCode = 55
+	CodeInsufficientSupply        ErrorCode = 56
+	CodeUnknownMsgName            ErrorCode = 57
+	CodeUnknownPageable           ErrorCode = 58
 
 	CodeInvalidBlockRange        ErrorCode = 60
 	CodeInvalidPublicKey         ErrorCode = 61
@@ -784,4 +784,8 @@ func ErrNoSubsidizedCommittees(chainId uint64) ErrorI {
 
 func ErrEmptyLotteryWinner() ErrorI {
 	return NewError(CodeEmptyLotteryWinner, StateMachineModule, "Lottery winner is empty")
+}
+
+func ErrFailedTransactions() ErrorI {
+	return NewError(CodeErrFailedTransactions, StateMachineModule, "a block contained failed transactions")
 }

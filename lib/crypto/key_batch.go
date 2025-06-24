@@ -25,6 +25,7 @@ type BatchVerifier struct {
 	secp256k1    [8][]BatchTuple
 	bls12381     [8][]BatchTuple
 	count        int
+	noOp         bool // no op disables all batch verifier operations
 }
 
 // BatchTuple is a convenient structure to validate the batch
@@ -36,7 +37,10 @@ type BatchTuple struct {
 }
 
 // NewBatchVerifier() constructs a batch verifier
-func NewBatchVerifier() (b *BatchVerifier) {
+func NewBatchVerifier(noOp ...bool) (b *BatchVerifier) {
+	if noOp != nil {
+		return &BatchVerifier{noOp: true}
+	}
 	capacity := 20_000
 	b = new(BatchVerifier)
 	for i := 0; i < 8; i++ {
@@ -50,6 +54,9 @@ func NewBatchVerifier() (b *BatchVerifier) {
 
 // Add() adds a tuple to the batch verifier
 func (b *BatchVerifier) Add(pk PublicKeyI, publicKey, message, signature []byte) (err error) {
+	if b.noOp {
+		return nil
+	}
 	t := BatchTuple{PublicKey: pk, Message: message, Signature: signature, index: b.count}
 	i := b.count % 8
 	switch len(publicKey) {
@@ -73,6 +80,10 @@ func (b *BatchVerifier) Verify() []int {
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
 	var badIndices []int
+
+	if b.noOp {
+		return nil
+	}
 
 	for i := 0; i < 8; i++ {
 		idx := i

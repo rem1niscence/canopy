@@ -37,6 +37,7 @@ type Controller struct {
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
 func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics *lib.Metrics, l lib.LoggerI) (controller *Controller, err lib.ErrorI) {
+	address := valKey.PublicKey().Address()
 	// load the maximum validators param to set limits on P2P
 	maxMembersPerCommittee, err := fsm.GetMaxValidators()
 	// if an error occurred when retrieving the max validators
@@ -45,7 +46,7 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 		return
 	}
 	// initialize the mempool using the FSM copy and the mempool config
-	mempool, err := NewMempool(fsm, c.MempoolConfig, metrics, l)
+	mempool, err := NewMempool(fsm, address, c.MempoolConfig, metrics, l)
 	// if an error occurred when creating a new mempool
 	if err != nil {
 		// exit with error
@@ -53,7 +54,7 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 	}
 	// create the controller
 	controller = &Controller{
-		Address:    valKey.PublicKey().Address().Bytes(),
+		Address:    address.Bytes(),
 		PublicKey:  valKey.PublicKey().Bytes(),
 		PrivateKey: valKey,
 		Config:     c,
@@ -106,6 +107,8 @@ func (c *Controller) Start() {
 				break
 			}
 		}
+		// start mempool service
+		//go c.CheckMempool() TODO - come up with a strategy to allow 'safe' but more frequent transaction gossipping
 		// start internal Controller listeners for P2P
 		c.StartListeners()
 		// start the syncing process (if not synced to top)
@@ -297,6 +300,9 @@ func (c *Controller) LoadCommitteeData() (data *lib.CommitteeData, err lib.Error
 
 // Syncing() returns if any of the supported chains are currently syncing
 func (c *Controller) Syncing() *atomic.Bool { return c.isSyncing }
+
+// ResetFSM() resets the underlying state machine to last valid state
+func (c *Controller) ResetFSM() { c.FSM.Reset() }
 
 // RootChainHeight() returns the height of the canopy root-chain
 func (c *Controller) RootChainHeight() uint64 {

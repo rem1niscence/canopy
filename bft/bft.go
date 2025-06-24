@@ -22,6 +22,7 @@ type BFT struct {
 	Block         []byte                 // the current Block being voted on (the foundational unit of the blockchain)
 	BlockHash     []byte                 // the current hash of the block being voted on
 	Results       *lib.CertificateResult // the current Result being voted on (reward and slash recipients)
+	BlockResult   *lib.BlockResult       // the cached result of the block - allowing a validator to validate the block only once and directly commit
 	SortitionData *lib.SortitionData     // the current data being used for VRF+CDF Leader Election
 	VDFService    *lib.VDFService        // the verifiable delay service, run once per block as a deterrent against long-range-attacks
 	HighVDF       *crypto.VDF            // the highest VDF among replicas - if the chain is using VDF for long-range-attack protection
@@ -118,12 +119,16 @@ func (b *BFT) Start() {
 				if !resetBFT.IsRootChainUpdate {
 					b.log.Info("Reset BFT (NEW_HEIGHT)")
 					b.NewHeight(false)
+					// set the wait timers to start consensus
+					b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
 					b.NewHeight(true)
+					if !b.LoadIsOwnRoot() {
+						// set the wait timers to start consensus
+						b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
+					}
 				}
-				// set the wait timers to start consensus
-				b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
 			}()
 		}
 	}
@@ -175,7 +180,11 @@ func (b *BFT) HandlePhase() {
 // ELECTION PHASE:
 // - Replicas run the Cumulative Distribution Function and a 'practical' Verifiable Random Function
 // - If they are a candidate they send the VRF Out to the replicas
+var electionTimer time.Time
+
 func (b *BFT) StartElectionPhase() {
+	fmt.Println("Round trip took", time.Since(electionTimer))
+	electionTimer = time.Now()
 	b.log.Infof(b.View.ToString())
 	// retrieve Validator object from the ValidatorSet
 	selfValidator, err := b.ValidatorSet.GetValidator(b.PublicKey)
@@ -298,6 +307,7 @@ func (b *BFT) StartProposePhase() {
 // - Replica Validates the proposal using the byzantine evidence and the specific plugin
 // - Replicas send a signed (aggregable) PROPOSE vote to the Leader
 func (b *BFT) StartProposeVotePhase() {
+	var err lib.ErrorI
 	b.log.Info(b.View.ToString())
 	msg := b.GetProposal()
 	if msg == nil {
@@ -313,7 +323,7 @@ func (b *BFT) StartProposeVotePhase() {
 	}
 	// if locked, confirm safe to unlock
 	if b.HighQC != nil {
-		if err := b.SafeNode(msg); err != nil {
+		if err = b.SafeNode(msg); err != nil {
 			b.log.Error(err.Error())
 			b.RoundInterrupt()
 			return
@@ -324,7 +334,7 @@ func (b *BFT) StartProposeVotePhase() {
 		DSE: NewDSE(msg.LastDoubleSignEvidence),
 	}
 	// check candidate block against FSM
-	if err := b.ValidateProposal(msg.Qc, byzantineEvidence); err != nil {
+	if b.BlockResult, err = b.ValidateProposal(msg.Qc, byzantineEvidence); err != nil {
 		b.log.Error(err.Error())
 		b.RoundInterrupt()
 		return
@@ -468,20 +478,39 @@ func (b *BFT) StartCommitProcessPhase() {
 	b.ByzantineEvidence = &ByzantineEvidence{
 		DSE: b.GetLocalDSE(),
 	}
-	// send the block to self for committing
-	b.SelfSendBlock(msg.Qc)
-	// gossip committed block message to peers
-	b.GossipBlock(msg.Qc, b.PublicKey)
+	// create a new block object reference to ensure a non nil result
+	block := new(lib.Block)
+	// populate the block obj ref with the block bytes in the qc
+	if err := lib.Unmarshal(msg.Qc.Block, block); err != nil {
+		return
+	}
+	// track processing time for consensus module
+	startTime := time.Now()
+	// commit the block
+	if err := b.Controller.CommitCertificate(msg.Qc, block, b.BlockResult); err != nil {
+		b.log.Error(err.Error())
+	}
+	// signal a reset to the bft module
+	b.ResetBFT <- ResetBFT{ProcessTime: time.Since(startTime)}
+	// execute a non-blocking function
+	go func() {
+		// add a delay to ensure the other replicas can start the commit process phase
+		time.After(time.Duration(b.Config.RoundInterruptTimeoutMS) * time.Millisecond)
+		// gossip committed block message to peers
+		b.GossipBlock(msg.Qc, b.PublicKey)
+	}()
 }
 
 // RoundInterrupt() begins the ROUND-INTERRUPT phase after any phase errors
 // ROUND-INTERRUPT:
 // - Replica sends current View message to other replicas (Pacemaker vote)
 func (b *BFT) RoundInterrupt() {
+	b.Controller.ResetFSM()
 	_ = b.VDFService.Finish() // stop VDF service because the block hash that was being used as a seed will change
 	b.Config.RoundInterruptTimeoutMS = b.msLeftInRound()
 	b.log.Warnf("Starting next round in %.2f secs", (time.Duration(b.Config.RoundInterruptTimeoutMS) * time.Millisecond).Seconds())
 	b.Phase = RoundInterrupt
+	b.ResetFSM()
 	// send pacemaker message
 	b.SendToReplicas(b.ValidatorSet, &Message{
 		Qc: &lib.QuorumCertificate{
@@ -573,7 +602,7 @@ func (b *BFT) NewRound(newHeight bool) {
 	}
 	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
-	b.Block, b.BlockHash, b.Results = nil, nil, nil
+	b.Block, b.BlockHash, b.Results, b.BlockResult = nil, nil, nil, nil
 	b.SortitionData = nil
 }
 
@@ -830,9 +859,11 @@ type (
 		// ProduceProposal() as a Leader, create a Proposal in the form of a block and certificate results
 		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
 		// ValidateCertificate() as a Replica, validates the leader proposal
-		ValidateProposal(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) lib.ErrorI
+		ValidateProposal(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) (*lib.BlockResult, lib.ErrorI)
 		// LoadCertificate() gets the Quorum Certificate from the chainId-> plugin at a certain height
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
+		// CommitCertificate() commits a block to persistence
+		CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI)
 		// GossipBlock() is a P2P call to gossip a completed Quorum Certificate with a Proposal
 		GossipBlock(certificate *lib.QuorumCertificate, sender []byte)
 		// SendToSelf() is a P2P call to directly send  a completed Quorum Certificate to self
@@ -847,6 +878,8 @@ type (
 		LoadIsOwnRoot() bool
 		// Syncing() returns true if the plugin is currently syncing
 		Syncing() *atomic.Bool
+		// ResetFSM() resets the finite state machine
+		ResetFSM()
 
 		/* root-chain Functionality Below*/
 

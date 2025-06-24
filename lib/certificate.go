@@ -15,7 +15,7 @@ import (
 
 const (
 	// the max possible block size without checking the governance parameter in state
-	GlobalMaxBlockSize = int(32 * units.MB)
+	GlobalMaxBlockSize = int(256 * units.MB)
 	// ensures developers are aware of a change to the header size (which is a consensus breaking change)
 	ExpectedMaxBlockHeaderSize = 1652
 )

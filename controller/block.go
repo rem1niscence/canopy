@@ -55,8 +55,6 @@ func (c *Controller) ListenForBlock() {
 				// exit iteration
 				return
 			}
-			// track processing time for consensus module
-			startTime := time.Now()
 			// 'handle' the peer block and certificate appropriately
 			qc, err := c.HandlePeerBlock(blockMessage, false)
 			// ensure no error
@@ -81,8 +79,6 @@ func (c *Controller) ListenForBlock() {
 			}
 			// gossip the block to our peers
 			c.GossipBlock(qc, sender)
-			// signal a reset to the bft module
-			c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
 		}()
 		// if quit signaled
 		if quit {
@@ -147,24 +143,12 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 			c.log.Error(lib.ErrInvalidVDF().Error())
 		}
 	}
-	// re-validate all transactions in the mempool as a 'double check' to ensure all transactions being proposed are valid
-	//c.Mempool.checkMempool()
-	// get the maximum possible size of the block as defined by the governance parameters of the state machine
-	maxBlockSize, err := c.FSM.GetMaxBlockSize()
-	if err != nil {
-		// exit with error
-		return
-	}
-	// create the actual block structure with the maximum amount of transactions allowed or available in the mempool
-	block := &lib.Block{
-		BlockHeader:  &lib.BlockHeader{Time: uint64(time.Now().UnixMicro()), ProposerAddress: c.Address, LastQuorumCertificate: lastCertificate, Vdf: vdf},
-		Transactions: c.Mempool.GetTransactions(maxBlockSize - lib.MaxBlockHeaderSize),
-	}
-	// capture the tentative block result using a new object reference
-	blockResult := new(lib.BlockResult)
-	// apply the block against the state machine and populate the resulting merkle `roots` in the block header
-	block.BlockHeader, blockResult.Transactions, err = c.FSM.ApplyBlock(block)
-	if err != nil {
+	// get the block from the mempool
+	block, blockResult := c.GetProposalBlockFromMempool()
+	// replace the VDF and last certificate in the header
+	block.BlockHeader.LastQuorumCertificate, block.BlockHeader.Vdf = lastCertificate, vdf
+	// execute the hash
+	if _, err = block.BlockHeader.SetHash(); err != nil {
 		// exit with error
 		return
 	}
@@ -183,7 +167,7 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 }
 
 // ValidateProposal() fully validates a proposal in the form of a quorum certificate and resets back to begin block state
-func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (err lib.ErrorI) {
+func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (blockResult *lib.BlockResult, err lib.ErrorI) {
 	defer lib.TimeTrack(c.log, time.Now())
 	// log the beginning of proposal validation
 	c.log.Debugf("Validating proposal from leader")
@@ -203,7 +187,7 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 		return
 	}
 	// play the block against the state machine to generate a block result
-	blockResult, err := c.ApplyAndValidateBlock(block, false)
+	blockResult, err = c.ApplyAndValidateBlock(block, false)
 	if err != nil {
 		// exit with error
 		return
@@ -213,7 +197,7 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 	// ensure generated the same results
 	if !qc.Results.Equals(compareResults) {
 		// exit with error
-		return fsm.ErrMismatchCertResults()
+		return nil, fsm.ErrMismatchCertResults()
 	}
 	// exit
 	return
@@ -226,7 +210,7 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 // - re-checks all transactions in mempool
 // - atomically writes all to the underlying db
 // - sets up the controller for the next height
-func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block) (err lib.ErrorI) {
+func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI) {
 	defer lib.TimeTrack(c.log, time.Now())
 	start := time.Now()
 	f, _ := os.Create("canopy.prof")
@@ -240,11 +224,14 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.ResultsHash))
 	// cast the store to ensure the proper store type to complete this operation
 	storeI := c.FSM.Store().(lib.StoreI)
-	// apply the block against the state machine
-	blockResult, err := c.ApplyAndValidateBlock(block, true)
-	if err != nil {
-		// exit with error
-		return
+	// if the block result isn't 'pre-calculated'
+	if blockResult == nil {
+		// apply the block against the state machine
+		blockResult, err = c.ApplyAndValidateBlock(block, true)
+		if err != nil {
+			// exit with error
+			return
+		}
 	}
 	// log indexing the quorum certificate
 	c.log.Debugf("Indexing certificate for height %d", qc.Header.Height)
@@ -260,13 +247,12 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
+	c.Mempool.Recheck.Swap(true)
 	// for each transaction included in the block
 	for _, tx := range block.Transactions {
 		// delete each transaction from the mempool
 		c.Mempool.DeleteTransaction(tx)
 	}
-	// rescan mempool to ensure validity of all transactions
-	c.Mempool.checkMempool()
 	// parse committed block for straw polls
 	c.FSM.ParsePollTransactions(blockResult)
 	// if self was the proposer
@@ -298,11 +284,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
-	// execute 'begin block' on mempool FSM to play the inbound transactions at the proper phase of the lifecycle
-	if err = c.Mempool.FSM.BeginBlock(); err != nil {
-		// exit with error
-		return
-	}
 	// publish the root chain info to the nested chain subscribers
 	for _, id := range c.RCManager.ChainIds() {
 		// get the root chain info
@@ -320,6 +301,8 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	// update telemetry (using proper defer to ensure time.Since is evaluated at defer execution)
 	processingTime := time.Since(start)
 	defer c.UpdateTelemetry(qc, block, processingTime)
+	// check the mempool to cache a proposal block and validate the mempool itself
+	c.Mempool.CheckMempool()
 	pprof.StopCPUProfile()
 	// exit
 	return
@@ -339,10 +322,14 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 	// log the start of 'apply block'
 	c.log.Debugf("Applying block %s for height %d", candidateHash[:20], candidateHeight)
 	// apply the block against the state machine
-	compare, txResults, err := c.FSM.ApplyBlock(block)
+	compare, txResults, failed, err := c.FSM.ApplyBlock(block, false)
 	if err != nil {
 		// exit with error
 		return
+	}
+	// if any transactions failed
+	if len(failed) != 0 {
+		return nil, lib.ErrFailedTransactions()
 	}
 	// compare the block headers for equality
 	compareHash, err := compare.SetHash()
@@ -437,7 +424,7 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 		return nil, lib.ErrOutOfSync()
 	}
 	// attempts to commit the QC to persistence of chain by playing it against the state machine
-	if err = c.CommitCertificate(qc, block); err != nil {
+	if err = c.CommitCertificate(qc, block, nil); err != nil {
 		// exit with error
 		return nil, err
 	}

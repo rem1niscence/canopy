@@ -496,6 +496,10 @@ type testController struct {
 	sendToReplicasChan chan lib.Signable
 }
 
+func (t *testController) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI) {
+	return nil
+}
+
 func (t *testController) LoadRootChainId(height uint64) (rootChainId uint64) {
 	return lib.CanopyChainId
 }
@@ -526,11 +530,12 @@ func (t *testController) ProduceProposal(_ *ByzantineEvidence, _ *crypto.VDF) (b
 	return
 }
 
-func (t *testController) ValidateProposal(qc *lib.QuorumCertificate, _ *ByzantineEvidence) lib.ErrorI {
+func (t *testController) ValidateProposal(qc *lib.QuorumCertificate, _ *ByzantineEvidence) (*lib.BlockResult, lib.ErrorI) {
 	if len(qc.Block) == expectedCandidateLen {
-		return nil
+		return nil, nil
 	}
-	return ErrEmptyMessage()
+	return &lib.BlockResult{
+		BlockHeader: &lib.BlockHeader{}, Transactions: nil, Meta: nil}, ErrEmptyMessage()
 }
 
 func (t *testController) LoadCommittee(rootChainId, rootHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
@@ -562,6 +567,7 @@ func (t *testController) RootChainHeight() uint64 { return 0 }
 func (t *testController) LoadLastProposers(_ uint64) (*lib.Proposers, lib.ErrorI) {
 	return t.proposers, nil
 }
+func (t *testController) ResetFSM() {}
 func (t *testController) GossipBlock(cert *lib.QuorumCertificate, _ []byte) {
 	t.gossipCertChan <- cert
 }
