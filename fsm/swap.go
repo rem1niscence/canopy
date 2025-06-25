@@ -299,7 +299,7 @@ func (s *StateMachine) SetOrderBook(b *lib.OrderBook) lib.ErrorI {
 		return err
 	}
 	// set the order book in the store
-	return s.store.Set(OrderBookPrefix(b.ChainId), orderBookBz)
+	return s.Set(OrderBookPrefix(b.ChainId), orderBookBz)
 }
 
 // SetOrderBooks() sets a series of OrderBooks in the state db

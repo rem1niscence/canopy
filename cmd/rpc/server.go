@@ -182,12 +182,15 @@ func (s *Server) submitTx(w http.ResponseWriter, tx any) (ok bool) {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
-
-	// Send transaction to controller
-	if err = s.controller.SendTxMsg(bz); err != nil {
+	if err = s.controller.Mempool.HandleTransaction(bz); err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
+	//// Send transaction to controller
+	//if err = s.controller.SendTxMsg(bz); err != nil {
+	//	write(w, err, http.StatusBadRequest)
+	//	return
+	//}
 
 	// Write transaction to http response
 	write(w, crypto.HashString(bz), http.StatusOK)

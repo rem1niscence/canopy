@@ -1,20 +1,26 @@
 package crypto
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
-	"github.com/dgraph-io/ristretto/v2"
+	"github.com/allegro/bigcache/v3"
 	oasisEd25519 "github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
 	"sort"
 	"sync"
+	"time"
 )
 
 var (
 	DisableCache      = false
-	SignatureCache, _ = ristretto.NewCache[string, struct{}](&ristretto.Config[string, struct{}]{
-		NumCounters: 2_000_000, // 10x number of items
-		MaxCost:     200_000,   // total cost (1 byte * 200K items)
-		BufferItems: 64,        // recommended default
+	SignatureCache, _ = bigcache.New(context.Background(), bigcache.Config{
+		Shards:             1024,             // Good for parallelism (use 2x GOMAXPROCS as rule of thumb)
+		LifeWindow:         5 * time.Minute,  // How long an entry stays in cache
+		CleanWindow:        20 * time.Second, // How often to clean expired entries
+		MaxEntriesInWindow: 1_00_000,         // Number of items you want in the cache
+		MaxEntrySize:       1000,             // Slightly overestimate to account for key/metadata (in bytes)
+		HardMaxCacheSize:   250,              // Total MB
+		Verbose:            false,
 	})
 )
 
@@ -110,7 +116,7 @@ func (b *BatchVerifier) verifyAll(idx int) (badIndices []int) {
 	verifyBatch := func(tuples []BatchTuple) {
 		for _, tuple := range tuples {
 			if ok := tuple.PublicKey.VerifyBytes(tuple.Message, tuple.Signature); ok {
-				SignatureCache.Set(tuple.Key(), struct{}{}, 1)
+				SignatureCache.Set(tuple.Key(), []byte{0})
 			} else {
 				badIndices = append(badIndices, tuple.index)
 			}
@@ -120,8 +126,10 @@ func (b *BatchVerifier) verifyAll(idx int) (badIndices []int) {
 	// verify ed25519
 	if len(b.ed25519Index[idx]) != 0 {
 		verifier := oasisEd25519.NewBatchVerifier()
-		for _, t := range b.ed25519Index[idx] {
-			if _, found := SignatureCache.Get(t.Key()); !found {
+		cacheKeys := make([]string, 0, len(b.ed25519Index[idx]))
+		for i, t := range b.ed25519Index[idx] {
+			cacheKeys = append(cacheKeys, t.Key())
+			if _, notFoundErr := SignatureCache.Get(cacheKeys[i]); notFoundErr != nil {
 				verifier.Add(t.PublicKey.Bytes(), t.Message, t.Signature)
 			}
 		}
@@ -132,12 +140,12 @@ func (b *BatchVerifier) verifyAll(idx int) (badIndices []int) {
 				if ok := t.PublicKey.VerifyBytes(t.Message, t.Signature); !ok {
 					badIndices = append(badIndices, t.index)
 				} else {
-					SignatureCache.Set(t.Key(), struct{}{}, 1)
+					_ = SignatureCache.Set(t.Key(), []byte{0})
 				}
 			}
 		} else {
-			for _, t := range b.ed25519Index[idx] {
-				SignatureCache.Set(t.Key(), struct{}{}, 1)
+			for i := range b.ed25519Index[idx] {
+				_ = SignatureCache.Set(cacheKeys[i], []byte{0})
 			}
 		}
 	}
@@ -173,7 +181,8 @@ func CheckCache(pk PublicKeyI, msg, sig []byte) (found bool, addToCache func()) 
 	}
 	cacheTuple := BatchTuple{PublicKey: pk, Message: msg, Signature: sig}
 	key := cacheTuple.Key()
-	addToCache = func() { SignatureCache.Set(key, struct{}{}, 1) }
-	_, found = SignatureCache.Get(key)
+	addToCache = func() { SignatureCache.Set(key, []byte{0}) }
+	_, notFoundErr := SignatureCache.Get(key)
+	found = notFoundErr == nil
 	return
 }

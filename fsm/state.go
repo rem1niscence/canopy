@@ -499,7 +499,10 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 		proposeVoteConfig:  s.proposeVoteConfig,
 		Config:             s.Config,
 		log:                s.log,
-		cache:              s.cache,
+		cache: &cache{
+			validators: make(map[string]*Validator),
+			delegates:  make(map[uint64]map[crypto.AddressI]struct{}),
+		},
 	}, nil
 }
 
