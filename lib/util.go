@@ -605,21 +605,31 @@ func CatchPanic(l LoggerI) {
 }
 
 // JoinLenPrefix() appends the items together separated by a single byte to represent the length of the segment
-func JoinLenPrefix(toAppend ...[]byte) (res []byte) {
-	// for each item to append
+func JoinLenPrefix(toAppend ...[]byte) []byte {
+	// calculate total length first
+	totalLen := 0
 	for _, item := range toAppend {
-		// if the item is empty
+		// if the item isn't empty, calculate the size
+		if item != nil {
+			// 1 byte for length + item length
+			totalLen += 1 + len(item)
+		}
+	}
+	// make the proper size buffer
+	res := make([]byte, 0, totalLen)
+	// iterate through each 'segment' and append it
+	for _, item := range toAppend {
+		// if item is empty, skip
 		if item == nil {
-			// next iteration
 			continue
 		}
-		// store the length of the segment in a single byte
-		length := []byte{byte(len(item))}
-		// append to the reset of the segment
-		res = append(append(res, length...), item...)
+		// length
+		res = append(res, byte(len(item)))
+		// item
+		res = append(res, item...)
 	}
-	// exit
-	return
+	// return the result
+	return res
 }
 
 // DecodeLengthPrefixed() decodes a key that is delimited by the length of the segment in a single byte
@@ -762,6 +772,19 @@ func Append(a, b []byte) []byte {
 	copy(out, a)
 	copy(out[len(a):], b)
 	return out
+}
+
+// AppendWithBuffer() appends a and b into a fresh []byte using a buffer to reduce allocations.
+// The result is safe to retain and use independently of a/b/buffer.
+func AppendWithBuffer(buf *[]byte, a, b []byte) []byte {
+	totalLen := len(a) + len(b)
+	if cap(*buf) < totalLen {
+		*buf = make([]byte, totalLen)
+	}
+	*buf = (*buf)[:totalLen]
+	copy(*buf, a)
+	copy((*buf)[len(a):], b)
+	return *buf
 }
 
 // EqualByteSlices() performs equality check on two byte slices

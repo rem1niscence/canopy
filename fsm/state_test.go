@@ -69,7 +69,7 @@ func TestInitialize(t *testing.T) {
 				log:    log,
 				cache: &cache{
 					validators: make(map[string]*Validator),
-					delegates:  make(map[uint64]map[crypto.AddressI]struct{}),
+					delegates:  make(map[uint64]map[string]struct{}),
 				},
 			}
 			// set the data dir path
@@ -265,7 +265,10 @@ func TestApplyBlock(t *testing.T) {
 			// execute the function call
 			header, txResults, failed, e := sm.ApplyBlock(test.block, false)
 			// validate the expected error
-			require.Equal(t, test.error != "" || len(failed) != 0, e != nil, e)
+			require.Equal(t, test.error != "", e != nil || len(failed) != 0, e)
+			if len(failed) != 0 {
+				return
+			}
 			if e != nil {
 				require.ErrorContains(t, e, test.error)
 				return
@@ -318,7 +321,7 @@ func newTestStateMachine(t *testing.T) StateMachine {
 		log: log,
 		cache: &cache{
 			validators: make(map[string]*Validator),
-			delegates:  make(map[uint64]map[crypto.AddressI]struct{}),
+			delegates:  make(map[uint64]map[string]struct{}),
 		},
 	}
 	require.NoError(t, sm.SetParams(DefaultParams()))

@@ -61,7 +61,7 @@ func (s *StateMachine) CheckTx(transaction []byte, txHash string, batchVerifier 
 		return
 	}
 	// validate the signature of the transaction
-	sender, err := s.CheckSignature(msg, tx, txHash, batchVerifier)
+	sender, err := s.CheckSignature(msg, tx, batchVerifier)
 	if err != nil {
 		return
 	}
@@ -85,7 +85,7 @@ type CheckTxResult struct {
 }
 
 // CheckSignature() validates the signer and the digital signature associated with the transaction object
-func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction, txHash string, batchSignatureVerifier *crypto.BatchVerifier) (crypto.AddressI, lib.ErrorI) {
+func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction, batchSignatureVerifier *crypto.BatchVerifier) (crypto.AddressI, lib.ErrorI) {
 	// validate the actual signature bytes
 	if tx.Signature == nil || len(tx.Signature.Signature) == 0 {
 		return nil, ErrEmptySignature()
@@ -139,16 +139,15 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction, txH
 				x.Signer = authorized
 			case *MessageChangeParameter:
 				// populate the proposal hash for change parameter
-				x.ProposalHash = txHash
+				hash, _ := tx.GetHash()
+				x.ProposalHash = lib.BytesToString(hash)
 			case *MessageDAOTransfer:
 				// populate the proposal hash for dao transfer
-				x.ProposalHash = txHash
+				hash, _ := tx.GetHash()
+				x.ProposalHash = lib.BytesToString(hash)
 			case *MessageCreateOrder:
 				// populate the order id for the create order
-				hash, err := lib.StringToBytes(txHash)
-				if err != nil {
-					return nil, err
-				}
+				hash, _ := tx.GetHash()
 				x.OrderId = hash[:20] // first 20 bytes of the transaction hash
 			}
 			// return the signer address
@@ -178,26 +177,29 @@ func (s *StateMachine) CheckReplay(tx *lib.Transaction, txHash string) lib.Error
 	if s.Height() < 2 {
 		return nil
 	}
-	// ensure the store can 'read the indexer'
-	store, ok := s.store.(lib.RIndexerI)
-	// if it can't then exit
-	if !ok {
-		return ErrWrongStoreType()
-	}
-	// convert the transaction hash string into bytes
-	hashBz, err := lib.StringToBytes(txHash)
-	if err != nil {
-		return err
-	}
-	// ensure the tx doesn't already exist in the indexer
-	// same block replays are protected at a higher level
-	txResult, err := store.GetTxByHash(hashBz)
-	if err != nil {
-		return err
-	}
-	// if the tx transaction result isn't nil, and it has a hash
-	if txResult != nil && txResult.TxHash == txHash {
-		return lib.ErrDuplicateTx(txHash)
+	// if checking the transaction hash
+	if txHash != "" {
+		// ensure the store can 'read the indexer'
+		store, ok := s.store.(lib.RIndexerI)
+		// if it can't then exit
+		if !ok {
+			return ErrWrongStoreType()
+		}
+		// convert the transaction hash string into bytes
+		hashBz, err := lib.StringToBytes(txHash)
+		if err != nil {
+			return err
+		}
+		// ensure the tx doesn't already exist in the indexer
+		// same block replays are protected at a higher level
+		txResult, err := store.GetTxByHash(hashBz)
+		if err != nil {
+			return err
+		}
+		// if the tx transaction result isn't nil, and it has a hash
+		if txResult != nil && txResult.TxHash == txHash {
+			return lib.ErrDuplicateTx(txHash)
+		}
 	}
 	// this gives the protocol a theoretically safe tx indexer prune height
 	maxHeight, minHeight := s.Height()+BlockAcceptanceRange, uint64(0)

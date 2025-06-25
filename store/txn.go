@@ -70,6 +70,7 @@ type txn struct {
 	ops       map[string]valueOp        // [string(key)] -> set/del operations saved in memory
 	sorted    *btree.BTreeG[*CacheItem] // sorted btree of keys for fast iteration
 	sortedLen int                       // len(sorted)
+	readBuf   []byte                    // a buffer to re-use for reads
 
 	l sync.Mutex // thread safety
 }
@@ -144,7 +145,7 @@ func (t *Txn) Get(key []byte) ([]byte, lib.ErrorI) {
 		return v.value, nil
 	}
 	// if not found, retrieve from the parent reader
-	return t.reader.Get(lib.Append(t.prefix, key))
+	return t.reader.Get(lib.AppendWithBuffer(&t.cache.readBuf, t.prefix, key))
 }
 
 // Set() adds or updates the value for a key in the cache operations

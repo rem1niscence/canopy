@@ -34,8 +34,10 @@ type StateMachine struct {
 
 // cache is the set of items to be cached used by the state machine
 type cache struct {
-	validators map[string]*Validator                   // address->validator
-	delegates  map[uint64]map[crypto.AddressI]struct{} // chainID->delegates
+	validators map[string]*Validator          // address->validator
+	delegates  map[uint64]map[string]struct{} // chainID->delegates address
+	feeParams  *FeeParams                     // fee params for the current block
+	valParams  *ValidatorParams               // validator params for the current block
 }
 
 // New() creates a new instance of a StateMachine
@@ -52,7 +54,7 @@ func New(c lib.Config, store lib.StoreI, metrics *lib.Metrics, log lib.LoggerI) 
 		log:               log,
 		cache: &cache{
 			validators: make(map[string]*Validator),
-			delegates:  make(map[uint64]map[crypto.AddressI]struct{}),
+			delegates:  make(map[uint64]map[string]struct{}),
 		},
 	}
 	defer sm.Reset()
@@ -196,7 +198,7 @@ func (s *StateMachine) ApplyTransactions(txs [][]byte, allowOversize bool) (resu
 	failedCheckTxs := map[int]struct{}{}
 	// first batch validate signatures over the entire set
 	for i, tx := range txs {
-		if _, err = s.CheckTx(tx, `00`, batchVerifier); err != nil {
+		if _, err = s.CheckTx(tx, "", batchVerifier); err != nil {
 			failedCheckTxs[i] = struct{}{}
 		}
 	}
@@ -501,7 +503,7 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 		log:                s.log,
 		cache: &cache{
 			validators: make(map[string]*Validator),
-			delegates:  make(map[uint64]map[crypto.AddressI]struct{}),
+			delegates:  make(map[uint64]map[string]struct{}),
 		},
 	}, nil
 }
@@ -609,15 +611,19 @@ func (s *StateMachine) Cache() error {
 		chainID := committee.ChainId
 		// initialize the delegates cache for this chainID
 		vs, err := s.GetAllDelegates(chainID)
-		s.cache.delegates[chainID] = make(map[crypto.AddressI]struct{}, 0)
+		s.cache.delegates[chainID] = make(map[string]struct{}, 0)
 		if err != nil {
 			return err
 		}
 		for _, val := range vs.ValidatorSet.ValidatorSet {
 			// get the address from the public key
-			address := crypto.NewAddressFromBytes(crypto.Hash(val.PublicKey)[:crypto.AddressSize])
+			publicKey, err := crypto.NewPublicKeyFromBytes(val.PublicKey)
+			if err != nil {
+				return err
+			}
+			address := publicKey.Address()
 			// add the address to the delegates cache for this chainID
-			s.cache.delegates[chainID][address] = struct{}{}
+			s.cache.delegates[chainID][address.String()] = struct{}{}
 		}
 	}
 	// exit

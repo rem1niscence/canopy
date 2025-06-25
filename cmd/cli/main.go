@@ -105,6 +105,18 @@ func Start() {
 	// start the rpc server
 	rpcServer.Start()
 	// block until a kill signal is received
+	fmt.Println("ADDING TXS")
+	txs := LoadTxs()
+	for _, tx := range txs {
+		bz, err := lib.Marshal(tx)
+		if err != nil {
+			panic(err)
+		}
+		if _, err := app.Mempool.AddTransaction(bz, tx.Fee); err != nil {
+			panic(err)
+		}
+	}
+	fmt.Println("DONE")
 	waitForKill()
 	// gracefully stop the app
 	app.Stop()
@@ -112,6 +124,33 @@ func Start() {
 	metrics.Stop()
 	// exit
 	os.Exit(0)
+}
+
+func LoadTxs() (list []*lib.Transaction) {
+	txsPerBlock := 200_000
+	fmt.Println("Loading transactions from json file")
+	txsFile, err := os.Open("cmd/tps/json/txs.json")
+	if err != nil {
+		panic(err)
+	}
+	defer txsFile.Close()
+	var txs []string
+	decoder := json.NewDecoder(txsFile)
+	if err = decoder.Decode(&txs); err != nil {
+		panic(err)
+	}
+	list = make([]*lib.Transaction, 0, txsPerBlock)
+	fmt.Println("Done loading transactions from json file")
+	fmt.Println("Adding", txsPerBlock, "txs to list")
+	for i := 0; i < txsPerBlock; i++ {
+		// Create a new instance of lib.Transaction to hold the incoming transaction data.
+		tx := new(lib.Transaction)
+		if err = lib.UnmarshalJSON([]byte(txs[i]), tx); err != nil {
+			panic(err)
+		}
+		list = append(list, tx)
+	}
+	return
 }
 
 // waitForKill() blocks until a kill signal is received

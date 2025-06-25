@@ -367,13 +367,17 @@ func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err
 	members := make([]*lib.ConsensusValidator, 0)
 	var totalPower uint64
 	// create a function to process the delegates
-	addToValidatorSet := func(address crypto.AddressI) lib.ErrorI {
+	addToValidatorSet := func(address string) lib.ErrorI {
+		addr, er := crypto.NewAddressFromString(address)
+		if er != nil {
+			return lib.ErrInvalidAddress()
+		}
 		// attempt to get validator from the cache
-		val, ok := s.cache.validators[address.String()]
+		val, ok := s.cache.validators[address]
 		if !ok {
 			// if not in cache, get validator from the state
 			var e lib.ErrorI
-			val, e = s.GetValidator(address)
+			val, e = s.GetValidator(addr)
 			if e != nil {
 				return e
 			}
@@ -415,7 +419,7 @@ func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err
 			if e != nil {
 				return vs, e
 			}
-			if e := addToValidatorSet(address); e != nil {
+			if e := addToValidatorSet(address.String()); e != nil {
 				return vs, e
 			}
 		}
@@ -513,10 +517,10 @@ func (s *StateMachine) SetDelegate(address crypto.AddressI, chainId, stakeForCom
 	}
 	// ensure the cache exists for the chainId
 	if _, ok := s.cache.delegates[chainId]; !ok {
-		s.cache.delegates[chainId] = make(map[crypto.AddressI]struct{})
+		s.cache.delegates[chainId] = make(map[string]struct{})
 	}
 	// set the delegator in the cache
-	s.cache.delegates[chainId][address] = struct{}{}
+	s.cache.delegates[chainId][address.String()] = struct{}{}
 	return nil
 }
 
@@ -528,7 +532,7 @@ func (s *StateMachine) DeleteDelegate(address crypto.AddressI, chainId, stakeFor
 		return err
 	}
 	// remove the delegator from the cache
-	delete(s.cache.delegates[chainId], address)
+	delete(s.cache.delegates[chainId], address.String())
 	return nil
 }
 
