@@ -121,6 +121,7 @@ func (s *Server) startRPC(router *httprouter.Router, port string) {
 	s.logger.Infof("Starting RPC server at 0.0.0.0:%s", port)
 	s.logger.Fatal((&http.Server{
 		Addr:              colon + port,
+		IdleTimeout:       120 * time.Second,
 		ReadHeaderTimeout: timeout,
 		ReadTimeout:       timeout,
 		WriteTimeout:      timeout,

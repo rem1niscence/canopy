@@ -26,10 +26,6 @@ func main() {
 	fmt.Println("Creating new RPC client")
 	client := rpc.NewClient(rpcURL, adminRPCURL)
 
-	if _, err := client.Height(); err != nil {
-		panic(err)
-	}
-
 	fmt.Println("Loading transactions from JSON file")
 	txsFile, err := os.Open("cmd/tps/json/txs.json")
 	if err != nil {
@@ -55,7 +51,7 @@ func main() {
 			continue
 		}
 		lastHeight = *height
-		time.Sleep(7 * time.Second)
+		time.Sleep(3 * time.Second)
 		fmt.Println("Submitting", txsPerBlock, "txs for height", lastHeight)
 
 		var wg sync.WaitGroup

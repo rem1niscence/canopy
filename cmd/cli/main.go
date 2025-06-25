@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -68,6 +69,7 @@ var startCmd = &cobra.Command{
 
 // Start() is the entrypoint of the application
 func Start() {
+	debug.SetGCPercent(-1)
 	// allow sleep and wake up using config
 	wakeDate := time.Unix(int64(config.SleepUntil), 0)
 	if time.Now().Before(wakeDate) {
