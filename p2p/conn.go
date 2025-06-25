@@ -27,7 +27,7 @@ const (
 	maxMessageSize         = 10 * units.Megabyte     // the maximum total size of a message once all the packets are added up
 	dataFlowRatePerS       = maxMessageSize          // the maximum number of bytes that may be sent or received per second per MultiConn
 	maxChanSize            = 1                       // maximum number of items in a channel before blocking
-	maxInboxQueueSize      = 100_000                 // maximum number of items in inbox queue before blocking
+	maxInboxQueueSize      = 500_000                 // maximum number of items in inbox queue before blocking
 	maxStreamSendQueueSize = 100_000                 // maximum number of items in a stream send queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to

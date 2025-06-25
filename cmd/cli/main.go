@@ -105,18 +105,7 @@ func Start() {
 	// start the rpc server
 	rpcServer.Start()
 	// block until a kill signal is received
-	fmt.Println("ADDING TXS")
-	txs := LoadTxs()
-	for _, tx := range txs {
-		bz, err := lib.Marshal(tx)
-		if err != nil {
-			panic(err)
-		}
-		if _, err := app.Mempool.AddTransaction(bz, tx.Fee); err != nil {
-			panic(err)
-		}
-	}
-	fmt.Println("DONE")
+	LoadTxs(app)
 	waitForKill()
 	// gracefully stop the app
 	app.Stop()
@@ -126,8 +115,8 @@ func Start() {
 	os.Exit(0)
 }
 
-func LoadTxs() (list []*lib.Transaction) {
-	txsPerBlock := 200_000
+func LoadTxs(c *controller.Controller) (list [][]byte) {
+	txsPerBlock := 150_000
 	fmt.Println("Loading transactions from json file")
 	txsFile, err := os.Open("cmd/tps/json/txs.json")
 	if err != nil {
@@ -139,16 +128,44 @@ func LoadTxs() (list []*lib.Transaction) {
 	if err = decoder.Decode(&txs); err != nil {
 		panic(err)
 	}
-	list = make([]*lib.Transaction, 0, txsPerBlock)
+	list = make([][]byte, 0, txsPerBlock)
 	fmt.Println("Done loading transactions from json file")
-	fmt.Println("Adding", txsPerBlock, "txs to list")
-	for i := 0; i < txsPerBlock; i++ {
+	fmt.Println("Adding", len(txs), "txs to list")
+	for i := 0; i < len(txs); i++ {
 		// Create a new instance of lib.Transaction to hold the incoming transaction data.
 		tx := new(lib.Transaction)
 		if err = lib.UnmarshalJSON([]byte(txs[i]), tx); err != nil {
 			panic(err)
 		}
-		list = append(list, tx)
+		bz, _ := lib.Marshal(tx)
+		list = append(list, bz)
+	}
+	fmt.Println("SIMULATING PEER SENDING")
+	i, lastHeight := 0, uint64(0)
+	for range time.Tick(100 * time.Millisecond) {
+		c.Lock()
+		h := c.ChainHeight()
+		c.Unlock()
+		if h <= lastHeight || h <= 1 {
+			continue
+		}
+		lastHeight = h
+		fmt.Printf("Sending %d txs\n", i)
+		// simulate a bunch of transactions coming in from P2P
+		for j := 0; j < txsPerBlock; func() { j++; i++ }() {
+			if i >= len(list) {
+				fmt.Println("Exhausted all transactions")
+				return
+			}
+			c.P2P.Inbox(lib.Topic_TX) <- (&lib.MessageAndMetadata{
+				Message: &lib.TxMessage{
+					ChainId: c.Config.ChainId,
+					Tx:      list[i],
+				},
+				Sender: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: c.PublicKey}},
+			}).WithHash()
+			fmt.Println("Done")
+		}
 	}
 	return
 }
