@@ -150,7 +150,7 @@ func LoadTxs(c *controller.Controller) (list [][]byte) {
 			continue
 		}
 		lastHeight = h
-		fmt.Printf("Sending %d txs\n", i)
+		fmt.Printf("Sending %d txs\n", txsPerBlock)
 		// simulate a bunch of transactions coming in from P2P
 		for j := 0; j < txsPerBlock; func() { j++; i++ }() {
 			if i >= len(list) {
