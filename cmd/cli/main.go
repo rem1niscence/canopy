@@ -164,8 +164,8 @@ func LoadTxs(c *controller.Controller) (list [][]byte) {
 				},
 				Sender: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: c.PublicKey}},
 			}).WithHash()
-			fmt.Println("Done")
 		}
+		fmt.Println("Done")
 	}
 	return
 }
