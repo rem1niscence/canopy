@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/canopy-network/canopy/fsm"
 	"io"
 	"net/http"
-
-	"github.com/canopy-network/canopy/fsm"
 
 	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/lib"

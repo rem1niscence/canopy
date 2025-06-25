@@ -169,11 +169,6 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 // ValidateProposal() fully validates a proposal in the form of a quorum certificate and resets back to begin block state
 func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (blockResult *lib.BlockResult, err lib.ErrorI) {
 	defer lib.TimeTrack(c.log, time.Now())
-	f, _ := os.Create("canopy.prof")
-	defer f.Close()
-	if err := pprof.StartCPUProfile(f); err != nil {
-		panic(err)
-	}
 	// log the beginning of proposal validation
 	c.log.Debugf("Validating proposal from leader")
 	// configure the FSM in 'consensus mode' for validator proposals
@@ -204,7 +199,6 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 		// exit with error
 		return nil, fsm.ErrMismatchCertResults()
 	}
-	pprof.StopCPUProfile()
 	// exit
 	return
 }
@@ -219,6 +213,11 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI) {
 	defer lib.TimeTrack(c.log, time.Now())
 	start := time.Now()
+	f, _ := os.Create("canopy.prof")
+	defer f.Close()
+	if err := pprof.StartCPUProfile(f); err != nil {
+		panic(err)
+	}
 	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
 	defer func() { c.FSM.Reset() }()
 	// log the beginning of the commit
@@ -304,6 +303,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	defer c.UpdateTelemetry(qc, block, processingTime)
 	// check the mempool to cache a proposal block and validate the mempool itself
 	c.Mempool.CheckMempool()
+	pprof.StopCPUProfile()
 	// exit
 	return
 }
