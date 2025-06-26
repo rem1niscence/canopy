@@ -167,7 +167,7 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 		db:      s.db,
 		writer:  writer,
 		ss:      NewBadgerTxn(s.db.NewTransactionAt(lssVersion, false), writer, []byte(latestStatePrefix), true, true, nextVersion, false),
-		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, true, nextVersion, false), s.blockCache, s.qcCache},
+		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, false, nextVersion, false), s.blockCache, s.qcCache},
 		metrics: s.metrics,
 	}, nil
 }
