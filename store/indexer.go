@@ -38,7 +38,7 @@ type Indexer struct {
 // IndexBlock() turns the block into bytes, indexes the block by hash and height
 // and then indexes the transactions
 func (t *Indexer) IndexBlock(b *lib.BlockResult) lib.ErrorI {
-	f, _ := os.Create("canopy.prof")
+	f, _ := os.Create("index_block.prof")
 	defer f.Close()
 	if err := pprof.StartCPUProfile(f); err != nil {
 		panic(err)
