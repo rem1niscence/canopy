@@ -51,7 +51,7 @@ func main() {
 			continue
 		}
 		lastHeight = *height
-		time.Sleep(3 * time.Second)
+		time.Sleep(2 * time.Second)
 		fmt.Println("Submitting", txsPerBlock, "txs for height", lastHeight)
 
 		var wg sync.WaitGroup

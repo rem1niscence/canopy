@@ -297,7 +297,7 @@ func (s *Store) Reset() {
 	newWriter := s.db.NewWriteBatchAt(nextVersion)
 	// create all new transaction-dependent objects
 	newLSS := NewBadgerTxn(newLSSReader, newWriter, []byte(latestStatePrefix), true, true, nextVersion, false)
-	newIndexer := NewBadgerTxn(newReader, newWriter, []byte(indexerPrefix), false, true, nextVersion, false)
+	newIndexer := NewBadgerTxn(newReader, newWriter, []byte(indexerPrefix), false, false, nextVersion, false)
 	// only after creating all new objects, discard old transactions
 	s.ss.reader.Discard()
 	s.sc = nil

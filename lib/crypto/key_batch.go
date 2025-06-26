@@ -126,26 +126,29 @@ func (b *BatchVerifier) verifyAll(idx int) (badIndices []int) {
 	// verify ed25519
 	if len(b.ed25519Index[idx]) != 0 {
 		verifier := oasisEd25519.NewBatchVerifier()
-		cacheKeys := make([]string, 0, len(b.ed25519Index[idx]))
+		cacheKeys, notInCache := make([]string, 0, len(b.ed25519Index[idx])), make(map[int]struct{})
 		for i, t := range b.ed25519Index[idx] {
 			cacheKeys = append(cacheKeys, t.Key())
 			if _, notFoundErr := SignatureCache.Get(cacheKeys[i]); notFoundErr != nil {
+				notInCache[i] = struct{}{}
 				verifier.Add(t.PublicKey.Bytes(), t.Message, t.Signature)
 			}
 		}
-		if !verifier.VerifyBatchOnly(rand.Reader) {
-			// if batch verification fails, check each signature individually
-			// TODO: use `Verify() bool, []bool` for an additional performance boost when there are bad signatures
-			for _, t := range b.ed25519Index[idx] {
-				if ok := t.PublicKey.VerifyBytes(t.Message, t.Signature); !ok {
-					badIndices = append(badIndices, t.index)
-				} else {
-					_ = SignatureCache.Set(t.Key(), []byte{0})
+		if len(notInCache) != 0 {
+			if !verifier.VerifyBatchOnly(rand.Reader) {
+				// if batch verification fails, check each signature individually
+				// TODO: use `Verify() bool, []bool` for an additional performance boost when there are bad signatures
+				for _, t := range b.ed25519Index[idx] {
+					if ok := t.PublicKey.VerifyBytes(t.Message, t.Signature); !ok {
+						badIndices = append(badIndices, t.index)
+					} else {
+						_ = SignatureCache.Set(t.Key(), []byte{0})
+					}
 				}
-			}
-		} else {
-			for i := range b.ed25519Index[idx] {
-				_ = SignatureCache.Set(cacheKeys[i], []byte{0})
+			} else {
+				for i := range notInCache {
+					_ = SignatureCache.Set(cacheKeys[i], []byte{0})
+				}
 			}
 		}
 	}
