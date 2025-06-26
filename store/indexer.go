@@ -3,6 +3,8 @@ package store
 import (
 	"bytes"
 	"encoding/binary"
+	"os"
+	"runtime/pprof"
 	"time"
 
 	"github.com/canopy-network/canopy/lib"
@@ -36,6 +38,11 @@ type Indexer struct {
 // IndexBlock() turns the block into bytes, indexes the block by hash and height
 // and then indexes the transactions
 func (t *Indexer) IndexBlock(b *lib.BlockResult) lib.ErrorI {
+	f, _ := os.Create("canopy.prof")
+	defer f.Close()
+	if err := pprof.StartCPUProfile(f); err != nil {
+		panic(err)
+	}
 	// save to cache
 	t.blockCache.Add(b.BlockHeader.Height, b)
 	// convert the header to bytes
@@ -58,6 +65,7 @@ func (t *Indexer) IndexBlock(b *lib.BlockResult) lib.ErrorI {
 			return err
 		}
 	}
+	pprof.StopCPUProfile()
 	return nil
 }
 

@@ -2,9 +2,8 @@ package controller
 
 import (
 	"bytes"
+	"fmt"
 	"math/rand"
-	"os"
-	"runtime/pprof"
 	"time"
 
 	"github.com/canopy-network/canopy/p2p"
@@ -213,11 +212,6 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI) {
 	defer lib.TimeTrack(c.log, time.Now())
 	start := time.Now()
-	f, _ := os.Create("canopy.prof")
-	defer f.Close()
-	if err := pprof.StartCPUProfile(f); err != nil {
-		panic(err)
-	}
 	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
 	defer func() { c.FSM.Reset() }()
 	// log the beginning of the commit
@@ -233,6 +227,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 			return
 		}
 	}
+	s := time.Now()
 	// log indexing the quorum certificate
 	c.log.Debugf("Indexing certificate for height %d", qc.Header.Height)
 	// index the quorum certificate in the store
@@ -240,21 +235,28 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
+	fmt.Println("INDEX CERT", time.Since(s))
 	// log indexing the block
 	c.log.Debugf("Indexing block %d", block.BlockHeader.Height)
+	s = time.Now()
 	// index the block in the store
 	if err = storeI.IndexBlock(blockResult); err != nil {
 		// exit with error
 		return
 	}
+	fmt.Println("INDEX BLK", time.Since(s))
+	s = time.Now()
 	c.Mempool.Recheck.Swap(true)
 	// for each transaction included in the block
 	for _, tx := range block.Transactions {
 		// delete each transaction from the mempool
 		c.Mempool.DeleteTransaction(tx)
 	}
+	fmt.Println("MEMPOOL DELETE", time.Since(s))
 	// parse committed block for straw polls
+	s = time.Now()
 	c.FSM.ParsePollTransactions(blockResult)
+	fmt.Println("POLL", time.Since(s))
 	// if self was the proposer
 	if bytes.Equal(qc.ProposerKey, c.PublicKey) && !c.isSyncing.Load() {
 		// send the certificate results transaction on behalf of the quorum
@@ -303,7 +305,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	defer c.UpdateTelemetry(qc, block, processingTime)
 	// check the mempool to cache a proposal block and validate the mempool itself
 	c.Mempool.CheckMempool()
-	pprof.StopCPUProfile()
 	// exit
 	return
 }

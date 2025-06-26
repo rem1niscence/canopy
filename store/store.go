@@ -123,7 +123,7 @@ func NewStoreWithDB(db *badger.DB, metrics *lib.Metrics, log lib.LoggerI) (*Stor
 		db:      db,
 		writer:  writer,
 		ss:      NewBadgerTxn(db.NewTransactionAt(lssVersion, false), writer, []byte(latestStatePrefix), true, true, nextVersion, false),
-		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, true, nextVersion, false), blkCache, qcCache},
+		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, false, nextVersion, false), blkCache, qcCache},
 		metrics: metrics,
 	}, nil
 }
@@ -174,6 +174,7 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 
 // Commit() performs a single atomic write of the current state to all stores.
 func (s *Store) Commit() (root []byte, err lib.ErrorI) {
+	defer lib.TimeTrack(s.log, time.Now())
 	// get the root from the sparse merkle tree at the current state
 	root, err = s.Root()
 	if err != nil {
