@@ -1,10 +1,11 @@
 package fsm
 
 import (
+	"time"
+
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"time"
 )
 
 /* This file contains transaction handling logic - for the payload handling check message.go */
@@ -27,8 +28,8 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 	if err = s.HandleMessage(result.msg); err != nil {
 		return nil, err
 	}
-	// return the tx result
-	return &lib.TxResult{
+	// create the tx result
+	tx := &lib.TxResult{
 		Sender:      result.sender.Bytes(),
 		Recipient:   result.msg.Recipient(),
 		MessageType: result.msg.Name(),
@@ -36,7 +37,15 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 		Index:       index,
 		Transaction: result.tx,
 		TxHash:      txHash,
-	}, nil
+	}
+	// encode the result to bytes and add it to the tx result
+	txBytes, err := lib.Marshal(tx)
+	if err != nil {
+		return nil, err
+	}
+	tx.TxBytes = txBytes
+	// return the tx result
+	return tx, nil
 }
 
 // CheckTx() validates the transaction object

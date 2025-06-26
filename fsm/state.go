@@ -263,17 +263,12 @@ func (s *StateMachine) ApplyTransactions(txs [][]byte, allowOversize bool) (resu
 		if oversize {
 			continue
 		}
-		// encode the result to bytes
-		txResultBz, e := lib.Marshal(result)
-		if e != nil {
-			return nil, nil, nil, nil, 0, e
-		}
 		// add to the 'block transactions' list
 		blockTxs = append(blockTxs, tx)
 		// add the result to a list of transaction results
 		results = append(results, result)
 		// add the bytes to the list of transactions results
-		txResultsBytes = append(txResultsBytes, txResultBz)
+		txResultsBytes = append(txResultsBytes, result.TxBytes)
 		// add to the size of the block
 		blockSize += txSize
 		// see if the size is the largest

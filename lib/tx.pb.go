@@ -173,7 +173,9 @@ type TxResult struct {
 	// transaction: The original transaction object
 	Transaction *Transaction `protobuf:"bytes,6,opt,name=transaction,proto3" json:"transaction,omitempty"`
 	// tx_hash: The unique hash that identifies the transaction
-	TxHash        string `protobuf:"bytes,7,opt,name=tx_hash,json=txHash,proto3" json:"txHash"` // @gotags: json:"txHash"
+	TxHash string `protobuf:"bytes,7,opt,name=tx_hash,json=txHash,proto3" json:"txHash"` // @gotags: json:"txHash"
+	// tx_bytes: The marshalled bytes of the transaction
+	TxBytes       []byte `protobuf:"bytes,8,opt,name=tx_bytes,json=txBytes,proto3" json:"txBytes"` // @gotags: json:"txBytes"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -257,6 +259,13 @@ func (x *TxResult) GetTxHash() string {
 	return ""
 }
 
+func (x *TxResult) GetTxBytes() []byte {
+	if x != nil {
+		return x.TxBytes
+	}
+	return nil
+}
+
 // A Signature is a digital signature is a cryptographic "fingerprint" created with a private key,
 // allowing others to verify the authenticity and integrity of a message using the corresponding public key
 type Signature struct {
@@ -328,7 +337,7 @@ const file_tx_proto_rawDesc = "" +
 	"\x04memo\x18\a \x01(\tR\x04memo\x12\x1d\n" +
 	"\n" +
 	"network_id\x18\b \x01(\x04R\tnetworkId\x12\x19\n" +
-	"\bchain_id\x18\t \x01(\x04R\achainId\"\xe0\x01\n" +
+	"\bchain_id\x18\t \x01(\x04R\achainId\"\xfb\x01\n" +
 	"\bTxResult\x12\x16\n" +
 	"\x06sender\x18\x01 \x01(\fR\x06sender\x12\x1c\n" +
 	"\trecipient\x18\x02 \x01(\fR\trecipient\x12!\n" +
@@ -336,7 +345,8 @@ const file_tx_proto_rawDesc = "" +
 	"\x06height\x18\x04 \x01(\x04R\x06height\x12\x14\n" +
 	"\x05index\x18\x05 \x01(\x04R\x05index\x124\n" +
 	"\vtransaction\x18\x06 \x01(\v2\x12.types.TransactionR\vtransaction\x12\x17\n" +
-	"\atx_hash\x18\a \x01(\tR\x06txHash\"H\n" +
+	"\atx_hash\x18\a \x01(\tR\x06txHash\x12\x19\n" +
+	"\btx_bytes\x18\b \x01(\fR\atxBytes\"H\n" +
 	"\tSignature\x12\x1d\n" +
 	"\n" +
 	"public_key\x18\x01 \x01(\fR\tpublicKey\x12\x1c\n" +

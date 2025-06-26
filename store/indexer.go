@@ -9,7 +9,7 @@ import (
 
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
 )
 
 var _ lib.RWIndexerI = &Indexer{}
@@ -218,17 +218,12 @@ func (t *Indexer) DeleteQCForHeight(height uint64) lib.ErrorI {
 // IndexTx() indexes the transaction by hash, height, sender and receiver
 // the tx bytes is indexed by hash and then that hash is indexed by height, sender, and receiver
 func (t *Indexer) IndexTx(result *lib.TxResult) lib.ErrorI {
-	// convert the tx to bytes
-	bz, err := lib.Marshal(result)
-	if err != nil {
-		return err
-	}
 	// store the tx by hash key
 	hash, err := lib.StringToBytes(result.GetTxHash())
 	if err != nil {
 		return err
 	}
-	hashKey, err := t.indexTxByHash(hash, bz)
+	hashKey, err := t.indexTxByHash(hash, result.TxBytes)
 	if err != nil {
 		return err
 	}
