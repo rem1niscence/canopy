@@ -18,8 +18,9 @@ func TestGenerate20KAccounts(t *testing.T) {
 	numAccounts, txPerAccount := 20_000, 100
 	amountInSend := 1000 + feeAmount
 	fmt.Println("Starting")
-	privateKeys := make([]string, 0)
-	txs := make([]string, 0)
+	privateKeys := make([]string, numAccounts)
+	blk := new(lib.Block)
+	blk.Transactions = make([][]byte, 0)
 	accounts := make([]*fsm.Account, 0)
 	for i := 0; i < numAccounts; i++ {
 		fmt.Println("Generating txs for account", i)
@@ -36,9 +37,9 @@ func TestGenerate20KAccounts(t *testing.T) {
 			require.NoError(t, er)
 			tx, er := fsm.NewSendTransaction(privateKey, crypto.NewAddress(toAddress), 1000, 1, 1, feeAmount, 1, "")
 			require.NoError(t, er)
-			jsonBz, er := lib.MarshalJSON(tx)
+			protoBz, er := lib.Marshal(tx)
 			require.NoError(t, er)
-			txs = append(txs, string(jsonBz))
+			blk.Transactions = append(blk.Transactions, protoBz)
 		}
 	}
 	fmt.Println("Generating genesis file")
@@ -61,13 +62,13 @@ func TestGenerate20KAccounts(t *testing.T) {
 		Params: params,
 	}
 	fmt.Println("Writing files")
-	require.NoError(t, os.MkdirAll("./json/", 0777))
+	require.NoError(t, os.MkdirAll("./data/", 0777))
 	validatorBz, _ := json.Marshal(blsKey.String())
-	require.NoError(t, os.WriteFile("json/validator_key.json", validatorBz, 0777))
+	require.NoError(t, os.WriteFile("./data/validator_key.json", validatorBz, 0777))
 	genesisBz, _ := json.MarshalIndent(j, "", "  ")
-	require.NoError(t, os.WriteFile("json/genesis.json", genesisBz, 0777))
-	txsBz, _ := json.Marshal(txs)
-	require.NoError(t, os.WriteFile("json/txs.json", txsBz, 0777))
+	require.NoError(t, os.WriteFile("./data/genesis.json", genesisBz, 0777))
+	txsBz, _ := lib.Marshal(blk)
+	require.NoError(t, os.WriteFile("./data/txs.proto", txsBz, 0777))
 	accountKeysBz, _ := json.MarshalIndent(privateKeys, "", "  ")
-	require.NoError(t, os.WriteFile("json/account_keys.json", accountKeysBz, 0777))
+	require.NoError(t, os.WriteFile("./data/account_keys.json", accountKeysBz, 0777))
 }
