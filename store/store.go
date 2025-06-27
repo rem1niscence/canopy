@@ -166,8 +166,9 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 		log:     s.log,
 		db:      s.db,
 		writer:  writer,
-		ss:      NewBadgerTxn(s.db.NewTransactionAt(lssVersion, false), writer, []byte(latestStatePrefix), true, true, nextVersion, false),
-		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, false, nextVersion, false), s.blockCache, s.qcCache, false},
+		ss:      s.ss.Copy(BadgerTxnReader{reader, s.ss.prefix}, writer),
+		Indexer: &Indexer{s.Indexer.db.Copy(BadgerTxnReader{reader, s.Indexer.db.prefix},
+			writer), s.blockCache, s.qcCache, false},
 		metrics: s.metrics,
 	}, nil
 }
@@ -181,7 +182,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 		return nil, err
 	}
 	// update the version (height) number
-	s.version++
+	s.IncreaseVersion()
 	// set the new CommitID (to the Transaction not the actual DB)
 	if err = s.setCommitID(s.version, root); err != nil {
 		return nil, err
@@ -202,6 +203,11 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	s.Reset()
 	// return the root
 	return
+}
+
+// IncreaseVersion increases the version number of the store without committing any data
+func (s *Store) IncreaseVersion() {
+	s.version++
 }
 
 // Flush() writes the current state to the batch writer without committing it.

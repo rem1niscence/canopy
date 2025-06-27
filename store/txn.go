@@ -303,6 +303,20 @@ func (t *Txn) NewIterator(prefix []byte, reverse bool, allVersions bool) lib.Ite
 	return newTxnIterator(parentIterator, t.cache, prefix, reverse)
 }
 
+// Copy creates a new Txn with the same configuration and cache as the original
+func (t *Txn) Copy(reader TxnReaderI, writer TxnWriterI) *Txn {
+	return &Txn{
+		reader:       reader,
+		writer:       writer,
+		prefix:       t.prefix,
+		state:        t.state,
+		sort:         t.sort,
+		writeVersion: t.writeVersion,
+		liveWrite:    t.liveWrite,
+		cache:        t.cache.copy(),
+	}
+}
+
 // TXN ITERATOR CODE BELOW
 
 // enforce the Iterator interface
