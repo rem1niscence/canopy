@@ -46,6 +46,9 @@ func init() {
 	autoCompleteCmd.AddCommand(generateCompleteCmd)
 	autoCompleteCmd.AddCommand(autoCompleteInstallCmd)
 	rootCmd.PersistentFlags().StringVar(&DataDir, "data-dir", lib.DefaultDataDirPath(), "custom data directory location")
+	config, validatorKey = InitializeDataDirectory(DataDir, lib.NewDefaultLogger())
+	l = lib.NewLogger(lib.LoggerConfig{Level: config.GetLogLevel()})
+	client = rpc.NewClient(config.RPCUrl, config.AdminRPCUrl)
 }
 
 func Execute() {
@@ -71,9 +74,6 @@ func Start() {
 		l.Infof("Sleeping until %s", untilTime.String())
 		time.Sleep(untilTime)
 	}
-	config, validatorKey = InitializeDataDirectory(DataDir, lib.NewDefaultLogger())
-	l = lib.NewLogger(lib.LoggerConfig{Level: config.GetLogLevel()})
-	client = rpc.NewClient(config.RPCUrl, config.AdminRPCUrl)
 	// initialize and start the metrics server
 	metrics := lib.NewMetricsServer(validatorKey.PublicKey().Address(), config.MetricsConfig)
 	// create a new database object from the config
