@@ -216,23 +216,18 @@ func (t *Indexer) DeleteQCForHeight(height uint64) lib.ErrorI {
 
 // IndexTx() indexes the transaction by hash, height, sender and receiver
 // the tx bytes is indexed by hash and then that hash is indexed by height, sender, and receiver
-func (t *Indexer) IndexTx(result *lib.TxResult) (err lib.ErrorI) {
-	// check the structure cache
-	txResultBytes := result.TxBytes
-	if txResultBytes != nil {
-		// convert the tx to bytes
-		txResultBytes, err = lib.Marshal(result)
-		if err != nil {
-			return err
-		}
+func (t *Indexer) IndexTx(result *lib.TxResult) lib.ErrorI {
+	// convert the tx to bytes
+	bz, err := lib.Marshal(result)
+	if err != nil {
+		return err
 	}
 	// store the tx by hash key
 	hash, err := lib.StringToBytes(result.GetTxHash())
 	if err != nil {
 		return err
 	}
-	// store the tx by hash key
-	hashKey, err := t.indexTxByHash(hash, txResultBytes)
+	hashKey, err := t.indexTxByHash(hash, bz)
 	if err != nil {
 		return err
 	}

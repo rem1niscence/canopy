@@ -71,8 +71,5 @@ func newTestTxResult(t *testing.T) (r *lib.TxResult, tx *lib.Transaction, hash [
 		Transaction: tx,
 		TxHash:      lib.BytesToString(hash),
 	}
-	resultBz, err := lib.Marshal(r)
-	require.NoError(t, err)
-	r.TxBytes = resultBz
 	return
 }

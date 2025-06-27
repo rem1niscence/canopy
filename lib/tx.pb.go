@@ -173,9 +173,7 @@ type TxResult struct {
 	// transaction: The original transaction object
 	Transaction *Transaction `protobuf:"bytes,6,opt,name=transaction,proto3" json:"transaction,omitempty"`
 	// tx_hash: The unique hash that identifies the transaction
-	TxHash string `protobuf:"bytes,7,opt,name=tx_hash,json=txHash,proto3" json:"txHash"` // @gotags: json:"txHash"
-	// tx_bytes: The marshalled bytes of the transaction (bytes cache)
-	TxBytes       []byte `protobuf:"bytes,8,opt,name=tx_bytes,json=txBytes,proto3" json:"tx_bytes,omitempty"`
+	TxHash        string `protobuf:"bytes,7,opt,name=tx_hash,json=txHash,proto3" json:"txHash"` // @gotags: json:"txHash"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

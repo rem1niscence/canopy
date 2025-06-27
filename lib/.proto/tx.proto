@@ -59,8 +59,6 @@ message TxResult {
   Transaction transaction = 6;
   // tx_hash: The unique hash that identifies the transaction
   string tx_hash = 7; // @gotags: json:"txHash"
-  // tx_bytes: The marshalled bytes of the transaction (bytes cache)
-  bytes tx_bytes = 8;
 }
 // A Signature is a digital signature is a cryptographic "fingerprint" created with a private key,
 // allowing others to verify the authenticity and integrity of a message using the corresponding public key
