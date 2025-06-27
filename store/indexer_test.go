@@ -21,7 +21,6 @@ func TestGetTxByHash(t *testing.T) {
 	require.NoError(t, err)
 	gotBytes, err := lib.Marshal(txResult)
 	require.NoError(t, err)
-	txRes.TxBytes = nil
 	wantedBytes, err := lib.Marshal(txRes)
 	require.NoError(t, err)
 	require.True(t, bytes.Equal(gotBytes, wantedBytes))
@@ -39,7 +38,6 @@ func TestGetTxByHeight(t *testing.T) {
 	require.Len(t, txResults, 1)
 	gotBytes, err := lib.Marshal(txResults[0])
 	require.NoError(t, err)
-	txRes.TxBytes = nil
 	wantedBytes, err := lib.Marshal(txRes)
 	require.NoError(t, err)
 	require.True(t, bytes.Equal(gotBytes, wantedBytes))
@@ -73,8 +71,5 @@ func newTestTxResult(t *testing.T) (r *lib.TxResult, tx *lib.Transaction, hash [
 		Transaction: tx,
 		TxHash:      lib.BytesToString(hash),
 	}
-	bz, err := lib.Marshal(r)
-	require.NoError(t, err)
-	r.TxBytes = bz
 	return
 }
