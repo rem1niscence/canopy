@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/canopy-network/canopy/p2p"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
@@ -218,6 +219,13 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.ResultsHash))
 	// cast the store to ensure the proper store type to complete this operation
 	storeI := c.FSM.Store().(lib.StoreI)
+	// create an ephemeral store copy for the mempool
+	memPoolStore, err := storeI.Copy()
+	if err != nil {
+		return err
+	}
+	// increase the version number of the ephemeral store
+	memPoolStore.IncreaseVersion()
 	// if the block result isn't 'pre-calculated'
 	if blockResult == nil {
 		// apply the block against the state machine
@@ -262,49 +270,73 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// send the certificate results transaction on behalf of the quorum
 		c.SendCertificateResultsTx(qc)
 	}
-	// log the start of the commit
-	c.log.Debug("Committing to store")
-	// atomically write all from the ephemeral database batch to the actual database
-	if _, err = storeI.Commit(); err != nil {
-		// exit with error
-		return
+
+	// create an error group to run the commit and mempool update in parallel
+	eg := errgroup.Group{}
+	eg.Go(func() error {
+		// log the start of the commit
+		c.log.Debug("Committing to store")
+		// atomically write all from the ephemeral database batch to the actual database
+		if _, err = storeI.Commit(); err != nil {
+			// exit with error
+			return err
+		}
+		// log to signal finishing the commit
+		c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToTruncatedString(qc.BlockHash), block.BlockHeader.Height)
+
+		// set up the finite state machine for the next height
+		newFSM, err := fsm.New(c.Config, storeI, c.Metrics, c.log)
+		if err != nil {
+			// exit with error
+			return err
+		}
+		// set the current fsm cache to the new fsm
+		newFSM.SetCacheFromFSM(c.FSM)
+		// set the new FSM in the controller
+		c.FSM = newFSM
+		// publish the root chain info to the nested chain subscribers
+		for _, id := range c.RCManager.ChainIds() {
+			// get the root chain info
+			info, e := c.FSM.LoadRootChainInfo(id, 0)
+			if e != nil {
+				// don't log 'no-validators' error as this is possible
+				if e.Error() != lib.ErrNoValidators().Error() {
+					c.log.Error(e.Error())
+				}
+				continue
+			}
+			// publish root chain information
+			go c.RCManager.Publish(id, info)
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		// create an ephemeral FSM with the increased version
+		newFSM, err := fsm.New(c.Config, memPoolStore, c.Metrics, c.log)
+		if err != nil {
+			// exit with error
+			return err
+		}
+		// set up the mempool for the next height with the temporary FSM
+		c.Mempool.FSM = newFSM
+		// check the mempool to cache a proposal block and validate the mempool itself
+		c.Mempool.CheckMempool()
+		// discard the temporary store after checking the mempool
+		memPoolStore.Discard()
+		return nil
+	})
+	// check for any errors while committing and checking the mempool
+	if err := eg.Wait(); err != nil {
+		return err.(lib.ErrorI)
 	}
-	// log to signal finishing the commit
-	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToTruncatedString(qc.BlockHash), block.BlockHeader.Height)
-	// set up the finite state machine for the next height
-	newFSM, err := fsm.New(c.Config, storeI, c.Metrics, c.log)
-	if err != nil {
-		// exit with error
-		return
-	}
-	// set the current fsm cache to the new fsm
-	newFSM.SetCacheFromFSM(c.FSM)
-	// set the new FSM in the controller
-	c.FSM = newFSM
-	// set up the mempool for the next height
+	// set up the mempool with the actual new FSM for the next height
 	if c.Mempool.FSM, err = c.FSM.Copy(); err != nil {
 		// exit with error
-		return
-	}
-	// publish the root chain info to the nested chain subscribers
-	for _, id := range c.RCManager.ChainIds() {
-		// get the root chain info
-		info, e := c.FSM.LoadRootChainInfo(id, 0)
-		if e != nil {
-			// don't log 'no-validators' error as this is possible
-			if e.Error() != lib.ErrNoValidators().Error() {
-				c.log.Error(e.Error())
-			}
-			continue
-		}
-		// publish root chain information
-		go c.RCManager.Publish(id, info)
+		return err
 	}
 	// update telemetry (using proper defer to ensure time.Since is evaluated at defer execution)
 	processingTime := time.Since(start)
 	defer c.UpdateTelemetry(qc, block, processingTime)
-	// check the mempool to cache a proposal block and validate the mempool itself
-	c.Mempool.CheckMempool()
 	// exit
 	return
 }
