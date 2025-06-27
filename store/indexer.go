@@ -226,7 +226,13 @@ func (t *Indexer) IndexTx(result *lib.TxResult) (err lib.ErrorI) {
 			return err
 		}
 	}
-	hashKey, err := t.indexTxByHash(result.TxHashBytes, txResultBytes)
+	// store the tx by hash key
+	hash, err := lib.StringToBytes(result.GetTxHash())
+	if err != nil {
+		return err
+	}
+	// store the tx by hash key
+	hashKey, err := t.indexTxByHash(hash, txResultBytes)
 	if err != nil {
 		return err
 	}

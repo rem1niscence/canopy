@@ -36,7 +36,6 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 		Index:       index,
 		Transaction: result.tx,
 		TxHash:      txHash,
-		TxHashBytes: txHashBz, // cached value only (prevents unnecessary lib.BytesToString())
 	}, nil
 }
 
