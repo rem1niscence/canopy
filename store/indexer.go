@@ -31,6 +31,9 @@ type Indexer struct {
 	db         *Txn
 	blockCache *lru.Cache[uint64, *lib.BlockResult]
 	qcCache    *lru.Cache[uint64, *lib.QuorumCertificate]
+	// must index is a flag that determines whether the indexer should index detailed
+	// information about transactions, blocks, and quorum certificates
+	mustIndex bool
 }
 
 // BLOCKS CODE BELOW
@@ -232,12 +235,19 @@ func (t *Indexer) IndexTx(result *lib.TxResult) lib.ErrorI {
 	if err = t.indexTxByHeightAndIndex(heightAndIndexKey, hashKey); err != nil {
 		return err
 	}
-	// store the hash key by sender
-	if err = t.indexTxBySender(result.GetSender(), heightAndIndexKey, hashKey); err != nil {
-		return err
+	if t.mustIndex {
+		// store the hash key by sender
+		if err = t.indexTxBySender(result.GetSender(), heightAndIndexKey, hashKey); err != nil {
+			return err
+		}
+
+		// store the hash key by recipient
+		if err = t.indexTxByRecipient(result.GetRecipient(), heightAndIndexKey, hashKey); err != nil {
+			return err
+		}
 	}
-	// store the hash key by recipient
-	return t.indexTxByRecipient(result.GetRecipient(), heightAndIndexKey, hashKey)
+
+	return nil
 }
 
 // GetTxByHash() returns the tx by hash

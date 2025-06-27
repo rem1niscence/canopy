@@ -123,7 +123,7 @@ func NewStoreWithDB(db *badger.DB, metrics *lib.Metrics, log lib.LoggerI) (*Stor
 		db:      db,
 		writer:  writer,
 		ss:      NewBadgerTxn(db.NewTransactionAt(lssVersion, false), writer, []byte(latestStatePrefix), true, true, nextVersion, false),
-		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, false, nextVersion, false), blkCache, qcCache},
+		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, false, nextVersion, false), blkCache, qcCache, false},
 		metrics: metrics,
 	}, nil
 }
@@ -148,7 +148,7 @@ func (s *Store) NewReadOnly(queryVersion uint64) (lib.StoreI, lib.ErrorI) {
 		writer:  nil,
 		ss:      stateReader,
 		sc:      NewDefaultSMT(NewBadgerTxn(reader, nil, []byte(stateCommitmentPrefix), false, false, 0, false)),
-		Indexer: &Indexer{NewBadgerTxn(reader, nil, []byte(indexerPrefix), false, false, 0, false), s.blockCache, s.qcCache},
+		Indexer: &Indexer{NewBadgerTxn(reader, nil, []byte(indexerPrefix), false, false, 0, false), s.blockCache, s.qcCache, false},
 		metrics: s.metrics,
 	}, nil
 }
@@ -167,7 +167,7 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 		db:      s.db,
 		writer:  writer,
 		ss:      NewBadgerTxn(s.db.NewTransactionAt(lssVersion, false), writer, []byte(latestStatePrefix), true, true, nextVersion, false),
-		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, false, nextVersion, false), s.blockCache, s.qcCache},
+		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, false, nextVersion, false), s.blockCache, s.qcCache, false},
 		metrics: s.metrics,
 	}, nil
 }
@@ -261,7 +261,7 @@ func (s *Store) NewTxn() lib.StoreI {
 		db:      s.db,
 		writer:  s.writer,
 		ss:      NewTxn(s.ss, s.ss, nil, false, true, nextVersion, false),
-		Indexer: &Indexer{NewTxn(s.Indexer.db, s.Indexer.db, nil, false, true, nextVersion, false), s.blockCache, s.qcCache},
+		Indexer: &Indexer{NewTxn(s.Indexer.db, s.Indexer.db, nil, false, true, nextVersion, false), s.blockCache, s.qcCache, false},
 		metrics: s.metrics,
 	}
 }
