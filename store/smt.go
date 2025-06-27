@@ -261,7 +261,7 @@ func (s *SMT) Commit() (err lib.ErrorI) {
 }
 
 // CommitParallel(): sorts the operations in 8 subtree threads, executes those threads in parallel and combines them into the master tree
-func (s *SMT) CommitParallel(unsortedOps map[string]valueOp) (err lib.ErrorI) {
+func (s *SMT) CommitParallel(unsortedOps map[uint64]valueOp) (err lib.ErrorI) {
 	// add 16 synthetic borders to the tree
 	cleanup, err := s.addSyntheticBorders()
 	// collect the roots for each group (000, 001, 010, 011...)
@@ -539,7 +539,7 @@ func (s *SMT) addSyntheticBorders() (cleanup func() lib.ErrorI, err lib.ErrorI) 
 }
 
 // sortOperationsByPrefix returns 8 sorted slices grouped by 3-bit prefix: 000 to 111
-func (s *SMT) sortOperationsByPrefix(unsortedOps map[string]valueOp) (groups [8][]*node, err lib.ErrorI) {
+func (s *SMT) sortOperationsByPrefix(unsortedOps map[uint64]valueOp) (groups [8][]*node, err lib.ErrorI) {
 	for _, operation := range unsortedOps {
 		value, del := []byte(nil), true
 		if operation.op != opDelete {

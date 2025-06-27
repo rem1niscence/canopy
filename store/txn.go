@@ -3,7 +3,6 @@ package store
 import (
 	"bytes"
 	"reflect"
-	"strings"
 	"sync"
 	"unsafe"
 
@@ -67,7 +66,7 @@ type Txn struct {
 
 // txn internal structure maintains the write operations sorted lexicographically by keys
 type txn struct {
-	ops       map[string]valueOp        // [string(key)] -> set/del operations saved in memory
+	ops       map[uint64]valueOp        // [string(key)] -> set/del operations saved in memory
 	sorted    *btree.BTreeG[*CacheItem] // sorted btree of keys for fast iteration
 	sortedLen int                       // len(sorted)
 	readBuf   []byte                    // a buffer to re-use for reads
@@ -79,7 +78,7 @@ type txn struct {
 func (t *txn) copy() *txn {
 	t.l.Lock()
 	defer t.l.Unlock()
-	ops := make(map[string]valueOp, t.sortedLen)
+	ops := make(map[uint64]valueOp, t.sortedLen)
 	maps.Copy(ops, t.ops)
 	return &txn{
 		ops:       ops,
@@ -129,7 +128,7 @@ func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, state, sort boo
 		writeVersion: version,
 		liveWrite:    liveWrite,
 		cache: &txn{
-			ops:    make(map[string]valueOp),
+			ops:    make(map[uint64]valueOp),
 			sorted: btree.NewG(32, func(a, b *CacheItem) bool { return a.Less(b) }), // need to benchmark this value
 			l:      sync.Mutex{},
 		},
@@ -141,7 +140,7 @@ func (t *Txn) Get(key []byte) ([]byte, lib.ErrorI) {
 	t.cache.l.Lock()
 	defer t.cache.l.Unlock()
 	// first retrieve from the in-memory cache
-	if v, found := t.cache.ops[string(key)]; found {
+	if v, found := t.cache.ops[lib.MemHash(key)]; found {
 		return v.value, nil
 	}
 	// if not found, retrieve from the parent reader
@@ -166,13 +165,13 @@ func (t *Txn) SetEntryAt(entry *badger.Entry, _ uint64) (e error) {
 // update() modifies or adds an operation to the txn
 // NOTE: updateEntry() won't modify the key itself, any key prefixing must be done before calling this
 func (t *Txn) update(key []byte, val []byte, entry *badger.Entry, opAction op) (e lib.ErrorI) {
-	k := string(key)
+	hashedKey := lib.MemHash(key)
 	t.cache.l.Lock()
-	if _, found := t.cache.ops[k]; !found && t.sort {
-		t.addToSorted(k)
+	if _, found := t.cache.ops[hashedKey]; !found && t.sort {
+		t.addToSorted(key, hashedKey)
 	}
 	valueOp := valueOp{key: key, value: val, entry: entry, op: opAction}
-	t.cache.ops[k] = valueOp
+	t.cache.ops[hashedKey] = valueOp
 	if t.writer != nil && t.liveWrite {
 		for version, prefix := range t.flushTo() {
 			if err := t.write(prefix, version, valueOp); err != nil {
@@ -185,9 +184,9 @@ func (t *Txn) update(key []byte, val []byte, entry *badger.Entry, opAction op) (
 }
 
 // addToSorted() inserts a key into the sorted list of operations maintaining lexicographical order
-func (t *Txn) addToSorted(key string) {
+func (t *Txn) addToSorted(key []byte, hashedKey uint64) {
 	t.cache.sortedLen++
-	t.cache.sorted.ReplaceOrInsert(&CacheItem{Key: key, Exists: true})
+	t.cache.sorted.ReplaceOrInsert(&CacheItem{Key: key, HashedKey: hashedKey, Exists: true})
 }
 
 // Iterator() returns a new iterator for merged iteration of both the in-memory operations and parent store with the given prefix
@@ -210,7 +209,7 @@ func (t *Txn) ArchiveIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 // Discard() clears all in-memory operations and resets the sorted key list
 func (t *Txn) Discard() {
 	t.cache.sorted.Clear(false)
-	t.cache.ops, t.cache.sortedLen = make(map[string]valueOp), 0
+	t.cache.ops, t.cache.sortedLen = make(map[uint64]valueOp), 0
 }
 
 // Cancel() cancels the current transaction and clears the live writer queue if enabled.
@@ -314,20 +313,19 @@ type TxnIterator struct {
 	parent lib.IteratorI
 	tree   *BTreeIterator
 	*txn
-	hasNext      bool
-	prefix       string
-	parentPrefix string
-	index        int
-	reverse      bool
-	invalid      bool
-	useTxn       bool
+	hasNext bool
+	prefix  []byte
+	index   int
+	reverse bool
+	invalid bool
+	useTxn  bool
 }
 
 // newTxnIterator() initializes a new merged iterator for traversing both the in-memory operations and parent store
 func newTxnIterator(parent lib.IteratorI, t *txn, prefix []byte, reverse bool) *TxnIterator {
 	tree := NewBTreeIterator(t.sorted.Clone(),
 		&CacheItem{
-			Key: string(prefix),
+			Key: prefix,
 		},
 		reverse)
 
@@ -335,7 +333,7 @@ func newTxnIterator(parent lib.IteratorI, t *txn, prefix []byte, reverse bool) *
 		parent:  parent,
 		tree:    tree,
 		txn:     t,
-		prefix:  string(prefix),
+		prefix:  prefix,
 		reverse: reverse,
 	}).First()
 }
@@ -447,11 +445,11 @@ func (ti *TxnIterator) txnInvalid() bool {
 	}
 	ti.invalid = true
 	current := ti.tree.Current()
-	if current == nil || current.Key == "" {
+	if current == nil || len(current.Key) == 0 {
 		ti.invalid = true
 		return ti.invalid
 	}
-	if !strings.HasPrefix(ti.tree.Current().Key, ti.prefix) {
+	if !bytes.HasPrefix(current.Key, ti.prefix) {
 		return ti.invalid
 	}
 	ti.invalid = false
@@ -467,7 +465,7 @@ func (ti *TxnIterator) txnKey() []byte {
 func (ti *TxnIterator) txnValue() valueOp {
 	ti.l.Lock()
 	defer ti.l.Unlock()
-	return ti.ops[ti.tree.Current().Key]
+	return ti.ops[ti.tree.Current().HashedKey]
 }
 
 // compare() compares two byte slices, adjusting for reverse iteration if needed
@@ -495,9 +493,8 @@ func (ti *TxnIterator) seek() *TxnIterator {
 // revSeek() positions the iterator at the last entry that matches the prefix in reverse order.
 func (ti *TxnIterator) revSeek() *TxnIterator {
 	bz := []byte(ti.prefix)
-	endPrefix := string(prefixEnd(bz))
 	ti.tree.Move(&CacheItem{
-		Key: endPrefix,
+		Key: prefixEnd(bz),
 	})
 	return ti
 }
@@ -675,13 +672,14 @@ func newEntry(key, value []byte, meta byte) (e *badger.Entry) {
 // BTREE ITERATOR CODE BELOW
 
 type CacheItem struct {
-	Key    string
-	Exists bool
+	HashedKey uint64
+	Key       []byte
+	Exists    bool
 }
 
 // Less() compares the keys lexicographically
 func (ti CacheItem) Less(than *CacheItem) bool {
-	return ti.Key < than.Key
+	return bytes.Compare(ti.Key, than.Key) < 0
 }
 
 // BTreeIterator provides external iteration over a btree
@@ -699,7 +697,7 @@ func NewBTreeIterator(tree *btree.BTreeG[*CacheItem], start *CacheItem, reverse 
 		reverse: reverse,
 	}
 	// if no start item is provided, set the iterator to the first or last item based on the direction
-	if start == nil || start.Key == "" {
+	if start == nil || len(start.Key) == 0 {
 		if reverse {
 			val, _ := tree.Max()
 			bt.current = val
@@ -725,7 +723,7 @@ func (bi *BTreeIterator) Move(item *CacheItem) {
 	}
 	// if no exact match, find the closest item based on the direction of iteration
 	if bi.reverse {
-		bi.current = &CacheItem{Key: item.Key + string(endBytes)}
+		bi.current = &CacheItem{Key: append(item.Key, endBytes...)}
 		bi.current = bi.prev()
 	} else {
 		bi.current = &CacheItem{Key: item.Key}
@@ -737,7 +735,7 @@ func (bi *BTreeIterator) Move(item *CacheItem) {
 func (bi *BTreeIterator) Current() *CacheItem {
 	// if current is nil, return an empty Item to avoid nil pointer dereference
 	if bi.current == nil {
-		return &CacheItem{Key: "", Exists: false}
+		return &CacheItem{Key: []byte{}, Exists: false}
 	}
 	return bi.current
 }
@@ -765,7 +763,7 @@ func (bi *BTreeIterator) next() *CacheItem {
 	// find the next item
 	bi.tree.AscendGreaterOrEqual(bi.current, func(item *CacheItem) bool {
 		nextItem = item
-		if nextItem.Key != bi.current.Key {
+		if !bytes.Equal(nextItem.Key, bi.current.Key) {
 			found = true
 			return false
 		}

@@ -2,8 +2,9 @@ package store
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	mathrand "math/rand"
 	"strconv"
 	"testing"
 
@@ -18,7 +19,7 @@ func TestFuzzMultiSet(t *testing.T) {
 	iterations := 1000
 	// create a new SMT
 	smt1, memStore := NewTestSMT(t, nil, nil, 160)
-	unsortedOps := make(map[string]valueOp)
+	unsortedOps := make(map[uint64]valueOp)
 	// close the store when done
 	defer memStore.Close()
 	// create a compare SMT
@@ -32,16 +33,16 @@ func TestFuzzMultiSet(t *testing.T) {
 		_, err := rand.Read(random)
 		require.NoError(t, err)
 		// 50% of the time do a set
-		if rand.Intn(2) == 0 {
+		if mathrand.Intn(2) == 0 {
 			keys = append(keys, random)
 			require.NoError(t, smt2.Set(random, random))
-			unsortedOps[string(random)] = valueOp{key: random, value: random, op: opSet}
+			unsortedOps[lib.MemHash(random)] = valueOp{key: random, value: random, op: opSet}
 		} else {
 			toDelete := random
-			if rand.Intn(2) == 0 {
+			if mathrand.Intn(2) == 0 {
 				if len(keys) != 0 {
 					// choose a random key
-					idx := rand.Intn(len(keys))
+					idx := mathrand.Intn(len(keys))
 					toDelete = keys[idx]
 					// remove it from the keys slice
 					keys = append(keys[:idx], keys[idx+1:]...)
@@ -49,7 +50,7 @@ func TestFuzzMultiSet(t *testing.T) {
 			}
 			// 50% of the time do a delete
 			require.NoError(t, smt2.Delete(toDelete))
-			unsortedOps[string(toDelete)] = valueOp{key: toDelete, op: opDelete}
+			unsortedOps[lib.MemHash(toDelete)] = valueOp{key: toDelete, op: opDelete}
 		}
 		// for smt 2 commit everytime
 		require.NoError(t, smt2.Commit())
