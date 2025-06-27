@@ -310,7 +310,7 @@ const (
 	CodeGarbageCollectDB       ErrorCode   = 12
 	CodeSetEntry               ErrorCode   = 13
 	CodeReadBytes              ErrorCode   = 14
-	CodeFlushMemTable          ErrorCode   = 15
+	CodeIndexBlock             ErrorCode   = 15
 
 	RPCModule             ErrorModule = "rpc"
 	CodeRPCTimeout        ErrorCode   = 1
