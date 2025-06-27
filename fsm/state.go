@@ -269,8 +269,6 @@ func (s *StateMachine) ApplyTransactions(txs [][]byte, allowOversize bool) (resu
 		if e != nil {
 			return nil, nil, nil, nil, 0, e
 		}
-		// add to structure cache for when indexing
-		result.TxBytes = txResultBz
 		// add to the 'block transactions' list
 		blockTxs = append(blockTxs, tx)
 		// add the result to a list of transaction results
