@@ -283,7 +283,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		}
 		// log to signal finishing the commit
 		c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToTruncatedString(qc.BlockHash), block.BlockHeader.Height)
-
 		// set up the finite state machine for the next height
 		newFSM, err := fsm.New(c.Config, storeI, c.Metrics, c.log)
 		if err != nil {
@@ -308,6 +307,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 			// publish root chain information
 			go c.RCManager.Publish(id, info)
 		}
+		// exit
 		return nil
 	})
 	eg.Go(func() error {
@@ -323,6 +323,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		c.Mempool.CheckMempool()
 		// discard the temporary store after checking the mempool
 		memPoolStore.Discard()
+		// exit
 		return nil
 	})
 	// check for any errors while committing and checking the mempool

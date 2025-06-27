@@ -3,8 +3,7 @@ package store
 import (
 	"bytes"
 	"encoding/binary"
-	"os"
-	"runtime/pprof"
+	"golang.org/x/sync/errgroup"
 	"time"
 
 	"github.com/canopy-network/canopy/lib"
@@ -33,7 +32,7 @@ type Indexer struct {
 	qcCache    *lru.Cache[uint64, *lib.QuorumCertificate]
 	// must index is a flag that determines whether the indexer should index detailed
 	// information about transactions, blocks, and quorum certificates
-	mustIndex bool
+	indexByAccounts bool
 }
 
 // BLOCKS CODE BELOW
@@ -41,34 +40,31 @@ type Indexer struct {
 // IndexBlock() turns the block into bytes, indexes the block by hash and height
 // and then indexes the transactions
 func (t *Indexer) IndexBlock(b *lib.BlockResult) lib.ErrorI {
-	f, _ := os.Create("index_block.prof")
-	defer f.Close()
-	if err := pprof.StartCPUProfile(f); err != nil {
-		panic(err)
-	}
-	// save to cache
 	t.blockCache.Add(b.BlockHeader.Height, b)
-	// convert the header to bytes
-	bz, err := lib.Marshal(b.BlockHeader)
-	if err != nil {
-		return err
-	}
-	// index the header by hash key
-	hashKey, err := t.indexBlockByHash(b.BlockHeader.Hash, bz)
-	if err != nil {
-		return err
-	}
-	// index the hash key by height key
-	if err = t.indexBlockByHeight(b.BlockHeader.Height, hashKey); err != nil {
-		return err
-	}
-	// index each transaction individually
-	for _, tx := range b.Transactions {
-		if err = t.IndexTx(tx); err != nil {
+	var eg errgroup.Group
+	// index block header in its own goroutine
+	eg.Go(func() error {
+		bz, err := lib.Marshal(b.BlockHeader)
+		if err != nil {
 			return err
 		}
+		hashKey, err := t.indexBlockByHash(b.BlockHeader.Hash, bz)
+		if err != nil {
+			return err
+		}
+		return t.indexBlockByHeight(b.BlockHeader.Height, hashKey)
+	})
+	// index transactions in parallel
+	for _, transaction := range b.Transactions {
+		tx := transaction // capture range variable
+		eg.Go(func() error {
+			return t.IndexTx(tx)
+		})
 	}
-	pprof.StopCPUProfile()
+	// wait for all goroutines to finish
+	if err := eg.Wait(); err != nil {
+		return ErrIndexBlock(err)
+	}
 	return nil
 }
 
@@ -220,18 +216,17 @@ func (t *Indexer) DeleteQCForHeight(height uint64) lib.ErrorI {
 
 // IndexTx() indexes the transaction by hash, height, sender and receiver
 // the tx bytes is indexed by hash and then that hash is indexed by height, sender, and receiver
-func (t *Indexer) IndexTx(result *lib.TxResult) lib.ErrorI {
-	// convert the tx to bytes
-	bz, err := lib.Marshal(result)
-	if err != nil {
-		return err
+func (t *Indexer) IndexTx(result *lib.TxResult) (err lib.ErrorI) {
+	// check the structure cache
+	txResultBytes := result.TxBytes
+	if txResultBytes != nil {
+		// convert the tx to bytes
+		txResultBytes, err = lib.Marshal(result)
+		if err != nil {
+			return err
+		}
 	}
-	// store the tx by hash key
-	hash, err := lib.StringToBytes(result.GetTxHash())
-	if err != nil {
-		return err
-	}
-	hashKey, err := t.indexTxByHash(hash, bz)
+	hashKey, err := t.indexTxByHash(result.TxHashBytes, txResultBytes)
 	if err != nil {
 		return err
 	}
@@ -240,8 +235,8 @@ func (t *Indexer) IndexTx(result *lib.TxResult) lib.ErrorI {
 	if err = t.indexTxByHeightAndIndex(heightAndIndexKey, hashKey); err != nil {
 		return err
 	}
-
-	if t.mustIndex {
+	// index by accounts indicates if the indexer should index by sender/receiver
+	if t.indexByAccounts {
 		// store the hash key by sender
 		if err = t.indexTxBySender(result.GetSender(), heightAndIndexKey, hashKey); err != nil {
 			return err

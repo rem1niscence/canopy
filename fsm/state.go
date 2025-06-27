@@ -219,7 +219,8 @@ func (s *StateMachine) ApplyTransactions(txs [][]byte, allowOversize bool) (resu
 			continue
 		}
 		// calculate the hash of the transaction and convert it to a hex string
-		hashString := crypto.HashString(tx)
+		hashBytes := crypto.Hash(tx)
+		hashString := lib.BytesToString(hashBytes)
 		// check if the transaction is a 'same block' duplicate
 		if found := deDuplicator.Found(hashString); found {
 			return nil, nil, nil, nil, 0, lib.ErrDuplicateTx(hashString)
@@ -246,7 +247,7 @@ func (s *StateMachine) ApplyTransactions(txs [][]byte, allowOversize bool) (resu
 			return nil, nil, nil, nil, 0, e
 		}
 		// apply the tx to the state machine, generating a transaction result
-		result, e := s.ApplyTransaction(uint64(n), tx, hashString, crypto.NewBatchVerifier(true))
+		result, e := s.ApplyTransaction(uint64(n), tx, hashBytes, hashString, crypto.NewBatchVerifier(true))
 		if e != nil {
 			// add to the failed list
 			failed = append(failed, tx)
@@ -268,6 +269,8 @@ func (s *StateMachine) ApplyTransactions(txs [][]byte, allowOversize bool) (resu
 		if e != nil {
 			return nil, nil, nil, nil, 0, e
 		}
+		// add to structure cache for when indexing
+		result.TxBytes = txResultBz
 		// add to the 'block transactions' list
 		blockTxs = append(blockTxs, tx)
 		// add the result to a list of transaction results
