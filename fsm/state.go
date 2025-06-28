@@ -34,6 +34,7 @@ type StateMachine struct {
 
 // cache is the set of items to be cached used by the state machine
 type cache struct {
+	accounts   map[uint64]*Account            // cache of accounts accessed
 	validators map[string]*Validator          // address->validator
 	delegates  map[uint64]map[string]struct{} // chainID->delegates address
 	feeParams  *FeeParams                     // fee params for the current block
@@ -53,6 +54,7 @@ func New(c lib.Config, store lib.StoreI, metrics *lib.Metrics, log lib.LoggerI) 
 		Metrics:           metrics,
 		log:               log,
 		cache: &cache{
+			accounts:   make(map[uint64]*Account),
 			validators: make(map[string]*Validator),
 			delegates:  make(map[uint64]map[string]struct{}),
 		},
@@ -504,6 +506,7 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 		Config:             s.Config,
 		log:                s.log,
 		cache: &cache{
+			accounts:   make(map[uint64]*Account),
 			validators: make(map[string]*Validator),
 			delegates:  make(map[uint64]map[string]struct{}),
 		},

@@ -117,7 +117,7 @@ func Start() {
 }
 
 func TransactionSubmitter(c *controller.Controller) {
-	txsPerBlock := 150_000
+	txsPerBlock := 200_000
 	fmt.Println("Loading transactions from proto file")
 	txsFile, err := os.ReadFile("cmd/tps/data/txs.proto")
 	if err != nil {

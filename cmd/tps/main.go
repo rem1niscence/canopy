@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	txsPerBlock = 150_000
+	txsPerBlock = 200_000
 	totalTxs    = 2_000_000
 	numWorkers  = 64 // You can tune this based on CPU & RPC server load
 	rpcURL      = "http://localhost:50002"

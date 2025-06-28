@@ -8,6 +8,8 @@ import (
 	"github.com/canopy-network/canopy/p2p"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"math"
+	"os"
+	"runtime/pprof"
 	"sync/atomic"
 	"time"
 )
@@ -251,6 +253,15 @@ func (m *Mempool) HandleTransaction(tx []byte) (err lib.ErrorI) {
 
 // CheckMempool() Checks each transaction in the mempool and caches a block proposal
 func (m *Mempool) CheckMempool() {
+	// Create file to write CPU profile to
+	f, _ := os.Create("canopy.prof")
+	defer f.Close()
+
+	// Start CPU profiling
+	if err := pprof.StartCPUProfile(f); err != nil {
+		panic(fmt.Sprintf("could not start CPU profile: %s", err))
+	}
+	defer pprof.StopCPUProfile()
 	defer lib.TimeTrack(m.log, time.Now())
 	var err lib.ErrorI
 	// reset the mempool (ephemeral copy) state to just after the automatic 'begin block' phase

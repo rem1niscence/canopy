@@ -68,6 +68,7 @@ func TestInitialize(t *testing.T) {
 				Config: lib.Config{},
 				log:    log,
 				cache: &cache{
+					accounts:   make(map[uint64]*Account),
 					validators: make(map[string]*Validator),
 					delegates:  make(map[uint64]map[string]struct{}),
 				},
@@ -320,6 +321,7 @@ func newTestStateMachine(t *testing.T) StateMachine {
 		},
 		log: log,
 		cache: &cache{
+			accounts:   make(map[uint64]*Account),
 			validators: make(map[string]*Validator),
 			delegates:  make(map[uint64]map[string]struct{}),
 		},
