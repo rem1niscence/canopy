@@ -183,8 +183,6 @@ func (b *BFT) HandlePhase() {
 var electionTimer time.Time
 
 func (b *BFT) StartElectionPhase() {
-	fmt.Println("Round trip took", time.Since(electionTimer))
-	electionTimer = time.Now()
 	b.log.Infof(b.View.ToString())
 	// retrieve Validator object from the ValidatorSet
 	selfValidator, err := b.ValidatorSet.GetValidator(b.PublicKey)
@@ -229,6 +227,8 @@ func (b *BFT) StartElectionPhase() {
 // - Replicas send a signed (aggregable) ELECTION vote to the Leader (Proposer)
 // - With this vote, the Replica attaches any Byzantine evidence or 'Locked' QC they have collected as well as their VDF output
 func (b *BFT) StartElectionVotePhase() {
+	fmt.Println("Round trip took", time.Since(electionTimer))
+	electionTimer = time.Now()
 	b.log.Info(b.View.ToString())
 	// get the candidates from messages received
 	candidates := b.GetElectionCandidates()
@@ -505,7 +505,6 @@ func (b *BFT) StartCommitProcessPhase() {
 // ROUND-INTERRUPT:
 // - Replica sends current View message to other replicas (Pacemaker vote)
 func (b *BFT) RoundInterrupt() {
-	b.Controller.ResetFSM()
 	_ = b.VDFService.Finish() // stop VDF service because the block hash that was being used as a seed will change
 	b.Config.RoundInterruptTimeoutMS = b.msLeftInRound()
 	b.log.Warnf("Starting next round in %.2f secs", (time.Duration(b.Config.RoundInterruptTimeoutMS) * time.Millisecond).Seconds())

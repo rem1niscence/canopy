@@ -182,7 +182,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 		return nil, err
 	}
 	// update the version (height) number
-	s.IncreaseVersion()
+	s.version++
 	// set the new CommitID (to the Transaction not the actual DB)
 	if err = s.setCommitID(s.version, root); err != nil {
 		return nil, err
@@ -208,6 +208,7 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 // IncreaseVersion increases the version number of the store without committing any data
 func (s *Store) IncreaseVersion() {
 	s.version++
+	s.sc = nil
 }
 
 // Flush() writes the current state to the batch writer without committing it.

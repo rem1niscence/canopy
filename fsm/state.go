@@ -652,6 +652,10 @@ func (s *StateMachine) catchPanic() {
 func (s *StateMachine) Reset() {
 	// reset the slash tracker
 	s.slashTracker = NewSlashTracker()
+	// reset caches
+	s.cache.delegates = make(map[uint64]map[string]struct{})
+	s.cache.validators = make(map[string]*Validator)
+	s.cache.accounts = make(map[uint64]*Account)
 	// reset the state store
 	s.store.(lib.StoreI).Reset()
 }

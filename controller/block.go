@@ -243,16 +243,13 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
-	fmt.Println("INDEX CERT", time.Since(s))
 	// log indexing the block
 	c.log.Debugf("Indexing block %d", block.BlockHeader.Height)
-	s = time.Now()
 	// index the block in the store
 	if err = storeI.IndexBlock(blockResult); err != nil {
 		// exit with error
 		return
 	}
-	fmt.Println("INDEX BLK", time.Since(s))
 	s = time.Now()
 	c.Mempool.Recheck.Swap(true)
 	// for each transaction included in the block
@@ -320,7 +317,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// set up the mempool for the next height with the temporary FSM
 		c.Mempool.FSM = newFSM
 		// check the mempool to cache a proposal block and validate the mempool itself
-		c.Mempool.CheckMempool()
+		c.Mempool.CheckMempool(false)
 		// discard the temporary store after checking the mempool
 		memPoolStore.Discard()
 		// exit

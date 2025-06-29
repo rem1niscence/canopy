@@ -79,12 +79,14 @@ func (s *StateMachine) GetAccountBalance(address crypto.AddressI) (uint64, lib.E
 
 // SetAccount() upserts an account into the state
 func (s *StateMachine) SetAccount(account *Account) lib.ErrorI {
+	cacheKey := lib.MemHash(account.Address)
 	// add to cache
-	s.cache.accounts[lib.MemHash(account.Address)] = account
+	s.cache.accounts[cacheKey] = account
 	// convert bytes to the address object
 	address := crypto.NewAddressFromBytes(account.Address)
 	// if the amount is 0, delete the account from state to prevent unnecessary bloat
 	if account.Amount == 0 {
+		delete(s.cache.accounts, cacheKey)
 		return s.Delete(KeyForAccount(address))
 	}
 	// convert the account into bytes

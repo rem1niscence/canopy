@@ -8,8 +8,6 @@ import (
 	"github.com/canopy-network/canopy/p2p"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"math"
-	"os"
-	"runtime/pprof"
 	"sync/atomic"
 	"time"
 )
@@ -122,7 +120,7 @@ func (c *Controller) GetProposalBlockFromMempool() (*lib.Block, *lib.BlockResult
 	// if the cached proposal is nil
 	if c.Mempool.cachedProposal == nil {
 		// check the mempool 'on-demand'
-		c.Mempool.CheckMempool()
+		c.Mempool.CheckMempool(true)
 	}
 	// return the block
 	return c.Mempool.cachedProposal.Block, c.Mempool.cachedProposal.BlockResult
@@ -142,7 +140,7 @@ func (c *Controller) CheckMempool() {
 		// lock the controller for thread safety
 		c.Lock()
 		// check the mempool to cache a proposal block and validate the mempool itself
-		c.Mempool.CheckMempool()
+		c.Mempool.CheckMempool(true)
 		// get the transactions to gossip
 		toGossip := c.Mempool.GetTransactions(math.MaxUint64)
 		// unlock the controller
@@ -252,20 +250,13 @@ func (m *Mempool) HandleTransaction(tx []byte) (err lib.ErrorI) {
 }
 
 // CheckMempool() Checks each transaction in the mempool and caches a block proposal
-func (m *Mempool) CheckMempool() {
-	// Create file to write CPU profile to
-	f, _ := os.Create("canopy.prof")
-	defer f.Close()
-
-	// Start CPU profiling
-	if err := pprof.StartCPUProfile(f); err != nil {
-		panic(fmt.Sprintf("could not start CPU profile: %s", err))
-	}
-	defer pprof.StopCPUProfile()
+func (m *Mempool) CheckMempool(resetFSM bool) {
 	defer lib.TimeTrack(m.log, time.Now())
 	var err lib.ErrorI
-	// reset the mempool (ephemeral copy) state to just after the automatic 'begin block' phase
-	m.FSM.Reset()
+	// reset the mempool (ephemeral copy) state
+	if resetFSM {
+		m.FSM.Reset()
+	}
 	// create the actual block structure with the maximum amount of transactions allowed or available in the mempool
 	block := &lib.Block{
 		BlockHeader:  &lib.BlockHeader{Time: uint64(time.Now().UnixMicro()), ProposerAddress: m.address.Bytes()},

@@ -12,7 +12,7 @@ import (
 
 const (
 	txsPerBlock = 200_000
-	totalTxs    = 2_000_000
+	totalTxs    = 20_000_000
 	numWorkers  = 64 // You can tune this based on CPU & RPC server load
 	rpcURL      = "http://localhost:50002"
 	adminRPCURL = "http://localhost:50003"
@@ -27,7 +27,7 @@ func main() {
 	client := rpc.NewClient(rpcURL, adminRPCURL)
 
 	fmt.Println("Loading transactions from JSON file")
-	txsFile, err := os.Open("cmd/tps/json/txs.json")
+	txsFile, err := os.Open("cmd/tps/data/txs.proto")
 	if err != nil {
 		panic(err)
 	}
