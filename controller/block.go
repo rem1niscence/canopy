@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"os"
+	"runtime/pprof"
 	"time"
 
 	"github.com/canopy-network/canopy/p2p"
@@ -168,6 +170,13 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 
 // ValidateProposal() fully validates a proposal in the form of a quorum certificate and resets back to begin block state
 func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (blockResult *lib.BlockResult, err lib.ErrorI) {
+	f, _ := os.Create("cpu.prof")
+	defer f.Close()
+
+	// Start CPU profiling
+	if e := pprof.StartCPUProfile(f); e != nil {
+		panic(e)
+	}
 	defer lib.TimeTrack(c.log, time.Now())
 	// log the beginning of proposal validation
 	c.log.Debugf("Validating proposal from leader")
@@ -199,6 +208,7 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 		// exit with error
 		return nil, fsm.ErrMismatchCertResults()
 	}
+	pprof.StopCPUProfile()
 	// exit
 	return
 }

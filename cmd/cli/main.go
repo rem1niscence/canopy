@@ -117,45 +117,49 @@ func Start() {
 }
 
 func TransactionSubmitter(c *controller.Controller) {
-	txsPerBlock := 200_000
-	fmt.Println("Loading transactions from proto file")
-	txsFile, err := os.ReadFile("cmd/tps/data/txs.proto")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("Done loading transactions from proto file")
-	blk := new(lib.Block)
-	if err = lib.Unmarshal(txsFile, blk); err != nil {
-		panic(err)
-	}
-	i, lastHeight := 0, uint64(0)
+	lastHeight := uint64(0)
+	var blk *lib.Block
+
 	for range time.Tick(100 * time.Millisecond) {
 		c.Lock()
 		h := c.ChainHeight()
 		c.Unlock()
+
 		if h <= lastHeight || h <= 1 {
 			continue
 		}
 		lastHeight = h
-		time.Sleep(time.Second * 3)
-		fmt.Printf("Sending %d txs\n", txsPerBlock)
-		// simulate a bunch of transactions coming in from P2P
-		for j := 0; j < txsPerBlock; func() { j++; i++ }() {
-			if i >= len(blk.Transactions) {
-				fmt.Println("Exhausted all transactions")
-				return
-			}
+		blockIndex := h - 2 // start from block 0 when height = 2
+
+		// load corresponding block file
+		fileName := fmt.Sprintf("cmd/tps/data/txs_block_%05d.proto", blockIndex)
+		fmt.Printf("Loading %s\n", fileName)
+		txsFile, err := os.ReadFile(fileName)
+		if err != nil {
+			fmt.Printf("Error reading file: %s\n", err)
+			return
+		}
+		blk = new(lib.Block)
+		if err := lib.Unmarshal(txsFile, blk); err != nil {
+			fmt.Printf("Error unmarshaling: %s\n", err)
+			return
+		}
+		fmt.Printf("Loaded %d txs from block %d\n", len(blk.Transactions), blockIndex)
+
+		time.Sleep(3 * time.Second) // simulate P2P propagation
+
+		for _, tx := range blk.Transactions {
 			c.P2P.Inbox(lib.Topic_TX) <- (&lib.MessageAndMetadata{
 				Message: &lib.TxMessage{
 					ChainId: c.Config.ChainId,
-					Tx:      blk.Transactions[i],
+					Tx:      tx,
 				},
 				Sender: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: c.PublicKey}},
 			}).WithHash()
 		}
-		fmt.Println("Done")
+
+		fmt.Println("Submitted block", blockIndex)
 	}
-	return
 }
 
 // waitForKill() blocks until a kill signal is received

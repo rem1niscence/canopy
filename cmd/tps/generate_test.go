@@ -13,9 +13,9 @@ import (
 	"testing"
 )
 
-func TestGenerate20KAccounts(t *testing.T) {
-	feeAmount := uint64(10000)
-	numAccounts, txPerAccount := 20_000, 100
+func TestGenerateTxs(t *testing.T) {
+	feeAmount, blockIndex := uint64(10000), 0
+	numAccounts, txPerAccount := 20_000, 1000
 	amountInSend := 1000 + feeAmount
 	fmt.Println("Starting")
 	privateKeys := make([]string, numAccounts)
@@ -40,6 +40,18 @@ func TestGenerate20KAccounts(t *testing.T) {
 			protoBz, er := lib.Marshal(tx)
 			require.NoError(t, er)
 			blk.Transactions = append(blk.Transactions, protoBz)
+			// append to a file
+			if len(blk.Transactions) == txsPerBlock {
+				// write this block to file
+				bz, err := lib.Marshal(blk)
+				require.NoError(t, err)
+				fileName := fmt.Sprintf("./data/txs_block_%05d.proto", blockIndex)
+				require.NoError(t, os.WriteFile(fileName, bz, 0777))
+				// reset
+				blockIndex++
+				blk = &lib.Block{}
+				blk.Transactions = make([][]byte, 0, txsPerBlock)
+			}
 		}
 	}
 	fmt.Println("Generating genesis file")
@@ -68,7 +80,11 @@ func TestGenerate20KAccounts(t *testing.T) {
 	genesisBz, _ := json.MarshalIndent(j, "", "  ")
 	require.NoError(t, os.WriteFile("./data/genesis.json", genesisBz, 0777))
 	txsBz, _ := lib.Marshal(blk)
-	require.NoError(t, os.WriteFile("./data/txs.proto", txsBz, 0777))
+	// write any remaining transactions
+	if len(blk.Transactions) > 0 {
+		fileName := fmt.Sprintf("./data/txs_block_%05d.proto", blockIndex)
+		require.NoError(t, os.WriteFile(fileName, txsBz, 0777))
+	}
 	accountKeysBz, _ := json.MarshalIndent(privateKeys, "", "  ")
 	require.NoError(t, os.WriteFile("./data/account_keys.json", accountKeysBz, 0777))
 }
