@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"github.com/alecthomas/units"
@@ -9,13 +8,14 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
+	math "math/rand"
 	"os"
 	"testing"
 )
 
 func TestGenerateTxs(t *testing.T) {
 	feeAmount, blockIndex := uint64(10000), 0
-	numAccounts, txPerAccount := 20_000, 1000
+	numAccounts, txPerAccount := 1000, 20_000
 	amountInSend := 1000 + feeAmount
 	fmt.Println("Starting")
 	privateKeys := make([]string, numAccounts)
@@ -32,9 +32,10 @@ func TestGenerateTxs(t *testing.T) {
 			Amount:  amountInSend * uint64(txPerAccount),
 		})
 		for j := 0; j < txPerAccount; j++ {
-			toAddress := make([]byte, 20)
-			_, er := rand.Read(toAddress)
-			require.NoError(t, er)
+			toAddress := accounts[math.Intn(len(accounts))].Address
+			//toAddress := make([]byte, 20)
+			//_, er := rand.Read(toAddress)
+			//require.NoError(t, er)
 			tx, er := fsm.NewSendTransaction(privateKey, crypto.NewAddress(toAddress), 1000, 1, 1, feeAmount, 1, "")
 			require.NoError(t, er)
 			protoBz, er := lib.Marshal(tx)
@@ -57,7 +58,6 @@ func TestGenerateTxs(t *testing.T) {
 	fmt.Println("Generating genesis file")
 	blsKey, err := crypto.NewBLS12381PrivateKey()
 	require.NoError(t, err)
-	fmt.Println("Validator Key:", blsKey.String())
 	params := fsm.DefaultParams()
 	params.Consensus.BlockSize = uint64(128 * units.MB)
 	j := &fsm.GenesisState{

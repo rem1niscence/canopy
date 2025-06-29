@@ -114,8 +114,8 @@ func NewStoreWithDB(db *badger.DB, metrics *lib.Metrics, log lib.LoggerI) (*Stor
 	// note: version for WriteBatch may be overridden by the setEntryAt(version) code
 	writer := db.NewWriteBatchAt(nextVersion)
 	// create indexer cache
-	blkCache, _ := lru.New[uint64, *lib.BlockResult](128)
-	qcCache, _ := lru.New[uint64, *lib.QuorumCertificate](128)
+	blkCache, _ := lru.New[uint64, *lib.BlockResult](4)
+	qcCache, _ := lru.New[uint64, *lib.QuorumCertificate](4)
 	// return the store object
 	return &Store{
 		version: version,

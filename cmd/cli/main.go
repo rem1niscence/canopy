@@ -118,9 +118,9 @@ func Start() {
 
 func TransactionSubmitter(c *controller.Controller) {
 	lastHeight := uint64(0)
-	var blk *lib.Block
+	blk := new(lib.Block)
 
-	for range time.Tick(100 * time.Millisecond) {
+	for range time.Tick(50 * time.Millisecond) {
 		c.Lock()
 		h := c.ChainHeight()
 		c.Unlock()
@@ -139,14 +139,11 @@ func TransactionSubmitter(c *controller.Controller) {
 			fmt.Printf("Error reading file: %s\n", err)
 			return
 		}
-		blk = new(lib.Block)
-		if err := lib.Unmarshal(txsFile, blk); err != nil {
+		if err = lib.Unmarshal(txsFile, blk); err != nil {
 			fmt.Printf("Error unmarshaling: %s\n", err)
 			return
 		}
 		fmt.Printf("Loaded %d txs from block %d\n", len(blk.Transactions), blockIndex)
-
-		time.Sleep(3 * time.Second) // simulate P2P propagation
 
 		for _, tx := range blk.Transactions {
 			c.P2P.Inbox(lib.Topic_TX) <- (&lib.MessageAndMetadata{
