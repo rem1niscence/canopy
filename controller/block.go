@@ -2,7 +2,6 @@ package controller
 
 import (
 	"bytes"
-	"fmt"
 	"math/rand"
 	"os"
 	"runtime/pprof"
@@ -145,25 +144,25 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 			c.log.Error(lib.ErrInvalidVDF().Error())
 		}
 	}
-	// get the block from the mempool
-	block, blockResult := c.GetProposalBlockFromMempool()
+	// get the proposal cached in the mempool
+	p := c.GetProposalBlockFromMempool()
 	// replace the VDF and last certificate in the header
-	block.BlockHeader.LastQuorumCertificate, block.BlockHeader.Vdf = lastCertificate, vdf
+	p.Block.BlockHeader.LastQuorumCertificate, p.Block.BlockHeader.Vdf = lastCertificate, vdf
 	// execute the hash
-	if _, err = block.BlockHeader.SetHash(); err != nil {
+	if _, err = p.Block.BlockHeader.SetHash(); err != nil {
 		// exit with error
 		return
 	}
 	// convert the block reference to bytes
-	blockBytes, err = lib.Marshal(block)
+	blockBytes, err = lib.Marshal(p.Block)
 	if err != nil {
 		// exit with error
 		return
 	}
 	// update the 'block results' with the newly created header
-	blockResult.BlockHeader = block.BlockHeader
+	p.BlockResult.BlockHeader = p.Block.BlockHeader
 	// create a new certificate results (includes reward recipients, slash recipients, swap commands, etc)
-	results = c.NewCertificateResults(block, blockResult, evidence)
+	results = c.NewCertificateResults(p.Block, p.BlockResult, evidence)
 	// exit
 	return
 }
@@ -223,6 +222,8 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI) {
 	defer lib.TimeTrack(c.log, time.Now())
 	start := time.Now()
+	c.Mempool.L.Lock()
+	defer c.Mempool.L.Unlock()
 	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
 	defer func() { c.FSM.Reset() }()
 	// log the beginning of the commit
@@ -245,7 +246,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 			return
 		}
 	}
-	s := time.Now()
 	// log indexing the quorum certificate
 	c.log.Debugf("Indexing certificate for height %d", qc.Header.Height)
 	// index the quorum certificate in the store
@@ -260,18 +260,13 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
-	s = time.Now()
-	c.Mempool.Recheck.Swap(true)
 	// for each transaction included in the block
 	for _, tx := range block.Transactions {
 		// delete each transaction from the mempool
 		c.Mempool.DeleteTransaction(tx)
 	}
-	fmt.Println("MEMPOOL DELETE", time.Since(s))
 	// parse committed block for straw polls
-	s = time.Now()
 	c.FSM.ParsePollTransactions(blockResult)
-	fmt.Println("POLL", time.Since(s))
 	// if self was the proposer
 	if bytes.Equal(qc.ProposerKey, c.PublicKey) && !c.isSyncing.Load() {
 		// send the certificate results transaction on behalf of the quorum
@@ -327,7 +322,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// set up the mempool for the next height with the temporary FSM
 		c.Mempool.FSM = newFSM
 		// check the mempool to cache a proposal block and validate the mempool itself
-		c.Mempool.CheckMempool(false)
+		c.Mempool.CheckMempool()
 		// discard the temporary store after checking the mempool
 		memPoolStore.Discard()
 		// exit
