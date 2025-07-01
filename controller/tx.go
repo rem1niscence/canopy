@@ -8,6 +8,7 @@ import (
 	"github.com/canopy-network/canopy/p2p"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"math"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -89,26 +90,12 @@ func (c *Controller) ListenForTx() {
 // HandleTransaction() accepts or rejects inbound txs based on the mempool state
 // - pass through call checking indexer and mempool for duplicate
 func (c *Controller) HandleTransaction(tx []byte) lib.ErrorI {
-	// generate hash bytes for the transaction
-	hash := crypto.Hash(tx)
-	// generate a hex encoded hash string for the transaction
-	hashString := lib.BytesToString(hash)
-	// get the transaction from the indexer using the hash bytes
-	txResult, err := c.FSM.Store().(lib.StoreI).GetTxByHash(hash)
-	// if an error occurred attempting to retrieve the tx
-	if err != nil {
-		// exit with the error
-		return err
-	}
-	// if the transaction already exists
-	if txResult.TxHash != "" {
-		// exit with duplicate transaction error
-		return lib.ErrDuplicateTx(hashString)
-	}
+	// generate hash hex string for the transaction
+	hash := crypto.HashString(tx)
 	// ensure the mempool doesn't already contain the transaction
-	if c.Mempool.Contains(hashString) {
+	if c.Mempool.Contains(hash) {
 		// if it does, exit with already found in the mempool
-		return lib.ErrTxFoundInMempool(hashString)
+		return lib.ErrTxFoundInMempool(hash)
 	}
 	// route the transaction to the mempool for handling
 	return c.Mempool.HandleTransaction(tx)
@@ -117,6 +104,8 @@ func (c *Controller) HandleTransaction(tx []byte) lib.ErrorI {
 // GetProposalBlockFromMempool() returns the cached proposal block
 // if there's no cached block - call CheckMempool then return
 func (c *Controller) GetProposalBlockFromMempool() (*lib.Block, *lib.BlockResult) {
+	c.Mempool.L.Lock()
+	defer c.Mempool.L.Unlock()
 	// if the cached proposal is nil
 	if c.Mempool.cachedProposal == nil {
 		// check the mempool 'on-demand'
@@ -132,19 +121,23 @@ func (c *Controller) GetProposalBlockFromMempool() (*lib.Block, *lib.BlockResult
 // - P2P Gossip out any transactions that weren't previously gossiped
 func (c *Controller) CheckMempool() {
 	deDupe, _ := lru.New[string, struct{}](100_000)
-	for range time.Tick(time.Second) {
+	// if configured to not check mempool besides right after CommitBlock
+	if c.Config.LazyMempoolCheckFrequencyS == 0 {
+		return
+	}
+	for {
 		// if no-recheck needed
 		if !c.Mempool.Recheck.Load() {
 			continue
 		}
 		// lock the controller for thread safety
-		c.Lock()
+		c.Mempool.L.Lock()
 		// check the mempool to cache a proposal block and validate the mempool itself
 		c.Mempool.CheckMempool(true)
 		// get the transactions to gossip
 		toGossip := c.Mempool.GetTransactions(math.MaxUint64)
 		// unlock the controller
-		c.Unlock()
+		c.Mempool.L.Unlock()
 		// for each transaction to gossip
 		for _, tx := range toGossip {
 			// get the key for the transaction
@@ -162,6 +155,8 @@ func (c *Controller) CheckMempool() {
 		}
 		// set 're-check' to false
 		c.Mempool.Recheck.Swap(false)
+		// sleep for the recheck time
+		time.Sleep(time.Duration(c.Config.LazyMempoolCheckFrequencyS) * time.Second)
 	}
 }
 
@@ -175,6 +170,7 @@ func (c *Controller) CheckMempool() {
 type Mempool struct {
 	lib.Mempool                        // the memory pool itself defined as an interface
 	Recheck         atomic.Bool        // a signal to Recheck the mempool
+	L               *sync.Mutex        // thread safety at the mempool level
 	FSM             *fsm.StateMachine  // the ephemeral finite state machine used to validate inbound transactions
 	cachedResults   lib.TxResults      // a memory cache of transaction results for efficient verification
 	cachedFailedTxs *lib.FailedTxCache // a memory cache of failed transactions for tracking
@@ -195,6 +191,7 @@ func NewMempool(fsm *fsm.StateMachine, address crypto.AddressI, config lib.Mempo
 	m = &Mempool{
 		Mempool:         lib.NewMempool(config),
 		Recheck:         atomic.Bool{},
+		L:               &sync.Mutex{},
 		cachedFailedTxs: lib.NewFailedTxCache(),
 		metrics:         metrics,
 		address:         address,

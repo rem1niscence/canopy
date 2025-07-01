@@ -176,24 +176,18 @@ func (s *Server) startStaticFileServers() {
 
 // submitTx submits a transaction to the controller and writes http response
 func (s *Server) submitTx(w http.ResponseWriter, tx any) (ok bool) {
-
-	// Marshal the transaction
+	// marshal the transaction
 	bz, err := lib.Marshal(tx)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
-	if err = s.controller.Mempool.HandleTransaction(bz); err != nil {
+	// write directly to the mempool
+	if err = s.controller.HandleTransaction(bz); err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
-	//// Send transaction to controller
-	//if err = s.controller.SendTxMsg(bz); err != nil {
-	//	write(w, err, http.StatusBadRequest)
-	//	return
-	//}
-
-	// Write transaction to http response
+	// write transaction to http response
 	write(w, crypto.HashString(bz), http.StatusOK)
 	return true
 }

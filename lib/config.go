@@ -244,19 +244,21 @@ func DefaultStoreConfig() StoreConfig {
 
 // MempoolConfig is the user configuration of the unconfirmed transaction pool
 type MempoolConfig struct {
-	MaxTotalBytes       uint64 `json:"maxTotalBytes"`       // maximum collective bytes in the pool
-	MaxTransactionCount uint32 `json:"maxTransactionCount"` // max number of Transactions
-	IndividualMaxTxSize uint32 `json:"individualMaxTxSize"` // max bytes of a single Transaction
-	DropPercentage      int    `json:"dropPercentage"`      // percentage that is dropped from the bottom of the queue if limits are reached
+	MaxTotalBytes              uint64 `json:"maxTotalBytes"`              // maximum collective bytes in the pool
+	MaxTransactionCount        uint32 `json:"maxTransactionCount"`        // max number of Transactions
+	IndividualMaxTxSize        uint32 `json:"individualMaxTxSize"`        // max bytes of a single Transaction
+	DropPercentage             int    `json:"dropPercentage"`             // percentage that is dropped from the bottom of the queue if limits are reached
+	LazyMempoolCheckFrequencyS int    `json:"lazyMempoolCheckFrequencyS"` // how often the mempool is checked for new transactions besides the mandatory (after Commit) (0) for none
 }
 
 // DefaultMempoolConfig() returns the developer created Mempool options
 func DefaultMempoolConfig() MempoolConfig {
 	return MempoolConfig{
-		MaxTotalBytes:       uint64(10 * units.MB),      // 10 MB max size
-		IndividualMaxTxSize: uint32(4 * units.Kilobyte), // 4 KB max individual tx size
-		MaxTransactionCount: 5000,                       // 5000 max transactions
-		DropPercentage:      35,                         // drop 35% if limits are reached
+		MaxTotalBytes:              uint64(10 * units.MB),      // 10 MB max size
+		MaxTransactionCount:        5000,                       // 5000 max transactions
+		IndividualMaxTxSize:        uint32(4 * units.Kilobyte), // 4 KB max individual tx size
+		DropPercentage:             35,                         // drop 35% if limits are reached
+		LazyMempoolCheckFrequencyS: 1,                          // check every 1 second
 	}
 }
 

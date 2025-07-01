@@ -108,7 +108,7 @@ func (c *Controller) Start() {
 			}
 		}
 		// start mempool service
-		//go c.CheckMempool() TODO - come up with a strategy to allow 'safe' but more frequent transaction gossipping
+		go c.CheckMempool()
 		// start internal Controller listeners for P2P
 		c.StartListeners()
 		// start the syncing process (if not synced to top)
