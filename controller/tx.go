@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
@@ -122,7 +123,7 @@ func (c *Controller) CheckMempool() {
 		// lock the controller for thread safety
 		c.Mempool.L.Lock()
 		// if recheck is necessary
-		if c.Mempool.recheck {
+		if c.Mempool.recheck.Load() {
 			// reset the mempool
 			c.Mempool.FSM.Reset()
 			// check the mempool to cache a proposal block and validate the mempool itself
@@ -130,7 +131,7 @@ func (c *Controller) CheckMempool() {
 			// get the transactions to gossip
 			toGossip = c.Mempool.GetTransactions(math.MaxUint64)
 			// set recheck to false
-			c.Mempool.recheck = false
+			c.Mempool.recheck.Store(false)
 		}
 		// unlock the controller
 		c.Mempool.L.Unlock()
@@ -163,7 +164,6 @@ func (c *Controller) CheckMempool() {
 //   - new tx added may also be evicted, this is expected behavior
 type Mempool struct {
 	lib.Mempool                        // the memory pool itself defined as an interface
-	Recheck         atomic.Bool        // a signal to Recheck the mempool
 	L               *sync.Mutex        // thread safety at the mempool level
 	FSM             *fsm.StateMachine  // the ephemeral finite state machine used to validate inbound transactions
 	cachedResults   lib.TxResults      // a memory cache of transaction results for the json rpc
@@ -171,7 +171,8 @@ type Mempool struct {
 	metrics         *lib.Metrics       // telemetry
 	address         crypto.AddressI    // validator identity
 	cachedProposal  atomic.Value       // the cached block proposal set when mempool is 'checked'
-	recheck         bool               // a signal to recheck the mempool
+	recheck         atomic.Bool        // a signal to recheck the mempool
+	stop            context.CancelFunc // the cancellable context of the mempool
 	log             lib.LoggerI        // the logger
 }
 
@@ -185,9 +186,9 @@ func NewMempool(fsm *fsm.StateMachine, address crypto.AddressI, config lib.Mempo
 	// initialize the structure
 	m = &Mempool{
 		Mempool:         lib.NewMempool(config),
-		Recheck:         atomic.Bool{},
 		L:               &sync.Mutex{},
 		cachedProposal:  atomic.Value{},
+		recheck:         atomic.Bool{},
 		cachedFailedTxs: lib.NewFailedTxCache(),
 		metrics:         metrics,
 		address:         address,
@@ -233,9 +234,7 @@ func (m *Mempool) HandleTransaction(tx []byte) (err lib.ErrorI) {
 		fee = math.MaxUint32
 	}
 	// signal a recheck
-	m.L.Lock()
-	m.recheck = true
-	m.L.Unlock()
+	m.recheck.Store(true)
 	// add a transaction to the mempool
 	if _, err = m.AddTransaction(tx, fee); err != nil {
 		// exit with the error
@@ -257,8 +256,12 @@ func (m *Mempool) CheckMempool() {
 	}
 	// capture the tentative block result using a new object reference
 	blockResult, failed := new(lib.BlockResult), make([][]byte, 0)
+	// setup a context with cancel
+	ctx, stop := context.WithCancel(context.Background())
+	// set the cancel function
+	m.stop = stop
 	// apply the block against the state machine and populate the resulting merkle `roots` in the block header
-	block.BlockHeader, blockResult.Transactions, failed, err = m.FSM.ApplyBlock(block, true)
+	block.BlockHeader, blockResult.Transactions, failed, err = m.FSM.ApplyBlock(ctx, block, true)
 	if err != nil {
 		m.log.Errorf("Check Mempool error: %s", err.Error())
 		return

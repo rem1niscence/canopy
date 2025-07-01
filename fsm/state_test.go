@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"testing"
@@ -264,7 +265,7 @@ func TestApplyBlock(t *testing.T) {
 				sm.ProtocolVersion = 1
 			}
 			// execute the function call
-			header, txResults, failed, e := sm.ApplyBlock(test.block, false)
+			header, txResults, failed, e := sm.ApplyBlock(context.Background(), test.block, false)
 			// validate the expected error
 			require.Equal(t, test.error != "", e != nil || len(failed) != 0, e)
 			if len(failed) != 0 {

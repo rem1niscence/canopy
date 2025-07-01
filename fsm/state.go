@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"context"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -92,7 +93,7 @@ func (s *StateMachine) Initialize(store lib.StoreI) (err lib.ErrorI) {
 // NOTES:
 // - this function may be used to validate 'additional' transactions outside the normal block size as if they were to be included
 // - a list of failed transactions are returned
-func (s *StateMachine) ApplyBlock(b *lib.Block, allowOversize bool) (header *lib.BlockHeader, txResults []*lib.TxResult, failed [][]byte, err lib.ErrorI) {
+func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, allowOversize bool) (header *lib.BlockHeader, txResults []*lib.TxResult, failed [][]byte, err lib.ErrorI) {
 	// catch in case there's a panic
 	defer func() {
 		if r := recover(); r != nil {
@@ -112,7 +113,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block, allowOversize bool) (header *lib
 		return nil, nil, nil, err
 	}
 	// apply all Transactions in the block
-	txResults, txRoot, blockTxs, failed, numTxs, err := s.ApplyTransactions(b.Transactions, allowOversize)
+	txResults, txRoot, blockTxs, failed, numTxs, err := s.ApplyTransactions(ctx, b.Transactions, allowOversize)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -178,7 +179,7 @@ func (s *StateMachine) ApplyBlock(b *lib.Block, allowOversize bool) (header *lib
 // 3. Allows ephemeral 'oversize' transaction processing without applying 'oversize txn' changes to the state
 // 4. Returns the following for successful transactions within a block: <results, tx-list, root, count>
 // 5. Returns all transactions that failed during processing
-func (s *StateMachine) ApplyTransactions(txs [][]byte, allowOversize bool) (results []*lib.TxResult, root []byte, blockTxs, failed [][]byte, n int, er lib.ErrorI) {
+func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allowOversize bool) (results []*lib.TxResult, root []byte, blockTxs, failed [][]byte, n int, er lib.ErrorI) {
 	// define vars to track the bytes of the transaction results and the size of a block
 	var (
 		txResultsBytes [][]byte
@@ -215,6 +216,10 @@ func (s *StateMachine) ApplyTransactions(txs [][]byte, allowOversize bool) (resu
 	var oversize bool
 	// iterates over each transaction in the block
 	for i, tx := range txs {
+		// if interrupt signal
+		if ctx.Err() != nil {
+			return nil, nil, nil, nil, 0, lib.ErrMempoolStopSignal()
+		}
 		// if already failed check tx or signature
 		if _, found := failedCheckTxs[i]; found {
 			failed = append(failed, tx)

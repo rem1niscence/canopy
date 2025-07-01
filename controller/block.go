@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"math/rand"
 	"os"
 	"runtime/pprof"
@@ -220,12 +221,14 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 // - atomically writes all to the underlying db
 // - sets up the controller for the next height
 func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI) {
-	defer lib.TimeTrack(c.log, time.Now())
 	start := time.Now()
+	defer lib.TimeTrack(c.log, start)
+	// cancel any running mempool check
+	c.Mempool.stop()
+	// lock the mempool
 	c.Mempool.L.Lock()
-	defer c.Mempool.L.Unlock()
 	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
-	defer func() { c.FSM.Reset() }()
+	defer func() { c.FSM.Reset(); c.Mempool.L.Unlock() }()
 	// log the beginning of the commit
 	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.ResultsHash))
 	// cast the store to ensure the proper store type to complete this operation
@@ -358,7 +361,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 	// log the start of 'apply block'
 	c.log.Debugf("Applying block %s for height %d", candidateHash[:20], candidateHeight)
 	// apply the block against the state machine
-	compare, txResults, failed, err := c.FSM.ApplyBlock(block, false)
+	compare, txResults, failed, err := c.FSM.ApplyBlock(context.Background(), block, false)
 	if err != nil {
 		// exit with error
 		return

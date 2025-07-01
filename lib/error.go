@@ -313,7 +313,7 @@ const (
 	CodeIndexBlock             ErrorCode   = 15
 
 	RPCModule             ErrorModule = "rpc"
-	CodeRPCTimeout        ErrorCode   = 1
+	CodeMempoolStopSignal ErrorCode   = 1
 	CodeInvalidParams     ErrorCode   = 2
 	CodeNewFSM            ErrorCode   = 3
 	CodeTimeMachine       ErrorCode   = 4
@@ -737,8 +737,8 @@ func ErrPanic() ErrorI {
 	return NewError(CodePanic, StateMachineModule, "panic")
 }
 
-func ErrServerTimeout() ErrorI {
-	return NewError(CodeRPCTimeout, RPCModule, "server timeout")
+func ErrMempoolStopSignal() ErrorI {
+	return NewError(CodeMempoolStopSignal, RPCModule, "mempool stop signal")
 }
 
 func ErrInvalidParams(err error) ErrorI {
