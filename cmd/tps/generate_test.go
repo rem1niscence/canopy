@@ -14,7 +14,7 @@ import (
 )
 
 func TestGenerateTxs(t *testing.T) {
-	t.SkipNow()
+	//t.SkipNow()
 	feeAmount, blockIndex := uint64(10000), 0
 	numAccounts, txPerAccount := 1000, 20_000
 	amountInSend := 1000 + feeAmount
@@ -59,6 +59,8 @@ func TestGenerateTxs(t *testing.T) {
 	fmt.Println("Generating genesis file")
 	blsKey, err := crypto.NewBLS12381PrivateKey()
 	require.NoError(t, err)
+	blsKey2, err := crypto.NewBLS12381PrivateKey()
+	require.NoError(t, err)
 	params := fsm.DefaultParams()
 	params.Consensus.BlockSize = uint64(128 * units.MB)
 	j := &fsm.GenesisState{
@@ -67,17 +69,28 @@ func TestGenerateTxs(t *testing.T) {
 			Address:      blsKey.PublicKey().Address().Bytes(),
 			PublicKey:    blsKey.PublicKey().Bytes(),
 			Committees:   []uint64{lib.CanopyChainId},
-			NetAddress:   "tcp://localhost",
+			NetAddress:   "tcp://node-1",
 			StakedAmount: 1,
 			Output:       blsKey.PublicKey().Address().Bytes(),
 			Compound:     true,
-		}},
+		},
+			{
+				Address:      blsKey2.PublicKey().Address().Bytes(),
+				PublicKey:    blsKey2.PublicKey().Bytes(),
+				Committees:   []uint64{lib.CanopyChainId},
+				NetAddress:   "tcp://node-2",
+				StakedAmount: 1,
+				Output:       blsKey2.PublicKey().Address().Bytes(),
+				Compound:     true,
+			}},
 		Params: params,
 	}
 	fmt.Println("Writing files")
 	require.NoError(t, os.MkdirAll("./data/", 0777))
 	validatorBz, _ := json.Marshal(blsKey.String())
-	require.NoError(t, os.WriteFile("./data/validator_key.json", validatorBz, 0777))
+	require.NoError(t, os.WriteFile("./data/n1_validator_key.json", validatorBz, 0777))
+	validator2Bz, _ := json.Marshal(blsKey2.String())
+	require.NoError(t, os.WriteFile("./data/n2_validator_key.json", validator2Bz, 0777))
 	genesisBz, _ := json.MarshalIndent(j, "", "  ")
 	require.NoError(t, os.WriteFile("./data/genesis.json", genesisBz, 0777))
 	txsBz, _ := lib.Marshal(blk)
