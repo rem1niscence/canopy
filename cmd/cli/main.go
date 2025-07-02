@@ -116,6 +116,8 @@ func Start() {
 	os.Exit(0)
 }
 
+const maxAllowedTransactions = 250_000
+
 func TransactionSubmitter(c *controller.Controller) {
 	lastHeight := uint64(0)
 	blk := new(lib.Block)
@@ -144,13 +146,16 @@ func TransactionSubmitter(c *controller.Controller) {
 			fmt.Printf("Error unmarshaling: %s\n", err)
 			return
 		}
-		fmt.Printf("Loaded %d txs from block %d\n", len(blk.Transactions), blockIndex)
-
-		for _, tx := range blk.Transactions {
+		maxTransactions := min(len(blk.Transactions), maxAllowedTransactions)
+		fmt.Printf("Loaded %d txs from block %d using %d\n", len(blk.Transactions), blockIndex, maxTransactions)
+		for i, tx := range blk.Transactions {
+			if i >= maxTransactions {
+				break
+			}
 			c.P2P.Inbox(lib.Topic_TX) <- (&lib.MessageAndMetadata{
 				Message: &lib.TxMessage{
 					ChainId: c.Config.ChainId,
-					Tx:      tx,
+					Txs:     [][]byte{tx},
 				},
 				Sender: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: c.PublicKey}},
 			}).WithHash()

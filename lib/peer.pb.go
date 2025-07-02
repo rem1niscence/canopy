@@ -520,8 +520,8 @@ type TxMessage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// chain_id: is the unique identifier of the committee associated with this message
 	ChainId uint64 `protobuf:"varint,1,opt,name=chain_id,json=chainId,proto3" json:"chainID"` // @gotags: json:"chainID"
-	// tx: is the bytes of the transaction that may be unmarshalled into a Transaction object
-	Tx            []byte `protobuf:"bytes,2,opt,name=tx,proto3" json:"tx,omitempty"`
+	// txs: is the bytes of the transactions that may be unmarshalled into a Transaction object
+	Txs           [][]byte `protobuf:"bytes,2,rep,name=txs,proto3" json:"txs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -563,9 +563,9 @@ func (x *TxMessage) GetChainId() uint64 {
 	return 0
 }
 
-func (x *TxMessage) GetTx() []byte {
+func (x *TxMessage) GetTxs() [][]byte {
 	if x != nil {
-		return x.Tx
+		return x.Txs
 	}
 	return nil
 }
@@ -610,10 +610,10 @@ const file_peer_proto_rawDesc = "" +
 	"\n" +
 	"max_height\x18\x02 \x01(\x04R\tmaxHeight\x120\n" +
 	"\x14total_vdf_iterations\x18\x03 \x01(\x04R\x12totalVdfIterations\x12J\n" +
-	"\x13BlockAndCertificate\x18\x04 \x01(\v2\x18.types.QuorumCertificateR\x13BlockAndCertificate\"6\n" +
+	"\x13BlockAndCertificate\x18\x04 \x01(\v2\x18.types.QuorumCertificateR\x13BlockAndCertificate\"8\n" +
 	"\tTxMessage\x12\x19\n" +
-	"\bchain_id\x18\x01 \x01(\x04R\achainId\x12\x0e\n" +
-	"\x02tx\x18\x02 \x01(\fR\x02tx*p\n" +
+	"\bchain_id\x18\x01 \x01(\x04R\achainId\x12\x10\n" +
+	"\x03txs\x18\x02 \x03(\fR\x03txs*p\n" +
 	"\x05Topic\x12\r\n" +
 	"\tCONSENSUS\x10\x00\x12\t\n" +
 	"\x05BLOCK\x10\x01\x12\x11\n" +

@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/canopy-network/canopy/p2p"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"math"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 /* This file implements logic for transaction sending and handling as well as memory pooling */
@@ -20,7 +21,7 @@ import (
 // SendTxMsg() routes a locally generated transaction message to the listener for processing + gossiping
 func (c *Controller) SendTxMsg(tx []byte) lib.ErrorI {
 	// create a transaction message object using the tx bytes and the chain id
-	msg := &lib.TxMessage{ChainId: c.Config.ChainId, Tx: tx}
+	msg := &lib.TxMessage{ChainId: c.Config.ChainId, Txs: [][]byte{tx}}
 	// send the transaction message to the listener using internal routing
 	return c.P2P.SelfSend(c.PublicKey, Tx, msg)
 }
@@ -70,19 +71,22 @@ func (c *Controller) ListenForTx() {
 				// exit
 				return
 			}
-			// route the transaction to the mempool handler
-			if err := c.HandleTransaction(txMsg.Tx); err != nil {
-				// if the error is 'mempool already has it'
-				if err.Error() == lib.ErrTxFoundInMempool(crypto.HashString(txMsg.Tx)).Error() {
+			// for each transaction in the transactions list
+			for _, tx := range txMsg.Txs {
+				// route the transaction to the mempool handler
+				if err := c.HandleTransaction(tx); err != nil {
+					// if the error is 'mempool already has it'
+					if err.Error() == lib.ErrTxFoundInMempool(crypto.HashString(tx)).Error() {
+						// exit
+						return
+					}
+					// else - warn of the error
+					c.log.Warnf("Handle tx from %s failed with err: %s", lib.BytesToTruncatedString(senderID), err.Error())
+					// slash the peers reputation score
+					c.P2P.ChangeReputation(senderID, p2p.InvalidTxRep)
 					// exit
 					return
 				}
-				// else - warn of the error
-				c.log.Warnf("Handle tx from %s failed with err: %s", lib.BytesToTruncatedString(senderID), err.Error())
-				// slash the peers reputation score
-				c.P2P.ChangeReputation(senderID, p2p.InvalidTxRep)
-				// exit
-				return
 			}
 			// onto the next message
 		}()
@@ -137,6 +141,7 @@ func (c *Controller) CheckMempool() {
 		// unlock the controller
 		c.Mempool.L.Unlock()
 		// for each transaction to gossip
+		var dedupedTxs [][]byte
 		for _, tx := range toGossip {
 			// get the key for the transaction
 			key := crypto.HashString(tx)
@@ -144,12 +149,13 @@ func (c *Controller) CheckMempool() {
 			if _, found := deDupe.Get(key); !found {
 				// add to the de-dupe list
 				deDupe.Add(key, struct{}{})
-				// gossip the transaction to peers
-				if err := c.P2P.SendToPeers(Tx, &lib.TxMessage{ChainId: c.Config.ChainId, Tx: tx}); err != nil {
-					// log the gossip error
-					c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
-				}
+				dedupedTxs = append(dedupedTxs, tx)
 			}
+		}
+		// gossip the transactions to peers
+		if err := c.P2P.SendToPeers(Tx, &lib.TxMessage{ChainId: c.Config.ChainId, Txs: dedupedTxs}); err != nil {
+			// log the gossip error
+			c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
 		}
 		// sleep for the recheck time
 		time.Sleep(time.Duration(c.Config.LazyMempoolCheckFrequencyS) * time.Second)

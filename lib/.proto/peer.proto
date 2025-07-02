@@ -114,6 +114,6 @@ message BlockMessage {
 message TxMessage {
   // chain_id: is the unique identifier of the committee associated with this message
   uint64 chain_id = 1; // @gotags: json:"chainID"
-  // tx: is the bytes of the transaction that may be unmarshalled into a Transaction object
-  bytes tx = 2;
+  // txs: is the bytes of the transactions that may be unmarshalled into a Transaction object
+  repeated bytes txs = 2;
 }
