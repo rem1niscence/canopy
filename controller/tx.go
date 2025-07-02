@@ -267,7 +267,7 @@ func (m *Mempool) CheckMempool() {
 		m.log.Errorf("Check Mempool error: %s", err.Error())
 		return
 	}
-	fmt.Printf("Setting cached proposal at height %d with hash %s\n", block.BlockHeader.Height, hex.EncodeToString(block.BlockHeader.Hash))
+	fmt.Printf("Setting cached proposal at height %d with hash %s and appHash %s\n", block.BlockHeader.Height, hex.EncodeToString(block.BlockHeader.Hash), hex.EncodeToString(block.BlockHeader.StateRoot))
 	// cache the proposal
 	m.cachedProposal.Store(&CachedProposal{
 		Block:       block,

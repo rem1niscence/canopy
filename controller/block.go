@@ -3,18 +3,15 @@ package controller
 import (
 	"bytes"
 	"context"
-	"math/rand"
-	"os"
-	"runtime/pprof"
-	"time"
-
-	"github.com/canopy-network/canopy/p2p"
 	"golang.org/x/sync/errgroup"
+	"math/rand"
+	"time"
 
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"github.com/canopy-network/canopy/p2p"
 )
 
 /* This file contains the high level functionality of block / proposal processing */
@@ -151,8 +148,14 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 	}
 	// get the proposal cached in the mempool
 	p := c.GetProposalBlockFromMempool()
+	// load the last block from the indexer
+	lastBlock, err := c.FSM.LoadBlock(c.FSM.Height() - 1)
+	if err != nil {
+		return
+	}
 	// replace the VDF and last certificate in the header
 	p.Block.BlockHeader.LastQuorumCertificate, p.Block.BlockHeader.Vdf = lastCertificate, vdf
+	p.Block.BlockHeader.TotalVdfIterations = vdf.GetIterations() + lastBlock.BlockHeader.TotalVdfIterations
 	// execute the hash
 	if _, err = p.Block.BlockHeader.SetHash(); err != nil {
 		// exit with error
@@ -174,13 +177,6 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 
 // ValidateProposal() fully validates a proposal in the form of a quorum certificate and resets back to begin block state
 func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (blockResult *lib.BlockResult, err lib.ErrorI) {
-	f, _ := os.Create("cpu.prof")
-	defer f.Close()
-
-	// Start CPU profiling
-	if e := pprof.StartCPUProfile(f); e != nil {
-		panic(e)
-	}
 	defer lib.TimeTrack(c.log, time.Now())
 	// log the beginning of proposal validation
 	c.log.Debugf("Validating proposal from leader")
@@ -212,7 +208,6 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 		// exit with error
 		return nil, fsm.ErrMismatchCertResults()
 	}
-	pprof.StopCPUProfile()
 	// exit
 	return
 }
