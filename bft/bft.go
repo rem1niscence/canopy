@@ -119,16 +119,12 @@ func (b *BFT) Start() {
 				if !resetBFT.IsRootChainUpdate {
 					b.log.Info("Reset BFT (NEW_HEIGHT)")
 					b.NewHeight(false)
-					// set the wait timers to start consensus
-					b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
 					b.NewHeight(true)
-					if !b.LoadIsOwnRoot() {
-						// set the wait timers to start consensus
-						b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
-					}
 				}
+				// set the wait timers to start consensus
+				b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
 			}()
 		}
 	}
@@ -478,27 +474,10 @@ func (b *BFT) StartCommitProcessPhase() {
 	b.ByzantineEvidence = &ByzantineEvidence{
 		DSE: b.GetLocalDSE(),
 	}
-	// create a new block object reference to ensure a non nil result
-	block := new(lib.Block)
-	// populate the block obj ref with the block bytes in the qc
-	if err := lib.Unmarshal(msg.Qc.Block, block); err != nil {
-		return
-	}
-	// track processing time for consensus module
-	startTime := time.Now()
-	// commit the block
-	if err := b.Controller.CommitCertificate(msg.Qc, block, b.BlockResult); err != nil {
-		b.log.Error(err.Error())
-	}
-	// signal a reset to the bft module
-	b.ResetBFT <- ResetBFT{ProcessTime: time.Since(startTime)}
-	// execute a non-blocking function
-	go func() {
-		// add a delay to ensure the other replicas can start the commit process phase
-		time.After(time.Duration(b.Config.RoundInterruptTimeoutMS) * time.Millisecond)
-		// gossip committed block message to peers
-		b.GossipBlock(msg.Qc, b.PublicKey)
-	}()
+	// send the block to self for committing
+	b.SelfSendBlock(msg.Qc)
+	// gossip committed block message to peers
+	b.GossipBlock(msg.Qc, b.PublicKey)
 }
 
 // RoundInterrupt() begins the ROUND-INTERRUPT phase after any phase errors

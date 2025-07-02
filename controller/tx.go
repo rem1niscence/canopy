@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
@@ -266,6 +267,7 @@ func (m *Mempool) CheckMempool() {
 		m.log.Errorf("Check Mempool error: %s", err.Error())
 		return
 	}
+	fmt.Printf("Setting cached proposal at height %d with hash %s\n", block.BlockHeader.Height, hex.EncodeToString(block.BlockHeader.Hash))
 	// cache the proposal
 	m.cachedProposal.Store(&CachedProposal{
 		Block:       block,

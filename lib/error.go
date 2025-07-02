@@ -438,6 +438,7 @@ func ErrNoValidators() ErrorI {
 }
 
 func ErrWrongHeight() ErrorI {
+	PrintStackTrace()
 	return NewError(CodeWrongHeight, ConsensusModule, "wrong height")
 }
 

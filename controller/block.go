@@ -57,6 +57,8 @@ func (c *Controller) ListenForBlock() {
 				// exit iteration
 				return
 			}
+			// track processing time for consensus module
+			startTime := time.Now()
 			// 'handle' the peer block and certificate appropriately
 			qc, err := c.HandlePeerBlock(blockMessage, false)
 			// ensure no error
@@ -81,6 +83,8 @@ func (c *Controller) ListenForBlock() {
 			}
 			// gossip the block to our peers
 			c.GossipBlock(qc, sender)
+			// signal a reset to the bft module
+			c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
 		}()
 		// if quit signaled
 		if quit {
@@ -462,8 +466,16 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 		// exit with error
 		return nil, lib.ErrOutOfSync()
 	}
+	// create a variable to store the cached result (if applicable)
+	var cachedResult *lib.BlockResult
+	// create a temp variable to double-check our saved block result against the peers
+	saved := c.Consensus.BlockResult
+	// if our cached result is the same as the peer block, use that
+	if saved != nil && saved.BlockHeader != nil && bytes.Equal(saved.BlockHeader.Hash, block.BlockHeader.Hash) {
+		cachedResult = saved
+	}
 	// attempts to commit the QC to persistence of chain by playing it against the state machine
-	if err = c.CommitCertificate(qc, block, nil); err != nil {
+	if err = c.CommitCertificate(qc, block, cachedResult); err != nil {
 		// exit with error
 		return nil, err
 	}
