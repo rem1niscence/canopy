@@ -235,7 +235,7 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 		}
 		// get the tx size
 		txSize := uint64(len(tx))
-		if len(blockTxs) > maxTxPerBlock && txSize+blockSize > maxBlockSize && !oversize {
+		if len(blockTxs) > maxTxPerBlock || txSize+blockSize > maxBlockSize && !oversize {
 			// if validating a block - oversize shouldn't happen
 			if !allowOversize {
 				return nil, nil, nil, nil, 0, ErrMaxBlockSize()
