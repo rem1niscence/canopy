@@ -9,8 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/canopy-network/canopy/lib/crypto"
-
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib"
 	limiter "github.com/mxk/go-flowrate/flowrate"
@@ -304,15 +302,15 @@ func (c *MultiConn) waitForAndHandleWireBytes(m *limiter.Monitor) (proto.Message
 // sends them across the wire without violating the data flow rate limits
 // message may be a Packet, a Ping or a Pong
 func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) {
-	if packet != nil {
-		c.log.Debugf("Send Packet to %s (ID:%s, L:%d, E:%t), hash: %s",
-			lib.BytesToTruncatedString(c.Address.PublicKey),
-			lib.Topic_name[int32(packet.StreamId)],
-			len(packet.Bytes),
-			packet.Eof,
-			crypto.ShortHashString(packet.Bytes),
-		)
-	}
+	//if packet != nil {
+	//	c.log.Debugf("Send Packet to %s (ID:%s, L:%d, E:%t), hash: %s",
+	//		lib.BytesToTruncatedString(c.Address.PublicKey),
+	//		lib.Topic_name[int32(packet.StreamId)],
+	//		len(packet.Bytes),
+	//		packet.Eof,
+	//		crypto.ShortHashString(packet.Bytes),
+	//	)
+	//}
 	// send packet as message over the wire
 	c.sendWireBytes(packet, m)
 	return
@@ -384,13 +382,13 @@ func (s *Stream) queueSend(p *Packet) bool {
 // handlePacket() merge the new packet with the previously received ones until the entire message is complete (EOF signal)
 func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, lib.ErrorI) {
 	msgAssemblerLen, packetLen := len(s.msgAssembler), len(packet.Bytes)
-	s.logger.Debugf("Received Packet from %s (ID:%s, L:%d, E:%t), hash: %s",
-		lib.BytesToTruncatedString(peerInfo.Address.PublicKey),
-		lib.Topic_name[int32(packet.StreamId)],
-		len(packet.Bytes),
-		packet.Eof,
-		crypto.ShortHashString(packet.Bytes),
-	)
+	//s.logger.Debugf("Received Packet from %s (ID:%s, L:%d, E:%t), hash: %s",
+	//	lib.BytesToTruncatedString(peerInfo.Address.PublicKey),
+	//	lib.Topic_name[int32(packet.StreamId)],
+	//	len(packet.Bytes),
+	//	packet.Eof,
+	//	crypto.ShortHashString(packet.Bytes),
+	//)
 	// if the addition of this new packet pushes the total message size above max
 	if int(maxMessageSize) < msgAssemblerLen+packetLen {
 		s.msgAssembler = s.msgAssembler[:0]
@@ -411,10 +409,10 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 			return BadPacketSlash, err
 		}
 		// wrap with metadata
-		m := (&lib.MessageAndMetadata{
+		m := &lib.MessageAndMetadata{
 			Message: payload,
 			Sender:  peerInfo,
-		}).WithHash()
+		}
 		// add to inbox for other parts of the app to read
 		//s.logger.Debugf("Inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
 		s.inbox <- m

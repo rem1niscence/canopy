@@ -152,13 +152,13 @@ func TransactionSubmitter(c *controller.Controller) {
 			if i >= maxTransactions {
 				break
 			}
-			c.P2P.Inbox(lib.Topic_TX) <- (&lib.MessageAndMetadata{
+			c.P2P.Inbox(lib.Topic_TX) <- &lib.MessageAndMetadata{
 				Message: &lib.TxMessage{
 					ChainId: c.Config.ChainId,
 					Txs:     [][]byte{tx},
 				},
 				Sender: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: c.PublicKey}},
-			}).WithHash()
+			}
 		}
 
 		fmt.Println("Submitted block", blockIndex)

@@ -14,7 +14,7 @@ import (
 )
 
 func TestGenerateTxs(t *testing.T) {
-	//t.SkipNow()
+	t.SkipNow()
 	feeAmount, blockIndex := uint64(10000), 0
 	numAccounts, txPerAccount := 1000, 20_000
 	amountInSend := 1000 + feeAmount

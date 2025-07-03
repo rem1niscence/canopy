@@ -322,21 +322,11 @@ out:
 func TestSelfSend(t *testing.T) {
 	topic := lib.Topic_CONSENSUS
 	n := newStartedTestP2PNode(t)
-	expected := (&lib.MessageAndMetadata{
-		Message: &PeerBookRequestMessage{},
-		Sender: &lib.PeerInfo{
-			Address: &lib.PeerAddress{
-				PublicKey:  n.pub,
-				NetAddress: "",
-			},
-		},
-	}).WithHash()
 	require.NoError(t, n.SelfSend(n.pub, topic, &PeerBookRequestMessage{}))
 	for {
 		select {
 		case msg := <-n.Inbox(topic):
 			require.Equal(t, msg.Sender.Address.PublicKey, n.pub)
-			require.Equal(t, msg.Hash, expected.Hash)
 			return
 		case <-time.After(testTimeout):
 			t.Fatal("timeout")

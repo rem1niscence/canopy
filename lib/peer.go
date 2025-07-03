@@ -19,22 +19,10 @@ import (
 // Channels are logical communication paths or streams that operate over a single 'multiplexed' network connection
 type Channels map[Topic]chan *MessageAndMetadata
 
-// MessageAndMetadata is a wrapper over a P2P message with information about the sender and the hash of the message
-// for easy de-duplication at the module level
+// MessageAndMetadata is a wrapper over a P2P message with information about the sender
 type MessageAndMetadata struct {
 	Message proto.Message // the (proto) payload of the message
-	Hash    []byte        // the hash of the payload
 	Sender  *PeerInfo     // the sender information
-}
-
-// WithHash() fills the hash field with the cryptographic hash of the message (used for de-duplication)
-func (x *MessageAndMetadata) WithHash() *MessageAndMetadata {
-	// convert the payload into proto bytes
-	payloadBytes, _ := Marshal(x.Message)
-	// hash the payload bytes and set the hash
-	x.Hash = crypto.Hash(payloadBytes)
-	// exit with the message
-	return x
 }
 
 // PEER ADDRESS CODE BELOW
@@ -248,7 +236,7 @@ type peerInfoJSON struct {
 // MessageCache is a simple p2p message de-duplicator that protects redundancy in the p2p network
 type MessageCache struct {
 	queue   *list.List            // a FIFO list of MessageAndMetadata
-	deDupe  *DeDuplicator[string] // the O(1) de-duplicator
+	deDupe  *DeDuplicator[uint64] // the O(1) de-duplicator
 	maxSize int                   // the max size before evicting the oldest
 }
 
@@ -256,7 +244,7 @@ type MessageCache struct {
 func NewMessageCache() *MessageCache {
 	return &MessageCache{
 		queue:   list.New(),
-		deDupe:  NewDeDuplicator[string](),
+		deDupe:  NewDeDuplicator[uint64](),
 		maxSize: 10000,
 	}
 }
@@ -264,8 +252,10 @@ func NewMessageCache() *MessageCache {
 // Add inserts a new message into the cache if it doesn't already exist
 // It removes the oldest message if the cache is full
 func (c *MessageCache) Add(msg *MessageAndMetadata) (ok bool) {
-	// convert the hash into a hex string
-	key := BytesToString(msg.Hash)
+	// convert the message into bytes
+	bz, _ := Marshal(msg.Message)
+	// create a key for the message
+	key := MemHash(bz)
 	// check / add to the de-duplicator to ensure no duplicates
 	if c.deDupe.Found(key) {
 		// exit with 'already found'
@@ -279,8 +269,12 @@ func (c *MessageCache) Add(msg *MessageAndMetadata) (ok bool) {
 		e := c.queue.Back()
 		// cast it to a MessageAndMetadata
 		message := e.Value.(*MessageAndMetadata)
+		// convert the message into bytes
+		toDeleteBz, _ := Marshal(message.Message)
+		// create a key for the message
+		toDeleteKey := MemHash(toDeleteBz)
 		// delete it from the underlying de-duplicator
-		c.deDupe.Delete(BytesToString(message.Hash))
+		c.deDupe.Delete(toDeleteKey)
 		// remove it from the queue
 		c.queue.Remove(e)
 	}
