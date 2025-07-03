@@ -127,6 +127,7 @@ func (b *BFT) Start() {
 						// set the wait timers to start consensus
 						b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
 					}
+					fmt.Println("DEADLOCK DEBUG: done new_committee")
 				}
 			}()
 		}

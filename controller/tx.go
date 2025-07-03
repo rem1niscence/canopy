@@ -256,6 +256,7 @@ func (m *Mempool) HandleTransaction(tx []byte) (err lib.ErrorI) {
 
 // CheckMempool() Checks each transaction in the mempool and caches a block proposal
 func (m *Mempool) CheckMempool() {
+	fmt.Println("DEADLOCK DEBUG: check mempool start")
 	defer lib.TimeTrack(m.log, time.Now())
 	var err lib.ErrorI
 	// create the actual block structure with the maximum amount of transactions allowed or available in the mempool
