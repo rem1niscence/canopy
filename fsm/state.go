@@ -235,7 +235,7 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 		}
 		// get the tx size
 		txSize := uint64(len(tx))
-		if len(blockTxs) > maxTxPerBlock || txSize+blockSize > maxBlockSize && !oversize {
+		if (len(blockTxs) > maxTxPerBlock || txSize+blockSize > maxBlockSize) && !oversize {
 			// if validating a block - oversize shouldn't happen
 			if !allowOversize {
 				return nil, nil, nil, nil, 0, ErrMaxBlockSize()
@@ -599,46 +599,6 @@ func (s *StateMachine) TxnWrap() (lib.StoreI, lib.ErrorI) {
 	s.SetStore(txn)
 	// return the transaction to be cleaned up by the caller
 	return txn, nil
-}
-
-// Cache() caches the validators from the current block into the validator cache
-func (s *StateMachine) Cache() error {
-	// retrieve current validator set
-	validators, err := s.GetValidators()
-	if err != nil {
-		return err
-	}
-	// fill the validator cache
-	for _, val := range validators {
-		s.cache.validators[crypto.NewAddressFromBytes(val.Address).String()] = val
-	}
-	// retrieve the current list of committees
-	committees, err := s.GetCommitteesData()
-	if err != nil {
-		return err
-	}
-	// iterate over the committees
-	for _, committee := range committees.List {
-		chainID := committee.ChainId
-		// initialize the delegates cache for this chainID
-		vs, err := s.GetAllDelegates(chainID)
-		s.cache.delegates[chainID] = make(map[string]struct{}, 0)
-		if err != nil {
-			return err
-		}
-		for _, val := range vs.ValidatorSet.ValidatorSet {
-			// get the address from the public key
-			publicKey, err := crypto.NewPublicKeyFromBytes(val.PublicKey)
-			if err != nil {
-				return err
-			}
-			address := publicKey.Address()
-			// add the address to the delegates cache for this chainID
-			s.cache.delegates[chainID][address.String()] = struct{}{}
-		}
-	}
-	// exit
-	return nil
 }
 
 // SetCacheFromFSM() sets the cache of the current state machine from another state machine

@@ -322,7 +322,7 @@ func (b *BFT) StartProposeVotePhase() {
 	}
 	// if locked, confirm safe to unlock
 	if b.HighQC != nil {
-		if err = b.SafeNode(msg); err != nil {
+		if err := b.SafeNode(msg); err != nil {
 			b.log.Error(err.Error())
 			b.RoundInterrupt()
 			return
