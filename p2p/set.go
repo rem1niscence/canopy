@@ -105,10 +105,10 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 	defer ps.Unlock()
 	ps.mustConnect = mustConnect
 	for _, peer := range ps.m {
-		peer.IsMustConnect = false
 		if peer.IsMustConnect {
 			ps.changeIOCount(true, peer.IsOutbound)
 		}
+		peer.IsMustConnect = false
 	}
 	// for each must connect
 	for _, peer := range mustConnect {
@@ -191,13 +191,10 @@ func (ps *PeerSet) GetAllInfos() (res []*lib.PeerInfo, numInbound, numOutbound i
 	ps.RLock()
 	defer ps.RUnlock()
 	for _, p := range ps.m {
-		if p.IsOutbound {
-			numOutbound++
-		} else {
-			numInbound++
-		}
 		res = append(res, p.PeerInfo.Copy())
 	}
+	numInbound = ps.inbound
+	numOutbound = ps.outbound
 	return
 }
 

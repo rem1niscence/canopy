@@ -127,7 +127,8 @@ func (p *P2P) ListenForInboundPeers(listenAddress *lib.PeerAddress) {
 		// wait for and then accept inbound tcp connection
 		c, err := p.listener.Accept()
 		if err != nil {
-			return
+			p.log.Errorf("Accept error: %v", err)
+			continue
 		}
 		// create a thread to prevent front-of-the-line blocking
 		go func(c net.Conn) {
@@ -235,6 +236,7 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect, strictPubli
 	// create the e2e encrypted connection while establishing a full peer info object
 	connection, err := p.NewConnection(conn)
 	if err != nil {
+		_ = conn.Close()
 		return err
 	}
 	// always in case of error close connection
@@ -295,13 +297,11 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect, strictPubli
 	// add peer to peer set and peer book
 	p.log.Infof("Adding peer: %s@%s", lib.BytesToString(info.Address.PublicKey), info.Address.NetAddress)
 	p.book.Add(&BookPeer{Address: info.Address})
-	if err = p.PeerSet.Add(&Peer{
+	err = p.PeerSet.Add(&Peer{
 		conn:     connection,
 		PeerInfo: info,
 		stop:     sync.Once{},
-	}); err != nil {
-		connection.Stop()
-	}
+	})
 	return
 }
 
