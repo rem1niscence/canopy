@@ -181,39 +181,39 @@ func (c *MultiConn) startSendService() {
 			c.sendPacket(packet, m)
 		case packet = <-c.streams[lib.Topic_PEERS_REQUEST].sendQueue:
 			c.sendPacket(packet, m)
-		// case <-ping.C: // fires every 'pingInterval'
-		// 	// send a ping to the peer
-		// 	c.sendWireBytes(new(Ping), m)
-		// 	// reset the pong timer
-		// 	lib.StopTimer(pongTimer)
-		// 	c.log.Debugf("Ping sent to  %s", lib.BytesToTruncatedString(c.Address.PublicKey))
-		// 	// set the pong timer to execute an Error function if the timer expires before receiving a pong
-		// 	pongTimer = time.AfterFunc(pongTimeoutDuration, func() {
-		// 		if e := ErrPongTimeout(); e != nil {
-		// 			c.Error(e, NoPongSlash)
-		// 		}
-		// 	})
-		// case _, open := <-c.sendPong: // fires when receive service got a 'ping' message
-		// 	// if the channel was closed
-		// 	if !open {
-		// 		// log the close
-		// 		c.log.Debugf("Pong channel closed, stopping")
-		// 		// exit
-		// 		return
-		// 	}
-		// 	// send a pong
-		// 	c.sendWireBytes(new(Pong), m)
-		// 	c.log.Debugf("Pong sent to  %s", lib.BytesToTruncatedString(c.Address.PublicKey))
-		// case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
-		// 	// if the channel was closed
-		// 	if !open {
-		// 		// log the close
-		// 		c.log.Debugf("Receive pong channel closed, stopping")
-		// 		// exit
-		// 		return
-		// 	}
-		// 	// reset the pong timer
-		// 	lib.StopTimer(pongTimer)
+		case <-ping.C: // fires every 'pingInterval'
+			// send a ping to the peer
+			c.sendWireBytes(new(Ping), m)
+			// reset the pong timer
+			lib.StopTimer(pongTimer)
+			c.log.Debugf("Ping sent to  %s", lib.BytesToTruncatedString(c.Address.PublicKey))
+			// set the pong timer to execute an Error function if the timer expires before receiving a pong
+			pongTimer = time.AfterFunc(pongTimeoutDuration, func() {
+				if e := ErrPongTimeout(); e != nil {
+					c.Error(e, NoPongSlash)
+				}
+			})
+		case _, open := <-c.sendPong: // fires when receive service got a 'ping' message
+			// if the channel was closed
+			if !open {
+				// log the close
+				c.log.Debugf("Pong channel closed, stopping")
+				// exit
+				return
+			}
+			// send a pong
+			c.sendWireBytes(new(Pong), m)
+			c.log.Debugf("Pong sent to  %s", lib.BytesToTruncatedString(c.Address.PublicKey))
+		case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
+			// if the channel was closed
+			if !open {
+				// log the close
+				c.log.Debugf("Receive pong channel closed, stopping")
+				// exit
+				return
+			}
+			// reset the pong timer
+			lib.StopTimer(pongTimer)
 		case <-c.quitSending: // fires when Stop() is called
 			return
 		}
@@ -261,12 +261,12 @@ func (c *MultiConn) startReceiveService() {
 					c.Error(er, slash)
 					return
 				}
-			// case *Ping: // receive ping message notifies the "send" service to respond with a 'pong' message
-			// 	c.log.Debugf("Ping received from  %s", lib.BytesToTruncatedString(c.Address.PublicKey))
-			// 	c.sendPong <- struct{}{}
-			// case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
-			// 	c.log.Debugf("Pong received from  %s", lib.BytesToTruncatedString(c.Address.PublicKey))
-			// 	c.receivedPong <- struct{}{}
+			case *Ping: // receive ping message notifies the "send" service to respond with a 'pong' message
+				c.log.Debugf("Ping received from  %s", lib.BytesToTruncatedString(c.Address.PublicKey))
+				c.sendPong <- struct{}{}
+			case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
+				c.log.Debugf("Pong received from  %s", lib.BytesToTruncatedString(c.Address.PublicKey))
+				c.receivedPong <- struct{}{}
 			default: // unknown type results in slash and exiting the service
 				c.Error(ErrUnknownP2PMsg(x), UnknownMessageSlash)
 				return
