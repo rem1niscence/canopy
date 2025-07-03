@@ -185,6 +185,7 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 		txResultsBytes [][]byte
 		largestTxSize  uint64
 		blockSize      uint64
+		maxTxPerBlock  = 200_000
 	)
 	// use a map to check for 'same-block' duplicate transactions
 	deDuplicator := lib.NewDeDuplicator[string]()
@@ -234,7 +235,7 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 		}
 		// get the tx size
 		txSize := uint64(len(tx))
-		if txSize+blockSize > maxBlockSize && !oversize {
+		if len(blockTxs) > maxTxPerBlock && txSize+blockSize > maxBlockSize && !oversize {
 			// if validating a block - oversize shouldn't happen
 			if !allowOversize {
 				return nil, nil, nil, nil, 0, ErrMaxBlockSize()
