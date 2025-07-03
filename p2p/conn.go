@@ -215,6 +215,18 @@ func (c *MultiConn) startSendService() {
 	}
 }
 
+var (
+	packetTimingMap sync.Map // map[lib.Topic]*PacketTiming
+)
+
+// PacketTiming tracks timing and size information for multi-packet messages
+type PacketTiming struct {
+	StartTime   time.Time  // when the first packet was received
+	TotalSize   int        // cumulative size of all packets received
+	PacketCount int        // number of packets received
+	mu          sync.Mutex // mutex for safe access
+}
+
 // startReceiveService() starts the main receive service
 // - reads from the underlying tcp connection and 'routes' the messages to the appropriate streams
 // - manages keep alive protocol by notifying the 'send service' of pings and pongs
@@ -244,6 +256,40 @@ func (c *MultiConn) startReceiveService() {
 					c.Error(ErrBadStream(), BadStreamSlash)
 					return
 				}
+
+				// track packet timing and stats
+				if x.Eof {
+					// this is the last packet, calculate and print total stats
+					if timingInterface, exists := packetTimingMap.LoadAndDelete(x.StreamId); exists {
+						timing := timingInterface.(*PacketTiming)
+						timing.mu.Lock()
+						// Add the EOF packet to the stats
+						timing.TotalSize += len(x.Bytes)
+						timing.PacketCount++
+						totalTime := time.Since(timing.StartTime)
+						totalSizeMB := float64(timing.TotalSize) / (1024 * 1024)
+						c.log.Infof("Message complete for topic %s: Duration=%v, Packets=%d, TotalSize=%.2f MB",
+							lib.Topic_name[int32(x.StreamId)], totalTime, timing.PacketCount, totalSizeMB)
+						timing.mu.Unlock()
+					}
+				} else {
+					// this is not the last packet, update or create timing info
+					timingInterface, loaded := packetTimingMap.LoadOrStore(x.StreamId, &PacketTiming{
+						StartTime:   time.Now(),
+						TotalSize:   len(x.Bytes),
+						PacketCount: 1,
+					})
+
+					if loaded {
+						// Entry already exists, update it
+						timing := timingInterface.(*PacketTiming)
+						timing.mu.Lock()
+						timing.TotalSize += len(x.Bytes)
+						timing.PacketCount++
+						timing.mu.Unlock()
+					}
+				}
+
 				// get the peer info from the peer set
 				info, e := c.p2p.GetPeerInfo(c.Address.PublicKey)
 				if e != nil {
