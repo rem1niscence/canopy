@@ -119,12 +119,14 @@ func (b *BFT) Start() {
 				if !resetBFT.IsRootChainUpdate {
 					b.log.Info("Reset BFT (NEW_HEIGHT)")
 					b.NewHeight(false)
+					b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
 					b.NewHeight(true)
+					if !b.LoadIsOwnRoot() {
+						b.SetWaitTimers(time.Duration(0)*time.Millisecond, 0)
+					}
 				}
-				// set the wait timers to start consensus
-				b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
 			}()
 		}
 	}

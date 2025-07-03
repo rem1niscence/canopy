@@ -152,10 +152,12 @@ func (c *Controller) CheckMempool() {
 				dedupedTxs = append(dedupedTxs, tx)
 			}
 		}
-		// gossip the transactions to peers
-		if err := c.P2P.SendToPeers(Tx, &lib.TxMessage{ChainId: c.Config.ChainId, Txs: dedupedTxs}); err != nil {
-			// log the gossip error
-			c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
+		if len(dedupedTxs) != 0 {
+			// gossip the transactions to peers
+			if err := c.P2P.SendToPeers(Tx, &lib.TxMessage{ChainId: c.Config.ChainId, Txs: dedupedTxs}); err != nil {
+				// log the gossip error
+				c.log.Error(fmt.Sprintf("unable to gossip tx with err: %s", err.Error()))
+			}
 		}
 		// sleep for the recheck time
 		time.Sleep(time.Duration(c.Config.LazyMempoolCheckFrequencyS) * time.Second)

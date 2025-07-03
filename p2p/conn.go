@@ -3,6 +3,7 @@ package p2p
 import (
 	"encoding/binary"
 	"io"
+	"math"
 	"net"
 	"runtime/debug"
 	"sync"
@@ -16,17 +17,17 @@ import (
 )
 
 const (
-	pingInterval           = 30 * time.Second            // how often a ping is to be sent
-	pongTimeoutDuration    = 20 * time.Second            // how long the sender of a ping waits for a pong before throwing an error
-	maxDataChunkSize       = 100*1024 - packetHeaderSize // maximum size of the chunk of bytes in a packet
-	maxPacketSize          = 100 * 1024 * 1024           // maximum size of the full packet
-	packetHeaderSize       = 47                          // the overhead of the protobuf packet header
-	queueSendTimeout       = 10 * time.Second            // how long a message waits to be queued before throwing an error
-	maxMessageSize         = 1024 * units.Megabyte       // the maximum total size of a message once all the packets are added up
-	dataFlowRatePerS       = maxMessageSize              // the maximum number of bytes that may be sent or received per second per MultiConn
-	maxChanSize            = 1                           // maximum number of items in a channel before blocking
-	maxInboxQueueSize      = 500_000                     // maximum number of items in inbox queue before blocking
-	maxStreamSendQueueSize = 100_000                     // maximum number of items in a stream send queue before blocking
+	pingInterval           = 30 * time.Second                  // how often a ping is to be sent
+	pongTimeoutDuration    = 20 * time.Second                  // how long the sender of a ping waits for a pong before throwing an error
+	maxDataChunkSize       = math.MaxUint32 - packetHeaderSize // maximum size of the chunk of bytes in a packet
+	maxPacketSize          = math.MaxUint32                    // maximum size of the full packet
+	packetHeaderSize       = 47                                // the overhead of the protobuf packet header
+	queueSendTimeout       = 10 * time.Second                  // how long a message waits to be queued before throwing an error
+	maxMessageSize         = 1024 * units.Megabyte             // the maximum total size of a message once all the packets are added up
+	dataFlowRatePerS       = maxMessageSize                    // the maximum number of bytes that may be sent or received per second per MultiConn
+	maxChanSize            = 1                                 // maximum number of items in a channel before blocking
+	maxInboxQueueSize      = 500_000                           // maximum number of items in inbox queue before blocking
+	maxStreamSendQueueSize = 100_000                           // maximum number of items in a stream send queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers

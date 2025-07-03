@@ -11,6 +11,7 @@ import (
 	math "math/rand"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestGenerateTxs(t *testing.T) {
@@ -101,4 +102,37 @@ func TestGenerateTxs(t *testing.T) {
 	}
 	accountKeysBz, _ := json.MarshalIndent(privateKeys, "", "  ")
 	require.NoError(t, os.WriteFile("./data/account_keys.json", accountKeysBz, 0777))
+}
+
+func TestT(t *testing.T) {
+	blk := new(lib.Block)
+
+	for range time.Tick(1 * time.Second) {
+		blockIndex := 0
+
+		// load corresponding block file
+		//home, _ := os.UserHomeDir()
+		fileName := fmt.Sprintf(fmt.Sprintf("./data/txs_block_%05d.proto", blockIndex))
+		fmt.Printf("Loading %s\n", fileName)
+		txsFile, err := os.ReadFile(fileName)
+		if err != nil {
+			fmt.Printf("Error reading file: %s\n", err)
+			return
+		}
+		if err = lib.Unmarshal(txsFile, blk); err != nil {
+			fmt.Printf("Error unmarshaling: %s\n", err)
+			return
+		}
+		maxTransactions := min(len(blk.Transactions), 200_000)
+		fmt.Printf("Loaded %d txs from block %d using %d\n", len(blk.Transactions), blockIndex, maxTransactions)
+		var size int
+		for i, tx := range blk.Transactions {
+			if i >= maxTransactions {
+				break
+			}
+			size += len(tx)
+		}
+		fmt.Println(size)
+		fmt.Println("Submitted block", blockIndex)
+	}
 }
