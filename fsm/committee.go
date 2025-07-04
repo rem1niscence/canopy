@@ -364,23 +364,13 @@ func (s *StateMachine) DeleteCommitteeMember(address crypto.AddressI, chainId, s
 // It is heavily cached to improve performance as the delegates are used for each block commit
 func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err lib.ErrorI) {
 	// create a variable to hold the committee members and total power
-	members := make([]*lib.ConsensusValidator, 0)
-	var totalPower uint64
+	members, totalPower := make([]*lib.ConsensusValidator, 0), uint64(0)
 	// create a function to process the delegates
-	addToValidatorSet := func(address string) lib.ErrorI {
-		addr, er := crypto.NewAddressFromString(address)
-		if er != nil {
-			return lib.ErrInvalidAddress()
-		}
-		// attempt to get validator from the cache
-		val, ok := s.cache.validators[address]
-		if !ok {
-			// if not in cache, get validator from the state
-			var e lib.ErrorI
-			val, e = s.GetValidator(addr)
-			if e != nil {
-				return e
-			}
+	addToValidatorSet := func(address crypto.AddressI) lib.ErrorI {
+		// get the validator
+		val, e := s.GetValidator(address)
+		if e != nil {
+			return e
 		}
 		// ensure the validator is not included in the committee if it's paused or unstaking
 		if val.MaxPausedHeight != 0 || val.UnstakingHeight != 0 {
@@ -401,15 +391,18 @@ func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err
 	if delegates, ok := s.cache.delegates[chainId]; ok {
 		// loop through the cached delegates
 		for address := range delegates {
-			if e := addToValidatorSet(address); e != nil {
+			// convert the address string to an address object
+			addr, _ := crypto.NewAddressFromString(address)
+			if e := addToValidatorSet(addr); e != nil {
 				return vs, e
 			}
 		}
 	} else {
+		s.cache.delegates[chainId] = make(map[string]struct{})
 		// iterate from highest stake to lowest
-		it, err := s.RevIterator(DelegatePrefix(chainId))
-		if err != nil {
-			return vs, err
+		it, er := s.RevIterator(DelegatePrefix(chainId))
+		if er != nil {
+			return vs, er
 		}
 		defer it.Close()
 		// loop through the iterator
@@ -419,12 +412,14 @@ func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err
 			if e != nil {
 				return vs, e
 			}
-			if e := addToValidatorSet(address.String()); e != nil {
+			// add to validator set
+			if e = addToValidatorSet(address); e != nil {
 				return vs, e
 			}
+			// add to cache
+			s.cache.delegates[chainId][address.String()] = struct{}{}
 		}
 	}
-
 	return lib.ValidatorSet{
 		ValidatorSet:  &lib.ConsensusValidators{ValidatorSet: members},
 		TotalPower:    totalPower,

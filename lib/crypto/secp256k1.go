@@ -11,6 +11,8 @@ import (
 	"golang.org/x/crypto/ripemd160"
 )
 
+/* This file implements logic for SECP256K1 when the public key is compressed (33 bytes) - this affects the 'addressing' and 'verify bytes' logic */
+
 const (
 	SECP256K1PrivKeySize   = 32
 	SECP256K1PubKeySize    = 33

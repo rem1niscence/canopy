@@ -6,7 +6,6 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"math"
-	"sync"
 	"testing"
 	"time"
 )
@@ -65,19 +64,16 @@ func TestAddTransaction(t *testing.T) {
 		error        string
 	}{
 		{
-			name:   "max tx size",
-			detail: "the tx size exceeds max (config)",
-			mempool: FeeMempool{
-				l: sync.RWMutex{},
-			},
-			toAdd: transaction,
-			error: "max tx size",
+			name:    "max tx size",
+			detail:  "the tx size exceeds max (config)",
+			mempool: FeeMempool{},
+			toAdd:   transaction,
+			error:   "max tx size",
 		},
 		{
 			name:   "already exists",
 			detail: "transaction not added because it already exists",
 			mempool: FeeMempool{
-				l:       sync.RWMutex{},
 				hashMap: map[string]struct{}{crypto.HashString(transaction.Tx): {}},
 				config: MempoolConfig{
 					MaxTotalBytes:       math.MaxUint64,
@@ -93,10 +89,8 @@ func TestAddTransaction(t *testing.T) {
 			name:   "recheck max tx count",
 			detail: "max tx count causes a recheck",
 			mempool: FeeMempool{
-				l:        sync.RWMutex{},
 				hashMap:  make(map[string]struct{}),
-				pool:     MempoolTxs{count: 0, l: list.New(), m: make(map[string]*list.Element)},
-				count:    0,
+				pool:     MempoolTxs{l: list.New(), m: make(map[string]*list.Element)},
 				txsBytes: 0,
 				config: MempoolConfig{
 					MaxTotalBytes:       math.MaxUint64,
@@ -112,10 +106,8 @@ func TestAddTransaction(t *testing.T) {
 			name:   "recheck max total bytes",
 			detail: "max total bytes",
 			mempool: FeeMempool{
-				l:        sync.RWMutex{},
 				hashMap:  make(map[string]struct{}),
-				pool:     MempoolTxs{count: 0, l: list.New(), m: make(map[string]*list.Element)},
-				count:    0,
+				pool:     MempoolTxs{l: list.New(), m: make(map[string]*list.Element)},
 				txsBytes: 0,
 				config: MempoolConfig{
 					MaxTotalBytes:       0,
@@ -131,10 +123,8 @@ func TestAddTransaction(t *testing.T) {
 			name:   "no recheck",
 			detail: "there's no recheck as the transaction is added without exceeding limits",
 			mempool: FeeMempool{
-				l:       sync.RWMutex{},
 				hashMap: make(map[string]struct{}),
-				pool:    MempoolTxs{count: 0, l: list.New(), m: make(map[string]*list.Element)},
-				count:   0,
+				pool:    MempoolTxs{l: list.New(), m: make(map[string]*list.Element)},
 				config: MempoolConfig{
 					MaxTotalBytes:       math.MaxUint64,
 					MaxTransactionCount: math.MaxUint32,
@@ -152,10 +142,8 @@ func TestAddTransaction(t *testing.T) {
 			name:   "multi-transaction",
 			detail: "test transaction ordering with multi-transaction",
 			mempool: FeeMempool{
-				l:       sync.RWMutex{},
 				hashMap: make(map[string]struct{}),
-				pool:    MempoolTxs{count: 0, l: list.New(), m: make(map[string]*list.Element)},
-				count:   0,
+				pool:    MempoolTxs{l: list.New(), m: make(map[string]*list.Element)},
 				config: MempoolConfig{
 					MaxTotalBytes:       math.MaxUint64,
 					MaxTransactionCount: math.MaxUint32,
@@ -183,7 +171,7 @@ func TestAddTransaction(t *testing.T) {
 			}
 			// compare got vs expected
 			require.Equal(t, test.recheck, gotRecheck)
-			require.Equal(t, test.count, test.mempool.count)
+			require.Equal(t, test.count, test.mempool.TxCount())
 			// call get transaction
 			gotTxs := test.mempool.GetTransactions(math.MaxUint64)
 			require.Equal(t, test.transactions, gotTxs)
@@ -228,7 +216,6 @@ func TestGetAndContainsTransaction(t *testing.T) {
 				},
 			},
 			mempool: &FeeMempool{
-				l:       sync.RWMutex{},
 				hashMap: make(map[string]struct{}),
 				config: MempoolConfig{
 					MaxTotalBytes:       math.MaxUint64,
@@ -276,7 +263,6 @@ func TestGetAndContainsTransaction(t *testing.T) {
 				},
 			},
 			mempool: &FeeMempool{
-				l:       sync.RWMutex{},
 				hashMap: make(map[string]struct{}),
 				config: MempoolConfig{
 					MaxTotalBytes:       math.MaxUint64,
@@ -334,9 +320,8 @@ func TestDeleteTransaction(t *testing.T) {
 			name:   "delete the first transaction",
 			detail: "delete the transaction with the highest fee",
 			mempool: &FeeMempool{
-				l: sync.RWMutex{},
 				pool: func() MempoolTxs {
-					m := MempoolTxs{count: 0, l: list.New(), m: make(map[string]*list.Element)}
+					m := MempoolTxs{l: list.New(), m: make(map[string]*list.Element)}
 					m.insert(MempoolTx{
 						Tx:  []byte("b"),
 						Fee: 1001,
@@ -382,9 +367,8 @@ func TestDeleteTransaction(t *testing.T) {
 			name:   "delete the second two transactions",
 			detail: "delete the 2 transactions with the lowest fees",
 			mempool: &FeeMempool{
-				l: sync.RWMutex{},
 				pool: func() MempoolTxs {
-					m := MempoolTxs{count: 0, l: list.New(), m: make(map[string]*list.Element)}
+					m := MempoolTxs{l: list.New(), m: make(map[string]*list.Element)}
 					m.insert(MempoolTx{
 						Tx:  []byte("b"),
 						Fee: 1001,

@@ -13,6 +13,11 @@ import (
 
 // GetValidator() gets the validator from the store via the address
 func (s *StateMachine) GetValidator(address crypto.AddressI) (*Validator, lib.ErrorI) {
+	// check the validators cache
+	got, found := s.cache.validators[address.String()]
+	if found {
+		return got, nil
+	}
 	// get the bytes from state using the key for a validator at a specific address
 	bz, err := s.Get(KeyForValidator(address))
 	if err != nil {
@@ -29,6 +34,8 @@ func (s *StateMachine) GetValidator(address crypto.AddressI) (*Validator, lib.Er
 	}
 	// update the validator structure address
 	val.Address = address.Bytes()
+	// set the validator in the cache
+	s.cache.validators[address.String()] = val
 	// return the validator
 	return val, nil
 }

@@ -130,8 +130,7 @@ func TransactionSubmitter(c *controller.Controller) {
 		blockIndex := h - 2 // start from block 0 when height = 2
 
 		// load corresponding block file
-		home, _ := os.UserHomeDir()
-		fileName := fmt.Sprintf(filepath.Join(home, fmt.Sprintf(".canopy/tps/txs_block_%05d.proto", blockIndex)))
+		fileName := fmt.Sprintf("cmd/tps/data/txs_block_%05d.proto", blockIndex)
 		fmt.Printf("Loading %s\n", fileName)
 		txsFile, err := os.ReadFile(fileName)
 		if err != nil {

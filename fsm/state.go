@@ -255,7 +255,7 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 			return nil, nil, nil, nil, 0, e
 		}
 		// apply the tx to the state machine, generating a transaction result
-		result, e := s.ApplyTransaction(uint64(n), tx, hashBytes, hashString, crypto.NewBatchVerifier(true))
+		result, e := s.ApplyTransaction(uint64(n), tx, hashString, crypto.NewBatchVerifier(true))
 		if e != nil {
 			// add to the failed list
 			failed = append(failed, tx)
@@ -602,10 +602,7 @@ func (s *StateMachine) TxnWrap() (lib.StoreI, lib.ErrorI) {
 }
 
 // SetCacheFromFSM() sets the cache of the current state machine from another state machine
-func (s *StateMachine) SetCacheFromFSM(fsm *StateMachine) {
-	// set the cache from the FSM
-	s.cache = fsm.cache
-}
+func (s *StateMachine) SetCacheFromFSM(fsm *StateMachine) { s.cache = fsm.cache }
 
 // catchPanic() acts as a failsafe, recovering from a panic and logging the error with the stack trace
 func (s *StateMachine) catchPanic() {

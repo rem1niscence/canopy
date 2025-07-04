@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"sync"
@@ -77,8 +76,8 @@ func (c *Controller) ListenForTx() {
 				if err := c.HandleTransaction(tx); err != nil {
 					// if the error is 'mempool already has it'
 					if err.Error() == lib.ErrTxFoundInMempool(crypto.HashString(tx)).Error() {
-						// exit
-						return
+						// continue
+						continue
 					}
 					// else - warn of the error
 					c.log.Warnf("Handle tx from %s failed with err: %s", lib.BytesToTruncatedString(senderID), err.Error())
@@ -263,7 +262,6 @@ func (m *Mempool) HandleTransaction(tx []byte) (err lib.ErrorI) {
 
 // CheckMempool() Checks each transaction in the mempool and caches a block proposal
 func (m *Mempool) CheckMempool() {
-	fmt.Println("DEADLOCK DEBUG: check mempool start")
 	defer lib.TimeTrack(m.log, time.Now())
 	var err lib.ErrorI
 	// create the actual block structure with the maximum amount of transactions allowed or available in the mempool
@@ -283,7 +281,6 @@ func (m *Mempool) CheckMempool() {
 		m.log.Errorf("Check Mempool error: %s", err.Error())
 		return
 	}
-	fmt.Printf("Setting cached proposal at height %d with hash %s and appHash %s\n", block.BlockHeader.Height, hex.EncodeToString(block.BlockHeader.Hash), hex.EncodeToString(block.BlockHeader.StateRoot))
 	// cache the proposal
 	m.cachedProposal.Store(&CachedProposal{
 		Block:       block,

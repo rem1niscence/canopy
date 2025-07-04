@@ -29,7 +29,6 @@ type Mempool interface {
 type FeeMempool struct {
 	hashMap  map[string]struct{} // O(1) de-duplication
 	pool     MempoolTxs          // the actual pool of transactions
-	count    int                 // the number of Transactions in the pool
 	txsBytes int                 // collective number of bytes in the pool
 	config   MempoolConfig       // user configuration of the pool
 }
@@ -51,9 +50,8 @@ func NewMempool(config MempoolConfig) Mempool {
 	return &FeeMempool{
 		hashMap: make(map[string]struct{}),
 		pool: MempoolTxs{
-			count: 0,
-			l:     list.New(),
-			m:     make(map[string]*list.Element),
+			l: list.New(),
+			m: make(map[string]*list.Element),
 		},
 		config: config,
 	}
@@ -81,20 +79,16 @@ func (f *FeeMempool) AddTransaction(tx []byte, fee uint64) (recheck bool, err Er
 	recheck = f.pool.insert(MempoolTx{Tx: tx, Fee: fee})
 	// insert into de-duplication hash map
 	f.hashMap[hash] = struct{}{}
-	// increment the count
-	f.count++
 	// update the number of bytes
 	f.txsBytes += txBytes
 	// assess if limits are exceeded - if so, drop from the bottom
 	var dropped []MempoolTx
 	// loop until the conditions are satisfied
-	for uint32(f.count) > f.config.MaxTransactionCount || uint64(f.txsBytes) > f.config.MaxTotalBytes {
+	for uint32(f.pool.l.Len()) >= f.config.MaxTransactionCount || uint64(f.txsBytes) > f.config.MaxTotalBytes {
 		// drop percentage is configurable
 		dropped = f.pool.drop(f.config.DropPercentage)
 		// for each dropped transaction
 		for _, d := range dropped {
-			// decrement count
-			f.count--
 			// subtract the txsBytes
 			f.txsBytes -= len(d.Tx)
 			// delete from teh de-duplication hash map
@@ -149,8 +143,6 @@ func (f *FeeMempool) DeleteTransaction(tx []byte) {
 	}
 	// delete from the hash map
 	delete(f.hashMap, crypto.HashString(deleted.Tx))
-	// reduce the mempool count
-	f.count--
 	// subtract the from the tx bytes count
 	f.txsBytes -= len(deleted.Tx)
 }
@@ -159,14 +151,11 @@ func (f *FeeMempool) DeleteTransaction(tx []byte) {
 func (f *FeeMempool) Clear() {
 	// reset the memory pool of transactions
 	f.pool = MempoolTxs{
-		count: 0,
-		l:     list.New(),
-		m:     make(map[string]*list.Element),
+		l: list.New(),
+		m: make(map[string]*list.Element),
 	}
 	// reset the hash map
 	f.hashMap = make(map[string]struct{})
-	// reset the count
-	f.count = 0
 	// reset the bytes count
 	f.txsBytes = 0
 }
@@ -174,7 +163,7 @@ func (f *FeeMempool) Clear() {
 // TxCount() returns the current number of transactions in the mempool
 func (f *FeeMempool) TxCount() int {
 	// return the count
-	return f.count
+	return f.pool.l.Len()
 }
 
 // TxsBytes() returns the total size in bytes of all transactions in the mempool
@@ -224,9 +213,8 @@ func (m *mempoolIterator) Close() {}
 
 // MempoolTxs is a list of MempoolTxs with a count
 type MempoolTxs struct {
-	count int
-	l     *list.List               // Doubly linked list
-	m     map[string]*list.Element // txHash -> list element
+	l *list.List               // Doubly linked list
+	m map[string]*list.Element // txHash -> list element
 }
 
 // insert() inserts a new tx into the list sorted by the highest fee to the lowest fee
@@ -236,8 +224,6 @@ func (t *MempoolTxs) insert(tx MempoolTx) (recheck bool) {
 		t.l = list.New()
 		t.m = make(map[string]*list.Element)
 	}
-	// increment count
-	t.count++
 	// get a key for the tx
 	k := string(tx.Tx)
 	// start from the back and scan backwards
@@ -245,13 +231,13 @@ func (t *MempoolTxs) insert(tx MempoolTx) (recheck bool) {
 		if e.Value.(MempoolTx).Fee >= tx.Fee {
 			// insert after this element
 			t.m[k] = t.l.InsertAfter(tx, e)
-			return t.m[k] != t.l.Back() && t.count != 1
+			return t.m[k] != t.l.Back() && t.l.Len() != 1
 		}
 	}
 	// if we got here, tx has the highest fee: insert at front
 	t.m[k] = t.l.PushFront(tx)
 	// return if recheck required
-	return t.m[k] != t.l.Back() && t.count != 1
+	return t.m[k] != t.l.Back() && t.l.Len() != 1
 }
 
 func (t *MempoolTxs) delete(tx []byte) (deleted MempoolTx) {
@@ -264,21 +250,17 @@ func (t *MempoolTxs) delete(tx []byte) (deleted MempoolTx) {
 	t.l.Remove(elem)
 	// remove from map
 	delete(t.m, string(tx))
-	// decrement the count
-	t.count--
 	// return the element
 	return elem.Value.(MempoolTx)
 }
 
 // drop() removes the bottom (the lowest fee) X percent of Transactions
 func (t *MempoolTxs) drop(percent int) (dropped []MempoolTx) {
-	if t.count == 0 || percent <= 0 {
+	if t.l.Len() == 0 || percent <= 0 {
 		return nil
 	}
 	// calculate the percent using integer division
-	numDrop := (t.count*percent)/100 + 1
-	// decrement count by number evicted
-	t.count -= numDrop
+	numDrop := (t.l.Len()*percent)/100 + 1
 	// start at the back
 	current := t.l.Back()
 	// reverse iterate 'num to drop'
@@ -291,8 +273,6 @@ func (t *MempoolTxs) drop(percent int) (dropped []MempoolTx) {
 		t.l.Remove(current)
 		// delete from the map
 		delete(t.m, string(tx.Tx))
-		// decrement the count
-		t.count--
 		// save dropped
 		dropped = append(dropped, tx)
 		// set previous to current
@@ -316,9 +296,8 @@ func (t *MempoolTxs) copy() *MempoolTxs {
 	}
 	// exit with new structure
 	return &MempoolTxs{
-		l:     newList,
-		m:     newMap,
-		count: t.count,
+		l: newList,
+		m: newMap,
 	}
 }
 
