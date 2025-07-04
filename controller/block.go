@@ -28,6 +28,9 @@ func (c *Controller) ListenForBlock() {
 		var quit bool
 		// wrap in a function call to use 'defer' functionality
 		func() {
+			// track processing time for consensus module
+			startTime := time.Now()
+			// log the beginning of handling the block message
 			c.log.Debug("Handling block message")
 			//defer lib.TimeTrack(c.log, time.Now())
 			// lock the controller to prevent multi-thread conflicts
@@ -54,8 +57,6 @@ func (c *Controller) ListenForBlock() {
 				// exit iteration
 				return
 			}
-			// track processing time for consensus module
-			startTime := time.Now()
 			// 'handle' the peer block and certificate appropriately
 			qc, err := c.HandlePeerBlock(blockMessage, false)
 			// ensure no error

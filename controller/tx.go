@@ -37,7 +37,7 @@ func (c *Controller) ListenForTx() {
 			continue
 		}
 		func() {
-			c.log.Debug("Handling transaction")
+			//c.log.Debug("Handling transaction")
 			//defer lib.TimeTrack(c.log, time.Now())
 			// lock the controller for thread safety
 			c.Lock()
@@ -255,7 +255,7 @@ func (m *Mempool) HandleTransaction(tx []byte) (err lib.ErrorI) {
 		// exit with the error
 		return
 	}
-	m.log.Debugf("Added tx %s to mempool for checking", crypto.HashString(tx))
+	//m.log.Debugf("Added tx %s to mempool for checking", crypto.HashString(tx))
 	// exit
 	return
 }

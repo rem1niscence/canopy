@@ -730,7 +730,7 @@ func (b *BFT) msLeftInRound() int {
 // - Phase Timeout ensures the node waits for a configured duration (Round x phaseTimeout) to allow for full voter participation
 // This design balances synchronization speed during adverse conditions with maximizing voter participation under normal conditions
 func (b *BFT) SetWaitTimers(phaseWaitTime, processTime time.Duration) {
-	//b.log.Debugf("Process time: %.2fs, Wait time: %.2fs", processTime.Seconds(), phaseWaitTime.Seconds())
+	b.log.Debugf("Process time: %.2fs, Wait time: %.2fs", processTime.Seconds(), phaseWaitTime.Seconds())
 	subtract := func(wt, pt time.Duration) (t time.Duration) {
 		if pt > 24*time.Hour {
 			return wt
@@ -742,7 +742,7 @@ func (b *BFT) SetWaitTimers(phaseWaitTime, processTime time.Duration) {
 	}
 	// calculate the phase timer by subtracting the process time
 	phaseWaitTime = subtract(phaseWaitTime, processTime)
-	//b.log.Debugf("Setting consensus timer: %.2f sec", phaseWaitTime.Seconds())
+	b.log.Debugf("Setting consensus timer: %.2f sec", phaseWaitTime.Seconds())
 	// set Phase timers to go off in their respective timeouts
 	lib.ResetTimer(b.PhaseTimer, phaseWaitTime)
 }
