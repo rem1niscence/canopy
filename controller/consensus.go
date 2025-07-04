@@ -292,6 +292,7 @@ func (c *Controller) verifyResponse(msg *lib.MessageAndMetadata, queue map[uint6
 
 // ListenForConsensus() listens and internally routes inbound consensus messages
 func (c *Controller) ListenForConsensus() {
+	defer lib.TimeTrack(c.log, time.Now())
 	// wait and execute for each consensus message received
 	for msg := range c.P2P.Inbox(Cons) {
 		// if the node is syncing

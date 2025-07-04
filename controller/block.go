@@ -18,6 +18,7 @@ import (
 
 // ListenForBlock() listens for inbound block messages, internally routes them, and gossips them to peers
 func (c *Controller) ListenForBlock() {
+	defer lib.TimeTrack(c.log, time.Now())
 	// log the beginning of the 'block listener' service
 	c.log.Debug("Listening for inbound blocks")
 	// initialize a cache that prevents duplicate messages

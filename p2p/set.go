@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
@@ -224,6 +225,7 @@ func (ps *PeerSet) SendTo(publicKey []byte, topic lib.Topic, msg proto.Message) 
 
 // SendToPeers() sends a message to all peers
 func (ps *PeerSet) SendToPeers(topic lib.Topic, msg proto.Message, excludeKeys ...string) lib.ErrorI {
+	defer lib.TimeTrack(ps.logger, time.Now())
 	ps.RLock()
 	defer ps.RUnlock()
 	for _, p := range ps.m {
