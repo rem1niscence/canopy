@@ -94,7 +94,7 @@ func TestAddTransaction(t *testing.T) {
 				txsBytes: 0,
 				config: MempoolConfig{
 					MaxTotalBytes:       math.MaxUint64,
-					MaxTransactionCount: 0,
+					MaxTransactionCount: 1,
 					IndividualMaxTxSize: math.MaxUint32,
 					DropPercentage:      10,
 				},
