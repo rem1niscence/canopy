@@ -677,7 +677,7 @@ func (c *Controller) finishSyncing() {
 	// when function completes, unlock
 	defer c.Unlock()
 	// signal a reset of bft for the chain
-	c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(c.LoadLastCommitTime(c.FSM.Height()))}
+	c.Consensus.ResetBFT <- bft.ResetBFT{StartTime: c.LoadLastCommitTime(c.FSM.Height())}
 	// set syncing to false
 	c.isSyncing.Store(false)
 	// enable listening for a block

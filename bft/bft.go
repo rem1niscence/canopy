@@ -114,18 +114,23 @@ func (b *BFT) Start() {
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
+				// calculate the process time
+				var processTime time.Duration
+				if !resetBFT.StartTime.IsZero() {
+					processTime = time.Since(resetBFT.StartTime)
+				}
 				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
 				// else increment the height and don't maintain locks
 				if !resetBFT.IsRootChainUpdate {
 					b.log.Info("Reset BFT (NEW_HEIGHT)")
 					b.NewHeight(false)
-					b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
+					b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, processTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
 					b.NewHeight(true)
 					if !b.LoadIsOwnRoot() {
 						// set the wait timers to start consensus
-						b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, resetBFT.ProcessTime)
+						b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, processTime)
 					}
 				}
 			}()
@@ -881,7 +886,7 @@ type (
 
 type ResetBFT struct {
 	IsRootChainUpdate bool
-	ProcessTime       time.Duration
+	StartTime         time.Time
 }
 
 const (
