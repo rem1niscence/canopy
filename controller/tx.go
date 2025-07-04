@@ -39,10 +39,6 @@ func (c *Controller) ListenForTx() {
 		func() {
 			c.log.Debug("Handling transaction")
 			defer lib.TimeTrack(c.log, time.Now())
-			// lock the controller for thread safety
-			c.Lock()
-			// unlock when this iteration completes
-			defer c.Unlock()
 			// check and add the message to the cache to prevent duplicates
 			if ok := cache.Add(msg); !ok {
 				// if duplicate, exit
