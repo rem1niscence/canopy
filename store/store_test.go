@@ -1,59 +1,13 @@
 package store
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
-	"math"
-	"os"
-	"runtime/debug"
 	"testing"
 
-	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/stretchr/testify/require"
 )
-
-func TestMaxTransaction(t *testing.T) {
-	tempDirector := os.TempDir()
-	db, err := badger.OpenManaged(badger.DefaultOptions(tempDirector).WithMemTableSize(128 * int64(units.MB)).
-		WithNumVersionsToKeep(math.MaxInt).WithLoggingLevel(badger.ERROR))
-	require.NoError(t, err)
-	defer func() { db.Close() }()
-	tx := db.NewTransactionAt(1, true)
-	i := 0
-	totalBytes := 0
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println(string(debug.Stack()))
-			fmt.Println(i)
-			fmt.Println("TOTAL_MBs", float64(totalBytes)/1000000)
-		}
-	}()
-	for ; i < 128000; i++ {
-		k := numberToBytes(i)
-		v := bytes.Repeat([]byte("b"), 1000)
-		totalBytes += len(k) + len(v)
-		if err = tx.Set(k, v); err != nil {
-			fmt.Println(err.Error())
-			fmt.Println(i)
-			fmt.Println("TOTAL_MBs", float64(totalBytes)/1000000)
-			tx.Discard()
-			return
-		}
-	}
-	require.NoError(t, tx.CommitAt(1, nil))
-}
-
-func numberToBytes(n int) []byte {
-	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.BigEndian, uint32(n))
-	if err != nil {
-		panic(err)
-	}
-	return buf.Bytes()
-}
 
 func TestStoreSetGetDelete(t *testing.T) {
 	store, _, cleanup := testStore(t)

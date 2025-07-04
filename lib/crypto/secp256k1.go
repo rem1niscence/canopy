@@ -167,16 +167,15 @@ func (s *SECP256K1PublicKey) Address() AddressI {
 }
 
 // VerifyBytes() returns true if the digital signature is valid for this public key and the given message
-func (s *SECP256K1PublicKey) VerifyBytes(msg []byte, sig []byte) bool {
+func (s *SECP256K1PublicKey) VerifyBytes(msg []byte, sig []byte) (valid bool) {
 	cached, addToCache := CheckCache(s, msg, sig)
 	if cached {
 		return true
 	}
-	valid := ethCrypto.VerifySignature(s.Bytes(), Hash(msg), sig)
-	if valid {
+	if valid = ethCrypto.VerifySignature(s.Bytes(), Hash(msg), sig); valid {
 		addToCache()
 	}
-	return valid
+	return
 }
 
 // Bytes() returns the byte representation of the Public Key

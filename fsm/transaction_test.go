@@ -83,9 +83,6 @@ func TestApplyTransaction(t *testing.T) {
 					Time:   uint64(test.lastBlockTime.UnixMicro()),
 				},
 			}))
-			// convert the hash to bytes
-			txHashBz, err := lib.StringToBytes(test.expected.TxHash)
-			require.NoError(t, err)
 			// execute the function call
 			got, err := sm.ApplyTransaction(0, tx, test.expected.TxHash, nil)
 			// validate the expected error
