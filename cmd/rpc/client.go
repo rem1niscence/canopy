@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/canopy-network/canopy/fsm"
 	"io"
-	"net"
 	"net/http"
-	"time"
+
+	"github.com/canopy-network/canopy/fsm"
 
 	"github.com/canopy-network/canopy/controller"
 	"github.com/canopy-network/canopy/lib"
@@ -23,23 +22,7 @@ type Client struct {
 }
 
 func NewClient(rpcURL, adminRPCUrl string) *Client {
-	client := http.Client{
-		Transport: &http.Transport{
-			// Allow a lot of reuse and open connections
-			MaxIdleConns:        10000,
-			MaxIdleConnsPerHost: 1000,
-			MaxConnsPerHost:     10000,
-			IdleConnTimeout:     90 * time.Second,
-
-			// Optional: Set TCP keep-alives
-			DialContext: (&net.Dialer{
-				Timeout:   5 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-		},
-		Timeout: 10 * time.Second, // Total request timeout
-	}
-	return &Client{rpcURL: rpcURL, adminRpcUrl: adminRPCUrl, client: client}
+	return &Client{rpcURL: rpcURL, adminRpcUrl: adminRPCUrl, client: http.Client{}}
 }
 
 func (c *Client) Version() (version *string, err lib.ErrorI) {

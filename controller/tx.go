@@ -98,6 +98,10 @@ func (c *Controller) ListenForTx() {
 func (c *Controller) HandleTransaction(tx []byte) lib.ErrorI {
 	// generate hash hex string for the transaction
 	hash := crypto.HashString(tx)
+	// lock the mempool
+	// lock the mempool
+	c.Mempool.L.Lock()
+	defer c.Mempool.L.Unlock()
 	// ensure the mempool doesn't already contain the transaction
 	if c.Mempool.Contains(hash) {
 		// if it does, exit with already found in the mempool
@@ -209,6 +213,9 @@ func NewMempool(fsm *fsm.StateMachine, address crypto.AddressI, config lib.Mempo
 	if err != nil {
 		return nil, err
 	}
+	// thread safety
+	m.L.Lock()
+	defer m.L.Unlock()
 	// pre-call check-mempool to load an empty block proposal
 	m.CheckMempool()
 	// exit

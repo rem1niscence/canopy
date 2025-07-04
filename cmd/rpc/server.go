@@ -121,7 +121,6 @@ func (s *Server) startRPC(router *httprouter.Router, port string) {
 	s.logger.Infof("Starting RPC server at 0.0.0.0:%s", port)
 	s.logger.Fatal((&http.Server{
 		Addr:              colon + port,
-		IdleTimeout:       120 * time.Second,
 		ReadHeaderTimeout: timeout,
 		ReadTimeout:       timeout,
 		WriteTimeout:      timeout,
@@ -176,18 +175,21 @@ func (s *Server) startStaticFileServers() {
 
 // submitTx submits a transaction to the controller and writes http response
 func (s *Server) submitTx(w http.ResponseWriter, tx any) (ok bool) {
-	// marshal the transaction
+
+	// Marshal the transaction
 	bz, err := lib.Marshal(tx)
 	if err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
-	// write directly to the mempool
-	if err = s.controller.HandleTransaction(bz); err != nil {
+
+	// Send transaction to controller
+	if err = s.controller.SendTxMsg(bz); err != nil {
 		write(w, err, http.StatusBadRequest)
 		return
 	}
-	// write transaction to http response
+
+	// Write transaction to http response
 	write(w, crypto.HashString(bz), http.StatusOK)
 	return true
 }

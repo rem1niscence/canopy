@@ -27,7 +27,6 @@ type Mempool interface {
 
 // FeeMempool is a Mempool implementation that prioritizes transactions with the highest fees
 type FeeMempool struct {
-	l        sync.RWMutex        // for thread safety // TODO evaluate the need for this since the controller locks
 	hashMap  map[string]struct{} // O(1) de-duplication
 	pool     MempoolTxs          // the actual pool of transactions
 	count    int                 // the number of Transactions in the pool
@@ -50,7 +49,6 @@ func NewMempool(config MempoolConfig) Mempool {
 	}
 	// return the default mempool
 	return &FeeMempool{
-		l:       sync.RWMutex{},
 		hashMap: make(map[string]struct{}),
 		pool: MempoolTxs{
 			count: 0,
@@ -64,10 +62,6 @@ func NewMempool(config MempoolConfig) Mempool {
 // AddTransaction() inserts a new unconfirmed Transaction to the Pool and returns if this addition
 // requires a recheck of the Mempool due to dropping or re-ordering of the Transactions
 func (f *FeeMempool) AddTransaction(tx []byte, fee uint64) (recheck bool, err ErrorI) {
-	// lock the mempool for thread safety
-	f.l.Lock()
-	// when the function finishes unlock the mempool
-	defer f.l.Unlock()
 	// ensure the size of the Transaction doesn't exceed the individual limit
 	txBytes := len(tx)
 	// if the transaction bytes is larger than the max size
@@ -113,10 +107,6 @@ func (f *FeeMempool) AddTransaction(tx []byte, fee uint64) (recheck bool, err Er
 
 // GetTransactions() returns a list of the Transactions from the pool up to 'max collective Transaction bytes'
 func (f *FeeMempool) GetTransactions(maxBytes uint64) (txs [][]byte) {
-	// lock for thread safety
-	f.l.RLock()
-	// unlock when the function completes
-	defer f.l.RUnlock()
 	// create a variable to track the total transaction byte count
 	totalBytes := uint64(0)
 	// for each transaction in the pool
@@ -142,10 +132,6 @@ func (f *FeeMempool) GetTransactions(maxBytes uint64) (txs [][]byte) {
 
 // Contains() checks if a transaction with the given hash exists in the mempool
 func (f *FeeMempool) Contains(hash string) (contains bool) {
-	// lock for thread safety
-	f.l.RLock()
-	// unlock when the function completes
-	defer f.l.RUnlock()
 	// check if the hash map contains the transaction hash
 	_, contains = f.hashMap[hash]
 	// exit
@@ -154,10 +140,6 @@ func (f *FeeMempool) Contains(hash string) (contains bool) {
 
 // DeleteTransaction() removes the specified transaction from the mempool
 func (f *FeeMempool) DeleteTransaction(tx []byte) {
-	// lock for thread safety
-	f.l.Lock()
-	// unlock when the function completes
-	defer f.l.Unlock()
 	// delete the transaction from the pool
 	deleted := f.pool.delete(tx)
 	// if the attempted deleted tx is nil
@@ -175,10 +157,6 @@ func (f *FeeMempool) DeleteTransaction(tx []byte) {
 
 // Clear() empties the mempool and resets its state
 func (f *FeeMempool) Clear() {
-	// lock the mempool for thread safety
-	f.l.Lock()
-	// unlock when the function completes
-	defer f.l.Unlock()
 	// reset the memory pool of transactions
 	f.pool = MempoolTxs{
 		count: 0,
@@ -195,20 +173,12 @@ func (f *FeeMempool) Clear() {
 
 // TxCount() returns the current number of transactions in the mempool
 func (f *FeeMempool) TxCount() int {
-	// lock for thread safety
-	f.l.RLock()
-	// unlock when function completes
-	defer f.l.RUnlock()
 	// return the count
 	return f.count
 }
 
 // TxsBytes() returns the total size in bytes of all transactions in the mempool
 func (f *FeeMempool) TxsBytes() int {
-	// lock for thread safety
-	f.l.RLock()
-	// unlock when function completes
-	defer f.l.RUnlock()
 	// return the number of bytes in the memory pool
 	return f.txsBytes
 }
