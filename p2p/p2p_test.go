@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/alecthomas/units"
 	"net"
 	"strings"
 	"sync"
@@ -110,6 +111,9 @@ func TestSendToPeers(t *testing.T) {
 }
 
 func TestSendToPeersChunkedPacket(t *testing.T) {
+	if maxChunksPerPacket == 1 {
+		t.SkipNow()
+	}
 	n1 := newStartedTestP2PNode(t)
 	n2 := newTestP2PNode(t)
 	n2.meta.ChainId = 1
@@ -381,6 +385,9 @@ func TestID(t *testing.T) {
 }
 
 func TestMaxPacketSize(t *testing.T) {
+	if maxDataChunkSize > 1*units.MB {
+		t.SkipNow()
+	}
 	a, err := lib.NewAny(&Packet{
 		StreamId: lib.Topic_INVALID,
 		Eof:      true,

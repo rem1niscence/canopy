@@ -101,7 +101,7 @@ func bulkSetKV(t *testing.T, store lib.WStoreI, prefix string, keyValue ...strin
 	}
 }
 
-func DoublyNestedTxn(t *testing.T) {
+func TestDoublyNestedTxn(t *testing.T) {
 	store, _, cleanup := testStore(t)
 	defer cleanup()
 	// set initial value to the store
