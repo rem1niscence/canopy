@@ -3,7 +3,6 @@ package p2p
 import (
 	"encoding/binary"
 	"io"
-	"math"
 	"net"
 	"runtime/debug"
 	"sync"
@@ -19,9 +18,9 @@ import (
 const (
 	pingInterval           = 30 * time.Second                                    // how often a ping is to be sent
 	pongTimeoutDuration    = 20 * time.Second                                    // how long the sender of a ping waits for a pong before throwing an error
-	maxChunksPerPacket     = 1                                                   // maximum number of chunks per packet - *1* means chunking disabled
+	maxChunksPerPacket     = 256                                                 // maximum number of chunks per packet - *1* means chunking disabled
 	maxDataChunkSize       = maxPacketSize/maxChunksPerPacket - packetHeaderSize // maximum size of the chunk of bytes in a packet
-	maxPacketSize          = math.MaxUint32                                      // maximum size of the full packet
+	maxPacketSize          = uint32(256 * units.MB)                              // maximum size of the full packet
 	packetHeaderSize       = 47                                                  // the overhead of the protobuf packet header
 	queueSendTimeout       = 10 * time.Second                                    // how long a message waits to be queued before throwing an error
 	maxMessageSize         = 1024 * units.Megabyte                               // the maximum total size of a message once all the packets are added up
@@ -78,6 +77,14 @@ type MultiConn struct {
 
 // NewConnection() creates and starts a new instance of a MultiConn
 func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		if err := tcpConn.SetWriteBuffer(32 * 1024 * 1024); err != nil {
+			p.log.Warnf("Failed to set write buffer: %v", err)
+		}
+		if err := tcpConn.SetReadBuffer(32 * 1024 * 1024); err != nil {
+			p.log.Warnf("Failed to set write buffer: %v", err)
+		}
+	}
 	// establish an encrypted connection using the handshake
 	eConn, err := NewHandshake(conn, p.meta, p.privateKey)
 	if err != nil {
@@ -138,7 +145,7 @@ func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
 		c.log.Errorf("Marshaling failed of payload: %s", msg.String())
 		return false
 	}
-	chunks := split(bz, maxDataChunkSize)
+	chunks := split(bz, int(maxDataChunkSize))
 	var packets []*Packet
 	for i, chunk := range chunks {
 		packets = append(packets, &Packet{
@@ -259,7 +266,6 @@ func (c *MultiConn) startReceiveService() {
 					return
 				}
 			case *Ping: // receive ping message notifies the "send" service to respond with a 'pong' message
-
 				c.sendPong <- struct{}{}
 			case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
 				c.receivedPong <- struct{}{}
@@ -290,7 +296,7 @@ func (c *MultiConn) waitForAndHandleWireBytes(m *limiter.Monitor) (proto.Message
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
-	m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
+	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
 	// read the proto message from the wire
 	if err := receiveProtoMsg(c.conn, msg); err != nil {
 		return nil, err
@@ -304,15 +310,16 @@ func (c *MultiConn) waitForAndHandleWireBytes(m *limiter.Monitor) (proto.Message
 // sends them across the wire without violating the data flow rate limits
 // message may be a Packet, a Ping or a Pong
 func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) {
-	//if packet != nil {
-	//	c.log.Debugf("Send Packet to %s (ID:%s, L:%d, E:%t), hash: %s",
-	//		lib.BytesToTruncatedString(c.Address.PublicKey),
-	//		lib.Topic_name[int32(packet.StreamId)],
-	//		len(packet.Bytes),
-	//		packet.Eof,
-	//		crypto.ShortHashString(packet.Bytes),
-	//	)
-	//}
+	if packet != nil {
+		//c.log.Debugf("Send Packet to %s (ID:%s, L:%d, E:%t), hash: %s",
+		//	lib.BytesToTruncatedString(c.Address.PublicKey),
+		//	lib.Topic_name[int32(packet.StreamId)],
+		//	len(packet.Bytes),
+		//	packet.Eof,
+		//	crypto.ShortHashString(packet.Bytes),
+		//)
+		//defer c.log.Debugf("Done sending: %s", crypto.ShortHashString(packet.Bytes))
+	}
 	// send packet as message over the wire
 	c.sendWireBytes(packet, m)
 	return
@@ -331,7 +338,7 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) {
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
-	m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
+	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
 	//defer lib.TimeTrack(c.log, time.Now())
 	// send the proto message wrapped in an Envelope over the wire
 	if err = sendProtoMsg(c.conn, &Envelope{Payload: a}); err != nil {
@@ -391,6 +398,7 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 	//	packet.Eof,
 	//	crypto.ShortHashString(packet.Bytes),
 	//)
+	//defer s.logger.Debugf("Done receiving: %s", crypto.ShortHashString(packet.Bytes))
 	// if the addition of this new packet pushes the total message size above max
 	if int(maxMessageSize) < msgAssemblerLen+packetLen {
 		s.msgAssembler = s.msgAssembler[:0]
@@ -416,7 +424,9 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 			Sender:  peerInfo,
 		}
 		// add to inbox for other parts of the app to read
-		//s.logger.Debugf("Inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
+		if packet.StreamId == lib.Topic_CONSENSUS {
+			s.logger.Debugf("Inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
+		}
 		s.inbox <- m
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]

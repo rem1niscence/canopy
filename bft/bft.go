@@ -100,6 +100,8 @@ func (b *BFT) Start() {
 		// - This triggers when the phase's sleep time has expired, indicating that all expected messages for this phase should have already been received
 		case <-b.PhaseTimer.C:
 			func() {
+				b.log.Debugf("PhaseTimer %s Lock", b.Phase.String())
+				defer b.log.Debugf("PHaseTimer %s Unlock", b.Phase.String())
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
 				// Update BFT metrics
@@ -112,6 +114,8 @@ func (b *BFT) Start() {
 		// - This triggers when receiving a new Commit Block (QC) from either root-chainId (a) or the Target-ChainId (b)
 		case resetBFT := <-b.ResetBFT:
 			func() {
+				b.log.Debugf("ResetBFT Lock")
+				defer b.log.Debugf("ResetBFT Unlock")
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
 				// calculate the process time
@@ -747,6 +751,9 @@ func (b *BFT) SetWaitTimers(phaseWaitTime, processTime time.Duration) {
 	}
 	// calculate the phase timer by subtracting the process time
 	phaseWaitTime = subtract(phaseWaitTime, processTime)
+	if b.Phase == Election {
+		b.log.Debugf("ELECTION WILL START at: %s", time.Now().Add(phaseWaitTime).String())
+	}
 	b.log.Debugf("Setting consensus timer: %.2f sec", phaseWaitTime.Seconds())
 	// set Phase timers to go off in their respective timeouts
 	lib.ResetTimer(b.PhaseTimer, phaseWaitTime)

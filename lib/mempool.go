@@ -1,9 +1,11 @@
 package lib
 
 import (
-	"container/list"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"maps"
+	"math"
 	"slices"
+	"sort"
 	"sync"
 	"time"
 )
@@ -14,10 +16,10 @@ var _ Mempool = &FeeMempool{} // Mempool interface enforcement for FeeMempool im
 
 // Mempool interface is a model for a pre-block, in-memory, Transaction store
 type Mempool interface {
-	Contains(hash string) bool                                       // whether the mempool has this transaction already (de-duplicated by hash)
-	AddTransaction(tx []byte, fee uint64) (recheck bool, err ErrorI) // insert new unconfirmed transaction
-	DeleteTransaction(tx []byte)                                     // delete unconfirmed transaction
-	GetTransactions(maxBytes uint64) [][]byte                        // retrieve transactions from the highest fee to lowest
+	Contains(txHash string) bool               // whether the mempool has this transaction already (de-duplicated by hash)
+	AddTransactions(tx ...[]byte) (err ErrorI) // insert new unconfirmed transaction
+	DeleteTransaction(tx ...[]byte)            // delete unconfirmed transaction
+	GetTransactions(maxBytes uint64) [][]byte  // retrieve transactions from the highest fee to lowest
 
 	Clear()              // reset the entire store
 	TxCount() int        // number of Transactions in the pool
@@ -27,10 +29,9 @@ type Mempool interface {
 
 // FeeMempool is a Mempool implementation that prioritizes transactions with the highest fees
 type FeeMempool struct {
-	hashMap  map[string]struct{} // O(1) de-duplication
-	pool     MempoolTxs          // the actual pool of transactions
-	txsBytes int                 // collective number of bytes in the pool
-	config   MempoolConfig       // user configuration of the pool
+	pool     MempoolTxs    // the actual pool of transactions
+	txsBytes int           // collective number of bytes in the pool
+	config   MempoolConfig // user configuration of the pool
 }
 
 // MempoolTx is a wrapper over Transaction bytes that maintains the fee associated with the bytes
@@ -48,55 +49,70 @@ func NewMempool(config MempoolConfig) Mempool {
 	}
 	// return the default mempool
 	return &FeeMempool{
-		hashMap: make(map[string]struct{}),
-		pool: MempoolTxs{
-			l: list.New(),
-			m: make(map[string]*list.Element),
-		},
+		pool:   MempoolTxs{},
 		config: config,
 	}
 }
 
 // AddTransaction() inserts a new unconfirmed Transaction to the Pool and returns if this addition
 // requires a recheck of the Mempool due to dropping or re-ordering of the Transactions
-func (f *FeeMempool) AddTransaction(tx []byte, fee uint64) (recheck bool, err ErrorI) {
-	// ensure the size of the Transaction doesn't exceed the individual limit
-	txBytes := len(tx)
-	// if the transaction bytes is larger than the max size
-	if uint32(txBytes) > f.config.IndividualMaxTxSize {
-		// exit with error
-		return false, ErrMaxTxSize()
+func (f *FeeMempool) AddTransactions(txs ...[]byte) (err ErrorI) {
+	// create a list of MempoolTxs
+	mempoolTxs := make([]MempoolTx, 0, len(txs))
+	for _, tx := range txs {
+		// ensure the size of the Transaction doesn't exceed the individual limit
+		txBytes := len(tx)
+		// if the transaction bytes is larger than the max size
+		if uint32(txBytes) > f.config.IndividualMaxTxSize {
+			// exit with error
+			return ErrMaxTxSize()
+		}
+		// check if the mempool already contains the transaction
+		if _, found := f.pool.m[crypto.HashString(tx)]; found {
+			continue // skip already contains
+		}
+		// create a new transaction object reference to ensure a non-nil transaction
+		transaction := new(Transaction)
+		// populate the object ref with the bytes of the transaction
+		if err = Unmarshal(tx, transaction); err != nil {
+			return
+		}
+		// perform basic validations against the tx object
+		if err = transaction.CheckBasic(); err != nil {
+			return
+		}
+		// extract the fee from the transaction result
+		fee := transaction.Fee
+		// if the transaction is a special type: 'certificate result'
+		if transaction.MessageType == "certificateResults" {
+			// prioritize certificate result transactions by artificially raising the fee 'stored fee'
+			fee = math.MaxUint32
+		}
+		// add to the list
+		mempoolTxs = append(mempoolTxs, MempoolTx{Tx: tx, Fee: fee})
+		// update the number of bytes
+		f.txsBytes += txBytes
 	}
-	// create quick hash of the transaction for de-duplication;
-	// note that hash may not equal Transaction Hash based on the implementation
-	hash := crypto.HashString(tx)
-	// check for a duplicate
-	if _, alreadyFound := f.hashMap[hash]; alreadyFound {
-		// exit with 'already found' error
-		return false, ErrTxFoundInMempool(hash)
-	}
-	// insert the transaction into the pool
-	recheck = f.pool.insert(MempoolTx{Tx: tx, Fee: fee})
-	// insert into de-duplication hash map
-	f.hashMap[hash] = struct{}{}
-	// update the number of bytes
-	f.txsBytes += txBytes
+	// insert the transactions into the pool
+	_ = f.pool.insert(mempoolTxs...)
 	// assess if limits are exceeded - if so, drop from the bottom
 	var dropped []MempoolTx
+	// handle bad config
+	if f.config.MaxTransactionCount == 0 {
+		f.config.MaxTransactionCount = 1
+	}
 	// loop until the conditions are satisfied
-	for uint32(f.pool.l.Len()) >= f.config.MaxTransactionCount || uint64(f.txsBytes) > f.config.MaxTotalBytes {
+	for uint32(len(f.pool.s)) >= f.config.MaxTransactionCount || uint64(f.txsBytes) > f.config.MaxTotalBytes {
 		// drop percentage is configurable
 		dropped = f.pool.drop(f.config.DropPercentage)
 		// for each dropped transaction
 		for _, d := range dropped {
 			// subtract the txsBytes
 			f.txsBytes -= len(d.Tx)
-			// delete from teh de-duplication hash map
-			delete(f.hashMap, crypto.HashString(d.Tx))
 		}
 	}
 	// if any are dropped or re-order happened
-	return len(dropped) != 0 || recheck, nil
+	return nil
 }
 
 // GetTransactions() returns a list of the Transactions from the pool up to 'max collective Transaction bytes'
@@ -104,11 +120,9 @@ func (f *FeeMempool) GetTransactions(maxBytes uint64) (txs [][]byte) {
 	// create a variable to track the total transaction byte count
 	totalBytes := uint64(0)
 	// for each transaction in the pool
-	for e := f.pool.l.Front(); e != nil; e = e.Next() {
-		// cast the item
-		item := e.Value.(MempoolTx)
+	for _, tx := range f.pool.s {
 		// get the size of the transaction in bytes
-		txSize := len(item.Tx)
+		txSize := len(tx.Tx)
 		// add to the total bytes
 		totalBytes += uint64(txSize)
 		// check to see if the addition of this transaction
@@ -118,44 +132,32 @@ func (f *FeeMempool) GetTransactions(maxBytes uint64) (txs [][]byte) {
 			return
 		}
 		// add the tx to the list and increment totalTxs
-		txs = append(txs, item.Tx)
+		txs = append(txs, tx.Tx)
 	}
 	// exit
 	return
 }
 
 // Contains() checks if a transaction with the given hash exists in the mempool
-func (f *FeeMempool) Contains(hash string) (contains bool) {
+func (f *FeeMempool) Contains(txHash string) (contains bool) {
 	// check if the hash map contains the transaction hash
-	_, contains = f.hashMap[hash]
+	_, contains = f.pool.m[txHash]
 	// exit
 	return
 }
 
 // DeleteTransaction() removes the specified transaction from the mempool
-func (f *FeeMempool) DeleteTransaction(tx []byte) {
+func (f *FeeMempool) DeleteTransaction(tx ...[]byte) {
 	// delete the transaction from the pool
-	deleted := f.pool.delete(tx)
-	// if the attempted deleted tx is nil
-	if deleted.Tx == nil {
-		// exit
-		return
-	}
-	// delete from the hash map
-	delete(f.hashMap, crypto.HashString(deleted.Tx))
+	_, deletedBz := f.pool.delete(tx)
 	// subtract the from the tx bytes count
-	f.txsBytes -= len(deleted.Tx)
+	f.txsBytes -= deletedBz
 }
 
 // Clear() empties the mempool and resets its state
 func (f *FeeMempool) Clear() {
 	// reset the memory pool of transactions
-	f.pool = MempoolTxs{
-		l: list.New(),
-		m: make(map[string]*list.Element),
-	}
-	// reset the hash map
-	f.hashMap = make(map[string]struct{})
+	f.pool = MempoolTxs{s: make([]MempoolTx, 0)}
 	// reset the bytes count
 	f.txsBytes = 0
 }
@@ -163,7 +165,7 @@ func (f *FeeMempool) Clear() {
 // TxCount() returns the current number of transactions in the mempool
 func (f *FeeMempool) TxCount() int {
 	// return the count
-	return f.pool.l.Len()
+	return len(f.pool.s)
 }
 
 // TxsBytes() returns the total size in bytes of all transactions in the mempool
@@ -182,25 +184,25 @@ var _ IteratorI = &mempoolIterator{} // enforce
 
 // mempoolIterator implements IteratorI using the list of Transactions the index and if the position is valid
 type mempoolIterator struct {
-	pool    *MempoolTxs   // reference to list of Transactions
-	current *list.Element // the current element
+	pool  *MempoolTxs // reference to list of Transactions
+	index int         // index position
+	valid bool        // is the position valid
 }
 
 // NewMempoolIterator() initializes a new iterator for the mempool transactions
 func NewMempoolIterator(p MempoolTxs) *mempoolIterator {
 	pool := p.copy() // copy the pool for safe iteration during a parallel
-	current := pool.l.Front()
-	return &mempoolIterator{pool: pool, current: current}
+	return &mempoolIterator{pool: pool, valid: len(pool.s) != 0}
 }
 
 // Valid() checks if the iterator is positioned on a valid element
-func (m *mempoolIterator) Valid() bool { return m.current != nil }
+func (m *mempoolIterator) Valid() bool { return m.index < len(m.pool.s) }
 
 // Next() advances the iterator to the next transaction in the pool
-func (m *mempoolIterator) Next() { m.current = m.current.Next() }
+func (m *mempoolIterator) Next() { m.index++ }
 
 // Key() returns the transaction at the current iterator position
-func (m *mempoolIterator) Key() (key []byte) { return m.current.Value.(MempoolTx).Tx }
+func (m *mempoolIterator) Key() (key []byte) { return m.pool.s[m.index].Tx }
 
 // Value() returns same as key
 func (m *mempoolIterator) Value() (value []byte) { return m.Key() }
@@ -213,91 +215,109 @@ func (m *mempoolIterator) Close() {}
 
 // MempoolTxs is a list of MempoolTxs with a count
 type MempoolTxs struct {
-	l *list.List               // Doubly linked list
-	m map[string]*list.Element // txHash -> list element
+	m map[string]struct{}
+	s []MempoolTx
 }
 
-// insert() inserts a new tx into the list sorted by the highest fee to the lowest fee
-func (t *MempoolTxs) insert(tx MempoolTx) (recheck bool) {
-	// initialization sanity check
-	if t.l == nil {
-		t.l = list.New()
-		t.m = make(map[string]*list.Element)
-	}
-	// get a key for the tx
-	k := string(tx.Tx)
-	// start from the back and scan backwards
-	for e := t.l.Back(); e != nil; e = e.Prev() {
-		if e.Value.(MempoolTx).Fee >= tx.Fee {
-			// insert after this element
-			t.m[k] = t.l.InsertAfter(tx, e)
-			return t.m[k] != t.l.Back() && t.l.Len() != 1
+// insert() batch inserts a number of txs into the list sorted by the highest fee to the lowest fee
+func (t *MempoolTxs) insert(txs ...MempoolTx) (recheck bool) {
+	// combine existing and incoming txs
+	combined := append(t.s, txs...)
+	// sort by Fee descending
+	sort.Slice(combined, func(i, j int) bool {
+		return combined[i].Fee > combined[j].Fee
+	})
+	// prepare new map and slice
+	newMap := make(map[string]struct{}, len(combined))
+	newList := make([]MempoolTx, 0, len(combined))
+	// for each tx in the combined array
+	for _, tx := range combined {
+		hash := crypto.HashString(tx.Tx)
+		// skip duplicates
+		if _, exists := newMap[hash]; exists {
+			continue
 		}
+		// populate the newMap and newList
+		newList = append(newList, tx)
+		newMap[hash] = struct{}{}
 	}
-	// if we got here, tx has the highest fee: insert at front
-	t.m[k] = t.l.PushFront(tx)
-	// return if recheck required
-	return t.m[k] != t.l.Back() && t.l.Len() != 1
+	// update
+	t.s = newList
+	t.m = newMap
+	// exit
+	return true
 }
 
-func (t *MempoolTxs) delete(tx []byte) (deleted MempoolTx) {
-	// check if exists
-	elem, exists := t.m[string(tx)]
-	if !exists {
-		return
+// delete() batch deletes a number of transactions
+func (t *MempoolTxs) delete(txs [][]byte) (deleted []MempoolTx, deletedBz int) {
+	if len(txs) == 0 || len(t.s) == 0 {
+		return nil, 0
 	}
-	// delete the element from the list
-	t.l.Remove(elem)
-	// remove from map
-	delete(t.m, string(tx))
-	// return the element
-	return elem.Value.(MempoolTx)
+	// build a lookup set for hashes to delete
+	toDelete := make(map[string]struct{}, len(txs))
+	for _, h := range txs {
+		toDelete[crypto.HashString(h)] = struct{}{}
+	}
+	// allocate new slice
+	newList := make([]MempoolTx, 0, len(t.s))
+	newMap := make(map[string]struct{}, len(t.s))
+	// for each tx in the current slice
+	for _, tx := range t.s {
+		// create the hash
+		hash := crypto.HashString(tx.Tx)
+		// if should delete
+		if _, found := toDelete[hash]; found {
+			// add to deleted list
+			deleted = append(deleted, tx)
+			// add to deleted bytes
+			deletedBz += len(tx.Tx)
+			// continue
+			continue
+		}
+		// add to new list and map
+		newList = append(newList, tx)
+		newMap[hash] = struct{}{}
+	}
+	// update
+	t.s = newList
+	t.m = newMap
+	// exit
+	return
 }
 
 // drop() removes the bottom (the lowest fee) X percent of Transactions
 func (t *MempoolTxs) drop(percent int) (dropped []MempoolTx) {
-	if t.l.Len() == 0 || percent <= 0 {
-		return nil
-	}
 	// calculate the percent using integer division
-	numDrop := (t.l.Len()*percent)/100 + 1
-	// start at the back
-	current := t.l.Back()
-	// reverse iterate 'num to drop'
-	for i := 0; i < numDrop && current != nil; i++ {
-		// maintain a pointer to the next item (previous)
-		prev := current.Prev()
-		// cast the transaction
-		tx := current.Value.(MempoolTx)
-		// remove from the list
-		t.l.Remove(current)
-		// delete from the map
-		delete(t.m, string(tx.Tx))
-		// save dropped
-		dropped = append(dropped, tx)
-		// set previous to current
-		current = prev
+	numDrop := (len(t.s)*percent)/100 + 1
+	// avoid slicing out of bounds
+	if numDrop >= len(t.s) {
+		numDrop = len(t.s)
 	}
+	// save the evicted list
+	dropped = t.s[len(t.s)-numDrop:]
+	// update the list with what's not evicted
+	t.s = t.s[:len(t.s)-numDrop]
+	// rebuild map
+	t.m = make(map[string]struct{}, len(t.s))
+	for _, tx := range t.s {
+		t.m[crypto.HashString(tx.Tx)] = struct{}{}
+	}
+	// exit
 	return
 }
 
 // copy() returns a shallow copy of the MempoolTxs
 func (t *MempoolTxs) copy() *MempoolTxs {
-	newList := list.New()
-	newMap := make(map[string]*list.Element)
-	// iterate through all the items
-	for e := t.l.Front(); e != nil; e = e.Next() {
-		// cast it
-		tx := e.Value.(MempoolTx)
-		// push it to the new list
-		elem := newList.PushBack(tx)
-		// add to the map
-		newMap[string(tx.Tx)] = elem
-	}
-	// exit with new structure
+	// allocate a destination
+	dst := make([]MempoolTx, len(t.s))
+	dstM := make(map[string]struct{}, len(t.s))
+	// shallow copy the source to destination
+	copy(dst, t.s)
+	maps.Copy(dstM, t.m)
+	// exit with copy
 	return &MempoolTxs{
-		l: newList,
-		m: newMap,
+		s: dst,
+		m: dstM,
 	}
 }
 

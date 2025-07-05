@@ -35,6 +35,8 @@ func (c *Controller) ListenForBlock() {
 			c.log.Debug("Handling block message")
 			//defer lib.TimeTrack(c.log, time.Now())
 			// lock the controller to prevent multi-thread conflicts
+			c.log.Debug("HandleBlockMessage Lock")
+			defer c.log.Debug("HandleBLockMessage Unlock")
 			c.Lock()
 			// when iteration completes, unlock
 			defer c.Unlock()
@@ -227,9 +229,10 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	// cancel any running mempool check
 	c.Mempool.stop()
 	// lock the mempool
+	c.log.Debug("CommitCertificateMempool Lock")
 	c.Mempool.L.Lock()
 	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
-	defer func() { c.FSM.Reset(); c.Mempool.L.Unlock() }()
+	defer func() { c.FSM.Reset(); c.Mempool.L.Unlock(); c.log.Debug("CommitCertificateMempool Unlock") }()
 	// log the beginning of the commit
 	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.ResultsHash))
 	// cast the store to ensure the proper store type to complete this operation
@@ -264,11 +267,9 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
-	// for each transaction included in the block
-	for _, tx := range block.Transactions {
-		// delete each transaction from the mempool
-		c.Mempool.DeleteTransaction(tx)
-	}
+
+	// delete each transaction from the mempool
+	c.Mempool.DeleteTransaction(block.Transactions...)
 	// parse committed block for straw polls
 	c.FSM.ParsePollTransactions(blockResult)
 	// if self was the proposer

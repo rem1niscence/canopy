@@ -214,6 +214,7 @@ func (ps *PeerSet) SendToRandPeer(topic lib.Topic, msg proto.Message) (*lib.Peer
 
 // SendTo() sends a message to a specific peer based on their public key
 func (ps *PeerSet) SendTo(publicKey []byte, topic lib.Topic, msg proto.Message) lib.ErrorI {
+	defer lib.TimeTrack(ps.logger, time.Now())
 	ps.RLock()
 	defer ps.RUnlock()
 	peer, err := ps.get(publicKey)

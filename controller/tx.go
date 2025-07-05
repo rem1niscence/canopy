@@ -66,44 +66,18 @@ func (c *Controller) ListenForTx() {
 				// exit
 				return
 			}
-			// for each transaction in the transactions list
-			for _, tx := range txMsg.Txs {
-				// route the transaction to the mempool handler
-				if err := c.HandleTransaction(tx); err != nil {
-					// if the error is 'mempool already has it'
-					if err.Error() == lib.ErrTxFoundInMempool(crypto.HashString(tx)).Error() {
-						// continue
-						continue
-					}
-					// else - warn of the error
-					c.log.Warnf("Handle tx from %s failed with err: %s", lib.BytesToTruncatedString(senderID), err.Error())
-					// slash the peers reputation score
-					c.P2P.ChangeReputation(senderID, p2p.InvalidTxRep)
-					// exit
-					return
-				}
+			// route the transactions to the mempool handler
+			if err := c.Mempool.HandleTransactions(txMsg.Txs...); err != nil {
+				// else - warn of the error
+				c.log.Warnf("Handle tx from %s failed with err: %s", lib.BytesToTruncatedString(senderID), err.Error())
+				// slash the peers reputation score
+				c.P2P.ChangeReputation(senderID, p2p.InvalidTxRep)
+				// exit
+				return
 			}
 			// onto the next message
 		}()
 	}
-}
-
-// HandleTransaction() accepts or rejects inbound txs based on the mempool state
-// - pass through call checking indexer and mempool for duplicate
-func (c *Controller) HandleTransaction(tx []byte) lib.ErrorI {
-	// generate hash hex string for the transaction
-	hash := crypto.HashString(tx)
-	// lock the mempool
-	// lock the mempool
-	c.Mempool.L.Lock()
-	defer c.Mempool.L.Unlock()
-	// ensure the mempool doesn't already contain the transaction
-	if c.Mempool.Contains(hash) {
-		// if it does, exit with already found in the mempool
-		return lib.ErrTxFoundInMempool(hash)
-	}
-	// route the transaction to the mempool for handling
-	return c.Mempool.HandleTransaction(tx)
 }
 
 // GetProposalBlockFromMempool() returns the cached proposal block
@@ -128,6 +102,7 @@ func (c *Controller) CheckMempool() {
 		c.Mempool.L.Lock()
 		// if recheck is necessary
 		if c.Mempool.recheck.Load() {
+			c.log.Debug("CheckMempool Lock")
 			// reset the mempool
 			c.Mempool.FSM.Reset()
 			// check the mempool to cache a proposal block and validate the mempool itself
@@ -136,6 +111,7 @@ func (c *Controller) CheckMempool() {
 			toGossip = c.Mempool.GetTransactions(math.MaxUint64)
 			// set recheck to false
 			c.Mempool.recheck.Store(false)
+			c.log.Debug("CheckMempool Unlock")
 		}
 		// unlock the controller
 		c.Mempool.L.Unlock()
@@ -217,41 +193,20 @@ func NewMempool(fsm *fsm.StateMachine, address crypto.AddressI, config lib.Mempo
 	return m, err
 }
 
-// HandleTransaction() attempts to add a transaction to the mempool by validating, adding, and evicting overfull or newly invalid txs
-func (m *Mempool) HandleTransaction(tx []byte) (err lib.ErrorI) {
-	// upon completing this function
-	defer func() {
-		// in an error occurred while handling this transaction
-		if err != nil {
-			// cache failed txs for RPC display
-			m.cachedFailedTxs.Add(tx, crypto.HashString(tx), err)
-		}
-	}()
-	// create a new transaction object reference to ensure a non-nil transaction
-	transaction := new(lib.Transaction)
-	// populate the object ref with the bytes of the transaction
-	if err = lib.Unmarshal(tx, transaction); err != nil {
-		return
-	}
-	// perform basic validations against the tx object
-	if err = transaction.CheckBasic(); err != nil {
-		return
-	}
-	// extract the fee from the transaction result
-	fee := transaction.Fee
-	// if the transaction is a special type: 'certificate result'
-	if transaction.MessageType == fsm.MessageCertificateResultsName {
-		// prioritize certificate result transactions by artificially raising the fee 'stored fee'
-		fee = math.MaxUint32
-	}
+// HandleTransactions() attempts to add a transaction to the mempool by validating, adding, and evicting overfull or newly invalid txs
+func (m *Mempool) HandleTransactions(tx ...[]byte) (err lib.ErrorI) {
+	m.log.Debug("HandleTxMempool Lock")
+	defer m.log.Debug("HandleTxMempool Unlock")
+	// lock the mempool
+	m.L.Lock()
+	defer m.L.Unlock()
 	// signal a recheck
 	m.recheck.Store(true)
 	// add a transaction to the mempool
-	if _, err = m.AddTransaction(tx, fee); err != nil {
+	if err = m.AddTransactions(tx...); err != nil {
 		// exit with the error
 		return
 	}
-	//m.log.Debugf("Added tx %s to mempool for checking", crypto.HashString(tx))
 	// exit
 	return
 }
@@ -283,10 +238,12 @@ func (m *Mempool) CheckMempool() {
 		BlockResult: blockResult,
 	})
 	// evict all invalid transactions from the mempool
+	m.DeleteTransaction(failed...)
+	// mark as failed in the cache
 	for _, tx := range failed {
 		m.log.Infof("Removed tx %s from mempool", crypto.HashString(tx))
-		// delete the transaction
-		m.DeleteTransaction(tx)
+		// cache failed txs for RPC display
+		m.cachedFailedTxs.Add(tx, crypto.HashString(tx), err)
 	}
 	// reset the RPC cached results
 	m.cachedResults = nil
@@ -329,6 +286,8 @@ func (c *Controller) GetPendingPage(p lib.PageParams) (page *lib.Page, err lib.E
 
 // GetFailedTxsPage() returns a list of failed mempool transactions
 func (c *Controller) GetFailedTxsPage(address string, p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
+	c.log.Debug("GetFailedTxsPage Lock")
+	defer c.log.Debug("GetFailedTxsPage Unlock")
 	// lock the controller for thread safety
 	c.Lock()
 	// unlock the controller when the function completes

@@ -304,6 +304,8 @@ func (c *Controller) ListenForConsensus() {
 		if err := func() (err lib.ErrorI) {
 			c.log.Debugf("Handling consensus message")
 			defer lib.TimeTrack(c.log, time.Now())
+			c.log.Debug("ListenForConsensus Lock")
+			defer c.log.Debug("ListenForConsensus Unlock")
 			// lock the controller for thread safety
 			c.Lock()
 			// once the handler completes, unlock
@@ -353,6 +355,8 @@ func (c *Controller) ListenForBlockRequests() {
 				c.log.Debug("Handing block request message")
 				//defer lib.TimeTrack(c.log, time.Now())
 				// lock the controller for thread safety
+				c.log.Debug("ListenForBlockRequests Lock")
+				defer c.log.Debug("ListenForBlockRequests Unlock")
 				c.Lock()
 				// unlock once the message handling completes
 				defer c.Unlock()
@@ -419,6 +423,7 @@ func (c *Controller) ListenForBlockRequests() {
 
 // SendToReplicas() directly send a bft message to each validator in a set (committee)
 func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable) {
+	defer lib.TimeTrack(c.log, time.Now())
 	// log the initialization of the send process
 	c.log.Debugf("Sending to %d replicas", replicas.NumValidators)
 	// sign the consensus message
@@ -433,11 +438,7 @@ func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 	for _, replica := range replicas.ValidatorSet.ValidatorSet {
 		// check if replica is self
 		if bytes.Equal(replica.PublicKey, c.PublicKey) {
-			// send the message to self using internal routing
-			if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
-				// log the error
-				c.log.Error(err.Error())
-			}
+			continue
 		} else {
 			// if not self, send directly to peer using P2P
 			if err = c.P2P.SendTo(replica.PublicKey, Cons, signedMessage); err != nil {
@@ -445,6 +446,11 @@ func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 				c.log.Warn(err.Error())
 			}
 		}
+	}
+	// send the message to self using internal routing
+	if err = c.P2P.SelfSend(c.PublicKey, Cons, signedMessage); err != nil {
+		// log the error
+		c.log.Error(err.Error())
 	}
 }
 
@@ -704,6 +710,8 @@ func (c *Controller) signConsensusMessage(msg lib.Signable) (*lib.ConsensusMessa
 
 // ConsensusSummary() for the RPC - returns the summary json object of the bft for a specific chainID
 func (c *Controller) ConsensusSummary() ([]byte, lib.ErrorI) {
+	c.log.Debug("ConsensusSummary Lock")
+	defer c.log.Debug("ConsensusSummary Unlock")
 	// lock for thread safety
 	c.Lock()
 	defer c.Unlock()
