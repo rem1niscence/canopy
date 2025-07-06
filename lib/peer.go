@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/canopy-network/canopy/lib/crypto"
-	"google.golang.org/protobuf/proto"
 )
 
 /* This file contains shared code for peers and messages that are routed by the controller throughout the app */
@@ -21,8 +20,8 @@ type Channels map[Topic]chan *MessageAndMetadata
 
 // MessageAndMetadata is a wrapper over a P2P message with information about the sender
 type MessageAndMetadata struct {
-	Message proto.Message // the (proto) payload of the message
-	Sender  *PeerInfo     // the sender information
+	Message []byte    // the (proto) payload of the message
+	Sender  *PeerInfo // the sender information
 }
 
 // PEER ADDRESS CODE BELOW
@@ -252,10 +251,8 @@ func NewMessageCache() *MessageCache {
 // Add inserts a new message into the cache if it doesn't already exist
 // It removes the oldest message if the cache is full
 func (c *MessageCache) Add(msg *MessageAndMetadata) (ok bool) {
-	// convert the message into bytes
-	bz, _ := Marshal(msg.Message)
 	// create a key for the message
-	key := MemHash(bz)
+	key := MemHash(msg.Message)
 	// check / add to the de-duplicator to ensure no duplicates
 	if c.deDupe.Found(key) {
 		// exit with 'already found'
@@ -269,10 +266,8 @@ func (c *MessageCache) Add(msg *MessageAndMetadata) (ok bool) {
 		e := c.queue.Back()
 		// cast it to a MessageAndMetadata
 		message := e.Value.(*MessageAndMetadata)
-		// convert the message into bytes
-		toDeleteBz, _ := Marshal(message.Message)
 		// create a key for the message
-		toDeleteKey := MemHash(toDeleteBz)
+		toDeleteKey := MemHash(message.Message)
 		// delete it from the underlying de-duplicator
 		c.deDupe.Delete(toDeleteKey)
 		// remove it from the queue

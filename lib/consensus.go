@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/drand/kyber"
@@ -411,6 +412,7 @@ func (x *View) CheckBasic() (err ErrorI) {
 
 // Check() checks the validity of the view and optionally enforce *heights* (plugin height and committee height)
 func (x *View) Check(view *View, enforceHeights bool) ErrorI {
+	defer TimeTrack(NewDefaultLogger(), time.Now())
 	// do a basic sanity check on the view
 	if err := x.CheckBasic(); err != nil {
 		// exit with err

@@ -120,8 +120,11 @@ func (b *BFT) Start() {
 				defer b.Controller.Unlock()
 				// calculate the process time
 				var processTime time.Duration
-				if !resetBFT.StartTime.IsZero() {
-					processTime = time.Since(resetBFT.StartTime)
+				// calculate time since
+				since := time.Since(resetBFT.StartTime)
+				// allow if 'since' is less than 1 block old
+				if int(since) < b.Config.BlockTimeMS() {
+					processTime = since
 				}
 				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
 				// else increment the height and don't maintain locks
@@ -459,6 +462,7 @@ func (b *BFT) StartCommitPhase() {
 			ProposerKey: b.ProposerKey,
 			Signature:   as,
 		},
+		Timestamp: uint64(time.Now().UnixMicro()),
 	})
 }
 
@@ -486,10 +490,15 @@ func (b *BFT) StartCommitProcessPhase() {
 	b.ByzantineEvidence = &ByzantineEvidence{
 		DSE: b.GetLocalDSE(),
 	}
-	// send the block to self for committing
-	b.SelfSendBlock(msg.Qc)
-	// gossip committed block message to peers
-	b.GossipBlock(msg.Qc, b.PublicKey)
+	// non-blocking
+	go func() {
+		// send the block to self for committing
+		b.SelfSendBlock(msg.Qc, msg.Timestamp)
+		// wait to allow for CommitProcess to finish
+		<-time.After(time.Duration(b.Config.CommitTimeoutMS) * time.Millisecond)
+		// gossip committed block message to peers
+		b.GossipBlock(msg.Qc, b.PublicKey, msg.Timestamp)
+	}()
 }
 
 // RoundInterrupt() begins the ROUND-INTERRUPT phase after any phase errors
@@ -858,9 +867,9 @@ type (
 		// CommitCertificate() commits a block to persistence
 		CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI)
 		// GossipBlock() is a P2P call to gossip a completed Quorum Certificate with a Proposal
-		GossipBlock(certificate *lib.QuorumCertificate, sender []byte)
+		GossipBlock(certificate *lib.QuorumCertificate, sender []byte, timestamp uint64)
 		// SendToSelf() is a P2P call to directly send  a completed Quorum Certificate to self
-		SelfSendBlock(qc *lib.QuorumCertificate)
+		SelfSendBlock(qc *lib.QuorumCertificate, timestamp uint64)
 		// SendToReplicas() is a P2P call to directly send a Consensus message to all Replicas
 		SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 		// SendToProposer() is a P2P call to directly send a Consensus message to the Leader

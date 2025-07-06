@@ -29,8 +29,6 @@ func (c *Controller) ListenForBlock() {
 		// wrap in a function call to use 'defer' functionality
 		func() {
 			defer lib.TimeTrack(c.log, time.Now())
-			// track processing time for consensus module
-			startTime := time.Now()
 			// log the beginning of handling the block message
 			c.log.Debug("Handling block message")
 			//defer lib.TimeTrack(c.log, time.Now())
@@ -49,10 +47,9 @@ func (c *Controller) ListenForBlock() {
 			sender := msg.Sender.Address.PublicKey
 			// log the receipt of the block message
 			c.log.Infof("Received new block from %s ✉️", lib.BytesToTruncatedString(sender))
-			// try to cast the message to a block message
-			blockMessage, ok := msg.Message.(*lib.BlockMessage)
-			// if cast fails (not a block message)
-			if !ok {
+			// try to unmarshal the message to a block message
+			blockMessage := new(lib.BlockMessage)
+			if err := lib.Unmarshal(msg.Message, blockMessage); err != nil {
 				// log the error
 				c.log.Debug("Invalid Peer Block Message")
 				// slash the peer's reputation
@@ -83,9 +80,9 @@ func (c *Controller) ListenForBlock() {
 				return
 			}
 			// gossip the block to our peers
-			c.GossipBlock(qc, sender)
+			c.GossipBlock(qc, sender, blockMessage.Time)
 			// signal a reset to the bft module
-			c.Consensus.ResetBFT <- bft.ResetBFT{StartTime: startTime}
+			c.Consensus.ResetBFT <- bft.ResetBFT{StartTime: time.UnixMicro(int64(blockMessage.Time))}
 		}()
 		// if quit signaled
 		if quit {
@@ -98,13 +95,14 @@ func (c *Controller) ListenForBlock() {
 // PUBLISHERS BELOW
 
 // GossipBlockMsg() gossips a certificate (with block) through the P2P network for a specific chainId
-func (c *Controller) GossipBlock(certificate *lib.QuorumCertificate, senderPubToExclude []byte) {
+func (c *Controller) GossipBlock(certificate *lib.QuorumCertificate, senderPubToExclude []byte, timestamp uint64) {
 	// log the start of the gossip block function
 	c.log.Debugf("Gossiping certificate: %s", lib.BytesToString(certificate.ResultsHash))
 	// create the block message to gossip
 	blockMessage := &lib.BlockMessage{
 		ChainId:             c.Config.ChainId,
 		BlockAndCertificate: certificate,
+		Time:                timestamp,
 	}
 	// send the block message to all peers excluding the sender (gossip)
 	if err := c.P2P.SendToPeers(Block, blockMessage, lib.BytesToString(senderPubToExclude)); err != nil {
@@ -113,11 +111,12 @@ func (c *Controller) GossipBlock(certificate *lib.QuorumCertificate, senderPubTo
 }
 
 // SelfSendBlock() gossips a QuorumCertificate (with block) through the P2P network for handling
-func (c *Controller) SelfSendBlock(certificate *lib.QuorumCertificate) {
+func (c *Controller) SelfSendBlock(qc *lib.QuorumCertificate, timestamp uint64) {
 	// create the block message
 	blockMessage := &lib.BlockMessage{
 		ChainId:             c.Config.ChainId,
-		BlockAndCertificate: certificate,
+		BlockAndCertificate: qc,
+		Time:                timestamp,
 	}
 	// internally route the block to the 'block inbox'
 	if err := c.P2P.SelfSend(c.PublicKey, Block, blockMessage); err != nil {

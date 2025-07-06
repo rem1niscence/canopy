@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
-	"slices"
-
 	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"math"
+	"slices"
+	"time"
 )
 
 /* This file has logic to certify the next block and result decided by a bft quorum */
@@ -299,6 +299,7 @@ func (x *QuorumCertificate) UnmarshalJSON(jsonBytes []byte) (err error) {
 
 // CheckBasic() provides basic 'sanity' checks on the CertificateResult structure
 func (x *CertificateResult) CheckBasic() (err ErrorI) {
+	defer TimeTrack(NewDefaultLogger(), time.Now())
 	// ensure the certificate result is not nil
 	if x == nil {
 		// exit with empty certificate results error

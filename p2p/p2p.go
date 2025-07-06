@@ -362,8 +362,9 @@ func (p *P2P) SelfSend(fromPublicKey []byte, topic lib.Topic, payload proto.Mess
 	p.log.Debugf("Self sending %s message", topic)
 	// non blocking
 	go func() {
+		bz, _ := lib.Marshal(payload)
 		p.Inbox(topic) <- &lib.MessageAndMetadata{
-			Message: proto.Clone(payload),
+			Message: bz,
 			Sender:  &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: fromPublicKey}},
 		}
 	}()

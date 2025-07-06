@@ -46,10 +46,9 @@ func (c *Controller) ListenForTx() {
 			}
 			// create a convenience variable for the identity of the sender
 			senderID := msg.Sender.Address.PublicKey
-			// try to cast the p2p message as a tx message
-			txMsg, ok := msg.Message.(*lib.TxMessage)
-			// if the cast failed
-			if !ok {
+			// try to unmarshal the p2p message as a tx message
+			txMsg := new(lib.TxMessage)
+			if err := lib.Unmarshal(msg.Message, txMsg); err != nil {
 				// log the unexpected behavior
 				c.log.Warnf("Non-Tx message from %s", lib.BytesToTruncatedString(senderID))
 				// slash the peer's reputation score
@@ -239,9 +238,12 @@ func (m *Mempool) CheckMempool() {
 	})
 	// evict all invalid transactions from the mempool
 	m.DeleteTransaction(failed...)
+	// log a warning
+	if len(failed) != 0 {
+		m.log.Warnf("Removed failed txs %d from mempool", len(failed))
+	}
 	// mark as failed in the cache
 	for _, tx := range failed {
-		m.log.Infof("Removed tx %s from mempool", crypto.HashString(tx))
 		// cache failed txs for RPC display
 		m.cachedFailedTxs.Add(tx, crypto.HashString(tx), err)
 	}

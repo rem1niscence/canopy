@@ -141,12 +141,13 @@ func TransactionSubmitter(c *controller.Controller) {
 			return
 		}
 		fmt.Printf("Loaded %d txs from block %d\n", len(blk.Transactions), blockIndex)
+		messageBytes, _ := lib.Marshal(&lib.TxMessage{
+			ChainId: c.Config.ChainId,
+			Txs:     blk.Transactions,
+		})
 		c.P2P.Inbox(lib.Topic_TX) <- &lib.MessageAndMetadata{
-			Message: &lib.TxMessage{
-				ChainId: c.Config.ChainId,
-				Txs:     blk.Transactions,
-			},
-			Sender: &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: c.PublicKey}},
+			Message: messageBytes,
+			Sender:  &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: c.PublicKey}},
 		}
 
 		fmt.Println("Submitted block", blockIndex)

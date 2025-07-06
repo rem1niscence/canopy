@@ -508,8 +508,8 @@ func (t *testController) LoadIsOwnRoot() bool {
 	return true
 }
 
-func (t *testController) SelfSendBlock(qc *lib.QuorumCertificate) {
-	t.GossipBlock(qc, nil)
+func (t *testController) SelfSendBlock(qc *lib.QuorumCertificate, timestamp uint64) {
+	t.GossipBlock(qc, nil, 0)
 }
 
 func (t *testController) ChainHeight() uint64 {
@@ -568,8 +568,8 @@ func (t *testController) LoadLastProposers(_ uint64) (*lib.Proposers, lib.ErrorI
 	return t.proposers, nil
 }
 func (t *testController) ResetFSM() {}
-func (t *testController) GossipBlock(cert *lib.QuorumCertificate, _ []byte) {
-	t.gossipCertChan <- cert
+func (t *testController) GossipBlock(certificate *lib.QuorumCertificate, sender []byte, timestamp uint64) {
+	t.gossipCertChan <- certificate
 }
 
 func (t *testController) NewTestBlock() []byte {

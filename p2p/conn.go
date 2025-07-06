@@ -16,18 +16,18 @@ import (
 )
 
 const (
-	pingInterval           = 30 * time.Second                                    // how often a ping is to be sent
-	pongTimeoutDuration    = 20 * time.Second                                    // how long the sender of a ping waits for a pong before throwing an error
-	maxChunksPerPacket     = 256                                                 // maximum number of chunks per packet - *1* means chunking disabled
-	maxDataChunkSize       = maxPacketSize/maxChunksPerPacket - packetHeaderSize // maximum size of the chunk of bytes in a packet
-	maxPacketSize          = uint32(256 * units.MB)                              // maximum size of the full packet
-	packetHeaderSize       = 47                                                  // the overhead of the protobuf packet header
-	queueSendTimeout       = 10 * time.Second                                    // how long a message waits to be queued before throwing an error
-	maxMessageSize         = 1024 * units.Megabyte                               // the maximum total size of a message once all the packets are added up
-	dataFlowRatePerS       = maxMessageSize                                      // the maximum number of bytes that may be sent or received per second per MultiConn
-	maxChanSize            = 1                                                   // maximum number of items in a channel before blocking
-	maxInboxQueueSize      = 500_000                                             // maximum number of items in inbox queue before blocking
-	maxStreamSendQueueSize = 100_000                                             // maximum number of items in a stream send queue before blocking
+	pingInterval           = 30 * time.Second                    // how often a ping is to be sent
+	pongTimeoutDuration    = 20 * time.Second                    // how long the sender of a ping waits for a pong before throwing an error
+	maxChunksPerPacket     = 256                                 // maximum number of chunks per packet - *1* means chunking disabled
+	maxDataChunkSize       = maxPacketSize - packetHeaderSize    // maximum size of the chunk of bytes in a packet
+	maxPacketSize          = maxMessageSize / maxChunksPerPacket // maximum size of the full packet
+	packetHeaderSize       = 50                                  // the overhead of the protobuf packet header
+	queueSendTimeout       = 10 * time.Second                    // how long a message waits to be queued before throwing an error
+	maxMessageSize         = uint32(256 * units.MB)              // the maximum total size of a message once all the packets are added up
+	dataFlowRatePerS       = maxMessageSize                      // the maximum number of bytes that may be sent or received per second per MultiConn
+	maxChanSize            = 1                                   // maximum number of items in a channel before blocking
+	maxInboxQueueSize      = 500_000                             // maximum number of items in inbox queue before blocking
+	maxStreamSendQueueSize = 100_000                             // maximum number of items in a stream send queue before blocking
 
 	// "Peer Reputation Points" are actively maintained for each peer the node is connected to
 	// These points allow a node to track peer behavior over its lifetime, allowing it to disconnect from faulty peers
@@ -134,16 +134,11 @@ func (c *MultiConn) Stop() {
 }
 
 // Send() queues the sending of a message to a specific Stream
-func (c *MultiConn) Send(topic lib.Topic, msg *Envelope) (ok bool) {
+func (c *MultiConn) Send(topic lib.Topic, bz []byte) (ok bool) {
 	stream, ok := c.streams[topic]
 	if !ok {
 		c.log.Errorf("Stream %s does not exist", topic)
 		return
-	}
-	bz, err := lib.Marshal(msg)
-	if err != nil {
-		c.log.Errorf("Marshaling failed of payload: %s", msg.String())
-		return false
 	}
 	chunks := split(bz, int(maxDataChunkSize))
 	var packets []*Packet
@@ -408,19 +403,13 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 	s.msgAssembler = append(s.msgAssembler, packet.Bytes...)
 	// if the packet is signalling message end
 	if packet.Eof {
-		// unmarshall all the bytes into the universal wrapper
-		var msg Envelope
-		if err := lib.Unmarshal(s.msgAssembler, &msg); err != nil {
-			return BadPacketSlash, err
-		}
-		// read the payload into a proto.Message
-		payload, err := lib.FromAny(msg.Payload)
-		if err != nil {
-			return BadPacketSlash, err
-		}
+		// create a buffer to retain the message assembler bytes
+		msg := make([]byte, len(s.msgAssembler))
+		// copy the message assembler bytes into a buffer
+		copy(msg, s.msgAssembler)
 		// wrap with metadata
 		m := &lib.MessageAndMetadata{
-			Message: payload,
+			Message: msg,
 			Sender:  peerInfo,
 		}
 		// add to inbox for other parts of the app to read
@@ -485,7 +474,7 @@ func receiveLengthPrefixed(conn net.Conn) ([]byte, lib.ErrorI) {
 	if err := conn.SetReadDeadline(time.Now().Add(ReadWriteTimeout)); err != nil {
 		return nil, ErrFailedRead(err)
 	}
-	// read the 2-byte length prefix
+	// read the 4-byte length prefix
 	lengthBuffer := make([]byte, 4)
 	if _, err := io.ReadFull(conn, lengthBuffer); err != nil {
 		return nil, ErrFailedRead(err)
@@ -509,6 +498,9 @@ func receiveLengthPrefixed(conn net.Conn) ([]byte, lib.ErrorI) {
 
 // split returns bytes split to size up to the lim param
 func split(buf []byte, lim int) [][]byte {
+	if len(buf) == 0 {
+		return [][]byte{buf}
+	}
 	var chunk []byte
 	chunks := make([][]byte, 0, len(buf)/lim+1)
 	for len(buf) >= lim {

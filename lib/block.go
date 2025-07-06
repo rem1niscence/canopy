@@ -3,6 +3,7 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+	"time"
 
 	"github.com/canopy-network/canopy/lib/crypto"
 )
@@ -201,6 +202,7 @@ func (x *Block) Hash() ([]byte, ErrorI) { return x.BlockHeader.SetHash() }
 
 // BytesToBlockHash() converts block bytes into a block hash
 func (x *Block) BytesToBlockHash(blockBytes []byte) (hash []byte, err ErrorI) {
+	defer TimeTrack(NewDefaultLogger(), time.Now())
 	// ensure the block isn't empty
 	if blockBytes == nil {
 		// exit with error

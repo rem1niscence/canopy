@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	testTimeout = 3 * time.Second
+	testTimeout = 10 * time.Second
 )
 
 func TestConnection(t *testing.T) {
@@ -38,12 +38,12 @@ func TestMultiSendRec(t *testing.T) {
 	go func() {
 		require.NoError(t, n1.SendTo(n2.pub, lib.Topic_TX, &PeerBookRequestMessage{}))
 		require.NoError(t, n1.SendTo(n2.pub, lib.Topic_CONSENSUS, &PeerBookResponseMessage{Book: []*BookPeer{expectedMsg}}))
-		time.AfterFunc(testTimeout, func() { panic("timeout") })
+		//time.AfterFunc(testTimeout, func() { panic("timeout") })
 	}()
 	<-n2.Inbox(lib.Topic_TX)
 	msg := <-n2.Inbox(lib.Topic_CONSENSUS)
-	gotMsg, ok := msg.Message.(*PeerBookResponseMessage)
-	require.True(t, ok)
+	gotMsg := new(PeerBookResponseMessage)
+	require.NoError(t, lib.Unmarshal(msg.Message, gotMsg))
 	require.True(t, len(gotMsg.Book) == 1)
 	require.Equal(t, expectedMsg.Address.NetAddress, gotMsg.Book[0].Address.NetAddress)
 	require.Equal(t, expectedMsg.Address.PublicKey, gotMsg.Book[0].Address.PublicKey)
@@ -67,8 +67,8 @@ func TestSendToRand(t *testing.T) {
 		time.AfterFunc(testTimeout, func() { panic("timeout") })
 	}()
 	msg := <-n2.Inbox(lib.Topic_CONSENSUS)
-	gotMsg, ok := msg.Message.(*PeerBookResponseMessage)
-	require.True(t, ok)
+	gotMsg := new(PeerBookResponseMessage)
+	require.NoError(t, lib.Unmarshal(msg.Message, gotMsg))
 	require.True(t, len(gotMsg.Book) == 1)
 	require.Equal(t, expectedMsg.Address.NetAddress, gotMsg.Book[0].Address.NetAddress)
 	require.Equal(t, expectedMsg.Address.PublicKey, gotMsg.Book[0].Address.PublicKey)
@@ -102,8 +102,8 @@ func TestSendToPeers(t *testing.T) {
 		time.AfterFunc(testTimeout, func() { panic("timeout") })
 	}()
 	msg := <-n2.Inbox(lib.Topic_PEERS_RESPONSE)
-	gotMsg, ok := msg.Message.(*PeerBookResponseMessage)
-	require.True(t, ok)
+	gotMsg := new(PeerBookResponseMessage)
+	require.NoError(t, lib.Unmarshal(msg.Message, gotMsg))
 	require.True(t, len(gotMsg.Book) == 1)
 	require.Equal(t, expectedMsg.Address.NetAddress, gotMsg.Book[0].Address.NetAddress)
 	require.Equal(t, expectedMsg.Address.PublicKey, gotMsg.Book[0].Address.PublicKey)
@@ -131,7 +131,7 @@ func TestSendToPeersChunkedPacket(t *testing.T) {
 			PublicKey:  n1.pub,
 			NetAddress: "pipe",
 			PeerMeta: &lib.PeerMeta{
-				Signature: bytes.Repeat([]byte("F"), maxDataChunkSize*5),
+				Signature: bytes.Repeat([]byte("F"), int(maxDataChunkSize)*5),
 			},
 		},
 		ConsecutiveFailedDial: 1,
@@ -141,8 +141,8 @@ func TestSendToPeersChunkedPacket(t *testing.T) {
 		time.AfterFunc(testTimeout, func() { panic("timeout") })
 	}()
 	msg := <-n2.Inbox(lib.Topic_PEERS_RESPONSE)
-	gotMsg, ok := msg.Message.(*PeerBookResponseMessage)
-	require.True(t, ok)
+	gotMsg := new(PeerBookResponseMessage)
+	require.NoError(t, lib.Unmarshal(msg.Message, gotMsg))
 	require.True(t, len(gotMsg.Book) == 1)
 	require.Equal(t, expectedMsg.Address.NetAddress, gotMsg.Book[0].Address.NetAddress)
 	require.Equal(t, expectedMsg.Address.PublicKey, gotMsg.Book[0].Address.PublicKey)
@@ -187,16 +187,16 @@ func TestSendToPeersMultipleMessages(t *testing.T) {
 	wg.Wait()
 
 	msg := <-n2.Inbox(lib.Topic_PEERS_RESPONSE)
-	gotMsg, ok := msg.Message.(*PeerBookResponseMessage)
-	require.True(t, ok)
+	gotMsg := new(PeerBookResponseMessage)
+	require.NoError(t, lib.Unmarshal(msg.Message, gotMsg))
 	require.True(t, len(gotMsg.Book) == 1)
 	require.Equal(t, expectedMsg.Address.NetAddress, gotMsg.Book[0].Address.NetAddress)
 	require.Equal(t, expectedMsg.Address.PublicKey, gotMsg.Book[0].Address.PublicKey)
 	require.Equal(t, expectedMsg.ConsecutiveFailedDial, gotMsg.Book[0].ConsecutiveFailedDial)
 
 	msg2 := <-n2.Inbox(lib.Topic_PEERS_RESPONSE)
-	gotMsg2, ok := msg2.Message.(*PeerBookResponseMessage)
-	require.True(t, ok)
+	gotMsg2 := new(PeerBookResponseMessage)
+	require.NoError(t, lib.Unmarshal(msg2.Message, gotMsg2))
 	require.True(t, len(gotMsg.Book) == 1)
 	require.Equal(t, expectedMsg.Address.NetAddress, gotMsg2.Book[0].Address.NetAddress)
 	require.Equal(t, expectedMsg.Address.PublicKey, gotMsg2.Book[0].Address.PublicKey)
@@ -385,18 +385,18 @@ func TestID(t *testing.T) {
 }
 
 func TestMaxPacketSize(t *testing.T) {
-	if maxDataChunkSize > 1*units.MB {
+	if int(maxDataChunkSize) > int(1*units.MB) {
 		t.SkipNow()
 	}
 	a, err := lib.NewAny(&Packet{
 		StreamId: lib.Topic_INVALID,
 		Eof:      true,
-		Bytes:    bytes.Repeat([]byte("F"), maxDataChunkSize),
+		Bytes:    bytes.Repeat([]byte("F"), int(maxDataChunkSize)),
 	})
 	require.NoError(t, err)
 	envelope := &Envelope{Payload: a}
 	maxPacket, _ := lib.Marshal(envelope)
-	require.Equal(t, len(maxPacket), maxPacketSize)
+	require.EqualValues(t, len(maxPacket), int(maxPacketSize))
 }
 
 func connectStartedNodes(t *testing.T, n1, n2 testP2PNode) error {

@@ -5,6 +5,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
+	"time"
 )
 
 // HandleMessage handles and routes incoming consensus message from a Validator peer
@@ -51,6 +52,7 @@ func (b *BFT) HandleMessage(message proto.Message) lib.ErrorI {
 
 // CheckProposerMessage() validates an inbound message from the Leader Validator
 func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI) {
+	defer lib.TimeTrack(b.log, time.Now())
 	// basic sanity checks on the message
 	if err = x.checkBasic(b.View); err != nil {
 		return false, err
@@ -78,16 +80,20 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 	if err = x.Qc.CheckBasic(); err != nil {
 		return
 	}
+	s := time.Now()
 	// load the proper committee
 	vals, err = b.LoadCommittee(b.LoadRootChainId(x.Qc.Header.Height), x.Qc.Header.RootHeight) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
 	if err != nil {
 		return false, err
 	}
+	b.log.Warn("LoadCommittee took: " + time.Since(s).String())
+	s = time.Now()
 	// validate the Quorum Certificate
 	isPartialQC, err = x.Qc.Check(vals, lib.GlobalMaxBlockSize, b.View, false)
 	if err != nil {
 		return
 	}
+	b.log.Warn("QC Check took: " + time.Since(s).String())
 	// if it doesn't have +2/3 majority
 	if isPartialQC {
 		return
@@ -97,11 +103,13 @@ func (b *BFT) CheckProposerMessage(x *Message) (isPartialQC bool, err lib.ErrorI
 	if x.Header.Height != b.Height {
 		return false, lib.ErrWrongHeight()
 	}
+	s = time.Now()
 	// load committee data from state
 	data, e := b.LoadCommitteeData()
 	if e != nil {
 		return false, e
 	}
+	b.log.Warn("LoadCommitteeData took: " + time.Since(s).String())
 	if x.Qc.Header.Height < data.LastChainHeightUpdated {
 		return false, lib.ErrWrongHeight()
 	}

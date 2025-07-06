@@ -33,7 +33,11 @@ func TestMessageCacheAdd(t *testing.T) {
 				maxSize: 2,
 			},
 			toAdd: &MessageAndMetadata{
-				Message: &StringWrapper{Value: "b"},
+				Message: func() []byte {
+					bz, err := Marshal(&StringWrapper{Value: "b"})
+					require.NoError(t, err)
+					return bz
+				}(),
 			},
 			expected: map[uint64]struct{}{
 				func() uint64 {
@@ -50,7 +54,11 @@ func TestMessageCacheAdd(t *testing.T) {
 				queue: func() (l *list.List) {
 					l = list.New()
 					l.PushFront(&MessageAndMetadata{
-						Message: &StringWrapper{Value: "b"},
+						Message: func() []byte {
+							bz, err := Marshal(&StringWrapper{Value: "b"})
+							require.NoError(t, err)
+							return bz
+						}(),
 					})
 					return
 				}(),
@@ -63,7 +71,11 @@ func TestMessageCacheAdd(t *testing.T) {
 				maxSize: 2,
 			},
 			toAdd: &MessageAndMetadata{
-				Message: &StringWrapper{Value: "c"},
+				Message: func() []byte {
+					bz, err := Marshal(&StringWrapper{Value: "c"})
+					require.NoError(t, err)
+					return bz
+				}(),
 			},
 			expected: map[uint64]struct{}{
 				func() uint64 {
@@ -84,7 +96,11 @@ func TestMessageCacheAdd(t *testing.T) {
 				queue: func() (l *list.List) {
 					l = list.New()
 					l.PushFront(&MessageAndMetadata{
-						Message: &StringWrapper{Value: "b"},
+						Message: func() []byte {
+							bz, err := Marshal(&StringWrapper{Value: "b"})
+							require.NoError(t, err)
+							return bz
+						}(),
 					})
 					return
 				}(),
@@ -97,7 +113,11 @@ func TestMessageCacheAdd(t *testing.T) {
 				maxSize: 1,
 			},
 			toAdd: &MessageAndMetadata{
-				Message: &StringWrapper{Value: "c"},
+				Message: func() []byte {
+					bz, err := Marshal(&StringWrapper{Value: "c"})
+					require.NoError(t, err)
+					return bz
+				}(),
 			},
 			expected: map[uint64]struct{}{
 				func() uint64 {
