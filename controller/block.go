@@ -19,8 +19,8 @@ import (
 func (c *Controller) ListenForBlock() {
 	// log the beginning of the 'block listener' service
 	c.log.Debug("Listening for inbound blocks")
-	// initialize a cache that prevents duplicate messages
-	cache := lib.NewMessageCache()
+	// initialize a cache that prevents duplicate messages and  create a map of peers that signal 'new block'
+	cache, newBlockPeers := lib.NewMessageCache(), make(map[string]struct{})
 	// wait and execute for each inbound message received
 	for msg := range c.P2P.Inbox(Block) {
 		// create a variable to signal a 'stop loop'
@@ -59,8 +59,15 @@ func (c *Controller) ListenForBlock() {
 			qc, err := c.HandlePeerBlock(blockMessage, false)
 			// ensure no error
 			if err != nil {
-				// if the node has fallen 'out of sync' with the chain
-				if err == lib.ErrOutOfSync() {
+				senderPublicKey := lib.BytesToString(sender)
+				// if new height notified add to the map
+				if err.Error() == lib.ErrNewHeight().Error() {
+					newBlockPeers[senderPublicKey] = struct{}{}
+				}
+				// check if the node has fallen out of sync if at least a third of its peers has notified it
+				if float64(len(newBlockPeers)) >= float64(c.P2P.PeerCount())/float64(3) && !c.Consensus.SelfIsValidator() {
+					// reset map since syncing will start
+					newBlockPeers = make(map[string]struct{})
 					// log the 'out of sync' message
 					c.log.Warnf("Node fell out of sync for chainId: %d", blockMessage.ChainId)
 					// revert to syncing mode
@@ -81,6 +88,8 @@ func (c *Controller) ListenForBlock() {
 			c.GossipBlock(qc, sender)
 			// signal a reset to the bft module
 			c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
+			// reset 'newBlockPeers' because a new block was received properly
+			newBlockPeers = make(map[string]struct{})
 		}()
 		// if quit signaled
 		if quit {
@@ -416,19 +425,14 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 	}
 	// ensure the proposal inside the quorum certificate is valid at a stateless level
 	block, err := qc.CheckProposalBasic(c.FSM.Height(), c.Config.NetworkID, c.Config.ChainId)
-	if err != nil {
-		// exit with error
-		return nil, err
-	}
 	// if this certificate isn't finalized
-	if qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
+	if err == nil && qc.Header.Phase != lib.Phase_PRECOMMIT_VOTE {
 		// exit with error
 		return nil, lib.ErrWrongPhase()
 	}
-	// check if the node has fallen out of sync
-	if !syncing && c.FSM.Height() != block.BlockHeader.Height {
+	if err != nil {
 		// exit with error
-		return nil, lib.ErrOutOfSync()
+		return nil, err
 	}
 	// attempts to commit the QC to persistence of chain by playing it against the state machine
 	if err = c.CommitCertificate(qc, block); err != nil {

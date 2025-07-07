@@ -65,8 +65,10 @@ func New(p crypto.PrivateKeyI, maxMembersPerCommittee uint64, m *lib.Metrics, c 
 		}
 		bannedIPs = append(bannedIPs, *i)
 	}
-	// set the read/write timeout to be 2 x the block time
-	ReadWriteTimeout = time.Duration(2*c.BlockTimeMS()) * time.Millisecond
+	// set the write timeout to be 2 x the block time
+	WriteTimeout = time.Duration(2*c.BlockTimeMS()) * time.Millisecond
+	// set the read timeout to double of write
+	ReadTimeout = WriteTimeout * 2
 	// set the peer meta
 	meta := &lib.PeerMeta{NetworkId: c.NetworkID, ChainId: c.ChainId}
 	// return the p2p structure
@@ -125,7 +127,8 @@ func (p *P2P) ListenForInboundPeers(listenAddress *lib.PeerAddress) {
 		// wait for and then accept inbound tcp connection
 		c, err := p.listener.Accept()
 		if err != nil {
-			return
+			p.log.Errorf("Accept error: %v", err)
+			continue
 		}
 		// create a thread to prevent front-of-the-line blocking
 		go func(c net.Conn) {
@@ -200,8 +203,12 @@ func (p *P2P) DialForOutboundPeers() {
 			dialing++
 			defer func() { dialing-- }()
 			if err := p.Dial(rand.Address, false, false); err != nil {
+				p.book.AddFailedDialAttempt(rand.Address.PublicKey)
 				p.log.Debug(err.Error())
 				return
+			} else {
+				// if succeeded, reset failed attempts
+				p.book.ResetFailedDialAttempts(rand.Address.PublicKey)
 			}
 		}()
 	}
@@ -229,6 +236,7 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect, strictPubli
 	// create the e2e encrypted connection while establishing a full peer info object
 	connection, err := p.NewConnection(conn)
 	if err != nil {
+		_ = conn.Close()
 		return err
 	}
 	// always in case of error close connection
@@ -289,13 +297,11 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect, strictPubli
 	// add peer to peer set and peer book
 	p.log.Infof("Adding peer: %s@%s", lib.BytesToString(info.Address.PublicKey), info.Address.NetAddress)
 	p.book.Add(&BookPeer{Address: info.Address})
-	if err = p.PeerSet.Add(&Peer{
+	err = p.PeerSet.Add(&Peer{
 		conn:     connection,
 		PeerInfo: info,
 		stop:     sync.Once{},
-	}); err != nil {
-		connection.Stop()
-	}
+	})
 	return
 }
 
