@@ -2,24 +2,52 @@
   "book": [
     {
       "address": {
-        "publicKey": "98d45087a99bcbfde91993502e77dde869d4485c3778fe46513958320da560823d56a0108f4cf3513393f4d561bc489b",
-        "netAddress": "node-2:9001",
+        "publicKey": "806ba4f8c9d0fee2f5456b70977065c111748cb3df8df99b32ce1d22b32c38d3dfaea40954ef5787370457fc64b6a339",
+        "netAddress": "192.168.107.3:9001",
         "peerMeta": {
+          "networkID": 1,
           "chainID": 1,
-          "signature": "r2Ak7hLDBnF0pttfdvfXObie3ywUGWY5xpXnE9GnmW4TmN6yFaQtYrXF5iw8dXMSCFWDdP9qOZ+9NEQHa3D8KhFdoWQpL6b6dYBCe5ad/TEFmgBzqf0RmS4KR336qL8A"
+          "signature": "tLHQJIMyJpyRs3Cp2o/wI9dz5vi0ibf5XT8AsIKmn97m0SLW/1hRBW7GGNuu5WszAGFYOPAwtoAhGwgAGmp3WzeQjLtHUSW/YrCOE2Zu8s7QGKF1ZpwDQ5Lntp9VZCsO"
         }
-      }
+      },
+      "consecutiveFailedDial": 0
+    },
+    {
+      "address": {
+        "publicKey": "98d45087a99bcbfde91993502e77dde869d4485c3778fe46513958320da560823d56a0108f4cf3513393f4d561bc489b",
+        "netAddress": "192.168.107.3:9001",
+        "peerMeta": {
+          "networkID": 1,
+          "chainID": 1,
+          "signature": "kIrSkiSImCKjOdovVbslrmDXhBbhFPS8/Bvfg15/E19fGAo76UCZoafcO9UL07bKFWEA35dp3ZV+GlGxiubI0tqVYT6MYtwibA8XOqxMiBCoCczkC77DI0lckDjZeBmz"
+        }
+      },
+      "consecutiveFailedDial": 0
+    },
+    {
+      "address": {
+        "publicKey": "a6e1a491d3eda9e241ca6f2a54fda28da1883a60ac5f57f8596ce59cf9c525ce660479c60cf95744121430be36065ad3",
+        "netAddress": "192.168.107.4:9001",
+        "peerMeta": {
+          "networkID": 1,
+          "chainID": 1,
+          "signature": "jrDLEduPbUR4v2/pi6yKiw30Q6FPUGZ+0IguxiXDmiGBNEk4qDDEz7BfVxl69ZWmBFhijsw8ENWRtetwfnGWdKPSXdOirkIYE2duMAyUPtc+h12njqo+iHiYnKvK2ct9"
+        }
+      },
+      "consecutiveFailedDial": 0
     },
     {
       "address": {
         "publicKey": "b88a5928e54cbf0a36e0b98f5bcf02de9a9a1deba6994739f9160181a609f516eb702936a0cbf4c1f2e7e6be5b8272f2",
-        "netAddress": "192.168.48.3:54198",
+        "netAddress": "192.168.107.4:9001",
         "peerMeta": {
+          "networkID": 1,
           "chainID": 1,
-          "signature": "j4ODmoV2b851hSwoWzw/zgYQOztTUDZlL9TopoWbYiJOstT0c6IFwvfYq3ClW2woBXY9+xo+iCwpRR/uoXMsqWox4EitLmoHPF6OhLd6oM0L9APawR0qdQ+qgvIq35Ye"
+          "signature": "r1I4DR7INUJBRyYgp1qlYz9WoIdsJtgBYlDTa5FyLdzSB8gXT0RZg9hco7s0mjn2AHsKUyWZrookhbM8Mjka0BLsO9Kn0VPV8ng5Shu821OsvuFCP3qempzGkxrwuSwk"
         }
-      }
+      },
+      "consecutiveFailedDial": 0
     }
   ],
-  "bookSize": 2
+  "bookSize": 4
 }

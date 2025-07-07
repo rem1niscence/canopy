@@ -3,9 +3,10 @@ package controller
 import (
 	"bytes"
 	"context"
-	"golang.org/x/sync/errgroup"
 	"math/rand"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/canopy-network/canopy/bft"
 	"github.com/canopy-network/canopy/fsm"

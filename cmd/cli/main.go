@@ -140,10 +140,13 @@ func TransactionSubmitter(c *controller.Controller) {
 			fmt.Printf("Error unmarshaling: %s\n", err)
 			return
 		}
-		fmt.Printf("Loaded %d txs from block %d\n", len(blk.Transactions), blockIndex)
+		txs := blk.Transactions
+		mempoolTxs := c.Mempool.TxCount()
+		txsToSend := txs[min(mempoolTxs, len(txs)):]
+		fmt.Printf("Loaded %d txs from block %d mempool txs: %d sending %d \n", len(txs), blockIndex, mempoolTxs, len(txsToSend))
 		messageBytes, _ := lib.Marshal(&lib.TxMessage{
 			ChainId: c.Config.ChainId,
-			Txs:     blk.Transactions,
+			Txs:     txsToSend,
 		})
 		c.P2P.Inbox(lib.Topic_TX) <- &lib.MessageAndMetadata{
 			Message: messageBytes,
