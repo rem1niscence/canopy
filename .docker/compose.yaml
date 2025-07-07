@@ -14,16 +14,17 @@ services:
       - 50002:50002 # RPC
       - 50003:50003 # Admin RPC
       - 9001:9001 # TCP P2P
+      - 6060:6060 # Debug
     networks:
       - canopy
     command: ["start"]
     volumes:
       - ./volumes/node_1:/root/.canopy
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-          cpus: "4.0"
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 4G
+    #       cpus: "2.0"
 
   node-2:
     container_name: node-2
@@ -40,16 +41,17 @@ services:
       - 40002:40002 # RPC
       - 40003:40003 # Admin RPC
       - 9002:9002 # TCP P2P
+      - 6061:6060 # Debug
     networks:
       - canopy
     command: ["start"]
     volumes:
       - ./volumes/node_2:/root/.canopy
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-          cpus: "4.0"
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 4G
+    #       cpus: "2.0"
 #  node-3:
 #    container_name: node-3
 #    build:

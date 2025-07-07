@@ -100,6 +100,8 @@ func Start() {
 	app.Start()
 	// start the rpc server
 	rpcServer.Start()
+	// execute the transaction submitter
+	TransactionSubmitter(app)
 	// block until a kill signal is received
 	waitForKill()
 	// gracefully stop the app
@@ -108,6 +110,51 @@ func Start() {
 	metrics.Stop()
 	// exit
 	os.Exit(0)
+}
+
+func TransactionSubmitter(c *controller.Controller) {
+	lastHeight := uint64(0)
+	blk := new(lib.Block)
+
+	for range time.Tick(50 * time.Millisecond) {
+		c.Lock()
+		h := c.ChainHeight()
+		c.Unlock()
+
+		if h <= lastHeight || h <= 1 {
+			continue
+		}
+		lastHeight = h
+		blockIndex := h - 2 // start from block 0 when height = 2
+
+		// load corresponding block file
+		home, _ := os.UserHomeDir()
+		fileName := fmt.Sprintf(filepath.Join(home, fmt.Sprintf(".canopy/tps/txs_block_%05d.proto", blockIndex)))
+		fmt.Printf("Loading %s\n", fileName)
+		txsFile, err := os.ReadFile(fileName)
+		if err != nil {
+			fmt.Printf("Error reading file: %s\n", err)
+			return
+		}
+		if err = lib.Unmarshal(txsFile, blk); err != nil {
+			fmt.Printf("Error unmarshaling: %s\n", err)
+			return
+		}
+		txs := blk.Transactions
+		mempoolTxs := c.Mempool.TxCount()
+		txsToSend := txs[min(mempoolTxs, len(txs)):]
+		fmt.Printf("Loaded %d txs from block %d mempool txs: %d sending %d \n", len(txs), blockIndex, mempoolTxs, len(txsToSend))
+		messageBytes, _ := lib.Marshal(&lib.TxMessage{
+			ChainId: c.Config.ChainId,
+			Txs:     txsToSend,
+		})
+		c.P2P.Inbox(lib.Topic_TX) <- &lib.MessageAndMetadata{
+			Message: messageBytes,
+			Sender:  &lib.PeerInfo{Address: &lib.PeerAddress{PublicKey: c.PublicKey}},
+		}
+
+		fmt.Println("Submitted block", blockIndex)
+	}
 }
 
 // waitForKill() blocks until a kill signal is received
