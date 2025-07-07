@@ -119,7 +119,7 @@ func TestDoublyNestedTxn(t *testing.T) {
 	// set doubly nested value
 	doublyNested.Set([]byte("doublyNested"), []byte("doublyNested"))
 	// commit doubly nested transaction
-	_, err = doublyNested.Commit()
+	err = doublyNested.Flush()
 	// retrieve grandparent key
 	value, err = doublyNested.Get([]byte("base"))
 	require.NoError(t, err)
@@ -132,9 +132,9 @@ func TestDoublyNestedTxn(t *testing.T) {
 	require.Equal(t, []byte("doublyNested"), value)
 	value, err = store.Get([]byte("doublyNested"))
 	require.NoError(t, err)
-	require.Equal(t, nil, value)
+	require.Nil(t, value)
 	// commit nested transaction
-	_, err = nested.Commit()
+	err = nested.Flush()
 	require.NoError(t, err)
 	// verify both nested and doubly nested values can be retrieved from the store
 	value, err = store.Get([]byte("nested"))
