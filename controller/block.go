@@ -19,8 +19,8 @@ import (
 func (c *Controller) ListenForBlock() {
 	// log the beginning of the 'block listener' service
 	c.log.Debug("Listening for inbound blocks")
-	// initialize a cache that prevents duplicate messages
-	cache := lib.NewMessageCache()
+	// initialize a cache that prevents duplicate messages and  create a map of peers that signal 'new block'
+	cache, newBlockPeers := lib.NewMessageCache(), make(map[string]struct{})
 	// wait and execute for each inbound message received
 	for msg := range c.P2P.Inbox(Block) {
 		// create a variable to signal a 'stop loop'
@@ -56,11 +56,18 @@ func (c *Controller) ListenForBlock() {
 			// track processing time for consensus module
 			startTime := time.Now()
 			// 'handle' the peer block and certificate appropriately
-			qc, err := c.HandlePeerBlock(blockMessage, lib.BytesToString(sender), false)
+			qc, err := c.HandlePeerBlock(blockMessage, false)
 			// ensure no error
 			if err != nil {
-				// if the node has fallen 'out of sync' with the chain
-				if err.Error() == lib.ErrOutOfSync().Error() {
+				senderPublicKey := lib.BytesToString(sender)
+				// if new height notified add to the map
+				if err.Error() == lib.ErrNewHeight().Error() {
+					newBlockPeers[senderPublicKey] = struct{}{}
+				}
+				// check if the node has fallen out of sync if at least a third of its peers has notified it
+				if float64(len(newBlockPeers)) >= float64(c.P2P.PeerCount())/float64(3) && !c.Consensus.SelfIsValidator() {
+					// reset map since syncing will start
+					newBlockPeers = make(map[string]struct{})
 					// log the 'out of sync' message
 					c.log.Warnf("Node fell out of sync for chainId: %d", blockMessage.ChainId)
 					// revert to syncing mode
@@ -81,6 +88,8 @@ func (c *Controller) ListenForBlock() {
 			c.GossipBlock(qc, sender)
 			// signal a reset to the bft module
 			c.Consensus.ResetBFT <- bft.ResetBFT{ProcessTime: time.Since(startTime)}
+			// reset 'newBlockPeers' because a new block was received properly
+			newBlockPeers = make(map[string]struct{})
 		}()
 		// if quit signaled
 		if quit {
@@ -366,7 +375,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 }
 
 // HandlePeerBlock() validates and handles an inbound certificate (with a block) from a remote peer
-func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, senderPublicKey string, syncing bool) (*lib.QuorumCertificate, lib.ErrorI) {
+func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.QuorumCertificate, lib.ErrorI) {
 	// log the start of 'peer block handling'
 	c.log.Info("Handling peer block")
 	// define a convenience variable for the certificate
@@ -421,28 +430,9 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, senderPublicKey stri
 		// exit with error
 		return nil, lib.ErrWrongPhase()
 	}
-	if !c.Consensus.SelfIsValidator() {
-		if err != nil {
-			// if new height notified add to the map
-			if err.Error() == lib.ErrNewHeight().Error() && senderPublicKey != "" {
-				c.newBlockPeers[senderPublicKey] = true
-			}
-		}
-		// check if the node has fallen out of sync if at least a third of its peers has notified it
-		if !syncing && float64(len(c.newBlockPeers)) >= float64(c.P2P.PeerCount())/float64(3) && senderPublicKey != "" {
-			// reset map since syncing will start
-			c.newBlockPeers = make(map[string]bool)
-			// exit with error
-			return nil, lib.ErrOutOfSync()
-		}
-	}
 	if err != nil {
 		// exit with error
 		return nil, err
-	}
-	if !c.Consensus.SelfIsValidator() {
-		// reset map since new height was gotten correctly
-		c.newBlockPeers = make(map[string]bool)
 	}
 	// attempts to commit the QC to persistence of chain by playing it against the state machine
 	if err = c.CommitCertificate(qc, block); err != nil {
