@@ -91,6 +91,7 @@ const (
 	CodeNoValidators                ErrorCode = 29
 	CodeInvalidResultsHash          ErrorCode = 30
 	CodeNonNilBlock                 ErrorCode = 31
+	CodeProtoParse                  ErrorCode = 32
 
 	// Consensus Module
 	ConsensusModule ErrorModule = "consensus"
@@ -723,6 +724,9 @@ func ErrHashSize() ErrorI {
 
 func ErrMaxPort() ErrorI {
 	return NewError(CodeMaxPort, MainModule, "max port exceeded")
+}
+func ErrProtoParse(err error) ErrorI {
+	return NewError(CodeProtoParse, MainModule, fmt.Sprintf("proto parse failed with error: %s", err.Error()))
 }
 
 func ErrOrderLocked() ErrorI {

@@ -24,6 +24,7 @@ type ValidatorSet struct {
 
 // NewValidatorSet() initializes a ValidatorSet from a given set of consensus validators
 func NewValidatorSet(validators *ConsensusValidators) (ValidatorSet, ErrorI) {
+	defer TimeTrack(NewDefaultLogger(), time.Now())
 	// handle empty set
 	if validators == nil {
 		// exit with error
@@ -412,7 +413,6 @@ func (x *View) CheckBasic() (err ErrorI) {
 
 // Check() checks the validity of the view and optionally enforce *heights* (plugin height and committee height)
 func (x *View) Check(view *View, enforceHeights bool) ErrorI {
-	defer TimeTrack(NewDefaultLogger(), time.Now())
 	// do a basic sanity check on the view
 	if err := x.CheckBasic(); err != nil {
 		// exit with err

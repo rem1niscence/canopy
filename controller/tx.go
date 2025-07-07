@@ -228,7 +228,11 @@ func (m *Mempool) CheckMempool() {
 	// apply the block against the state machine and populate the resulting merkle `roots` in the block header
 	block.BlockHeader, blockResult.Transactions, failed, err = m.FSM.ApplyBlock(ctx, block, true)
 	if err != nil {
-		m.log.Errorf("Check Mempool error: %s", err.Error())
+		if err.Error() != lib.ErrMempoolStopSignal().Error() {
+			m.log.Errorf("Check Mempool error: %s", err.Error())
+		} else {
+			m.log.Debugf("Check Mempool stopped %s", err.Error())
+		}
 		return
 	}
 	// cache the proposal

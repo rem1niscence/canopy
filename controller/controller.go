@@ -295,7 +295,7 @@ func (c *Controller) LoadLastProposers(height uint64) (*lib.Proposers, lib.Error
 // LoadCommitteeData() returns the state metadata for the 'self chain'
 func (c *Controller) LoadCommitteeData() (data *lib.CommitteeData, err lib.ErrorI) {
 	// get the committee data from the FSM
-	return c.FSM.LoadCommitteeData(c.ChainHeight(), c.Config.ChainId)
+	return c.FSM.GetCommitteeData(c.Config.ChainId)
 }
 
 // Syncing() returns if any of the supported chains are currently syncing

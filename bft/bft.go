@@ -18,6 +18,7 @@ type BFT struct {
 	Proposals     ProposalsForHeight     // 'proposals' received from the Leader Validator(s)
 	ProposerKey   []byte                 // the public key of the proposer
 	ValidatorSet  ValSet                 // the current set of Validators
+	CommitteeData *lib.CommitteeData     // the data for the committee for this height
 	HighQC        *QC                    // the highest PRECOMMIT quorum certificate the node is aware of for this Height
 	Block         []byte                 // the current Block being voted on (the foundational unit of the blockchain)
 	BlockHash     []byte                 // the current hash of the block being voted on
@@ -94,6 +95,11 @@ func (b *BFT) Start() {
 	if err != nil {
 		b.log.Warn(err.Error())
 	}
+	// load the committee data
+	b.CommitteeData, err = b.Controller.LoadCommitteeData()
+	if err != nil {
+		b.log.Warn(err.Error())
+	}
 	for {
 		select {
 		// EXECUTE PHASE
@@ -123,7 +129,7 @@ func (b *BFT) Start() {
 				// calculate time since
 				since := time.Since(resetBFT.StartTime)
 				// allow if 'since' is less than 1 block old
-				if int(since) < b.Config.BlockTimeMS() {
+				if int(since.Milliseconds()) < b.Config.BlockTimeMS() {
 					processTime = since
 				}
 				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
@@ -559,6 +565,8 @@ type PacemakerMessages map[string]*Message // [ public_key_string ] -> View mess
 
 // AddPacemakerMessage() adds the 'View' message to the list (keyed by public key string)
 func (b *BFT) AddPacemakerMessage(msg *Message) (err lib.ErrorI) {
+	b.Controller.Lock()
+	defer b.Controller.Unlock()
 	b.PacemakerMessages[lib.BytesToString(msg.Signature.PublicKey)] = msg
 	return
 }
@@ -626,6 +634,11 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.Height), b.RootHeight)
 	if err != nil {
 		b.log.Errorf("LoadCommittee() failed with err: %s", err.Error())
+	}
+	// update the committee data
+	b.CommitteeData, err = b.Controller.LoadCommitteeData()
+	if err != nil {
+		b.log.Errorf("LoadCommitteeData() failed with err: %s", err.Error())
 	}
 	// if resetting due to new Canopy Block and Validator Set then KeepLocks
 	// - protecting any who may have committed against attacks like malicious proposers from withholding

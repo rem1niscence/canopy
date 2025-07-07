@@ -5,6 +5,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"slices"
+	"time"
 )
 
 // ByzantineEvidence represents a collection of evidence that supports byzantine behavior during the BFT lifecycle
@@ -243,6 +244,9 @@ type PartialQCs map[string]*QC // [ PayloadHash ] -> Partial QC
 
 // AddPartialQC() saves a non-majority Quorum Certificate which is a big hint of faulty behavior
 func (b *BFT) AddPartialQC(m *Message) (err lib.ErrorI) {
+	defer lib.TimeTrack(b.log, time.Now())
+	b.Controller.Lock()
+	defer b.Controller.Unlock()
 	bz, err := lib.Marshal(m.Qc)
 	if err != nil {
 		return

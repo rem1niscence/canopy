@@ -305,12 +305,6 @@ func (c *Controller) ListenForConsensus() {
 		if err := func() (err lib.ErrorI) {
 			c.log.Debugf("Handling consensus message")
 			defer lib.TimeTrack(c.log, time.Now())
-			c.log.Debug("ListenForConsensus Lock")
-			defer c.log.Debug("ListenForConsensus Unlock")
-			// lock the controller for thread safety
-			c.Lock()
-			// once the handler completes, unlock
-			defer c.Unlock()
 			// create a new 'consensus message' to unmarshal the bytes to
 			bftMsg := new(bft.Message)
 			// try to unmarshal into a consensus message
