@@ -22,8 +22,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
-          cpus: "2.0"
+          memory: 8G
+          cpus: "4.0"
 
   node-2:
     container_name: node-2
@@ -48,8 +48,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
-          cpus: "2.0"
+          memory: 8G
+          cpus: "4.0"
 #  node-3:
 #    container_name: node-3
 #    build:
