@@ -163,10 +163,7 @@ func (f *FeeMempool) Clear() {
 }
 
 // TxCount() returns the current number of transactions in the mempool
-func (f *FeeMempool) TxCount() int {
-	// return the count
-	return len(f.pool.s)
-}
+func (f *FeeMempool) TxCount() int { return len(f.pool.s) }
 
 // TxsBytes() returns the total size in bytes of all transactions in the mempool
 func (f *FeeMempool) TxsBytes() int {

@@ -28,7 +28,6 @@ func (c *Controller) ListenForBlock() {
 		var quit bool
 		// wrap in a function call to use 'defer' functionality
 		func() {
-			defer lib.TimeTrack(c.log, time.Now())
 			// log the beginning of handling the block message
 			c.log.Debug("Handling block message")
 			//defer lib.TimeTrack(c.log, time.Now())
@@ -128,7 +127,6 @@ func (c *Controller) SelfSendBlock(qc *lib.QuorumCertificate, timestamp uint64) 
 
 // ProduceProposal() create a proposal in the form of a `block` and `certificate result` for the bft process
 func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypto.VDF) (blockBytes []byte, results *lib.CertificateResult, err lib.ErrorI) {
-	defer lib.TimeTrack(c.log, time.Now())
 	c.log.Debugf("Producing proposal as leader")
 	// configure the FSM in 'consensus mode' for validator proposals
 	resetProposalConfig := c.SetFSMInConsensusModeForProposals()
@@ -180,7 +178,6 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 
 // ValidateProposal() fully validates a proposal in the form of a quorum certificate and resets back to begin block state
 func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (blockResult *lib.BlockResult, err lib.ErrorI) {
-	defer lib.TimeTrack(c.log, time.Now())
 	// log the beginning of proposal validation
 	c.log.Debugf("Validating proposal from leader")
 	// configure the FSM in 'consensus mode' for validator proposals
@@ -224,14 +221,12 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 // - sets up the controller for the next height
 func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI) {
 	start := time.Now()
-	defer lib.TimeTrack(c.log, start)
 	// cancel any running mempool check
 	c.Mempool.stop()
 	// lock the mempool
-	c.log.Debug("CommitCertificateMempool Lock")
 	c.Mempool.L.Lock()
 	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
-	defer func() { c.FSM.Reset(); c.Mempool.L.Unlock(); c.log.Debug("CommitCertificateMempool Unlock") }()
+	defer func() { c.FSM.Reset(); c.Mempool.L.Unlock() }()
 	// log the beginning of the commit
 	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.ResultsHash))
 	// cast the store to ensure the proper store type to complete this operation

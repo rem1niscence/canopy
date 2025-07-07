@@ -261,6 +261,7 @@ func (c *MultiConn) startReceiveService() {
 					return
 				}
 			case *Ping: // receive ping message notifies the "send" service to respond with a 'pong' message
+
 				c.sendPong <- struct{}{}
 			case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
 				c.receivedPong <- struct{}{}
@@ -291,7 +292,7 @@ func (c *MultiConn) waitForAndHandleWireBytes(m *limiter.Monitor) (proto.Message
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
-	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
+	m.Limit(int(maxPacketSize), int64(dataFlowRatePerS), true)
 	// read the proto message from the wire
 	if err := receiveProtoMsg(c.conn, msg); err != nil {
 		return nil, err
@@ -333,7 +334,7 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) {
 	// restrict the instantaneous data flow to rate bytes per second
 	// Limit() request maxPacketSize bytes from the limiter and the limiter
 	// will block the execution until at or below the desired rate of flow
-	//m.Limit(maxPacketSize, int64(dataFlowRatePerS), true)
+	m.Limit(int(maxPacketSize), int64(dataFlowRatePerS), true)
 	//defer lib.TimeTrack(c.log, time.Now())
 	// send the proto message wrapped in an Envelope over the wire
 	if err = sendProtoMsg(c.conn, &Envelope{Payload: a}); err != nil {

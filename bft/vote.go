@@ -3,7 +3,6 @@ package bft
 import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
-	"time"
 )
 
 // LEADER TRACKING AND AGGREGATING MESSAGES FROM REPLICAS
@@ -50,7 +49,6 @@ func (b *BFT) GetLeadingVote() (m *Message, maxVotePercent uint64, maxVotes uint
 
 // AddVote() adds a Replica's vote to the VoteSet
 func (b *BFT) AddVote(vote *Message) lib.ErrorI {
-	defer lib.TimeTrack(b.log, time.Now())
 	b.Controller.Lock()
 	defer b.Controller.Unlock()
 	voteSet := b.getVoteSet(vote)

@@ -5,7 +5,6 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
-	"time"
 )
 
 // HandleMessage handles and routes incoming consensus message from a Validator peer
@@ -13,26 +12,15 @@ func (b *BFT) HandleMessage(message proto.Message) lib.ErrorI {
 	// ensure is a valid `Consensus Message` type
 	switch msg := message.(type) {
 	case *Message:
-		// lock the controller for thread safety
-		b.Controller.Lock()
-		// check if a validator
-		valSet := b.ValidatorSet
-		_, err := valSet.GetValidator(msg.Signature.PublicKey)
-		// get variables needed to validate the messages
-		var blockHash, resultsHash []byte
-		if b.Block != nil {
-			blockHash, resultsHash = b.GetBlockHash(), b.Results.Hash()
-		}
-		view, rHeight, height, cHeightUpdated := b.View.Copy(), b.RootHeight, b.Height, b.CommitteeData.LastChainHeightUpdated
-		// unlock the controller for thread safety
-		b.Controller.Unlock()
+		// capture the paramters needed to validate the message
+		params, err := b.GetValidateMessageParams(msg)
 		if err != nil {
 			return err
 		}
 		switch {
 		case msg.IsReplicaMessage() || msg.IsPacemakerMessage(): // consensus message from a Replica
 			// validate the Replica message
-			if err = b.CheckReplicaMessage(msg, view, blockHash, resultsHash); err != nil {
+			if err = b.CheckReplicaMessage(msg, params); err != nil {
 				b.log.Errorf("Received invalid vote from %s", lib.BytesToString(msg.Signature.PublicKey))
 				return err
 			}
@@ -45,10 +33,10 @@ func (b *BFT) HandleMessage(message proto.Message) lib.ErrorI {
 			return b.AddVote(msg)
 		case msg.IsProposerMessage(): // consensus message from the Leader
 			// validate the Leader message
-			partialQC, err := b.CheckProposerMessage(msg, valSet, rHeight, height, cHeightUpdated, view, blockHash, resultsHash)
-			if err != nil {
+			partialQC, e := b.CheckProposerMessage(msg, params)
+			if e != nil {
 				b.log.Errorf("Received invalid proposal from %s", lib.BytesToString(msg.Signature.PublicKey))
-				return err
+				return e
 			}
 			b.log.Debugf("Received %s message from proposer: %s", msg.Header.ToString(), lib.BytesToTruncatedString(msg.Signature.PublicKey))
 			// store partial QCs as they may be indicative of byzantine behavior
@@ -64,16 +52,17 @@ func (b *BFT) HandleMessage(message proto.Message) lib.ErrorI {
 }
 
 // CheckProposerMessage() validates an inbound message from the Leader Validator
-func (b *BFT) CheckProposerMessage(x *Message, vals ValSet, rHeight, height, cHeightUpdated uint64, view *lib.View, bHash, rHash []byte) (isPartialQC bool, err lib.ErrorI) {
-	defer lib.TimeTrack(b.log, time.Now())
+func (b *BFT) CheckProposerMessage(x *Message, p *validateMessageParams) (isPartialQC bool, err lib.ErrorI) {
+	// store a variable to capture the validator set in-case it's replaced by an unexpected root height
+	var vals = p.vals
 	// basic sanity checks on the message
-	if err = x.checkBasic(view); err != nil {
+	if err = x.checkBasic(p.view); err != nil {
 		return false, err
 	}
 	// ELECTION
 	if x.Header.Phase == Election {
 		// validate target height
-		if x.Header.Height != height {
+		if x.Header.Height != p.height {
 			return false, lib.ErrWrongHeight()
 		}
 		// sanity check the VRF
@@ -93,34 +82,30 @@ func (b *BFT) CheckProposerMessage(x *Message, vals ValSet, rHeight, height, cHe
 		return
 	}
 	// if an unexpected root height
-	if x.Qc.Header.RootHeight != rHeight {
-		s := time.Now()
-		b.Controller.Lock()
+	if x.Qc.Header.RootHeight != p.rootHeight {
 		// load the proper committee
+		b.Controller.Lock()
 		vals, err = b.LoadCommittee(b.LoadRootChainId(x.Qc.Header.Height), x.Qc.Header.RootHeight) // REPLICAS: CAPTURE PARTIAL QCs FROM ANY HEIGHT
 		b.Controller.Unlock()
 		if err != nil {
 			return false, err
 		}
-		b.log.Warn("LoadCommittee took: " + time.Since(s).String())
 	}
-	s := time.Now()
 	// validate the Quorum Certificate
-	isPartialQC, err = x.Qc.Check(vals, lib.GlobalMaxBlockSize, view, false)
+	isPartialQC, err = x.Qc.Check(vals, lib.GlobalMaxBlockSize, p.view, false)
 	if err != nil {
 		return
 	}
-	b.log.Warn("QC Check took: " + time.Since(s).String())
 	// if it doesn't have +2/3 majority
 	if isPartialQC {
 		return
 	}
 	// validate header height, qc height, and committee height
 	// NOTE: these height checks are correct even when sending a highQC as the header is updated when using a highQC
-	if x.Header.Height != height {
+	if x.Header.Height != p.height {
 		return false, lib.ErrWrongHeight()
 	}
-	if x.Qc.Header.Height < cHeightUpdated {
+	if x.Qc.Header.Height < p.cHeightUpdated {
 		return false, lib.ErrWrongHeight()
 	}
 	if x.Header.Phase == Propose {
@@ -138,14 +123,14 @@ func (b *BFT) CheckProposerMessage(x *Message, vals ValSet, rHeight, height, cHe
 		}
 	} else {
 		// in PRECOMMIT or COMMIT phase
-		if bHash == nil || rHash == nil {
+		if p.blockHash == nil || p.resultsHash == nil {
 			return false, lib.ErrNoSavedBlockOrResults()
 		}
 		// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
-		if !bytes.Equal(x.Qc.BlockHash, bHash) {
+		if !bytes.Equal(x.Qc.BlockHash, p.blockHash) {
 			return false, lib.ErrMismatchConsBlockHash()
 		}
-		if !bytes.Equal(x.Qc.ResultsHash, rHash) {
+		if !bytes.Equal(x.Qc.ResultsHash, p.resultsHash) {
 			return false, lib.ErrMismatchResultsHash()
 		}
 	}
@@ -153,7 +138,7 @@ func (b *BFT) CheckProposerMessage(x *Message, vals ValSet, rHeight, height, cHe
 }
 
 // CheckReplicaMessage() validates an inbound message from a Replica Validator
-func (b *BFT) CheckReplicaMessage(x *Message, view *lib.View, blockHash, resultsHash []byte) lib.ErrorI {
+func (b *BFT) CheckReplicaMessage(x *Message, params *validateMessageParams) lib.ErrorI {
 	// NOTE: x.CheckBasic() but without the 'header' check - Replicas always use the QC so their communications may be aggregable
 	if x == nil {
 		return ErrEmptyMessage()
@@ -167,7 +152,7 @@ func (b *BFT) CheckReplicaMessage(x *Message, view *lib.View, blockHash, results
 		return err
 	}
 	// validate the header of the Quorum  Certificate
-	if err := x.Qc.Header.Check(view, true); err != nil {
+	if err := x.Qc.Header.Check(params.view, true); err != nil {
 		return err
 	}
 	// the validation is done for Pacemaker message types
@@ -181,16 +166,16 @@ func (b *BFT) CheckReplicaMessage(x *Message, view *lib.View, blockHash, results
 		}
 	} else {
 		// PROPOSE-VOTE and PRECOMMIT-VOTE Replica message
-		if blockHash == nil {
+		if params.blockHash == nil {
 			if !bytes.Equal(x.Qc.BlockHash, b.BlockToHash(x.Qc.Block)) {
 				return lib.ErrMismatchQCBlockHash()
 			}
 		} else {
-			if !bytes.Equal(x.Qc.BlockHash, blockHash) {
+			if !bytes.Equal(x.Qc.BlockHash, params.blockHash) {
 				return lib.ErrMismatchConsBlockHash()
 			}
 		}
-		if !bytes.Equal(x.Qc.ResultsHash, resultsHash) {
+		if !bytes.Equal(x.Qc.ResultsHash, params.resultsHash) {
 			return lib.ErrMismatchResultsHash()
 		}
 	}
@@ -276,7 +261,6 @@ func (x *Message) IsPacemakerMessage() bool {
 
 // checkBasic() performs basic sanity checks on the Message
 func (x *Message) checkBasic(view *lib.View) lib.ErrorI {
-	defer lib.TimeTrack(lib.NewDefaultLogger(), time.Now())
 	if x == nil {
 		return ErrEmptyMessage()
 	}
@@ -284,6 +268,47 @@ func (x *Message) checkBasic(view *lib.View) lib.ErrorI {
 		return err
 	}
 	return checkSignature(x.Signature, x)
+}
+
+// GetValidateMessageParams() executes a blocking function to collect the params needed to validate a consensus message
+func (b *BFT) GetValidateMessageParams(msg *Message) (*validateMessageParams, lib.ErrorI) {
+	// lock the controller for thread safety
+	b.Controller.Lock()
+	// check if a validator
+	valSet := b.ValidatorSet
+	_, err := valSet.GetValidator(msg.Signature.PublicKey)
+	// get variables needed to validate the messages
+	var blockHash, resultsHash []byte
+	if b.Block != nil {
+		blockHash, resultsHash = b.GetBlockHash(), b.Results.Hash()
+	}
+	view, rHeight, height, cHeightUpdated := b.View.Copy(), b.RootHeight, b.Height, b.CommitteeData.LastChainHeightUpdated
+	// unlock the controller for thread safety
+	b.Controller.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	// return the params
+	return &validateMessageParams{
+		view:           view,
+		vals:           valSet,
+		rootHeight:     rHeight,
+		height:         height,
+		cHeightUpdated: cHeightUpdated,
+		blockHash:      blockHash,
+		resultsHash:    resultsHash,
+	}, nil
+}
+
+// validateMessageParams defines the parameters structure for validating consensus messages
+type validateMessageParams struct {
+	view           *lib.View // the current BFT view of this node
+	vals           ValSet    // the validator set corresponding with the message
+	rootHeight     uint64    // the height of the root chain
+	height         uint64    // the chain height
+	cHeightUpdated uint64    // the last 'chain' height the committee updated
+	blockHash      []byte    // the hash of the proposal.Block (if any)
+	resultsHash    []byte    // the hash of the proposal.Results (if any)
 }
 
 // checkSignature() validates the signature of a SignByte implementation (object that can be converted to Sign Bytes)

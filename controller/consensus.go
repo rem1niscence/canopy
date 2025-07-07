@@ -293,7 +293,6 @@ func (c *Controller) verifyResponse(msg *lib.MessageAndMetadata, queue map[uint6
 
 // ListenForConsensus() listens and internally routes inbound consensus messages
 func (c *Controller) ListenForConsensus() {
-	defer lib.TimeTrack(c.log, time.Now())
 	// wait and execute for each consensus message received
 	for msg := range c.P2P.Inbox(Cons) {
 		// if the node is syncing
@@ -304,7 +303,6 @@ func (c *Controller) ListenForConsensus() {
 		// execute in a sub-function to unify error handling and enable 'defer' functionality
 		if err := func() (err lib.ErrorI) {
 			c.log.Debugf("Handling consensus message")
-			defer lib.TimeTrack(c.log, time.Now())
 			// create a new 'consensus message' to unmarshal the bytes to
 			bftMsg := new(bft.Message)
 			// try to unmarshal into a consensus message
@@ -343,8 +341,6 @@ func (c *Controller) ListenForBlockRequests() {
 				c.log.Debug("Handing block request message")
 				//defer lib.TimeTrack(c.log, time.Now())
 				// lock the controller for thread safety
-				c.log.Debug("ListenForBlockRequests Lock")
-				defer c.log.Debug("ListenForBlockRequests Unlock")
 				c.Lock()
 				// unlock once the message handling completes
 				defer c.Unlock()
@@ -410,7 +406,6 @@ func (c *Controller) ListenForBlockRequests() {
 
 // SendToReplicas() directly send a bft message to each validator in a set (committee)
 func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable) {
-	defer lib.TimeTrack(c.log, time.Now())
 	// log the initialization of the send process
 	c.log.Debugf("Sending to %d replicas", replicas.NumValidators)
 	if err := msg.Sign(c.PrivateKey); err != nil {
@@ -675,8 +670,6 @@ func (c *Controller) finishSyncing() {
 
 // ConsensusSummary() for the RPC - returns the summary json object of the bft for a specific chainID
 func (c *Controller) ConsensusSummary() ([]byte, lib.ErrorI) {
-	c.log.Debug("ConsensusSummary Lock")
-	defer c.log.Debug("ConsensusSummary Unlock")
 	// lock for thread safety
 	c.Lock()
 	defer c.Unlock()

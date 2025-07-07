@@ -2,13 +2,11 @@ package p2p
 
 import (
 	"bytes"
-	"slices"
-	"sync"
-	"time"
-
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
+	"slices"
+	"sync"
 )
 
 const (
@@ -101,7 +99,6 @@ func (ps *PeerSet) Remove(publicKey []byte) (peer *Peer, err lib.ErrorI) {
 // UpdateMustConnects() updates the list of peers that 'must be connected to'
 // Ex. the peers needed to complete committee consensus
 func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []*lib.PeerAddress) {
-	defer lib.TimeTrack(ps.logger, time.Now())
 	ps.Lock()
 	defer ps.Unlock()
 	ps.mustConnect = mustConnect
@@ -131,7 +128,6 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 
 // ChangeReputation() updates the peer reputation +/- based on the int32 delta
 func (ps *PeerSet) ChangeReputation(publicKey []byte, delta int32) {
-	defer lib.TimeTrack(ps.logger, time.Now())
 	ps.Lock()
 	defer ps.Unlock()
 	peer, err := ps.get(publicKey)
@@ -219,7 +215,6 @@ func (ps *PeerSet) SendToRandPeer(topic lib.Topic, msg proto.Message) (*lib.Peer
 
 // SendTo() sends a message to a specific peer based on their public key
 func (ps *PeerSet) SendTo(publicKey []byte, topic lib.Topic, msg proto.Message) lib.ErrorI {
-	defer lib.TimeTrack(ps.logger, time.Now())
 	bz, err := lib.Marshal(msg)
 	if err != nil {
 		return err
@@ -235,7 +230,6 @@ func (ps *PeerSet) SendTo(publicKey []byte, topic lib.Topic, msg proto.Message) 
 
 // SendToPeers() sends a message to all peers
 func (ps *PeerSet) SendToPeers(topic lib.Topic, msg proto.Message, excludeKeys ...string) lib.ErrorI {
-	defer lib.TimeTrack(ps.logger, time.Now())
 	bz, err := lib.Marshal(msg)
 	if err != nil {
 		return err

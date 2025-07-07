@@ -106,8 +106,6 @@ func (b *BFT) Start() {
 		// - This triggers when the phase's sleep time has expired, indicating that all expected messages for this phase should have already been received
 		case <-b.PhaseTimer.C:
 			func() {
-				b.log.Debugf("PhaseTimer %s Lock", b.Phase.String())
-				defer b.log.Debugf("PHaseTimer %s Unlock", b.Phase.String())
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
 				// Update BFT metrics
@@ -120,8 +118,6 @@ func (b *BFT) Start() {
 		// - This triggers when receiving a new Commit Block (QC) from either root-chainId (a) or the Target-ChainId (b)
 		case resetBFT := <-b.ResetBFT:
 			func() {
-				b.log.Debugf("ResetBFT Lock")
-				defer b.log.Debugf("ResetBFT Unlock")
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
 				// calculate the process time
@@ -197,8 +193,6 @@ func (b *BFT) HandlePhase() {
 // ELECTION PHASE:
 // - Replicas run the Cumulative Distribution Function and a 'practical' Verifiable Random Function
 // - If they are a candidate they send the VRF Out to the replicas
-var electionTimer time.Time
-
 func (b *BFT) StartElectionPhase() {
 	b.log.Infof(b.View.ToString())
 	// retrieve Validator object from the ValidatorSet
@@ -244,8 +238,6 @@ func (b *BFT) StartElectionPhase() {
 // - Replicas send a signed (aggregable) ELECTION vote to the Leader (Proposer)
 // - With this vote, the Replica attaches any Byzantine evidence or 'Locked' QC they have collected as well as their VDF output
 func (b *BFT) StartElectionVotePhase() {
-	fmt.Println("Round trip took", time.Since(electionTimer))
-	electionTimer = time.Now()
 	b.log.Info(b.View.ToString())
 	// get the candidates from messages received
 	candidates := b.GetElectionCandidates()
@@ -773,9 +765,6 @@ func (b *BFT) SetWaitTimers(phaseWaitTime, processTime time.Duration) {
 	}
 	// calculate the phase timer by subtracting the process time
 	phaseWaitTime = subtract(phaseWaitTime, processTime)
-	if b.Phase == Election {
-		b.log.Debugf("ELECTION WILL START at: %s", time.Now().Add(phaseWaitTime).String())
-	}
 	b.log.Debugf("Setting consensus timer: %.2f sec", phaseWaitTime.Seconds())
 	// set Phase timers to go off in their respective timeouts
 	lib.ResetTimer(b.PhaseTimer, phaseWaitTime)

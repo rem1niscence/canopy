@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/canopy-network/canopy/lib/crypto"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 	"math"
 	"math/big"
 	"os"
@@ -17,10 +20,6 @@ import (
 	"strings"
 	"time"
 	"unsafe"
-
-	"github.com/canopy-network/canopy/lib/crypto"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 /* This file implements shared general utility functions that are used throughout the app */

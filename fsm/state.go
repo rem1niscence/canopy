@@ -185,7 +185,6 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 		txResultsBytes [][]byte
 		largestTxSize  uint64
 		blockSize      uint64
-		maxTxPerBlock  = 200_000
 	)
 	// use a map to check for 'same-block' duplicate transactions
 	deDuplicator := lib.NewDeDuplicator[string]()
@@ -235,7 +234,7 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 		}
 		// get the tx size
 		txSize := uint64(len(tx))
-		if (len(blockTxs) >= maxTxPerBlock || txSize+blockSize > maxBlockSize) && !oversize {
+		if txSize+blockSize > maxBlockSize && !oversize {
 			// if validating a block - oversize shouldn't happen
 			if !allowOversize {
 				return nil, nil, nil, nil, 0, ErrMaxBlockSize()
@@ -432,7 +431,6 @@ func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
 
 // LoadRootChainInfo() returns the 'need-to-know' information for a nested chain
 func (s *StateMachine) LoadRootChainInfo(id, height uint64) (*lib.RootChainInfo, lib.ErrorI) {
-	defer lib.TimeTrack(s.log, time.Now())
 	lastHeight := uint64(1)
 	// update the metrics once complete
 	defer s.Metrics.UpdateGetRootChainInfo(time.Now())

@@ -38,7 +38,6 @@ func (c *Controller) ListenForTx() {
 		}
 		func() {
 			c.log.Debug("Handling transaction")
-			defer lib.TimeTrack(c.log, time.Now())
 			// check and add the message to the cache to prevent duplicates
 			if ok := cache.Add(msg); !ok {
 				// if duplicate, exit
@@ -101,7 +100,6 @@ func (c *Controller) CheckMempool() {
 		c.Mempool.L.Lock()
 		// if recheck is necessary
 		if c.Mempool.recheck.Load() {
-			c.log.Debug("CheckMempool Lock")
 			// reset the mempool
 			c.Mempool.FSM.Reset()
 			// check the mempool to cache a proposal block and validate the mempool itself
@@ -110,7 +108,6 @@ func (c *Controller) CheckMempool() {
 			toGossip = c.Mempool.GetTransactions(math.MaxUint64)
 			// set recheck to false
 			c.Mempool.recheck.Store(false)
-			c.log.Debug("CheckMempool Unlock")
 		}
 		// unlock the controller
 		c.Mempool.L.Unlock()
@@ -194,8 +191,6 @@ func NewMempool(fsm *fsm.StateMachine, address crypto.AddressI, config lib.Mempo
 
 // HandleTransactions() attempts to add a transaction to the mempool by validating, adding, and evicting overfull or newly invalid txs
 func (m *Mempool) HandleTransactions(tx ...[]byte) (err lib.ErrorI) {
-	m.log.Debug("HandleTxMempool Lock")
-	defer m.log.Debug("HandleTxMempool Unlock")
 	// lock the mempool
 	m.L.Lock()
 	defer m.L.Unlock()
@@ -212,7 +207,6 @@ func (m *Mempool) HandleTransactions(tx ...[]byte) (err lib.ErrorI) {
 
 // CheckMempool() Checks each transaction in the mempool and caches a block proposal
 func (m *Mempool) CheckMempool() {
-	defer lib.TimeTrack(m.log, time.Now())
 	var err lib.ErrorI
 	// create the actual block structure with the maximum amount of transactions allowed or available in the mempool
 	block := &lib.Block{
@@ -292,8 +286,6 @@ func (c *Controller) GetPendingPage(p lib.PageParams) (page *lib.Page, err lib.E
 
 // GetFailedTxsPage() returns a list of failed mempool transactions
 func (c *Controller) GetFailedTxsPage(address string, p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
-	c.log.Debug("GetFailedTxsPage Lock")
-	defer c.log.Debug("GetFailedTxsPage Unlock")
 	// lock the controller for thread safety
 	c.Lock()
 	// unlock the controller when the function completes

@@ -175,7 +175,6 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 
 // Commit() performs a single atomic write of the current state to all stores.
 func (s *Store) Commit() (root []byte, err lib.ErrorI) {
-	defer lib.TimeTrack(s.log, time.Now())
 	// get the root from the sparse merkle tree at the current state
 	root, err = s.Root()
 	if err != nil {

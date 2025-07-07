@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
-	"time"
 
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/drand/kyber"
@@ -24,7 +23,6 @@ type ValidatorSet struct {
 
 // NewValidatorSet() initializes a ValidatorSet from a given set of consensus validators
 func NewValidatorSet(validators *ConsensusValidators) (ValidatorSet, ErrorI) {
-	defer TimeTrack(NewDefaultLogger(), time.Now())
 	// handle empty set
 	if validators == nil {
 		// exit with error
