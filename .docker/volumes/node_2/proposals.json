@@ -1,5 +1,5 @@
 {
-  "ca9dd51e484ee1aa2a3456b7d2750d2ea64f669aa91503a71a3bbd07e1095e4a": {
+  "7edaf1a0cac74c54b9ec34023af7fe8977fe36b95e40f4566db12b6f69daf75c": {
     "proposal": {
       "type": "changeParameter",
       "msg": {
@@ -8,13 +8,14 @@
         "parameterValue": "example",
         "startHeight": 1,
         "endHeight": 1000,
-        "signer": "4646464646464646464646464646464646464646"
+        "signer": "4646464646464646464646464646464646464646",
+        "proposalHash": ""
       },
       "signature": {
-        "publicKey": "b37484c212446d8f3f70a487d29f5f96bc700d433c21c590a920ef5070c7205bfe439f610cc65e82b6f5054983b4f8dd",
-        "signature": "b76965ae80f37ad2e93ce9092dda2143fb72cbd9c0847101a013e33f3c204b2427324f667c4d4558b31fcf54b5bc4dcb02a7a6e9a8a52c9e59be30e985a64012da075586ca4dc4f8ede1e70ed5c55a0e45375ef2a135f1f7b4377b310e385bf6"
+        "publicKey": "95ecf39914b027b32132a8e24ad0e7d7a3599dcd06757b9eacf4cab391ea1fd7e3facde205d949a6e147402c81f90b6f",
+        "signature": "923396da659a35c81b4600853d1f151126f1b322d82fe36bea50c978abbb99b7a20867ec33cc97649f46d58572e87b8a0c3a108a146265163410d4ac03555515a15096446479d9983edb492d26e6ff3f2e464657179692c12498e5cc5426b7f3"
       },
-      "time": 1751478608705997,
+      "time": 1741350747491943,
       "createdHeight": 1,
       "fee": 10000,
       "memo": "example",
