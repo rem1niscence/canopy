@@ -413,10 +413,8 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 			Message: msg,
 			Sender:  peerInfo,
 		}
+		// s.logger.Debugf("Inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
 		// add to inbox for other parts of the app to read
-		if packet.StreamId == lib.Topic_CONSENSUS {
-			s.logger.Debugf("Inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
-		}
 		s.inbox <- m
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]

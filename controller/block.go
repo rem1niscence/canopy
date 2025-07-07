@@ -31,10 +31,7 @@ func (c *Controller) ListenForBlock() {
 		func() {
 			// log the beginning of handling the block message
 			c.log.Debug("Handling block message")
-			//defer lib.TimeTrack(c.log, time.Now())
 			// lock the controller to prevent multi-thread conflicts
-			c.log.Debug("HandleBlockMessage Lock")
-			defer c.log.Debug("HandleBLockMessage Unlock")
 			c.Lock()
 			// when iteration completes, unlock
 			defer c.Unlock()
