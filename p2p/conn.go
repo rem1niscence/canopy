@@ -16,8 +16,6 @@ import (
 )
 
 const (
-	pingInterval           = 30 * time.Second                    // how often a ping is to be sent
-	pongTimeoutDuration    = 20 * time.Second                    // how long the sender of a ping waits for a pong before throwing an error
 	maxChunksPerPacket     = 256                                 // maximum number of chunks per packet - *1* means chunking disabled
 	maxDataChunkSize       = maxPacketSize - packetHeaderSize    // maximum size of the chunk of bytes in a packet
 	maxPacketSize          = maxMessageSize / maxChunksPerPacket // maximum size of the full packet
@@ -56,7 +54,8 @@ const (
 )
 
 var (
-	ReadWriteTimeout = 40 * time.Second // this is just the default; it gets set by config upon initialization
+	ReadTimeout  = 40 * time.Second // this is just the default; it gets set by config upon initialization
+	WriteTimeout = 80 * time.Second // this is just the default; it gets set by config upon initialization
 )
 
 // MultiConn: A rate-limited, multiplexed connection that utilizes a series streams with varying priority for sending and receiving
@@ -163,10 +162,8 @@ func (c *MultiConn) startSendService() {
 		}
 	}()
 	m := limiter.New(0, 0)
-	ping := time.NewTicker(pingInterval)
-	pongTimer := time.NewTimer(pongTimeoutDuration)
 	var packet *Packet
-	defer func() { lib.StopTimer(pongTimer); ping.Stop(); m.Done() }()
+	defer func() { m.Done() }()
 	for {
 		// select statement ensures the sequential coordination of the concurrent processes
 		select {
@@ -182,37 +179,6 @@ func (c *MultiConn) startSendService() {
 			c.sendPacket(packet, m)
 		case packet = <-c.streams[lib.Topic_PEERS_REQUEST].sendQueue:
 			c.sendPacket(packet, m)
-		case <-ping.C: // fires every 'pingInterval'
-			// send a ping to the peer
-			c.sendWireBytes(new(Ping), m)
-			// reset the pong timer
-			lib.StopTimer(pongTimer)
-			// set the pong timer to execute an Error function if the timer expires before receiving a pong
-			pongTimer = time.AfterFunc(pongTimeoutDuration, func() {
-				if e := ErrPongTimeout(); e != nil {
-					c.Error(e, NoPongSlash)
-				}
-			})
-		case _, open := <-c.sendPong: // fires when receive service got a 'ping' message
-			// if the channel was closed
-			if !open {
-				// log the close
-				c.log.Debugf("Pong channel closed, stopping")
-				// exit
-				return
-			}
-			// send a pong
-			c.sendWireBytes(new(Pong), m)
-		case _, open := <-c.receivedPong: // fires when receive service got a 'pong' message
-			// if the channel was closed
-			if !open {
-				// log the close
-				c.log.Debugf("Receive pong channel closed, stopping")
-				// exit
-				return
-			}
-			// reset the pong timer
-			lib.StopTimer(pongTimer)
 		case <-c.quitSending: // fires when Stop() is called
 			return
 		}
@@ -260,11 +226,6 @@ func (c *MultiConn) startReceiveService() {
 					c.Error(er, slash)
 					return
 				}
-			case *Ping: // receive ping message notifies the "send" service to respond with a 'pong' message
-
-				c.sendPong <- struct{}{}
-			case *Pong: // receive pong message notifies the "send" service to disable the 'pong timer exit'
-				c.receivedPong <- struct{}{}
 			default: // unknown type results in slash and exiting the service
 				c.Error(ErrUnknownP2PMsg(x), UnknownMessageSlash)
 				return
@@ -455,7 +416,7 @@ func sendLengthPrefixed(conn net.Conn, bz []byte) lib.ErrorI {
 	lengthPrefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(lengthPrefix, uint32(len(bz)))
 	//// set the write deadline to 20 second
-	if e := conn.SetWriteDeadline(time.Now().Add(ReadWriteTimeout)); e != nil {
+	if e := conn.SetWriteDeadline(time.Now().Add(WriteTimeout)); e != nil {
 		return ErrFailedWrite(e)
 	}
 	// write the message (length prefixed)
@@ -470,7 +431,7 @@ func sendLengthPrefixed(conn net.Conn, bz []byte) lib.ErrorI {
 // receiveLengthPrefixed() reads a length prefixed message from a tcp connection
 func receiveLengthPrefixed(conn net.Conn) ([]byte, lib.ErrorI) {
 	// set the read conn deadline
-	if err := conn.SetReadDeadline(time.Now().Add(ReadWriteTimeout)); err != nil {
+	if err := conn.SetReadDeadline(time.Now().Add(ReadTimeout)); err != nil {
 		return nil, ErrFailedRead(err)
 	}
 	// read the 4-byte length prefix
