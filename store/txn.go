@@ -693,14 +693,6 @@ func newEntry(key, value []byte, meta byte) (e *badger.Entry) {
 	return
 }
 
-// entryIsDelete() checks if entry is 'delete' operation
-func entryIsDelete(e *badger.Entry) bool {
-	if e == nil {
-		return false
-	}
-	return (getMeta(e) & badgerDeleteBit) != 0
-}
-
 // BTREE ITERATOR CODE BELOW
 
 type CacheItem struct {
