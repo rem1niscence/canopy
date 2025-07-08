@@ -240,13 +240,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.ResultsHash))
 	// cast the store to ensure the proper store type to complete this operation
 	storeI := c.FSM.Store().(lib.StoreI)
-	// create an ephemeral store copy for the mempool
-	memPoolStore, err := storeI.Copy()
-	if err != nil {
-		return err
-	}
-	// increase the version number of the ephemeral store
-	memPoolStore.IncreaseVersion()
 	// if the block result isn't 'pre-calculated'
 	if blockResult == nil {
 		// apply the block against the state machine
@@ -270,6 +263,13 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
+	// create an ephemeral store copy for the mempool
+	memPoolStore, err := storeI.Copy()
+	if err != nil {
+		return err
+	}
+	// increase the version number of the ephemeral store
+	memPoolStore.IncreaseVersion()
 	// delete each transaction from the mempool
 	c.Mempool.DeleteTransaction(block.Transactions...)
 	// parse committed block for straw polls

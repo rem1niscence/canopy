@@ -161,7 +161,7 @@ func (t *Indexer) GetBlocks(p lib.PageParams) (page *lib.Page, err lib.ErrorI) {
 // IndexQC() indexes the quorum certificate by height
 func (t *Indexer) IndexQC(qc *lib.QuorumCertificate) lib.ErrorI {
 	// add to cache
-	t.qcCache.Add(qc.Header.Height, qc)
+	//t.qcCache.Add(qc.Header.Height, qc)
 	// convert to bytes
 	bz, err := lib.Marshal(&lib.QuorumCertificate{
 		Header:      qc.Header,
@@ -180,9 +180,9 @@ func (t *Indexer) IndexQC(qc *lib.QuorumCertificate) lib.ErrorI {
 // GetQCByHeight() returns the quorum certificate by height key
 func (t *Indexer) GetQCByHeight(height uint64) (*lib.QuorumCertificate, lib.ErrorI) {
 	// check cache
-	if qc, found := t.qcCache.Get(height); found {
-		return qc, nil
-	}
+	//if qc, found := t.qcCache.Get(height); found && qc.Block != nil {
+	//	return qc, nil
+	//}
 	// unlike blocks, QCs are stored by hash key
 	qc, err := t.getQC(t.qcHeightKey(height))
 	if err != nil {
@@ -208,7 +208,7 @@ func (t *Indexer) GetQCByHeight(height uint64) (*lib.QuorumCertificate, lib.Erro
 
 // DeleteQCForHeight() deletes the Quorum Certificate by height
 func (t *Indexer) DeleteQCForHeight(height uint64) lib.ErrorI {
-	t.qcCache.Remove(height)
+	//t.qcCache.Remove(height)
 	return t.db.Delete(t.qcHeightKey(height))
 }
 
