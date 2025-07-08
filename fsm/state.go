@@ -195,8 +195,6 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 	if err != nil {
 		return nil, nil, nil, nil, 0, err
 	}
-	// calculate true max block size for number of transactions
-	maxBlockSize -= lib.MaxBlockHeaderSize
 	// keep a map to track transactions that failed 'check'
 	failedCheckTxs := map[int]struct{}{}
 	// first batch validate signatures over the entire set
@@ -226,14 +224,14 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 			continue
 		}
 		// calculate the hash of the transaction and convert it to a hex string
-		hashBytes := crypto.Hash(tx)
-		hashString := lib.BytesToString(hashBytes)
+		hashString := crypto.HashString(tx)
 		// check if the transaction is a 'same block' duplicate
 		if found := deDuplicator.Found(hashString); found {
 			return nil, nil, nil, nil, 0, lib.ErrDuplicateTx(hashString)
 		}
 		// get the tx size
 		txSize := uint64(len(tx))
+		// if the max block size is exceeded and we're not yet marked as 'oversize'
 		if txSize+blockSize > maxBlockSize && !oversize {
 			// if validating a block - oversize shouldn't happen
 			if !allowOversize {
@@ -258,6 +256,9 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 		if e != nil {
 			// add to the failed list
 			failed = append(failed, tx)
+			// discard the FSM cache
+			s.ResetCaches()
+			//txn.Discard()
 			s.SetStore(currentStore)
 			continue
 		} else {
@@ -426,7 +427,7 @@ func (s *StateMachine) GetMaxBlockSize() (uint64, lib.ErrorI) {
 		return 0, err
 	}
 	// return the max block size
-	return consParams.BlockSize, nil
+	return consParams.BlockSize - lib.MaxBlockHeaderSize, nil
 }
 
 // LoadRootChainInfo() returns the 'need-to-know' information for a nested chain
@@ -614,11 +615,16 @@ func (s *StateMachine) Reset() {
 	// reset the slash tracker
 	s.slashTracker = NewSlashTracker()
 	// reset caches
+	s.ResetCaches()
+	// reset the state store
+	s.store.(lib.StoreI).Reset()
+}
+
+// ResetCaches() dumps the state machine caches
+func (s *StateMachine) ResetCaches() {
 	s.cache.delegates = make(map[uint64]map[string]struct{})
 	s.cache.validators = make(map[string]*Validator)
 	s.cache.accounts = make(map[uint64]*Account)
-	// reset the state store
-	s.store.(lib.StoreI).Reset()
 }
 
 // nonEmptyHash() ensures the hash isn't empty

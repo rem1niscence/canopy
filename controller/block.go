@@ -339,6 +339,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		return err.(lib.ErrorI)
 	}
 	// set up the mempool with the actual new FSM for the next height
+	// this makes c.Mempool.FSM.Reset() is unnecessary
 	if c.Mempool.FSM, err = c.FSM.Copy(); err != nil {
 		// exit with error
 		return err

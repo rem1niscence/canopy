@@ -238,7 +238,7 @@ func (m *Mempool) CheckMempool() {
 	m.DeleteTransaction(failed...)
 	// log a warning
 	if len(failed) != 0 {
-		m.log.Warnf("Removed failed txs %d from mempool", len(failed))
+		m.log.Warnf("Removed failed %d txs from mempool", len(failed))
 	}
 	// mark as failed in the cache
 	for _, tx := range failed {
