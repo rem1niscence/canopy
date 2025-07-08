@@ -345,8 +345,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		return err
 	}
 	// update telemetry (using proper defer to ensure time.Since is evaluated at defer execution)
-	processingTime := time.Since(start)
-	defer c.UpdateTelemetry(qc, block, processingTime)
+	defer c.UpdateTelemetry(qc, block, time.Since(start))
 	// exit
 	return
 }

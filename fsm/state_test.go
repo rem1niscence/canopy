@@ -77,7 +77,8 @@ func TestInitialize(t *testing.T) {
 			// set the data dir path
 			sm.Config.DataDirPath = dataDirPath
 			// execute the function call
-			require.NoError(t, sm.Initialize(db))
+			_, err = sm.Initialize(db)
+			require.NoError(t, err)
 			// validate the initialization path
 			if test.height == 0 {
 				// if genesis, validate the state
