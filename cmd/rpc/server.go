@@ -167,7 +167,9 @@ func (s *Server) updatePollResults() {
 // startStaticFileServers starts a file server for the wallet and explorer
 func (s *Server) startStaticFileServers() {
 	s.logger.Infof("Starting Web Wallet 🔑 http://localhost:%s ⬅️", s.config.WalletPort)
+	s.runStaticFileServer(walletFS, walletStaticDir, s.config.WalletPort, s.config)
 	s.logger.Infof("Starting Block Explorer 🔍️ http://localhost:%s ⬅️", s.config.ExplorerPort)
+	s.runStaticFileServer(explorerFS, explorerStaticDir, s.config.ExplorerPort, s.config)
 }
 
 // submitTx submits a transaction to the controller and writes http response
