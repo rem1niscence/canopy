@@ -68,6 +68,7 @@ type Store struct {
 	*Indexer                    // reference to the indexer store
 	metrics  *lib.Metrics       // telemetry
 	log      lib.LoggerI        // logger
+	config   lib.Config         // config
 }
 
 // New() creates a new instance of a StoreI either in memory or an actual disk DB
@@ -75,11 +76,11 @@ func New(config lib.Config, metrics *lib.Metrics, l lib.LoggerI) (lib.StoreI, li
 	if config.StoreConfig.InMemory {
 		return NewStoreInMemory(l)
 	}
-	return NewStore(filepath.Join(config.DataDirPath, config.DBName), metrics, l)
+	return NewStore(config, filepath.Join(config.DataDirPath, config.DBName), metrics, l)
 }
 
 // NewStore() creates a new instance of a disk DB
-func NewStore(path string, metrics *lib.Metrics, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
+func NewStore(config lib.Config, path string, metrics *lib.Metrics, log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	// use badger DB in managed mode to allow efficient versioning
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt64).WithLoggingLevel(badger.ERROR).
 		WithValueThreshold(1024).WithCompression(options.None).WithNumMemtables(16).WithMemTableSize(256 << 20).
@@ -89,7 +90,7 @@ func NewStore(path string, metrics *lib.Metrics, log lib.LoggerI) (lib.StoreI, l
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
-	return NewStoreWithDB(db, metrics, log)
+	return NewStoreWithDB(config, db, metrics, log)
 }
 
 // NewStoreInMemory() creates a new instance of a mem DB
@@ -98,12 +99,12 @@ func NewStoreInMemory(log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
-	return NewStoreWithDB(db, nil, log)
+	return NewStoreWithDB(lib.DefaultConfig(), db, nil, log)
 }
 
 // NewStoreWithDB() returns a Store object given a DB and a logger
 // NOTE: to read the state commit store i.e. for merkle proofs, use NewReadOnly()
-func NewStoreWithDB(db *badger.DB, metrics *lib.Metrics, log lib.LoggerI) (*Store, lib.ErrorI) {
+func NewStoreWithDB(config lib.Config, db *badger.DB, metrics *lib.Metrics, log lib.LoggerI) (*Store, lib.ErrorI) {
 	// get the latest CommitID (height and hash)
 	id := getLatestCommitID(db, log)
 	// set the version
@@ -123,8 +124,9 @@ func NewStoreWithDB(db *badger.DB, metrics *lib.Metrics, log lib.LoggerI) (*Stor
 		db:      db,
 		writer:  writer,
 		ss:      NewBadgerTxn(db.NewTransactionAt(lssVersion, false), writer, []byte(latestStatePrefix), true, true, nextVersion, false),
-		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, false, nextVersion, false), blkCache, qcCache, false},
+		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, false, nextVersion, false), blkCache, qcCache, config.IndexByAccount},
 		metrics: metrics,
+		config:  config,
 	}, nil
 }
 
@@ -148,7 +150,7 @@ func (s *Store) NewReadOnly(queryVersion uint64) (lib.StoreI, lib.ErrorI) {
 		writer:  nil,
 		ss:      stateReader,
 		sc:      NewDefaultSMT(NewBadgerTxn(reader, nil, []byte(stateCommitmentPrefix), false, false, 0, false)),
-		Indexer: &Indexer{NewBadgerTxn(reader, nil, []byte(indexerPrefix), false, false, 0, false), s.blockCache, s.qcCache, false},
+		Indexer: &Indexer{NewBadgerTxn(reader, nil, []byte(indexerPrefix), false, false, 0, false), s.blockCache, s.qcCache, s.config.IndexByAccount},
 		metrics: s.metrics,
 	}, nil
 }
@@ -168,7 +170,7 @@ func (s *Store) Copy() (lib.StoreI, lib.ErrorI) {
 		writer:  writer,
 		ss:      s.ss.Copy(BadgerTxnReader{s.db.NewTransactionAt(lssVersion, false), s.ss.prefix}, writer),
 		Indexer: &Indexer{s.Indexer.db.Copy(BadgerTxnReader{reader, s.Indexer.db.prefix},
-			writer), s.blockCache, s.qcCache, false},
+			writer), s.blockCache, s.qcCache, s.config.IndexByAccount},
 		metrics: s.metrics,
 	}, nil
 }
@@ -267,7 +269,7 @@ func (s *Store) NewTxn() lib.StoreI {
 		db:      s.db,
 		writer:  s.writer,
 		ss:      NewTxn(s.ss, s.ss, nil, false, true, nextVersion, false),
-		Indexer: &Indexer{NewTxn(s.Indexer.db, s.Indexer.db, nil, false, true, nextVersion, false), s.blockCache, s.qcCache, false},
+		Indexer: &Indexer{NewTxn(s.Indexer.db, s.Indexer.db, nil, false, true, nextVersion, false), s.blockCache, s.qcCache, s.config.IndexByAccount},
 		metrics: s.metrics,
 	}
 }

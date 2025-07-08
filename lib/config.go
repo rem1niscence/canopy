@@ -213,9 +213,10 @@ func DefaultP2PConfig() P2PConfig {
 
 // StoreConfig is user configurations for the key value database
 type StoreConfig struct {
-	DataDirPath string `json:"dataDirPath"` // path of the designated folder where the application stores its data
-	DBName      string `json:"dbName"`      // name of the database
-	InMemory    bool   `json:"inMemory"`    // non-disk database, only for testing
+	DataDirPath    string `json:"dataDirPath"`    // path of the designated folder where the application stores its data
+	DBName         string `json:"dbName"`         // name of the database
+	IndexByAccount bool   `json:"indexByAccount"` // index transactions by account
+	InMemory       bool   `json:"inMemory"`       // non-disk database, only for testing
 }
 
 // DefaultDataDirPath() is $USERHOME/.canopy
@@ -234,9 +235,10 @@ func DefaultDataDirPath() string {
 // DefaultStoreConfig() returns the developer recommended store configuration
 func DefaultStoreConfig() StoreConfig {
 	return StoreConfig{
-		DataDirPath: DefaultDataDirPath(), // use the default data dir path
-		DBName:      "canopy",             // 'canopy' database name
-		InMemory:    false,                // persist to disk, not memory
+		DataDirPath:    DefaultDataDirPath(), // use the default data dir path
+		DBName:         "canopy",             // 'canopy' database name
+		IndexByAccount: true,                 // index transactions by account
+		InMemory:       false,                // persist to disk, not memory
 	}
 }
 
@@ -264,14 +266,14 @@ func DefaultMempoolConfig() MempoolConfig {
 
 // MetricsConfig represents the configuration for the metrics server
 type MetricsConfig struct {
-	Enabled           bool   `json:"enabled"`           // if the metrics are enabled
+	MetricsEnabled    bool   `json:"metricsEnabled"`    // if the metrics are enabled
 	PrometheusAddress string `json:"prometheusAddress"` // the address of the server
 }
 
 // DefaultMetricsConfig() returns the default metrics configuration
 func DefaultMetricsConfig() MetricsConfig {
 	return MetricsConfig{
-		Enabled:           true,           // enabled by default
+		MetricsEnabled:    true,           // enabled by default
 		PrometheusAddress: "0.0.0.0:9090", // the default prometheus address
 	}
 }
