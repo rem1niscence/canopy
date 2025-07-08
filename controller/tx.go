@@ -214,13 +214,13 @@ func (m *Mempool) CheckMempool() {
 		Transactions: m.GetTransactions(math.MaxUint64), // get all transactions in mempool - but apply block will only keep 'max-block' amount
 	}
 	// capture the tentative block result using a new object reference
-	blockResult, failed := new(lib.BlockResult), make([]*lib.FailedTx, 0)
+	blockResult, oversized, failed := new(lib.BlockResult), make([]*lib.TxResult, 0), make([]*lib.FailedTx, 0)
 	// setup a context with cancel
 	ctx, stop := context.WithCancel(context.Background())
 	// set the cancel function
 	m.stop = stop
 	// apply the block against the state machine and populate the resulting merkle `roots` in the block header
-	block.BlockHeader, blockResult.Transactions, failed, err = m.FSM.ApplyBlock(ctx, block, true)
+	block.BlockHeader, blockResult.Transactions, oversized, failed, err = m.FSM.ApplyBlock(ctx, block, true)
 	if err != nil {
 		if err.Error() != lib.ErrMempoolStopSignal().Error() {
 			m.log.Errorf("Check Mempool error: %s", err.Error())
@@ -254,6 +254,12 @@ func (m *Mempool) CheckMempool() {
 	// add results to cache
 	for _, result := range blockResult.Transactions {
 		// cache the results
+		m.cachedResults = append(m.cachedResults, result)
+	}
+	// add results to cache
+	for _, result := range oversized {
+		// cache the results
+		result.Index = uint64(len(m.cachedResults))
 		m.cachedResults = append(m.cachedResults, result)
 	}
 	// update the mempool metrics

@@ -364,7 +364,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 	// log the start of 'apply block'
 	c.log.Debugf("Applying block %s for height %d", candidateHash[:20], candidateHeight)
 	// apply the block against the state machine
-	compare, txResults, failed, err := c.FSM.ApplyBlock(context.Background(), block, false)
+	compare, txResults, _, failed, err := c.FSM.ApplyBlock(context.Background(), block, false)
 	if err != nil {
 		// exit with error
 		return
