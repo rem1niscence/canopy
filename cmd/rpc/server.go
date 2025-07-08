@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -307,6 +308,12 @@ func (h logHandler) Handle(resp http.ResponseWriter, req *http.Request, p httpro
 	// Call the actual handler function with the response, request, and parameters.
 	h.h(resp, req, p)
 }
+
+//go:embed all:web/explorer/out
+var explorerFS embed.FS
+
+//go:embed all:web/wallet/out
+var walletFS embed.FS
 
 // runStaticFileServer creates a web server serving static files
 func (s *Server) runStaticFileServer(fileSys fs.FS, dir, port string, conf lib.Config) {
