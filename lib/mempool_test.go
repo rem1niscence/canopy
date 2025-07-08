@@ -525,8 +525,10 @@ func TestFailedTxCache(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// create a new failed tx cache
 			cache := NewFailedTxCache(test.dissallowedMessageTypes...)
+			// create a new failed tx
+			failedTx := NewFailedTx(test.txBytes, test.err)
 			// add transaction to cache
-			result := cache.Add(test.txBytes, test.hash, test.err)
+			result := cache.Add(failedTx)
 			// validate result
 			require.Equal(t, test.expectedResult, result)
 			if test.expectedResult {

@@ -4,7 +4,6 @@ import (
 	"github.com/canopy-network/canopy/lib/crypto"
 	"maps"
 	"math"
-	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -341,44 +340,39 @@ func NewFailedTxCache(disallowedMessageTypes ...string) (cache *FailedTxCache) {
 	return
 }
 
+// NewFailedTx() attempts to create a new failed transaction from bytes
+func NewFailedTx(txBytes []byte, txErr error) *FailedTx {
+	addressString := "unknown"
+	// create a new transaction object reference to ensure a non nil result
+	tx := new(Transaction)
+	// populate the new object reference using the transaction bytes
+	_ = Unmarshal(txBytes, tx)
+	// if the signature is empty
+	if tx.Signature != nil {
+		// get the public key object from the bytes of the signature
+		pubKey, err := crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey)
+		if err == nil {
+			addressString = pubKey.Address().String()
+		}
+	}
+	return &FailedTx{
+		Transaction: tx,
+		Hash:        crypto.HashString(txBytes),
+		Address:     addressString,
+		Error:       txErr,
+		timestamp:   time.Now(),
+		bytes:       txBytes,
+	}
+}
+
 // Add() adds a failed transaction with its error to the cache
-func (f *FailedTxCache) Add(txBytes []byte, hash string, txErr error) (added bool) {
+func (f *FailedTxCache) Add(failed *FailedTx) (added bool) {
 	// lock for thread safety
 	f.l.Lock()
 	// unlock when the function completes
 	defer f.l.Unlock()
-	// create a new transaction object reference to ensure a non nil result
-	tx := new(Transaction)
-	// populate the new object reference using the transaction bytes
-	if err := Unmarshal(txBytes, tx); err != nil {
-		// exit with 'not added'
-		return
-	}
-	// if the message is on the 'disallowed' list
-	if slices.Contains(f.disallowedMessageTypes, tx.MessageType) {
-		// exit with 'not added'
-		return
-	}
-	// if the signature is empty
-	if tx.Signature == nil {
-		// exit with 'not added'
-		return
-	}
-	// get the public key object from the bytes of the signature
-	pubKey, err := crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey)
-	// if an error occurred during the conversion
-	if err != nil {
-		// exit with 'not added'
-		return
-	}
 	// add a new 'failed tx' type to the cache
-	f.cache[hash] = &FailedTx{
-		Transaction: tx,
-		Hash:        hash,
-		Address:     pubKey.Address().String(),
-		Error:       txErr,
-		timestamp:   time.Now(),
-	}
+	f.cache[failed.Hash] = failed
 	// exit with 'added'
 	return true
 }
@@ -453,6 +447,9 @@ func (f *FailedTxCache) StartCleanService() {
 	}
 }
 
+// GetBytes() returns the raw tx bytes for the failed tx
+func (f *FailedTx) GetBytes() []byte { return f.bytes }
+
 // FailedTx contains a failed transaction and its error
 type FailedTx struct {
 	Transaction *Transaction `json:"transaction,omitempty"` // the transaction object that failed
@@ -460,6 +457,7 @@ type FailedTx struct {
 	Address     string       `json:"address,omitempty"`     // the address that sent the transaction
 	Error       error        `json:"error,omitempty"`       // the error that occurred
 	timestamp   time.Time    // the time when the failure was recorded
+	bytes       []byte       // raw bytes of the transaction
 }
 
 type FailedTxs []*FailedTx // a list of failed transactions

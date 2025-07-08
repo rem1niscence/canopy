@@ -214,7 +214,7 @@ func (m *Mempool) CheckMempool() {
 		Transactions: m.GetTransactions(math.MaxUint64), // get all transactions in mempool - but apply block will only keep 'max-block' amount
 	}
 	// capture the tentative block result using a new object reference
-	blockResult, failed := new(lib.BlockResult), make([][]byte, 0)
+	blockResult, failed := new(lib.BlockResult), make([]*lib.FailedTx, 0)
 	// setup a context with cancel
 	ctx, stop := context.WithCancel(context.Background())
 	// set the cancel function
@@ -234,16 +234,20 @@ func (m *Mempool) CheckMempool() {
 		Block:       block,
 		BlockResult: blockResult,
 	})
-	// evict all invalid transactions from the mempool
-	m.DeleteTransaction(failed...)
-	// log a warning
-	if len(failed) != 0 {
-		m.log.Warnf("Removed failed %d txs from mempool", len(failed))
-	}
+	// create a cache of failed tx bytes to evict from the mempool
+	var failedTxBz [][]byte
 	// mark as failed in the cache
 	for _, tx := range failed {
 		// cache failed txs for RPC display
-		m.cachedFailedTxs.Add(tx, crypto.HashString(tx), err)
+		m.cachedFailedTxs.Add(tx)
+		// save the bytes
+		failedTxBz = append(failedTxBz, tx.GetBytes())
+	}
+	// evict all invalid transactions from the mempool
+	m.DeleteTransaction(failedTxBz...)
+	// log a warning
+	if len(failed) != 0 {
+		m.log.Warnf("Removed failed %d txs from mempool", len(failed))
 	}
 	// reset the RPC cached results
 	m.cachedResults = nil

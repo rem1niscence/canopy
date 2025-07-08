@@ -101,7 +101,7 @@ func (s *StateMachine) Initialize(store lib.StoreI) (genesis bool, err lib.Error
 // NOTES:
 // - this function may be used to validate 'additional' transactions outside the normal block size as if they were to be included
 // - a list of failed transactions are returned
-func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, allowOversize bool) (header *lib.BlockHeader, txResults []*lib.TxResult, failed [][]byte, err lib.ErrorI) {
+func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, allowOversize bool) (header *lib.BlockHeader, txResults []*lib.TxResult, failed []*lib.FailedTx, err lib.ErrorI) {
 	// catch in case there's a panic
 	defer func() {
 		if r := recover(); r != nil {
@@ -187,7 +187,8 @@ func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, allowOversi
 // 3. Allows ephemeral 'oversize' transaction processing without applying 'oversize txn' changes to the state
 // 4. Returns the following for successful transactions within a block: <results, tx-list, root, count>
 // 5. Returns all transactions that failed during processing
-func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allowOversize bool) (results []*lib.TxResult, root []byte, blockTxs, failed [][]byte, n int, er lib.ErrorI) {
+func (s *StateMachine) ApplyTransactions(
+	ctx context.Context, txs [][]byte, allowOversize bool) (results []*lib.TxResult, root []byte, blockTxs [][]byte, failed []*lib.FailedTx, n int, er lib.ErrorI) {
 	// define vars to track the bytes of the transaction results and the size of a block
 	var (
 		txResultsBytes [][]byte
@@ -204,16 +205,16 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 		return nil, nil, nil, nil, 0, err
 	}
 	// keep a map to track transactions that failed 'check'
-	failedCheckTxs := map[int]struct{}{}
+	failedCheckTxs := map[int]error{}
 	// first batch validate signatures over the entire set
 	for i, tx := range txs {
 		if _, err = s.CheckTx(tx, "", batchVerifier); err != nil {
-			failedCheckTxs[i] = struct{}{}
+			failedCheckTxs[i] = err
 		}
 	}
 	// execute batch verification of the signatures in the block
 	for _, failedIdx := range batchVerifier.Verify() {
-		failedCheckTxs[failedIdx] = struct{}{}
+		failedCheckTxs[failedIdx] = ErrInvalidSignature()
 	}
 	// set the store back to the original at the end of processing
 	originalStore := s.Store().(lib.StoreI)
@@ -227,8 +228,8 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 			return nil, nil, nil, nil, 0, lib.ErrMempoolStopSignal()
 		}
 		// if already failed check tx or signature
-		if _, found := failedCheckTxs[i]; found {
-			failed = append(failed, tx)
+		if e, found := failedCheckTxs[i]; found {
+			failed = append(failed, lib.NewFailedTx(tx, e))
 			continue
 		}
 		// calculate the hash of the transaction and convert it to a hex string
@@ -263,7 +264,7 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, allo
 		result, e := s.ApplyTransaction(uint64(n), tx, hashString, crypto.NewBatchVerifier(true))
 		if e != nil {
 			// add to the failed list
-			failed = append(failed, tx)
+			failed = append(failed, lib.NewFailedTx(tx, e))
 			// discard the FSM cache
 			s.ResetCaches()
 			//txn.Discard()
