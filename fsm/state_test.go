@@ -69,9 +69,7 @@ func TestInitialize(t *testing.T) {
 				Config: lib.Config{},
 				log:    log,
 				cache: &cache{
-					accounts:   make(map[uint64]*Account),
-					validators: make(map[string]*Validator),
-					delegates:  make(map[uint64]map[string]struct{}),
+					accounts: make(map[uint64]*Account),
 				},
 			}
 			// set the data dir path
@@ -323,9 +321,7 @@ func newTestStateMachine(t *testing.T) StateMachine {
 		},
 		log: log,
 		cache: &cache{
-			accounts:   make(map[uint64]*Account),
-			validators: make(map[string]*Validator),
-			delegates:  make(map[uint64]map[string]struct{}),
+			accounts: make(map[uint64]*Account),
 		},
 	}
 	require.NoError(t, sm.SetParams(DefaultParams()))

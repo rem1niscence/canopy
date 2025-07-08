@@ -35,11 +35,9 @@ type StateMachine struct {
 
 // cache is the set of items to be cached used by the state machine
 type cache struct {
-	accounts   map[uint64]*Account            // cache of accounts accessed
-	validators map[string]*Validator          // address->validator
-	delegates  map[uint64]map[string]struct{} // chainID->delegates address
-	feeParams  *FeeParams                     // fee params for the current block
-	valParams  *ValidatorParams               // validator params for the current block
+	accounts  map[uint64]*Account // cache of accounts accessed
+	feeParams *FeeParams          // fee params for the current block
+	valParams *ValidatorParams    // validator params for the current block
 }
 
 // New() creates a new instance of a StateMachine
@@ -55,9 +53,7 @@ func New(c lib.Config, store lib.StoreI, metrics *lib.Metrics, log lib.LoggerI) 
 		Metrics:           metrics,
 		log:               log,
 		cache: &cache{
-			accounts:   make(map[uint64]*Account),
-			validators: make(map[string]*Validator),
-			delegates:  make(map[uint64]map[string]struct{}),
+			accounts: make(map[uint64]*Account),
 		},
 	}
 	// initialize the state machine
@@ -522,9 +518,7 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 		Config:             s.Config,
 		log:                s.log,
 		cache: &cache{
-			accounts:   make(map[uint64]*Account),
-			validators: make(map[string]*Validator),
-			delegates:  make(map[uint64]map[string]struct{}),
+			accounts: make(map[uint64]*Account),
 		},
 	}, nil
 }
@@ -633,8 +627,6 @@ func (s *StateMachine) Reset() {
 
 // ResetCaches() dumps the state machine caches
 func (s *StateMachine) ResetCaches() {
-	s.cache.delegates = make(map[uint64]map[string]struct{})
-	s.cache.validators = make(map[string]*Validator)
 	s.cache.accounts = make(map[uint64]*Account)
 }
 

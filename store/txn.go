@@ -288,6 +288,9 @@ func (t *Txn) write(prefix []byte, writeVersion uint64, valueOp valueOp) lib.Err
 			ExpiresAt: valueOp.entry.ExpiresAt,
 			UserMeta:  valueOp.entry.UserMeta,
 		}
+		// set the entry meta
+		setMeta(entry, getMeta(valueOp.entry))
+		// setEntry to the underlying writer
 		if err := t.writer.SetEntryAt(entry, writeVersion); err != nil {
 			return ErrStoreSet(err)
 		}
@@ -635,6 +638,13 @@ func setMeta(e *badger.Entry, value byte) {
 	*(*byte)(ptr) = value
 }
 
+// getMeta() accesses the private field 'meta' of badgerDB's 'Entry'
+func getMeta(entry *badger.Entry) byte {
+	v := reflect.ValueOf(entry).Elem()
+	f := v.FieldByName("meta")
+	return *(*byte)(unsafe.Pointer(f.UnsafeAddr()))
+}
+
 // getTxnFromBatch() accesses the private field 'size/count' of badgerDB's `Txn` inside a 'WriteBatch'
 // badger doesn't yet allow users to access this info - though it allows users to avoid
 // TxnTooBig errors
@@ -681,6 +691,14 @@ func newEntry(key, value []byte, meta byte) (e *badger.Entry) {
 	e = &badger.Entry{Key: key, Value: value}
 	setMeta(e, meta)
 	return
+}
+
+// entryIsDelete() checks if entry is 'delete' operation
+func entryIsDelete(e *badger.Entry) bool {
+	if e == nil {
+		return false
+	}
+	return (getMeta(e) & badgerDeleteBit) != 0
 }
 
 // BTREE ITERATOR CODE BELOW

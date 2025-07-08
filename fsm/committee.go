@@ -363,18 +363,30 @@ func (s *StateMachine) DeleteCommitteeMember(address crypto.AddressI, chainId, s
 // GetAllDelegates() returns all delegates for a certain chainId
 // It is heavily cached to improve performance as the delegates are used for each block commit
 func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err lib.ErrorI) {
-	// create a variable to hold the committee members and total power
-	members, totalPower := make([]*lib.ConsensusValidator, 0), uint64(0)
-	// create a function to process the delegates
-	addToValidatorSet := func(address crypto.AddressI) lib.ErrorI {
-		// get the validator
+	// iterate from highest stake to lowest
+	it, err := s.RevIterator(DelegatePrefix(chainId))
+	if err != nil {
+		return vs, err
+	}
+	defer it.Close()
+	// create a variable to hold the committee members
+	members := make([]*lib.ConsensusValidator, 0)
+	var totalPower uint64
+	// loop through the iterator
+	for ; it.Valid(); it.Next() {
+		// get the address from the iterator key
+		address, e := AddressFromKey(it.Key())
+		if e != nil {
+			return vs, e
+		}
+		// get the validator from the address
 		val, e := s.GetValidator(address)
 		if e != nil {
-			return e
+			return vs, e
 		}
 		// ensure the validator is not included in the committee if it's paused or unstaking
 		if val.MaxPausedHeight != 0 || val.UnstakingHeight != 0 {
-			return nil
+			continue
 		}
 		// increment the total power
 		totalPower += val.StakedAmount
@@ -384,41 +396,6 @@ func (s *StateMachine) GetAllDelegates(chainId uint64) (vs lib.ValidatorSet, err
 			VotingPower: val.StakedAmount,
 			NetAddress:  val.NetAddress,
 		})
-		// exit
-		return nil
-	}
-	// attempt to get the delegates from the cache, otherwise iterate through the state
-	if delegates, ok := s.cache.delegates[chainId]; ok {
-		// loop through the cached delegates
-		for address := range delegates {
-			// convert the address string to an address object
-			addr, _ := crypto.NewAddressFromString(address)
-			if e := addToValidatorSet(addr); e != nil {
-				return vs, e
-			}
-		}
-	} else {
-		s.cache.delegates[chainId] = make(map[string]struct{})
-		// iterate from highest stake to lowest
-		it, er := s.RevIterator(DelegatePrefix(chainId))
-		if er != nil {
-			return vs, er
-		}
-		defer it.Close()
-		// loop through the iterator
-		for ; it.Valid(); it.Next() {
-			// get the address from the iterator key
-			address, e := AddressFromKey(it.Key())
-			if e != nil {
-				return vs, e
-			}
-			// add to validator set
-			if e = addToValidatorSet(address); e != nil {
-				return vs, e
-			}
-			// add to cache
-			s.cache.delegates[chainId][address.String()] = struct{}{}
-		}
 	}
 	return lib.ValidatorSet{
 		ValidatorSet:  &lib.ConsensusValidators{ValidatorSet: members},
@@ -505,30 +482,12 @@ func (s *StateMachine) DeleteDelegations(address crypto.AddressI, totalStake uin
 
 // SetDelegate() sets a delegate in state using the delegate prefix
 func (s *StateMachine) SetDelegate(address crypto.AddressI, chainId, stakeForCommittee uint64) lib.ErrorI {
-	// set the delegate in the state
-	err := s.Set(KeyForDelegate(chainId, address, stakeForCommittee), nil)
-	if err != nil {
-		return err
-	}
-	// ensure the cache exists for the chainId
-	if _, ok := s.cache.delegates[chainId]; !ok {
-		s.cache.delegates[chainId] = make(map[string]struct{})
-	}
-	// set the delegator in the cache
-	s.cache.delegates[chainId][address.String()] = struct{}{}
-	return nil
+	return s.Set(KeyForDelegate(chainId, address, stakeForCommittee), nil)
 }
 
 // DeleteDelegate() removes a delegate from the state using the delegate prefix
 func (s *StateMachine) DeleteDelegate(address crypto.AddressI, chainId, stakeForCommittee uint64) lib.ErrorI {
-	// remove the delegate from the state
-	err := s.Delete(KeyForDelegate(chainId, address, stakeForCommittee))
-	if err != nil {
-		return err
-	}
-	// remove the delegator from the cache
-	delete(s.cache.delegates[chainId], address.String())
-	return nil
+	return s.Delete(KeyForDelegate(chainId, address, stakeForCommittee))
 }
 
 // COMMITTEE DATA CODE BELOW

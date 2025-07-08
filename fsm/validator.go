@@ -13,11 +13,6 @@ import (
 
 // GetValidator() gets the validator from the store via the address
 func (s *StateMachine) GetValidator(address crypto.AddressI) (*Validator, lib.ErrorI) {
-	// check the validators cache
-	got, found := s.cache.validators[address.String()]
-	if found {
-		return got, nil
-	}
 	// get the bytes from state using the key for a validator at a specific address
 	bz, err := s.Get(KeyForValidator(address))
 	if err != nil {
@@ -34,8 +29,6 @@ func (s *StateMachine) GetValidator(address crypto.AddressI) (*Validator, lib.Er
 	}
 	// update the validator structure address
 	val.Address = address.Bytes()
-	// set the validator in the cache
-	s.cache.validators[address.String()] = val
 	// return the validator
 	return val, nil
 }
@@ -192,12 +185,9 @@ func (s *StateMachine) SetValidator(validator *Validator) (err lib.ErrorI) {
 		return
 	}
 	// set the bytes under a key for validator using a specific 'validator address'
-	address := crypto.NewAddressFromBytes(validator.Address)
-	if err = s.Set(KeyForValidator(address), bz); err != nil {
+	if err = s.Set(KeyForValidator(crypto.NewAddressFromBytes(validator.Address)), bz); err != nil {
 		return
 	}
-	// set the validator in the cache
-	s.cache.validators[address.String()] = validator
 	// exit
 	return
 }
@@ -261,13 +251,7 @@ func (s *StateMachine) DeleteValidator(validator *Validator) lib.ErrorI {
 		}
 	}
 	// delete the validator from state
-	if err := s.Delete(KeyForValidator(addr)); err != nil {
-		return err
-	}
-	// delete the validator from the cache
-	delete(s.cache.validators, addr.String())
-	// exit
-	return nil
+	return s.Delete(KeyForValidator(addr))
 }
 
 // UNSTAKING VALIDATORS BELOW
