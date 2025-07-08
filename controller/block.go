@@ -185,12 +185,14 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 
 // ValidateProposal() fully validates a proposal in the form of a quorum certificate and resets back to begin block state
 func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (blockResult *lib.BlockResult, err lib.ErrorI) {
+	// reset the mempool at the beginning of the function to preserve the state for CommitCertificate()
+	c.FSM.Reset()
 	// log the beginning of proposal validation
 	c.log.Debugf("Validating proposal from leader")
 	// configure the FSM in 'consensus mode' for validator proposals
 	resetProposalConfig := c.SetFSMInConsensusModeForProposals()
 	// once done proposing, 'reset' the proposal mode back to default to 'accept all'
-	defer func() { resetProposalConfig(); c.FSM.Reset() }()
+	defer func() { resetProposalConfig() }()
 	// ensure the proposal inside the quorum certificate is valid at a stateless level
 	block, err := qc.CheckProposalBasic(c.FSM.Height(), c.Config.NetworkID, c.Config.ChainId)
 	if err != nil {
@@ -268,7 +270,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return
 	}
-
 	// delete each transaction from the mempool
 	c.Mempool.DeleteTransaction(block.Transactions...)
 	// parse committed block for straw polls
@@ -278,7 +279,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// send the certificate results transaction on behalf of the quorum
 		c.SendCertificateResultsTx(qc)
 	}
-
 	// create an error group to run the commit and mempool update in parallel
 	eg := errgroup.Group{}
 	eg.Go(func() error {
