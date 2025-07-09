@@ -1,14 +1,18 @@
 {
   "logLevel": "debug",
-  "chainId": 1,
+  "chainId": 2,
   "sleepUntil": 0,
   "rootChain": [
     {
       "chainId": 1,
+      "url": "http://node-1:50002"
+    },
+    {
+      "chainId": 2,
       "url": "http://node-2:40002"
     }
   ],
-  "runVDF": true,
+  "runVDF": false,
   "headless": false,
   "walletPort": "40000",
   "explorerPort": "40001",
@@ -21,7 +25,7 @@
   "dbName": "canopy",
   "inMemory": false,
   "networkID": 1,
-  "listenAddress": "0.0.0.0:9001",
+  "listenAddress": "0.0.0.0:9002",
   "externalAddress": "node-2",
   "maxInbound": 21,
   "maxOutbound": 7,

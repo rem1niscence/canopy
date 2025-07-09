@@ -1,4 +1,17 @@
 {
-  "book": [],
-  "bookSize": 0
+  "book": [
+    {
+      "address": {
+        "publicKey": "b88a5928e54cbf0a36e0b98f5bcf02de9a9a1deba6994739f9160181a609f516eb702936a0cbf4c1f2e7e6be5b8272f2",
+        "netAddress": "172.28.0.2:9002",
+        "peerMeta": {
+          "networkID": 1,
+          "chainID": 2,
+          "signature": "iFaVBeNAryP9TCn5fVIV0vGAN0QgyQnvgsoIVwms7MVc4DpNTozbTdCPlMqAy/VAGS3By7F/KEjvnvpVG2lc077NcPwPNQ9FdPGstYtQpMEmui01PZkzf6gydCYYrFCa"
+        }
+      },
+      "consecutiveFailedDial": 0
+    }
+  ],
+  "bookSize": 1
 }

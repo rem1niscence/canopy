@@ -100,14 +100,28 @@ func (c *Controller) CheckMempool() {
 		c.Mempool.L.Lock()
 		// if recheck is necessary
 		if c.Mempool.recheck.Load() {
-			// reset the mempool
-			c.Mempool.FSM.Reset()
-			// check the mempool to cache a proposal block and validate the mempool itself
-			c.Mempool.CheckMempool()
-			// get the transactions to gossip
-			toGossip = c.Mempool.GetTransactions(math.MaxUint64)
-			// set recheck to false
-			c.Mempool.recheck.Store(false)
+			// execute in a function call to allow defer
+			func() {
+				// check if self is validator
+				c.Lock()
+				selfIsValidator := c.Consensus.SelfIsValidator()
+				c.Unlock()
+				// if a validator, be strict on proposals
+				if selfIsValidator {
+					// configure the FSM in 'consensus mode' for validator proposals
+					resetProposalConfig := c.SetFSMInConsensusModeForProposals()
+					// once done proposing, 'reset' the proposal mode back to default to 'accept all'
+					defer func() { resetProposalConfig() }()
+				}
+				// reset the mempool
+				c.Mempool.FSM.Reset()
+				// check the mempool to cache a proposal block and validate the mempool itself
+				c.Mempool.CheckMempool()
+				// get the transactions to gossip
+				toGossip = c.Mempool.GetTransactions(math.MaxUint64)
+				// set recheck to false
+				c.Mempool.recheck.Store(false)
+			}()
 		}
 		// unlock the controller
 		c.Mempool.L.Unlock()
@@ -208,6 +222,7 @@ func (m *Mempool) HandleTransactions(tx ...[]byte) (err lib.ErrorI) {
 // CheckMempool() Checks each transaction in the mempool and caches a block proposal
 func (m *Mempool) CheckMempool() {
 	var err lib.ErrorI
+	// check if a validator
 	// create the actual block structure with the maximum amount of transactions allowed or available in the mempool
 	block := &lib.Block{
 		BlockHeader:  &lib.BlockHeader{Time: uint64(time.Now().UnixMicro()), ProposerAddress: m.address.Bytes()},

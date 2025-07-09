@@ -139,10 +139,8 @@ func (c *Controller) SelfSendBlock(qc *lib.QuorumCertificate, timestamp uint64) 
 // ProduceProposal() create a proposal in the form of a `block` and `certificate result` for the bft process
 func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypto.VDF) (blockBytes []byte, results *lib.CertificateResult, err lib.ErrorI) {
 	c.log.Debugf("Producing proposal as leader")
-	// configure the FSM in 'consensus mode' for validator proposals
-	resetProposalConfig := c.SetFSMInConsensusModeForProposals()
 	// once done proposing, 'reset' the proposal mode back to default to 'accept all'
-	defer func() { resetProposalConfig(); c.FSM.Reset() }()
+	defer c.FSM.Reset()
 	// load the previous quorum height quorum certificate from the indexer
 	lastCertificate, err := c.FSM.LoadCertificateHashesOnly(c.FSM.Height() - 1)
 	if err != nil {
@@ -375,6 +373,10 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 	}
 	// if any transactions failed
 	if len(failed) != 0 {
+		for _, f := range failed {
+			// log the error
+			c.log.Errorf("From: %s\nType:%s\nErr:%s", f.Address, f.Transaction.MessageType, f.Error.Error())
+		}
 		return nil, lib.ErrFailedTransactions()
 	}
 	// compare the block headers for equality
