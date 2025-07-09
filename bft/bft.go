@@ -136,8 +136,8 @@ func (b *BFT) Start() {
 					b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, processTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
-					b.NewHeight(true)
-					if !b.LoadIsOwnRoot() {
+					if b.Round != 0 && !b.LoadIsOwnRoot() {
+						b.NewHeight(true)
 						// set the wait timers to start consensus
 						b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, processTime)
 					}

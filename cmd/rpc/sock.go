@@ -150,7 +150,7 @@ func (r *RCManager) GetValidatorSet(rootChainId, id, rootHeight uint64) (lib.Val
 		return lib.NewValidatorSet(sub.Info.LastValidatorSet)
 	}
 	// warn of the remote RPC call to the root chain API
-	r.log.Warnf("Executing remote GetValidatorSet call with requested height=%d for rootChainId=%d", rootHeight, rootChainId)
+	r.log.Warnf("Executing remote GetValidatorSet call with requested height=%d for rootChainId=%d with latest root height at %d", rootHeight, rootChainId, sub.Info.Height)
 	// execute the remote RPC call to the root chain API
 	return sub.ValidatorSet(rootHeight, id)
 }
