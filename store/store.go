@@ -123,8 +123,8 @@ func NewStoreWithDB(config lib.Config, db *badger.DB, metrics *lib.Metrics, log 
 		log:     log,
 		db:      db,
 		writer:  writer,
-		ss:      NewBadgerTxn(db.NewTransactionAt(lssVersion, false), writer, []byte(latestStatePrefix), true, true, nextVersion, false),
-		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, false, nextVersion, false), blkCache, qcCache, config.IndexByAccount},
+		ss:      NewBadgerTxn(db.NewTransactionAt(lssVersion, false), writer, []byte(latestStatePrefix), true, true, nextVersion),
+		Indexer: &Indexer{NewBadgerTxn(reader, writer, []byte(indexerPrefix), false, false, nextVersion), blkCache, qcCache, config.IndexByAccount},
 		metrics: metrics,
 		config:  config,
 	}, nil
@@ -138,9 +138,9 @@ func (s *Store) NewReadOnly(queryVersion uint64) (lib.StoreI, lib.ErrorI) {
 	reader := s.db.NewTransactionAt(queryVersion, false)
 	// if the query is for the latest version use the HSS over the LSS
 	if s.version == queryVersion {
-		stateReader = NewBadgerTxn(s.db.NewTransactionAt(lssVersion, false), nil, []byte(latestStatePrefix), false, false, 0, false)
+		stateReader = NewBadgerTxn(s.db.NewTransactionAt(lssVersion, false), nil, []byte(latestStatePrefix), false, false, 0)
 	} else {
-		stateReader = NewBadgerTxn(reader, nil, []byte(historicStatePrefix), false, false, 0, false)
+		stateReader = NewBadgerTxn(reader, nil, []byte(historicStatePrefix), false, false, 0)
 	}
 	// return the store object
 	return &Store{
@@ -149,8 +149,8 @@ func (s *Store) NewReadOnly(queryVersion uint64) (lib.StoreI, lib.ErrorI) {
 		db:      s.db,
 		writer:  nil,
 		ss:      stateReader,
-		sc:      NewDefaultSMT(NewBadgerTxn(reader, nil, []byte(stateCommitmentPrefix), false, false, 0, false)),
-		Indexer: &Indexer{NewBadgerTxn(reader, nil, []byte(indexerPrefix), false, false, 0, false), s.blockCache, s.qcCache, s.config.IndexByAccount},
+		sc:      NewDefaultSMT(NewBadgerTxn(reader, nil, []byte(stateCommitmentPrefix), false, false, 0)),
+		Indexer: &Indexer{NewBadgerTxn(reader, nil, []byte(indexerPrefix), false, false, 0), s.blockCache, s.qcCache, s.config.IndexByAccount},
 		metrics: s.metrics,
 	}, nil
 }
@@ -268,8 +268,8 @@ func (s *Store) NewTxn() lib.StoreI {
 		log:     s.log,
 		db:      s.db,
 		writer:  s.writer,
-		ss:      NewTxn(s.ss, s.ss, nil, false, true, nextVersion, false),
-		Indexer: &Indexer{NewTxn(s.Indexer.db, s.Indexer.db, nil, false, true, nextVersion, false), s.blockCache, s.qcCache, s.config.IndexByAccount},
+		ss:      NewTxn(s.ss, s.ss, nil, false, true, nextVersion),
+		Indexer: &Indexer{NewTxn(s.Indexer.db, s.Indexer.db, nil, false, true, nextVersion), s.blockCache, s.qcCache, s.config.IndexByAccount},
 		metrics: s.metrics,
 	}
 }
@@ -284,7 +284,7 @@ func (s *Store) Root() (root []byte, err lib.ErrorI) {
 	nextVersion := s.version + 1
 	if s.sc == nil {
 		// set up the state commit store
-		s.sc = NewDefaultSMT(NewTxn(s.ss.reader.(BadgerTxnReader), s.writer, []byte(stateCommitIDPrefix), false, false, nextVersion, false))
+		s.sc = NewDefaultSMT(NewTxn(s.ss.reader.(BadgerTxnReader), s.writer, []byte(stateCommitIDPrefix), false, false, nextVersion))
 		// commit the SMT directly using the cache ops
 		if err = s.sc.CommitParallel(s.ss.cache.ops); err != nil {
 			return nil, err
@@ -304,8 +304,8 @@ func (s *Store) Reset() {
 	nextVersion := s.version + 1
 	newWriter := s.db.NewWriteBatchAt(nextVersion)
 	// create all new transaction-dependent objects
-	newLSS := NewBadgerTxn(newLSSReader, newWriter, []byte(latestStatePrefix), true, true, nextVersion, false)
-	newIndexer := NewBadgerTxn(newReader, newWriter, []byte(indexerPrefix), false, false, nextVersion, false)
+	newLSS := NewBadgerTxn(newLSSReader, newWriter, []byte(latestStatePrefix), true, true, nextVersion)
+	newIndexer := NewBadgerTxn(newReader, newWriter, []byte(indexerPrefix), false, false, nextVersion)
 	// only after creating all new objects, discard old transactions
 	s.ss.reader.Discard()
 	s.sc = nil
@@ -345,7 +345,7 @@ func (s *Store) commitIDKey(version uint64) []byte {
 // getCommitID() retrieves the CommitID value for the specified version from the database
 func (s *Store) getCommitID(version uint64) (id lib.CommitID, err lib.ErrorI) {
 	var bz []byte
-	bz, err = NewTxn(s.Indexer.db.reader, nil, nil, false, false, 0, false).Get(s.commitIDKey(version))
+	bz, err = NewTxn(s.Indexer.db.reader, nil, nil, false, false, 0).Get(s.commitIDKey(version))
 	if err != nil {
 		return
 	}
@@ -357,7 +357,7 @@ func (s *Store) getCommitID(version uint64) (id lib.CommitID, err lib.ErrorI) {
 
 // setCommitID() stores the CommitID for the specified version and root in the database
 func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
-	w := NewTxn(s.Indexer.db.reader, s.writer, nil, false, false, version, false)
+	w := NewTxn(s.Indexer.db.reader, s.writer, nil, false, false, version)
 	value, err := lib.Marshal(&lib.CommitID{Height: version, Root: root})
 	if err != nil {
 		return err
@@ -377,7 +377,7 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 // getLatestCommitID() retrieves the latest CommitID from the database
 func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *lib.CommitID) {
 	reader := db.NewTransactionAt(math.MaxUint64, false)
-	tx := NewBadgerTxn(reader, nil, nil, false, false, 0, false)
+	tx := NewBadgerTxn(reader, nil, nil, false, false, 0)
 	defer reader.Discard()
 	bz, err := tx.Get([]byte(lastCommitIDPrefix))
 	if err != nil {

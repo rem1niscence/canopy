@@ -60,7 +60,6 @@ type Txn struct {
 	state        bool       // whether the flush should go to the HSS and LSS
 	sort         bool       // whether to sort the keys in the cache; used for iteration
 	writeVersion uint64     // the version to commit the data to
-	liveWrite    bool       // whether to flush to the underlying writer on every update
 	cache        *txn
 }
 
@@ -106,7 +105,7 @@ type valueOp struct {
 }
 
 // NewBadgerTxn() creates a new instance of Txn from badger Txn and WriteBatch correspondingly
-func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, state, sort bool, writeVersion uint64, liveWrite bool) *Txn {
+func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, state, sort bool, writeVersion uint64) *Txn {
 	var writerI TxnWriterI
 	// only assign the writer interface if not nil, otherwise leave it as nil.
 	// This prevents the "nil interface containing nil value" problem where
@@ -114,11 +113,11 @@ func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, 
 	if writer != nil {
 		writerI = writer
 	}
-	return NewTxn(BadgerTxnReader{reader, prefix}, writerI, prefix, state, sort, writeVersion, liveWrite)
+	return NewTxn(BadgerTxnReader{reader, prefix}, writerI, prefix, state, sort, writeVersion)
 }
 
 // NewTxn() creates a new instance of Txn with the specified reader and writer
-func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, state, sort bool, version uint64, liveWrite bool) *Txn {
+func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, state, sort bool, version uint64) *Txn {
 	return &Txn{
 		reader:       reader,
 		writer:       writer,
@@ -126,7 +125,6 @@ func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, state, sort boo
 		state:        state,
 		sort:         sort,
 		writeVersion: version,
-		liveWrite:    liveWrite,
 		cache: &txn{
 			ops:    make(map[uint64]valueOp),
 			sorted: btree.NewG(32, func(a, b *CacheItem) bool { return a.Less(b) }), // need to benchmark this value
@@ -172,13 +170,6 @@ func (t *Txn) update(key []byte, val []byte, entry *badger.Entry, opAction op) (
 	}
 	valueOp := valueOp{key: key, value: val, entry: entry, op: opAction}
 	t.cache.ops[hashedKey] = valueOp
-	if t.writer != nil && t.liveWrite {
-		for version, prefix := range t.flushTo() {
-			if err := t.write(prefix, version, valueOp); err != nil {
-				return err
-			}
-		}
-	}
 	t.cache.l.Unlock()
 	return
 }
@@ -232,9 +223,6 @@ func (t *Txn) Flush() (err error) {
 	t.cache.l.Lock()
 	defer t.cache.l.Unlock()
 	defer t.Discard()
-	if t.liveWrite {
-		return nil
-	}
 	for version, prefix := range t.flushTo() {
 		if err = t.flush(prefix, version); err != nil {
 			return err
@@ -315,7 +303,6 @@ func (t *Txn) Copy(reader TxnReaderI, writer TxnWriterI) *Txn {
 		state:        t.state,
 		sort:         t.sort,
 		writeVersion: t.writeVersion,
-		liveWrite:    t.liveWrite,
 		cache:        t.cache.copy(),
 	}
 }

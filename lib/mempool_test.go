@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"errors"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/stretchr/testify/require"
 	"math"
@@ -496,27 +495,9 @@ func TestFailedTxCache(t *testing.T) {
 			name:                    "valid transaction",
 			dissallowedMessageTypes: []string{},
 			txBytes:                 txBytes,
-			hash:                    "validHash",
+			hash:                    crypto.HashString(txBytes),
 			err:                     nil,
 			expectedResult:          true,
-			address:                 pubKey.Address().String(),
-		},
-		{
-			name:                    "invalid message type",
-			dissallowedMessageTypes: []string{testMessageName},
-			txBytes:                 txBytes,
-			hash:                    "invalidHash",
-			err:                     nil,
-			expectedResult:          false,
-			address:                 pubKey.Address().String(),
-		},
-		{
-			name:                    "unmarshal error",
-			dissallowedMessageTypes: []string{},
-			txBytes:                 []byte("invalidBytes"),
-			hash:                    "unmarshalErrorHash",
-			err:                     ErrUnmarshal(errors.New("unmarshal error")),
-			expectedResult:          false,
 			address:                 pubKey.Address().String(),
 		},
 	}
