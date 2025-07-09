@@ -478,7 +478,7 @@ func (tc *testConsensus) view(phase Phase, round ...uint64) *lib.View {
 
 // proposal() generates a mock block and result objects using the mock controller and their corresponding hashes
 func (tc *testConsensus) proposal(t *testing.T) (blk, blkHash []byte, results *lib.CertificateResult, resultsHash []byte) {
-	blk, results, err := tc.cont.ProduceProposal(nil, nil)
+	_, blk, results, err := tc.cont.ProduceProposal(nil, nil)
 	require.NoError(t, err)
 	blkHash, resultsHash = tc.cont.NewTestBlockHash(), results.Hash()
 	return
@@ -517,7 +517,7 @@ func (t *testController) ChainHeight() uint64 {
 	return t.RootChainHeight()
 }
 
-func (t *testController) ProduceProposal(_ *ByzantineEvidence, _ *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI) {
+func (t *testController) ProduceProposal(_ *ByzantineEvidence, _ *crypto.VDF) (rcBuildHeight uint64, block []byte, results *lib.CertificateResult, err lib.ErrorI) {
 	block = t.NewTestBlock()
 	results = &lib.CertificateResult{
 		RewardRecipients: &lib.RewardRecipients{
@@ -531,7 +531,7 @@ func (t *testController) ProduceProposal(_ *ByzantineEvidence, _ *crypto.VDF) (b
 	return
 }
 
-func (t *testController) ValidateProposal(qc *lib.QuorumCertificate, _ *ByzantineEvidence) (*lib.BlockResult, lib.ErrorI) {
+func (t *testController) ValidateProposal(_ uint64, qc *lib.QuorumCertificate, _ *ByzantineEvidence) (*lib.BlockResult, lib.ErrorI) {
 	if len(qc.Block) == expectedCandidateLen {
 		return nil, nil
 	}

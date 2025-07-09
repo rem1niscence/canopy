@@ -277,6 +277,7 @@ func (b *BFT) StartElectionVotePhase() {
 // - Leader creates a PROPOSE message from the Proposal and justifies the message with the +2/3 threshold multi-signature
 func (b *BFT) StartProposePhase() {
 	b.log.Info(b.View.ToString())
+	var rcBuildHeight uint64
 	vote, as, err := b.GetMajorityVote()
 	if err != nil {
 		return
@@ -284,7 +285,7 @@ func (b *BFT) StartProposePhase() {
 	b.log.Info("Self is the proposer")
 	// produce new proposal or use highQC as the proposal
 	if b.HighQC == nil {
-		b.Block, b.Results, err = b.ProduceProposal(b.ByzantineEvidence, b.HighVDF)
+		rcBuildHeight, b.Block, b.Results, err = b.ProduceProposal(b.ByzantineEvidence, b.HighVDF)
 		if err != nil {
 			b.log.Error(err.Error())
 			return
@@ -306,6 +307,7 @@ func (b *BFT) StartProposePhase() {
 		},
 		HighQc:                 b.HighQC,                         // nil or justifies the proposal
 		LastDoubleSignEvidence: b.ByzantineEvidence.DSE.Evidence, // evidence is attached (if any) to validate the Proposal
+		RcBuildHeight:          rcBuildHeight,                    // the root chain height when the block was built
 	})
 }
 
@@ -338,12 +340,18 @@ func (b *BFT) StartProposeVotePhase() {
 			return
 		}
 	}
+	// ensure the build height isn't too old
+	if msg.RcBuildHeight < b.CommitteeData.LastRootHeightUpdated {
+		b.log.Error(lib.ErrInvalidRCBuildHeight().Error())
+		b.RoundInterrupt()
+		return
+	}
 	// aggregate any evidence submitted from the replicas
 	byzantineEvidence := &ByzantineEvidence{
 		DSE: NewDSE(msg.LastDoubleSignEvidence),
 	}
 	// check candidate block against FSM
-	if b.BlockResult, err = b.ValidateProposal(msg.Qc, byzantineEvidence); err != nil {
+	if b.BlockResult, err = b.ValidateProposal(msg.RcBuildHeight, msg.Qc, byzantineEvidence); err != nil {
 		b.log.Error(err.Error())
 		b.RoundInterrupt()
 		return
@@ -861,9 +869,9 @@ type (
 		// RootChainHeight returns the height of the root-chain
 		RootChainHeight() uint64
 		// ProduceProposal() as a Leader, create a Proposal in the form of a block and certificate results
-		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (block []byte, results *lib.CertificateResult, err lib.ErrorI)
+		ProduceProposal(be *ByzantineEvidence, vdf *crypto.VDF) (rcBuildHeight uint64, block []byte, results *lib.CertificateResult, err lib.ErrorI)
 		// ValidateCertificate() as a Replica, validates the leader proposal
-		ValidateProposal(qc *lib.QuorumCertificate, evidence *ByzantineEvidence) (*lib.BlockResult, lib.ErrorI)
+		ValidateProposal(rcBuildHeight uint64, qc *lib.QuorumCertificate, evidence *ByzantineEvidence) (*lib.BlockResult, lib.ErrorI)
 		// LoadCertificate() gets the Quorum Certificate from the chainId-> plugin at a certain height
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
 		// CommitCertificate() commits a block to persistence

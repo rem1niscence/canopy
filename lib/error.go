@@ -134,7 +134,7 @@ const (
 	CodeInvalidEvidence                 ErrorCode = 35
 	CodeMismatchEvidenceAndHeader       ErrorCode = 36
 	CodeInvalidTxTime                   ErrorCode = 37
-	CodeWrongMaxHeight                  ErrorCode = 38
+	CodeInvalidRCBuildHeight            ErrorCode = 38
 	CodeExpectedBlockSizeLimit          ErrorCode = 39
 	CodeNonNilCertResults               ErrorCode = 40
 	CodeInvalidMemo                     ErrorCode = 41
@@ -458,8 +458,8 @@ func ErrInvalidQCRootChainHeight() ErrorI {
 	return NewError(CodeInvalidQCRootChainHeight, ConsensusModule, "invalid certificate root-chain height")
 }
 
-func ErrWrongMaxHeight() ErrorI {
-	return NewError(CodeWrongMaxHeight, ConsensusModule, "wrong max height")
+func ErrInvalidRCBuildHeight() ErrorI {
+	return NewError(CodeInvalidRCBuildHeight, ConsensusModule, "invalid root chain build height")
 }
 
 func ErrEmptyView() ErrorI {

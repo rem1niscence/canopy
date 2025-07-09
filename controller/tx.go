@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"github.com/canopy-network/canopy/bft"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -157,6 +158,7 @@ func (c *Controller) CheckMempool() {
 // - notes:
 //   - new tx added may also be evicted, this is expected behavior
 type Mempool struct {
+	controller      *Controller
 	lib.Mempool                        // the memory pool itself defined as an interface
 	L               *sync.Mutex        // thread safety at the mempool level
 	FSM             *fsm.StateMachine  // the ephemeral finite state machine used to validate inbound transactions
@@ -171,8 +173,10 @@ type Mempool struct {
 }
 
 type CachedProposal struct {
-	Block       *lib.Block
-	BlockResult *lib.BlockResult
+	Block         *lib.Block
+	BlockResult   *lib.BlockResult
+	CertResults   *lib.CertificateResult
+	rcBuildHeight uint64
 }
 
 // NewMempool() creates a new instance of a Mempool structure
@@ -194,11 +198,6 @@ func NewMempool(fsm *fsm.StateMachine, address crypto.AddressI, config lib.Mempo
 	if err != nil {
 		return nil, err
 	}
-	// thread safety
-	m.L.Lock()
-	defer m.L.Unlock()
-	// pre-call check-mempool to load an empty block proposal
-	m.CheckMempool()
 	// exit
 	return m, err
 }
@@ -244,10 +243,25 @@ func (m *Mempool) CheckMempool() {
 		}
 		return
 	}
+	// set the block result block header
+	blockResult.BlockHeader = block.BlockHeader
+	// get RC build height
+	rcBuildHeight := m.controller.RootChainHeight()
+	// calculate rc build height
+	ownRoot, err := m.FSM.LoadIsOwnRoot()
+	if err != nil {
+		m.log.Error(err.Error())
+	}
+	// if ownRoot
+	if ownRoot {
+		rcBuildHeight = m.FSM.Height()
+	}
 	// cache the proposal
 	m.cachedProposal.Store(&CachedProposal{
-		Block:       block,
-		BlockResult: blockResult,
+		Block:         block,
+		BlockResult:   blockResult,
+		CertResults:   m.controller.NewCertificateResults(rcBuildHeight, m.FSM, block, blockResult, &bft.ByzantineEvidence{DSE: bft.DoubleSignEvidences{}}),
+		rcBuildHeight: rcBuildHeight,
 	})
 	// create a cache of failed tx bytes to evict from the mempool
 	var failedTxBz [][]byte

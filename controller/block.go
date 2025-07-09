@@ -137,7 +137,7 @@ func (c *Controller) SelfSendBlock(qc *lib.QuorumCertificate, timestamp uint64) 
 // BFT FUNCTIONS BELOW
 
 // ProduceProposal() create a proposal in the form of a `block` and `certificate result` for the bft process
-func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypto.VDF) (blockBytes []byte, results *lib.CertificateResult, err lib.ErrorI) {
+func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypto.VDF) (rcBuildHeight uint64, blockBytes []byte, results *lib.CertificateResult, err lib.ErrorI) {
 	c.log.Debugf("Producing proposal as leader")
 	// once done proposing, 'reset' the proposal mode back to default to 'accept all'
 	defer c.FSM.Reset()
@@ -166,6 +166,8 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 	// replace the VDF and last certificate in the header
 	p.Block.BlockHeader.LastQuorumCertificate, p.Block.BlockHeader.Vdf = lastCertificate, vdf
 	p.Block.BlockHeader.TotalVdfIterations = vdf.GetIterations() + lastBlock.BlockHeader.TotalVdfIterations
+	// set the certificate results variable and rcBuildHeight
+	results, rcBuildHeight = p.CertResults, p.rcBuildHeight
 	// execute the hash
 	if _, err = p.Block.BlockHeader.SetHash(); err != nil {
 		// exit with error
@@ -179,14 +181,16 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 	}
 	// update the 'block results' with the newly created header
 	p.BlockResult.BlockHeader = p.Block.BlockHeader
-	// create a new certificate results (includes reward recipients, slash recipients, swap commands, etc)
-	results = c.NewCertificateResults(p.Block, p.BlockResult, evidence)
+	// set slash recipients (this is necessary because values changed)
+	c.CalculateSlashRecipients(results, evidence)
+	// set checkpoint (this is necessary because values changed)
+	c.CalculateCheckpoint(p.BlockResult, results)
 	// exit
 	return
 }
 
 // ValidateProposal() fully validates a proposal in the form of a quorum certificate and resets back to begin block state
-func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (blockResult *lib.BlockResult, err lib.ErrorI) {
+func (c *Controller) ValidateProposal(rcBuildHeight uint64, qc *lib.QuorumCertificate, evidence *bft.ByzantineEvidence) (blockResult *lib.BlockResult, err lib.ErrorI) {
 	// reset the mempool at the beginning of the function to preserve the state for CommitCertificate()
 	c.FSM.Reset()
 	// log the beginning of proposal validation
@@ -213,7 +217,7 @@ func (c *Controller) ValidateProposal(qc *lib.QuorumCertificate, evidence *bft.B
 		return
 	}
 	// create a comparable certificate results (includes reward recipients, slash recipients, swap commands, etc)
-	compareResults := c.NewCertificateResults(block, blockResult, evidence)
+	compareResults := c.NewCertificateResults(rcBuildHeight, c.FSM, block, blockResult, evidence)
 	// ensure generated the same results
 	if !qc.Results.Equals(compareResults) {
 		// exit with error

@@ -69,6 +69,8 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 	}
 	// initialize the consensus in the controller, passing a reference to itself
 	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, c.RunVDF, metrics, l)
+	// initialize the mempool controller
+	mempool.controller = controller
 	// if an error occurred initializing the bft module
 	if err != nil {
 		// exit with error
@@ -101,6 +103,8 @@ func (c *Controller) Start() {
 			if e != nil {
 				c.log.Error(e.Error()) // log error but continue
 			} else if rootChainInfo != nil {
+				// call mempool check
+				c.Mempool.CheckMempool()
 				// update the peer 'must connect'
 				c.UpdateP2PMustConnect(rootChainInfo.ValidatorSet)
 				// exit the loop
@@ -175,14 +179,14 @@ func (c *Controller) LoadCommittee(rootChainId, rootHeight uint64) (lib.Validato
 }
 
 // LoadRootChainOrderBook() gets the order book from the root-chain
-func (c *Controller) LoadRootChainOrderBook(rootHeight uint64) (*lib.OrderBook, lib.ErrorI) {
-	return c.RCManager.GetOrders(c.LoadRootChainId(c.ChainHeight()), rootHeight, c.Config.ChainId)
+func (c *Controller) LoadRootChainOrderBook(rootChainId, rootHeight uint64) (*lib.OrderBook, lib.ErrorI) {
+	return c.RCManager.GetOrders(rootChainId, rootHeight, c.Config.ChainId)
 }
 
 // GetRootChainLotteryWinner() gets the pseudorandomly selected delegate to reward and their cut
-func (c *Controller) GetRootChainLotteryWinner(rootHeight uint64) (winner *lib.LotteryWinner, err lib.ErrorI) {
+func (c *Controller) GetRootChainLotteryWinner(fsm *fsm.StateMachine, rootHeight uint64) (winner *lib.LotteryWinner, err lib.ErrorI) {
 	// get the root chain id from the state machine
-	rootChainId, err := c.FSM.LoadRootChainId(c.ChainHeight())
+	rootChainId, err := fsm.LoadRootChainId(c.ChainHeight())
 	// if an error occurred retrieving the id
 	if err != nil {
 		// exit with error

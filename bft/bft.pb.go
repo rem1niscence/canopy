@@ -63,7 +63,9 @@ type Message struct {
 	// signature: the digital signature of the sender of the consensus message
 	Signature *lib.Signature `protobuf:"bytes,7,opt,name=signature,proto3" json:"signature,omitempty"`
 	// timestamp: allow the leader to coordinate the new height (within reason)
-	Timestamp     uint64 `protobuf:"varint,8,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Timestamp uint64 `protobuf:"varint,8,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	// rcBuildHeight: the root height when the block was built
+	RcBuildHeight uint64 `protobuf:"varint,9,opt,name=rcBuildHeight,proto3" json:"rcBuildHeight,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -150,6 +152,13 @@ func (x *Message) GetSignature() *lib.Signature {
 func (x *Message) GetTimestamp() uint64 {
 	if x != nil {
 		return x.Timestamp
+	}
+	return 0
+}
+
+func (x *Message) GetRcBuildHeight() uint64 {
+	if x != nil {
+		return x.RcBuildHeight
 	}
 	return 0
 }
@@ -271,7 +280,7 @@ var File_bft_proto protoreflect.FileDescriptor
 
 const file_bft_proto_rawDesc = "" +
 	"\n" +
-	"\tbft.proto\x12\x05types\x1a\x0fconsensus.proto\x1a\fcrypto.proto\x1a\x11certificate.proto\x1a\btx.proto\"\xf1\x02\n" +
+	"\tbft.proto\x12\x05types\x1a\x0fconsensus.proto\x1a\fcrypto.proto\x1a\x11certificate.proto\x1a\btx.proto\"\x97\x03\n" +
 	"\aMessage\x12#\n" +
 	"\x06header\x18\x01 \x01(\v2\v.types.ViewR\x06header\x12\"\n" +
 	"\x03vrf\x18\x02 \x01(\v2\x10.types.SignatureR\x03vrf\x12(\n" +
@@ -281,7 +290,8 @@ const file_bft_proto_rawDesc = "" +
 	"\x03vdf\x18\x06 \x01(\v2\n" +
 	".types.VDFR\x03vdf\x12.\n" +
 	"\tsignature\x18\a \x01(\v2\x10.types.SignatureR\tsignature\x12\x1c\n" +
-	"\ttimestamp\x18\b \x01(\x04R\ttimestamp\"v\n" +
+	"\ttimestamp\x18\b \x01(\x04R\ttimestamp\x12$\n" +
+	"\rrcBuildHeight\x18\t \x01(\x04R\rrcBuildHeight\"v\n" +
 	"\x12DoubleSignEvidence\x12/\n" +
 	"\x06vote_a\x18\x01 \x01(\v2\x18.types.QuorumCertificateR\x05voteA\x12/\n" +
 	"\x06vote_b\x18\x02 \x01(\v2\x18.types.QuorumCertificateR\x05voteB\"\xdf\x01\n" +
