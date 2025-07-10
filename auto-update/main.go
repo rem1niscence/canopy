@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -33,6 +34,9 @@ const (
 var (
 	binPath   = os.Getenv("BIN_PATH")
 	repoOwner = os.Getenv("REPO_OWNER")
+
+	config         lib.Config
+	configFilePath string
 )
 
 // init initializes the binary path if not set in environment variables
@@ -215,25 +219,10 @@ func runBinary() (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-// main is the entry point of the application
-// It handles both manual and auto-update modes based on configuration
-func main() {
-	// Initialize data directory and configuration
-	if err := os.MkdirAll(cli.DataDir, os.ModePerm); err != nil {
-		log.Print(err.Error())
-	}
-	configFilePath := filepath.Join(cli.DataDir, lib.ConfigFilePath)
-	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
-		log.Printf("Creating %s file", lib.ConfigFilePath)
-		if err = lib.DefaultConfig().WriteToFile(configFilePath); err != nil {
-			log.Print(err.Error())
-		}
-	}
-	// Load configuration
-	config, err := lib.NewConfigFromFile(configFilePath)
-	if err != nil {
-		log.Print(err.Error())
-	}
+func runAutoUpdate() {
+	// save in the config file that the auto update software is running
+	config.RunningAutoUpdate = true
+	config.WriteToFile(configFilePath)
 	if !config.AutoUpdate {
 		cli.Start()
 	} else {
@@ -252,6 +241,7 @@ func main() {
 		// Channels for process coordination
 		notifyStartRun := make(chan struct{}, 1) // Signals when to start the CLI process
 		notifyEndRun := make(chan struct{}, 1)   // Signals when the CLI process has ended
+		stop := make(chan os.Signal, 1)          // Signals stop in auto update to do graceful shutdown
 
 		// Goroutine to handle binary execution and restart
 		go func() {
@@ -271,7 +261,7 @@ func main() {
 				err = cmd.Wait()
 				log.Printf("Process exited: %v", err)
 				if !uploadingNewVersion.Load() {
-					os.Exit(1)
+					stop <- syscall.SIGINT
 				}
 
 				// Notify that the process has ended
@@ -346,12 +336,62 @@ func main() {
 			}
 		}()
 
+		// routine to wait for kill
+		go func() {
+			signal.Notify(stop, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGABRT)
+			// block until kill signal is received
+			s := <-stop
+			log.Printf("Exit command %s received in auto update\n", s)
+			config.RunningAutoUpdate = false
+			config.WriteToFile(configFilePath)
+			// Gracefully terminate the current process
+			err = cmd.Process.Signal(syscall.SIGINT)
+			if err != nil {
+				log.Printf("Failed to send syscall to child process: %v", err)
+				return
+			}
+			log.Println("SENT KILL SIGNAL")
+			<-notifyEndRun
+			log.Println("KILLED OLD PROCESS")
+			log.Println("Finished auto update setup for closure")
+			os.Exit(0)
+		}()
+
 		// Start the initial binary if it exists
 		_, err = os.Stat(binPath)
 		if err == nil {
 			notifyStartRun <- struct{}{}
 		}
+	}
+}
+
+// main is the entry point of the application
+// It handles both manual and auto-update modes based on configuration
+func main() {
+	// Initialize data directory and configuration
+	err := os.MkdirAll(cli.DataDir, os.ModePerm)
+	if err != nil {
+		log.Print(err.Error())
+	}
+	configFilePath = filepath.Join(cli.DataDir, lib.ConfigFilePath)
+	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
+		log.Printf("Creating %s file", lib.ConfigFilePath)
+		if err = lib.DefaultConfig().WriteToFile(configFilePath); err != nil {
+			log.Print(err.Error())
+		}
+	}
+	// Load configuration
+	config, err = lib.NewConfigFromFile(configFilePath)
+	if err != nil {
+		log.Print(err.Error())
+	}
+	// run regular way if not saved it is already running
+	if !config.RunningAutoUpdate {
+		go runAutoUpdate()
 		// Block forever
 		select {}
+		// if the auto update software is already running just setup cli commands
+	} else {
+		cli.Execute()
 	}
 }
