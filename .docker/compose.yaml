@@ -21,10 +21,10 @@ services:
     volumes:
       - ./volumes/node_1:/root/.canopy
     deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: "1.0"
+#      resources:
+#        limits:
+#          memory: 2G
+#          cpus: "1.0"
 
   node-2:
     container_name: node-2
@@ -48,10 +48,10 @@ services:
     volumes:
       - ./volumes/node_2:/root/.canopy
     deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: "1.0"
+#      resources:
+#        limits:
+#          memory: 2G
+#          cpus: "1.0"
 
   node-3:
     container_name: node-3
@@ -72,10 +72,10 @@ services:
     volumes:
       - ./volumes/node_3:/root/.canopy
     deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: "1.0"
+#      resources:
+#        limits:
+#          memory: 2G
+#          cpus: "1.0"
 
 networks:
   canopy:
