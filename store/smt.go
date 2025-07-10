@@ -541,12 +541,15 @@ func (s *SMT) addSyntheticBorders() (cleanup func() lib.ErrorI, err lib.ErrorI) 
 
 // sortOperationsByPrefix returns 8 sorted slices grouped by 3-bit prefix: 000 to 111
 func (s *SMT) sortOperationsByPrefix(unsortedOps map[uint64]valueOp) (groups [8][]*node, err lib.ErrorI) {
+	// for each unsorted operation
 	for _, operation := range unsortedOps {
-		value, del := []byte(nil), true
+		// set up the new node as a 'delete'
+		n := &node{Key: newNodeKey(crypto.Hash(operation.key), s.keyBitLength), Node: lib.Node{}, delete: true}
+		// if the operation is not a 'delete'
 		if operation.op != opDelete && !entryIsDelete(operation.entry) {
-			value, del = crypto.Hash(operation.value), false
+			// set the value as the hash of the op.value and set 'delete' to false
+			n.Node.Value, n.delete = crypto.Hash(operation.value), false
 		}
-		n := &node{Key: newNodeKey(crypto.Hash(operation.key), s.keyBitLength), Node: lib.Node{Value: value}, delete: del}
 		// check to make sure the target is valid
 		if err = s.validateTarget(n); err != nil {
 			return

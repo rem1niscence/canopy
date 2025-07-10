@@ -34,7 +34,6 @@
   "bannedPeerIDs": null,
   "bannedIPs": null,
   "minimumPeersToStart": 0,
-  "newHeightTimeoutMS": 7500,
   "newHeightTimeoutMS": 4500,
   "electionTimeoutMS": 1500,
   "electionVoteTimeoutMS": 1500,
