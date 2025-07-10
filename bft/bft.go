@@ -136,7 +136,9 @@ func (b *BFT) Start() {
 					b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, processTime)
 				} else {
 					b.log.Info("Reset BFT (NEW_COMMITTEE)")
-					if b.Round != 0 && !b.LoadIsOwnRoot() {
+					if b.LoadIsOwnRoot() {
+						b.NewHeight(true)
+					} else if b.Round != 0 {
 						b.NewHeight(true)
 						// set the wait timers to start consensus
 						b.SetWaitTimers(time.Duration(b.Config.NewHeightTimeoutMs)*time.Millisecond, processTime)
@@ -602,6 +604,7 @@ func (b *BFT) CheckProposerAndProposal(msg *Message) (interrupt bool) {
 // NewRound() initializes the VoteSet and Proposals cache for the next round
 // - increments the round count if not NewHeight (goes to Round 0)
 func (b *BFT) NewRound(newHeight bool) {
+	var err lib.ErrorI
 	// if starting a new height
 	if newHeight {
 		// reset round
@@ -612,6 +615,18 @@ func (b *BFT) NewRound(newHeight bool) {
 		// defensive: clear byzantine evidence
 		b.ByzantineEvidence = &ByzantineEvidence{DSE: DoubleSignEvidences{}}
 	}
+	// update root height
+	b.RootHeight = b.Controller.RootChainHeight()
+	// update the validator set
+	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.Height), b.RootHeight)
+	if err != nil {
+		b.log.Errorf("LoadCommittee() failed with err: %s", err.Error())
+	}
+	// update the committee data
+	b.CommitteeData, err = b.Controller.LoadCommitteeData()
+	if err != nil {
+		b.log.Errorf("LoadCommitteeData() failed with err: %s", err.Error())
+	}
 	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
 	b.Block, b.BlockHash, b.Results, b.BlockResult = nil, nil, nil, nil
@@ -620,7 +635,6 @@ func (b *BFT) NewRound(newHeight bool) {
 
 // NewHeight() initializes / resets consensus variables preparing for the NewHeight
 func (b *BFT) NewHeight(keepLocks ...bool) {
-	var err lib.ErrorI
 	// reset VotesForHeight
 	b.Votes = make(VotesForHeight)
 	// reset ProposalsForHeight
@@ -633,18 +647,6 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.Phase = Election
 	// update height
 	b.Height = b.Controller.ChainHeight()
-	// update canopy height
-	b.RootHeight = b.Controller.RootChainHeight()
-	// update the validator set
-	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.Height), b.RootHeight)
-	if err != nil {
-		b.log.Errorf("LoadCommittee() failed with err: %s", err.Error())
-	}
-	// update the committee data
-	b.CommitteeData, err = b.Controller.LoadCommitteeData()
-	if err != nil {
-		b.log.Errorf("LoadCommitteeData() failed with err: %s", err.Error())
-	}
 	// if resetting due to new Canopy Block and Validator Set then KeepLocks
 	// - protecting any who may have committed against attacks like malicious proposers from withholding
 	// COMMIT_MSG and sending it after the next block is produces
