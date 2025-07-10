@@ -245,7 +245,7 @@ func (b *BFT) StartElectionVotePhase() {
 	// get the candidates from messages received
 	candidates := b.GetElectionCandidates()
 	if len(candidates) == 0 {
-		b.log.Warn("No election candidates, falling back to weighted pseudorandom")
+		b.log.Info("No election candidates, falling back to weighted pseudorandom")
 	}
 	// select Proposer (set is required for self-send)
 	b.ProposerKey = SelectProposerFromCandidates(candidates, b.SortitionData, b.ValidatorSet.ValidatorSet)
@@ -618,6 +618,8 @@ func (b *BFT) NewRound(newHeight bool) {
 		// defensive: clear byzantine evidence
 		b.ByzantineEvidence = &ByzantineEvidence{DSE: DoubleSignEvidences{}}
 	}
+	// update height
+	b.Height = b.Controller.ChainHeight()
 	// update root height
 	b.RootHeight = b.Controller.RootChainHeight()
 	// update the validator set
@@ -632,7 +634,7 @@ func (b *BFT) NewRound(newHeight bool) {
 	}
 	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
-	b.Block, b.BlockHash, b.Results, b.BlockResult = nil, nil, nil, nil
+	b.Block, b.BlockHash, b.Results = nil, nil, nil
 	b.SortitionData = nil
 }
 
@@ -648,8 +650,6 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 	b.NewRound(true)
 	// set phase to Election
 	b.Phase = Election
-	// update height
-	b.Height = b.Controller.ChainHeight()
 	// if resetting due to new Canopy Block and Validator Set then KeepLocks
 	// - protecting any who may have committed against attacks like malicious proposers from withholding
 	// COMMIT_MSG and sending it after the next block is produces

@@ -200,8 +200,6 @@ func (ps *PeerSet) GetAllInfos() (res []*lib.PeerInfo, numInbound, numOutbound i
 		}
 		res = append(res, p.PeerInfo.Copy())
 	}
-	numInbound = ps.inbound
-	numOutbound = ps.outbound
 	return
 }
 

@@ -250,6 +250,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	storeI := c.FSM.Store().(lib.StoreI)
 	// if the block result isn't 'pre-calculated'
 	if blockResult == nil {
+		c.FSM.Reset()
 		// apply the block against the state machine
 		blockResult, err = c.ApplyAndValidateBlock(block, true)
 		if err != nil {
