@@ -540,7 +540,7 @@ func (t *testController) ValidateProposal(_ uint64, qc *lib.QuorumCertificate, _
 }
 
 func (t *testController) LoadCommittee(rootChainId, rootHeight uint64) (lib.ValidatorSet, lib.ErrorI) {
-	return t.valSet[rootHeight], nil
+	return t.valSet[rootChainId], nil
 }
 func (t *testController) LoadCertificate(_ uint64) (*lib.QuorumCertificate, lib.ErrorI) {
 	return nil, nil
