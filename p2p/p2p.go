@@ -328,7 +328,10 @@ func (p *P2P) DialAndDisconnect(a *lib.PeerAddress, strictPublicKey bool) lib.Er
 func (p *P2P) OnPeerError(err error, publicKey []byte, remoteAddr string) {
 	p.log.Warn(PeerError(publicKey, remoteAddr, err))
 	// ignore error: peer may have disconnected before added
-	peer, _ := p.PeerSet.Remove(publicKey)
+	peer, err := p.PeerSet.Remove(publicKey)
+	if err != nil {
+		p.log.Errorf("Remove error: %s", err.Error())
+	}
 	if peer != nil {
 		peer.stop.Do(peer.conn.Stop)
 	}
