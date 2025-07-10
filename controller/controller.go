@@ -197,9 +197,9 @@ func (c *Controller) GetRootChainLotteryWinner(fsm *fsm.StateMachine, rootHeight
 }
 
 // IsValidDoubleSigner() checks if the double signer is valid at a certain double sign height
-func (c *Controller) IsValidDoubleSigner(rootHeight uint64, address []byte) bool {
+func (c *Controller) IsValidDoubleSigner(rootChainId, rootHeight uint64, address []byte) bool {
 	// do a remote call to the root chain to see if the double signer is valid
-	isValidDoubleSigner, err := c.RCManager.IsValidDoubleSigner(c.LoadRootChainId(c.ChainHeight()), rootHeight, lib.BytesToString(address))
+	isValidDoubleSigner, err := c.RCManager.IsValidDoubleSigner(rootChainId, rootHeight, lib.BytesToString(address))
 	// if an error occurred during the remote call
 	if err != nil {
 		// log the error
@@ -245,8 +245,8 @@ func (c *Controller) LoadCertificate(height uint64) (*lib.QuorumCertificate, lib
 }
 
 // LoadMinimumEvidenceHeight() gets the minimum evidence height from the finite state machine
-func (c *Controller) LoadMinimumEvidenceHeight() (uint64, lib.ErrorI) {
-	return c.FSM.LoadMinimumEvidenceHeight()
+func (c *Controller) LoadMinimumEvidenceHeight(rootChainId, rootHeight uint64) (*uint64, lib.ErrorI) {
+	return c.RCManager.GetMinimumEvidenceHeight(rootChainId, rootHeight)
 }
 
 // LoadMaxBlockSize() gets the max block size from the state

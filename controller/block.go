@@ -181,6 +181,8 @@ func (c *Controller) ProduceProposal(evidence *bft.ByzantineEvidence, vdf *crypt
 	}
 	// update the 'block results' with the newly created header
 	p.BlockResult.BlockHeader = p.Block.BlockHeader
+	// IMPORTANT: none of the calls below should rely on the latest FSM because
+	// the mempool FSM was discarded during 'check mempool'
 	// set slash recipients (this is necessary because values changed)
 	c.CalculateSlashRecipients(results, evidence)
 	// set checkpoint (this is necessary because values changed)

@@ -209,6 +209,18 @@ func (r *RCManager) IsValidDoubleSigner(rootChainId, height uint64, address stri
 	return sub.IsValidDoubleSigner(height, address)
 }
 
+// GetMinimumEvidenceHeight() returns the minimum height double sign evidence must have to be 'valid'
+func (r *RCManager) GetMinimumEvidenceHeight(rootChainId, height uint64) (*uint64, lib.ErrorI) {
+	// if the root chain id is the same as the info
+	sub, found := r.subscriptions[rootChainId]
+	if !found {
+		// exit with 'not subscribed' error
+		return nil, lib.ErrNotSubscribed()
+	}
+	// exit with the results of the remote RPC call to the API of the 'root chain'
+	return sub.MinimumEvidenceHeight(height)
+}
+
 // GetCheckpoint() returns the checkpoint if any for a specific chain height
 // TODO should be able to get these from the file or the root-chain upon independence
 func (r *RCManager) GetCheckpoint(rootChainId, height, chainId uint64) (blockHash lib.HexBytes, err lib.ErrorI) {

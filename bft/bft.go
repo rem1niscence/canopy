@@ -602,10 +602,15 @@ func (b *BFT) CheckProposerAndProposal(msg *Message) (interrupt bool) {
 // NewRound() initializes the VoteSet and Proposals cache for the next round
 // - increments the round count if not NewHeight (goes to Round 0)
 func (b *BFT) NewRound(newHeight bool) {
+	// if starting a new height
 	if newHeight {
+		// reset round
 		b.Round = 0
 	} else {
+		// increment round
 		b.Round++
+		// defensive: clear byzantine evidence
+		b.ByzantineEvidence = &ByzantineEvidence{DSE: DoubleSignEvidences{}}
 	}
 	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
@@ -904,9 +909,9 @@ type (
 		// LoadLastProposers() loads the last Canopy committee proposers for sortition data
 		LoadLastProposers(rootHeight uint64) (*lib.Proposers, lib.ErrorI)
 		// LoadMinimumEvidenceHeight() loads the Canopy enforced minimum height for valid Byzantine Evidence
-		LoadMinimumEvidenceHeight() (uint64, lib.ErrorI)
+		LoadMinimumEvidenceHeight(rootChainId, rootHeight uint64) (*uint64, lib.ErrorI)
 		// IsValidDoubleSigner() checks to see if the double signer is valid for this specific height
-		IsValidDoubleSigner(height uint64, address []byte) bool
+		IsValidDoubleSigner(rootChainId, rootHeight uint64, address []byte) bool
 	}
 )
 

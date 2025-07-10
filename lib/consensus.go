@@ -109,6 +109,7 @@ type RCManagerI interface {
 	GetOrders(rootChainId, rootHeight, id uint64) (*OrderBook, ErrorI)                        // get the order book for a specific 'chain id'
 	GetOrder(rootChainId, height uint64, orderId string, chainId uint64) (*SellOrder, ErrorI) // get a specific order from the order book
 	IsValidDoubleSigner(rootChainId, height uint64, address string) (p *bool, err ErrorI)     // check if a double signer is valid for an address for a specific 'double sign height'
+	GetMinimumEvidenceHeight(rootChainId, rootHeight uint64) (*uint64, ErrorI)                // load the minimum height that evidence is valid
 	GetCheckpoint(rootChainId, height, id uint64) (blockHash HexBytes, i ErrorI)              // get a checkpoint at a height and chain id combination
 	Transaction(rootChainId uint64, tx TransactionI) (hash *string, err ErrorI)               // submit a transaction to the 'root chain'
 }
