@@ -138,6 +138,7 @@ func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 				b.log.Infof("Replica %s submitted a highQC", lib.BytesToTruncatedString(vote.Signature.PublicKey))
 				b.HighQC = vote.HighQc
 				b.Block, b.Results = vote.Qc.Block, vote.Qc.Results
+				b.RCBuildHeight = vote.RcBuildHeight
 			}
 		}
 		// handle VDF

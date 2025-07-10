@@ -20,6 +20,7 @@ type BFT struct {
 	ValidatorSet  ValSet                 // the current set of Validators
 	CommitteeData *lib.CommitteeData     // the data for the committee for this height
 	HighQC        *QC                    // the highest PRECOMMIT quorum certificate the node is aware of for this Height
+	RCBuildHeight uint64                 // the build height of the locked proposal
 	Block         []byte                 // the current Block being voted on (the foundational unit of the blockchain)
 	BlockHash     []byte                 // the current hash of the block being voted on
 	Results       *lib.CertificateResult // the current Result being voted on (reward and slash recipients)
@@ -265,6 +266,7 @@ func (b *BFT) StartElectionVotePhase() {
 		HighQc:                 b.HighQC,                         // forward highest known 'Lock' for this Height, so the new Proposer may satisfy SAFE-NODE-PREDICATE
 		LastDoubleSignEvidence: b.ByzantineEvidence.DSE.Evidence, // forward any evidence of DoubleSigning
 		Vdf:                    b.HighVDF,                        // forward local VDF to the candidate
+		RcBuildHeight:          b.RCBuildHeight,                  // forward the highQC build height (if applicable)
 	})
 }
 
@@ -279,7 +281,6 @@ func (b *BFT) StartElectionVotePhase() {
 // - Leader creates a PROPOSE message from the Proposal and justifies the message with the +2/3 threshold multi-signature
 func (b *BFT) StartProposePhase() {
 	b.log.Info(b.View.ToString())
-	var rcBuildHeight uint64
 	vote, as, err := b.GetMajorityVote()
 	if err != nil {
 		return
@@ -287,7 +288,7 @@ func (b *BFT) StartProposePhase() {
 	b.log.Info("Self is the proposer")
 	// produce new proposal or use highQC as the proposal
 	if b.HighQC == nil {
-		rcBuildHeight, b.Block, b.Results, err = b.ProduceProposal(b.ByzantineEvidence, b.HighVDF)
+		b.RCBuildHeight, b.Block, b.Results, err = b.ProduceProposal(b.ByzantineEvidence, b.HighVDF)
 		if err != nil {
 			b.log.Error(err.Error())
 			return
@@ -309,7 +310,7 @@ func (b *BFT) StartProposePhase() {
 		},
 		HighQc:                 b.HighQC,                         // nil or justifies the proposal
 		LastDoubleSignEvidence: b.ByzantineEvidence.DSE.Evidence, // evidence is attached (if any) to validate the Proposal
-		RcBuildHeight:          rcBuildHeight,                    // the root chain height when the block was built
+		RcBuildHeight:          b.RCBuildHeight,                  // the root chain height when the block was built
 	})
 }
 
@@ -405,6 +406,7 @@ func (b *BFT) StartPrecommitPhase() {
 			ProposerKey: b.ProposerKey,
 			Signature:   as,
 		},
+		RcBuildHeight: b.RCBuildHeight,
 	})
 }
 
@@ -428,6 +430,7 @@ func (b *BFT) StartPrecommitVotePhase() {
 	}
 	// `lock` on the proposal (only by satisfying the SAFE-NODE-PREDICATE or COMMIT can this node unlock)
 	b.HighQC = msg.Qc
+	b.RCBuildHeight = msg.RcBuildHeight
 	b.HighQC.Block = b.Block
 	b.HighQC.Results = b.Results
 	b.log.Infof("🔒 Locked on proposal %s", lib.BytesToTruncatedString(b.HighQC.BlockHash))
@@ -656,6 +659,7 @@ func (b *BFT) NewHeight(keepLocks ...bool) {
 		// reset PartialQCs
 		b.PartialQCs = make(PartialQCs)
 		b.HighQC = nil
+		b.RCBuildHeight = 0
 	}
 }
 
