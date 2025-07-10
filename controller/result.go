@@ -179,8 +179,6 @@ func (c *Controller) addPaymentPercent(toAdd *lib.LotteryWinner, results *lib.Ce
 // HandleSwaps() handles the 'buy' side of the sell orders
 func (c *Controller) HandleSwaps(fsm *fsm.StateMachine, blockResult *lib.BlockResult, results *lib.CertificateResult, rootChainHeight uint64) {
 	var orders *lib.OrderBook
-	// parse the last block for 'lock orders'
-	lockOrders := fsm.ParseLockOrders(blockResult)
 	// load the root chain id
 	rootChainId, err := fsm.GetRootChainId()
 	if err != nil {
@@ -209,7 +207,7 @@ func (c *Controller) HandleSwaps(fsm *fsm.StateMachine, blockResult *lib.BlockRe
 		return
 	}
 	// process the root chain order book against the state
-	closeOrders, resetOrders := fsm.ProcessRootChainOrderBook(orders, blockResult)
+	lockOrders, closeOrders, resetOrders := fsm.ProcessRootChainOrderBook(orders, blockResult)
 	// add the orders to the certificate result - truncating the 'lock orders' for defensive spam protection
 	results.Orders = &lib.Orders{
 		LockOrders:  lib.TruncateSlice(lockOrders, 1000),
