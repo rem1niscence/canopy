@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"fmt"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"slices"
@@ -14,6 +15,7 @@ func (s *StateMachine) HandleByzantine(qc *lib.QuorumCertificate, vs *lib.Valida
 	if vs == nil {
 		return
 	}
+	fmt.Println("GetVal Params")
 	// get the validator params
 	params, err := s.GetParamsVal()
 	if err != nil {
@@ -29,6 +31,7 @@ func (s *StateMachine) HandleByzantine(qc *lib.QuorumCertificate, vs *lib.Valida
 			return 0, err
 		}
 	}
+	fmt.Println("Get non signers")
 	// get those who did not sign this particular QC but should have
 	nonSignerPubKeys, nonSignerPercent, err := qc.GetNonSigners(vs.ValidatorSet)
 	if err != nil {

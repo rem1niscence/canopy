@@ -196,6 +196,7 @@ func (x *AggregateSignature) GetNonSigners(validatorList *ConsensusValidators) (
 		// exit with error
 		return
 	}
+	fmt.Println("got non signers: ", len(nonSignerPubKeys))
 	// set the non signer percent (Non Signer Power / Total Power)
 	nonSignerPercent = int(Uint64PercentageDiv(nonSignerPower, vs.TotalPower))
 	// exit
