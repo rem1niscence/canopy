@@ -368,6 +368,12 @@ func runAutoUpdate() {
 // main is the entry point of the application
 // It handles both manual and auto-update modes based on configuration
 func main() {
+	// check if start was called or just waken up for setup
+	if len(os.Args) < 2 || os.Args[1] != "start" {
+		log.Println("Set up complete! Now you can start!")
+		return
+	}
+
 	// Initialize data directory and configuration
 	err := os.MkdirAll(cli.DataDir, os.ModePerm)
 	if err != nil {
