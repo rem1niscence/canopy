@@ -118,11 +118,10 @@ func (b *BFT) Start() {
 		// RESET BFT
 		// - This triggers when receiving a new Commit Block (QC) from either root-chainId (a) or the Target-ChainId (b)
 		case resetBFT := <-b.ResetBFT:
+			var processTime time.Duration
 			func() {
 				b.Controller.Lock()
 				defer b.Controller.Unlock()
-				// calculate the process time
-				var processTime time.Duration
 				// calculate time since
 				since := time.Since(resetBFT.StartTime)
 				// allow if 'since' is less than 1 block old

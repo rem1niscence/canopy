@@ -64,7 +64,7 @@ func (c *Controller) ListenForBlock() {
 					newBlockPeers[senderPublicKey] = struct{}{}
 				}
 				// check if the node has fallen out of sync if at least a third of its peers has notified it
-				if float64(len(newBlockPeers)) >= float64(c.P2P.PeerCount())/float64(3) && !c.Consensus.SelfIsValidator() {
+				if float64(len(newBlockPeers)) >= float64(c.P2P.PeerCount())/float64(3) {
 					// reset map since syncing will start
 					newBlockPeers = make(map[string]struct{})
 					// log the 'out of sync' message
