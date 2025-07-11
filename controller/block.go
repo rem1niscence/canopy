@@ -370,9 +370,6 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 		// exit with error
 		return
 	}
-	exported, _ := c.FSM.ExportState()
-	state, _ := lib.MarshalJSONIndentString(exported)
-	c.log.Errorf("Before State:%d\n:%s", c.FSM.Height(), state)
 	// log the start of 'apply block'
 	c.log.Debugf("Applying block %s for height %d", candidateHash[:20], candidateHeight)
 	// apply the block against the state machine
@@ -381,9 +378,6 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 		// exit with error
 		return
 	}
-	exported, _ = c.FSM.ExportState()
-	state, _ = lib.MarshalJSONIndentString(exported)
-	c.log.Errorf("AFTER State:%d\n:%s", c.FSM.Height(), state)
 	// if any transactions failed
 	if len(failed) != 0 {
 		for _, f := range failed {
