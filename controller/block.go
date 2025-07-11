@@ -288,6 +288,9 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// send the certificate results transaction on behalf of the quorum
 		c.SendCertificateResultsTx(qc)
 	}
+	if blockResult.BlockHeader.Height == 3705 {
+		panic("exit")
+	}
 	// create an error group to run the commit and mempool update in parallel
 	eg := errgroup.Group{}
 	eg.Go(func() error {
