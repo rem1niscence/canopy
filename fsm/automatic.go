@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"fmt"
 	"github.com/canopy-network/canopy/lib"
 )
 
@@ -94,7 +93,6 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	if qc == nil || qc.Results == nil {
 		return lib.ErrNilCertResults()
 	}
-	fmt.Println("HandleCertificateResults()")
 	// ensure the committee isn't retired
 	retired, err := s.CommitteeIsRetired(qc.Header.ChainId)
 	if err != nil {
@@ -109,7 +107,6 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	if err != nil {
 		return err
 	}
-	fmt.Println("Got Committee Data")
 	// ensure the root height isn't too old
 	if qc.Header.RootHeight < data.LastRootHeightUpdated {
 		return lib.ErrInvalidQCRootChainHeight()
@@ -125,13 +122,11 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	if err = s.HandleCheckpoint(chainId, results); err != nil {
 		return err
 	}
-	fmt.Println("Handle Byzantine")
 	// handle byzantine evidence
 	nonSignerPercent, err := s.HandleByzantine(qc, committee)
 	if err != nil {
 		return err
 	}
-	fmt.Println("NonSignerPercentage: ", nonSignerPercent)
 	// reduce all payment percents proportional to the non-signer percent
 	for i, p := range results.RewardRecipients.PaymentPercents {
 		results.RewardRecipients.PaymentPercents[i].Percent = lib.Uint64ReducePercentage(p.Percent, uint64(nonSignerPercent))
