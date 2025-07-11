@@ -1,7 +1,6 @@
 package fsm
 
 import (
-	"fmt"
 	"github.com/canopy-network/canopy/lib"
 )
 
@@ -26,8 +25,6 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	if err != nil {
 		return err
 	}
-	j, _ := lib.MarshalJSONIndentString(lastCertificate)
-	fmt.Printf("LAST CERTIFICATE AT HEIGHT %d:\n%s", s.Height()-1, j)
 	// load the root chain id at the certificate height
 	rootChainId, err := s.LoadRootChainId(s.Height() - 1)
 	if err != nil {
@@ -45,10 +42,6 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 	committee, err := s.LoadCommittee(s.Config.ChainId, s.Height()-1)
 	if err != nil {
 		return err
-	}
-	for i, val := range committee.ValidatorSet.ValidatorSet {
-		j, _ := lib.MarshalJSONIndentString(val)
-		fmt.Printf("VAL %d:\n%s", i, j)
 	}
 	return s.HandleCertificateResults(lastCertificate, &committee)
 }
