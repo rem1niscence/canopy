@@ -169,7 +169,7 @@ func (r *RCManager) GetOrders(rootChainId, rootHeight, id uint64) (*lib.OrderBoo
 		return sub.Info.Orders, nil
 	}
 	// warn of the remote RPC call to the root chain API
-	r.log.Warnf("Executing remote GetOrders call with requested height=%d for rootChainId=%d", rootHeight, rootChainId)
+	r.log.Warnf("Executing remote GetOrders call with requested height=%d for rootChainId=%d with latest root height at %d", rootHeight, rootChainId, sub.Info.Height)
 	// execute the remote call
 	books, err := sub.Orders(rootHeight, id)
 	// if an error occurred during the remote call

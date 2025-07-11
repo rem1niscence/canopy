@@ -244,7 +244,7 @@ func (b *BFT) StartElectionVotePhase() {
 	// get the candidates from messages received
 	candidates := b.GetElectionCandidates()
 	if len(candidates) == 0 {
-		b.log.Info("No election candidates, falling back to weighted pseudorandom")
+		b.log.Warn("No election candidates, falling back to weighted pseudorandom")
 	}
 	// select Proposer (set is required for self-send)
 	b.ProposerKey = SelectProposerFromCandidates(candidates, b.SortitionData, b.ValidatorSet.ValidatorSet)
@@ -606,17 +606,13 @@ func (b *BFT) CheckProposerAndProposal(msg *Message) (interrupt bool) {
 // NewRound() initializes the VoteSet and Proposals cache for the next round
 // - increments the round count if not NewHeight (goes to Round 0)
 func (b *BFT) NewRound(newHeight bool) {
-	// if starting a new height
 	if newHeight {
-		// reset round
 		b.Round = 0
 	} else {
-		// increment round
 		b.Round++
 		// defensive: clear byzantine evidence
 		b.ByzantineEvidence = &ByzantineEvidence{DSE: DoubleSignEvidences{}}
 	}
-	// update the cached root chain info
 	b.RefreshRootChainInfo()
 	// reset ProposerKey, Proposal, and Sortition data
 	b.ProposerKey = nil
@@ -627,9 +623,8 @@ func (b *BFT) NewRound(newHeight bool) {
 // RefreshRootChainInfo() updates the cached root chain info with the latest known
 func (b *BFT) RefreshRootChainInfo() {
 	var err lib.ErrorI
-	// update height
+	// update heights
 	b.Height = b.Controller.ChainHeight()
-	// update root height
 	b.RootHeight = b.Controller.RootChainHeight()
 	// update the validator set
 	b.ValidatorSet, err = b.Controller.LoadCommittee(b.LoadRootChainId(b.Height), b.RootHeight)

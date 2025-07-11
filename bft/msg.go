@@ -33,10 +33,10 @@ func (b *BFT) HandleMessage(message proto.Message) lib.ErrorI {
 			return b.AddVote(msg)
 		case msg.IsProposerMessage(): // consensus message from the Leader
 			// validate the Leader message
-			partialQC, e := b.CheckProposerMessage(msg, params)
-			if e != nil {
+			partialQC, err := b.CheckProposerMessage(msg, params)
+			if err != nil {
 				b.log.Errorf("Received invalid proposal from %s", lib.BytesToString(msg.Signature.PublicKey))
-				return e
+				return err
 			}
 			b.log.Debugf("Received %s message from proposer: %s", msg.Header.ToString(), lib.BytesToTruncatedString(msg.Signature.PublicKey))
 			// store partial QCs as they may be indicative of byzantine behavior
@@ -53,8 +53,6 @@ func (b *BFT) HandleMessage(message proto.Message) lib.ErrorI {
 
 // CheckProposerMessage() validates an inbound message from the Leader Validator
 func (b *BFT) CheckProposerMessage(x *Message, p *validateMessageParams) (isPartialQC bool, err lib.ErrorI) {
-	// store a variable to capture the validator set in-case it's replaced by an unexpected root height
-	var vals = p.vals
 	// basic sanity checks on the message
 	if err = x.checkBasic(p.view); err != nil {
 		return false, err
@@ -76,6 +74,7 @@ func (b *BFT) CheckProposerMessage(x *Message, p *validateMessageParams) (isPart
 		return
 	}
 	// PROPOSE, PRECOMMIT, COMMIT
+	var vals = p.vals
 	// any message from the Leader after the ELECTION phase contains a justification (Quorum Certificate)
 	// sanity check the Quorum Certificate
 	if err = x.Qc.CheckBasic(); err != nil {
@@ -274,27 +273,22 @@ func (x *Message) checkBasic(view *lib.View) lib.ErrorI {
 func (b *BFT) GetValidateMessageParams(msg *Message) (*validateMessageParams, lib.ErrorI) {
 	// lock the controller for thread safety
 	b.Controller.Lock()
+	defer b.Controller.Unlock()
 	// check if a validator
-	valSet := b.ValidatorSet
-	_, err := valSet.GetValidator(msg.Signature.PublicKey)
+	if _, err := b.ValidatorSet.GetValidator(msg.Signature.PublicKey); err != nil {
+		return nil, err
+	}
 	// get variables needed to validate the messages
 	var blockHash, resultsHash []byte
 	if b.Block != nil {
 		blockHash, resultsHash = b.GetBlockHash(), b.Results.Hash()
 	}
-	view, rHeight, height, cHeightUpdated := b.View.Copy(), b.RootHeight, b.Height, b.CommitteeData.LastChainHeightUpdated
-	// unlock the controller for thread safety
-	b.Controller.Unlock()
-	if err != nil {
-		return nil, err
-	}
-	// return the params
 	return &validateMessageParams{
-		view:           view,
-		vals:           valSet,
-		rootHeight:     rHeight,
-		height:         height,
-		cHeightUpdated: cHeightUpdated,
+		view:           b.View.Copy(),
+		vals:           b.ValidatorSet,
+		rootHeight:     b.RootHeight,
+		height:         b.Height,
+		cHeightUpdated: b.CommitteeData.LastChainHeightUpdated,
 		blockHash:      blockHash,
 		resultsHash:    resultsHash,
 	}, nil

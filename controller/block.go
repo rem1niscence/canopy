@@ -29,7 +29,6 @@ func (c *Controller) ListenForBlock() {
 		var quit bool
 		// wrap in a function call to use 'defer' functionality
 		func() {
-			// log the beginning of handling the block message
 			c.log.Debug("Handling block message")
 			// lock the controller to prevent multi-thread conflicts
 			c.Lock()
@@ -83,7 +82,6 @@ func (c *Controller) ListenForBlock() {
 				// exit iteration
 				return
 			}
-
 			// if not syncing - gossip the block
 			if !c.Syncing().Load() {
 				// gossip the block to our peers
