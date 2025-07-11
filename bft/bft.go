@@ -607,7 +607,6 @@ func (b *BFT) CheckProposerAndProposal(msg *Message) (interrupt bool) {
 // NewRound() initializes the VoteSet and Proposals cache for the next round
 // - increments the round count if not NewHeight (goes to Round 0)
 func (b *BFT) NewRound(newHeight bool) {
-	var err lib.ErrorI
 	// if starting a new height
 	if newHeight {
 		// reset round
@@ -618,6 +617,17 @@ func (b *BFT) NewRound(newHeight bool) {
 		// defensive: clear byzantine evidence
 		b.ByzantineEvidence = &ByzantineEvidence{DSE: DoubleSignEvidences{}}
 	}
+	// update the cached root chain info
+	b.RefreshRootChainInfo()
+	// reset ProposerKey, Proposal, and Sortition data
+	b.ProposerKey = nil
+	b.Block, b.BlockHash, b.Results = nil, nil, nil
+	b.SortitionData = nil
+}
+
+// RefreshRootChainInfo() updates the cached root chain info with the latest known
+func (b *BFT) RefreshRootChainInfo() {
+	var err lib.ErrorI
 	// update height
 	b.Height = b.Controller.ChainHeight()
 	// update root height
@@ -632,10 +642,6 @@ func (b *BFT) NewRound(newHeight bool) {
 	if err != nil {
 		b.log.Errorf("LoadCommitteeData() failed with err: %s", err.Error())
 	}
-	// reset ProposerKey, Proposal, and Sortition data
-	b.ProposerKey = nil
-	b.Block, b.BlockHash, b.Results = nil, nil, nil
-	b.SortitionData = nil
 }
 
 // NewHeight() initializes / resets consensus variables preparing for the NewHeight
@@ -798,6 +804,16 @@ func (b *BFT) IsProposer(id []byte) bool { return bytes.Equal(id, b.ProposerKey)
 // SelfIsValidator() returns true if this node is part of the ValSet
 func (b *BFT) SelfIsValidator() bool {
 	selfValidator, _ := b.ValidatorSet.GetValidator(b.PublicKey)
+	// if not a validator
+	if selfValidator == nil {
+		// defensively check to make sure there wasn't a race between
+		// NEW_HEIGHT and NEW_COMMITTEE, worst case is extra consensus
+		// participation
+		b.RefreshRootChainInfo()
+		// double check
+		selfValidator, _ = b.ValidatorSet.GetValidator(b.PublicKey)
+	}
+	// return 'self is validator'
 	return selfValidator != nil
 }
 
