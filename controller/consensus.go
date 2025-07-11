@@ -408,6 +408,7 @@ func (c *Controller) ListenForBlockRequests() {
 func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable) {
 	// log the initialization of the send process
 	c.log.Debugf("Sending to %d replicas", replicas.NumValidators)
+	// sign the consensus message
 	if err := msg.Sign(c.PrivateKey); err != nil {
 		// log the error
 		c.log.Error(err.Error())
@@ -418,7 +419,11 @@ func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 	for _, replica := range replicas.ValidatorSet.ValidatorSet {
 		// check if replica is self
 		if bytes.Equal(replica.PublicKey, c.PublicKey) {
-			continue
+			// send the message to self using internal routing
+			if err := c.P2P.SelfSend(c.PublicKey, Cons, msg); err != nil {
+				// log the error
+				c.log.Error(err.Error())
+			}
 		} else {
 			// if not self, send directly to peer using P2P
 			if err := c.P2P.SendTo(replica.PublicKey, Cons, msg); err != nil {
@@ -426,11 +431,6 @@ func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 				c.log.Warn(err.Error())
 			}
 		}
-	}
-	// send the message to self using internal routing
-	if err := c.P2P.SelfSend(c.PublicKey, Cons, msg); err != nil {
-		// log the error
-		c.log.Error(err.Error())
 	}
 }
 

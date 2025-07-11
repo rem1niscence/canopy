@@ -198,7 +198,7 @@ func (c *Controller) ValidateProposal(rcBuildHeight uint64, qc *lib.QuorumCertif
 	// configure the FSM in 'consensus mode' for validator proposals
 	resetProposalConfig := c.SetFSMInConsensusModeForProposals()
 	// once done proposing, 'reset' the proposal mode back to default to 'accept all'
-	defer func() { resetProposalConfig() }()
+	defer resetProposalConfig()
 	// ensure the proposal inside the quorum certificate is valid at a stateless level
 	block, err := qc.CheckProposalBasic(c.FSM.Height(), c.Config.NetworkID, c.Config.ChainId)
 	if err != nil {
@@ -217,7 +217,7 @@ func (c *Controller) ValidateProposal(rcBuildHeight uint64, qc *lib.QuorumCertif
 		return
 	}
 	// create a comparable certificate results (includes reward recipients, slash recipients, swap commands, etc)
-	compareResults := c.NewCertificateResults(rcBuildHeight, c.FSM, block, blockResult, evidence)
+	compareResults := c.NewCertificateResults(c.FSM, block, blockResult, evidence, rcBuildHeight)
 	// ensure generated the same results
 	if !qc.Results.Equals(compareResults) {
 		// exit with error
@@ -240,14 +240,16 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	c.Mempool.stop()
 	// lock the mempool
 	c.Mempool.L.Lock()
-	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
-	defer func() { c.FSM.Reset(); c.Mempool.L.Unlock() }()
+	defer c.Mempool.L.Unlock()
 	// log the beginning of the commit
 	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.ResultsHash))
 	// cast the store to ensure the proper store type to complete this operation
 	storeI := c.FSM.Store().(lib.StoreI)
+	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
+	defer c.FSM.Reset()
 	// if the block result isn't 'pre-calculated'
 	if blockResult == nil {
+		// reset the FSM to ensure stale proposal validations don't come into play
 		c.FSM.Reset()
 		// apply the block against the state machine
 		blockResult, err = c.ApplyAndValidateBlock(block, true)
@@ -299,15 +301,11 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// log to signal finishing the commit
 		c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToTruncatedString(qc.BlockHash), block.BlockHeader.Height)
 		// set up the finite state machine for the next height
-		newFSM, err := fsm.New(c.Config, storeI, c.Metrics, c.log)
+		c.FSM, err = fsm.New(c.Config, storeI, c.Metrics, c.log)
 		if err != nil {
 			// exit with error
 			return err
 		}
-		// set the current fsm cache to the new fsm
-		newFSM.SetCacheFromFSM(c.FSM)
-		// set the new FSM in the controller
-		c.FSM = newFSM
 		// publish the root chain info to the nested chain subscribers
 		for _, id := range c.RCManager.ChainIds() {
 			// get the root chain info
@@ -326,14 +324,12 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		return nil
 	})
 	eg.Go(func() error {
-		// create an ephemeral FSM with the increased version
-		newFSM, err := fsm.New(c.Config, memPoolStore, c.Metrics, c.log)
+		// set up the mempool for the next height with the temporary FSM
+		c.Mempool.FSM, err = fsm.New(c.Config, memPoolStore, c.Metrics, c.log)
 		if err != nil {
 			// exit with error
 			return err
 		}
-		// set up the mempool for the next height with the temporary FSM
-		c.Mempool.FSM = newFSM
 		// check the mempool to cache a proposal block and validate the mempool itself
 		c.Mempool.CheckMempool()
 		// discard the temporary store after checking the mempool
@@ -342,8 +338,8 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		return nil
 	})
 	// check for any errors while committing and checking the mempool
-	if err := eg.Wait(); err != nil {
-		return err.(lib.ErrorI)
+	if e := eg.Wait(); e != nil {
+		return e.(lib.ErrorI)
 	}
 	// set up the mempool with the actual new FSM for the next height
 	// this makes c.Mempool.FSM.Reset() is unnecessary
@@ -379,7 +375,6 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 	// if any transactions failed
 	if len(failed) != 0 {
 		for _, f := range failed {
-			// log the error
 			c.log.Errorf("From: %s\nType:%s\nErr:%s", f.Address, f.Transaction.MessageType, f.Error.Error())
 		}
 		return nil, lib.ErrFailedTransactions()
@@ -392,13 +387,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, commit bool) (b *li
 	}
 	// use the hash to compare two block headers for equality
 	if !bytes.Equal(compareHash, candidate.Hash) {
-		cand, _ := lib.MarshalJSONIndentString(candidate)
-		comp, _ := lib.MarshalJSONIndentString(compare)
-		exported, _ := c.FSM.ExportState()
-		state, _ := lib.MarshalJSONIndentString(exported)
-		c.log.Errorf("Candidate:\n:%s", cand)
-		c.log.Errorf("Compare:\n:%s", comp)
-		c.log.Errorf("State:\n:%s", state)
+		c.debugDumpHeaderDiff(candidate, compare)
 		return nil, lib.ErrUnequalBlockHash()
 	}
 	// validate VDF if committing randomly since this randomness is pseudo-non-deterministic (among nodes)
@@ -478,16 +467,14 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 		// exit with error
 		return nil, err
 	}
-	// create a variable to store the cached result (if applicable)
-	var cachedResult *lib.BlockResult
 	// create a temp variable to double-check our saved block result against the peers
-	saved := c.Consensus.BlockResult
+	result := c.Consensus.BlockResult
 	// if our cached result is the same as the peer block, use that
-	if saved != nil && saved.BlockHeader != nil && bytes.Equal(saved.BlockHeader.Hash, block.BlockHeader.Hash) {
-		cachedResult = saved
+	if result == nil || result.BlockHeader == nil || !bytes.Equal(result.BlockHeader.Hash, block.BlockHeader.Hash) {
+		result = nil
 	}
 	// attempts to commit the QC to persistence of chain by playing it against the state machine
-	if err = c.CommitCertificate(qc, block, cachedResult); err != nil {
+	if err = c.CommitCertificate(qc, block, result); err != nil {
 		// exit with error
 		return nil, err
 	}
@@ -582,4 +569,15 @@ func (c *Controller) UpdateTelemetry(qc *lib.QuorumCertificate, block *lib.Block
 	if a, _ := c.FSM.GetAccount(address); a.Amount != 0 {
 		c.Metrics.UpdateAccount(address.String(), a.Amount)
 	}
+}
+
+// debugDumpHeaderDiff() logs the differences between the candidate and the constructed
+func (c *Controller) debugDumpHeaderDiff(candidate, compare *lib.BlockHeader) {
+	cand, _ := lib.MarshalJSONIndentString(candidate)
+	comp, _ := lib.MarshalJSONIndentString(compare)
+	exported, _ := c.FSM.ExportState()
+	state, _ := lib.MarshalJSONIndentString(exported)
+	c.log.Errorf("Candidate:\n:%s", cand)
+	c.log.Errorf("Compare:\n:%s", comp)
+	c.log.Errorf("State:\n:%s", state)
 }

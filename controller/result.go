@@ -12,7 +12,9 @@ import (
 /* This file implements the 'Certificate Result' logic which ensures the */
 
 // NewCertificateResults() creates a structure to hold the results of the certificate produced by a quorum in consensus
-func (c *Controller) NewCertificateResults(rcBuildHeight uint64, fsm *fsm.StateMachine, block *lib.Block, blockResult *lib.BlockResult, evidence *bft.ByzantineEvidence) (results *lib.CertificateResult) {
+func (c *Controller) NewCertificateResults(
+	fsm *fsm.StateMachine, block *lib.Block, blockResult *lib.BlockResult,
+	evidence *bft.ByzantineEvidence, rcBuildHeight uint64) (results *lib.CertificateResult) {
 	// calculate reward recipients, creating a 'certificate results' object reference in the process
 	results = c.CalculateRewardRecipients(fsm, block.BlockHeader.ProposerAddress, rcBuildHeight)
 	// handle swaps

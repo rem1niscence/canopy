@@ -605,9 +605,6 @@ func (s *StateMachine) TxnWrap() (lib.StoreI, lib.ErrorI) {
 	return txn, nil
 }
 
-// SetCacheFromFSM() sets the cache of the current state machine from another state machine
-func (s *StateMachine) SetCacheFromFSM(fsm *StateMachine) { s.cache = fsm.cache }
-
 // catchPanic() acts as a failsafe, recovering from a panic and logging the error with the stack trace
 func (s *StateMachine) catchPanic() {
 	if r := recover(); r != nil {

@@ -97,23 +97,16 @@ func (c *Controller) CheckMempool() {
 	for {
 		// keep a list of transaction needing to be gossipped
 		var toGossip [][]byte
-		// lock the controller for thread safety
-		c.Mempool.L.Lock()
 		// if recheck is necessary
 		if c.Mempool.recheck.Load() {
 			// execute in a function call to allow defer
 			func() {
-				// check if self is validator
-				c.Lock()
-				selfIsValidator := c.Consensus.SelfIsValidator()
-				c.Unlock()
-				// if a validator, be strict on proposals
-				if selfIsValidator {
-					// configure the FSM in 'consensus mode' for validator proposals
-					resetProposalConfig := c.SetFSMInConsensusModeForProposals()
-					// once done proposing, 'reset' the proposal mode back to default to 'accept all'
-					defer func() { resetProposalConfig() }()
-				}
+				c.Mempool.L.Lock()
+				defer c.Mempool.L.Unlock()
+				// be mempool strict on proposals
+				resetProposalConfig := c.SetFSMInConsensusModeForProposals()
+				// once done proposing, 'reset' the proposal mode back to default to 'accept all'
+				defer func() { resetProposalConfig() }()
 				// reset the mempool
 				c.Mempool.FSM.Reset()
 				// check the mempool to cache a proposal block and validate the mempool itself
@@ -124,8 +117,6 @@ func (c *Controller) CheckMempool() {
 				c.Mempool.recheck.Store(false)
 			}()
 		}
-		// unlock the controller
-		c.Mempool.L.Unlock()
 		// for each transaction to gossip
 		var dedupedTxs [][]byte
 		for _, tx := range toGossip {
@@ -236,11 +227,7 @@ func (m *Mempool) CheckMempool() {
 	// apply the block against the state machine and populate the resulting merkle `roots` in the block header
 	block.BlockHeader, blockResult.Transactions, oversized, failed, err = m.FSM.ApplyBlock(ctx, block, true)
 	if err != nil {
-		if err.Error() != lib.ErrMempoolStopSignal().Error() {
-			m.log.Errorf("Check Mempool error: %s", err.Error())
-		} else {
-			m.log.Debugf("Check Mempool stopped %s", err.Error())
-		}
+		m.log.Warnf("Check Mempool error: %s", err.Error())
 		return
 	}
 	// set the block result block header
@@ -260,7 +247,7 @@ func (m *Mempool) CheckMempool() {
 	m.cachedProposal.Store(&CachedProposal{
 		Block:         block,
 		BlockResult:   blockResult,
-		CertResults:   m.controller.NewCertificateResults(rcBuildHeight, m.FSM, block, blockResult, &bft.ByzantineEvidence{DSE: bft.DoubleSignEvidences{}}),
+		CertResults:   m.controller.NewCertificateResults(m.FSM, block, blockResult, &bft.ByzantineEvidence{DSE: bft.DoubleSignEvidences{}}, rcBuildHeight),
 		rcBuildHeight: rcBuildHeight,
 	})
 	// create a cache of failed tx bytes to evict from the mempool
