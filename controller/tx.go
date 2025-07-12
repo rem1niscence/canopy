@@ -211,6 +211,7 @@ func (m *Mempool) HandleTransactions(tx ...[]byte) (err lib.ErrorI) {
 
 // CheckMempool() Checks each transaction in the mempool and caches a block proposal
 func (m *Mempool) CheckMempool() {
+	m.log.Info("Validating mempool and caching a new proposal block")
 	var err lib.ErrorI
 	// check if a validator
 	// create the actual block structure with the maximum amount of transactions allowed or available in the mempool
@@ -278,6 +279,7 @@ func (m *Mempool) CheckMempool() {
 		result.Index = uint64(len(m.cachedResults))
 		m.cachedResults = append(m.cachedResults, result)
 	}
+	m.log.Info("Done checking mempool")
 	// update the mempool metrics
 	m.metrics.UpdateMempoolMetrics(m.Mempool.TxCount(), m.Mempool.TxsBytes())
 }
