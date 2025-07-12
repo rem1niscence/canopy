@@ -20,6 +20,7 @@ func TestFuzzMultiSet(t *testing.T) {
 	// create a new SMT
 	smt1, memStore := NewTestSMT(t, nil, nil, 160)
 	unsortedOps := make(map[uint64]valueOp)
+	unsortedOps2 := make(map[uint64]valueOp)
 	// close the store when done
 	defer memStore.Close()
 	// create a compare SMT
@@ -35,8 +36,8 @@ func TestFuzzMultiSet(t *testing.T) {
 		// 50% of the time do a set
 		if mathrand.Intn(2) == 0 {
 			keys = append(keys, random)
-			require.NoError(t, smt2.Set(random, random))
 			unsortedOps[lib.MemHash(random)] = valueOp{key: random, value: random, op: opSet}
+			unsortedOps2[lib.MemHash(random)] = valueOp{key: random, value: random, op: opSet}
 		} else {
 			toDelete := random
 			if mathrand.Intn(2) == 0 {
@@ -49,11 +50,11 @@ func TestFuzzMultiSet(t *testing.T) {
 				}
 			}
 			// 50% of the time do a delete
-			require.NoError(t, smt2.Delete(toDelete))
 			unsortedOps[lib.MemHash(toDelete)] = valueOp{key: toDelete, op: opDelete}
+			unsortedOps2[lib.MemHash(toDelete)] = valueOp{key: toDelete, op: opDelete}
 		}
 		// for smt 2 commit everytime
-		require.NoError(t, smt2.Commit())
+		require.NoError(t, smt2.Commit(unsortedOps2))
 	}
 	// commit smt 1
 	require.NoError(t, smt1.CommitParallel(unsortedOps))
@@ -534,9 +535,10 @@ func TestSet(t *testing.T) {
 				// close the store when done
 				defer memStore.Close()
 				// execute the traversal code
-				require.NoError(t, smt.Set(test.targetKey, test.targetValue))
+				unsortedOps := map[uint64]valueOp{}
+				unsortedOps[lib.MemHash(test.targetKey)] = valueOp{key: test.targetKey, value: test.targetValue, op: opSet}
 				// commit the set
-				require.NoError(t, smt.Commit())
+				require.NoError(t, smt.Commit(unsortedOps))
 				// create an iterator to check out the values of the store
 				it, err := memStore.Iterator(nil)
 				require.NoError(t, err)
@@ -862,10 +864,10 @@ func TestDelete(t *testing.T) {
 				smt, memStore := NewTestSMT(t, test.preset, nil, test.keyBitSize)
 				// close the store when done
 				defer memStore.Close()
-				// execute the traversal code
-				require.NoError(t, smt.Delete(test.targetKey))
+				unsortedOps := map[uint64]valueOp{}
+				unsortedOps[lib.MemHash(test.targetKey)] = valueOp{key: test.targetKey, op: opSet}
 				// commit the result
-				require.NoError(t, smt.Commit())
+				require.NoError(t, smt.Commit(unsortedOps))
 				// create an iterator to check out the values of the store
 				it, err := memStore.Iterator(nil)
 				require.NoError(t, err)

@@ -172,32 +172,21 @@ func NewSMT(rootKey []byte, keyBitLen int, store lib.RWStoreI) (smt *SMT) {
 // Root() returns the root value of the smt
 func (s *SMT) Root() []byte { return bytes.Clone(s.root.Value) }
 
-// Set: insert or update a target
-func (s *SMT) Set(k, v []byte) (err lib.ErrorI) {
-	// calculate the key and value to upsert
-	n := &node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), Node: lib.Node{Value: crypto.Hash(v)}}
-	// check to make sure the target is valid
-	if err = s.validateTarget(n); err != nil {
-		return err
+// Commit() DEPRECATED: executes deferred operations in order (left-to-right),
+// minimizing the amount of traversals, IOPS, and hash operations over the master tree
+// this is the sequential alternative to 'commit parallel'
+func (s *SMT) Commit(unsortedOps map[uint64]valueOp) (err lib.ErrorI) {
+	s.operations = make([]*node, 0, len(unsortedOps))
+	// insert all unsorted operations into the slice
+	for _, operation := range unsortedOps {
+		s.operations = append(s.operations, s.valueOpToSMTNode(operation))
 	}
-	// set the node in the deferred list
-	s.addOperation(n)
-	// exit
-	return
-}
-
-// Delete: removes a target node if exists in the tree
-func (s *SMT) Delete(k []byte) (err lib.ErrorI) {
-	// calculate the key and value to upsert
-	n := &node{Key: newNodeKey(crypto.Hash(k), s.keyBitLength), delete: true}
-	// check to make sure the target is valid
-	if err = s.validateTarget(n); err != nil {
-		return
-	}
-	// set the node in the deferred list
-	s.addOperation(n)
-	// exit
-	return
+	// sort the operations
+	sort.Slice(s.operations, func(i, j int) bool {
+		return s.operations[i].Key.cmp(s.operations[j].Key) < 0
+	})
+	// execute in a single tree
+	return s.commit(false)
 }
 
 // CommitParallel(): sorts the operations in 8 subtree threads, executes those threads in parallel and combines them into the master tree
@@ -243,14 +232,6 @@ func (s *SMT) CommitParallel(unsortedOps map[uint64]valueOp) (err lib.ErrorI) {
 		}
 	}
 	return cleanup()
-}
-
-// Commit() DEPRECATED: executes deferred operations in order (left-to-right),
-// minimizing the amount of traversals, IOPS, and hash operations over the master tree
-// this is the sequential alternative to 'commit parallel'
-func (s *SMT) Commit() (err lib.ErrorI) {
-	s.sortOperations()
-	return s.commit(false)
 }
 
 // commit(): executes the deferred operations in order (left-to-right),
@@ -411,21 +392,6 @@ func (s *SMT) rehash() (err lib.ErrorI) {
 // addOperation() adds a deferred operation to the sorted list
 func (s *SMT) addOperation(n *node) { s.unsortedOps[string(n.Key.bytes())] = n }
 
-// sortOperations() sorts the operations
-func (s *SMT) sortOperations() {
-	s.operations = make([]*node, len(s.unsortedOps))
-	// insert all unsorted operations into the slice
-	i := 0
-	for _, n := range s.unsortedOps {
-		s.operations[i] = n
-		i++
-	}
-	// sort the operations
-	sort.Slice(s.operations, func(i, j int) bool {
-		return s.operations[i].Key.cmp(s.operations[j].Key) < 0
-	})
-}
-
 // initializeTree() ensures the tree always has a root with two children
 // this allows the logic to be without root edge cases for insert and delete
 func (s *SMT) initializeTree(rootKey *key) {
@@ -562,12 +528,7 @@ func (s *SMT) sortOperationsByPrefix(unsortedOps map[uint64]valueOp) (groups [8]
 	// for each unsorted operation
 	for _, operation := range unsortedOps {
 		// set up the new node as a 'delete'
-		n := &node{Key: newNodeKey(crypto.Hash(operation.key), s.keyBitLength), Node: lib.Node{}, delete: true}
-		// if the operation is not a 'delete'
-		if operation.op != opDelete && !entryIsDelete(operation.entry) {
-			// set the value as the hash of the op.value and set 'delete' to false
-			n.Node.Value, n.delete = crypto.Hash(operation.value), false
-		}
+		n := s.valueOpToSMTNode(operation)
 		// check to make sure the target is valid
 		if err = s.validateTarget(n); err != nil {
 			return
@@ -592,6 +553,18 @@ func (s *SMT) generatePrefixRange(prefix uint8, bitCount int) (*key, *key) {
 	low := append([]byte{base}, make([]byte, 19)...)
 	high := append([]byte{base | 0x1F}, bytes.Repeat([]byte{0xFF}, 19)...)
 	return newNodeKey(low, bitCount), newNodeKey(high, bitCount)
+}
+
+// valueOpToSMTNode() converts a txn value operation into an SMT node
+func (s *SMT) valueOpToSMTNode(operation valueOp) *node {
+	// set up the new node as a 'delete'
+	n := &node{Key: newNodeKey(crypto.Hash(operation.key), s.keyBitLength), Node: lib.Node{}, delete: true}
+	// if the operation is not a 'delete'
+	if operation.op != opDelete && !entryIsDelete(operation.entry) {
+		// set the value as the hash of the op.value and set 'delete' to false
+		n.Node.Value, n.delete = crypto.Hash(operation.value), false
+	}
+	return n
 }
 
 // reset() resets data for each operation
