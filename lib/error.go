@@ -159,6 +159,9 @@ const (
 	CodeInvalidBuyerSendAddress         ErrorCode = 60
 	CodeDuplicateCloseOrder             ErrorCode = 61
 	CodeDuplicateResetOrder             ErrorCode = 62
+	CodeMismatchCertHeight              ErrorCode = 63
+	CodeNewHeight                       ErrorCode = 64
+	CodeWrongViewHeight                 ErrorCode = 65
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"
@@ -438,16 +441,24 @@ func ErrNoValidators() ErrorI {
 	return NewError(CodeNoValidators, MainModule, fmt.Sprintf("there are no validators in the set"))
 }
 
-func ErrWrongCertHeight() ErrorI {
-	return NewError(CodeWrongHeight, ConsensusModule, "wrong certificate height")
+func ErrWrongCertHeight(got, wanted uint64) ErrorI {
+	return NewError(CodeWrongHeight, ConsensusModule, fmt.Sprintf("wrong certificate height, got=%d | wanted=%d", got, wanted))
 }
 
-func ErrWrongBlockHeight() ErrorI {
-	return NewError(CodeWrongBlockHeight, ConsensusModule, "wrong block height")
+func ErrWrongViewHeight(got, wanted uint64) ErrorI {
+	return NewError(CodeWrongViewHeight, ConsensusModule, fmt.Sprintf("wrong view height, got=%d | wanted=%d", got, wanted))
+}
+
+func ErrMismatchCertBlockHeight(got, wanted uint64) ErrorI {
+	return NewError(CodeMismatchCertHeight, ConsensusModule, fmt.Sprintf("mismatch certificate height, got=%d | wanted=%d", got, wanted))
+}
+
+func ErrWrongBlockHeight(got, wanted uint64) ErrorI {
+	return NewError(CodeWrongBlockHeight, ConsensusModule, fmt.Sprintf("wrong block height, got=%d | wanted=%d", got, wanted))
 }
 
 func ErrNewHeight() ErrorI {
-	return NewError(CodeWrongHeight, ConsensusModule, "new height")
+	return NewError(CodeNewHeight, ConsensusModule, "new height")
 }
 
 func ErrWrongRootHeight() ErrorI {

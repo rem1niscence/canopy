@@ -430,7 +430,7 @@ func (x *View) Check(view *View, enforceHeights bool) ErrorI {
 	// if enforcing heights, ensure the chain height is correct
 	if enforceHeights && x.Height != view.Height {
 		// exit with wrong height error
-		return ErrWrongCertHeight()
+		return ErrWrongViewHeight(x.Height, view.Height)
 	}
 	// if enforcing heights, ensure root height is correct
 	if enforceHeights && x.RootHeight != view.RootHeight {
