@@ -18,7 +18,7 @@ func (b *BFT) ValidateByzantineEvidence(slashRecipients *lib.SlashRecipients, be
 	if slashRecipients == nil {
 		return nil
 	}
-	if slashRecipients.DoubleSigners != nil {
+	if len(slashRecipients.DoubleSigners) != 0 {
 		// locally generate a Double Signers list from the provided evidence
 		doubleSigners, err := b.ProcessDSE(be.DSE.Evidence...)
 		if err != nil {

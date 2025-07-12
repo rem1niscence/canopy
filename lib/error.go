@@ -98,7 +98,7 @@ const (
 
 	// Consensus Module Error Codes
 	CodeDuplicateTransaction            ErrorCode = 1
-	CodeTxFoundInMempool                ErrorCode = 2
+	CodeWrongHighQCHeight               ErrorCode = 2
 	CodeMismatchResultsHash             ErrorCode = 3
 	CodeDuplicateProposerMessage        ErrorCode = 4
 	CodeDuplicateVote                   ErrorCode = 5
@@ -108,7 +108,7 @@ const (
 	CodeUnknownConsensusMessage         ErrorCode = 9
 	CodeValidatorNotInSet               ErrorCode = 10
 	CodeWrongHeight                     ErrorCode = 11
-	CodeOutOfSync                       ErrorCode = 12
+	CodeWrongBlockHeight                ErrorCode = 12
 	CodeWrongPhase                      ErrorCode = 13
 	CodePartialSignatureEmpty           ErrorCode = 14
 	CodeInvalidPartialSignature         ErrorCode = 15
@@ -438,8 +438,12 @@ func ErrNoValidators() ErrorI {
 	return NewError(CodeNoValidators, MainModule, fmt.Sprintf("there are no validators in the set"))
 }
 
-func ErrWrongHeight() ErrorI {
-	return NewError(CodeWrongHeight, ConsensusModule, "wrong height")
+func ErrWrongCertHeight() ErrorI {
+	return NewError(CodeWrongHeight, ConsensusModule, "wrong certificate height")
+}
+
+func ErrWrongBlockHeight() ErrorI {
+	return NewError(CodeWrongBlockHeight, ConsensusModule, "wrong block height")
 }
 
 func ErrNewHeight() ErrorI {
@@ -464,10 +468,6 @@ func ErrInvalidRCBuildHeight() ErrorI {
 
 func ErrEmptyView() ErrorI {
 	return NewError(CodeEmptyView, ConsensusModule, "empty view")
-}
-
-func ErrOutOfSync() ErrorI {
-	return NewError(CodeOutOfSync, ConsensusModule, "out of sync")
 }
 
 func ErrWrongPhase() ErrorI {
@@ -586,8 +586,8 @@ func ErrInvalidNetAddress(s string) ErrorI {
 	return NewError(CodeInvalidNetAddress, P2PModule, fmt.Sprintf("invalid net address host and port: %s", s))
 }
 
-func ErrTxFoundInMempool(hash string) ErrorI {
-	return NewError(CodeTxFoundInMempool, ConsensusModule, fmt.Sprintf("tx %s already found in mempool", hash))
+func ErrWrongHighQCHeight() ErrorI {
+	return NewError(CodeWrongHighQCHeight, ConsensusModule, fmt.Sprintf("wrong high qc hegiht"))
 }
 
 func ErrWriteFile(err error) ErrorI {
@@ -754,8 +754,8 @@ func ErrInvalidParams(err error) ErrorI {
 	return NewError(CodeInvalidParams, RPCModule, fmt.Sprintf("invalid params: %s", string(bz)))
 }
 
-func ErrNewFSM(err error) ErrorI {
-	return NewError(CodeNewFSM, RPCModule, fmt.Sprintf("new fsm failed with err: %s", err.Error()))
+func ErrWrongHighQCRootHeight() ErrorI {
+	return NewError(CodeNewFSM, RPCModule, fmt.Sprintf("wrong high qc root height"))
 }
 
 func ErrNewStore(err error) ErrorI {

@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/alecthomas/units"
-	"github.com/canopy-network/canopy/lib/crypto"
 	"math"
 	"slices"
+
+	"github.com/alecthomas/units"
+	"github.com/canopy-network/canopy/lib/crypto"
 )
 
 /* This file has logic to certify the next block and result decided by a bft quorum */
@@ -144,11 +145,11 @@ func (x *QuorumCertificate) CheckProposalBasic(height, networkId, chainId uint64
 	}
 	// ensure header and block have the same height
 	if x.Header.Height != block.BlockHeader.Height {
-		return nil, ErrWrongHeight()
+		return nil, ErrWrongCertHeight()
 	}
 	// don't accept any blocks below the local height
 	if height > block.BlockHeader.Height {
-		return nil, ErrWrongHeight()
+		return nil, ErrWrongBlockHeight()
 	}
 	// new height notified error
 	if height < block.BlockHeader.Height {
@@ -188,12 +189,12 @@ func (x *QuorumCertificate) CheckHighQC(maxBlockSize int, view *View, lastRootHe
 	// invalid 'historical committee', if the root height of the committee is before that saved in state
 	if lastRootHeightUpdated > x.Header.RootHeight {
 		// exit with wrong root height error
-		return ErrWrongRootHeight()
+		return ErrWrongHighQCRootHeight()
 	}
 	// enforce same target height
 	if x.Header.Height != view.Height {
 		// exit with wrong height error
-		return ErrWrongHeight()
+		return ErrWrongHighQCHeight()
 	}
 	// a valid HighQC has the phase PRECOMMIT_VOTE as that's the phase where replicas 'Lock'
 	if x.Header.Phase != Phase_PROPOSE_VOTE {

@@ -14,28 +14,6 @@ import (
 	"github.com/google/btree"
 )
 
-// TxReaderI() defines the interface to read a TxnTransaction
-// Txn implements this itself to allow for nested transactions
-type TxnReaderI interface {
-	Get(key []byte) ([]byte, lib.ErrorI)
-	NewIterator(prefix []byte, reverse bool, allVersions bool) lib.IteratorI
-	Discard()
-}
-
-// TxnWriterI() defines the interface to write a TxnTransaction
-// Txn implements this itself to allow for nested transactions
-type TxnWriterI interface {
-	SetEntryAt(entry *badger.Entry, version uint64) error
-	Flush() error
-	Cancel()
-}
-
-// enforce the necessary interfaces over Txn
-var _ lib.RWStoreI = &Txn{}
-var _ TxnReaderI = &Txn{}
-var _ TxnWriterI = &Txn{}
-var _ lib.IteratorI = &Iterator{}
-
 /*
 	Txn acts like a database transaction
 	It saves set/del operations in memory and allows the caller to Flush() to the parent or Discard()
@@ -53,48 +31,31 @@ var _ lib.IteratorI = &Iterator{}
 	- Nested txns are supported, but iteration becomes increasingly inefficient
 */
 
-type Txn struct {
-	reader       TxnReaderI // memory store to Read() from
-	writer       TxnWriterI // memory store to Flush() to
-	prefix       []byte     // prefix for keys in this txn
-	state        bool       // whether the flush should go to the HSS and LSS
-	sort         bool       // whether to sort the keys in the cache; used for iteration
-	writeVersion uint64     // the version to commit the data to
-	cache        *txn
-}
-
-// txn internal structure maintains the write operations sorted lexicographically by keys
-type txn struct {
-	ops       map[uint64]valueOp        // [string(key)] -> set/del operations saved in memory
-	sorted    *btree.BTreeG[*CacheItem] // sorted btree of keys for fast iteration
-	sortedLen int                       // len(sorted)
-	readBuf   []byte                    // a buffer to re-use for reads
-
-	l sync.Mutex // thread safety
-}
-
-// txn() returns a copy of the current transaction cache
-func (t *txn) copy() *txn {
-	t.l.Lock()
-	defer t.l.Unlock()
-	ops := make(map[uint64]valueOp, t.sortedLen)
-	maps.Copy(ops, t.ops)
-	return &txn{
-		ops:       ops,
-		sorted:    t.sorted.Clone(),
-		sortedLen: t.sortedLen,
-		l:         sync.Mutex{},
-	}
-}
-
-// op is the type of operation to be performed on the key
-type op uint8
-
 const (
 	opDelete op = iota // delete the key
 	opSet              // set the key
 	opEntry            // custom badger entry
 )
+
+// Txn is an in memory database transaction
+type Txn struct {
+	reader       TxnReaderI // memory store to Read() from
+	writer       TxnWriterI // memory store to Flush() to
+	prefix       []byte     // prefix for keys in this txn
+	state        bool       // whether the flush should go to the HSS and LSS
+	sort         bool       // whether to sort the keys in the txn; used for iteration
+	writeVersion uint64     // the version to commit the data to
+	txn          *txn       // the internal structure maintaining the write operations
+}
+
+// txn internal structure maintains the write operations sorted lexicographically by keys
+type txn struct {
+	ops    map[uint64]valueOp        // [string(key)] -> set/del operations saved in memory
+	sorted *btree.BTreeG[*CacheItem] // sorted btree of keys for fast iteration
+	rbuf   []byte                    // a buffer to re-use for reads
+
+	l sync.Mutex // thread safety
+}
 
 // valueOp has the value portion of the operation and the corresponding operation to perform
 type valueOp struct {
@@ -104,28 +65,50 @@ type valueOp struct {
 	op    op            // is operation delete
 }
 
+// op is the type of operation to be performed on the key
+type op uint8
+
+// TxReaderI() defines the interface to read a TxnTransaction
+// Txn implements this itself to allow for nested transactions
+type TxnReaderI interface {
+	Get(key []byte) ([]byte, lib.ErrorI)
+	NewIterator(prefix []byte, reverse bool, allVersions bool) lib.IteratorI
+	Discard()
+}
+
+// TxnWriterI() defines the interface to write a TxnTransaction
+// Txn implements this itself to allow for nested transactions
+type TxnWriterI interface {
+	SetEntryAt(entry *badger.Entry, version uint64) error
+	Flush() error
+	Cancel()
+}
+
 // NewBadgerTxn() creates a new instance of Txn from badger Txn and WriteBatch correspondingly
-func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, state, sort bool, writeVersion uint64) *Txn {
+func NewBadgerTxn(reader *badger.Txn, writer *badger.WriteBatch, prefix []byte, state, sort bool, writeVersion ...uint64) *Txn {
 	var writerI TxnWriterI
-	// only assign the writer interface if not nil, otherwise leave it as nil.
-	// This prevents the "nil interface containing nil value" problem where
-	// t.writer != nil would be true even though the actual writer is nil.
+	// prevent nil interface containing nil value
 	if writer != nil {
 		writerI = writer
 	}
-	return NewTxn(BadgerTxnReader{reader, prefix}, writerI, prefix, state, sort, writeVersion)
+	// exit with the new transaction
+	return NewTxn(BadgerTxnReader{reader, prefix}, writerI, prefix, state, sort, writeVersion...)
 }
 
 // NewTxn() creates a new instance of Txn with the specified reader and writer
-func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, state, sort bool, version uint64) *Txn {
+func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, state, sort bool, version ...uint64) *Txn {
+	var v uint64
+	if len(version) != 0 {
+		v = version[0]
+	}
 	return &Txn{
 		reader:       reader,
 		writer:       writer,
 		prefix:       prefix,
 		state:        state,
 		sort:         sort,
-		writeVersion: version,
-		cache: &txn{
+		writeVersion: v,
+		txn: &txn{
 			ops:    make(map[uint64]valueOp),
 			sorted: btree.NewG(32, func(a, b *CacheItem) bool { return a.Less(b) }), // need to benchmark this value
 			l:      sync.Mutex{},
@@ -133,63 +116,60 @@ func NewTxn(reader TxnReaderI, writer TxnWriterI, prefix []byte, state, sort boo
 	}
 }
 
-// Get() retrieves the value for a given key from either the cache operations or the reader store
+// Get() retrieves the value for a given key from either the txn operations or the reader store
 func (t *Txn) Get(key []byte) ([]byte, lib.ErrorI) {
-	t.cache.l.Lock()
-	defer t.cache.l.Unlock()
-	// first retrieve from the in-memory cache
-	if v, found := t.cache.ops[lib.MemHash(key)]; found {
+	t.txn.l.Lock()
+	defer t.txn.l.Unlock()
+	// first retrieve from the in-memory txn
+	if v, found := t.txn.ops[lib.MemHash(key)]; found {
 		return v.value, nil
 	}
 	// if not found, retrieve from the parent reader
-	return t.reader.Get(lib.AppendWithBuffer(&t.cache.readBuf, t.prefix, key))
+	return t.reader.Get(lib.AppendWithBuffer(&t.txn.rbuf, t.prefix, key))
 }
 
-// Set() adds or updates the value for a key in the cache operations
+// Set() adds or updates the value for a key in the txn operations
 func (t *Txn) Set(key, value []byte) lib.ErrorI {
 	return t.update(key, value, nil, opSet)
 }
 
-// Delete() marks a key for deletion in the cache operations
+// Delete() marks a key for deletion in the txn operations
 func (t *Txn) Delete(key []byte) lib.ErrorI {
 	return t.update(key, nil, nil, opDelete)
 }
 
-// SetEntry() adds or updates a custom badger entry in the cache operations
-func (t *Txn) SetEntryAt(entry *badger.Entry, _ uint64) (e error) {
-	return t.update(entry.Key, entry.Value, entry, opEntry)
+// SetEntry() adds or updates a custom badger entry in the txn operations
+func (t *Txn) SetEntryAt(e *badger.Entry, _ uint64) (err error) {
+	return t.update(e.Key, e.Value, e, opEntry)
 }
 
 // update() modifies or adds an operation to the txn
-// NOTE: updateEntry() won't modify the key itself, any key prefixing must be done before calling this
 func (t *Txn) update(key []byte, val []byte, entry *badger.Entry, opAction op) (e lib.ErrorI) {
 	hashedKey := lib.MemHash(key)
-	t.cache.l.Lock()
-	if _, found := t.cache.ops[hashedKey]; !found && t.sort {
+	t.txn.l.Lock()
+	defer t.txn.l.Unlock()
+	if _, found := t.txn.ops[hashedKey]; !found && t.sort {
 		t.addToSorted(key, hashedKey)
 	}
-	valueOp := valueOp{key: key, value: val, entry: entry, op: opAction}
-	t.cache.ops[hashedKey] = valueOp
-	t.cache.l.Unlock()
+	t.txn.ops[hashedKey] = valueOp{key: key, value: val, entry: entry, op: opAction}
 	return
 }
 
 // addToSorted() inserts a key into the sorted list of operations maintaining lexicographical order
 func (t *Txn) addToSorted(key []byte, hashedKey uint64) {
-	t.cache.sortedLen++
-	t.cache.sorted.ReplaceOrInsert(&CacheItem{Key: key, HashedKey: hashedKey, Exists: true})
+	t.txn.sorted.ReplaceOrInsert(&CacheItem{Key: key, HashedKey: hashedKey, Exists: true})
 }
 
 // Iterator() returns a new iterator for merged iteration of both the in-memory operations and parent store with the given prefix
 func (t *Txn) Iterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	it := t.reader.NewIterator(prefix, false, false)
-	return newTxnIterator(it, t.cache.copy(), prefix, false), nil
+	return newTxnIterator(it, t.txn.copy(), prefix, false), nil
 }
 
 // RevIterator() returns a new reverse iterator for merged iteration of both the in-memory operations and parent store with the given prefix
 func (t *Txn) RevIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 	it := t.reader.NewIterator(prefix, true, false)
-	return newTxnIterator(it, t.cache.copy(), prefix, true), nil
+	return newTxnIterator(it, t.txn.copy(), prefix, true), nil
 }
 
 // ArchiveIterator() creates a new iterator for all versions under the given prefix in the BadgerDB transaction
@@ -199,8 +179,8 @@ func (t *Txn) ArchiveIterator(prefix []byte) (lib.IteratorI, lib.ErrorI) {
 
 // Discard() clears all in-memory operations and resets the sorted key list
 func (t *Txn) Discard() {
-	t.cache.sorted.Clear(false)
-	t.cache.ops, t.cache.sortedLen = make(map[uint64]valueOp), 0
+	t.txn.sorted.Clear(false)
+	t.txn.ops = make(map[uint64]valueOp)
 }
 
 // Cancel() cancels the current transaction and clears the live writer queue if enabled.
@@ -220,8 +200,8 @@ func (t *Txn) Close() {
 
 // Flush() flushes the in-memory operations to the batch writer and clears in-memory changes
 func (t *Txn) Flush() (err error) {
-	t.cache.l.Lock()
-	defer t.cache.l.Unlock()
+	t.txn.l.Lock()
+	defer t.txn.l.Unlock()
 	defer t.Discard()
 	for version, prefix := range t.flushTo() {
 		if err = t.flush(prefix, version); err != nil {
@@ -243,7 +223,7 @@ func (t *Txn) flushTo() map[uint64][]byte {
 
 // flush() flushes all operations to the underlying writer with a prefix if given
 func (t *Txn) flush(prefix []byte, writeVersion uint64) (err error) {
-	for _, v := range t.cache.ops {
+	for _, v := range t.txn.ops {
 		if err = t.write(prefix, writeVersion, v); err != nil {
 			return err
 		}
@@ -290,11 +270,11 @@ func (t *Txn) write(prefix []byte, writeVersion uint64, valueOp valueOp) lib.Err
 func (t *Txn) NewIterator(prefix []byte, reverse bool, allVersions bool) lib.IteratorI {
 	// create an iterator for the parent
 	parentIterator := t.reader.NewIterator(lib.Append(t.prefix, prefix), reverse, allVersions)
-	// create a merged iterator for the parent and in-memory cache
-	return newTxnIterator(parentIterator, t.cache, prefix, reverse)
+	// create a merged iterator for the parent and in-memory txn
+	return newTxnIterator(parentIterator, t.txn, prefix, reverse)
 }
 
-// Copy creates a new Txn with the same configuration and cache as the original
+// Copy creates a new Txn with the same configuration and txn as the original
 func (t *Txn) Copy(reader TxnReaderI, writer TxnWriterI) *Txn {
 	return &Txn{
 		reader:       reader,
@@ -303,7 +283,20 @@ func (t *Txn) Copy(reader TxnReaderI, writer TxnWriterI) *Txn {
 		state:        t.state,
 		sort:         t.sort,
 		writeVersion: t.writeVersion,
-		cache:        t.cache.copy(),
+		txn:          t.txn.copy(),
+	}
+}
+
+// txn() returns a copy of the current transaction txn
+func (t *txn) copy() *txn {
+	t.l.Lock()
+	defer t.l.Unlock()
+	ops := make(map[uint64]valueOp, t.sorted.Len())
+	maps.Copy(ops, t.ops)
+	return &txn{
+		ops:    ops,
+		sorted: t.sorted.Clone(),
+		l:      sync.Mutex{},
 	}
 }
 
@@ -397,7 +390,7 @@ func (ti *TxnIterator) Value() []byte {
 func (ti *TxnIterator) Valid() bool {
 	for {
 		if !ti.parent.Valid() {
-			// only using cache; call txn.next until invalid or !deleted
+			// only using txn; call txn.next until invalid or !deleted
 			ti.txnFastForward()
 			ti.useTxn = true
 			break

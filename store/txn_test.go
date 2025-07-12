@@ -62,7 +62,7 @@ func TestTxnWriteSetGet(t *testing.T) {
 	require.NoError(t, test.Flush())
 	require.NoError(t, writer.Flush())
 	// test get from reader after write()
-	require.Len(t, test.cache.ops, 0)
+	require.Len(t, test.txn.ops, 0)
 	val, err = test.Get(key)
 	require.NoError(t, err)
 	require.Equal(t, value, val)
@@ -182,17 +182,17 @@ func TestTxnIterateBasic(t *testing.T) {
 func TestTxnIterateMixed(t *testing.T) {
 	test, db, writer := newTxn(t, []byte("s/"))
 	defer func() { test.Close(); db.Close(); test.Discard() }()
-	// first write to the memory cache and flush it
+	// first write to the memory txn and flush it
 	bulkSetKV(t, test, "1/", "f", "e", "d")
 	require.NoError(t, test.Flush())
 	require.NoError(t, writer.Flush())
-	// now add new entries to the memory cache.
+	// now add new entries to the memory txn.
 	// Since the reader and writer are on the same version,
 	// it's possible to read the previously flushed data
 	// without creating a new transaction
 	bulkSetKV(t, test, "1/", "i", "h", "g")
-	// confirm that the only data in the memory cache are the last 3 entries
-	require.Len(t, test.cache.ops, 3)
+	// confirm that the only data in the memory txn are the last 3 entries
+	require.Len(t, test.txn.ops, 3)
 	it1, err := test.Iterator([]byte(""))
 	require.NoError(t, err)
 	var i int
@@ -262,11 +262,11 @@ func TestTxnIterateMixedWithDeletedValues(t *testing.T) {
 	bulkSetKV(t, test, "1/", "f", "e", "d")
 	require.NoError(t, test.Flush())
 	require.NoError(t, writer.Flush())
-	// now add new entries to the memory cache.
+	// now add new entries to the memory txn.
 	// Since the reader and writer are on the same version,
 	// it's possible to read the previously flushed data
 	// without creating a new transaction
-	// add the values to the memory cache
+	// add the values to the memory txn
 	bulkSetKV(t, test, "1/", "h", "g", "f")
 	require.NoError(t, test.Delete([]byte("1/f"))) // shared and shadowed
 	require.NoError(t, test.Delete([]byte("1/d"))) // first

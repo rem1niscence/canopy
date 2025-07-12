@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
@@ -86,10 +85,8 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 
 // Remove() evicts a peer from the set
 func (ps *PeerSet) Remove(publicKey []byte) (peer *Peer, err lib.ErrorI) {
-	fmt.Println("Peer set locked to remove")
 	ps.Lock()
 	defer ps.Unlock()
-	fmt.Println("Past peer lock to remove")
 	peer, err = ps.get(publicKey)
 	if err != nil {
 		return

@@ -61,7 +61,7 @@ func (b *BFT) CheckProposerMessage(x *Message, p *validateMessageParams) (isPart
 	if x.Header.Phase == Election {
 		// validate target height
 		if x.Header.Height != p.height {
-			return false, lib.ErrWrongHeight()
+			return false, lib.ErrWrongCertHeight()
 		}
 		// sanity check the VRF
 		if err = checkSignatureBasic(x.Vrf); err != nil {
@@ -102,10 +102,10 @@ func (b *BFT) CheckProposerMessage(x *Message, p *validateMessageParams) (isPart
 	// validate header height, qc height, and committee height
 	// NOTE: these height checks are correct even when sending a highQC as the header is updated when using a highQC
 	if x.Header.Height != p.height {
-		return false, lib.ErrWrongHeight()
+		return false, lib.ErrWrongCertHeight()
 	}
 	if x.Qc.Header.Height < p.cHeightUpdated {
-		return false, lib.ErrWrongHeight()
+		return false, lib.ErrInvalidQCCommitteeHeight()
 	}
 	if x.Header.Phase == Propose {
 		// ensure the sender is justified as the proposer

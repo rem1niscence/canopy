@@ -23,16 +23,15 @@ var (
 	qcHeightPrefix     = []byte{7} // store key prefix for quorum certificate by height
 	doubleSignerPrefix = []byte{8} // store key prefix for double signers by height
 	checkPointPrefix   = []byte{9} // store key prefix for checkpoints for committee chains
+	// create indexer cache
+	blockCache, _ = lru.New[uint64, *lib.BlockResult](4)
+	//qcCache, _ = lru.New[uint64, *lib.QuorumCertificate](4) TODO add back
 )
 
 // Indexer: the part of the DB that stores transactions, blocks, and quorum certificates
 type Indexer struct {
-	db         *Txn
-	blockCache *lru.Cache[uint64, *lib.BlockResult]
-	qcCache    *lru.Cache[uint64, *lib.QuorumCertificate]
-	// must index is a flag that determines whether the indexer should index detailed
-	// information about transactions, blocks, and quorum certificates
-	indexByAccounts bool
+	db     *Txn
+	config lib.Config
 }
 
 // BLOCKS CODE BELOW
@@ -40,7 +39,7 @@ type Indexer struct {
 // IndexBlock() turns the block into bytes, indexes the block by hash and height
 // and then indexes the transactions
 func (t *Indexer) IndexBlock(b *lib.BlockResult) lib.ErrorI {
-	t.blockCache.Add(b.BlockHeader.Height, b)
+	blockCache.Add(b.BlockHeader.Height, b)
 	var eg errgroup.Group
 	// index block header in its own goroutine
 	eg.Go(func() error {
@@ -71,7 +70,7 @@ func (t *Indexer) IndexBlock(b *lib.BlockResult) lib.ErrorI {
 // DeleteBlockForHeight() deletes the block & transaction data for a certain height
 func (t *Indexer) DeleteBlockForHeight(height uint64) lib.ErrorI {
 	// remove from cache
-	t.blockCache.Remove(height)
+	blockCache.Remove(height)
 	// get the height key
 	heightKey := t.blockHeightKey(height)
 	// get the hash key (was indexed by height key)
@@ -99,7 +98,7 @@ func (t *Indexer) GetBlockByHash(hash []byte) (*lib.BlockResult, lib.ErrorI) {
 // GetBlockByHeight() returns the block result by height key
 func (t *Indexer) GetBlockByHeight(height uint64) (*lib.BlockResult, lib.ErrorI) {
 	// check cache
-	if got, found := t.blockCache.Get(height); found {
+	if got, found := blockCache.Get(height); found {
 		return got, nil
 	}
 	// height key points to hash key
@@ -114,7 +113,7 @@ func (t *Indexer) GetBlockByHeight(height uint64) (*lib.BlockResult, lib.ErrorI)
 // GetBlockHeaderByHeight() returns the block result without transactions
 func (t *Indexer) GetBlockHeaderByHeight(height uint64) (*lib.BlockResult, lib.ErrorI) {
 	// check cache
-	if got, found := t.blockCache.Get(height); found {
+	if got, found := blockCache.Get(height); found {
 		return got, nil
 	}
 	// height key points to hash key
@@ -237,7 +236,7 @@ func (t *Indexer) IndexTx(result *lib.TxResult) lib.ErrorI {
 		return err
 	}
 	// index by accounts indicates if the indexer should index by sender/receiver
-	if t.indexByAccounts {
+	if t.config.IndexByAccount {
 		// store the hash key by sender
 		if err = t.indexTxBySender(result.GetSender(), heightAndIndexKey, hashKey); err != nil {
 			return err

@@ -93,7 +93,7 @@ func (f *FeeMempool) AddTransactions(txs ...[]byte) (err ErrorI) {
 		f.txsBytes += txBytes
 	}
 	// insert the transactions into the pool
-	_ = f.pool.insert(mempoolTxs...)
+	f.pool.insert(mempoolTxs...)
 	// assess if limits are exceeded - if so, drop from the bottom
 	var dropped []MempoolTx
 	// handle bad config
@@ -216,7 +216,7 @@ type MempoolTxs struct {
 }
 
 // insert() batch inserts a number of txs into the list sorted by the highest fee to the lowest fee
-func (t *MempoolTxs) insert(txs ...MempoolTx) (recheck bool) {
+func (t *MempoolTxs) insert(txs ...MempoolTx) {
 	// combine existing and incoming txs
 	combined := append(t.s, txs...)
 	// sort by Fee descending
@@ -240,8 +240,6 @@ func (t *MempoolTxs) insert(txs ...MempoolTx) (recheck bool) {
 	// update
 	t.s = newList
 	t.m = newMap
-	// exit
-	return true
 }
 
 // delete() batch deletes a number of transactions

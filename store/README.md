@@ -166,8 +166,8 @@ These prefixes are only used internally and never exposed to the user.
 #### Ad Hoc Nested Transactions Implementation
 
 The `Txn` type provides a transaction-like interface for the store, enabling atomic operations and
-rollbacks. All writes are first stored in an internal in-memory cache before being flushed to the
-database, leveraging either the in-memory cache for current state keys or a badgerDB reader for
+rollbacks. All writes are first stored in an internal in-memory txn before being flushed to the
+database, leveraging either the in-memory txn for current state keys or a badgerDB reader for
 committed keys. This design is particularly useful for testing block proposals and managing
 ephemeral states.
 
