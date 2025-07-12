@@ -143,7 +143,7 @@ func DefaultStateMachineConfig() StateMachineConfig { return StateMachineConfig{
 // NOTES:
 // - BlockTime = ElectionTimeout + ElectionVoteTimeout + ProposeTimeout + ProposeVoteTimeout + PrecommitTimeout + PrecommitVoteTimeout + CommitTimeout + CommitProcess
 // - async faults may lead to extended block time
-// - social consensus dictates BlockTime for the protocol - being too fast or too slow can lead to Non-Signing and Consensus failures
+// - social consensus dictates BlockTime for the protocol - being oo fast or too slow can lead to Non-Signing and Consensus failures
 type ConsensusConfig struct {
 	NewHeightTimeoutMs      int `json:"newHeightTimeoutMS"`      // how long (in milliseconds) the replica sleeps before moving to the ELECTION phase
 	ElectionTimeoutMS       int `json:"electionTimeoutMS"`       // minus VRF creation time (if Candidate), is how long (in milliseconds) the replica sleeps before moving to ELECTION-VOTE phase
@@ -159,10 +159,10 @@ type ConsensusConfig struct {
 // DefaultConsensusConfig() configures the block time
 func DefaultConsensusConfig() ConsensusConfig {
 	return ConsensusConfig{
-		NewHeightTimeoutMs:     2000, // 2 seconds
-		ElectionTimeoutMS:      2000, // 2 seconds
-		ElectionVoteTimeoutMS:  2000, // 2 seconds
-		ProposeTimeoutMS:       4000, // 4 seconds
+		NewHeightTimeoutMs:     4500, // 4.5 seconds
+		ElectionTimeoutMS:      1500, // 1.5 seconds
+		ElectionVoteTimeoutMS:  1500, // 1.5 seconds
+		ProposeTimeoutMS:       2500, // 2.5 seconds
 		ProposeVoteTimeoutMS:   4000, // 4 seconds
 		PrecommitTimeoutMS:     2000, // 2 seconds
 		PrecommitVoteTimeoutMS: 2000, // 2 seconds
