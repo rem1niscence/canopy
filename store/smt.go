@@ -3,7 +3,6 @@ package store
 import (
 	"bytes"
 	"math/bits"
-	"slices"
 	"sort"
 	"sync"
 
@@ -79,8 +78,16 @@ import (
 //
 // =====================================================
 
-const MaxKeyBitLength = 160 // the maximum leaf key bits (20 bytes)
-const MaxCacheSize = 1_000_000
+const (
+	MaxKeyBitLength = 160 // the maximum leaf key bits (20 bytes)
+	MaxCacheSize    = 1_000_000
+	// Child position constants
+	LeftChild  = 0
+	RightChild = 1
+	// parallelization parameters
+	NumSubtrees       = 8
+	SubtreePrefixBits = 3 // log2(NumSubtrees)
+)
 
 type SMT struct {
 	// store: an abstraction of the database where the tree is being stored
@@ -127,13 +134,6 @@ type OpData struct {
 	// traversed: a descending list of traversed nodes from root to parent of current
 	traversed *NodeList
 }
-
-const (
-	// leftChild: enum identifier of left child (0)
-	leftChild = iota
-	// leftChild: enum identifier of right child (1)
-	rightChild
-)
 
 // NewDefaultSMT() creates a new abstraction fo the SMT object using default parameters
 func NewDefaultSMT(store lib.RWStoreI) (smt *SMT) {
@@ -186,35 +186,6 @@ func (s *SMT) Set(k, v []byte) (err lib.ErrorI) {
 	return
 }
 
-// set() executes the 'set' logic after traversal
-func (s *SMT) set() lib.ErrorI {
-	// if current != target key then it is an insert not an update
-	if !s.target.Key.equals(s.gcp) {
-		// create a new node (new parent of current and target)
-		newParent := newNode()
-		newParent.Key = s.gcp.copy()
-		// get the parent (soon to be grandparent) of current
-		oldParent := s.traversed.Parent()
-		// calculate current's bytes by encoding
-		currentBytes, targetBytes := s.current.Key.bytes(), s.target.Key.bytes()
-		// replace the reference to Current in its parent with the new parent
-		oldParent.replaceChild(currentBytes, newParent.Key.bytes())
-		// set current and target as children of new parent
-		// NOTE: the old parent is now the grandparent of target and current
-		switch s.pathBit = s.target.Key.bitAt(s.bitPos); s.pathBit {
-		case 0:
-			newParent.setChildren(targetBytes, currentBytes)
-		case 1:
-			newParent.setChildren(currentBytes, targetBytes)
-		}
-		// add new node to traversed list, as it's the new parent for current and target
-		// and should come after the grandparent (previously parent)
-		s.traversed.Nodes = append(s.traversed.Nodes, newParent.copy())
-	}
-	// set the node in the database
-	return s.setNode(s.target)
-}
-
 // Delete: removes a target node if exists in the tree
 func (s *SMT) Delete(k []byte) (err lib.ErrorI) {
 	// calculate the key and value to upsert
@@ -229,88 +200,57 @@ func (s *SMT) Delete(k []byte) (err lib.ErrorI) {
 	return
 }
 
-// delete() executes the 'delete' logic after traversal
-func (s *SMT) delete() lib.ErrorI {
-	// if gcp != target key then there is no delete because the node does not exist
-	if !s.target.Key.equals(s.gcp) {
-		return nil
-	}
-	// calculate target key bytes
-	targetBytes := s.target.Key.bytes()
-	// get the parent and grandparent
-	parent, grandparent := s.traversed.Parent(), s.traversed.GrandParent()
-	// get the sibling of the target
-	sibling, _ := parent.getOtherChild(targetBytes)
-	// replace the parent reference with the sibling in the grandparent
-	grandparent.replaceChild(parent.Key.bytes(), sibling)
-	// delete the parent from the database and remove it from the traversal array
-	if err := s.delNode(parent.Key.bytes()); err != nil {
-		return err
-	}
-	// remove the parent from the traversed list
-	s.traversed.Pop()
-	// delete the target from the database
-	return s.delNode(targetBytes)
-}
-
-// Commit(): executes deferred operations in order (left-to-right),
-// minimizing the amount of traversals, IOPS, and hash operations over the master tree
-// this is the sequential alternative to 'commit parallel'
-func (s *SMT) Commit() (err lib.ErrorI) {
-	s.sortOperations()
-	return s.commit(false)
-}
-
 // CommitParallel(): sorts the operations in 8 subtree threads, executes those threads in parallel and combines them into the master tree
 func (s *SMT) CommitParallel(unsortedOps map[uint64]valueOp) (err lib.ErrorI) {
+	var wg sync.WaitGroup
+	errChan := make(chan lib.ErrorI, NumSubtrees)
 	// add 16 synthetic borders to the tree
 	cleanup, err := s.addSyntheticBorders()
+	if err != nil {
+		return err
+	}
 	// collect the roots for each group (000, 001, 010, 011...)
-	roots := make([]*node, 8)
-	for i := uint8(0); i < 8; i++ {
-		if roots[i], err = s.getNode(newNodeKey([]byte{i << 5}, 3).key); err != nil {
-			return
-		}
+	roots, err := s.getSubtreeRoots()
+	if err != nil {
+		return err
 	}
 	// sort operations grouping by prefix
 	groupedByPrefix, err := s.sortOperationsByPrefix(unsortedOps)
 	if err != nil {
 		return
 	}
-	// create parallel ops
-	wg, eChan := sync.WaitGroup{}, make(chan lib.ErrorI, 8)
 	// commit each group in parallel
 	for i := 0; i < 8; i++ {
-		// create the subtree SMT
-		smt := &SMT{
-			store:        s.store,
-			root:         roots[i].copy(),
-			keyBitLength: s.keyBitLength,
-			nodeCache:    make(map[string]*node),
-			operations:   groupedByPrefix[i],
-			minKey:       s.minKey.copy(),
-			maxKey:       s.maxKey.copy(),
-		}
 		wg.Add(1)
-		go func(smt *SMT) {
+		go func(index int) {
 			defer wg.Done()
-			smt.reset()
+			// create subtree
+			subtree := s.createSubtree(roots[index], groupedByPrefix[index])
+			subtree.reset()
 			// commit the subtree
-			if err = smt.commit(true); err != nil {
-				eChan <- err
+			if e := subtree.commit(true); e != nil {
+				errChan <- e
 			}
-		}(smt)
+		}(i)
 	}
 	// wait for all goroutines to finish
 	wg.Wait()
-	close(eChan)
+	close(errChan)
 	// check if any errors occurred
-	for err = range eChan {
+	for err = range errChan {
 		if err != nil {
 			return
 		}
 	}
 	return cleanup()
+}
+
+// Commit() DEPRECATED: executes deferred operations in order (left-to-right),
+// minimizing the amount of traversals, IOPS, and hash operations over the master tree
+// this is the sequential alternative to 'commit parallel'
+func (s *SMT) Commit() (err lib.ErrorI) {
+	s.sortOperations()
+	return s.commit(false)
 }
 
 // commit(): executes the deferred operations in order (left-to-right),
@@ -351,6 +291,59 @@ func (s *SMT) commit(subTree bool) (err lib.ErrorI) {
 	}
 }
 
+// set() executes the 'set' logic after traversal
+func (s *SMT) set() lib.ErrorI {
+	// if current != target key then it is an insert not an update
+	if !s.target.Key.equals(s.gcp) {
+		// create a new node (new parent of current and target)
+		newParent := newNode()
+		newParent.Key = s.gcp
+		// get the parent (soon to be grandparent) of current
+		oldParent := s.traversed.Parent()
+		// calculate current's bytes by encoding
+		currentBytes, targetBytes := s.current.Key.bytes(), s.target.Key.bytes()
+		// replace the reference to Current in its parent with the new parent
+		oldParent.replaceChild(currentBytes, newParent.Key.bytes())
+		// set current and target as children of new parent
+		// NOTE: the old parent is now the grandparent of target and current
+		switch s.pathBit = s.target.Key.bitAt(s.bitPos); s.pathBit {
+		case LeftChild:
+			newParent.setChildren(targetBytes, currentBytes)
+		case RightChild:
+			newParent.setChildren(currentBytes, targetBytes)
+		}
+		// add new node to traversed list, as it's the new parent for current and target
+		// and should come after the grandparent (previously parent)
+		s.traversed.Nodes = append(s.traversed.Nodes, newParent.copy())
+	}
+	// set the node in the database
+	return s.setNode(s.target)
+}
+
+// delete() executes the 'delete' logic after traversal
+func (s *SMT) delete() lib.ErrorI {
+	// if gcp != target key then there is no delete because the node does not exist
+	if !s.target.Key.equals(s.gcp) {
+		return nil
+	}
+	// calculate target key bytes
+	targetBytes := s.target.Key.bytes()
+	// get the parent and grandparent
+	parent, grandparent := s.traversed.Parent(), s.traversed.GrandParent()
+	// get the sibling of the target
+	sibling, _ := parent.getOtherChild(targetBytes)
+	// replace the parent reference with the sibling in the grandparent
+	grandparent.replaceChild(parent.Key.bytes(), sibling)
+	// delete the parent from the database and remove it from the traversal array
+	if err := s.delNode(parent.Key.bytes()); err != nil {
+		return err
+	}
+	// remove the parent from the traversed list
+	s.traversed.Pop()
+	// delete the target from the database
+	return s.delNode(targetBytes)
+}
+
 // traverse: navigates the tree downward to locate the target or its closest position
 func (s *SMT) traverse() (err lib.ErrorI) {
 	// execute main loop
@@ -360,9 +353,9 @@ func (s *SMT) traverse() (err lib.ErrorI) {
 		s.traversed.Nodes = append(s.traversed.Nodes, s.current.copy())
 		// decide to move left or right based on the bit-value of the key
 		switch s.pathBit = s.target.Key.bitAt(s.bitPos); s.pathBit {
-		case 0: // move down to the left
+		case LeftChild: // move down to the left
 			currentKey = s.current.LeftChildKey
-		case 1: // move down to the right
+		case RightChild: // move down to the right
 			currentKey = s.current.RightChildKey
 		}
 		// load current node from the store
@@ -450,8 +443,8 @@ func (s *SMT) initializeTree(rootKey *key) {
 	s.root = &node{
 		Key: rootKey,
 		Node: lib.Node{
-			LeftChildKey:  bytes.Clone(minNode.Key.bytes()),
-			RightChildKey: bytes.Clone(maxNode.Key.bytes()),
+			LeftChildKey:  minNode.Key.bytes(),
+			RightChildKey: maxNode.Key.bytes(),
 		},
 	}
 	// update the root's value
@@ -466,29 +459,29 @@ func (s *SMT) initializeTree(rootKey *key) {
 
 // updateParentValue() updates the value of parent based on its children
 func (s *SMT) updateParentValue(parent *node) (err lib.ErrorI) {
-	var rightChild, leftChild *node
+	var rChild, lChild *node
 	// get the left child
-	if leftChild, err = s.getNode(parent.LeftChildKey); err != nil {
+	if lChild, err = s.getNode(parent.LeftChildKey); err != nil {
 		return
 	}
 	// get the left child
-	if rightChild, err = s.getNode(parent.RightChildKey); err != nil {
+	if rChild, err = s.getNode(parent.RightChildKey); err != nil {
 		return
 	}
 	// create a buffer for the input
-	input := make([]byte, leftChild.Key.size()+len(leftChild.Value)+rightChild.Key.size()+len(rightChild.Value))
+	input := make([]byte, lChild.Key.size()+len(lChild.Value)+rChild.Key.size()+len(rChild.Value))
 	offset := 0
 	// copy leftChild key
-	n := copy(input[offset:], leftChild.Key.bytes())
+	n := copy(input[offset:], lChild.Key.bytes())
 	offset += n
 	// copy leftChild value
-	n = copy(input[offset:], leftChild.Value)
+	n = copy(input[offset:], lChild.Value)
 	offset += n
 	// copy rightChild key
-	n = copy(input[offset:], rightChild.Key.bytes())
+	n = copy(input[offset:], rChild.Key.bytes())
 	offset += n
 	// copy rightChild value
-	copy(input[offset:], rightChild.Value)
+	copy(input[offset:], rChild.Value)
 	// concatenate the left and right children values; update the parents value
 	parent.Value = crypto.Hash(input)
 	// save the updated root value to the structure
@@ -537,6 +530,31 @@ func (s *SMT) addSyntheticBorders() (cleanup func() lib.ErrorI, err lib.ErrorI) 
 		return s.commit(false)
 	}
 	return
+}
+
+// getSubtreeRoots() prepares synthetic roots for the subtrees
+func (s *SMT) getSubtreeRoots() (roots []*node, err lib.ErrorI) {
+	roots = make([]*node, NumSubtrees)
+	for i := uint8(0); i < NumSubtrees; i++ {
+		k := newNodeKey([]byte{i << 5}, SubtreePrefixBits)
+		if roots[i], err = s.getNode(k.bytes()); err != nil {
+			return
+		}
+	}
+	return
+}
+
+// createSubtree() initializes the subtree structure
+func (s *SMT) createSubtree(root *node, operations []*node) *SMT {
+	return &SMT{
+		store:        s.store,
+		root:         root,
+		keyBitLength: s.keyBitLength,
+		nodeCache:    make(map[string]*node),
+		operations:   operations,
+		minKey:       s.minKey,
+		maxKey:       s.maxKey,
+	}
 }
 
 // sortOperationsByPrefix returns 8 sorted slices grouped by 3-bit prefix: 000 to 111
@@ -630,7 +648,7 @@ func (s *SMT) getNode(key []byte) (n *node, err lib.ErrorI) {
 		return
 	}
 	// set the key in the node for convenience
-	n.Key.fromBytes(bytes.Clone(key))
+	n.Key.fromBytes(key)
 	return
 }
 
@@ -741,7 +759,7 @@ func (s *SMT) VerifyProof(k []byte, v []byte, validateMembership bool, root []by
 		// parentNode will be calculated based on the current node and its sibling
 		var parentNode *node
 		// calculate the hash of the parent node based on the bitmask of the sibling
-		if proof[i].Bitmask == leftChild {
+		if proof[i].Bitmask == LeftChild {
 			// build the parent node hash based on the left sibling of the given node
 			hash = crypto.Hash(
 				append(append(proof[i].Key, proof[i].Value...),
@@ -1080,16 +1098,16 @@ func (x *node) bytes() ([]byte, lib.ErrorI) {
 
 // setChildren() sets the children of a node in its structure
 func (x *node) setChildren(leftKey, rightKey []byte) {
-	x.LeftChildKey, x.RightChildKey = bytes.Clone(leftKey), bytes.Clone(rightKey)
+	x.LeftChildKey, x.RightChildKey = leftKey, rightKey
 }
 
 // getOtherChild() returns the sibling for the child key passed and which child it is
 func (x *node) getOtherChild(childKey []byte) ([]byte, byte) {
 	switch {
 	case bytes.Equal(x.LeftChildKey, childKey):
-		return x.RightChildKey, rightChild
+		return x.RightChildKey, RightChild
 	case bytes.Equal(x.RightChildKey, childKey):
-		return x.LeftChildKey, leftChild
+		return x.LeftChildKey, LeftChild
 	}
 	panic("no child node was a match for getOtherChild")
 }
@@ -1098,35 +1116,17 @@ func (x *node) getOtherChild(childKey []byte) ([]byte, byte) {
 func (x *node) replaceChild(oldKey, newKey []byte) {
 	switch {
 	case bytes.Equal(x.LeftChildKey, oldKey):
-		x.LeftChildKey = bytes.Clone(newKey)
+		x.LeftChildKey = newKey
 		return
 	case bytes.Equal(x.RightChildKey, oldKey):
-		x.RightChildKey = bytes.Clone(newKey)
+		x.RightChildKey = newKey
 		return
 	}
 	panic("no child node was replaced")
 }
 
-// copy() returns a deep copy of the node
-func (x *node) copy() *node {
-	return &node{
-		Key: x.Key.copy(),
-		Node: lib.Node{
-			Value:         slices.Clone(x.Value),
-			LeftChildKey:  slices.Clone(x.LeftChildKey),
-			RightChildKey: slices.Clone(x.RightChildKey),
-		},
-	}
-}
-
-// copy() returns a deep copy of the key
-func (k *key) copy() *key {
-	return &key{
-		key:      bytes.Clone(k.key),
-		bitCount: k.bitCount,
-		length:   k.length,
-	}
-}
+// copy() returns a shallow copy of the node
+func (x *node) copy() *node { return &(*x) }
 
 // NODE LIST CODE BELOW
 

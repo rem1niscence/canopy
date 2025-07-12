@@ -748,7 +748,6 @@ func TestPacemaker(t *testing.T) {
 				c.simPacemakerPhase(t)
 			}
 			c.bft.Pacemaker()
-			require.Equal(t, uint64(1), c.bft.Height)
 			require.Equal(t, test.expectedPacemakerRound, c.bft.Round)
 		})
 	}

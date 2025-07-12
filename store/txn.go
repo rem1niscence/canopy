@@ -9,8 +9,6 @@ import (
 	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
 
-	"maps"
-
 	"github.com/google/btree"
 )
 
@@ -201,8 +199,7 @@ func (t *Txn) Close() {
 // Flush() flushes the in-memory operations to the batch writer and clears in-memory changes
 func (t *Txn) Flush() (err error) {
 	t.txn.l.Lock()
-	defer t.txn.l.Unlock()
-	defer t.Discard()
+	defer func() { t.txn.l.Unlock(); t.Discard() }()
 	for version, prefix := range t.flushTo() {
 		if err = t.flush(prefix, version); err != nil {
 			return err
@@ -212,9 +209,8 @@ func (t *Txn) Flush() (err error) {
 	return nil
 }
 
-// flushTo() returns the prefixes to flush to
+// flushTo() returns the prefixes to flush to; state uses special logic to flush
 func (t *Txn) flushTo() map[uint64][]byte {
-	// special state flush
 	if t.state {
 		return map[uint64][]byte{lssVersion: []byte(latestStatePrefix), t.writeVersion: []byte(historicStatePrefix)}
 	}
@@ -232,15 +228,15 @@ func (t *Txn) flush(prefix []byte, writeVersion uint64) (err error) {
 }
 
 // write() writes a value operation to the underlying writer
-func (t *Txn) write(prefix []byte, writeVersion uint64, valueOp valueOp) lib.ErrorI {
-	k := valueOp.key
+func (t *Txn) write(prefix []byte, writeVersion uint64, op valueOp) lib.ErrorI {
+	k := op.key
 	if prefix != nil {
 		k = lib.Append(prefix, k)
 	}
-	switch valueOp.op {
+	switch op.op {
 	case opSet:
 		// set an entry with a bit that marks it as deleted and prevents it from being discarded
-		if err := t.writer.SetEntryAt(&badger.Entry{Key: k, Value: valueOp.value}, writeVersion); err != nil {
+		if err := t.writer.SetEntryAt(&badger.Entry{Key: k, Value: op.value}, writeVersion); err != nil {
 			return ErrStoreSet(err)
 		}
 	case opDelete:
@@ -252,12 +248,12 @@ func (t *Txn) write(prefix []byte, writeVersion uint64, valueOp valueOp) lib.Err
 		// set the entry in the batch
 		entry := &badger.Entry{
 			Key:       k,
-			Value:     valueOp.value,
-			ExpiresAt: valueOp.entry.ExpiresAt,
-			UserMeta:  valueOp.entry.UserMeta,
+			Value:     op.value,
+			ExpiresAt: op.entry.ExpiresAt,
+			UserMeta:  op.entry.UserMeta,
 		}
 		// set the entry meta
-		setMeta(entry, getMeta(valueOp.entry))
+		setMeta(entry, getMeta(op.entry))
 		// setEntry to the underlying writer
 		if err := t.writer.SetEntryAt(entry, writeVersion); err != nil {
 			return ErrStoreSet(err)
@@ -291,12 +287,25 @@ func (t *Txn) Copy(reader TxnReaderI, writer TxnWriterI) *Txn {
 func (t *txn) copy() *txn {
 	t.l.Lock()
 	defer t.l.Unlock()
-	ops := make(map[uint64]valueOp, t.sorted.Len())
-	maps.Copy(ops, t.ops)
+	ops := make(map[uint64]valueOp, len(t.ops))
+	for k, o := range t.ops {
+		ops[k] = o.copy()
+	}
 	return &txn{
 		ops:    ops,
 		sorted: t.sorted.Clone(),
 		l:      sync.Mutex{},
+	}
+}
+
+// copy() deep copies a value operation
+func (o valueOp) copy() valueOp {
+	k, v := bytes.Clone(o.key), bytes.Clone(o.value)
+	return valueOp{
+		key:   k,
+		value: v,
+		entry: newEntry(k, v, getMeta(o.entry)),
+		op:    o.op,
 	}
 }
 
@@ -342,9 +351,6 @@ func (ti *TxnIterator) First() *TxnIterator {
 	}
 	return ti.seek() // seek to the beginning
 }
-
-// Close() closes the merged iterator
-func (ti *TxnIterator) Close() { ti.parent.Close() }
 
 // Next() advances the iterator to the next entry, choosing between in-memory and parent store entries
 func (ti *TxnIterator) Next() {
@@ -424,6 +430,9 @@ func (ti *TxnIterator) Valid() bool {
 	return !ti.txnInvalid() || ti.parent.Valid()
 }
 
+// Close() closes the merged iterator
+func (ti *TxnIterator) Close() { ti.parent.Close() }
+
 // txnFastForward() skips over deleted entries in the in-memory operations
 // return when invalid or !deleted
 func (ti *TxnIterator) txnFastForward() {
@@ -455,7 +464,7 @@ func (ti *TxnIterator) txnInvalid() bool {
 
 // txnKey() returns the key of the current in-memory operation
 func (ti *TxnIterator) txnKey() []byte {
-	return []byte(ti.tree.Current().Key)
+	return ti.tree.Current().Key
 }
 
 // txnValue() returns the value of the current in-memory operation
@@ -481,18 +490,13 @@ func (ti *TxnIterator) txnNext() {
 
 // seek() positions the iterator at the first entry that matches or exceeds the prefix.
 func (ti *TxnIterator) seek() *TxnIterator {
-	ti.tree.Move(&CacheItem{
-		Key: ti.prefix,
-	})
+	ti.tree.Move(&CacheItem{Key: ti.prefix})
 	return ti
 }
 
 // revSeek() positions the iterator at the last entry that matches the prefix in reverse order.
 func (ti *TxnIterator) revSeek() *TxnIterator {
-	bz := []byte(ti.prefix)
-	ti.tree.Move(&CacheItem{
-		Key: prefixEnd(bz),
-	})
+	ti.tree.Move(&CacheItem{Key: prefixEnd(ti.prefix)})
 	return ti
 }
 
@@ -503,10 +507,7 @@ type Iterator struct {
 	err    error
 }
 
-func (i *Iterator) Valid() bool {
-	valid := i.reader.Valid()
-	return valid
-}
+func (i *Iterator) Valid() bool     { return i.reader.Valid() }
 func (i *Iterator) Next()           { i.reader.Next() }
 func (i *Iterator) Close()          { i.reader.Close() }
 func (i *Iterator) Version() uint64 { return i.reader.Item().Version() }
@@ -529,8 +530,6 @@ func (i *Iterator) Value() (value []byte) {
 	}
 	return
 }
-
-// BADGERDB TXNWRITER AND TXNREADER INTERFACES IMPLEMENTATION BELOW
 
 const (
 	// ----------------------------------------------------------------------------------------------------------------
@@ -612,6 +611,9 @@ func (r BadgerTxnReader) Discard() { r.Txn.Discard() }
 // badger doesn't yet allow users to explicitly set keys as *do not discard*
 // https://github.com/hypermodeinc/badger/issues/2192
 func setMeta(e *badger.Entry, value byte) {
+	if e == nil {
+		return
+	}
 	v := reflect.ValueOf(e).Elem()
 	f := v.FieldByName(badgerMetaFieldName)
 	ptr := unsafe.Pointer(f.UnsafeAddr())
@@ -619,8 +621,11 @@ func setMeta(e *badger.Entry, value byte) {
 }
 
 // getMeta() accesses the private field 'meta' of badgerDB's 'Entry'
-func getMeta(entry *badger.Entry) byte {
-	v := reflect.ValueOf(entry).Elem()
+func getMeta(e *badger.Entry) byte {
+	if e == nil {
+		return 0
+	}
+	v := reflect.ValueOf(e).Elem()
 	f := v.FieldByName("meta")
 	return *(*byte)(unsafe.Pointer(f.UnsafeAddr()))
 }
@@ -656,10 +661,6 @@ func getSizeAndCount(txn *badger.Txn) (size, count int64) {
 // seekLast() positions the iterator at the last key for the given prefix
 func seekLast(it *badger.Iterator, prefix []byte) { it.Seek(prefixEnd(prefix)) }
 
-var (
-	endBytes = bytes.Repeat([]byte{0xFF}, maxKeyBytes+1)
-)
-
 // removePrefix() removes the prefix from the key
 func removePrefix(b, prefix []byte) []byte { return b[len(prefix):] }
 
@@ -681,6 +682,8 @@ func entryIsDelete(e *badger.Entry) bool {
 	return (getMeta(e) & badgerDeleteBit) != 0
 }
 
+var endBytes = bytes.Repeat([]byte{0xFF}, maxKeyBytes+1)
+
 // BTREE ITERATOR CODE BELOW
 
 type CacheItem struct {
@@ -690,9 +693,7 @@ type CacheItem struct {
 }
 
 // Less() compares the keys lexicographically
-func (ti CacheItem) Less(than *CacheItem) bool {
-	return bytes.Compare(ti.Key, than.Key) < 0
-}
+func (ti CacheItem) Less(than *CacheItem) bool { return bytes.Compare(ti.Key, than.Key) < 0 }
 
 // BTreeIterator provides external iteration over a btree
 type BTreeIterator struct {
@@ -702,26 +703,24 @@ type BTreeIterator struct {
 }
 
 // NewBTreeIterator() creates a new iterator starting at the closest item to the given key
-func NewBTreeIterator(tree *btree.BTreeG[*CacheItem], start *CacheItem, reverse bool) *BTreeIterator {
+func NewBTreeIterator(tree *btree.BTreeG[*CacheItem], start *CacheItem, reverse bool) (bt *BTreeIterator) {
 	// create a new BTreeIterator
-	bt := &BTreeIterator{
+	bt = &BTreeIterator{
 		tree:    tree,
 		reverse: reverse,
 	}
 	// if no start item is provided, set the iterator to the first or last item based on the direction
 	if start == nil || len(start.Key) == 0 {
 		if reverse {
-			val, _ := tree.Max()
-			bt.current = val
+			bt.current, _ = tree.Max()
 		} else {
-			val, _ := tree.Min()
-			bt.current = val
+			bt.current, _ = tree.Min()
 		}
-		return bt
+		return
 	}
 	// otherwise, move the iterator to that item
 	bt.Move(start)
-	return bt
+	return
 }
 
 // Move() moves the iterator to the given key or the closest item if the key is not found
@@ -805,25 +804,17 @@ func (bi *BTreeIterator) Prev() *CacheItem {
 	return bi.Current()
 }
 
-// next() finds the previous item in the tree based on the current item
+// prev() finds the previous item in the tree based on the current item
 func (bi *BTreeIterator) prev() *CacheItem {
-	var prevItem *CacheItem
-	var found bool
-	// find the previous item
+	var prev *CacheItem
 	bi.tree.DescendLessOrEqual(bi.current, func(item *CacheItem) bool {
-		prevItem = item
-		if prevItem.Less(bi.current) {
-			found = true
-			return false
+		if item.Less(bi.current) {
+			prev = item
+			return false // stop iteration
 		}
-		return true
+		return true // continue iteration
 	})
-	// if the item found, return it
-	if found {
-		return prevItem
-	}
-	// no previous item
-	return nil
+	return prev
 }
 
 // HasNext() returns true if there are more items after current
