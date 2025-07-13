@@ -472,7 +472,7 @@ func (b *BFT) StartCommitPhase() {
 			ProposerKey: b.ProposerKey,
 			Signature:   as,
 		},
-		Timestamp: uint64(time.Now().UnixMicro()),
+		Timestamp: uint64(time.Now().Add(b.WaitTime(Commit, b.Round)).UnixMicro()),
 	})
 }
 
