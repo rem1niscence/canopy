@@ -102,7 +102,7 @@ function pageHeightReq(page, height) {
 }
 
 function validatorsReq(page, height, committee) {
-  return JSON.stringify({ height: height, pageNumber: page, perPage: 10, committee: committee });
+  return JSON.stringify({ height: height, pageNumber: page, perPage: 1000, committee: committee });
 }
 
 // API CALLS BELOW
