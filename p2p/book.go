@@ -104,7 +104,7 @@ func (p *P2P) SendPeerBookRequests() {
 			p.ChangeReputation(senderID, GoodPeerBookRespRep)
 			// fires when request times out
 		case <-time.After(PeerBookRequestTimeoutS * time.Second):
-			p.log.Warnf("Peer book timeout")
+			p.log.Debugf("Peer book timeout")
 			continue
 		}
 	}
