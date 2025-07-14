@@ -31,7 +31,7 @@ import (
 const (
 	colon = ":"
 
-	SoftwareVersion = "0.0.0-alpha"
+	SoftwareVersion = "beta-0.1.2"
 	ContentType     = "Content-MessageType"
 	ApplicationJSON = "application/json; charset=utf-8"
 
