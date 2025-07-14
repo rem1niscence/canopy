@@ -234,7 +234,7 @@ func (c *Controller) ValidateProposal(rcBuildHeight uint64, qc *lib.QuorumCertif
 // - re-checks all transactions in mempool
 // - atomically writes all to the underlying db
 // - sets up the controller for the next height
-func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI) {
+func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult, ts uint64) (err lib.ErrorI) {
 	start := time.Now()
 	// cancel any running mempool check
 	c.Mempool.stop()
@@ -319,6 +319,8 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 			}
 			continue
 		}
+		// set the timestamp
+		info.Timestamp = ts
 		// publish root chain information
 		go c.RCManager.Publish(id, info)
 	}
@@ -567,7 +569,7 @@ func (c *Controller) HandlePeerBlock(msg *lib.BlockMessage, syncing bool) (*lib.
 		result = nil
 	}
 	// attempts to commit the QC to persistence of chain by playing it against the state machine
-	if err = c.CommitCertificate(qc, block, result); err != nil {
+	if err = c.CommitCertificate(qc, block, result, msg.Time); err != nil {
 		// exit with error
 		return nil, err
 	}

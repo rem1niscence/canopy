@@ -546,7 +546,9 @@ type RootChainInfo struct {
 	// lottery_winner: the selected delegate/pseudo-validator who receives rewards
 	LotteryWinner *LotteryWinner `protobuf:"bytes,5,opt,name=lottery_winner,json=lotteryWinner,proto3" json:"lotteryWinner"` // @gotags: json:"lotteryWinner"
 	// orders: the swap order book from the 'root chain' for the 'nested chain'
-	Orders        *OrderBook `protobuf:"bytes,6,opt,name=orders,proto3" json:"orders"` // @gotags: json:"orders"
+	Orders *OrderBook `protobuf:"bytes,6,opt,name=orders,proto3" json:"orders"` // @gotags: json:"orders"
+	// timestamp: a timestamp of when the notification should cause a reset
+	Timestamp     uint64 `protobuf:"varint,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -623,6 +625,13 @@ func (x *RootChainInfo) GetOrders() *OrderBook {
 	return nil
 }
 
+func (x *RootChainInfo) GetTimestamp() uint64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
 var File_consensus_proto protoreflect.FileDescriptor
 
 const file_consensus_proto_rawDesc = "" +
@@ -653,14 +662,15 @@ const file_consensus_proto_rawDesc = "" +
 	"\fValidatorSet\x18\x01 \x03(\v2\x19.types.ConsensusValidatorR\fValidatorSet\"9\n" +
 	"\rLotteryWinner\x12\x16\n" +
 	"\x06winner\x18\x01 \x01(\fR\x06winner\x12\x10\n" +
-	"\x03cut\x18\x02 \x01(\x04R\x03cut\"\xbd\x02\n" +
+	"\x03cut\x18\x02 \x01(\x04R\x03cut\"\xdb\x02\n" +
 	"\rRootChainInfo\x12\"\n" +
 	"\rroot_chain_id\x18\x01 \x01(\x04R\vrootChainId\x12\x16\n" +
 	"\x06height\x18\x02 \x01(\x04R\x06height\x12?\n" +
 	"\rvalidator_set\x18\x03 \x01(\v2\x1a.types.ConsensusValidatorsR\fvalidatorSet\x12H\n" +
 	"\x12last_validator_set\x18\x04 \x01(\v2\x1a.types.ConsensusValidatorsR\x10lastValidatorSet\x12;\n" +
 	"\x0elottery_winner\x18\x05 \x01(\v2\x14.types.LotteryWinnerR\rlotteryWinner\x12(\n" +
-	"\x06orders\x18\x06 \x01(\v2\x10.types.OrderBookR\x06orders*\xbb\x01\n" +
+	"\x06orders\x18\x06 \x01(\v2\x10.types.OrderBookR\x06orders\x12\x1c\n" +
+	"\ttimestamp\x18\a \x01(\x04R\ttimestamp*\xbb\x01\n" +
 	"\x05Phase\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\f\n" +
 	"\bELECTION\x10\x01\x12\x11\n" +

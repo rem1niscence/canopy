@@ -126,6 +126,7 @@ func (b *BFT) Start() {
 				since := time.Since(resetBFT.StartTime)
 				// allow if 'since' is less than 1 block old
 				if int(since.Milliseconds()) < b.Config.BlockTimeMS() {
+					b.log.Infof("Using included timestamp to calculate process time: %s", resetBFT.StartTime.String())
 					processTime = since
 				}
 				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'
@@ -897,7 +898,7 @@ type (
 		// LoadCertificate() gets the Quorum Certificate from the chainId-> plugin at a certain height
 		LoadCertificate(height uint64) (*lib.QuorumCertificate, lib.ErrorI)
 		// CommitCertificate() commits a block to persistence
-		CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI)
+		CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult, ts uint64) (err lib.ErrorI)
 		// GossipBlock() is a P2P call to gossip a completed Quorum Certificate with a Proposal
 		GossipBlock(certificate *lib.QuorumCertificate, sender []byte, timestamp uint64)
 		// SendToSelf() is a P2P call to directly send  a completed Quorum Certificate to self

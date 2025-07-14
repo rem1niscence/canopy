@@ -166,4 +166,6 @@ message RootChainInfo {
   LotteryWinner lottery_winner = 5; // @gotags: json:"lotteryWinner"
   // orders: the swap order book from the 'root chain' for the 'nested chain'
   OrderBook orders = 6; // @gotags: json:"orders"
+  // timestamp: a timestamp of when the notification should cause a reset
+  uint64 timestamp = 7;
 }
