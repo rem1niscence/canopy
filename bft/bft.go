@@ -519,6 +519,7 @@ func (b *BFT) RoundInterrupt() {
 	b.Config.RoundInterruptTimeoutMS = b.msLeftInRound()
 	b.log.Warnf("Starting next round in %.2f secs", (time.Duration(b.Config.RoundInterruptTimeoutMS) * time.Millisecond).Seconds())
 	b.Phase = RoundInterrupt
+	b.BlockResult = nil
 	b.ResetFSM()
 	// send pacemaker message
 	b.SendToReplicas(b.ValidatorSet, &Message{
