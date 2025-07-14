@@ -342,6 +342,11 @@ func runAutoUpdate() {
 			// block until kill signal is received
 			s := <-stop
 			log.Printf("Exit command %s received in auto update\n", s)
+			config, err = lib.NewConfigFromFile(configFilePath)
+			if err != nil {
+				log.Printf("Failed to read config file on closure: %v", err)
+				return
+			}
 			config.RunningAutoUpdate = false
 			config.WriteToFile(configFilePath)
 			// Gracefully terminate the current process
