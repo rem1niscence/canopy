@@ -43,3 +43,10 @@ jobs:
             dist/cli-linux-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dispatch to Docker release repo
+        run: |
+          curl -X POST https://api.github.com/repos/canopy-network/deployments/dispatches \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: token ${{ secrets.DISPATCH_TOKEN }}" \
+            -d '{"event_type":"docker-release","client_payload":{"tag":"${{ github.event.inputs.tag }}"}}'
