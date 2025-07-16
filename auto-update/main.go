@@ -233,6 +233,7 @@ func runAutoUpdate() {
 		// Atomic flags for thread-safe state management
 		var uploadingNewVersion atomic.Bool    // Indicates if a new version is currently being installed
 		var newVersionAlreadyFound atomic.Bool // Prevents multiple goroutines from handling the same update
+		var killedFromChild atomic.Bool        // Indicates if a kill signal was sent from the child process
 
 		firstTime := true                 // Flag to skip random delay on first run
 		downloadLock := new(sync.Mutex)   // Mutex to prevent concurrent binary downloads and replacements
@@ -261,6 +262,7 @@ func runAutoUpdate() {
 				err = cmd.Wait()
 				log.Printf("Process exited: %v", err)
 				if !uploadingNewVersion.Load() {
+					killedFromChild.Store(true)
 					stop <- syscall.SIGINT
 				}
 
@@ -317,13 +319,13 @@ func runAutoUpdate() {
 								// Gracefully terminate the current process
 								err = cmd.Process.Signal(syscall.SIGINT)
 								if err != nil {
-									log.Printf("Failed to send syscall to child process: %v", err)
-									return
+									log.Printf("Failed to send syscall to child process in routine of check updates: %v", err)
+									return // use of return instead of continue here is correct since this routine is short lived
 								}
 
-								log.Println("SENT KILL SIGNAL")
+								log.Println("SENT KILL SIGNAL in routine of check updates")
 								<-notifyEndRun
-								log.Println("KILLED OLD PROCESS")
+								log.Println("KILLED OLD PROCESS in routine of check updates")
 							}
 
 							notifyStartRun <- struct{}{}
@@ -338,28 +340,34 @@ func runAutoUpdate() {
 
 		// routine to wait for kill
 		go func() {
-			signal.Notify(stop, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGABRT)
-			// block until kill signal is received
-			s := <-stop
-			log.Printf("Exit command %s received in auto update\n", s)
-			config, err = lib.NewConfigFromFile(configFilePath)
-			if err != nil {
-				log.Printf("Failed to read config file on closure: %v", err)
-				return
+			for {
+				signal.Notify(stop, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGABRT)
+				// block until kill signal is received
+				s := <-stop
+				log.Printf("Exit command %s received in auto update\n", s)
+				config, err = lib.NewConfigFromFile(configFilePath)
+				if err != nil {
+					log.Printf("Failed to read config file on closure: %v", err)
+					continue
+				}
+				config.RunningAutoUpdate = false
+				config.WriteToFile(configFilePath)
+				if !killedFromChild.Load() {
+					// Gracefully terminate the current process
+					err = cmd.Process.Signal(syscall.SIGINT)
+					if err != nil {
+						killedFromChild.Store(false) // in case of error when a new kill signal comes it is not necessarily because of child process kill
+						log.Printf("Failed to send syscall to child process in routine wait for kill: %v", err)
+						continue
+					}
+					log.Println("SENT KILL SIGNAL in routine wait for kill")
+					<-notifyEndRun
+					log.Println("KILLED OLD PROCESS in routine wait for kill")
+
+				}
+				log.Println("Finished auto update setup for closure")
+				os.Exit(0)
 			}
-			config.RunningAutoUpdate = false
-			config.WriteToFile(configFilePath)
-			// Gracefully terminate the current process
-			err = cmd.Process.Signal(syscall.SIGINT)
-			if err != nil {
-				log.Printf("Failed to send syscall to child process: %v", err)
-				return
-			}
-			log.Println("SENT KILL SIGNAL")
-			<-notifyEndRun
-			log.Println("KILLED OLD PROCESS")
-			log.Println("Finished auto update setup for closure")
-			os.Exit(0)
 		}()
 
 		// Start the initial binary if it exists
