@@ -315,6 +315,14 @@ func (r *RCSubscription) dialWithBackoff(chainId uint64, config lib.RootChain) {
 		if e == nil {
 			// set the connection
 			r.conn = conn
+			// call get root chain info
+			info, er := r.RootChainInfo(0, chainId)
+			if er != nil || info.Height == 0 {
+				r.log.Error(e.Error())
+				continue
+			}
+			// set the information
+			r.Info = info
 			// start the listener
 			go r.Listen()
 			// add to the manager

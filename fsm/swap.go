@@ -77,6 +77,9 @@ func (s *StateMachine) ParseCloseOrder(tx *lib.Transaction) (co *lib.CloseOrder,
 // ProcessRootChainOrderBook() processes the order book from the root-chain and cross-references blocks on this chain to determine
 // actions that warrant committee level changes to the root-chain order book like: LockOrder, ResetOrder and CloseOrder
 func (s *StateMachine) ProcessRootChainOrderBook(book *lib.OrderBook, proposalBlock *lib.BlockResult) (lockOrders []*lib.LockOrder, closedOrders, resetOrders [][]byte) {
+	if book == nil {
+		return
+	}
 	blocks := []*lib.BlockResult{proposalBlock}
 	// historical checking logic:
 	// don't do historical checking before block 16
