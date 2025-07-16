@@ -102,7 +102,7 @@ func (c *Controller) Start() {
 			rootChainInfo, e := c.RCManager.GetRootChainInfo(rootChainId, c.Config.ChainId)
 			if e != nil {
 				c.log.Error(e.Error()) // log error but continue
-			} else if rootChainInfo != nil {
+			} else if rootChainInfo != nil && rootChainInfo.Height != 0 {
 				// call mempool check
 				c.Mempool.CheckMempool()
 				// update the peer 'must connect'
