@@ -3,12 +3,13 @@ package lib
 import (
 	"bytes"
 	"context"
+	"net/http"
+	"time"
+
 	"github.com/canopy-network/canopy/lib/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"net/http"
-	"time"
 )
 
 /* This file implements dev-ops telemetry for the node in the form of prometheus metrics */
@@ -133,14 +134,14 @@ type MempoolMetrics struct {
 }
 
 // NewMetricsServer() creates a new telemetry server
-func NewMetricsServer(nodeAddress crypto.AddressI, config MetricsConfig) *Metrics {
+func NewMetricsServer(nodeAddress crypto.AddressI, config MetricsConfig, logger LoggerI) *Metrics {
 	mux := http.NewServeMux()
 	mux.Handle(metricsPattern, promhttp.Handler())
 	return &Metrics{
 		server:      &http.Server{Addr: config.PrometheusAddress, Handler: mux},
 		config:      config,
 		nodeAddress: nodeAddress.Bytes(),
-		log:         NewDefaultLogger(),
+		log:         logger,
 		// NODE
 		NodeMetrics: NodeMetrics{
 			NodeStatus: promauto.NewGauge(prometheus.GaugeOpts{

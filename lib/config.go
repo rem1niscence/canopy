@@ -32,6 +32,7 @@ const (
 // Config is the structure of the user configuration options for a Canopy node
 type Config struct {
 	MainConfig         // main options spanning over all modules
+	LoggerConfig       // logger options
 	RPCConfig          // rpc API options
 	StateMachineConfig // FSM options
 	StoreConfig        // persistence options

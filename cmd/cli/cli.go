@@ -47,7 +47,11 @@ func init() {
 	autoCompleteCmd.AddCommand(autoCompleteInstallCmd)
 	rootCmd.PersistentFlags().StringVar(&DataDir, "data-dir", lib.DefaultDataDirPath(), "custom data directory location")
 	config, validatorKey = InitializeDataDirectory(DataDir, lib.NewDefaultLogger())
-	l = lib.NewLogger(lib.LoggerConfig{Level: config.GetLogLevel()})
+	l = lib.NewLogger(lib.LoggerConfig{
+		Level:      config.GetLogLevel(),
+		Structured: config.Structured,
+		JSON:       config.JSON,
+	})
 	client = rpc.NewClient(config.RPCUrl, config.AdminRPCUrl)
 }
 
@@ -75,7 +79,7 @@ func Start() {
 		time.Sleep(untilTime)
 	}
 	// initialize and start the metrics server
-	metrics := lib.NewMetricsServer(validatorKey.PublicKey().Address(), config.MetricsConfig)
+	metrics := lib.NewMetricsServer(validatorKey.PublicKey().Address(), config.MetricsConfig, l)
 	// create a new database object from the config
 	db, err := store.New(config, metrics, l)
 	if err != nil {
