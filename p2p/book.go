@@ -310,6 +310,8 @@ func (p *P2P) GetBookPeers() []*BookPeer { return p.book.GetAll() }
 
 // WriteToFile() saves the peer book object to a json file
 func (p *PeerBook) WriteToFile() error {
+	p.l.Lock()
+	defer p.l.Unlock()
 	configBz, err := json.MarshalIndent(p, "", "  ")
 	if err != nil {
 		return err
