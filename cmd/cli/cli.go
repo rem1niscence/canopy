@@ -27,9 +27,16 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:     "canopy",
-	Short:   "the canopy blockchain software",
-	Version: rpc.SoftwareVersion,
+	Use:   "canopy",
+	Short: "the canopy blockchain software",
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print the version number",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(rpc.SoftwareVersion)
+	},
 }
 
 var (
@@ -40,6 +47,7 @@ var (
 func init() {
 	flag.Parse()
 	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(queryCmd)
 	rootCmd.AddCommand(adminCmd)
 	rootCmd.AddCommand(autoCompleteCmd)

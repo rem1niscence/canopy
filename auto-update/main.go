@@ -220,9 +220,6 @@ func runBinary() (*exec.Cmd, error) {
 }
 
 func runAutoUpdate() {
-	// save in the config file that the auto update software is running
-	config.RunningAutoUpdate = true
-	config.WriteToFile(configFilePath)
 	if !config.AutoUpdate {
 		cli.Start()
 	} else {
@@ -345,13 +342,6 @@ func runAutoUpdate() {
 				// block until kill signal is received
 				s := <-stop
 				log.Printf("Exit command %s received in auto update\n", s)
-				config, err = lib.NewConfigFromFile(configFilePath)
-				if err != nil {
-					log.Printf("Failed to read config file on closure: %v", err)
-					continue
-				}
-				config.RunningAutoUpdate = false
-				config.WriteToFile(configFilePath)
 				if !killedFromChild.Load() {
 					// Gracefully terminate the current process
 					err = cmd.Process.Signal(syscall.SIGINT)
@@ -404,13 +394,8 @@ func main() {
 	if err != nil {
 		log.Print(err.Error())
 	}
-	// run regular way if not saved it is already running
-	if !config.RunningAutoUpdate {
-		go runAutoUpdate()
-		// Block forever
-		select {}
-		// if the auto update software is already running just setup cli commands
-	} else {
-		cli.Execute()
-	}
+	// Run auto update
+	go runAutoUpdate()
+	// Block forever
+	select {}
 }
