@@ -110,10 +110,13 @@ type BFTMetrics struct {
 
 // FSMMetrics represents the telemetry of the FSM module for the node's address
 type FSMMetrics struct {
-	ValidatorStatus      *prometheus.GaugeVec // what's the status of this validator?
-	ValidatorType        *prometheus.GaugeVec // what's the type of this validator?
-	ValidatorCompounding *prometheus.GaugeVec // is this validator compounding?
-	ValidatorStakeAmount *prometheus.GaugeVec // what's the stake amount of this validator
+	ValidatorStatus        *prometheus.GaugeVec // what's the status of this validator?
+	ValidatorType          *prometheus.GaugeVec // what's the type of this validator?
+	ValidatorCompounding   *prometheus.GaugeVec // is this validator compounding?
+	ValidatorStakeAmount   *prometheus.GaugeVec // what's the stake amount of this validator
+	ValidatorBlockProducer *prometheus.GaugeVec // was this validator a block producer?
+	ValidatorNonSigner     *prometheus.GaugeVec // was this validator a non signer?
+	ValidatorDoubleSigner  *prometheus.GaugeVec // was this validator a double signer?
 }
 
 // StoreMetrics represents the telemetry of the 'store' package
@@ -276,6 +279,18 @@ func NewMetricsServer(nodeAddress crypto.AddressI, config MetricsConfig, logger 
 				Name: "canopy_validator_stake_amount",
 				Help: "Validator stake in uCNPY",
 			}, []string{"address"}),
+			ValidatorBlockProducer: promauto.NewGaugeVec(prometheus.GaugeOpts{
+				Name: "canopy_validator_block_producer",
+				Help: "Validator was block producer (1: true, 0: false)",
+			}, []string{"address"}),
+			ValidatorNonSigner: promauto.NewGaugeVec(prometheus.GaugeOpts{
+				Name: "canopy_validator_non_signer",
+				Help: "Validator was block non signer (1: true, 0: false)",
+			}, []string{"address"}),
+			ValidatorDoubleSigner: promauto.NewGaugeVec(prometheus.GaugeOpts{
+				Name: "canopy_validator_double_signer",
+				Help: "Validator was double signer (1: true, 0: false)",
+			}, []string{"address"}),
 		},
 		// STORE
 		StoreMetrics: StoreMetrics{
@@ -423,7 +438,7 @@ func (m *Metrics) UpdateBFTMetrics(height, rootHeight, round uint64, phase Phase
 }
 
 // UpdateValidator() updates the validator metrics for prometheus
-func (m *Metrics) UpdateValidator(address string, stakeAmount uint64, unstaking, paused, delegate, compounding bool) {
+func (m *Metrics) UpdateValidator(address string, stakeAmount uint64, unstaking, paused, delegate, compounding, isProducer, isNonSigner, isDoubleSigner bool) {
 	// exit if empty
 	if m == nil {
 		return
@@ -441,6 +456,24 @@ func (m *Metrics) UpdateValidator(address string, stakeAmount uint64, unstaking,
 		m.ValidatorType.WithLabelValues(address).Set(float64(0))
 	} else {
 		m.ValidatorType.WithLabelValues(address).Set(float64(1))
+	}
+	// update block producer
+	if isProducer {
+		m.ValidatorBlockProducer.WithLabelValues(address).Set(float64(1))
+	} else {
+		m.ValidatorBlockProducer.WithLabelValues(address).Set(float64(0))
+	}
+	// update non signer
+	if isNonSigner {
+		m.ValidatorNonSigner.WithLabelValues(address).Set(float64(1))
+	} else {
+		m.ValidatorNonSigner.WithLabelValues(address).Set(float64(0))
+	}
+	// update double signer
+	if isDoubleSigner {
+		m.ValidatorDoubleSigner.WithLabelValues(address).Set(float64(1))
+	} else {
+		m.ValidatorDoubleSigner.WithLabelValues(address).Set(float64(0))
 	}
 	// update the status metric
 	switch {
@@ -522,7 +555,7 @@ func (m *Metrics) UpdateMempoolMetrics(txCount, size int) {
 	// update the transaction count metric
 	m.MempoolTxCount.Set(float64(txCount))
 	// update the mempool size metric
-	m.MempoolTxCount.Set(float64(size))
+	m.MempoolSize.Set(float64(size))
 }
 
 // UpdateNonSignerPercent() updates the percent of the non-signers for a block
