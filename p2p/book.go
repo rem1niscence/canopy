@@ -79,11 +79,29 @@ func (p *P2P) SendPeerBookRequests() {
 			continue
 		}
 		p.log.Debugf("Sent peer book request to all peers")
+	}
+}
+
+func (p *P2P) ListenForPeerBookResponses() {
+	// limit the number of inbound PeerBook requests per requester and by total number of requests
+	l := lib.NewLimiter(MaxPeerBookRequestsPerWindow, p.MaxPossiblePeers()*MaxPeerBookRequestsPerWindow, PeerBookRequestWindowS)
+	for {
 		select {
 		// fires when received the response to the request
 		case msg := <-p.Inbox(lib.Topic_PEERS_RESPONSE):
 			p.log.Debugf("Received peer book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 			senderID := msg.Sender.Address.PublicKey
+			// rate limit per requester
+			blocked, totalBlock := l.NewRequest(lib.BytesToString(senderID))
+			// if requester blocked
+			if blocked {
+				p.ChangeReputation(senderID, ExceedMaxPBReqRep)
+				continue
+			}
+			// if blocked by total number of requests
+			if totalBlock {
+				continue // dos defensive
+			}
 			// ensure PeerBookResponse message type
 			peerBookResponseMsg := new(PeerBookResponseMessage)
 			if err := lib.Unmarshal(msg.Message, peerBookResponseMsg); err != nil {
@@ -102,10 +120,8 @@ func (p *P2P) SendPeerBookRequests() {
 				p.book.Add(bp)
 			}
 			p.ChangeReputation(senderID, GoodPeerBookRespRep)
-			// fires when request times out
-		case <-time.After(PeerBookRequestTimeoutS * time.Second):
-			p.log.Debugf("Peer book timeout")
-			continue
+		case <-l.TimeToReset(): // fires when the limiter should reset
+			l.Reset()
 		}
 	}
 }
@@ -168,6 +184,7 @@ func (p *P2P) ListenForPeerBookRequests() {
 func (p *P2P) StartPeerBookService() {
 	go p.ListenForPeerBookRequests()
 	go p.SendPeerBookRequests()
+	go p.ListenForPeerBookResponses()
 	go p.book.StartChurnManagement(p.DialAndDisconnect)
 	go p.book.SaveRoutine()
 }

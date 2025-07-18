@@ -374,9 +374,26 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 			Message: msg,
 			Sender:  peerInfo,
 		}
-		// s.logger.Debugf("Inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
+		//s.logger.Debugf("Inbox %s queue: %d", lib.Topic_name[int32(packet.StreamId)], len(s.inbox))
 		// add to inbox for other parts of the app to read
-		s.inbox <- m
+		select {
+		case s.inbox <- m:
+		default:
+			s.logger.Errorf("CRITICAL: Inbox %s queue full", lib.Topic_name[int32(packet.StreamId)])
+			s.logger.Error("Dropping all messages")
+			// drain inbox
+			func() {
+				for {
+					select {
+					case <-s.inbox:
+						// drop
+					default:
+						// channel is empty now
+						return
+					}
+				}
+			}()
+		}
 		// reset receiving buffer
 		s.msgAssembler = s.msgAssembler[:0]
 	}

@@ -19,6 +19,7 @@ func (b *BFT) ValidateByzantineEvidence(slashRecipients *lib.SlashRecipients, be
 		return nil
 	}
 	if len(slashRecipients.DoubleSigners) != 0 {
+		b.log.Error("ValidateByzantineEvidence: found double signers")
 		// locally generate a Double Signers list from the provided evidence
 		doubleSigners, err := b.ProcessDSE(be.DSE.Evidence...)
 		if err != nil {
@@ -144,6 +145,7 @@ func (b *BFT) AddDSE(e *DoubleSignEvidences, ev *DoubleSignEvidence) (err lib.Er
 	// process the Double Sign Evidence and save the double signers
 	badSigners, err := b.ProcessDSE(ev)
 	if err != nil {
+		b.log.Error(err.Error())
 		return err
 	}
 	// ignore if there are no bad actors
@@ -260,18 +262,21 @@ func (b *BFT) AddPartialQC(m *Message) (err lib.ErrorI) {
 func (b *BFT) addDSEByPartialQC(dse *DoubleSignEvidences) {
 	// REPLICA with two proposer messages for same (H,R,P) - the partial is the malicious one
 	for _, pQC := range b.PartialQCs {
+		b.log.Warnf("Inspecting PartialQC for height/round: %d/%d", pQC.Header.Height, pQC.Header.Round)
 		evidenceHeight := pQC.Header.Height
 		// check if evidence height is current (non-historical)
 		if evidenceHeight == b.Height {
 			// get the round of the partial QC to try to find a conflicting majority QC
 			roundProposal := b.Proposals[pQC.Header.Round]
 			if roundProposal == nil {
+				b.log.Warn("RoundProposal nil, skipping")
 				continue
 			}
 			// try to find a conflicting QC
 			// NOTE: proposals with conflicting QC is 1 phase above as it's used by the leader as justification
 			proposal, found := roundProposal[phaseToString(pQC.Header.Phase+1)]
 			if !found {
+				b.log.Warn("Conflicting proposal not found, skipping")
 				continue
 			}
 			// add the double sign evidence to the list
@@ -285,11 +290,13 @@ func (b *BFT) addDSEByPartialQC(dse *DoubleSignEvidences) {
 		} else { // this partial QC is historical
 			// historically can only process precommit vote as the other non Commit QCs are pruned
 			if pQC.Header.Phase != PrecommitVote {
+				b.log.Warnf("DSE wrong phase: %s", lib.Phase_name[int32(pQC.Header.Phase)])
 				continue
 			}
 			// Load the certificate that contains the competing QC
 			certificate, err := b.LoadCertificate(evidenceHeight)
 			if err != nil {
+				b.log.Warn("DSE ERR: loading certificate")
 				continue
 			}
 			// add the double sign evidence to the list
@@ -318,11 +325,13 @@ This allows the Leader Candidate to `out` the validators who `double signed` for
 func (b *BFT) addDSEByCandidate(dse *DoubleSignEvidences) {
 	// ELECTION CANDIDATE exposing double sign election
 	if !b.SelfIsProposer() {
+		b.log.Debugf("Inspecting candidate messages for conflicts")
 		// for each Round until present
 		for r := uint64(0); r <= b.Round; r++ {
 			// get votes for round
 			rvs := b.Votes[r]
 			if rvs == nil {
+				b.log.Debugf("No round vote sets found")
 				continue
 			}
 			// get votes for Election Vote phase
@@ -330,25 +339,30 @@ func (b *BFT) addDSEByCandidate(dse *DoubleSignEvidences) {
 			electionVotes := rvs[ps]
 			// if didn't receive any election votes
 			if electionVotes == nil {
+				b.log.Debugf("No election votes found")
 				continue
 			}
 			// get the true Leaders' messages for this same round
 			roundProposal := b.Proposals[r]
 			if roundProposal == nil {
+				b.log.Debugf("No round proposals found")
 				continue
 			}
 			// specifically the Propose message which contains the ElectionVote justification signatures
 			proposal, found := roundProposal[phaseToString(Propose)]
 			if !found || len(proposal) == 0 {
+				b.log.Debugf("No propose message which contains the ElectionVote justification signatures found")
 				continue
 			}
 			// for each election vote payload received (likely only 1 payload)
 			for _, voteSet := range electionVotes {
 				// if the vote exists and the QC is not empty
 				if voteSet.Vote != nil && voteSet.Vote.Qc != nil {
+					b.log.Debugf("inspecting election vote payload for conflicts")
 					// aggregate the signers of this vote
 					signature, e := voteSet.multiKey.AggregateSignatures()
 					if e != nil {
+						b.log.Error(e.Error())
 						continue
 					}
 					// build into an ElectionQC
@@ -360,6 +374,7 @@ func (b *BFT) addDSEByCandidate(dse *DoubleSignEvidences) {
 							Bitmap:    voteSet.multiKey.Bitmap(),
 						},
 					}
+					b.log.Errorf("Double sign evidence found: 'By LeaderCandidate'")
 					// attempt to add it as DoubleSignEvidence
 					// (will be rejected if there are no conflicting signers)
 					if err := b.AddDSE(dse, &DoubleSignEvidence{

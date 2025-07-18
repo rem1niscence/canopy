@@ -3,6 +3,7 @@ package lib
 import (
 	"container/list"
 	"encoding/json"
+	"github.com/canopy-network/canopy/lib/crypto"
 	"testing"
 	"time"
 
@@ -17,17 +18,17 @@ func TestMessageCacheAdd(t *testing.T) {
 		cache      MessageCache
 		toAdd      *MessageAndMetadata
 		expectedOk bool
-		expected   map[uint64]struct{}
+		expected   map[string]struct{}
 	}{
 		{
 			name:   "exists",
 			detail: "not added as message already exists in cache",
 			cache: MessageCache{
 				queue: list.New(),
-				deDupe: &DeDuplicator[uint64]{m: map[uint64]struct{}{
-					func() uint64 {
+				deDupe: &DeDuplicator[string]{m: map[string]struct{}{
+					func() string {
 						bz, _ := Marshal(&StringWrapper{Value: "b"})
-						return MemHash(bz)
+						return crypto.HashString(bz)
 					}(): {},
 				}},
 				maxSize: 2,
@@ -39,10 +40,10 @@ func TestMessageCacheAdd(t *testing.T) {
 					return bz
 				}(),
 			},
-			expected: map[uint64]struct{}{
-				func() uint64 {
+			expected: map[string]struct{}{
+				func() string {
 					bz, _ := Marshal(&StringWrapper{Value: "b"})
-					return MemHash(bz)
+					return crypto.HashString(bz)
 				}(): {},
 			},
 			expectedOk: false,
@@ -62,10 +63,10 @@ func TestMessageCacheAdd(t *testing.T) {
 					})
 					return
 				}(),
-				deDupe: &DeDuplicator[uint64]{m: map[uint64]struct{}{
-					func() uint64 {
+				deDupe: &DeDuplicator[string]{m: map[string]struct{}{
+					func() string {
 						bz, _ := Marshal(&StringWrapper{Value: "b"})
-						return MemHash(bz)
+						return crypto.HashString(bz)
 					}(): {},
 				}},
 				maxSize: 2,
@@ -77,14 +78,14 @@ func TestMessageCacheAdd(t *testing.T) {
 					return bz
 				}(),
 			},
-			expected: map[uint64]struct{}{
-				func() uint64 {
+			expected: map[string]struct{}{
+				func() string {
 					bz, _ := Marshal(&StringWrapper{Value: "b"})
-					return MemHash(bz)
+					return crypto.HashString(bz)
 				}(): {},
-				func() uint64 {
+				func() string {
 					bz, _ := Marshal(&StringWrapper{Value: "c"})
-					return MemHash(bz)
+					return crypto.HashString(bz)
 				}(): {},
 			},
 			expectedOk: true,
@@ -104,10 +105,10 @@ func TestMessageCacheAdd(t *testing.T) {
 					})
 					return
 				}(),
-				deDupe: &DeDuplicator[uint64]{m: map[uint64]struct{}{
-					func() uint64 {
+				deDupe: &DeDuplicator[string]{m: map[string]struct{}{
+					func() string {
 						bz, _ := Marshal(&StringWrapper{Value: "b"})
-						return MemHash(bz)
+						return crypto.HashString(bz)
 					}(): {},
 				}},
 				maxSize: 1,
@@ -119,10 +120,10 @@ func TestMessageCacheAdd(t *testing.T) {
 					return bz
 				}(),
 			},
-			expected: map[uint64]struct{}{
-				func() uint64 {
+			expected: map[string]struct{}{
+				func() string {
 					bz, _ := Marshal(&StringWrapper{Value: "c"})
-					return MemHash(bz)
+					return crypto.HashString(bz)
 				}(): {},
 			},
 			expectedOk: true,
