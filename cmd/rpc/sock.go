@@ -317,8 +317,12 @@ func (r *RCSubscription) dialWithBackoff(chainId uint64, config lib.RootChain) {
 			r.conn = conn
 			// call get root chain info
 			info, er := r.RootChainInfo(0, chainId)
-			if er != nil || info.Height == 0 {
-				r.log.Error(e.Error())
+			if er != nil || info == nil || info.Height == 0 {
+				if er != nil {
+					r.log.Error(er.Error())
+				} else if info == nil || info.Height == 0 {
+					r.log.Error("invalid root chain info")
+				}
 				continue
 			}
 			// set the information
