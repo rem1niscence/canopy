@@ -47,6 +47,10 @@ import (
 // DBCommitSize         | 128MB       | 10MB       | Hard = Badger set limit (configurable)
 // MempoolSize          | 10MB        | 2MB        | Hard = default config, Soft = 2 blocks
 // MempoolCount         | 5,000       | 3,500      | Hard = default config, Soft = 75% of hard
+// DoubleSignerCount    | 1           | n/a        | Hard = any double signer
+// DoubleSigner         | 1           | n/a        | Hard = any double sign
+// NonSignerCount       | 50          | 20         | Hard = arbitrary, Soft = arbitrary
+// NonSigner            | 2           | 1          | Hard = repeat offense, Soft = first occurrence
 
 const metricsPattern = "/metrics"
 
