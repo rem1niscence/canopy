@@ -110,13 +110,15 @@ type BFTMetrics struct {
 
 // FSMMetrics represents the telemetry of the FSM module for the node's address
 type FSMMetrics struct {
-	ValidatorStatus        *prometheus.GaugeVec // what's the status of this validator?
-	ValidatorType          *prometheus.GaugeVec // what's the type of this validator?
-	ValidatorCompounding   *prometheus.GaugeVec // is this validator compounding?
-	ValidatorStakeAmount   *prometheus.GaugeVec // what's the stake amount of this validator
-	ValidatorBlockProducer *prometheus.GaugeVec // was this validator a block producer?
-	ValidatorNonSigner     *prometheus.GaugeVec // was this validator a non signer?
-	ValidatorDoubleSigner  *prometheus.GaugeVec // was this validator a double signer?
+	ValidatorStatus            *prometheus.GaugeVec // what's the status of this validator?
+	ValidatorType              *prometheus.GaugeVec // what's the type of this validator?
+	ValidatorCompounding       *prometheus.GaugeVec // is this validator compounding?
+	ValidatorStakeAmount       *prometheus.GaugeVec // what's the stake amount of this validator
+	ValidatorBlockProducer     *prometheus.GaugeVec // was this validator a block producer?
+	ValidatorNonSigner         *prometheus.GaugeVec // was this validator a non signer?
+	ValidatorNonSignerCount    *prometheus.GaugeVec // was any validator a non signer?
+	ValidatorDoubleSigner      *prometheus.GaugeVec // was this validator a double signer?
+	ValidatorDoubleSignerCount *prometheus.GaugeVec // was any validator a double signer?
 }
 
 // StoreMetrics represents the telemetry of the 'store' package
@@ -287,10 +289,18 @@ func NewMetricsServer(nodeAddress crypto.AddressI, config MetricsConfig, logger 
 				Name: "canopy_validator_non_signer",
 				Help: "Validator was block non signer (1: true, 0: false)",
 			}, []string{"address"}),
+			ValidatorNonSignerCount: promauto.NewGaugeVec(prometheus.GaugeOpts{
+				Name: "canopy_validator_non_signer_count",
+				Help: "Count of non signers within the non-sign-window",
+			}, []string{"type"}),
 			ValidatorDoubleSigner: promauto.NewGaugeVec(prometheus.GaugeOpts{
 				Name: "canopy_validator_double_signer",
 				Help: "Validator was double signer (1: true, 0: false)",
 			}, []string{"address"}),
+			ValidatorDoubleSignerCount: promauto.NewGaugeVec(prometheus.GaugeOpts{
+				Name: "canopy_validator_double_signer_count",
+				Help: "Count of double signers for the last block",
+			}, []string{"type"}),
 		},
 		// STORE
 		StoreMetrics: StoreMetrics{
@@ -438,7 +448,8 @@ func (m *Metrics) UpdateBFTMetrics(height, rootHeight, round uint64, phase Phase
 }
 
 // UpdateValidator() updates the validator metrics for prometheus
-func (m *Metrics) UpdateValidator(address string, stakeAmount uint64, unstaking, paused, delegate, compounding, isProducer, isNonSigner, isDoubleSigner bool) {
+func (m *Metrics) UpdateValidator(address string, stakeAmount uint64, unstaking, paused, delegate, compounding, isProducer bool,
+	nonSigners map[string]uint64, doubleSigners []crypto.AddressI) {
 	// exit if empty
 	if m == nil {
 		return
@@ -463,13 +474,27 @@ func (m *Metrics) UpdateValidator(address string, stakeAmount uint64, unstaking,
 	} else {
 		m.ValidatorBlockProducer.WithLabelValues(address).Set(float64(0))
 	}
+	var isNonSigner bool
 	// update non signer
+	for nonSignerAddress := range nonSigners {
+		if address == nonSignerAddress {
+			isNonSigner = true
+		}
+	}
+	m.ValidatorNonSignerCount.WithLabelValues("any").Set(float64(len(nonSigners)))
 	if isNonSigner {
 		m.ValidatorNonSigner.WithLabelValues(address).Set(float64(1))
 	} else {
 		m.ValidatorNonSigner.WithLabelValues(address).Set(float64(0))
 	}
+	var isDoubleSigner bool
 	// update double signer
+	for _, doubleSigner := range doubleSigners {
+		if doubleSigner.String() == address {
+			isDoubleSigner = true
+		}
+	}
+	m.ValidatorDoubleSignerCount.WithLabelValues("any").Set(float64(len(doubleSigners)))
 	if isDoubleSigner {
 		m.ValidatorDoubleSigner.WithLabelValues(address).Set(float64(1))
 	} else {

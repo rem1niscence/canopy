@@ -658,8 +658,8 @@ func (c *Controller) UpdateTelemetry(qc *lib.QuorumCertificate, block *lib.Block
 	c.Metrics.UpdateBlockMetrics(block.BlockHeader.ProposerAddress, uint64(len(qc.Block)), block.BlockHeader.NumTxs, vdfIterations, blockProcessingTime)
 	// update validator metric
 	if v, _ := c.FSM.GetValidator(address); v != nil && v.StakedAmount != 0 {
-		isProducer, isNonSigner, isDoubleSigner := c.getValidatorBehaviorMetrics(address.String(), qc, block)
-		c.Metrics.UpdateValidator(address.String(), v.StakedAmount, v.UnstakingHeight != 0, v.MaxPausedHeight != 0, v.Delegate, v.Compound, isProducer, isNonSigner, isDoubleSigner)
+		isProducer, nonSigners, doubleSigners := c.getValidatorBehaviorMetrics(address, qc)
+		c.Metrics.UpdateValidator(address.String(), v.StakedAmount, v.UnstakingHeight != 0, v.MaxPausedHeight != 0, v.Delegate, v.Compound, isProducer, nonSigners, doubleSigners)
 	}
 	// update account metrics
 	if a, _ := c.FSM.GetAccount(address); a.Amount != 0 {
@@ -668,38 +668,35 @@ func (c *Controller) UpdateTelemetry(qc *lib.QuorumCertificate, block *lib.Block
 }
 
 // getValidatorBehaviorMetrics() gets metrics for validator behavior in this block
-func (c *Controller) getValidatorBehaviorMetrics(address string, qc *lib.QuorumCertificate, block *lib.Block) (isProducer, isNonSigner, isDoubleSigner bool) {
+func (c *Controller) getValidatorBehaviorMetrics(address crypto.AddressI, qc *lib.QuorumCertificate) (isProducer bool, nonSigners map[string]uint64, doubleSigners []crypto.AddressI) {
+	nonSigners = make(map[string]uint64)
 	// 1. Track block producer
 	if proposerPubKey, err := crypto.NewPublicKeyFromBytes(qc.ProposerKey); err == nil {
-		isProducer = proposerPubKey.Address().String() == address
+		isProducer = proposerPubKey.Address().Equals(address)
 	}
 
 	// 2. Track non-signers - only if we have the validator set for this chain
-	if vs, err := c.FSM.LoadCommittee(qc.Header.ChainId, block.BlockHeader.Height); err == nil {
-		if nonSignerPubKeys, _, err := qc.GetNonSigners(vs.ValidatorSet); err == nil {
-			for _, pubKeyBytes := range nonSignerPubKeys {
-				if pubKey, e := crypto.NewPublicKeyFromBytes(pubKeyBytes); e == nil {
-					if pubKey.Address().String() == address {
-						isNonSigner = true
-					}
-				}
-			}
+	if ns, err := c.FSM.GetNonSigners(); err == nil {
+		for _, n := range ns {
+			nonSigners[lib.BytesToString(n.Address)] = n.Counter
 		}
 	}
 
 	// 3. Track double signers (if evidence is available in the QC results)
-	if qc.Results != nil && qc.Results.SlashRecipients != nil && qc.Results.SlashRecipients.DoubleSigners != nil {
-		for _, doubleSigner := range qc.Results.SlashRecipients.DoubleSigners {
-			if doubleSigner != nil && doubleSigner.Id != nil {
-				if pubKey, err := crypto.NewPublicKeyFromBytes(doubleSigner.Id); err == nil {
-					if pubKey.Address().String() == address {
-						isDoubleSigner = true
-					}
+	// TODO this call is really inefficient - we need to segment double signers by block or address
+	if doubleSigner, err := c.FSM.GetDoubleSigners(); err == nil {
+		// for each double signer
+		for _, ds := range doubleSigner {
+			// for each height
+			for _, height := range ds.Heights {
+				// if double signed on the last height
+				if height == qc.Header.Height {
+					// update list
+					doubleSigners = append(doubleSigners, crypto.NewAddress(ds.Id))
 				}
 			}
 		}
 	}
-
 	return
 }
 

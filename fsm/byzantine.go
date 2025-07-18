@@ -213,6 +213,8 @@ func (s *StateMachine) HandleDoubleSigners(chainId uint64, params *ValidatorPara
 			slashList = append(slashList, pubKey.Address().Bytes())
 		}
 	}
+	// pause all on the bad list
+	//s.SetValidatorsPaused(chainId, slashList)
 	// slash those on the list
 	return s.SlashDoubleSigners(chainId, params, slashList)
 }
