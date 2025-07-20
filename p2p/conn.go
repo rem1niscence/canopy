@@ -323,7 +323,7 @@ type Stream struct {
 	msgAssembler []byte                       // collects and adds incoming packets until the entire message is received (EOF signal)
 	inbox        chan *lib.MessageAndMetadata // the channel where fully received messages are held for other parts of the app to read
 	mu           sync.Mutex                   // mutex to prevent race conditions when sending packets (all packets of the same message should be one right after the other)
-	isClosed     atomic.Bool                  // flag to identify if stream is closed
+	closed       bool                         // flag to identify if stream is closed
 	logger       lib.LoggerI
 }
 
@@ -343,7 +343,7 @@ func (s *Stream) queueSends(packets []*Packet) bool {
 
 // queueSend() schedules the packet to be sent
 func (s *Stream) queueSend(p *Packet) bool {
-	if s.isClosed.Load() {
+	if s.closed {
 		return false
 	}
 	select {
