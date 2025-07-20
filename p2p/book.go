@@ -246,10 +246,10 @@ func (p *PeerBook) GetAll() (res []*BookPeer) {
 
 // Add() adds a peer to the book in sorted order by public key
 func (p *PeerBook) Add(peer *BookPeer) {
-	p.log.Debugf("Try add book peer %s with self %s", lib.BytesToTruncatedString(peer.Address.PublicKey), lib.BytesToTruncatedString(p.publicKey))
+	//p.log.Debugf("Try add book peer %s with self %s", lib.BytesToTruncatedString(peer.Address.PublicKey), lib.BytesToTruncatedString(p.publicKey))
 	// if peer is self, ignore
 	if bytes.Equal(p.publicKey, peer.Address.PublicKey) {
-		p.log.Debugf("Peer %s is self; ignoring", lib.BytesToTruncatedString(peer.Address.PublicKey))
+		//p.log.Debugf("Peer %s is self; ignoring", lib.BytesToTruncatedString(peer.Address.PublicKey))
 		return
 	}
 	// lock for thread safety
@@ -260,7 +260,7 @@ func (p *PeerBook) Add(peer *BookPeer) {
 	// if peer already exists in the slice
 	if found {
 		p.Book[i] = peer // overwrite existing in case ip changed
-		p.log.Debugf("Peer %s already found", lib.BytesToTruncatedString(peer.Address.PublicKey))
+		//p.log.Debugf("Peer %s already found", lib.BytesToTruncatedString(peer.Address.PublicKey))
 		return
 	}
 	// if the peer does not yet exist, add it to the slice

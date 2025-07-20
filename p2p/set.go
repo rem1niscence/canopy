@@ -76,7 +76,6 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 	} else {
 		ps.inbound++
 	}
-	p.conn.isAdded.Store(true)
 	// set the peer
 	ps.set(p)
 	// update metrics
@@ -305,7 +304,10 @@ func (ps *PeerSet) changeIOCount(increment, outbound bool) {
 }
 
 // map based CRUD operations below
-func (ps *PeerSet) set(p *Peer)          { ps.m[lib.BytesToString(p.Address.PublicKey)] = p }
+func (ps *PeerSet) set(p *Peer) {
+	p.conn.isAdded.Store(true)
+	ps.m[lib.BytesToString(p.Address.PublicKey)] = p
+}
 func (ps *PeerSet) del(publicKey []byte) { delete(ps.m, lib.BytesToString(publicKey)) }
 func (ps *PeerSet) get(publicKey []byte) (*Peer, lib.ErrorI) {
 	pub := lib.BytesToString(publicKey)
