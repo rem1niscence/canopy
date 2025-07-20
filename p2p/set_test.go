@@ -43,6 +43,11 @@ func TestUpdateMustConnects(t *testing.T) {
 	n1, n2, n3 := newTestP2PNode(t), newTestP2PNode(t), newTestP2PNode(t)
 	require.NoError(t, n1.Add(&Peer{
 		PeerInfo: &lib.PeerInfo{Address: n2.ID()},
+		conn: &MultiConn{
+			error:   sync.Once{},
+			close:   sync.Once{},
+			isAdded: atomic.Bool{},
+		},
 	}))
 	toDial := n1.UpdateMustConnects([]*lib.PeerAddress{
 		n2.ID(),
