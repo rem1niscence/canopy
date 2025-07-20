@@ -199,17 +199,30 @@ func (p *PeerBook) StartChurnManagement(dialAndDisconnect func(a *lib.PeerAddres
 		copy(bookCopy, p.Book)
 		p.l.RUnlock()
 		// create a map to deduplicate based on 'signature'
-		deDupe := lib.NewDeDuplicator[string]()
+		pubs, netAddrs := make(map[string]int), make(map[string]int)
 		// iterate through the copy
 		for _, peer := range bookCopy {
+			// deduplicate based on public key and net address
+			pubs[lib.BytesToTruncatedString(peer.Address.PublicKey)]++
+			netAddrs[peer.Address.NetAddress]++
 			// deduplicate based on signature
-			if deDupe.Found(lib.BytesToString(peer.Address.PeerMeta.Signature)) {
-				p.AddFailedDialAttempt(peer.Address)
-			} else if err := dialAndDisconnect(peer.Address, true); err != nil {
+			if err := dialAndDisconnect(peer.Address, true); err != nil {
 				p.AddFailedDialAttempt(peer.Address)
 			} else {
 				// if succeeded, reset failed attempts
 				p.ResetFailedDialAttempts(peer.Address)
+			}
+		}
+		// second pass to remove duplicates
+		p.l.RLock()
+		bookCopy = make([]*BookPeer, len(p.Book))
+		copy(bookCopy, p.Book)
+		p.l.RUnlock()
+		// iterate through the copy
+		for _, peer := range bookCopy {
+			if pubs[lib.BytesToTruncatedString(peer.Address.PublicKey)] > 1 ||
+				netAddrs[peer.Address.NetAddress] > 1 {
+				p.DeleteAtIndex(peer.Address)
 			}
 		}
 		time.Sleep(CrawlAndCleanBookFrequency)
@@ -328,6 +341,21 @@ func (p *PeerBook) AddFailedDialAttempt(address *lib.PeerAddress) {
 		p.delAtIndex(i)
 		return
 	}
+}
+
+// AddFailedDialAttempt() increments the failed dial attempt counter for a BookPeer
+func (p *PeerBook) DeleteAtIndex(address *lib.PeerAddress) {
+	p.l.Lock()
+	defer p.l.Unlock()
+	// get the peer at a specific index
+	i, found := p.getIndex(address)
+	// if not in the slice, ignore
+	if !found {
+		p.log.Warnf("DeleteAtIndex: address not found in book")
+		return
+	}
+	// delete the peer at index
+	p.delAtIndex(i)
 }
 
 // GetBookPeers() returns all peers in the PeerBook
