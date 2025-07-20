@@ -87,7 +87,7 @@ func (p *P2P) ListenForPeerBookResponses() {
 		select {
 		// fires when received the response to the request
 		case msg := <-p.Inbox(lib.Topic_PEERS_RESPONSE):
-			p.log.Debugf("Received peer book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
+			//p.log.Debugf("Received peer book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 			senderID := msg.Sender.Address.PublicKey
 			// rate limit per requester
 			blocked, totalBlock := l.NewRequest(lib.BytesToString(senderID))
@@ -115,6 +115,9 @@ func (p *P2P) ListenForPeerBookResponses() {
 			}
 			// add each peer to the book (deduplicated upon adding)
 			for _, bp := range peerBookResponseMsg.Book {
+				if bp.ConsecutiveFailedDial >= MaxFailedDialAttempts {
+					continue
+				}
 				p.book.Add(bp)
 			}
 			p.ChangeReputation(senderID, GoodPeerBookRespRep)
@@ -132,7 +135,7 @@ func (p *P2P) ListenForPeerBookRequests() {
 		select {
 		// fires after receiving a peer request
 		case msg := <-p.Inbox(lib.Topic_PEERS_REQUEST):
-			p.log.Debugf("Received peer book request from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
+			//p.log.Debugf("Received peer book request from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 			requesterID := msg.Sender.Address.PublicKey
 			// rate limit per requester
 			blocked, totalBlock := l.NewRequest(lib.BytesToString(requesterID))
@@ -195,11 +198,14 @@ func (p *PeerBook) StartChurnManagement(dialAndDisconnect func(a *lib.PeerAddres
 		bookCopy := make([]*BookPeer, len(p.Book))
 		copy(bookCopy, p.Book)
 		p.l.RUnlock()
+		// create a map to deduplicate based on 'signature'
+		deDupe := lib.NewDeDuplicator[string]()
 		// iterate through the copy
 		for _, peer := range bookCopy {
-			// try to dial the peer
-			if err := dialAndDisconnect(peer.Address, true); err != nil {
-				// if failed, add failed attempt
+			// deduplicate based on signature
+			if deDupe.Found(lib.BytesToString(peer.Address.PeerMeta.Signature)) {
+				p.AddFailedDialAttempt(peer.Address)
+			} else if err := dialAndDisconnect(peer.Address, true); err != nil {
 				p.AddFailedDialAttempt(peer.Address)
 			} else {
 				// if succeeded, reset failed attempts

@@ -76,6 +76,7 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 	} else {
 		ps.inbound++
 	}
+	p.conn.isAdded.Store(true)
 	// set the peer
 	ps.set(p)
 	// update metrics
@@ -268,7 +269,7 @@ func (ps *PeerSet) Stop() {
 
 // send() sends a message to a specific peer object
 func (ps *PeerSet) send(peer *Peer, topic lib.Topic, bz []byte) lib.ErrorI {
-	ps.logger.Debugf("Sending %s message to %s", topic, lib.BytesToTruncatedString(peer.Address.PublicKey))
+	//ps.logger.Debugf("Sending %s message to %s", topic, lib.BytesToTruncatedString(peer.Address.PublicKey))
 	peer.conn.Send(topic, bz)
 	return nil
 }

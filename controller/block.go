@@ -29,7 +29,6 @@ func (c *Controller) ListenForBlock() {
 		var quit bool
 		// wrap in a function call to use 'defer' functionality
 		func() {
-			c.log.Debug("Handling block message")
 			// lock the controller to prevent multi-thread conflicts
 			c.Lock()
 			// when iteration completes, unlock
@@ -39,6 +38,7 @@ func (c *Controller) ListenForBlock() {
 				// if duplicate, exit iteration
 				return
 			}
+			c.log.Debug("Handling block message")
 			// add a convenience variable to track the sender
 			sender := msg.Sender.Address.PublicKey
 			// log the receipt of the block message

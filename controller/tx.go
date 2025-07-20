@@ -38,12 +38,12 @@ func (c *Controller) ListenForTx() {
 			continue
 		}
 		func() {
-			c.log.Debug("Handling transaction")
 			// check and add the message to the cache to prevent duplicates
 			if ok := cache.Add(msg); !ok {
 				// if duplicate, exit
 				return
 			}
+			c.log.Debug("Handling transaction")
 			// create a convenience variable for the identity of the sender
 			senderID := msg.Sender.Address.PublicKey
 			// try to unmarshal the p2p message as a tx message
