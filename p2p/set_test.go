@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -119,6 +120,8 @@ func newTestMultiConnMock(_ *testing.T, peerPubKey []byte, conn net.Conn, p *P2P
 		onError:       func(err error, bytes []byte, s string) { p.log.Error(err.Error()) },
 		error:         sync.Once{},
 		p2p:           p,
+		close:         sync.Once{},
+		isAdded:       atomic.Bool{},
 		log:           p.log,
 	}
 }

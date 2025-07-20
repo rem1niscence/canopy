@@ -70,7 +70,7 @@ type MultiConn struct {
 	onError       func(error, []byte, string) // callback to call if peer errors
 	error         sync.Once                   // thread safety to ensure MultiConn.onError is only called once
 	p2p           *P2P                        // a pointer reference to the P2P module
-	isClosed      atomic.Bool                 // flag to identify if MultiConn is closed
+	close         sync.Once                   // flag to identify if MultiConn is closed
 	isAdded       atomic.Bool                 // flag to identify if MultiConn is added to the peer list and should be removed
 	log           lib.LoggerI                 // logging
 }
@@ -101,6 +101,8 @@ func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
 		onError:       p.OnPeerError,
 		error:         sync.Once{},
 		p2p:           p,
+		close:         sync.Once{},
+		isAdded:       atomic.Bool{},
 		log:           p.log,
 	}
 	_ = c.conn.SetReadDeadline(time.Time{})
@@ -118,9 +120,8 @@ func (c *MultiConn) Start() {
 
 // Stop() sends exit signals for send and receive loops and closes the connection
 func (c *MultiConn) Stop() {
-	if !c.isClosed.Load() {
+	c.close.Do(func() {
 		c.p2p.log.Warnf("Stopping peer %s", lib.BytesToString(c.Address.PublicKey))
-		c.isClosed.Store(true)
 		c.quitReceiving <- struct{}{}
 		c.quitSending <- struct{}{}
 		close(c.quitSending)
@@ -130,7 +131,7 @@ func (c *MultiConn) Stop() {
 		for _, stream := range c.streams {
 			stream.cleanup()
 		}
-	}
+	})
 }
 
 // Send() queues the sending of a message to a specific Stream
