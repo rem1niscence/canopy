@@ -249,9 +249,10 @@ func (c *MultiConn) Error(err error, reputationDelta ...int32) {
 	// call onError() for the peer
 	c.error.Do(func() {
 		// only try to remove the peer from set if 'was added' to the peer set
-		if c.isAdded.Load() {
+		if c.isAdded.Swap(true) {
 			c.onError(err, c.Address.PublicKey, c.conn.RemoteAddr().String())
 		} else {
+			c.log.Error(err.Error())
 			c.log.Warnf("Peer not yet added, so skipping set removal")
 		}
 		// stop the multi-conn

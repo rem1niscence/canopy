@@ -50,6 +50,9 @@ type Peer struct {
 
 // Add() introduces a peer to the set
 func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
+	if p.conn.isAdded.Swap(true) {
+		return ErrPeerAlreadyExists(lib.BytesToTruncatedString(p.Address.PublicKey))
+	}
 	// check if peer is already added
 	pubKey := lib.BytesToString(p.Address.PublicKey)
 	if _, found := ps.m[pubKey]; found {
@@ -304,10 +307,7 @@ func (ps *PeerSet) changeIOCount(increment, outbound bool) {
 }
 
 // map based CRUD operations below
-func (ps *PeerSet) set(p *Peer) {
-	p.conn.isAdded.Store(true)
-	ps.m[lib.BytesToString(p.Address.PublicKey)] = p
-}
+func (ps *PeerSet) set(p *Peer)          { ps.m[lib.BytesToString(p.Address.PublicKey)] = p }
 func (ps *PeerSet) del(publicKey []byte) { delete(ps.m, lib.BytesToString(publicKey)) }
 func (ps *PeerSet) get(publicKey []byte) (*Peer, lib.ErrorI) {
 	pub := lib.BytesToString(publicKey)

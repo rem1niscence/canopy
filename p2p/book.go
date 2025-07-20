@@ -316,6 +316,7 @@ func (p *PeerBook) AddFailedDialAttempt(address *lib.PeerAddress) {
 	i, found := p.getIndex(address)
 	// if not in the slice, ignore
 	if !found {
+		p.log.Warnf("AddFailedDialAttempt: address not found in book")
 		return
 	}
 	// increment the consecutive failed dial attempts for the peer
