@@ -31,7 +31,8 @@ func TestMultiSendRec(t *testing.T) {
 	expectedMsg := &BookPeer{
 		Address: &lib.PeerAddress{
 			PublicKey:  n1.pub,
-			NetAddress: "pipe",
+			NetAddress: "localhost:90001",
+			PeerMeta:   &lib.PeerMeta{ChainId: 1},
 		},
 		ConsecutiveFailedDial: 1,
 	}
@@ -56,7 +57,8 @@ func TestSendToRand(t *testing.T) {
 	expectedMsg := &BookPeer{
 		Address: &lib.PeerAddress{
 			PublicKey:  n1.pub,
-			NetAddress: "pipe",
+			NetAddress: "localhost:90001",
+			PeerMeta:   &lib.PeerMeta{ChainId: 1},
 		},
 		ConsecutiveFailedDial: 1,
 	}
@@ -90,7 +92,7 @@ func TestSendToPeers(t *testing.T) {
 	expectedMsg := &BookPeer{
 		Address: &lib.PeerAddress{
 			PublicKey:  n1.pub,
-			NetAddress: "pipe",
+			NetAddress: "localhost:90001",
 			PeerMeta: &lib.PeerMeta{
 				NetworkId: 1,
 				ChainId:   lib.CanopyChainId,
@@ -131,7 +133,7 @@ func TestSendToPeersChunkedPacket(t *testing.T) {
 	expectedMsg := &BookPeer{
 		Address: &lib.PeerAddress{
 			PublicKey:  n1.pub,
-			NetAddress: "pipe",
+			NetAddress: "localhost:90001",
 			PeerMeta: &lib.PeerMeta{
 				Signature: bytes.Repeat([]byte("F"), int(maxDataChunkSize)*5),
 			},
@@ -166,7 +168,7 @@ func TestSendToPeersMultipleMessages(t *testing.T) {
 	expectedMsg := &BookPeer{
 		Address: &lib.PeerAddress{
 			PublicKey:  n1.pub,
-			NetAddress: "pipe",
+			NetAddress: "localhost:90001",
 			PeerMeta: &lib.PeerMeta{
 				Signature: []byte("1"),
 			},
@@ -228,12 +230,13 @@ func TestStart(t *testing.T) {
 		NetworkId: 1,
 		ChainId:   1,
 	}
+	randomPeerAddress := &lib.PeerAddress{
+		PublicKey:  random.Bytes(),
+		NetAddress: n4.listener.Addr().String(),
+		PeerMeta:   pm,
+	}
 	n1.book.Add(&BookPeer{
-		Address: &lib.PeerAddress{
-			PublicKey:  random.Bytes(),
-			NetAddress: n4.listener.Addr().String(),
-			PeerMeta:   pm,
-		},
+		Address:               randomPeerAddress,
 		ConsecutiveFailedDial: MaxFailedDialAttempts - 1,
 	})
 	// test validator receiver
@@ -250,7 +253,7 @@ func TestStart(t *testing.T) {
 		if !peerInfo.IsMustConnect {
 			return false, "n2 not validator"
 		}
-		if n1.book.Has(random.Bytes()) {
+		if n1.book.Has(randomPeerAddress) {
 			return false, "n1 did not churn peer book"
 		}
 		n3PI, _ := n1.GetPeerInfo(n3.pub)
@@ -343,7 +346,15 @@ func TestSelfSend(t *testing.T) {
 func TestOnPeerError(t *testing.T) {
 	n1, n2, cleanup := newTestP2PPair(t)
 	defer cleanup()
-	_, found := n1.book.getIndex(n2.pub)
+	n2PeerAddress := &lib.PeerAddress{
+		PublicKey:  n2.pub,
+		NetAddress: "localhost:90001",
+		PeerMeta: &lib.PeerMeta{
+			NetworkId: 0,
+			ChainId:   1,
+		},
+	}
+	_, found := n1.book.getIndex(n2PeerAddress)
 	require.True(t, found)
 	peer, err := n1.PeerSet.get(n2.pub)
 	require.NoError(t, err)
@@ -458,23 +469,27 @@ func newTestP2PPair(t *testing.T) (n1, n2 testP2PNode, cleanup func()) {
 	cleanup = func() { n1.Stop(); n2.Stop() }
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	go func() {
-		require.NoError(t, n1.AddPeer(c2, &lib.PeerInfo{Address: &lib.PeerAddress{
-			PublicKey:  n2.pub,
-			NetAddress: c2.RemoteAddr().String(),
-			PeerMeta: &lib.PeerMeta{
-				ChainId: 0,
-			},
-		}}, false, true))
-		wg.Done()
-	}()
-	require.NoError(t, n2.AddPeer(c1, &lib.PeerInfo{Address: &lib.PeerAddress{
+	n1PeerAddress := &lib.PeerAddress{
+		PublicKey:  n2.pub,
+		NetAddress: c2.RemoteAddr().String(),
+		PeerMeta: &lib.PeerMeta{
+			ChainId: 0,
+		},
+	}
+	n2PeerAddress := &lib.PeerAddress{
 		PublicKey:  n1.pub,
 		NetAddress: c1.RemoteAddr().String(),
 		PeerMeta:   &lib.PeerMeta{ChainId: 0},
-	}},
+	}
+	go func() {
+		require.NoError(t, n1.AddPeer(c2, &lib.PeerInfo{Address: n1PeerAddress}, false, true))
+		wg.Done()
+	}()
+	require.NoError(t, n2.AddPeer(c1, &lib.PeerInfo{Address: n2PeerAddress},
 		false, true))
 	wg.Wait()
+	n1.peerAddress = n1PeerAddress
+	n2.peerAddress = n2PeerAddress
 	require.True(t, n1.PeerSet.Has(n2.pub))
 	require.True(t, n2.PeerSet.Has(n1.pub))
 	return
@@ -482,8 +497,9 @@ func newTestP2PPair(t *testing.T) (n1, n2 testP2PNode, cleanup func()) {
 
 type testP2PNode struct {
 	*P2P
-	priv crypto.PrivateKeyI
-	pub  []byte
+	priv        crypto.PrivateKeyI
+	peerAddress *lib.PeerAddress
+	pub         []byte
 }
 
 func newTestP2PNode(t *testing.T) (n testP2PNode) {
@@ -496,6 +512,11 @@ func newTestP2PNodeWithConfig(t *testing.T, c lib.Config, noLog ...bool) (n test
 	require.NoError(t, err)
 	n.pub = n.priv.PublicKey().Bytes()
 	require.NoError(t, err)
+	n.peerAddress = &lib.PeerAddress{
+		PublicKey:  n.pub,
+		NetAddress: "localhost:90001",
+		PeerMeta:   &lib.PeerMeta{ChainId: 1},
+	}
 	logger := lib.NewDefaultLogger()
 	if len(noLog) == 1 && noLog[0] == true {
 		logger = lib.NewNullLogger()

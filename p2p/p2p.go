@@ -203,12 +203,12 @@ func (p *P2P) DialForOutboundPeers() {
 			dialing++
 			defer func() { dialing-- }()
 			if err := p.Dial(rand.Address, false, false); err != nil {
-				p.book.AddFailedDialAttempt(rand.Address.PublicKey)
+				p.book.AddFailedDialAttempt(rand.Address)
 				p.log.Debug(err.Error())
 				return
 			} else {
 				// if succeeded, reset failed attempts
-				p.book.ResetFailedDialAttempts(rand.Address.PublicKey)
+				p.book.ResetFailedDialAttempts(rand.Address)
 			}
 		}()
 	}

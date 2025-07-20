@@ -10,15 +10,14 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
-	"sort"
 	"sync"
 	"time"
 
 	"github.com/canopy-network/canopy/lib"
 )
 
-const (
-	MaxFailedDialAttempts        = 1               // maximum times a peer may fail a churn management dial attempt before evicted from the peer book
+var (
+	MaxFailedDialAttempts        = int32(1)        // maximum times a peer may fail a churn management dial attempt before evicted from the peer book
 	MaxPeersExchanged            = 1               // maximum number of peers per chain that may be sent/received during a peer exchange
 	MaxPeerBookRequestsPerWindow = 2               // maximum peer book request per window
 	PeerBookRequestWindowS       = 30              // seconds in a peer book request
@@ -154,7 +153,7 @@ func (p *P2P) ListenForPeerBookRequests() {
 			}
 			var response []*BookPeer
 			// grab up to MaxPeerExchangePerChain number of peers for that specific chain
-			for i := 0; i < MaxPeersExchanged; i++ {
+			for i := 0; i <= MaxPeersExchanged; i++ {
 				toBeAdded := p.book.GetRandom()
 				if toBeAdded == nil {
 					break
@@ -201,10 +200,10 @@ func (p *PeerBook) StartChurnManagement(dialAndDisconnect func(a *lib.PeerAddres
 			// try to dial the peer
 			if err := dialAndDisconnect(peer.Address, true); err != nil {
 				// if failed, add failed attempt
-				p.AddFailedDialAttempt(peer.Address.PublicKey)
+				p.AddFailedDialAttempt(peer.Address)
 			} else {
 				// if succeeded, reset failed attempts
-				p.ResetFailedDialAttempts(peer.Address.PublicKey)
+				p.ResetFailedDialAttempts(peer.Address)
 			}
 		}
 		time.Sleep(CrawlAndCleanBookFrequency)
@@ -241,7 +240,7 @@ func (p *PeerBook) GetAll() (res []*BookPeer) {
 
 // Add() adds a peer to the book in sorted order by public key
 func (p *PeerBook) Add(peer *BookPeer) {
-	p.log.Debugf("Try add book peer %s", lib.BytesToTruncatedString(peer.Address.PublicKey))
+	p.log.Debugf("Try add book peer %s with self %s", lib.BytesToTruncatedString(peer.Address.PublicKey), lib.BytesToTruncatedString(p.publicKey))
 	// if peer is self, ignore
 	if bytes.Equal(p.publicKey, peer.Address.PublicKey) {
 		return
@@ -250,7 +249,7 @@ func (p *PeerBook) Add(peer *BookPeer) {
 	p.l.Lock()
 	defer p.l.Unlock()
 	// get the index where the peer should be located in the slice
-	i, found := p.getIndex(peer.Address.PublicKey)
+	i, found := p.getIndex(peer.Address)
 	// if peer already exists in the slice
 	if found {
 		p.Book[i] = peer // overwrite existing in case ip changed
@@ -261,19 +260,20 @@ func (p *PeerBook) Add(peer *BookPeer) {
 	p.Book = append(p.Book, new(BookPeer))
 	copy(p.Book[i+1:], p.Book[i:])
 	p.Book[i] = peer
+	p.log.Debugf("Added book peer %s", lib.BytesToTruncatedString(peer.Address.PublicKey))
 }
 
 // Remove() a peer from the book
-func (p *PeerBook) Remove(publicKey []byte) {
+func (p *PeerBook) Remove(address *lib.PeerAddress) {
 	p.l.Lock()
 	defer p.l.Unlock()
 	// get the index where the peer should be located in the slice
-	i, found := p.getIndex(publicKey)
+	i, found := p.getIndex(address)
 	// if not in the slice, ignore
 	if !found {
 		return
 	}
-	p.log.Debugf("Removing peer %s from PeerBook", lib.BytesToString(publicKey))
+	p.log.Debugf("Removing peer %s from PeerBook", lib.BytesToString(address.PublicKey))
 	// remove at this index
 	p.delAtIndex(i)
 }
@@ -287,11 +287,11 @@ func (p *PeerBook) GetBookSize() int {
 }
 
 // ResetFailedDialAttempts() resets the failed dial attempt count for the peer
-func (p *PeerBook) ResetFailedDialAttempts(publicKey []byte) {
+func (p *PeerBook) ResetFailedDialAttempts(address *lib.PeerAddress) {
 	p.l.Lock()
 	defer p.l.Unlock()
 	// get the peer at a specific index
-	i, found := p.getIndex(publicKey)
+	i, found := p.getIndex(address)
 	// if not in the slice, ignore
 	if !found {
 		return
@@ -301,11 +301,11 @@ func (p *PeerBook) ResetFailedDialAttempts(publicKey []byte) {
 }
 
 // AddFailedDialAttempt() increments the failed dial attempt counter for a BookPeer
-func (p *PeerBook) AddFailedDialAttempt(publicKey []byte) {
+func (p *PeerBook) AddFailedDialAttempt(address *lib.PeerAddress) {
 	p.l.Lock()
 	defer p.l.Unlock()
 	// get the peer at a specific index
-	i, found := p.getIndex(publicKey)
+	i, found := p.getIndex(address)
 	// if not in the slice, ignore
 	if !found {
 		return
@@ -315,7 +315,7 @@ func (p *PeerBook) AddFailedDialAttempt(publicKey []byte) {
 	// if the consecutive failed dial attempts exceeds the maximum
 	// then remove the peer from the book
 	if p.Book[i].ConsecutiveFailedDial >= MaxFailedDialAttempts {
-		p.log.Debugf("Removing peer %s from PeerBook after max failed dial", lib.BytesToString(publicKey))
+		p.log.Debugf("Removing peer %s from PeerBook after max failed dial", lib.BytesToString(address.PublicKey))
 		p.delAtIndex(i)
 		return
 	}
@@ -351,16 +351,17 @@ func (p *PeerBook) SaveRoutine() {
 
 // getIndex() returns the index where the peer should be located within the sorted
 // slice, and if the peer exists in the slice or not
-func (p *PeerBook) getIndex(publicKey []byte) (int, bool) {
-	// binary search the slice to find the index where the public key should be located
-	i := sort.Search(p.BookSize, func(i int) bool {
-		return bytes.Compare(p.Book[i].Address.PublicKey, publicKey) >= 0
-	})
-	// if the index is within the slice and the peer at that index has the target pubkey
-	if i != p.BookSize && bytes.Equal(p.Book[i].Address.PublicKey, publicKey) {
-		return i, true // found
+func (p *PeerBook) getIndex(address *lib.PeerAddress) (int, bool) {
+	// loop through the peer book
+	for i, peer := range p.Book {
+		// if the addresses are equal
+		if peer.Address.Equals(address) {
+			// return the index and found
+			return i, true
+		}
 	}
-	return i, false // not found but i == index where it should be
+	// return not found
+	return 0, false
 }
 
 // delAtIndex() deletes the peer from the slice at index i

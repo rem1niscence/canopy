@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"bytes"
 	"container/list"
 	"encoding/json"
 	"net/url"
@@ -333,3 +334,36 @@ func (l *SimpleLimiter) Reset() {
 // TimeToReset() returns the channel that signals when the limiter may be reset
 // This channel is called by the time.Ticker() set in NewLimiter
 func (l *SimpleLimiter) TimeToReset() <-chan time.Time { return l.reset.C }
+
+// Equals() compares the equality of two peer addresses
+func (x *PeerAddress) Equals(y *PeerAddress) bool {
+	if x == nil || y == nil {
+		return false
+	}
+	// check if public keys are not equal
+	if !bytes.Equal(x.PublicKey, y.PublicKey) {
+		return false
+	}
+	// check if net address is not equal
+	if x.NetAddress != y.NetAddress {
+		return false
+	}
+	// check if peer metas are equal
+	return x.PeerMeta.Equals(y.PeerMeta)
+}
+
+// Equals() compares the equality of two peer metas
+func (x *PeerMeta) Equals(y *PeerMeta) bool {
+	if x == nil || y == nil {
+		return false
+	}
+	// if network ids aren't equal
+	if x.NetworkId != y.NetworkId {
+		return false
+	}
+	// if chain ids are not equal
+	if x.ChainId != y.ChainId {
+		return false
+	}
+	return true
+}
