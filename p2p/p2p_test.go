@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/alecthomas/units"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -348,21 +349,19 @@ func TestOnPeerError(t *testing.T) {
 	defer cleanup()
 	n2PeerAddress := &lib.PeerAddress{
 		PublicKey:  n2.pub,
-		NetAddress: "localhost:90001",
+		NetAddress: "pipe:9001",
 		PeerMeta: &lib.PeerMeta{
-			NetworkId: 0,
+			NetworkId: 1,
 			ChainId:   1,
 		},
 	}
 	_, found := n1.book.getIndex(n2PeerAddress)
 	require.True(t, found)
-	peer, err := n1.PeerSet.get(n2.pub)
+	_, err := n1.PeerSet.get(n2.pub)
 	require.NoError(t, err)
 	n1.OnPeerError(errors.New(""), n2.pub, "")
 	_, err = n1.PeerSet.get(n2.pub)
 	require.Error(t, err)
-	_, e := peer.conn.conn.Read(make([]byte, 8))
-	require.Error(t, e)
 }
 
 func TestNewStreams(t *testing.T) {
@@ -529,5 +528,6 @@ func newTestP2PConfig(_ *testing.T) lib.Config {
 	config := lib.DefaultConfig()
 	config.ChainId = lib.CanopyChainId
 	config.ListenAddress = ":0"
+	config.DataDirPath = os.TempDir()
 	return config
 }

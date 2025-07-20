@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
@@ -45,7 +46,6 @@ func NewPeerSet(c lib.Config, priv crypto.PrivateKeyI, metrics *lib.Metrics, log
 type Peer struct {
 	conn          *MultiConn // multiplexed tcp connection
 	*lib.PeerInfo            // authenticated information of the peer
-	stop          sync.Once  // ensures a peer may only be stopped once
 }
 
 // Add() introduces a peer to the set
@@ -130,9 +130,9 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 // ChangeReputation() updates the peer reputation +/- based on the int32 delta
 func (ps *PeerSet) ChangeReputation(publicKey []byte, delta int32) {
 	ps.Lock()
-	defer ps.Unlock()
 	peer, err := ps.get(publicKey)
 	if err != nil {
+		ps.Unlock()
 		return
 	}
 	// update the peers reputation
@@ -143,15 +143,13 @@ func (ps *PeerSet) ChangeReputation(publicKey []byte, delta int32) {
 	}
 	// if peer isn't trusted nor is 'must connect' and the reputation is below minimum
 	if !peer.IsTrusted && !peer.IsMustConnect && peer.Reputation < MinimumPeerReputation {
-		ps.logger.Warnf("Peer %s reputation too low; removing", lib.BytesToTruncatedString(peer.Address.PublicKey))
-		peer.stop.Do(func() {
-			peer.conn.Stop()
-		})
-		ps.remove(peer)
+		ps.Unlock()
+		peer.conn.Error(fmt.Errorf("peer %s reputation too low", lib.BytesToTruncatedString(peer.Address.PublicKey)))
 		return
 	}
 	// update the peer
 	ps.set(peer)
+	ps.Unlock()
 }
 
 // GetPeerInfo() returns a copy of the authenticated information from the peer structure
@@ -264,7 +262,7 @@ func (ps *PeerSet) Stop() {
 	ps.RLock()
 	defer ps.RUnlock()
 	for _, p := range ps.m {
-		p.stop.Do(p.conn.Stop)
+		p.conn.Stop()
 	}
 }
 

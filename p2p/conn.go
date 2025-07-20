@@ -71,6 +71,7 @@ type MultiConn struct {
 	error         sync.Once                   // thread safety to ensure MultiConn.onError is only called once
 	p2p           *P2P                        // a pointer reference to the P2P module
 	isClosed      atomic.Bool                 // flag to identify if MultiConn is closed
+	isAdded       atomic.Bool                 // flag to identify if MultiConn is added to the peer list and should be removed
 	log           lib.LoggerI                 // logging
 }
 
@@ -242,7 +243,14 @@ func (c *MultiConn) Error(err error, reputationDelta ...int32) {
 		c.p2p.ChangeReputation(c.Address.PublicKey, reputationDelta[0])
 	}
 	// call onError() for the peer
-	c.error.Do(func() { c.onError(err, c.Address.PublicKey, c.conn.RemoteAddr().String()) })
+	c.error.Do(func() {
+		// only try to remove the peer from set if 'was added' to the peer set
+		if c.isAdded.Load() {
+			c.onError(err, c.Address.PublicKey, c.conn.RemoteAddr().String())
+		}
+		// stop the multi-conn
+		c.Stop()
+	})
 }
 
 // waitForAndHandleWireBytes() a rate limited handler of inbound bytes from the wire.

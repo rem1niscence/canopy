@@ -17,12 +17,12 @@ import (
 )
 
 var (
-	MaxFailedDialAttempts        = int32(1)        // maximum times a peer may fail a churn management dial attempt before evicted from the peer book
-	MaxPeersExchanged            = 1               // maximum number of peers per chain that may be sent/received during a peer exchange
-	MaxPeerBookRequestsPerWindow = 2               // maximum peer book request per window
-	PeerBookRequestWindowS       = 30              // seconds in a peer book request
-	CrawlAndCleanBookFrequency   = time.Minute * 2 // how often the book is cleaned and crawled
-	SaveBookFrequency            = time.Minute * 5 // how often the book is saved to a file
+	MaxFailedDialAttempts        = int32(1)    // maximum times a peer may fail a churn management dial attempt before evicted from the peer book
+	MaxPeersExchanged            = 1           // maximum number of peers per chain that may be sent/received during a peer exchange
+	MaxPeerBookRequestsPerWindow = 2           // maximum peer book request per window
+	PeerBookRequestWindowS       = 30          // seconds in a peer book request
+	CrawlAndCleanBookFrequency   = time.Minute // how often the book is cleaned and crawled
+	SaveBookFrequency            = time.Minute // how often the book is saved to a file
 )
 
 // PeerBook is a persisted structure that maintains information on potential peers
@@ -243,6 +243,7 @@ func (p *PeerBook) Add(peer *BookPeer) {
 	p.log.Debugf("Try add book peer %s with self %s", lib.BytesToTruncatedString(peer.Address.PublicKey), lib.BytesToTruncatedString(p.publicKey))
 	// if peer is self, ignore
 	if bytes.Equal(p.publicKey, peer.Address.PublicKey) {
+		p.log.Debugf("Peer %s is self; ignoring", lib.BytesToTruncatedString(peer.Address.PublicKey))
 		return
 	}
 	// lock for thread safety
@@ -253,6 +254,7 @@ func (p *PeerBook) Add(peer *BookPeer) {
 	// if peer already exists in the slice
 	if found {
 		p.Book[i] = peer // overwrite existing in case ip changed
+		p.log.Debugf("Peer %s already found", lib.BytesToTruncatedString(peer.Address.PublicKey))
 		return
 	}
 	// if the peer does not yet exist, add it to the slice

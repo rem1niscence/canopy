@@ -7,7 +7,6 @@ import (
 	"net"
 	"runtime/debug"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/canopy-network/canopy/lib"
@@ -297,11 +296,12 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect, strictPubli
 	// add peer to peer set and peer book
 	p.log.Infof("Adding peer: %s@%s", lib.BytesToString(info.Address.PublicKey), info.Address.NetAddress)
 	p.book.Add(&BookPeer{Address: info.Address})
-	err = p.PeerSet.Add(&Peer{
+	if err = p.PeerSet.Add(&Peer{
 		conn:     connection,
 		PeerInfo: info,
-		stop:     sync.Once{},
-	})
+	}); err == nil {
+		connection.isAdded.Store(true)
+	}
 	return
 }
 
@@ -328,12 +328,9 @@ func (p *P2P) DialAndDisconnect(a *lib.PeerAddress, strictPublicKey bool) lib.Er
 func (p *P2P) OnPeerError(err error, publicKey []byte, remoteAddr string) {
 	p.log.Warn(PeerError(publicKey, remoteAddr, err))
 	// ignore error: peer may have disconnected before added
-	peer, err := p.PeerSet.Remove(publicKey)
+	_, err = p.PeerSet.Remove(publicKey)
 	if err != nil {
 		p.log.Errorf("Remove error: %s", err.Error())
-	}
-	if peer != nil {
-		peer.stop.Do(peer.conn.Stop)
 	}
 }
 
