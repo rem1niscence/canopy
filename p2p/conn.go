@@ -121,7 +121,7 @@ func (c *MultiConn) Start() {
 // Stop() sends exit signals for send and receive loops and closes the connection
 func (c *MultiConn) Stop() {
 	c.close.Do(func() {
-		c.p2p.log.Warnf("Stopping peer %s", lib.BytesToString(c.Address.PublicKey))
+		c.p2p.log.Debugf("Stopping peer %s", lib.BytesToString(c.Address.PublicKey))
 		c.quitReceiving <- struct{}{}
 		c.quitSending <- struct{}{}
 		close(c.quitSending)
@@ -252,8 +252,7 @@ func (c *MultiConn) Error(err error, reputationDelta ...int32) {
 		if c.isAdded.Swap(true) {
 			c.onError(err, c.Address.PublicKey, c.conn.RemoteAddr().String())
 		} else {
-			c.log.Error(err.Error())
-			c.log.Warnf("Peer not yet added, so skipping set removal")
+			c.log.Warn(err.Error())
 		}
 		// stop the multi-conn
 		c.Stop()

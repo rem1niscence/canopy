@@ -242,7 +242,7 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect, strictPubli
 	// first we need to check the error on creation to prevent panics
 	defer func() {
 		if err != nil {
-			p.log.Errorf(err.Error())
+			p.log.Warn(err.Error())
 			connection.Stop()
 		}
 	}()
@@ -268,7 +268,7 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect, strictPubli
 	}
 	// disconnect immediately if prompted by params
 	if disconnect {
-		p.log.Debugf("disconnecting from peer %s", lib.BytesToTruncatedString(info.Address.PublicKey))
+		p.log.Debugf("Disconnecting from peer %s", lib.BytesToTruncatedString(info.Address.PublicKey))
 		connection.Stop()
 		return nil
 	}
