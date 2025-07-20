@@ -151,6 +151,9 @@ func (c *MultiConn) Send(topic lib.Topic, bz []byte) (ok bool) {
 		})
 	}
 	ok = stream.queueSends(packets)
+	if !ok {
+		c.log.Errorf("Packet(ID:%s) packet failed in queue for: %s", lib.Topic_name[int32(topic)], lib.BytesToTruncatedString(c.Address.PublicKey))
+	}
 	return
 }
 
@@ -336,7 +339,6 @@ func (s *Stream) queueSends(packets []*Packet) bool {
 	for _, packet := range packets {
 		ok := s.queueSend(packet)
 		if !ok {
-			s.logger.Errorf("Packet(ID:%s, L:%d, E:%t) packet failed in queue", lib.Topic_name[int32(packet.StreamId)], len(packet.Bytes), packet.Eof)
 			return false
 		}
 	}
