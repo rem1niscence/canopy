@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -227,6 +228,9 @@ func (c *MultiConn) startReceiveService() {
 				}
 				// handle the packet within the stream
 				if slash, er := stream.handlePacket(info, x); er != nil {
+					if strings.Contains(er.Error(), "use of closed network connection") {
+						return
+					}
 					c.log.Warnf(er.Error())
 					c.Error(er, slash)
 					return
