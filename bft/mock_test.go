@@ -410,12 +410,12 @@ func (tc *testConsensus) newElectionVoteDoubleSign(t *testing.T) {
 func (tc *testConsensus) newTestDoubleSignEvidence(t *testing.T) []*DoubleSignEvidence {
 	// create two equivocating Quorum Certificates with the same View
 	qcA := &lib.QuorumCertificate{
-		Header:      tc.view(0),
+		Header:      tc.view(5),
 		BlockHash:   crypto.Hash([]byte("some proposal")),
 		ResultsHash: crypto.Hash([]byte("some results")),
 	}
 	qcB := &lib.QuorumCertificate{
-		Header:      tc.view(0),
+		Header:      tc.view(5),
 		BlockHash:   crypto.Hash([]byte("some other proposal")),
 		ResultsHash: crypto.Hash([]byte("some other results")),
 	}

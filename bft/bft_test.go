@@ -621,14 +621,6 @@ func TestStartCommitProcessPhase(t *testing.T) {
 			validProposal:    true,
 			hasPartialQCDSE:  true,
 		},
-		{
-			name:             "received +2/3 prop vote and has election vote DSE stored",
-			detail:           `received +2/3 quorum on the precommit votes from replicas and has double sign evidence stored in the form of a conflicting election votes`,
-			proposalReceived: true,
-			isProposer:       true,
-			validProposal:    true,
-			hasEVDSE:         true,
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

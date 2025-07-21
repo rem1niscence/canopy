@@ -349,7 +349,7 @@ func TestOnPeerError(t *testing.T) {
 	defer cleanup()
 	n2PeerAddress := &lib.PeerAddress{
 		PublicKey:  n2.pub,
-		NetAddress: "pipe:9001",
+		NetAddress: "pipe",
 		PeerMeta: &lib.PeerMeta{
 			NetworkId: 1,
 			ChainId:   1,

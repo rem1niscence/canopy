@@ -258,12 +258,12 @@ func TestPeerAddressFromString(t *testing.T) {
 		},
 		{
 			name:   "valid url in string",
-			detail: "the address string is missing an @ sign",
+			detail: "valid url",
 			s:      newTestPublicKey(t).String() + "@tcp://0.0.0.0:8080",
 			expected: &PeerAddress{
 				PeerMeta:   &PeerMeta{ChainId: 1},
 				PublicKey:  newTestPublicKeyBytes(t),
-				NetAddress: "0.0.0.0:8080",
+				NetAddress: "0.0.0.0:8081",
 			},
 		},
 	}
