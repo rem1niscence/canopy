@@ -5,7 +5,6 @@ import (
 	"io"
 	"net"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -78,14 +77,14 @@ type MultiConn struct {
 
 // NewConnection() creates and starts a new instance of a MultiConn
 func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
-	if tcpConn, ok := conn.(*net.TCPConn); ok {
-		if err := tcpConn.SetWriteBuffer(32 * 1024 * 1024); err != nil {
-			p.log.Warnf("Failed to set write buffer: %v", err)
-		}
-		if err := tcpConn.SetReadBuffer(32 * 1024 * 1024); err != nil {
-			p.log.Warnf("Failed to set write buffer: %v", err)
-		}
-	}
+	//if tcpConn, ok := conn.(*net.TCPConn); ok {
+	//	if err := tcpConn.SetWriteBuffer(32 * 1024 * 1024); err != nil {
+	//		p.log.Warnf("Failed to set write buffer: %v", err)
+	//	}
+	//	if err := tcpConn.SetReadBuffer(32 * 1024 * 1024); err != nil {
+	//		p.log.Warnf("Failed to set write buffer: %v", err)
+	//	}
+	//}
 	// establish an encrypted connection using the handshake
 	eConn, err := NewHandshake(conn, p.meta, p.privateKey)
 	if err != nil {
@@ -228,9 +227,6 @@ func (c *MultiConn) startReceiveService() {
 				}
 				// handle the packet within the stream
 				if slash, er := stream.handlePacket(info, x); er != nil {
-					if strings.Contains(er.Error(), "use of closed network connection") {
-						return
-					}
 					c.log.Warnf(er.Error())
 					c.Error(er, slash)
 					return
@@ -256,7 +252,7 @@ func (c *MultiConn) Error(err error, reputationDelta ...int32) {
 		if c.isAdded.Swap(true) {
 			c.onError(err, c.Address.PublicKey, c.conn.RemoteAddr().String())
 		} else {
-			c.log.Warn(err.Error())
+			c.log.Debug(err.Error())
 		}
 		// stop the multi-conn
 		c.Stop()
