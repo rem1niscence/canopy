@@ -35,9 +35,7 @@ This component represents proof that validators have signed contradictory messag
 - Validation logic to ensure the evidence is legitimate
 - Checks to prevent processing of expired or invalid evidence
 
-The system can detect double signing in two main scenarios:
-1. When a leader sends a PartialQC (insufficient signatures) that conflicts with a valid QC
-2. When a leader candidate receives election votes from validators who also voted for the true leader
+The system can detect double signing when a leader sends a PartialQC (insufficient signatures) that conflicts with a valid QC
 
 ### Evidence Collection and Processing
 

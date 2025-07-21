@@ -118,7 +118,7 @@ type FSMMetrics struct {
 	ValidatorType              *prometheus.GaugeVec // what's the type of this validator?
 	ValidatorCompounding       *prometheus.GaugeVec // is this validator compounding?
 	ValidatorStakeAmount       *prometheus.GaugeVec // what's the stake amount of this validator
-	ValidatorBlockProducer     *prometheus.GaugeVec // was this validator a block producer?
+	ValidatorBlockProducer     *prometheus.GaugeVec // was this validator a block producer? // TODO duplicate of canopy_proposer_count
 	ValidatorNonSigner         *prometheus.GaugeVec // was this validator a non signer?
 	ValidatorNonSignerCount    *prometheus.GaugeVec // was any validator a non signer?
 	ValidatorDoubleSigner      *prometheus.GaugeVec // was this validator a double signer?

@@ -218,7 +218,10 @@ func (p *P2P) Dial(address *lib.PeerAddress, disconnect, strictPublicKey bool) l
 	if p.IsSelf(address) || p.PeerSet.Has(address.PublicKey) {
 		return nil
 	}
-	p.log.Debugf("Dialing %s@%s", lib.BytesToString(address.PublicKey), address.NetAddress)
+	// only log if not immediate disconnect
+	if !disconnect {
+		p.log.Debugf("Dialing %s@%s", lib.BytesToString(address.PublicKey), address.NetAddress)
+	}
 	// try to establish the basic tcp connection
 	conn, er := net.DialTimeout(transport, address.NetAddress, dialTimeout)
 	if er != nil {
@@ -246,11 +249,6 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect, strictPubli
 			connection.Stop()
 		}
 	}()
-	// replace the peer's port with the resolved port
-	if err = lib.ResolveAndReplacePort(&info.Address.NetAddress, p.config.ChainId); err != nil {
-		p.log.Error(err.Error())
-		return
-	}
 	// log the peer add attempt
 	p.log.Debugf("Try Add peer: %s@%s", lib.BytesToString(connection.Address.PublicKey), info.Address.NetAddress)
 	// if peer is outbound, ensure the public key matches who we expected to dial
@@ -321,6 +319,7 @@ func (p *P2P) DialWithBackoff(peerInfo *lib.PeerAddress, strictPublicKey bool) {
 
 // DialAndDisconnect() dials the peer but disconnects once a fully authenticated connection is established
 func (p *P2P) DialAndDisconnect(a *lib.PeerAddress, strictPublicKey bool) lib.ErrorI {
+	p.log.Debugf("DialAndDisconnect %s@%s", lib.BytesToString(a.PublicKey), a.NetAddress)
 	return p.Dial(a, true, strictPublicKey)
 }
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/canopy-network/canopy/bft"
@@ -511,15 +510,6 @@ func (c *Controller) SendBlock(maxHeight, vdfIterations uint64, blockAndCert *li
 
 // UpdateP2PMustConnect() tells the P2P module which nodes are *required* to be connected to (usually fellow committee members or none if not in committee)
 func (c *Controller) UpdateP2PMustConnect(v *lib.ConsensusValidators) {
-	// resolve the port to append based on the 'chain id'
-	port, err := lib.ResolvePort(c.Config.ChainId)
-	// if an error occurred
-	if err != nil {
-		// log the error
-		c.log.Error(err.Error())
-		// exit
-		return
-	}
 	// handle empty validator set
 	if v.ValidatorSet == nil {
 		// exit
@@ -529,6 +519,13 @@ func (c *Controller) UpdateP2PMustConnect(v *lib.ConsensusValidators) {
 	mustConnects, selfIsValidator := make([]*lib.PeerAddress, 0), false
 	// for each member of the committee
 	for _, member := range v.ValidatorSet {
+		// if an error occurred
+		if err := lib.ResolveAndReplacePort(&member.NetAddress, c.Config.ChainId); err != nil {
+			// log the error
+			c.log.Error(err.Error())
+			// exit
+			return
+		}
 		// if self is a validator
 		if bytes.Equal(member.PublicKey, c.PublicKey) {
 			// update the variable
@@ -537,7 +534,7 @@ func (c *Controller) UpdateP2PMustConnect(v *lib.ConsensusValidators) {
 		// create the peer object and add it to the list
 		mustConnects = append(mustConnects, &lib.PeerAddress{
 			PublicKey:  member.PublicKey,
-			NetAddress: strings.ReplaceAll(member.NetAddress, "tcp://", "") + port,
+			NetAddress: member.NetAddress,
 			PeerMeta:   &lib.PeerMeta{NetworkId: c.Config.NetworkID, ChainId: c.Config.ChainId},
 		})
 	}

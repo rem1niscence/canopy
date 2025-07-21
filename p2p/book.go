@@ -17,12 +17,12 @@ import (
 )
 
 var (
-	MaxFailedDialAttempts        = int32(1)    // maximum times a peer may fail a churn management dial attempt before evicted from the peer book
-	MaxPeersExchanged            = 1           // maximum number of peers per chain that may be sent/received during a peer exchange
-	MaxPeerBookRequestsPerWindow = 2           // maximum peer book request per window
-	PeerBookRequestWindowS       = 30          // seconds in a peer book request
-	CrawlAndCleanBookFrequency   = time.Minute // how often the book is cleaned and crawled
-	SaveBookFrequency            = time.Minute // how often the book is saved to a file
+	MaxFailedDialAttempts        = int32(1)         // maximum times a peer may fail a churn management dial attempt before evicted from the peer book
+	MaxPeersExchanged            = 1                // maximum number of peers per chain that may be sent/received during a peer exchange
+	MaxPeerBookRequestsPerWindow = 2                // maximum peer book request per window
+	PeerBookRequestWindowS       = 30               // seconds in a peer book request
+	CrawlAndCleanBookFrequency   = time.Minute * 10 // how often the book is cleaned and crawled
+	SaveBookFrequency            = time.Minute * 5  // how often the book is saved to a file
 )
 
 // PeerBook is a persisted structure that maintains information on potential peers
@@ -115,9 +115,24 @@ func (p *P2P) ListenForPeerBookResponses() {
 			}
 			// add each peer to the book (deduplicated upon adding)
 			for _, bp := range peerBookResponseMsg.Book {
+				// skip empty
+				if bp == nil || bp.Address == nil || bp.Address.PeerMeta == nil {
+					continue
+				}
+				// skip max dial failed
 				if bp.ConsecutiveFailedDial >= MaxFailedDialAttempts {
 					continue
 				}
+				// skip if already connected
+				if p.Has(bp.Address.PublicKey) {
+					continue
+				}
+				// try to dial
+				if err := p.DialAndDisconnect(bp.Address, true); err != nil {
+					p.log.Debugf("DialAndDisconnect failed with err: %s", err.Error())
+					continue
+				}
+				// add peer to list
 				p.book.Add(bp)
 			}
 			p.ChangeReputation(senderID, GoodPeerBookRespRep)
@@ -135,7 +150,7 @@ func (p *P2P) ListenForPeerBookRequests() {
 		select {
 		// fires after receiving a peer request
 		case msg := <-p.Inbox(lib.Topic_PEERS_REQUEST):
-			//p.log.Debugf("Received peer book request from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
+			p.log.Debugf("Received peer book request from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 			requesterID := msg.Sender.Address.PublicKey
 			// rate limit per requester
 			blocked, totalBlock := l.NewRequest(lib.BytesToString(requesterID))
@@ -202,8 +217,9 @@ func (p *PeerBook) StartChurnManagement(dialAndDisconnect func(a *lib.PeerAddres
 		pubs, netAddrs := make(map[string]int), make(map[string]int)
 		// iterate through the copy
 		for _, peer := range bookCopy {
-			// deduplicate based on public key and net address
+			// deduplicate based on public key, net address, and ips
 			pubs[lib.BytesToTruncatedString(peer.Address.PublicKey)]++
+			// net addr deduplication
 			netAddrs[peer.Address.NetAddress]++
 			// deduplicate based on signature
 			if err := dialAndDisconnect(peer.Address, true); err != nil {

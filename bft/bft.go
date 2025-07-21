@@ -126,7 +126,7 @@ func (b *BFT) Start() {
 				since := time.Since(resetBFT.StartTime)
 				// allow if 'since' is less than 1 block old
 				if int(since.Milliseconds()) < b.Config.BlockTimeMS() {
-					b.log.Infof("Using included timestamp to calculate process time: %s", resetBFT.StartTime.String())
+					b.log.Infof("Using included timestamp to calculate process time: %s", resetBFT.StartTime.Format(time.StampMilli))
 					processTime = since
 				}
 				// if is a root-chain update reset back to round 0 but maintain locks to prevent 'fork attacks'

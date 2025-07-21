@@ -176,10 +176,6 @@ func (b *BFT) GetLocalDSE() DoubleSignEvidences {
 	// by partial QC: a byzantine Leader sent a 'non +2/3 quorum certificate'
 	// and the node holds a correct Quorum Certificate for the same View
 	b.addDSEByPartialQC(&dse)
-	// by candidate: a good samaritan Leader Candidate node receives ELECTION votes from Replicas
-	// that also voted for the 'true Leader' the candidate now holds equivocating signatures by Replicas
-	// for the same View
-	b.addDSEByCandidate(&dse)
 	// log if DSE is found
 	if dseLen := len(dse.Evidence); dseLen != 0 {
 		b.log.Infof("GetLocalDSE yielded %d pieces of evidence", dseLen)
@@ -230,6 +226,10 @@ func (x *DoubleSignEvidence) Check(vs lib.ValidatorSet, view *lib.View, minimumE
 	}
 	if bytes.Equal(x.VoteB.SignBytes(), x.VoteA.SignBytes()) {
 		return lib.ErrNonEquivocatingVote() // same payloads
+	}
+	// don't allow double signs below propose
+	if x.VoteA.Header.Phase <= Propose {
+		return lib.ErrWrongPhase()
 	}
 	return nil
 }
@@ -307,84 +307,6 @@ func (b *BFT) addDSEByPartialQC(dse *DoubleSignEvidences) {
 				b.log.Error(err.Error())
 			}
 			b.log.Infof("Added byzantine evidence by historical partial QC at height %d ", evidenceHeight)
-		}
-	}
-}
-
-/*
-DoubleSignEvidence: By LeaderCandidate
-
-If a Leader Candidate receives ELECTION votes from Replicas that also voted for the true Leader, when the true Leader proves
-their legitimacy with an ELECTION_VOTE_QC, the candidate ends up holding equivocating signatures (evidence) that some Replicas
-voted for both Leaders in the same View
-
-This allows the Leader Candidate to `out` the validators who `double signed` for themselves and the true leader for the same View.
-*/
-
-// addDSEByCandidate() node looks through any ELECTION-VOTES they received to see if any signers conflict with signers of the true Leader
-func (b *BFT) addDSEByCandidate(dse *DoubleSignEvidences) {
-	// ELECTION CANDIDATE exposing double sign election
-	if !b.SelfIsProposer() {
-		b.log.Debugf("Inspecting candidate messages for conflicts")
-		// for each Round until present
-		for r := uint64(0); r <= b.Round; r++ {
-			// get votes for round
-			rvs := b.Votes[r]
-			if rvs == nil {
-				b.log.Debugf("No round vote sets found")
-				continue
-			}
-			// get votes for Election Vote phase
-			ps := phaseToString(ElectionVote)
-			electionVotes := rvs[ps]
-			// if didn't receive any election votes
-			if electionVotes == nil {
-				b.log.Debugf("No election votes found")
-				continue
-			}
-			// get the true Leaders' messages for this same round
-			roundProposal := b.Proposals[r]
-			if roundProposal == nil {
-				b.log.Debugf("No round proposals found")
-				continue
-			}
-			// specifically the Propose message which contains the ElectionVote justification signatures
-			proposal, found := roundProposal[phaseToString(Propose)]
-			if !found || len(proposal) == 0 {
-				b.log.Debugf("No propose message which contains the ElectionVote justification signatures found")
-				continue
-			}
-			// for each election vote payload received (likely only 1 payload)
-			for _, voteSet := range electionVotes {
-				// if the vote exists and the QC is not empty
-				if voteSet.Vote != nil && voteSet.Vote.Qc != nil {
-					b.log.Debugf("inspecting election vote payload for conflicts")
-					// aggregate the signers of this vote
-					signature, e := voteSet.multiKey.AggregateSignatures()
-					if e != nil {
-						b.log.Error(e.Error())
-						continue
-					}
-					// build into an ElectionQC
-					qc := &QC{
-						Header:      voteSet.Vote.Qc.Header,
-						ProposerKey: voteSet.Vote.Qc.ProposerKey,
-						Signature: &lib.AggregateSignature{
-							Signature: signature,
-							Bitmap:    voteSet.multiKey.Bitmap(),
-						},
-					}
-					b.log.Errorf("Double sign evidence found: 'By LeaderCandidate'")
-					// attempt to add it as DoubleSignEvidence
-					// (will be rejected if there are no conflicting signers)
-					if err := b.AddDSE(dse, &DoubleSignEvidence{
-						VoteA: proposal[0].Qc,
-						VoteB: qc,
-					}); err != nil {
-						b.log.Warn(err.Error())
-					}
-				}
-			}
 		}
 	}
 }

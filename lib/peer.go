@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/json"
-	"net/url"
+	"net"
 	"slices"
 	"strings"
 	"time"
@@ -58,33 +58,12 @@ func (x *PeerAddress) FromString(stringFromConfig string) (e ErrorI) {
 		// exit with invalid public key
 		return ErrInvalidNetAddressPubKey(splitArr[0])
 	}
-	// attempt to extract the net address from the second part of the split array
-	netAddress, er := url.Parse(splitArr[1])
-	// if an error occurred during the parsing
-	if er != nil || netAddress.Hostname() == "" {
-		// exit with 'invalid net address'
-		return ErrInvalidNetAddress(stringFromConfig)
-	}
 	// get the port from the net address
-	port := netAddress.Port()
+	x.NetAddress = splitArr[1]
 	// resolve port automatically if not exists
-	// port definition exists everywhere except for in state
-	if port == "" {
-		// resolve the port
-		port, e = ResolvePort(x.PeerMeta.ChainId)
-		// if an error occurred resolving the port
-		if e != nil {
-			// exit
-			return
-		}
+	if e = ResolveAndReplacePort(&x.NetAddress, x.PeerMeta.ChainId); e != nil {
+		return e
 	}
-	// ensure the port starts with a colon
-	if !strings.HasPrefix(port, ":") {
-		// add the colon if not exists
-		port = ":" + port
-	}
-	// remove the transport prefix (if exists) and set the NetAddress
-	x.NetAddress = strings.ReplaceAll(netAddress.Hostname(), "tcp://", "") + port
 	// set the PublicKey
 	x.PublicKey = pubKey.Bytes()
 	// exit
@@ -93,33 +72,50 @@ func (x *PeerAddress) FromString(stringFromConfig string) (e ErrorI) {
 
 // ResolvePort() executes a network wide protocol for determining what the p2p port of the peer is
 // This is useful to allow 1 URL in state to expand to many routing paths for nested-chains
-// Example: ResolvePort(CHAIN-ID = 2) returns 9002
-func ResolvePort(chainId uint64) (string, ErrorI) {
-	return AddToPort(":9000", chainId)
+// Example: ResolvePort(CHAIN-ID = 2) with original port 9000 returns 9002
+func ResolvePort(oldPort string, chainId uint64) (string, ErrorI) {
+	if oldPort != "" {
+		return AddToPort(strings.ReplaceAll(oldPort, ":", ""), chainId)
+	}
+	return AddToPort("9000", chainId)
 }
 
-// ResolveAndReplacePort() resolves the appropriate port and replaces the port in the net address
-func ResolveAndReplacePort(netAddress *string, chainId uint64) ErrorI {
-	// resolve the port using the network wide protocol
-	newPort, err := ResolvePort(chainId)
+// ResolveAndReplacePort resolves the appropriate port and replaces the port in the net address
+func ResolveAndReplacePort(netAddress *string, chainId uint64) (error ErrorI) {
+	if netAddress == nil {
+		return ErrInvalidNetAddress("<nil>")
+	}
+	// capture the input
+	input := *netAddress
+	// replace any prefix
+	if strings.HasPrefix(input, "tcp://") {
+		input = strings.TrimPrefix(input, "tcp://")
+	}
+	// extract the host and port
+	host, port, err := net.SplitHostPort(input)
 	if err != nil {
-		return err
+		// if err isn't about a missing port
+		if !strings.Contains(err.Error(), "missing port in address") {
+			return ErrInvalidNetAddress(err.Error())
+		}
+		// resolve the new port
+		newPort, e := ResolvePort("", chainId)
+		if e != nil {
+			return e
+		}
+		// unwrap IPv6 brackets if present, e.g., "[2001:db8::1]" -> "2001:db8::1"
+		*netAddress = net.JoinHostPort(strings.Trim(input, "[]"), newPort)
+		return
 	}
-	// remove the colon
-	newPort = strings.Replace(newPort, ":", "", 1)
-	// find the index of the final colon in the address
-	i := strings.LastIndex(*netAddress, ":")
-	// if no colon found
-	if i == -1 {
-		// return the original address with the new port appended
-		*netAddress = *netAddress + ":" + newPort
-		// exit with no error
-		return nil
+	// host and port were parsed successfully
+	newPort, e := ResolvePort(":"+port, chainId)
+	if e != nil {
+		return e
 	}
-	// return the address up to and including the colon, then the new port
-	*netAddress = (*netAddress)[:i+1] + newPort
-	// exit with no error
-	return nil
+	// set the input
+	*netAddress = net.JoinHostPort(host, newPort)
+	// exit
+	return
 }
 
 // HasChain() returns if the PeerAddress's PeerMeta has this chain

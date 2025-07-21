@@ -287,6 +287,104 @@ func TestPeerAddressFromString(t *testing.T) {
 	}
 }
 
+func TestResolveAndReplacePort(t *testing.T) {
+	tests := []struct {
+		name        string
+		netaddr     string
+		expected    string
+		chainId     uint64
+		expectedErr string
+	}{
+		{
+			name:        "invalid net address: bad port",
+			netaddr:     "tcp://:badport",
+			expected:    "",
+			chainId:     1,
+			expectedErr: "port not numerical",
+		},
+		{
+			name:     "no port",
+			netaddr:  "tcp://example.com",
+			expected: "example.com:9001",
+			chainId:  1,
+		},
+
+		{
+			name:     "no port chain 2",
+			netaddr:  "tcp://example.com",
+			expected: "example.com:9002",
+			chainId:  2,
+		},
+		{
+			name:     "with port",
+			netaddr:  "tcp://example.com:9000",
+			expected: "example.com:9001",
+			chainId:  1,
+		},
+		{
+			name:     "with port chain 2",
+			netaddr:  "tcp://example.com:9000",
+			expected: "example.com:9002",
+			chainId:  2,
+		},
+		{
+			name:     "with ip",
+			netaddr:  "tcp://9.9.9.9:9000",
+			expected: "9.9.9.9:9001",
+			chainId:  1,
+		},
+		{
+			name:     "with ip big chain id",
+			netaddr:  "tcp://9.9.9.9:9000",
+			expected: "9.9.9.9:10000",
+			chainId:  1000,
+		},
+		{
+			name:     "with large port",
+			netaddr:  "example.com:60000",
+			expected: "example.com:60001",
+			chainId:  1,
+		},
+		{
+			name:     "with large port chain 2",
+			netaddr:  "tcp://example.com:60000",
+			expected: "example.com:60002",
+			chainId:  2,
+		},
+		{
+			name:        "exceeds port limit",
+			netaddr:     "tcp://example.com:70000",
+			expected:    "",
+			chainId:     2,
+			expectedErr: "max port exceeded",
+		},
+
+		{
+			name:     "IPV6",
+			netaddr:  "[2001:db8::1]:7000",
+			expected: "[2001:db8::1]:7001",
+			chainId:  1,
+		},
+		{
+			name:     "IPV6 no port",
+			netaddr:  "tcp://[2001:db8::1]",
+			expected: "[2001:db8::1]:9002",
+			chainId:  2,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ResolveAndReplacePort(&test.netaddr, test.chainId)
+			require.Equal(t, err == nil, test.expectedErr == "")
+			if err != nil {
+				require.Contains(t, err.Error(), test.expectedErr)
+				return
+			}
+			require.Equal(t, test.expected, test.netaddr)
+		})
+	}
+}
+
 func TestHasChain(t *testing.T) {
 	tests := []struct {
 		name        string

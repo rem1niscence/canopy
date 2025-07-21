@@ -380,11 +380,11 @@ func TestValidURLInput(t *testing.T) {
 		{"subdomain.example.com", true},         // valid subdomain
 		{"", false},                             // empty input
 		{"tcp://", false},                       // missing hostname/IP
-		{"192.168.1.1:443", false},              // invalid (port not allowed)
-		{"tcp://localhost:8080", false},         // invalid (port not allowed)
-		{"localhost:8080", false},               // invalid (port not allowed)
-		{"tcp://192.168.1.1:80", false},         // invalid (port not allowed)
-		{"example.com:1234", false},             // invalid (port not allowed)
+		{"192.168.1.1:443", true},               // valid (port allowed)
+		{"tcp://localhost:8080", true},          // valid (port allowed)
+		{"localhost:8080", true},                // valid (port allowed)
+		{"tcp://192.168.1.1:80", true},          // valid (port allowed)
+		{"example.com:1234", true},              // valid (port allowed)
 		{"localhost/extra", false},              // invalid (sub-path not allowed)
 		{"example.com/path/to/resource", false}, // invalid (sub-path not allowed)
 		{"192.168.1.1/resource", false},         // invalid (sub-path not allowed)

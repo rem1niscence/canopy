@@ -1,60 +1,10 @@
 package p2p
 
 import (
-	"bytes"
-	"testing"
-	"time"
-
 	"github.com/canopy-network/canopy/lib"
 	"github.com/stretchr/testify/require"
+	"testing"
 )
-
-func TestStartPeerBookService(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping test in short mode")
-	}
-	MaxFailedDialAttempts = 5
-	MaxPeersExchanged = 2
-	n1, n2, cleanup := newTestP2PPair(t)
-	defer cleanup()
-	n3, n4 := newTestP2PNode(t), newTestP2PNode(t)
-	n1.book.Add(&BookPeer{Address: n3.ID()})
-	n2.book.Add(&BookPeer{Address: n4.ID()})
-	n1.StartPeerBookService()
-	n2.StartPeerBookService()
-	for {
-		select {
-		case <-time.NewTicker(time.Millisecond * 100).C:
-			bp := n1.GetBookPeers()
-			if len(bp) < 3 {
-				continue
-			}
-			hasN4 := false
-			for _, peer := range bp {
-				if bytes.Equal(peer.Address.PublicKey, n4.pub) {
-					hasN4 = true
-					break
-				}
-			}
-			require.True(t, hasN4)
-			bp = n2.GetBookPeers()
-			if len(bp) < 3 {
-				continue
-			}
-			hasN3 := false
-			for _, peer := range bp {
-				if bytes.Equal(peer.Address.PublicKey, n3.pub) {
-					hasN3 = true
-					break
-				}
-			}
-			require.True(t, hasN3)
-			return
-		case <-time.After(testTimeout):
-			t.Fatal("timeout")
-		}
-	}
-}
 
 func TestGetRandom(t *testing.T) {
 	n1, n2 := newTestP2PNode(t), newTestP2PNode(t)

@@ -531,37 +531,36 @@ func (x *HexBytes) UnmarshalJSON(jsonBytes []byte) (err error) {
 // - optional tcp:// prefix
 // - valid hostname
 // - valid ip4 and ip6 address
+// - optional port (e.g., :80)
 //
 // Disallow:
-// - Ports
-// - Sub-paths
+// - Sub-paths (e.g., /path)
 func ValidNetURLInput(netURL string) bool {
-	// regex for optional tcp://, valid hostname, or IP with no ports
-	regex := `^(?:tcp:\/\/)?(?:localhost|(?:[a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+|(?:\d{1,3}\.){3}\d{1,3}|(?:\[[0-9a-fA-F:]+\]))$`
-	// see if the net url passes the regex check
+	// updated regex with optional port
+	regex := `^(?:tcp:\/\/)?(?:localhost|(?:[a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+|(?:\d{1,3}\.){3}\d{1,3}|\[[0-9a-fA-F:]+\])(?:\:\d{1,5})?$`
 	matched, err := regexp.MatchString(regex, netURL)
-	// if an error occurred during the check
 	if err != nil {
-		// exit 'not valid'
 		return false
 	}
-	// exit with the result of the regex check
 	return matched
 }
 
 // AddToPort() adds some number to the port ensuring it doesn't exceed the max port
 func AddToPort(portStr string, add uint64) (string, ErrorI) {
-	// remove the colon from the port
-	portPart := portStr[1:]
+	// remove the colon if present
+	portStr = strings.ReplaceAll(portStr, ":", "")
 	// convert the port to
-	port, _ := strconv.Atoi(portPart)
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return "", ErrBadPort()
+	}
 	// add the given number to the port
 	newPort := port + int(add)
 	// ensure the new port doesn't exceed the max port number (65535)
 	if newPort > 65535 {
 		return "", ErrMaxPort()
 	}
-	return fmt.Sprintf(":%d", newPort), nil
+	return fmt.Sprintf("%d", newPort), nil
 }
 
 // NewTimer() creates a 0 value initialized instance of a timer
