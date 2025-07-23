@@ -87,12 +87,13 @@ func (p *P2P) ListenForPeerBookResponses() {
 		select {
 		// fires when received the response to the request
 		case msg := <-p.Inbox(lib.Topic_PEERS_RESPONSE):
-			//p.log.Debugf("Received peer book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
+			p.log.Debugf("Received peer book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 			senderID := msg.Sender.Address.PublicKey
 			// rate limit per requester
 			blocked, totalBlock := l.NewRequest(lib.BytesToString(senderID))
 			// if requester blocked
 			if blocked {
+				p.log.Warnf("too many peer book responses from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 				p.ChangeReputation(senderID, ExceedMaxPBReqRep)
 				continue
 			}
@@ -156,6 +157,7 @@ func (p *P2P) ListenForPeerBookRequests() {
 			blocked, totalBlock := l.NewRequest(lib.BytesToString(requesterID))
 			// if requester blocked
 			if blocked {
+				p.log.Warnf("too many peer book requests from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 				p.ChangeReputation(requesterID, ExceedMaxPBReqRep)
 				continue
 			}
