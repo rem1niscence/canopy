@@ -28,6 +28,11 @@ import (
 	- Guarantee the integrity of a message sent
 */
 
+var (
+	// handshakeTimeout is the timeout for each of the handshake network operations
+	handshakeTimeout = 1 * time.Second
+)
+
 // EncryptedConn is made of the underlying tcp connection, send and receive AEAD ciphers, and the peer address
 // NOTE: receiving and sending have two distinct AEAD state objects for key / nonce management and simultaneous send/receive
 type EncryptedConn struct {
@@ -54,7 +59,7 @@ func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKe
 	tempPublicKey := tempPrivateKey.PublicKey().Bytes()
 	encryptedConn = &EncryptedConn{conn: conn}
 	// swap temporary keys
-	peerTempPublicKey, e := keySwap(encryptedConn, tempPublicKey)
+	peerTempPublicKey, e := keySwap(encryptedConn, tempPublicKey, handshakeTimeout)
 	if e != nil {
 		return
 	}
@@ -79,7 +84,7 @@ func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKe
 	peerSig, err := signatureSwap(encryptedConn, &lib.Signature{
 		PublicKey: privateKey.PublicKey().Bytes(),
 		Signature: privateKey.Sign(challenge[:]),
-	})
+	}, handshakeTimeout)
 	if err != nil {
 		return nil, ErrFailedSignatureSwap(err)
 	}
@@ -92,7 +97,7 @@ func NewHandshake(conn net.Conn, meta *lib.PeerMeta, privateKey crypto.PrivateKe
 		return nil, ErrFailedChallenge()
 	}
 	// swap peer metadata using the encrypted channel
-	peerMeta, err := peerMetaSwap(encryptedConn, meta.Sign(privateKey))
+	peerMeta, err := peerMetaSwap(encryptedConn, meta.Sign(privateKey), handshakeTimeout)
 	if err != nil {
 		return nil, ErrFailedMetaSwap(err)
 	}
@@ -236,34 +241,34 @@ func (c *EncryptedConn) SetReadDeadline(t time.Time) error  { return c.conn.SetR
 func (c *EncryptedConn) SetWriteDeadline(t time.Time) error { return c.conn.SetWriteDeadline(t) }
 
 // keySwap() exchanges temporary public keys between peers
-func keySwap(conn net.Conn, tempPublicKey []byte) (peerTempPublicKey []byte, err lib.ErrorI) {
+func keySwap(conn net.Conn, tempPublicKey []byte, timeout time.Duration) (peerTempPublicKey []byte, err lib.ErrorI) {
 	peerTempKey, selfPubKey := new(crypto.ProtoPubKey), &crypto.ProtoPubKey{Pubkey: tempPublicKey}
-	if err = parallelSendReceive(conn, selfPubKey, peerTempKey); err != nil {
+	if err = parallelSendReceive(conn, selfPubKey, peerTempKey, timeout); err != nil {
 		return nil, err
 	}
 	return peerTempKey.Pubkey, nil
 }
 
 // signatureSwap() exchanges the actual peer keys along with a signature between peers
-func signatureSwap(conn net.Conn, signature *lib.Signature) (peerSig *lib.Signature, err lib.ErrorI) {
+func signatureSwap(conn net.Conn, signature *lib.Signature, timeout time.Duration) (peerSig *lib.Signature, err lib.ErrorI) {
 	peerSig = new(lib.Signature)
-	err = parallelSendReceive(conn, signature, peerSig)
+	err = parallelSendReceive(conn, signature, peerSig, timeout)
 	return
 }
 
 // peerMetaSwap() exchanges peer metadata between two peers
-func peerMetaSwap(conn net.Conn, meta *lib.PeerMeta) (peerMeta *lib.PeerMeta, err lib.ErrorI) {
+func peerMetaSwap(conn net.Conn, meta *lib.PeerMeta, timeout time.Duration) (peerMeta *lib.PeerMeta, err lib.ErrorI) {
 	peerMeta = new(lib.PeerMeta)
-	err = parallelSendReceive(conn, meta, peerMeta)
+	err = parallelSendReceive(conn, meta, peerMeta, timeout)
 	return
 }
 
 // parallelSendReceive() executes send and receive functions in parallel
 // waits for both functions to complete, and returns if either has an error
-func parallelSendReceive(conn net.Conn, a, b proto.Message) lib.ErrorI {
+func parallelSendReceive(conn net.Conn, a, b proto.Message, timeout time.Duration) lib.ErrorI {
 	var g errgroup.Group
-	g.Go(func() error { return sendProtoMsg(conn, a) })
-	g.Go(func() error { return receiveProtoMsg(conn, b) })
+	g.Go(func() error { return sendProtoMsg(conn, a, timeout) })
+	g.Go(func() error { return receiveProtoMsg(conn, b, timeout) })
 	if er := g.Wait(); er != nil {
 		return ErrErrorGroup(er)
 	}

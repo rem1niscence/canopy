@@ -77,14 +77,14 @@ type MultiConn struct {
 
 // NewConnection() creates and starts a new instance of a MultiConn
 func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
-	//if tcpConn, ok := conn.(*net.TCPConn); ok {
-	//	if err := tcpConn.SetWriteBuffer(32 * 1024 * 1024); err != nil {
-	//		p.log.Warnf("Failed to set write buffer: %v", err)
-	//	}
-	//	if err := tcpConn.SetReadBuffer(32 * 1024 * 1024); err != nil {
-	//		p.log.Warnf("Failed to set write buffer: %v", err)
-	//	}
-	//}
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		if err := tcpConn.SetWriteBuffer(32 * 1024 * 1024); err != nil {
+			p.log.Warnf("Failed to set write buffer: %v", err)
+		}
+		if err := tcpConn.SetReadBuffer(32 * 1024 * 1024); err != nil {
+			p.log.Warnf("Failed to set write buffer: %v", err)
+		}
+	}
 	// establish an encrypted connection using the handshake
 	eConn, err := NewHandshake(conn, p.meta, p.privateKey)
 	if err != nil {
@@ -293,7 +293,6 @@ func (c *MultiConn) sendPacket(packet *Packet, m *limiter.Monitor) {
 	}
 	// send packet as message over the wire
 	c.sendWireBytes(packet, m)
-	return
 }
 
 // sendWireBytes() a rate limited writer of outbound bytes to the wire
@@ -317,7 +316,6 @@ func (c *MultiConn) sendWireBytes(message proto.Message, m *limiter.Monitor) {
 	}
 	// update the rate limiter with how many bytes were written
 	//m.Update(n)
-	return
 }
 
 // Stream: an independent, bidirectional communication channel that is scoped to a single topic.
@@ -416,20 +414,20 @@ func (s *Stream) handlePacket(peerInfo *lib.PeerInfo, packet *Packet) (int32, li
 // HELPERS BELOW
 
 // sendProtoMsg() encodes and sends a length-prefixed proto message to a net.Conn
-func sendProtoMsg(conn net.Conn, ptr proto.Message) lib.ErrorI {
+func sendProtoMsg(conn net.Conn, ptr proto.Message, timeout ...time.Duration) lib.ErrorI {
 	// marshal into proto bytes
 	bz, err := lib.Marshal(ptr)
 	if err != nil {
 		return err
 	}
 	// send the bytes prefixed by length
-	return sendLengthPrefixed(conn, bz)
+	return sendLengthPrefixed(conn, bz, timeout...)
 }
 
 // receiveProtoMsg() receives and decodes a length-prefixed proto message from a net.Conn
-func receiveProtoMsg(conn net.Conn, ptr proto.Message) lib.ErrorI {
+func receiveProtoMsg(conn net.Conn, ptr proto.Message, timeout ...time.Duration) lib.ErrorI {
 	// read the message from the wire
-	msg, err := receiveLengthPrefixed(conn)
+	msg, err := receiveLengthPrefixed(conn, timeout...)
 	if err != nil {
 		return err
 	}
@@ -441,12 +439,17 @@ func receiveProtoMsg(conn net.Conn, ptr proto.Message) lib.ErrorI {
 }
 
 // sendLengthPrefixed() sends a message that is prefix by length through a tcp connection
-func sendLengthPrefixed(conn net.Conn, bz []byte) lib.ErrorI {
+func sendLengthPrefixed(conn net.Conn, bz []byte, timeout ...time.Duration) lib.ErrorI {
+	// set the write timeout
+	writeTimeout := WriteTimeout
+	if len(timeout) == 1 {
+		writeTimeout = timeout[0]
+	}
 	// create the length prefix (2 bytes, big endian)
 	lengthPrefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(lengthPrefix, uint32(len(bz)))
-	//// set the write deadline to 20 second
-	if e := conn.SetWriteDeadline(time.Now().Add(WriteTimeout)); e != nil {
+	// set the write deadline
+	if e := conn.SetWriteDeadline(time.Now().Add(writeTimeout)); e != nil {
 		return ErrFailedWrite(e)
 	}
 	// write the message (length prefixed)
@@ -459,9 +462,14 @@ func sendLengthPrefixed(conn net.Conn, bz []byte) lib.ErrorI {
 }
 
 // receiveLengthPrefixed() reads a length prefixed message from a tcp connection
-func receiveLengthPrefixed(conn net.Conn) ([]byte, lib.ErrorI) {
+func receiveLengthPrefixed(conn net.Conn, timeout ...time.Duration) ([]byte, lib.ErrorI) {
+	// set the read timeout
+	readTimeout := ReadTimeout
+	if len(timeout) == 1 {
+		readTimeout = timeout[0]
+	}
 	// set the read conn deadline
-	if err := conn.SetReadDeadline(time.Now().Add(ReadTimeout)); err != nil {
+	if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
 		return nil, ErrFailedRead(err)
 	}
 	// read the 4-byte length prefix
