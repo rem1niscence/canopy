@@ -87,7 +87,7 @@ func (p *P2P) ListenForPeerBookResponses() {
 		select {
 		// fires when received the response to the request
 		case msg := <-p.Inbox(lib.Topic_PEERS_RESPONSE):
-			p.log.Debugf("Received peer book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
+			// p.log.Debugf("Received peer book response from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 			senderID := msg.Sender.Address.PublicKey
 			// rate limit per requester
 			blocked, totalBlock := l.NewRequest(lib.BytesToString(senderID))
@@ -130,7 +130,7 @@ func (p *P2P) ListenForPeerBookResponses() {
 				}
 				// try to dial
 				if err := p.DialAndDisconnect(bp.Address, true); err != nil {
-					p.log.Debugf("DialAndDisconnect failed with err: %s", err.Error())
+					// p.log.Debugf("DialAndDisconnect failed with err: %s", err.Error())
 					continue
 				}
 				// add peer to list
@@ -151,7 +151,7 @@ func (p *P2P) ListenForPeerBookRequests() {
 		select {
 		// fires after receiving a peer request
 		case msg := <-p.Inbox(lib.Topic_PEERS_REQUEST):
-			p.log.Debugf("Received peer book request from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
+			// p.log.Debugf("Received peer book request from %s", lib.BytesToTruncatedString(msg.Sender.Address.PublicKey))
 			requesterID := msg.Sender.Address.PublicKey
 			// rate limit per requester
 			blocked, totalBlock := l.NewRequest(lib.BytesToString(requesterID))
