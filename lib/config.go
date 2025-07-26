@@ -194,7 +194,7 @@ type P2PConfig struct {
 	ExternalAddress     string   `json:"externalAddress"`     // advertise for external dialing
 	MaxInbound          int      `json:"maxInbound"`          // max inbound peers
 	MaxOutbound         int      `json:"maxOutbound"`         // max outbound peers
-	TrustedPeerIDs      []string `json:"trutedPeersIDs"`      // trusted public keys
+	TrustedPeerIDs      []string `json:"trustedPeerIDs"`      // trusted public keys
 	DialPeers           []string `json:"dialPeers"`           // peers to consistently dial until expo-backoff fails (format pubkey@ip:port)
 	BannedPeerIDs       []string `json:"bannedPeersIDs"`      // banned public keys
 	BannedIPs           []string `json:"bannedIPs"`           // banned IPs
