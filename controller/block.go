@@ -22,7 +22,7 @@ func (c *Controller) ListenForBlock() {
 	// log the beginning of the 'block listener' service
 	c.log.Debug("Listening for inbound blocks")
 	// initialize a cache that prevents duplicate messages and  create a map of peers that signal 'new block'
-	cache, newBlockPeers := lib.NewMessageCache(), make(map[string]struct{})
+	cache, syncDetector := lib.NewMessageCache(), lib.NewBlockTracker(c.Sync, c.log)
 	// wait and execute for each inbound message received
 	for msg := range c.P2P.Inbox(Block) {
 		// create a variable to signal a 'stop loop'
@@ -33,14 +33,16 @@ func (c *Controller) ListenForBlock() {
 			c.Lock()
 			// when iteration completes, unlock
 			defer c.Unlock()
+			// add a convenience variable to track the sender
+			sender := msg.Sender.Address.PublicKey
 			// check and add the message to the cache to prevent duplicates
 			if ok := cache.Add(msg); !ok {
-				// if duplicate, exit iteration
+				// if fallen out of sync
+				quit = syncDetector.AddIfHas(sender, msg.Message, c.P2P.PeerCount())
+				// exit iteration
 				return
 			}
 			c.log.Debug("Handling block message")
-			// add a convenience variable to track the sender
-			sender := msg.Sender.Address.PublicKey
 			// log the receipt of the block message
 			c.log.Infof("Received new block from %s ✉️", lib.BytesToTruncatedString(sender))
 			// try to unmarshal the message to a block message
@@ -57,23 +59,13 @@ func (c *Controller) ListenForBlock() {
 			qc, err := c.HandlePeerBlock(blockMessage, false)
 			// ensure no error
 			if err != nil {
-				senderPublicKey := lib.BytesToString(sender)
-				// if new height notified add to the map
+				// if new height notified
 				if err.Error() == lib.ErrNewHeight().Error() {
-					newBlockPeers[senderPublicKey] = struct{}{}
-				}
-				// check if the node has fallen out of sync if at least a third of its peers has notified it
-				if float64(len(newBlockPeers)) >= float64(c.P2P.PeerCount())/float64(3) {
-					// reset map since syncing will start
-					newBlockPeers = make(map[string]struct{})
-					// log the 'out of sync' message
-					c.log.Warnf("Node fell out of sync for chainId: %d", blockMessage.ChainId)
-					// revert to syncing mode
-					go c.Sync()
-					// signal exit the out loop
-					quit = true
-					// exit iteration
-					return
+					// if fallen out of sync
+					if quit = syncDetector.Add(sender, msg.Message, qc.Header.Height, c.P2P.PeerCount()); quit {
+						// exit iteration
+						return
+					}
 				}
 				// log the error
 				c.log.Warnf("Peer block invalid:\n%s", err.Error())
@@ -89,8 +81,8 @@ func (c *Controller) ListenForBlock() {
 				// signal a reset to the bft module
 				c.Consensus.ResetBFT <- bft.ResetBFT{StartTime: time.UnixMicro(int64(blockMessage.Time))}
 			}
-			// reset 'newBlockPeers' because a new block was received properly
-			newBlockPeers = make(map[string]struct{})
+			// reset 'syncDetector' because a new block was received properly
+			syncDetector.Reset()
 		}()
 		// if quit signaled
 		if quit {

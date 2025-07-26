@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/json"
+	"fmt"
 	"net"
 	"slices"
 	"strings"
@@ -272,6 +273,61 @@ func (c *MessageCache) Add(msg *MessageAndMetadata) (ok bool) {
 	}
 	// exit with 'added'
 	return true
+}
+
+// NewHeightTracker() detects if a node has fallen out of sync based on peer info
+type NewHeightTracker struct {
+	Peers  map[string]struct{} // peers (peer + height) that claimed new height with a valid block
+	Blocks map[string]uint64   // pre-validated blocks showing new height
+	syncCB func()              // the callback to start syncing
+	l      LoggerI
+}
+
+// NewBlockTracker() constructs a NewHeightTracker
+func NewBlockTracker(syncCB func(), l LoggerI) (n *NewHeightTracker) {
+	return &NewHeightTracker{
+		Peers:  make(map[string]struct{}),
+		Blocks: make(map[string]uint64),
+		syncCB: syncCB,
+		l:      l,
+	}
+}
+
+// Add() records a 'new height' for a sender and height
+func (n *NewHeightTracker) Add(sender, message []byte, height uint64, peerCount int) (outOfSync bool) {
+	// create key
+	newHeightKey := fmt.Sprintf("%s/%d", BytesToString(sender), height)
+	// add to peers
+	n.Peers[newHeightKey] = struct{}{}
+	// add to blocks
+	n.Blocks[crypto.HashString(message)] = height
+	// if num of peers claiming new height is >= 1/3 of total peers
+	if float64(len(n.Peers)) >= float64(peerCount)/float64(3) {
+		// reset the counter
+		n.Reset()
+		// log out of sync
+		n.l.Error("Detected node has fallen out of sync")
+		// start syncing
+		go n.syncCB()
+		// set 'out of sync'
+		outOfSync = true
+	}
+	return
+}
+
+// AddIfHas() records a 'new height' for a sender and height only if it already contains this block
+func (n *NewHeightTracker) AddIfHas(sender, message []byte, peerCount int) (outOfSync bool) {
+	//	if already has this block
+	if height, found := n.Blocks[crypto.HashString(message)]; found {
+		outOfSync = n.Add(sender, message, height, peerCount)
+	}
+	// exit
+	return
+}
+
+// Reset() resets the new height tracker
+func (n *NewHeightTracker) Reset() {
+	n.Peers, n.Blocks = make(map[string]struct{}), make(map[string]uint64)
 }
 
 // MESSAGE LIMITERS BELOW
