@@ -10,6 +10,7 @@ import { getCardData, getTableData, getModalData, Config } from "@/components/ap
 export default function Home() {
   const [state, setState] = useState({
     loading: true,
+    tableLoading: false,
     cardData: {},
     category: 0,
     tablePage: 0,
@@ -56,7 +57,8 @@ export default function Home() {
         setState(prevState => ({
           ...prevState,
           loading: setLoading ? false : prevState.loading,
-          tableData: settledValues[0],
+          // Only update tableData if not currently loading from user interaction, unless it's initial load
+          tableData: (prevState.tableLoading && !setLoading) ? prevState.tableData : settledValues[0],
           cardData: settledValues[1],
           consensusDuration: consensusDuration,
         }));
@@ -82,13 +84,30 @@ export default function Home() {
     if (committee == null) {
       committee = state.committee;
     }
-    setState({
-      ...state,
+    
+    // Set table loading state and update page/category immediately
+    setState(prevState => ({
+      ...prevState,
       committee: committee,
       category: category,
       tablePage: page,
-      tableData: await getTableData(page, category, committee),
-    });
+      tableLoading: true,
+    }));
+    
+    try {
+      const tableData = await getTableData(page, category, committee);
+      setState(prevState => ({
+        ...prevState,
+        tableData: tableData,
+        tableLoading: false,
+      }));
+    } catch (error) {
+      console.error('Error loading table data:', error);
+      setState(prevState => ({
+        ...prevState,
+        tableLoading: false,
+      }));
+    }
   }
 
   useEffect(() => {
