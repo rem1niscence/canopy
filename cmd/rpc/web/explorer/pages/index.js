@@ -33,13 +33,7 @@ export default function Home() {
   });
 
   function getCardAndTableData(setLoading, currentState = state) {
-    // For auto-refresh, only fetch table data if we're on blocks tab (category 0) AND page 0
-    const shouldFetchTableData = setLoading || (currentState.category === 0 && currentState.tablePage === 0);
-    const apiCalls = shouldFetchTableData 
-      ? [getTableData(currentState.tablePage, currentState.category, currentState.committee), getCardData(), Config()]
-      : [Promise.resolve(null), getCardData(), Config()];
-
-    Promise.allSettled(apiCalls).then(
+    Promise.allSettled([getTableData(currentState.tablePage, currentState.category, currentState.committee), getCardData(), Config()]).then(
       (values) => {
         let settledValues = [];
         for (const v of values) {
@@ -63,9 +57,39 @@ export default function Home() {
         setState(prevState => ({
           ...prevState,
           loading: setLoading ? false : prevState.loading,
-          // Only update tableData if we fetched it and not currently loading from user interaction
-          tableData: (shouldFetchTableData && !(prevState.tableLoading && !setLoading)) ? settledValues[0] || prevState.tableData : prevState.tableData,
+          tableData: settledValues[0],
           cardData: settledValues[1],
+          consensusDuration: consensusDuration,
+        }));
+      },
+    );
+  }
+
+  function getCardDataOnly() {
+    Promise.allSettled([getCardData(), Config()]).then(
+      (values) => {
+        let settledValues = [];
+        for (const v of values) {
+          if (v.status === "rejected") {
+            settledValues.push({});
+            continue;
+          }
+          settledValues.push(v.value);
+        }
+
+        const consensusDuration =
+          settledValues[1].newHeightTimeoutMS +
+          settledValues[1].electionTimeoutMS +
+          settledValues[1].electionVoteTimeoutMS +
+          settledValues[1].proposeTimeoutMS +
+          settledValues[1].proposeVoteTimeoutMS +
+          settledValues[1].precommitTimeoutMS +
+          settledValues[1].precommitVoteTimeoutMS +
+          settledValues[1].commitTimeoutMS;
+
+        setState(prevState => ({
+          ...prevState,
+          cardData: settledValues[0],
           consensusDuration: consensusDuration,
         }));
       },
@@ -119,7 +143,12 @@ export default function Home() {
   useEffect(() => {
     const interval = setInterval(() => {
       setState(currentState => {
-        getCardAndTableData(false, currentState);
+        // Only auto-refresh table data if not currently loading from user interaction
+        if (!currentState.tableLoading) {
+          getCardAndTableData(false, currentState);
+        } else {
+          getCardDataOnly();
+        }
         return currentState;
       });
     }, 4000);
