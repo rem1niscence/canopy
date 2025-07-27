@@ -143,15 +143,34 @@ export default function Home() {
     }
   }
 
+  async function refreshCurrentTable() {
+    if (state.tableLoading) return; // Prevent double refresh
+    
+    setState(prevState => ({
+      ...prevState,
+      tableLoading: true,
+    }));
+    
+    try {
+      const tableData = await getTableData(state.tablePage, state.category, state.committee);
+      setState(prevState => ({
+        ...prevState,
+        tableData: tableData,
+        tableLoading: false,
+      }));
+    } catch (error) {
+      console.error('Error refreshing table data:', error);
+      setState(prevState => ({
+        ...prevState,
+        tableLoading: false,
+      }));
+    }
+  }
+
   useEffect(() => {
     const interval = setInterval(() => {
-      const currentState = stateRef.current;
-      // Only auto-refresh table data if not currently loading from user interaction
-      if (!currentState.tableLoading) {
-        getCardAndTableData(false, currentState);
-      } else {
-        getCardDataOnly();
-      }
+      // Only auto-refresh card data, never table data
+      getCardDataOnly();
     }, 4000);
     return () => clearInterval(interval);
   }, []);
@@ -170,7 +189,7 @@ export default function Home() {
       </>
     );
   } else {
-    const props = { state, setState, openModal, selectTable };
+    const props = { state, setState, openModal, selectTable, refreshCurrentTable };
     const onToastClose = () => setState({ ...state, showToast: false });
     return (
       <>
