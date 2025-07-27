@@ -153,16 +153,18 @@ export default function Home() {
   }
 
   async function refreshCurrentTable() {
-    if (state.tableLoading || autoRefreshingRef.current) return; // Prevent conflicts
+    const currentState = stateRef.current;
+    if (currentState.tableLoading || autoRefreshingRef.current) return; // Prevent conflicts
     
-    // Capture version to detect if user navigated during this auto-refresh
+    // Capture version and current state to detect if user navigated during this auto-refresh
     const refreshVersion = autoRefreshVersionRef.current;
+    const { tablePage, category, committee } = currentState;
     
     // Set invisible auto-refresh flag (doesn't affect UI)
     autoRefreshingRef.current = true;
     
     try {
-      const tableData = await getTableData(state.tablePage, state.category, state.committee);
+      const tableData = await getTableData(tablePage, category, committee);
       
       // Only update state if no user navigation happened during this request
       if (autoRefreshVersionRef.current === refreshVersion) {
