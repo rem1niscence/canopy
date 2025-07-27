@@ -75,7 +75,7 @@ export default function Home() {
 
   useEffect(() => {
     const i = setInterval(() => {
-      queryAPI();
+      queryAPI(keyIdxRef.current);
     }, 4000);
     return () => clearInterval(i);
   }, [queryAPI]);
