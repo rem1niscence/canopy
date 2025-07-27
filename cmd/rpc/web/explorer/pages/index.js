@@ -3,7 +3,7 @@ import Sidebar from "@/components/sidebar";
 import DTable from "@/components/table";
 import DetailModal from "@/components/modal";
 import Cards from "@/components/cards";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Spinner, Toast, ToastContainer } from "react-bootstrap";
 import { getCardData, getTableData, getModalData, Config } from "@/components/api";
 
@@ -31,6 +31,9 @@ export default function Home() {
       accOnly: false,
     },
   });
+
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   function getCardAndTableData(setLoading, currentState = state) {
     Promise.allSettled([getTableData(currentState.tablePage, currentState.category, currentState.committee), getCardData(), Config()]).then(
@@ -142,15 +145,13 @@ export default function Home() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setState(currentState => {
-        // Only auto-refresh table data if not currently loading from user interaction
-        if (!currentState.tableLoading) {
-          getCardAndTableData(false, currentState);
-        } else {
-          getCardDataOnly();
-        }
-        return currentState;
-      });
+      const currentState = stateRef.current;
+      // Only auto-refresh table data if not currently loading from user interaction
+      if (!currentState.tableLoading) {
+        getCardAndTableData(false, currentState);
+      } else {
+        getCardDataOnly();
+      }
     }, 4000);
     return () => clearInterval(interval);
   }, []);
