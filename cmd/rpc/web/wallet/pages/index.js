@@ -26,6 +26,7 @@ export default function Home() {
   const setNavIdx = (i) => setState(prevState => ({ ...prevState, navIdx: i }));
 
   const queryAPI = useCallback((i = keyIdxRef.current) => {
+    keyIdxRef.current = i;
     Keystore().then((ks) => {
       if (!ks.addressMap || Object.keys(ks.addressMap).length === 0) {
         console.warn("mergedKS is empty. No data to query.");
