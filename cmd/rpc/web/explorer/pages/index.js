@@ -33,6 +33,8 @@ export default function Home() {
   });
 
   const stateRef = useRef(state);
+  const lastUserActionRef = useRef(0);
+  const autoRefreshVersionRef = useRef(0);
   stateRef.current = state;
 
   function getCardAndTableData(setLoading, currentState = state) {
@@ -118,6 +120,10 @@ export default function Home() {
       committee = state.committee;
     }
     
+    // Mark user action timestamp and invalidate auto-refresh promises
+    lastUserActionRef.current = Date.now();
+    autoRefreshVersionRef.current += 1;
+    
     // Set table loading state and update page/category immediately
     setState(prevState => ({
       ...prevState,
@@ -146,6 +152,9 @@ export default function Home() {
   async function refreshCurrentTable() {
     if (state.tableLoading) return; // Prevent double refresh
     
+    // Capture version to detect if user navigated during this auto-refresh
+    const refreshVersion = autoRefreshVersionRef.current;
+    
     setState(prevState => ({
       ...prevState,
       tableLoading: true,
@@ -153,11 +162,21 @@ export default function Home() {
     
     try {
       const tableData = await getTableData(state.tablePage, state.category, state.committee);
-      setState(prevState => ({
-        ...prevState,
-        tableData: tableData,
-        tableLoading: false,
-      }));
+      
+      // Only update state if no user navigation happened during this request
+      if (autoRefreshVersionRef.current === refreshVersion) {
+        setState(prevState => ({
+          ...prevState,
+          tableData: tableData,
+          tableLoading: false,
+        }));
+      } else {
+        // User navigated, just clear loading state
+        setState(prevState => ({
+          ...prevState,
+          tableLoading: false,
+        }));
+      }
     } catch (error) {
       console.error('Error refreshing table data:', error);
       setState(prevState => ({
@@ -169,8 +188,18 @@ export default function Home() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      // Only auto-refresh card data, never table data
+      const currentState = stateRef.current;
+      const timeSinceUserAction = Date.now() - lastUserActionRef.current;
+      
+      // Auto-refresh cards always
       getCardDataOnly();
+      
+      // Auto-refresh table data only if:
+      // 1. Not currently loading from user interaction
+      // 2. At least 2 seconds since last user action (prevents interference)
+      if (!currentState.tableLoading && timeSinceUserAction > 2000) {
+        refreshCurrentTable();
+      }
     }, 4000);
     return () => clearInterval(interval);
   }, []);
