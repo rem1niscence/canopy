@@ -31,8 +31,8 @@ export default function Home() {
     },
   });
 
-  function getCardAndTableData(setLoading) {
-    Promise.allSettled([getTableData(state.tablePage, state.category, state.committee), getCardData(), Config()]).then(
+  function getCardAndTableData(setLoading, currentState = state) {
+    Promise.allSettled([getTableData(currentState.tablePage, currentState.category, currentState.committee), getCardData(), Config()]).then(
       (values) => {
         let settledValues = [];
         for (const v of values) {
@@ -53,21 +53,13 @@ export default function Home() {
           settledValues[2].precommitVoteTimeoutMS +
           settledValues[2].commitTimeoutMS;
 
-        if (setLoading) {
-          return setState({
-            ...state,
-            loading: false,
-            tableData: settledValues[0],
-            cardData: settledValues[1],
-            consensusDuration: consensusDuration,
-          });
-        }
-        return setState({
-          ...state,
+        setState(prevState => ({
+          ...prevState,
+          loading: setLoading ? false : prevState.loading,
           tableData: settledValues[0],
           cardData: settledValues[1],
           consensusDuration: consensusDuration,
-        });
+        }));
       },
     );
   }
@@ -101,10 +93,13 @@ export default function Home() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      getCardAndTableData(false);
+      setState(currentState => {
+        getCardAndTableData(false, currentState);
+        return currentState;
+      });
     }, 4000);
     return () => clearInterval(interval);
-  });
+  }, []);
   if (state.loading || !state.cardData.blocks) {
     getCardAndTableData(true);
     return (
