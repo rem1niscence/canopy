@@ -447,7 +447,7 @@ td, th {
 
 .net-address-col {
   min-width: 250px !important;
-  max-width: 350px !important;
+  max-width: 500px !important;
   font-size: 13px !important;
   padding-left: 10px !important;
   padding-top: 15px !important;
@@ -455,7 +455,9 @@ td, th {
 }
 
 .net-address {
-  word-break: break-all !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 .table-head {
