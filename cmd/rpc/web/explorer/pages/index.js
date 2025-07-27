@@ -33,7 +33,13 @@ export default function Home() {
   });
 
   function getCardAndTableData(setLoading, currentState = state) {
-    Promise.allSettled([getTableData(currentState.tablePage, currentState.category, currentState.committee), getCardData(), Config()]).then(
+    // For auto-refresh, only fetch table data if we're on blocks tab (category 0) AND page 0
+    const shouldFetchTableData = setLoading || (currentState.category === 0 && currentState.tablePage === 0);
+    const apiCalls = shouldFetchTableData 
+      ? [getTableData(currentState.tablePage, currentState.category, currentState.committee), getCardData(), Config()]
+      : [Promise.resolve(null), getCardData(), Config()];
+
+    Promise.allSettled(apiCalls).then(
       (values) => {
         let settledValues = [];
         for (const v of values) {
@@ -57,8 +63,8 @@ export default function Home() {
         setState(prevState => ({
           ...prevState,
           loading: setLoading ? false : prevState.loading,
-          // Only update tableData if not currently loading from user interaction, unless it's initial load
-          tableData: (prevState.tableLoading && !setLoading) ? prevState.tableData : settledValues[0],
+          // Only update tableData if we fetched it and not currently loading from user interaction
+          tableData: (shouldFetchTableData && !(prevState.tableLoading && !setLoading)) ? settledValues[0] || prevState.tableData : prevState.tableData,
           cardData: settledValues[1],
           consensusDuration: consensusDuration,
         }));
