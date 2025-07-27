@@ -32,6 +32,8 @@ export default function Home() {
     },
   });
 
+  const autoRefreshingRef = useRef(false);
+
   const stateRef = useRef(state);
   const lastUserActionRef = useRef(0);
   const autoRefreshVersionRef = useRef(0);
@@ -123,6 +125,7 @@ export default function Home() {
     // Mark user action timestamp and invalidate auto-refresh promises
     lastUserActionRef.current = Date.now();
     autoRefreshVersionRef.current += 1;
+    autoRefreshingRef.current = false; // Cancel any ongoing auto-refresh
     
     // Set table loading state and update page/category immediately
     setState(prevState => ({
@@ -150,15 +153,13 @@ export default function Home() {
   }
 
   async function refreshCurrentTable() {
-    if (state.tableLoading) return; // Prevent double refresh
+    if (state.tableLoading || autoRefreshingRef.current) return; // Prevent conflicts
     
     // Capture version to detect if user navigated during this auto-refresh
     const refreshVersion = autoRefreshVersionRef.current;
     
-    setState(prevState => ({
-      ...prevState,
-      tableLoading: true,
-    }));
+    // Set invisible auto-refresh flag (doesn't affect UI)
+    autoRefreshingRef.current = true;
     
     try {
       const tableData = await getTableData(state.tablePage, state.category, state.committee);
@@ -168,21 +169,13 @@ export default function Home() {
         setState(prevState => ({
           ...prevState,
           tableData: tableData,
-          tableLoading: false,
-        }));
-      } else {
-        // User navigated, just clear loading state
-        setState(prevState => ({
-          ...prevState,
-          tableLoading: false,
         }));
       }
     } catch (error) {
       console.error('Error refreshing table data:', error);
-      setState(prevState => ({
-        ...prevState,
-        tableLoading: false,
-      }));
+    } finally {
+      // Always clear auto-refresh flag
+      autoRefreshingRef.current = false;
     }
   }
 
@@ -196,8 +189,9 @@ export default function Home() {
       
       // Auto-refresh table data only if:
       // 1. Not currently loading from user interaction
-      // 2. At least 2 seconds since last user action (prevents interference)
-      if (!currentState.tableLoading && timeSinceUserAction > 2000) {
+      // 2. Not already auto-refreshing
+      // 3. At least 2 seconds since last user action (prevents interference)
+      if (!currentState.tableLoading && !autoRefreshingRef.current && timeSinceUserAction > 2000) {
         refreshCurrentTable();
       }
     }, 4000);
