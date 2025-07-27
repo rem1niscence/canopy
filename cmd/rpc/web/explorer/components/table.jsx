@@ -81,7 +81,7 @@ function convertBlock(v) {
 function convertValidator(v) {
   let value = Object.assign({}, v);
   value.stakedAmount = toCNPY(value.stakedAmount);
-  value.committees = value.committees.toString();
+  value.committees = value.committees.join(",");
   return value;
 }
 
