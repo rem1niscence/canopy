@@ -62,7 +62,3 @@ func ErrFailedSafeNodePredicate() lib.ErrorI {
 func ErrAggregateSignature(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeAggregateSignature, lib.ConsensusModule, fmt.Sprintf("aggregateSignature() failed with err: %s", err.Error()))
 }
-
-func ErrNoValidVDF() lib.ErrorI {
-	return lib.NewError(lib.CodeNoValidVDF, lib.ConsensusModule, "No valid VDF found")
-}

@@ -3,8 +3,8 @@ package bft
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"sort"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -323,45 +323,6 @@ func (b *BFT) StartProposePhase() {
 	})
 }
 
-// selectHighestVDF validates all the previously sent VDFs by replicas and selects the highest valid one
-func (b *BFT) selectHighestVDF() (*crypto.VDF, lib.ErrorI) {
-	// clean cache upon exit
-	defer func() {
-		b.VDFCache = []*Message{}
-	}()
-	// initialize variables
-	wg, vdfChan := sync.WaitGroup{}, make(chan *Message, len(b.VDFCache))
-	// iterate over all the VDFs votes sent by replicas
-	for _, vote := range b.VDFCache {
-		wg.Add(1)
-		go func(vote *Message) {
-			defer wg.Done()
-			ok, err := b.VerifyVDF(vote)
-			if err != nil {
-				// b.log.Warnf("failed to Verify VDF by replica %s: %s", lib.BytesToTruncatedString(vote.Signature.PublicKey), err.Error())
-				return
-			}
-			if !ok {
-				return
-			}
-			vdfChan <- vote
-		}(vote)
-	}
-	// wait for all goroutines to finish
-	wg.Wait()
-	close(vdfChan)
-	var highVDF *crypto.VDF
-	// select the highest valid VDF across all replicas
-	for vote := range vdfChan {
-		if highVDF == nil || vote.Vdf.Iterations > highVDF.Iterations {
-			b.log.Infof("Replica %s submitted a highVDF", lib.BytesToTruncatedString(vote.Signature.PublicKey))
-			highVDF = vote.Vdf
-		}
-	}
-	// exit
-	return highVDF, nil
-}
-
 // StartProposeVotePhase() begins the ProposeVote after the PROPOSE phase timeout
 // PROPOSE-VOTE PHASE:
 // - Replica reviews the message from the Leader by validating the justification (+2/3 multi-sig) proving that they are in-fact the leader
@@ -669,6 +630,7 @@ func (b *BFT) NewRound(newHeight bool) {
 	b.ProposerKey = nil
 	b.Block, b.BlockHash, b.Results = nil, nil, nil
 	b.SortitionData = nil
+	b.VDFCache = []*Message{}
 }
 
 // RefreshRootChainInfo() updates the cached root chain info with the latest known
@@ -918,6 +880,35 @@ func (b *BFT) BlockToHash(blk []byte) (hash []byte) {
 		b.log.Errorf("bft.BlockToHash failed: %s", err.Error())
 	}
 	return
+}
+
+// selectHighestVDF validates the previously sent VDFs by replicas and selects the highest valid one
+func (b *BFT) selectHighestVDF() (*crypto.VDF, lib.ErrorI) {
+	// clean cache upon exit
+	defer func() {
+		b.VDFCache = []*Message{}
+	}()
+	// sort the VDF cache by the number of VDF iterations
+	slices.SortFunc(b.VDFCache, func(a, b *Message) int {
+		return int(a.Vdf.Iterations - b.Vdf.Iterations)
+	})
+	for i := len(b.VDFCache) - 1; i >= 0; i-- {
+		vote := b.VDFCache[i]
+		// validate VDF
+		ok, err := b.VerifyVDF(vote)
+		if err != nil {
+			// b.log.Warnf("failed to Verify VDF by replica %s: %s", lib.BytesToTruncatedString(vote.Signature.PublicKey), err.Error())
+			continue
+		}
+		if !ok {
+			continue
+		}
+		b.log.Infof("Replica %s submitted a highVDF", lib.BytesToTruncatedString(vote.Signature.PublicKey))
+		// return the highest valid VDF
+		return vote.Vdf, nil
+	}
+	// exit, no valid VDF found
+	return nil, nil
 }
 
 // phaseToString() converts the phase object to a human-readable string

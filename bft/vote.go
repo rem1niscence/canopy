@@ -141,8 +141,8 @@ func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 				b.RCBuildHeight = vote.RcBuildHeight
 			}
 		}
-		// pre handle VDF
-		if vote.Vdf != nil && vote.Vdf.Iterations != 0 {
+		// pre handle VDF if enabled
+		if b.Config.RunVDF && vote.Vdf != nil && vote.Vdf.Iterations != 0 {
 			// save the obtained VDF vote to be processed at the PROPOSE phase
 			b.VDFCache = append(b.VDFCache, vote)
 		}
