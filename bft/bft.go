@@ -353,7 +353,7 @@ func (b *BFT) selectHighestVDF() (*crypto.VDF, lib.ErrorI) {
 	var highVDF *crypto.VDF
 	// select the highest valid VDF across all replicas
 	for vote := range vdfChan {
-		if vote.Vdf.Iterations > highVDF.Iterations {
+		if highVDF == nil || vote.Vdf.Iterations > highVDF.Iterations {
 			b.log.Infof("Replica %s submitted a highVDF", lib.BytesToTruncatedString(vote.Signature.PublicKey))
 			highVDF = vote.Vdf
 		}
