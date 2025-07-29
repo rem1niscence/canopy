@@ -331,7 +331,7 @@ func (b *BFT) selectHighestVDF() (*crypto.VDF, lib.ErrorI) {
 	}()
 	// initialize variables
 	wg, vdfChan := sync.WaitGroup{}, make(chan *Message, len(b.VDFCache))
-	// iterate over all the VDFs sent by replicas
+	// iterate over all the VDFs votes sent by replicas
 	for _, vote := range b.VDFCache {
 		wg.Add(1)
 		go func(vote *Message) {

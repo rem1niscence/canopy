@@ -143,7 +143,7 @@ func (b *BFT) handleHighQCVDFAndEvidence(vote *Message) lib.ErrorI {
 		}
 		// pre handle VDF
 		if vote.Vdf != nil && vote.Vdf.Iterations != 0 {
-			// save all the obtained VDFs to be processed at the PROPOSE phase
+			// save the obtained VDF vote to be processed at the PROPOSE phase
 			b.VDFCache = append(b.VDFCache, vote)
 		}
 		// combine double sign evidence
