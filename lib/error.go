@@ -163,6 +163,7 @@ const (
 	CodeNewHeight                       ErrorCode = 64
 	CodeWrongViewHeight                 ErrorCode = 65
 	CodeBadPort                         ErrorCode = 66
+	CodeNoValidVDF                      ErrorCode = 67
 
 	// State Machine Module
 	StateMachineModule ErrorModule = "state_machine"

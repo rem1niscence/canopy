@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -28,6 +29,7 @@ type BFT struct {
 	SortitionData *lib.SortitionData     // the current data being used for VRF+CDF Leader Election
 	VDFService    *lib.VDFService        // the verifiable delay service, run once per block as a deterrent against long-range-attacks
 	HighVDF       *crypto.VDF            // the highest VDF among replicas - if the chain is using VDF for long-range-attack protection
+	VDFCache      []*Message             // the cache of VDFs used for long-range-attack protection, validated at the PROPOSE phase
 
 	ByzantineEvidence *ByzantineEvidence // evidence of faulty or malicious Validators collected during the BFT process
 	PartialQCs        PartialQCs         // potentially implicating evidence that may turn into ByzantineEvidence if paired with an equivocating QC
@@ -80,6 +82,7 @@ func New(c lib.Config, valKey crypto.PrivateKeyI, rootHeight, height uint64, con
 		VDFService:        vdf,
 		Metrics:           m,
 		HighVDF:           new(crypto.VDF),
+		VDFCache:          []*Message{},
 	}, nil
 }
 
@@ -286,6 +289,12 @@ func (b *BFT) StartProposePhase() {
 		return
 	}
 	b.log.Info("Self is the proposer")
+	// select the highest VDF from the cache
+	highVDF, err := b.selectHighestVDF()
+	if err != nil {
+		return
+	}
+	b.HighVDF = highVDF
 	// produce new proposal or use highQC as the proposal
 	if b.HighQC == nil {
 		b.RCBuildHeight, b.Block, b.Results, err = b.ProduceProposal(b.ByzantineEvidence, b.HighVDF)
@@ -312,6 +321,45 @@ func (b *BFT) StartProposePhase() {
 		LastDoubleSignEvidence: b.ByzantineEvidence.DSE.Evidence, // evidence is attached (if any) to validate the Proposal
 		RcBuildHeight:          b.RCBuildHeight,                  // the root chain height when the block was built
 	})
+}
+
+// selectHighestVDF validates all the previously sent VDFs by replicas and selects the highest valid one
+func (b *BFT) selectHighestVDF() (*crypto.VDF, lib.ErrorI) {
+	// clean cache upon exit
+	defer func() {
+		b.VDFCache = []*Message{}
+	}()
+	// initialize variables
+	wg, vdfChan := sync.WaitGroup{}, make(chan *Message, len(b.VDFCache))
+	// iterate over all the VDFs sent by replicas
+	for _, vote := range b.VDFCache {
+		wg.Add(1)
+		go func(vote *Message) {
+			defer wg.Done()
+			ok, err := b.VerifyVDF(vote)
+			if err != nil {
+				// b.log.Warnf("failed to Verify VDF by replica %s: %s", lib.BytesToTruncatedString(vote.Signature.PublicKey), err.Error())
+				return
+			}
+			if !ok {
+				return
+			}
+			vdfChan <- vote
+		}(vote)
+	}
+	// wait for all goroutines to finish
+	wg.Wait()
+	close(vdfChan)
+	var highVDF *crypto.VDF
+	// select the highest valid VDF across all replicas
+	for vote := range vdfChan {
+		if vote.Vdf.Iterations > highVDF.Iterations {
+			b.log.Infof("Replica %s submitted a highVDF", lib.BytesToTruncatedString(vote.Signature.PublicKey))
+			highVDF = vote.Vdf
+		}
+	}
+	// exit
+	return highVDF, nil
 }
 
 // StartProposeVotePhase() begins the ProposeVote after the PROPOSE phase timeout
@@ -521,6 +569,7 @@ func (b *BFT) RoundInterrupt() {
 	b.log.Warnf("Starting next round in %.2f secs", (time.Duration(b.Config.RoundInterruptTimeoutMS) * time.Millisecond).Seconds())
 	b.Phase = RoundInterrupt
 	b.BlockResult = nil
+	b.VDFCache = []*Message{}
 	b.ResetFSM()
 	// send pacemaker message
 	b.SendToReplicas(b.ValidatorSet, &Message{

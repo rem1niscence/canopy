@@ -2,6 +2,7 @@ package bft
 
 import (
 	"fmt"
+
 	"github.com/canopy-network/canopy/lib"
 	"google.golang.org/protobuf/proto"
 )
@@ -60,4 +61,8 @@ func ErrFailedSafeNodePredicate() lib.ErrorI {
 
 func ErrAggregateSignature(err error) lib.ErrorI {
 	return lib.NewError(lib.CodeAggregateSignature, lib.ConsensusModule, fmt.Sprintf("aggregateSignature() failed with err: %s", err.Error()))
+}
+
+func ErrNoValidVDF() lib.ErrorI {
+	return lib.NewError(lib.CodeNoValidVDF, lib.ConsensusModule, "No valid VDF found")
 }
