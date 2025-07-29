@@ -888,12 +888,11 @@ func (b *BFT) selectHighestVDF() (*crypto.VDF, lib.ErrorI) {
 	defer func() {
 		b.VDFCache = []*Message{}
 	}()
-	// sort the VDF cache by the number of VDF iterations
+	// sort the cache by the number of VDF iterations from highest to lowest
 	slices.SortFunc(b.VDFCache, func(a, b *Message) int {
-		return int(a.Vdf.Iterations - b.Vdf.Iterations)
+		return int(b.Vdf.Iterations - a.Vdf.Iterations)
 	})
-	for i := len(b.VDFCache) - 1; i >= 0; i-- {
-		vote := b.VDFCache[i]
+	for _, vote := range b.VDFCache {
 		// validate VDF
 		ok, err := b.VerifyVDF(vote)
 		if err != nil {
