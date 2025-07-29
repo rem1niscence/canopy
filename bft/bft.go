@@ -2,6 +2,7 @@ package bft
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"slices"
 	"sort"
@@ -890,7 +891,7 @@ func (b *BFT) selectHighestVDF() (*crypto.VDF, lib.ErrorI) {
 	}()
 	// sort the cache by the number of VDF iterations from highest to lowest
 	slices.SortFunc(b.VDFCache, func(a, b *Message) int {
-		return int(b.Vdf.Iterations - a.Vdf.Iterations)
+		return cmp.Compare(b.Vdf.Iterations, a.Vdf.Iterations)
 	})
 	for _, vote := range b.VDFCache {
 		// validate VDF
