@@ -83,7 +83,7 @@ type NodeMetrics struct {
 type BlockMetrics struct {
 	BlockProcessingTime prometheus.Histogram // how long does it take for this node to commit a block?
 	BlockSize           prometheus.Gauge     // what is the size of the block in bytes?
-	BlockNumTxs         prometheus.Counter   // how many transactions has the node processed?
+	BlockNumTxs         prometheus.Gauge     // how many transactions has the node processed?
 	LargestTxSize       prometheus.Gauge     // what is the largest tx size in a block?
 	BlockVDFIterations  prometheus.Gauge     // how many vdf iterations are included in the block?
 	NonSignerPercent    prometheus.Gauge     // what percent of the voting power were non signers
@@ -508,13 +508,16 @@ func (m *Metrics) UpdateValidator(address string, stakeAmount uint64, unstaking,
 	switch {
 	case unstaking:
 		// if the val is unstaking
-		m.ValidatorStatus.WithLabelValues(address).Set(1)
+		m.ValidatorStatus.WithLabelValues(address).Set(2)
 	case paused:
 		// if the val is paused
-		m.ValidatorStatus.WithLabelValues(address).Set(2)
+		m.ValidatorStatus.WithLabelValues(address).Set(3)
+	case stakeAmount == 0:
+		// if the val is unstaked
+		m.ValidatorStatus.WithLabelValues(address).Set(0)
 	default:
 		// if the val is active
-		m.ValidatorStatus.WithLabelValues(address).Set(0)
+		m.ValidatorStatus.WithLabelValues(address).Set(1)
 	}
 }
 
@@ -566,7 +569,7 @@ func (m *Metrics) UpdateBlockMetrics(proposerAddress []byte, blockSize, txCount,
 		m.ProposerCount.Inc()
 	}
 	// update the number of transactions
-	m.BlockNumTxs.Add(float64(txCount))
+	m.BlockNumTxs.Set(float64(txCount))
 	// update the block processing time in seconds
 	m.BlockProcessingTime.Observe(duration.Seconds())
 	// update block size
