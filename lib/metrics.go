@@ -56,10 +56,12 @@ const metricsPattern = "/metrics"
 
 // Metrics represents a server that exposes Prometheus metrics
 type Metrics struct {
-	server      *http.Server  // the http prometheus server
-	config      MetricsConfig // the configuration
-	nodeAddress []byte        // the node's address
-	log         LoggerI       // the logger
+	server          *http.Server  // the http prometheus server
+	chainID         float64       // the chain id the node is running
+	softwareVersion string        // the sofware version the node is running
+	config          MetricsConfig // the configuration
+	nodeAddress     []byte        // the node's address
+	log             LoggerI       // the logger
 
 	NodeMetrics    // general telemetry about the node
 	BlockMetrics   // block telemetry
@@ -77,6 +79,8 @@ type NodeMetrics struct {
 	GetRootChainInfo prometheus.Histogram // how long does the 'GetRootChainInfo' call take?
 	AccountBalance   *prometheus.GaugeVec // what's the balance of this node's account?
 	ProposerCount    prometheus.Counter   // how many times did this node propose the block?
+	ChainId          prometheus.Gauge     // what chain id is this node running on?
+	SoftwareVersion  *prometheus.GaugeVec // what software version is this node running?
 }
 
 // BlockMetrics represents telemetry for block health
@@ -143,14 +147,16 @@ type MempoolMetrics struct {
 }
 
 // NewMetricsServer() creates a new telemetry server
-func NewMetricsServer(nodeAddress crypto.AddressI, config MetricsConfig, logger LoggerI) *Metrics {
+func NewMetricsServer(nodeAddress crypto.AddressI, chainID float64, softwareVersion string, config MetricsConfig, logger LoggerI) *Metrics {
 	mux := http.NewServeMux()
 	mux.Handle(metricsPattern, promhttp.Handler())
 	return &Metrics{
-		server:      &http.Server{Addr: config.PrometheusAddress, Handler: mux},
-		config:      config,
-		nodeAddress: nodeAddress.Bytes(),
-		log:         logger,
+		server:          &http.Server{Addr: config.PrometheusAddress, Handler: mux},
+		config:          config,
+		nodeAddress:     nodeAddress.Bytes(),
+		chainID:         float64(chainID),
+		softwareVersion: softwareVersion,
+		log:             logger,
 		// NODE
 		NodeMetrics: NodeMetrics{
 			NodeStatus: promauto.NewGauge(prometheus.GaugeOpts{
@@ -173,6 +179,14 @@ func NewMetricsServer(nodeAddress crypto.AddressI, config MetricsConfig, logger 
 				Name: "canopy_account_balance",
 				Help: "Account balance in uCNPY of the node's address",
 			}, []string{"address"}),
+			ChainId: promauto.NewGauge(prometheus.GaugeOpts{
+				Name: "canopy_chain_id",
+				Help: "The chain ID this node is running on",
+			}),
+			SoftwareVersion: promauto.NewGaugeVec(prometheus.GaugeOpts{
+				Name: "canopy_software_version",
+				Help: "The software version this node is running",
+			}, []string{"version"}),
 		},
 		// BLOCK
 		BlockMetrics: BlockMetrics{
@@ -357,6 +371,9 @@ func (m *Metrics) Start() {
 	if m == nil {
 		return
 	}
+	// set the chain ID and software version metrics (one-time on startup)
+	m.ChainId.Set(m.chainID)
+	m.SoftwareVersion.WithLabelValues(m.softwareVersion).Set(1)
 	// if the metrics server is enabled
 	if m.config.MetricsEnabled {
 		go func() {

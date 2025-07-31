@@ -87,7 +87,7 @@ func Start() {
 		time.Sleep(untilTime)
 	}
 	// initialize and start the metrics server
-	metrics := lib.NewMetricsServer(validatorKey.PublicKey().Address(), config.MetricsConfig, l)
+	metrics := lib.NewMetricsServer(validatorKey.PublicKey().Address(), float64(config.ChainId), rpc.SoftwareVersion, config.MetricsConfig, l)
 	// create a new database object from the config
 	db, err := store.New(config, metrics, l)
 	if err != nil {
