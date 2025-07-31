@@ -163,7 +163,7 @@ func NewMetricsServer(nodeAddress crypto.AddressI, config MetricsConfig, logger 
 			}),
 			SyncingStatus: promauto.NewGauge(prometheus.GaugeOpts{
 				Name: "canopy_syncing_status",
-				Help: "Node syncing status (1 for syncing, 0 for synced)",
+				Help: "Node syncing status (0 for syncing, 1 for synced)",
 			}),
 			ProposerCount: promauto.NewCounter(prometheus.CounterOpts{
 				Name: "canopy_proposer_count",
@@ -396,9 +396,9 @@ func (m *Metrics) UpdateNodeMetrics(isSyncing bool) {
 	m.NodeStatus.Set(1)
 	// update syncing status
 	if isSyncing {
-		m.SyncingStatus.Set(1)
-	} else {
 		m.SyncingStatus.Set(0)
+	} else {
+		m.SyncingStatus.Set(1)
 	}
 }
 
