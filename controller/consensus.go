@@ -656,6 +656,8 @@ func (c *Controller) finishSyncing() {
 	c.Lock()
 	// when function completes, unlock
 	defer c.Unlock()
+	// set the startup block metric (block height when first sync completed)
+	c.Metrics.SetStartupBlock(c.FSM.Height())
 	// signal a reset of bft for the chain
 	c.Consensus.ResetBFT <- bft.ResetBFT{StartTime: c.LoadLastCommitTime(c.FSM.Height())}
 	// set syncing to false

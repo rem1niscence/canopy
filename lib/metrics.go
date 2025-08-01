@@ -62,6 +62,7 @@ type Metrics struct {
 	config          MetricsConfig // the configuration
 	nodeAddress     []byte        // the node's address
 	log             LoggerI       // the logger
+	startupBlockSet bool          // flag to ensure startup block is only set once
 
 	NodeMetrics    // general telemetry about the node
 	BlockMetrics   // block telemetry
@@ -81,6 +82,7 @@ type NodeMetrics struct {
 	ProposerCount    prometheus.Counter   // how many times did this node propose the block?
 	ChainId          prometheus.Gauge     // what chain id is this node running on?
 	SoftwareVersion  *prometheus.GaugeVec // what software version is this node running?
+	StartupBlock     prometheus.Gauge     // the block height when node first completed syncing (set only once)
 }
 
 // BlockMetrics represents telemetry for block health
@@ -187,6 +189,10 @@ func NewMetricsServer(nodeAddress crypto.AddressI, chainID float64, softwareVers
 				Name: "canopy_software_version",
 				Help: "The software version this node is running",
 			}, []string{"version"}),
+			StartupBlock: promauto.NewGauge(prometheus.GaugeOpts{
+				Name: "canopy_startup_block",
+				Help: "The block height when node first completed syncing after startup (set only once per run)",
+			}),
 		},
 		// BLOCK
 		BlockMetrics: BlockMetrics{
@@ -640,4 +646,17 @@ func (m *Metrics) UpdateGetRootChainInfo(startTime time.Time) {
 	}
 	// update the metric
 	m.GetRootChainInfo.Observe(time.Since(startTime).Seconds())
+}
+
+// SetStartupBlock() sets the block height when the node first completed syncing after startup
+func (m *Metrics) SetStartupBlock(blockHeight uint64) {
+	// exit if empty
+	if m == nil {
+		return
+	}
+	// only set the startup block metric once per node run
+	if !m.startupBlockSet {
+		m.StartupBlock.Set(float64(blockHeight))
+		m.startupBlockSet = true
+	}
 }
