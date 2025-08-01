@@ -56,10 +56,13 @@ const metricsPattern = "/metrics"
 
 // Metrics represents a server that exposes Prometheus metrics
 type Metrics struct {
-	server      *http.Server  // the http prometheus server
-	config      MetricsConfig // the configuration
-	nodeAddress []byte        // the node's address
-	log         LoggerI       // the logger
+	server          *http.Server  // the http prometheus server
+	chainID         float64       // the chain id the node is running
+	softwareVersion string        // the sofware version the node is running
+	config          MetricsConfig // the configuration
+	nodeAddress     []byte        // the node's address
+	log             LoggerI       // the logger
+	startupBlockSet bool          // flag to ensure startup block is only set once
 
 	NodeMetrics    // general telemetry about the node
 	BlockMetrics   // block telemetry
@@ -77,13 +80,16 @@ type NodeMetrics struct {
 	GetRootChainInfo prometheus.Histogram // how long does the 'GetRootChainInfo' call take?
 	AccountBalance   *prometheus.GaugeVec // what's the balance of this node's account?
 	ProposerCount    prometheus.Counter   // how many times did this node propose the block?
+	ChainId          prometheus.Gauge     // what chain id is this node running on?
+	SoftwareVersion  *prometheus.GaugeVec // what software version is this node running?
+	StartupBlock     prometheus.Gauge     // the block height when node first completed syncing (set only once)
 }
 
 // BlockMetrics represents telemetry for block health
 type BlockMetrics struct {
 	BlockProcessingTime prometheus.Histogram // how long does it take for this node to commit a block?
 	BlockSize           prometheus.Gauge     // what is the size of the block in bytes?
-	BlockNumTxs         prometheus.Counter   // how many transactions has the node processed?
+	BlockNumTxs         prometheus.Gauge     // how many transactions has the node processed?
 	LargestTxSize       prometheus.Gauge     // what is the largest tx size in a block?
 	BlockVDFIterations  prometheus.Gauge     // how many vdf iterations are included in the block?
 	NonSignerPercent    prometheus.Gauge     // what percent of the voting power were non signers
@@ -143,14 +149,16 @@ type MempoolMetrics struct {
 }
 
 // NewMetricsServer() creates a new telemetry server
-func NewMetricsServer(nodeAddress crypto.AddressI, config MetricsConfig, logger LoggerI) *Metrics {
+func NewMetricsServer(nodeAddress crypto.AddressI, chainID float64, softwareVersion string, config MetricsConfig, logger LoggerI) *Metrics {
 	mux := http.NewServeMux()
 	mux.Handle(metricsPattern, promhttp.Handler())
 	return &Metrics{
-		server:      &http.Server{Addr: config.PrometheusAddress, Handler: mux},
-		config:      config,
-		nodeAddress: nodeAddress.Bytes(),
-		log:         logger,
+		server:          &http.Server{Addr: config.PrometheusAddress, Handler: mux},
+		config:          config,
+		nodeAddress:     nodeAddress.Bytes(),
+		chainID:         float64(chainID),
+		softwareVersion: softwareVersion,
+		log:             logger,
 		// NODE
 		NodeMetrics: NodeMetrics{
 			NodeStatus: promauto.NewGauge(prometheus.GaugeOpts{
@@ -163,7 +171,7 @@ func NewMetricsServer(nodeAddress crypto.AddressI, config MetricsConfig, logger 
 			}),
 			SyncingStatus: promauto.NewGauge(prometheus.GaugeOpts{
 				Name: "canopy_syncing_status",
-				Help: "Node syncing status (1 for syncing, 0 for synced)",
+				Help: "Node syncing status (0 for syncing, 1 for synced)",
 			}),
 			ProposerCount: promauto.NewCounter(prometheus.CounterOpts{
 				Name: "canopy_proposer_count",
@@ -173,6 +181,18 @@ func NewMetricsServer(nodeAddress crypto.AddressI, config MetricsConfig, logger 
 				Name: "canopy_account_balance",
 				Help: "Account balance in uCNPY of the node's address",
 			}, []string{"address"}),
+			ChainId: promauto.NewGauge(prometheus.GaugeOpts{
+				Name: "canopy_chain_id",
+				Help: "The chain ID this node is running on",
+			}),
+			SoftwareVersion: promauto.NewGaugeVec(prometheus.GaugeOpts{
+				Name: "canopy_software_version",
+				Help: "The software version this node is running",
+			}, []string{"version"}),
+			StartupBlock: promauto.NewGauge(prometheus.GaugeOpts{
+				Name: "canopy_startup_block",
+				Help: "The block height when node first completed syncing after startup (set only once per run)",
+			}),
 		},
 		// BLOCK
 		BlockMetrics: BlockMetrics{
@@ -357,6 +377,9 @@ func (m *Metrics) Start() {
 	if m == nil {
 		return
 	}
+	// set the chain ID and software version metrics (one-time on startup)
+	m.ChainId.Set(m.chainID)
+	m.SoftwareVersion.WithLabelValues(m.softwareVersion).Set(1)
 	// if the metrics server is enabled
 	if m.config.MetricsEnabled {
 		go func() {
@@ -396,9 +419,9 @@ func (m *Metrics) UpdateNodeMetrics(isSyncing bool) {
 	m.NodeStatus.Set(1)
 	// update syncing status
 	if isSyncing {
-		m.SyncingStatus.Set(1)
-	} else {
 		m.SyncingStatus.Set(0)
+	} else {
+		m.SyncingStatus.Set(1)
 	}
 }
 
@@ -508,13 +531,16 @@ func (m *Metrics) UpdateValidator(address string, stakeAmount uint64, unstaking,
 	switch {
 	case unstaking:
 		// if the val is unstaking
-		m.ValidatorStatus.WithLabelValues(address).Set(1)
+		m.ValidatorStatus.WithLabelValues(address).Set(2)
 	case paused:
 		// if the val is paused
-		m.ValidatorStatus.WithLabelValues(address).Set(2)
+		m.ValidatorStatus.WithLabelValues(address).Set(3)
+	case stakeAmount == 0:
+		// if the val is unstaked
+		m.ValidatorStatus.WithLabelValues(address).Set(0)
 	default:
 		// if the val is active
-		m.ValidatorStatus.WithLabelValues(address).Set(0)
+		m.ValidatorStatus.WithLabelValues(address).Set(1)
 	}
 }
 
@@ -566,7 +592,7 @@ func (m *Metrics) UpdateBlockMetrics(proposerAddress []byte, blockSize, txCount,
 		m.ProposerCount.Inc()
 	}
 	// update the number of transactions
-	m.BlockNumTxs.Add(float64(txCount))
+	m.BlockNumTxs.Set(float64(txCount))
 	// update the block processing time in seconds
 	m.BlockProcessingTime.Observe(duration.Seconds())
 	// update block size
@@ -620,4 +646,17 @@ func (m *Metrics) UpdateGetRootChainInfo(startTime time.Time) {
 	}
 	// update the metric
 	m.GetRootChainInfo.Observe(time.Since(startTime).Seconds())
+}
+
+// SetStartupBlock() sets the block height when the node first completed syncing after startup
+func (m *Metrics) SetStartupBlock(blockHeight uint64) {
+	// exit if empty
+	if m == nil {
+		return
+	}
+	// only set the startup block metric once per node run
+	if !m.startupBlockSet {
+		m.StartupBlock.Set(float64(blockHeight))
+		m.startupBlockSet = true
+	}
 }
