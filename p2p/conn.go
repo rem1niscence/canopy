@@ -35,16 +35,9 @@ const (
 	BlockReqWindowS         = 2   // the 'window of time' before resetting limits for block (certificate) requests
 	GoodPeerBookRespRep     = 3   // reputation points for a good peer book response
 	GoodBlockRep            = 3   // rep boost for sending us a valid block (certificate)
-	GoodTxRep               = 3   // rep boost for sending us a valid transaction (certificate)
-	BadPacketSlash          = -1  // bad packet is received
-	NoPongSlash             = -1  // no pong received
-	TimeoutRep              = -1  // rep slash for not responding in time
 	UnexpectedBlockRep      = -1  // rep slash for sending us a block we weren't expecting
-	PeerBookReqTimeoutRep   = -1  // slash for a non-response for a peer book request
-	UnexpectedMsgRep        = -1  // slash for an unexpected message
 	InvalidMsgRep           = -3  // slash for an invalid message
 	ExceedMaxPBReqRep       = -3  // slash for exceeding the max peer book requests
-	ExceedMaxPBLenRep       = -3  // slash for exceeding the size of the peer book message
 	UnknownMessageSlash     = -3  // unknown message type is received
 	BadStreamSlash          = -3  // unknown stream id is received
 	InvalidTxRep            = -3  // rep slash for sending us an invalid transaction
@@ -65,8 +58,6 @@ type MultiConn struct {
 	streams        map[lib.Topic]*Stream       // multiple independent bi-directional communication channels
 	quitSending    chan struct{}               // signal to quit
 	quitReceiving  chan struct{}               // signal to quit
-	sendPong       chan struct{}               // signal to send keep alive message
-	receivedPong   chan struct{}               // signal that received keep alive message
 	onError        func(error, []byte, string) // callback to call if peer errors
 	error          sync.Once                   // thread safety to ensure MultiConn.onError is only called once
 	p2p            *P2P                        // a pointer reference to the P2P module
@@ -96,8 +87,6 @@ func (p *P2P) NewConnection(conn net.Conn) (*MultiConn, lib.ErrorI) {
 		streams:        p.NewStreams(),
 		quitSending:    make(chan struct{}, maxChanSize),
 		quitReceiving:  make(chan struct{}, maxChanSize),
-		sendPong:       make(chan struct{}, maxChanSize),
-		receivedPong:   make(chan struct{}, maxChanSize),
 		onError:        p.OnPeerError,
 		error:          sync.Once{},
 		p2p:            p,
@@ -200,7 +189,7 @@ func (c *MultiConn) startReceiveService() {
 		}
 	}()
 	m := limiter.New(0, 0)
-	defer func() { close(c.sendPong); close(c.receivedPong); m.Done() }()
+	defer m.Done()
 	for {
 		select {
 		default: // fires unless quit was signaled

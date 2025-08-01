@@ -92,8 +92,6 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 
 // Remove() evicts a peer from the set
 func (ps *PeerSet) Remove(publicKey []byte) (peer *Peer, err lib.ErrorI) {
-	ps.Lock()
-	defer ps.Unlock()
 	peer, err = ps.get(publicKey)
 	if err != nil {
 		return

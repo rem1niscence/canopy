@@ -126,6 +126,7 @@ func (p *P2P) ListenForInboundPeers(listenAddress *lib.PeerAddress) {
 		// wait for and then accept inbound tcp connection
 		c, err := p.listener.Accept()
 		if err != nil {
+			<-time.After(5 * time.Second)
 			p.log.Errorf("Accept error: %v", err)
 			continue
 		}
@@ -309,7 +310,7 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect, strictPubli
 func (p *P2P) DialWithBackoff(peerInfo *lib.PeerAddress, strictPublicKey bool) {
 	dialAndLog := func() (err error) {
 		if err = p.Dial(peerInfo, false, strictPublicKey); err != nil {
-			p.log.Errorf("Dial %s@%s failed: %s", lib.BytesToString(peerInfo.PublicKey), peerInfo.NetAddress, err.Error())
+			p.log.Warnf("Dial %s@%s failed: %s", lib.BytesToString(peerInfo.PublicKey), peerInfo.NetAddress, err.Error())
 		}
 		return
 	}

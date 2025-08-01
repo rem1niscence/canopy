@@ -203,7 +203,7 @@ func (p *P2P) StartPeerBookService() {
 	go p.ListenForPeerBookRequests()
 	go p.SendPeerBookRequests()
 	go p.ListenForPeerBookResponses()
-	//go p.book.StartChurnManagement(p.DialAndDisconnect)
+	go p.book.StartChurnManagement(p.DialAndDisconnect)
 	go p.book.SaveRoutine()
 }
 
