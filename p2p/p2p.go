@@ -293,13 +293,15 @@ func (p *P2P) AddPeer(conn net.Conn, info *lib.PeerInfo, disconnect, strictPubli
 			return ErrBannedID(pubKeyString)
 		}
 	}
-	// add peer to peer set and peer book
-	p.log.Infof("Adding peer: %s@%s", lib.BytesToString(info.Address.PublicKey), info.Address.NetAddress)
 	p.book.Add(&BookPeer{Address: info.Address})
-	err = p.PeerSet.Add(&Peer{
+	if err = p.PeerSet.Add(&Peer{
 		conn:     connection,
 		PeerInfo: info,
-	})
+	}); err != nil {
+		return err
+	}
+	// add peer to peer set and peer book
+	p.log.Infof("Added peer: %s@%s", lib.BytesToString(info.Address.PublicKey), info.Address.NetAddress)
 	return
 }
 
