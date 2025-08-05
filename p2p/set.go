@@ -3,11 +3,12 @@ package p2p
 import (
 	"bytes"
 	"fmt"
+	"slices"
+	"sync"
+
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
-	"slices"
-	"sync"
 )
 
 const (
@@ -79,7 +80,7 @@ func (ps *PeerSet) Add(p *Peer) (err lib.ErrorI) {
 	// set the peer
 	ps.set(p)
 	// update metrics
-	ps.metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
+	ps.metrics.UpdatePeerMetrics(ps.outbound+ps.inbound, ps.inbound, ps.outbound)
 	return nil
 }
 
@@ -94,7 +95,7 @@ func (ps *PeerSet) Remove(publicKey []byte, uuid uint64) (err lib.ErrorI) {
 	}
 	ps.remove(peer)
 	// update metrics
-	ps.metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
+	ps.metrics.UpdatePeerMetrics(ps.outbound+ps.inbound, ps.inbound, ps.outbound)
 	return
 }
 
@@ -301,7 +302,7 @@ func (ps *PeerSet) changeIOCount(increment, outbound bool) {
 			ps.inbound--
 		}
 	}
-	ps.metrics.UpdatePeerMetrics(len(ps.m), ps.inbound, ps.outbound)
+	ps.metrics.UpdatePeerMetrics(ps.outbound+ps.inbound, ps.inbound, ps.outbound)
 }
 
 // map based CRUD operations below
