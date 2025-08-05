@@ -7,6 +7,7 @@ import (
 	"net"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alecthomas/units"
@@ -64,6 +65,7 @@ type MultiConn struct {
 	p2p           *P2P                                // a pointer reference to the P2P module
 	close         sync.Once                           // flag to identify if MultiConn is closed
 	log           lib.LoggerI                         // logging
+	hasError      atomic.Bool                         // flag to identify if MultiConn has encountered an error
 }
 
 // NewConnection() creates and starts a new instance of a MultiConn
@@ -240,6 +242,12 @@ func (c *MultiConn) Error(err error, reputationDelta ...int32) {
 		// prevent race between adding to peer set and erroring
 		c.p2p.Lock()
 		defer c.p2p.Unlock()
+		// set the connection as failed - this marks the underlying net.Conn as invalid
+		// since it's about to be closed. There's no reliable way to check whether a connection
+		// is closed without attempting read/write operations, which can lead to race conditions,
+		// data corruption, and message loss.
+		c.hasError.Store(true)
+		// run the callback
 		c.onError(err, c.Address.PublicKey, c.conn.RemoteAddr().String(), c.uuid)
 		// stop the multi-conn
 		c.Stop()
