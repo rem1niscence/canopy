@@ -156,7 +156,7 @@ type CertificateResult struct {
 	// checkpoint: contains information from the 3rd party chain in order for Canopy to provide Checkpoint-as-a-Service
 	Checkpoint *Checkpoint `protobuf:"bytes,4,opt,name=checkpoint,proto3" json:"checkpoint,omitempty"`
 	// retired: signals if the committee wants to shut down and mark itself as 'forever unsubsidized' on the root-chain
-	Retired       bool `protobuf:"varint,5,opt,name=retired,proto3" json:"retired,omitempty"`
+	Retired       bool `protobuf:"varint,5,opt,name=retired,proto3" json:"retired,omitempty"` // dex: contains information regarding the selling side 'dex' operations
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -857,11 +857,75 @@ func (x *CommitteeData) GetNumberOfSamples() uint64 {
 	return 0
 }
 
+// DexData is information regarding 'dex' operations from the nested chain
+type DexData struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// orders: contains the list of dex limit orders
+	Orders []*DexLimitOrder `protobuf:"bytes,1,rep,name=orders,proto3" json:"orders"` // @gotags: json:"orders"
+	// poolSize: contains the current balance of the liquidity pool
+	PoolSize uint64 `protobuf:"varint,2,opt,name=pool_size,json=poolSize,proto3" json:"poolSize"` // @gotags: json:"poolSize"
+	// receipts: contains the list of dex receipts
+	Receipts      []*DexReceipt `protobuf:"bytes,3,rep,name=receipts,proto3" json:"receipts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DexData) Reset() {
+	*x = DexData{}
+	mi := &file_certificate_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DexData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DexData) ProtoMessage() {}
+
+func (x *DexData) ProtoReflect() protoreflect.Message {
+	mi := &file_certificate_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DexData.ProtoReflect.Descriptor instead.
+func (*DexData) Descriptor() ([]byte, []int) {
+	return file_certificate_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *DexData) GetOrders() []*DexLimitOrder {
+	if x != nil {
+		return x.Orders
+	}
+	return nil
+}
+
+func (x *DexData) GetPoolSize() uint64 {
+	if x != nil {
+		return x.PoolSize
+	}
+	return 0
+}
+
+func (x *DexData) GetReceipts() []*DexReceipt {
+	if x != nil {
+		return x.Receipts
+	}
+	return nil
+}
+
 var File_certificate_proto protoreflect.FileDescriptor
 
 const file_certificate_proto_rawDesc = "" +
 	"\n" +
-	"\x11certificate.proto\x12\x05types\x1a\x0fconsensus.proto\"\xa0\x02\n" +
+	"\x11certificate.proto\x12\x05types\x1a\x0fconsensus.proto\x1a\tdex.proto\"\xa0\x02\n" +
 	"\x11QuorumCertificate\x12#\n" +
 	"\x06header\x18\x01 \x01(\v2\v.types.ViewR\x06header\x122\n" +
 	"\aresults\x18\x02 \x01(\v2\x18.types.CertificateResultR\aresults\x12!\n" +
@@ -920,7 +984,11 @@ const file_certificate_proto_rawDesc = "" +
 	"\x18last_root_height_updated\x18\x02 \x01(\x04R\x15lastRootHeightUpdated\x129\n" +
 	"\x19last_chain_height_updated\x18\x03 \x01(\x04R\x16lastChainHeightUpdated\x12A\n" +
 	"\x10payment_percents\x18\x04 \x03(\v2\x16.types.PaymentPercentsR\x0fpaymentPercents\x12*\n" +
-	"\x11number_of_samples\x18\x05 \x01(\x04R\x0fnumberOfSamplesB&Z$github.com/canopy-network/canopy/libb\x06proto3"
+	"\x11number_of_samples\x18\x05 \x01(\x04R\x0fnumberOfSamples\"\x83\x01\n" +
+	"\aDexData\x12,\n" +
+	"\x06orders\x18\x01 \x03(\v2\x14.types.DexLimitOrderR\x06orders\x12\x1b\n" +
+	"\tpool_size\x18\x02 \x01(\x04R\bpoolSize\x12-\n" +
+	"\breceipts\x18\x03 \x03(\v2\x11.types.DexReceiptR\breceiptsB&Z$github.com/canopy-network/canopy/libb\x06proto3"
 
 var (
 	file_certificate_proto_rawDescOnce sync.Once
@@ -934,7 +1002,7 @@ func file_certificate_proto_rawDescGZIP() []byte {
 	return file_certificate_proto_rawDescData
 }
 
-var file_certificate_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_certificate_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_certificate_proto_goTypes = []any{
 	(*QuorumCertificate)(nil),  // 0: types.QuorumCertificate
 	(*CertificateResult)(nil),  // 1: types.CertificateResult
@@ -948,13 +1016,16 @@ var file_certificate_proto_goTypes = []any{
 	(*DoubleSigner)(nil),       // 9: types.DoubleSigner
 	(*CommitteesData)(nil),     // 10: types.CommitteesData
 	(*CommitteeData)(nil),      // 11: types.CommitteeData
-	(*View)(nil),               // 12: types.View
-	(*AggregateSignature)(nil), // 13: types.AggregateSignature
+	(*DexData)(nil),            // 12: types.DexData
+	(*View)(nil),               // 13: types.View
+	(*AggregateSignature)(nil), // 14: types.AggregateSignature
+	(*DexLimitOrder)(nil),      // 15: types.DexLimitOrder
+	(*DexReceipt)(nil),         // 16: types.DexReceipt
 }
 var file_certificate_proto_depIdxs = []int32{
-	12, // 0: types.QuorumCertificate.header:type_name -> types.View
+	13, // 0: types.QuorumCertificate.header:type_name -> types.View
 	1,  // 1: types.QuorumCertificate.results:type_name -> types.CertificateResult
-	13, // 2: types.QuorumCertificate.signature:type_name -> types.AggregateSignature
+	14, // 2: types.QuorumCertificate.signature:type_name -> types.AggregateSignature
 	2,  // 3: types.CertificateResult.reward_recipients:type_name -> types.RewardRecipients
 	3,  // 4: types.CertificateResult.slash_recipients:type_name -> types.SlashRecipients
 	4,  // 5: types.CertificateResult.orders:type_name -> types.Orders
@@ -964,11 +1035,13 @@ var file_certificate_proto_depIdxs = []int32{
 	5,  // 9: types.Orders.lock_orders:type_name -> types.LockOrder
 	11, // 10: types.CommitteesData.list:type_name -> types.CommitteeData
 	8,  // 11: types.CommitteeData.payment_percents:type_name -> types.PaymentPercents
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	15, // 12: types.DexData.orders:type_name -> types.DexLimitOrder
+	16, // 13: types.DexData.receipts:type_name -> types.DexReceipt
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_certificate_proto_init() }
@@ -977,13 +1050,14 @@ func file_certificate_proto_init() {
 		return
 	}
 	file_consensus_proto_init()
+	file_dex_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_certificate_proto_rawDesc), len(file_certificate_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

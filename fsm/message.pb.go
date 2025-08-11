@@ -46,7 +46,7 @@ type MessageSend struct {
 	FromAddress []byte `protobuf:"bytes,1,opt,name=from_address,json=fromAddress,proto3" json:"fromAddress"` // @gotags: json:"fromAddress"
 	// to_address: is the recipient of the funds
 	ToAddress []byte `protobuf:"bytes,2,opt,name=to_address,json=toAddress,proto3" json:"toAddress"` // @gotags: json:"toAddress"
-	// amount: is the amount of tokens in micro-denomination (uCNPY)
+	// amount: is the amount of tokens in micro-denomination (uAsset)
 	Amount        uint64 `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -784,11 +784,11 @@ func (x *MessageSubsidy) GetOpcode() []byte {
 // account and transferring them to an escrow pool while awaiting a buyer
 type MessageCreateOrder struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// chain_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
+	// chain_id: the id of the committee that is responsible for the 'counter asset' the uAsset will swapped for
 	ChainId uint64 `protobuf:"varint,1,opt,name=ChainId,proto3" json:"chainID"` // @gotags: json:"chainID"
 	// data: a generic data field which can allow a committee to execute specific functionality for the swap
 	Data []byte `protobuf:"bytes,2,opt,name=data,proto3" json:"data"` // @gotags: json:"data"
-	// amount_for_sale: the amount of uCNPY listed for sale, transferred to escrow
+	// amount_for_sale: the amount of uAsset listed for sale, transferred to escrow
 	AmountForSale uint64 `protobuf:"varint,3,opt,name=AmountForSale,proto3" json:"amountForSale"` // @gotags: json:"amountForSale"
 	// requested_amount: the amount of the 'counter asset' the buyer must send in order to complete a swap
 	RequestedAmount uint64 `protobuf:"varint,4,opt,name=RequestedAmount,proto3" json:"requestAmount"` // @gotags: json:"requestAmount"
@@ -797,7 +797,7 @@ type MessageCreateOrder struct {
 	// sellers_send_address: the Canopy address the seller is selling and signing from
 	SellersSendAddress []byte `protobuf:"bytes,6,opt,name=SellersSendAddress,proto3" json:"sellersSendAddress"` // @gotags: json:"sellersSendAddress"
 	// OrderId: auto-populated by the state machine to assign the unique bytes to the order
-	OrderId       []byte `protobuf:"bytes,7,opt,name=OrderId,proto3" json:"OrderId,omitempty"`
+	OrderId       []byte `protobuf:"bytes,7,opt,name=OrderId,proto3" json:"orderId"` // @gotags: json:"orderId"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -889,12 +889,12 @@ type MessageEditOrder struct {
 	// order_id: is the number id that is unique to this committee to identify the order
 	// not modifiable, used for order identification only
 	OrderId []byte `protobuf:"bytes,1,opt,name=OrderId,proto3" json:"orderID"` // @gotags: json:"orderID"
-	// chain_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
+	// chain_id: the id of the committee that is responsible for the 'counter asset' the uAsset will swapped for
 	// not modifiable, used for order identification only
 	ChainId uint64 `protobuf:"varint,2,opt,name=ChainId,proto3" json:"chainID"` // @gotags: json:"chainID"
 	// data: a generic data field which can allow a committee to execute specific functionality for the swap
 	Data []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data"` // @gotags: json:"data"
-	// amount_for_sale: the updated amount of uCNPY listed for sale, a reduction will return escrowed tokens to the seller's
+	// amount_for_sale: the updated amount of uAsset listed for sale, a reduction will return escrowed tokens to the seller's
 	// send address
 	AmountForSale uint64 `protobuf:"varint,4,opt,name=AmountForSale,proto3" json:"amountForSale"` // @gotags: json:"amountForSale"
 	// requested_amount: the updated amount of the 'counter asset' the buyer must send in order to complete a swap
@@ -983,7 +983,7 @@ type MessageDeleteOrder struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// order_id: is the number id that is unique to this committee to identify the order
 	OrderId []byte `protobuf:"bytes,1,opt,name=OrderId,proto3" json:"orderID"` // @gotags: json:"orderID"
-	// chain_id: the id of the committee that is responsible for the 'counter asset' the uCNPY will swapped for
+	// chain_id: the id of the committee that is responsible for the 'counter asset' the uAsset will swapped for
 	ChainId       uint64 `protobuf:"varint,2,opt,name=ChainId,proto3" json:"chainID"` // @gotags: json:"chainID"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1031,6 +1031,88 @@ func (x *MessageDeleteOrder) GetChainId() uint64 {
 		return x.ChainId
 	}
 	return 0
+}
+
+// MessageDexLimitOrder: creates a limit order for the Canopy Dex Protocol
+type MessageDexLimitOrder struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// chain_id: the id of the committee that is responsible for the 'counter asset' the uAsset will swapped for
+	ChainId uint64 `protobuf:"varint,1,opt,name=ChainId,proto3" json:"chainID"` // @gotags: json:"chainID"
+	// amount_for_sale: the amount of asset listed for sale, transferred to escrow
+	AmountForSale uint64 `protobuf:"varint,2,opt,name=AmountForSale,proto3" json:"amountForSale"` // @gotags: json:"amountForSale"
+	// requested_amount: the minimum amount of the 'counter asset' the seller is willing to receive
+	RequestedAmount uint64 `protobuf:"varint,3,opt,name=RequestedAmount,proto3" json:"requestAmount"` // @gotags: json:"requestAmount"
+	// sellers_send_address: the Canopy address the seller is selling and signing from
+	SellersSendAddress []byte `protobuf:"bytes,4,opt,name=SellersSendAddress,proto3" json:"sellersSendAddress"` // @gotags: json:"sellersSendAddress"
+	// OrderId: auto-populated by the state machine to assign the unique bytes to the order
+	OrderId       []byte `protobuf:"bytes,5,opt,name=OrderId,proto3" json:"orderId"` // @gotags: json:"orderId"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MessageDexLimitOrder) Reset() {
+	*x = MessageDexLimitOrder{}
+	mi := &file_message_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MessageDexLimitOrder) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MessageDexLimitOrder) ProtoMessage() {}
+
+func (x *MessageDexLimitOrder) ProtoReflect() protoreflect.Message {
+	mi := &file_message_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MessageDexLimitOrder.ProtoReflect.Descriptor instead.
+func (*MessageDexLimitOrder) Descriptor() ([]byte, []int) {
+	return file_message_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *MessageDexLimitOrder) GetChainId() uint64 {
+	if x != nil {
+		return x.ChainId
+	}
+	return 0
+}
+
+func (x *MessageDexLimitOrder) GetAmountForSale() uint64 {
+	if x != nil {
+		return x.AmountForSale
+	}
+	return 0
+}
+
+func (x *MessageDexLimitOrder) GetRequestedAmount() uint64 {
+	if x != nil {
+		return x.RequestedAmount
+	}
+	return 0
+}
+
+func (x *MessageDexLimitOrder) GetSellersSendAddress() []byte {
+	if x != nil {
+		return x.SellersSendAddress
+	}
+	return nil
+}
+
+func (x *MessageDexLimitOrder) GetOrderId() []byte {
+	if x != nil {
+		return x.OrderId
+	}
+	return nil
 }
 
 var File_message_proto protoreflect.FileDescriptor
@@ -1113,7 +1195,13 @@ const file_message_proto_rawDesc = "" +
 	"\x14SellerReceiveAddress\x18\x06 \x01(\fR\x14SellerReceiveAddress\"H\n" +
 	"\x12MessageDeleteOrder\x12\x18\n" +
 	"\aOrderId\x18\x01 \x01(\fR\aOrderId\x12\x18\n" +
-	"\aChainId\x18\x02 \x01(\x04R\aChainIdB&Z$github.com/canopy-network/canopy/fsmb\x06proto3"
+	"\aChainId\x18\x02 \x01(\x04R\aChainId\"\xca\x01\n" +
+	"\x14MessageDexLimitOrder\x12\x18\n" +
+	"\aChainId\x18\x01 \x01(\x04R\aChainId\x12$\n" +
+	"\rAmountForSale\x18\x02 \x01(\x04R\rAmountForSale\x12(\n" +
+	"\x0fRequestedAmount\x18\x03 \x01(\x04R\x0fRequestedAmount\x12.\n" +
+	"\x12SellersSendAddress\x18\x04 \x01(\fR\x12SellersSendAddress\x12\x18\n" +
+	"\aOrderId\x18\x05 \x01(\fR\aOrderIdB&Z$github.com/canopy-network/canopy/fsmb\x06proto3"
 
 var (
 	file_message_proto_rawDescOnce sync.Once
@@ -1127,7 +1215,7 @@ func file_message_proto_rawDescGZIP() []byte {
 	return file_message_proto_rawDescData
 }
 
-var file_message_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_message_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_message_proto_goTypes = []any{
 	(*MessageSend)(nil),               // 0: types.MessageSend
 	(*MessageStake)(nil),              // 1: types.MessageStake
@@ -1142,12 +1230,13 @@ var file_message_proto_goTypes = []any{
 	(*MessageCreateOrder)(nil),        // 10: types.MessageCreateOrder
 	(*MessageEditOrder)(nil),          // 11: types.MessageEditOrder
 	(*MessageDeleteOrder)(nil),        // 12: types.MessageDeleteOrder
-	(*anypb.Any)(nil),                 // 13: google.protobuf.Any
-	(*lib.QuorumCertificate)(nil),     // 14: types.QuorumCertificate
+	(*MessageDexLimitOrder)(nil),      // 13: types.MessageDexLimitOrder
+	(*anypb.Any)(nil),                 // 14: google.protobuf.Any
+	(*lib.QuorumCertificate)(nil),     // 15: types.QuorumCertificate
 }
 var file_message_proto_depIdxs = []int32{
-	13, // 0: types.MessageChangeParameter.parameter_value:type_name -> google.protobuf.Any
-	14, // 1: types.MessageCertificateResults.qc:type_name -> types.QuorumCertificate
+	14, // 0: types.MessageChangeParameter.parameter_value:type_name -> google.protobuf.Any
+	15, // 1: types.MessageCertificateResults.qc:type_name -> types.QuorumCertificate
 	2,  // [2:2] is the sub-list for method output_type
 	2,  // [2:2] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name
@@ -1166,7 +1255,7 @@ func file_message_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_message_proto_rawDesc), len(file_message_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
