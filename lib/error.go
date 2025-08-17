@@ -226,17 +226,17 @@ const (
 	CodeInsufficientSupply        ErrorCode = 56
 	CodeUnknownMsgName            ErrorCode = 57
 	CodeUnknownPageable           ErrorCode = 58
-
-	CodeInvalidBlockRange        ErrorCode = 60
-	CodeInvalidPublicKey         ErrorCode = 61
-	CodeInvalidDoubleSignHeights ErrorCode = 62
-	CodeInvalidDoubleSigner      ErrorCode = 63
-	CodeInvalidNumCommittees     ErrorCode = 64
-
-	CodeValidatorIsADelegate ErrorCode = 66
-
-	CodeInvalidChainId ErrorCode = 68
-	CodeWrongNetworkID ErrorCode = 69
+	CodeMismatchDexBatchReceipt   ErrorCode = 59
+	CodeInvalidBlockRange         ErrorCode = 60
+	CodeInvalidPublicKey          ErrorCode = 61
+	CodeInvalidDoubleSignHeights  ErrorCode = 62
+	CodeInvalidDoubleSigner       ErrorCode = 63
+	CodeInvalidNumCommittees      ErrorCode = 64
+	CodeInvalidLiquidityPool      ErrorCode = 65
+	CodeValidatorIsADelegate      ErrorCode = 66
+	CodeMaxDexBatchSize           ErrorCode = 67
+	CodeInvalidChainId            ErrorCode = 68
+	CodeWrongNetworkID            ErrorCode = 69
 
 	CodeRootHeight               ErrorCode = 71
 	CodeInvalidQCCommitteeHeight ErrorCode = 72
