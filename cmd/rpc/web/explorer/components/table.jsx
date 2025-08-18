@@ -195,6 +195,7 @@ export default function DTable(props) {
             min="1"
             onChange={(e) => e.target.value && props.selectTable(6, 0, Number(e.target.value))}
             className="chain-table mb-3"
+            style={{ backgroundImage: 'url("./chain.png")' }}
           />
         )}
         <input
@@ -202,6 +203,7 @@ export default function DTable(props) {
           value={filterText}
           onChange={(e) => props.setState({ ...props.state, filterText: e.target.value })}
           className="search-table mb-3"
+          style={{ backgroundImage: 'url("./filter.png")' }}
         />
         <h5 className="data-table-head">{getHeader(tableData)}</h5>
       </div>
