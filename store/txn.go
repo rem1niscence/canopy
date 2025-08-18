@@ -240,8 +240,13 @@ func (t *Txn) write(prefix []byte, writeVersion uint64, op valueOp) lib.ErrorI {
 			return ErrStoreSet(err)
 		}
 	case opDelete:
-		// set an entry with a bit that marks it as deleted and prevents it from being discarded
-		if err := t.writer.SetEntryAt(newEntry(k, nil, badgerDeleteBit|badgerNoDiscardBit), writeVersion); err != nil {
+		meta := badgerDeleteBit
+		// for non LSS keys, the values should not be actually deleted from the store
+		if writeVersion != lssVersion {
+			// set an entry with a bit that marks it as deleted and prevents it from being discarded
+			meta |= badgerNoDiscardBit
+		}
+		if err := t.writer.SetEntryAt(newEntry(k, nil, meta), writeVersion); err != nil {
 			return ErrStoreDelete(err)
 		}
 	case opEntry:
