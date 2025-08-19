@@ -79,7 +79,7 @@ func TestIteratorCommitAndPrefixed(t *testing.T) {
 
 func testStore(t *testing.T) (*Store, *badger.DB, func()) {
 	db, err := badger.OpenManaged(badger.DefaultOptions("").
-		WithInMemory(true).WithLoggingLevel(badger.ERROR))
+		WithInMemory(true).WithLoggingLevel(badger.ERROR).WithDetectConflicts(false))
 	require.NoError(t, err)
 	store, err := NewStoreWithDB(lib.DefaultConfig(), db, nil, lib.NewDefaultLogger())
 	require.NoError(t, err)
