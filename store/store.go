@@ -1,12 +1,14 @@
 package store
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math"
 	"path/filepath"
 	"runtime"
 	"time"
 
+	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/options"
@@ -190,17 +192,12 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	if e := s.Flush(); e != nil {
 		return nil, e
 	}
-	// evict LSS deleted keys, part of the hack for previously set keys for deletion
-	triggerEvict := []byte("zzz/trigger_key")
-	if err := s.writer.Set(triggerEvict, nil); err != nil {
-		return nil, ErrStoreSet(err)
-	}
 	// finally commit the entire Transaction to the actual DB under the proper version (height) number
 	if e := s.writer.Flush(); e != nil {
 		return nil, ErrCommitDB(e)
 	}
 	// Trigger eviction of LSS deleted keys
-	if err := s.Evict(triggerEvict); err != nil {
+	if err := s.Evict(); err != nil {
 		return nil, err
 	}
 
@@ -375,19 +372,25 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 }
 
 // Evict deletes all entries marked for eviction
-func (s *Store) Evict(triggerEvict []byte) lib.ErrorI {
+func (s *Store) Evict() lib.ErrorI {
 	s.keyCount("Before eviction: ")
-	// This is basically a hack to force deletion of entries marked for eviction
-	// mark evict with the correct meta bits
-	writer, err := s.MarkEvict()
-	if err != nil {
-		return err
+
+	// evict LSS deleted keys, part of the hack for previously set keys for deletion
+	triggerEvict := fmt.Appendf(nil, "zzz/trigger_key_%s", randValue())
+	writer := s.db.NewWriteBatchAt(lssVersion)
+	if err := writer.Set(triggerEvict, nil); err != nil {
+		return ErrStoreSet(err)
 	}
-	// flush the corrected deletion entries
 	if err := writer.Flush(); err != nil {
 		return ErrCommitDB(err)
 	}
-	time.Sleep(1 * time.Millisecond)
+	// this is basically a hack to force deletion of entries marked for eviction
+	// mark evict with the correct meta bits
+	err := s.MarkEvict()
+	if err != nil {
+		return err
+	}
+
 	// set discard timestamp, before marking entries for eviction
 	s.db.SetDiscardTs(lssVersion)
 	// drop the trigger to force eviction
@@ -396,17 +399,23 @@ func (s *Store) Evict(triggerEvict []byte) lib.ErrorI {
 	}
 	// reset discard timestamp after eviction
 	s.db.SetDiscardTs(0)
+
+	cleanTrigger := s.db.NewWriteBatchAt(lssVersion)
+	cleanTrigger.Delete(triggerEvict)
+	if err := cleanTrigger.Flush(); err != nil {
+		return ErrCommitDB(err)
+	}
 	s.keyCount("After eviction: ")
 	return nil
 }
 
 // MarkEvict marks entries for eviction and flushes the corrected deletion entries
-func (s *Store) MarkEvict() (writer *badger.WriteBatch, err lib.ErrorI) {
+func (s *Store) MarkEvict() (err lib.ErrorI) {
 	// create a new transaction reader at the latest state version
 	reader := s.db.NewTransactionAt(lssVersion, false)
 	defer reader.Discard()
 	// create a new transaction writer at the latest state version
-	writer = s.db.NewWriteBatchAt(lssVersion)
+	writer := s.db.NewWriteBatchAt(lssVersion)
 
 	// initialize the iterator for the latest state prefix
 	it := reader.NewIterator(badger.IteratorOptions{
@@ -428,17 +437,26 @@ func (s *Store) MarkEvict() (writer *badger.WriteBatch, err lib.ErrorI) {
 		// log details about each deleted key
 		// s.log.Infof("processing deleted key %d: version=%d, key_prefix=%s", count, version,
 		// string(key[:min(10, len(key))]))
+		//
 
 		e := &badger.Entry{Key: key}
 		setMeta(e, badgerDeleteBit)
 
 		// overwrite the key to be a full deletion
-		if err := writer.Delete(it.Item().Key()); err != nil {
-			return nil, ErrStoreDelete(err)
+		if err := writer.SetEntryAt(e, item.Version()); err != nil {
+			return ErrStoreDelete(err)
 		}
+		// using badgerdb's native delete mechanism
+		// if err := writer.Delete(it.Item().Key()); err != nil {
+		// 	return ErrStoreDelete(err)
+		// }
+	}
+	// flush the corrected deletion entries
+	if err := writer.Flush(); err != nil {
+		return ErrCommitDB(err)
 	}
 	s.log.Infof("Total deleted keys processed in MarkEvict: %d", count)
-	return writer, nil
+	return nil
 }
 
 // keyCount counts the number of LSS keys and those marked for deletion
@@ -477,4 +495,10 @@ func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *lib.CommitID) {
 		log.Fatalf("unmarshalCommitID() failed with err: %s", err.Error())
 	}
 	return
+}
+
+func randValue() []byte {
+	value := make([]byte, units.KB)
+	rand.Read(value)
+	return value
 }
