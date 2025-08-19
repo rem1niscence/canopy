@@ -93,7 +93,7 @@ func NewStore(config lib.Config, path string, metrics *lib.Metrics, log lib.Logg
 
 // NewStoreInMemory() creates a new instance of a mem DB
 func NewStoreInMemory(log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
-	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR))
+	db, err := badger.OpenManaged(badger.DefaultOptions("").WithInMemory(true).WithLoggingLevel(badger.ERROR).WithDetectConflicts(false))
 	if err != nil {
 		return nil, ErrOpenDB(err)
 	}
@@ -190,10 +190,20 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	if e := s.Flush(); e != nil {
 		return nil, e
 	}
+	// evict LSS deleted keys, part of the hack for previously set keys for deletion
+	triggerEvict := []byte("zzz/trigger_key")
+	if err := s.writer.Set(triggerEvict, nil); err != nil {
+		return nil, ErrStoreSet(err)
+	}
 	// finally commit the entire Transaction to the actual DB under the proper version (height) number
 	if e := s.writer.Flush(); e != nil {
 		return nil, ErrCommitDB(e)
 	}
+	// Trigger eviction of LSS deleted keys
+	if err := s.Evict(triggerEvict); err != nil {
+		return nil, err
+	}
+
 	// update the metrics once complete
 	s.metrics.UpdateStoreMetrics(size, entries, time.Time{}, startTime)
 	// reset the writer for the next height
@@ -362,6 +372,95 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 		return ErrCommitDB(e)
 	}
 	return nil
+}
+
+// Evict deletes all entries marked for eviction
+func (s *Store) Evict(triggerEvict []byte) lib.ErrorI {
+	s.keyCount("Before eviction: ")
+	// This is basically a hack to force deletion of entries marked for eviction
+	// mark evict with the correct meta bits
+	writer, err := s.MarkEvict()
+	if err != nil {
+		return err
+	}
+	// flush the corrected deletion entries
+	if err := writer.Flush(); err != nil {
+		return ErrCommitDB(err)
+	}
+	time.Sleep(1 * time.Millisecond)
+	// set discard timestamp, before marking entries for eviction
+	s.db.SetDiscardTs(lssVersion)
+	// drop the trigger to force eviction
+	if err := s.db.DropPrefix(triggerEvict); err != nil {
+		return ErrCommitDB(err)
+	}
+	// reset discard timestamp after eviction
+	s.db.SetDiscardTs(0)
+	s.keyCount("After eviction: ")
+	return nil
+}
+
+// MarkEvict marks entries for eviction and flushes the corrected deletion entries
+func (s *Store) MarkEvict() (writer *badger.WriteBatch, err lib.ErrorI) {
+	// create a new transaction reader at the latest state version
+	reader := s.db.NewTransactionAt(lssVersion, false)
+	defer reader.Discard()
+	// create a new transaction writer at the latest state version
+	writer = s.db.NewWriteBatchAt(lssVersion)
+
+	// initialize the iterator for the latest state prefix
+	it := reader.NewIterator(badger.IteratorOptions{
+		Prefix:      []byte(latestStatePrefix),
+		AllVersions: true,
+	})
+	defer it.Close()
+
+	count := 0
+	for it.Rewind(); it.Valid(); it.Next() {
+		item := it.Item()
+		if !item.IsDeletedOrExpired() {
+			continue
+		}
+		count++
+
+		key := item.Key()
+		// version := item.Version()
+		// log details about each deleted key
+		// s.log.Infof("processing deleted key %d: version=%d, key_prefix=%s", count, version,
+		// string(key[:min(10, len(key))]))
+
+		e := &badger.Entry{Key: key}
+		setMeta(e, badgerDeleteBit)
+
+		// overwrite the key to be a full deletion
+		if err := writer.Delete(it.Item().Key()); err != nil {
+			return nil, ErrStoreDelete(err)
+		}
+	}
+	s.log.Infof("Total deleted keys processed in MarkEvict: %d", count)
+	return writer, nil
+}
+
+// keyCount counts the number of LSS keys and those marked for deletion
+func (s *Store) keyCount(prefixLog string) {
+	txn := s.db.NewTransactionAt(lssVersion, false)
+	defer txn.Discard()
+
+	it := txn.NewIterator(badger.IteratorOptions{
+		Prefix:      []byte(latestStatePrefix),
+		AllVersions: true,
+	})
+	defer it.Close()
+
+	count := 0
+	deleted := 0
+	for it.Rewind(); it.Valid(); it.Next() {
+		count++
+		if it.Item().IsDeletedOrExpired() {
+			deleted++
+		}
+	}
+	s.log.Infof("%s Total keys at LSS: %d deleted keys: %d", prefixLog, count, deleted)
 }
 
 // getLatestCommitID() retrieves the latest CommitID from the database
