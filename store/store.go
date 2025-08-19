@@ -432,7 +432,7 @@ func (s *Store) MarkEvict() (err lib.ErrorI) {
 		}
 		count++
 
-		key := item.Key()
+		key := item.KeyCopy(nil)
 		// version := item.Version()
 		// log details about each deleted key
 		// s.log.Infof("processing deleted key %d: version=%d, key_prefix=%s", count, version,
