@@ -241,9 +241,7 @@ func (t *Txn) write(prefix []byte, writeVersion uint64, op valueOp) lib.ErrorI {
 		}
 	case opDelete:
 		meta := badgerDeleteBit
-		// for non LSS keys, the values should not be actually deleted from the store
-		if writeVersion != lssVersion {
-			// set an entry with a bit that marks it as deleted and prevents it from being discarded
+		if t.state && writeVersion != lssVersion {
 			meta |= badgerNoDiscardBit
 		}
 		if err := t.writer.SetEntryAt(newEntry(k, nil, meta), writeVersion); err != nil {
@@ -635,6 +633,15 @@ func getMeta(e *badger.Entry) byte {
 	return *(*byte)(unsafe.Pointer(f.UnsafeAddr()))
 }
 
+func getItemMeta(e *badger.Item) byte {
+	if e == nil {
+		return 0
+	}
+	v := reflect.ValueOf(e).Elem()
+	f := v.FieldByName("meta")
+	return *(*byte)(unsafe.Pointer(f.UnsafeAddr()))
+}
+
 // getTxnFromBatch() accesses the private field 'size/count' of badgerDB's `Txn` inside a 'WriteBatch'
 // badger doesn't yet allow users to access this info - though it allows users to avoid
 // TxnTooBig errors
@@ -685,6 +692,19 @@ func entryIsDelete(e *badger.Entry) bool {
 		return false
 	}
 	return (getMeta(e) & badgerDeleteBit) != 0
+}
+
+func entryItemIsDelete(e *badger.Item) bool {
+	if e == nil {
+		return false
+	}
+	return (getItemMeta(e) & badgerDeleteBit) != 0
+}
+func entryItemIsDoNotDiscard(e *badger.Item) bool {
+	if e == nil {
+		return false
+	}
+	return (getItemMeta(e) & badgerNoDiscardBit) != 0
 }
 
 var endBytes = bytes.Repeat([]byte{0xFF}, maxKeyBytes+1)
