@@ -200,7 +200,6 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	if err := s.Evict(); err != nil {
 		return nil, err
 	}
-
 	// update the metrics once complete
 	s.metrics.UpdateStoreMetrics(size, entries, time.Time{}, startTime)
 	// reset the writer for the next height
@@ -371,10 +370,20 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 	return nil
 }
 
-// Evict deletes all entries marked for eviction
+// Evict deletes all entries marked for eviction.
+// BadgerDB GC's behavior is undocumented which may lead to unexpected behavior.
+// This eviction process is a hack to guarantee the deletion of entries marked for
+// deletion or eviction. It works as follows:
+// 1. Create a trigger key and write it to the database.
+// 2. Mark entries for eviction with the correct meta bits.
+// 3. Set discard timestamp to enable BadgerDB GC.
+// 4. Drop the trigger prefix to force eviction processing.
+// 5. Clean up by resetting discard timestamp and deleting trigger key.
 func (s *Store) Evict() lib.ErrorI {
-	s.keyCount("Before eviction: ")
-
+	if s.Version()%200 != 0 {
+		return nil
+	}
+	s.log.Infof("Eviction process started at height %d", s.Version())
 	// evict LSS deleted keys, part of the hack for previously set keys for deletion
 	triggerEvict := fmt.Appendf(nil, "zzz/trigger_key_%s", randValue())
 	writer := s.db.NewWriteBatchAt(lssVersion)
@@ -386,11 +395,10 @@ func (s *Store) Evict() lib.ErrorI {
 	}
 	// this is basically a hack to force deletion of entries marked for eviction
 	// mark evict with the correct meta bits
-	err := s.MarkEvict()
+	err := s.MarkAndEvict()
 	if err != nil {
-		return err
+		return ErrStoreSet(err)
 	}
-
 	// set discard timestamp, before marking entries for eviction
 	s.db.SetDiscardTs(lssVersion)
 	// drop the trigger to force eviction
@@ -399,31 +407,24 @@ func (s *Store) Evict() lib.ErrorI {
 	}
 	// reset discard timestamp after eviction
 	s.db.SetDiscardTs(0)
-
-	cleanTrigger := s.db.NewWriteBatchAt(lssVersion)
-	cleanTrigger.Delete(triggerEvict)
-	if err := cleanTrigger.Flush(); err != nil {
-		return ErrCommitDB(err)
-	}
-	s.keyCount("After eviction: ")
+	total, deleted := s.keyCount(lssVersion, []byte(latestStatePrefix), true)
+	s.log.Infof("Eviction process finished. Removed %d keys, %d total keys", deleted, total)
 	return nil
 }
 
-// MarkEvict marks entries for eviction and flushes the corrected deletion entries
-func (s *Store) MarkEvict() (err lib.ErrorI) {
+// MarkAndkEvict marks entries for eviction and flushes the corrected deletion entries
+func (s *Store) MarkAndEvict() (err lib.ErrorI) {
 	// create a new transaction reader at the latest state version
 	reader := s.db.NewTransactionAt(lssVersion, false)
 	defer reader.Discard()
 	// create a new transaction writer at the latest state version
 	writer := s.db.NewWriteBatchAt(lssVersion)
-
 	// initialize the iterator for the latest state prefix
 	it := reader.NewIterator(badger.IteratorOptions{
 		Prefix:      []byte(latestStatePrefix),
 		AllVersions: true,
 	})
 	defer it.Close()
-
 	count := 0
 	for it.Rewind(); it.Valid(); it.Next() {
 		item := it.Item()
@@ -431,25 +432,10 @@ func (s *Store) MarkEvict() (err lib.ErrorI) {
 			continue
 		}
 		count++
-
-		key := item.KeyCopy(nil)
-		// version := item.Version()
-		// log details about each deleted key
-		// s.log.Infof("processing deleted key %d: version=%d, key_prefix=%s", count, version,
-		// string(key[:min(10, len(key))]))
-		//
-
-		e := &badger.Entry{Key: key}
-		setMeta(e, badgerDeleteBit)
-
 		// overwrite the key to be a full deletion
-		if err := writer.SetEntryAt(e, item.Version()); err != nil {
-			return ErrStoreDelete(err)
+		if err := writer.Delete(item.KeyCopy(nil)); err != nil {
+			return ErrStoreSet(err)
 		}
-		// using badgerdb's native delete mechanism
-		// if err := writer.Delete(it.Item().Key()); err != nil {
-		// 	return ErrStoreDelete(err)
-		// }
 	}
 	// flush the corrected deletion entries
 	if err := writer.Flush(); err != nil {
@@ -459,26 +445,33 @@ func (s *Store) MarkEvict() (err lib.ErrorI) {
 	return nil
 }
 
-// keyCount counts the number of LSS keys and those marked for deletion
-func (s *Store) keyCount(prefixLog string) {
-	txn := s.db.NewTransactionAt(lssVersion, false)
+// keyCount counts the number of total keys and those marked for deletion within a version/prefix
+func (s *Store) keyCount(version uint64, prefix []byte, noDiscardBit bool) (count, deleted uint64) {
+	// create a new transaction at the specified version
+	txn := s.db.NewTransactionAt(version, false)
 	defer txn.Discard()
-
+	// create a new iterator for the transaction on the given prefix
 	it := txn.NewIterator(badger.IteratorOptions{
-		Prefix:      []byte(latestStatePrefix),
+		Prefix:      prefix,
 		AllVersions: true,
 	})
 	defer it.Close()
-
-	count := 0
-	deleted := 0
 	for it.Rewind(); it.Valid(); it.Next() {
 		count++
 		if it.Item().IsDeletedOrExpired() {
 			deleted++
+			item := it.Item()
+			deleteBit := entryItemIsDelete(item)
+			discardBit := entryItemIsDoNotDiscard(item)
+			// check if a no discard bit is set to key that should be deleted
+			if discardBit && noDiscardBit {
+				s.log.Warnf("discard bit found, key=%s size=%d delete=%t",
+					lib.BytesToString(item.KeyCopy(nil)), item.EstimatedSize(), deleteBit)
+			}
 		}
 	}
-	s.log.Infof("%s Total keys at LSS: %d deleted keys: %d", prefixLog, count, deleted)
+	// return the counts
+	return count, deleted
 }
 
 // getLatestCommitID() retrieves the latest CommitID from the database
