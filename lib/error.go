@@ -237,11 +237,11 @@ const (
 	CodeMaxDexBatchSize           ErrorCode = 67
 	CodeInvalidChainId            ErrorCode = 68
 	CodeWrongNetworkID            ErrorCode = 69
-
-	CodeRootHeight               ErrorCode = 71
-	CodeInvalidQCCommitteeHeight ErrorCode = 72
-
-	CodeOrderNotFound ErrorCode = 74
+	CodePointHolderNotFound       ErrorCode = 70
+	CodeRootHeight                ErrorCode = 71
+	CodeInvalidQCCommitteeHeight  ErrorCode = 72
+	CodeZeroPointHolder           ErrorCode = 73
+	CodeOrderNotFound             ErrorCode = 74
 
 	CodeMinimumOrderSize     ErrorCode = 76
 	CodeOrderLocked          ErrorCode = 77
@@ -809,4 +809,12 @@ func ErrEmptyLotteryWinner() ErrorI {
 
 func ErrFailedTransactions() ErrorI {
 	return NewError(CodeErrFailedTransactions, StateMachineModule, "a block contained failed transactions")
+}
+
+func ErrPointHolderNotFound() ErrorI {
+	return NewError(CodePointHolderNotFound, StateMachineModule, "point holder not found")
+}
+
+func ErrZeroLiquidityPool() ErrorI {
+	return NewError(CodeZeroPointHolder, StateMachineModule, "pool cannot have zero points after allocated")
 }
