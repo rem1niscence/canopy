@@ -197,11 +197,12 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 		return nil, ErrCommitDB(e)
 	}
 	// Trigger eviction of LSS deleted keys
-	go func() {
-		if err := s.Evict(); err != nil {
-			s.log.Errorf("failed to evict LSS deleted keys: %s", err)
-		}
-	}()
+	if err := s.Evict(); err != nil {
+		s.log.Errorf("failed to evict LSS deleted keys: %s", err)
+	}
+	total, deleted := s.keyCount(lssVersion, []byte(latestStatePrefix), true)
+	// TODO: remove once `invalid aggregate signature` bug is fixed
+	s.log.Infof("Key Count [%d] Total keys: %d, Deleted keys: %d", s.Version(), total, deleted)
 	// update the metrics once complete
 	s.metrics.UpdateStoreMetrics(size, entries, time.Time{}, startTime)
 	// reset the writer for the next height
@@ -382,7 +383,7 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 // 4. Drop the trigger prefix to force eviction processing.
 // 5. Clean up by resetting discard timestamp and deleting trigger key.
 func (s *Store) Evict() lib.ErrorI {
-	if s.Version()%250 != 0 {
+	if s.Version()%200 != 0 {
 		return nil
 	}
 	s.log.Infof("Eviction process started at height %d", s.Version())
@@ -409,11 +410,11 @@ func (s *Store) Evict() lib.ErrorI {
 	}
 	// reset discard timestamp after eviction
 	defer s.db.SetDiscardTs(0)
-
-	if err := s.db.Flatten(runtime.NumCPU()); err != nil {
+	// flatten the DB to optimize the storage layout
+	if err := s.db.Flatten(runtime.NumCPU() / 2); err != nil {
 		return ErrCommitDB(err)
 	}
-
+	// log the results
 	total, deleted := s.keyCount(lssVersion, []byte(latestStatePrefix), true)
 	s.log.Infof("Eviction process finished. Removed %d keys, %d total keys", deleted, total)
 	return nil
