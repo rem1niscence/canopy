@@ -200,9 +200,6 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 	if err := s.Evict(); err != nil {
 		s.log.Errorf("failed to evict LSS deleted keys: %s", err)
 	}
-	total, deleted := s.keyCount(lssVersion, []byte(latestStatePrefix), true)
-	// TODO: remove once `invalid aggregate signature` bug is fixed
-	s.log.Infof("Key Count [%d] Total keys: %d, Deleted keys: %d", s.Version(), total, deleted)
 	// update the metrics once complete
 	s.metrics.UpdateStoreMetrics(size, entries, time.Time{}, startTime)
 	// reset the writer for the next height
@@ -398,10 +395,10 @@ func (s *Store) Evict() lib.ErrorI {
 	}
 	// this is basically a hack to force deletion of entries marked for eviction
 	// mark evict with the correct meta bits
-	err := s.MarkAndEvict()
-	if err != nil {
-		return ErrStoreSet(err)
-	}
+	// err := s.MarkAndEvict()
+	// if err != nil {
+	// 	return ErrStoreSet(err)
+	// }
 	// set discard timestamp, before marking entries for eviction
 	s.db.SetDiscardTs(lssVersion)
 	// drop the trigger to force eviction
