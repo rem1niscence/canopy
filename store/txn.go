@@ -255,8 +255,13 @@ func (t *Txn) write(prefix []byte, writeVersion uint64, op valueOp) lib.ErrorI {
 			ExpiresAt: op.entry.ExpiresAt,
 			UserMeta:  op.entry.UserMeta,
 		}
+		meta := getMeta(op.entry)
+		isDelete := (meta & badgerDeleteBit) != 0
+		if isDelete && t.state && writeVersion != lssVersion {
+			meta |= badgerNoDiscardBit
+		}
 		// set the entry meta
-		setMeta(entry, getMeta(op.entry))
+		setMeta(entry, meta)
 		// setEntry to the underlying writer
 		if err := t.writer.SetEntryAt(entry, writeVersion); err != nil {
 			return ErrStoreSet(err)
