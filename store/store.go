@@ -197,9 +197,11 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 		return nil, ErrCommitDB(e)
 	}
 	// Trigger eviction of LSS deleted keys
-	if err := s.Evict(); err != nil {
-		s.log.Errorf("failed to evict LSS deleted keys: %s", err)
-	}
+	go func() {
+		if err := s.Evict(); err != nil {
+			s.log.Errorf("failed to evict LSS deleted keys: %s", err)
+		}
+	}()
 	// update the metrics once complete
 	s.metrics.UpdateStoreMetrics(size, entries, time.Time{}, startTime)
 	// reset the writer for the next height
