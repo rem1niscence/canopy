@@ -321,7 +321,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 }
 
 // CommitCertificate() the experimental and parallelized version of the above
-func (c *Controller) CommitCertificateParallel(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult) (err lib.ErrorI) {
+func (c *Controller) CommitCertificateParallel(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult, ts uint64) (err lib.ErrorI) {
 	start := time.Now()
 	// cancel any running mempool check
 	c.Mempool.stop()
@@ -405,6 +405,8 @@ func (c *Controller) CommitCertificateParallel(qc *lib.QuorumCertificate, block 
 				continue
 			}
 			// publish root chain information
+			// set the timestamp
+			info.Timestamp = ts
 			go c.RCManager.Publish(id, info)
 		}
 		// exit
