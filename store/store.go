@@ -15,14 +15,15 @@ import (
 )
 
 const (
-	latestStatePrefix     = "s/"           // prefix designated for the LatestStateStore where the most recent blobs of state data are held
-	historicStatePrefix   = "h/"           // prefix designated for the HistoricalStateStore where the historical blobs of state data are held
-	stateCommitmentPrefix = "c/"           // prefix designated for the StateCommitmentStore (immutable, tree DB) built of hashes of state store data
-	indexerPrefix         = "i/"           // prefix designated for indexer (transactions, blocks, and quorum certificates)
-	stateCommitIDPrefix   = "x/"           // prefix designated for the commit ID (height and state merkle root)
-	lastCommitIDPrefix    = "a/"           // prefix designated for the latest commit ID for easy access (latest height and latest state merkle root)
-	maxKeyBytes           = 256            // maximum size of a key
-	lssVersion            = math.MaxUint64 // the arbitrary version the latest state is written to for optimized queries
+	latestStatePrefix       = "s/"           // prefix designated for the LatestStateStore where the most recent blobs of state data are held
+	historicStatePrefix     = "h/"           // prefix designated for the HistoricalStateStore where the historical blobs of state data are held
+	stateCommitmentPrefix   = "c/"           // prefix designated for the StateCommitmentStore (immutable, tree DB) built of hashes of state store data
+	indexerPrefix           = "i/"           // prefix designated for indexer (transactions, blocks, and quorum certificates)
+	stateCommitIDPrefix     = "x/"           // prefix designated for the commit ID (height and state merkle root)
+	lastCommitIDPrefix      = "a/"           // prefix designated for the latest commit ID for easy access (latest height and latest state merkle root)
+	maxKeyBytes             = 256            // maximum size of a key
+	lssVersion              = math.MaxUint64 // the arbitrary version the latest state is written to for optimized queries
+	valueLogGCDiscardRation = 0.5            // discard ratio for value log GC
 )
 
 var _ lib.StoreI = &Store{} // enforce the Store interface
@@ -408,6 +409,10 @@ func (s *Store) Evict() lib.ErrorI {
 	defer s.db.SetDiscardTs(0)
 	// flatten the DB to optimize the storage layout
 	if err := s.db.Flatten(runtime.NumCPU() / 2); err != nil {
+		return ErrCommitDB(err)
+	}
+	// run GC to clean up unused data
+	if err := s.db.RunValueLogGC(valueLogGCDiscardRation); err != nil {
 		return ErrCommitDB(err)
 	}
 	// log the results
