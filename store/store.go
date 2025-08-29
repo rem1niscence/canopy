@@ -73,6 +73,9 @@ type Store struct {
 
 // New() creates a new instance of a StoreI either in memory or an actual disk DB
 func New(config lib.Config, metrics *lib.Metrics, l lib.LoggerI) (lib.StoreI, lib.ErrorI) {
+	if config.StoreConfig.CleanupBlockInterval == 0 {
+		config.StoreConfig.CleanupBlockInterval = 1
+	}
 	if config.StoreConfig.InMemory {
 		return NewStoreInMemory(l)
 	}
@@ -377,7 +380,7 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 
 // Evict deletes all entries marked for eviction.
 // BadgerDB GC's behavior is undocumented which may lead to unexpected behavior.
-// This eviction process is a hack to guarantee the deletion of entries marked for
+// This eviction process is a workaround to guarantee the deletion of entries marked for
 // deletion or eviction. It works as follows:
 // 1. Create a trigger key and write it to the database.
 // 2. Mark entries for eviction with the correct meta bits.
@@ -385,8 +388,8 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 // 4. Drop the trigger prefix to force eviction processing.
 // 5. Clean up by resetting discard timestamp and deleting trigger key.
 func (s *Store) Evict() lib.ErrorI {
-	s.log.Infof("Eviction process started at height %d", s.Version())
-	// evict LSS deleted keys, part of the hack for previously set keys for deletion
+	s.log.Debugf("Eviction process started at height %d", s.Version())
+	// evict LSS deleted keys, part of the workaround for previously set keys for deletion
 	triggerEvict := fmt.Appendf(nil, "zzz/trigger_key_%s", randValue())
 	writer := s.db.NewWriteBatchAt(lssVersion)
 	if err := writer.Set(triggerEvict, nil); err != nil {
@@ -395,12 +398,6 @@ func (s *Store) Evict() lib.ErrorI {
 	if err := writer.Flush(); err != nil {
 		return ErrCommitDB(err)
 	}
-	// this is basically a hack to force deletion of entries marked for eviction
-	// mark evict with the correct meta bits
-	// err := s.MarkAndEvict()
-	// if err != nil {
-	// 	return ErrStoreSet(err)
-	// }
 	// set discard timestamp, before marking entries for eviction
 	s.db.SetDiscardTs(lssVersion)
 	// drop the trigger to force eviction
@@ -415,40 +412,7 @@ func (s *Store) Evict() lib.ErrorI {
 	}
 	// log the results
 	total, deleted := s.keyCount(lssVersion, []byte(latestStatePrefix), true)
-	s.log.Infof("Eviction process finished. Removed %d keys, %d total keys", deleted, total)
-	return nil
-}
-
-// MarkAndkEvict marks entries for eviction and flushes the corrected deletion entries
-func (s *Store) MarkAndEvict() (err lib.ErrorI) {
-	// create a new transaction reader at the latest state version
-	reader := s.db.NewTransactionAt(lssVersion, false)
-	defer reader.Discard()
-	// create a new transaction writer at the latest state version
-	writer := s.db.NewWriteBatchAt(lssVersion)
-	// initialize the iterator for the latest state prefix
-	it := reader.NewIterator(badger.IteratorOptions{
-		Prefix:      []byte(latestStatePrefix),
-		AllVersions: true,
-	})
-	defer it.Close()
-	count := 0
-	for it.Rewind(); it.Valid(); it.Next() {
-		item := it.Item()
-		if !item.IsDeletedOrExpired() {
-			continue
-		}
-		count++
-		// overwrite the key to be a full deletion
-		if err := writer.Delete(item.KeyCopy(nil)); err != nil {
-			return ErrStoreSet(err)
-		}
-	}
-	// flush the corrected deletion entries
-	if err := writer.Flush(); err != nil {
-		return ErrCommitDB(err)
-	}
-	s.log.Infof("Total deleted keys processed in MarkEvict: %d", count)
+	s.log.Debugf("Eviction process finished. Removed %d keys, %d total keys", deleted, total)
 	return nil
 }
 
