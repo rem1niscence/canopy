@@ -411,7 +411,8 @@ func (s *Store) Evict() lib.ErrorI {
 		return ErrCommitDB(err)
 	}
 	// run GC to clean up unused data
-	if err := s.db.RunValueLogGC(valueLogGCDiscardRation); err != nil {
+	if err := s.db.RunValueLogGC(valueLogGCDiscardRation); err != nil &&
+		err != badger.ErrNoRewrite {
 		return ErrCommitDB(err)
 	}
 	// log the results
