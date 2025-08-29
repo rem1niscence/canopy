@@ -1,14 +1,12 @@
 package store
 
 import (
-	"crypto/rand"
 	"fmt"
 	"math"
 	"path/filepath"
 	"runtime"
 	"time"
 
-	"github.com/alecthomas/units"
 	"github.com/canopy-network/canopy/lib"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/options"
@@ -23,6 +21,7 @@ const (
 	lastCommitIDPrefix      = "a/"           // prefix designated for the latest commit ID for easy access (latest height and latest state merkle root)
 	maxKeyBytes             = 256            // maximum size of a key
 	lssVersion              = math.MaxUint64 // the arbitrary version the latest state is written to for optimized queries
+	evictRandKeySize        = 64             // size of the random key used for eviction
 	valueLogGCDiscardRation = 0.5            // discard ratio for value log GC
 )
 
@@ -391,7 +390,7 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 func (s *Store) Evict() lib.ErrorI {
 	s.log.Debugf("Eviction process started at height %d", s.Version())
 	// evict LSS deleted keys, part of the workaround for previously set keys for deletion
-	triggerEvict := fmt.Appendf(nil, "zzz/trigger_key_%s", randValue())
+	triggerEvict := fmt.Appendf(nil, "zzz/trigger_key_%s", lib.RandSlice(evictRandKeySize))
 	writer := s.db.NewWriteBatchAt(lssVersion)
 	if err := writer.Set(triggerEvict, nil); err != nil {
 		return ErrStoreSet(err)
@@ -464,10 +463,4 @@ func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *lib.CommitID) {
 		log.Fatalf("unmarshalCommitID() failed with err: %s", err.Error())
 	}
 	return
-}
-
-func randValue() []byte {
-	value := make([]byte, units.KB)
-	rand.Read(value)
-	return value
 }
