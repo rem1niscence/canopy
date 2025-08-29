@@ -197,11 +197,14 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 		return nil, ErrCommitDB(e)
 	}
 	// Trigger eviction of LSS deleted keys
-	go func() {
-		if err := s.Evict(); err != nil {
-			s.log.Errorf("failed to evict LSS deleted keys: %s", err)
-		}
-	}()
+	// check if the current version is a multiple of the cleanup block interval
+	if s.Version()%s.config.StoreConfig.CleanupBlockInterval == 0 {
+		go func() {
+			if err := s.Evict(); err != nil {
+				s.log.Errorf("failed to evict LSS deleted keys: %s", err)
+			}
+		}()
+	}
 	// update the metrics once complete
 	s.metrics.UpdateStoreMetrics(size, entries, time.Time{}, startTime)
 	// reset the writer for the next height
@@ -382,9 +385,6 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 // 4. Drop the trigger prefix to force eviction processing.
 // 5. Clean up by resetting discard timestamp and deleting trigger key.
 func (s *Store) Evict() lib.ErrorI {
-	if s.Version()%200 != 0 {
-		return nil
-	}
 	s.log.Infof("Eviction process started at height %d", s.Version())
 	// evict LSS deleted keys, part of the hack for previously set keys for deletion
 	triggerEvict := fmt.Appendf(nil, "zzz/trigger_key_%s", randValue())
