@@ -407,7 +407,7 @@ func (s *Store) Evict() lib.ErrorI {
 	// reset discard timestamp after eviction
 	defer s.db.SetDiscardTs(0)
 	// flatten the DB to optimize the storage layout
-	if err := s.db.Flatten(runtime.NumCPU() / 2); err != nil {
+	if err := s.db.Flatten(1); err != nil {
 		return ErrCommitDB(err)
 	}
 	// ValueLogGC temporarily disabled due to increased memory usage
