@@ -410,11 +410,13 @@ func (s *Store) Evict() lib.ErrorI {
 	if err := s.db.Flatten(runtime.NumCPU() / 2); err != nil {
 		return ErrCommitDB(err)
 	}
+	// ValueLogGC temporarily disabled due to increased memory usage
+	// TODO: Re-enable ValueLogGC after optimizing memory usage
 	// run GC to clean up unused data
-	if err := s.db.RunValueLogGC(valueLogGCDiscardRation); err != nil &&
-		err != badger.ErrNoRewrite {
-		return ErrCommitDB(err)
-	}
+	// if err := s.db.RunValueLogGC(valueLogGCDiscardRation); err != nil &&
+	// 	err != badger.ErrNoRewrite {
+	// 	return ErrCommitDB(err)
+	// }
 	// log the results
 	total, deleted := s.keyCount(lssVersion, []byte(latestStatePrefix), true)
 	s.log.Debugf("Eviction process finished. Removed %d keys, %d total keys", deleted, total)
