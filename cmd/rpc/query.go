@@ -286,7 +286,7 @@ func (s *Server) DexBatch(w http.ResponseWriter, r *http.Request, _ httprouter.P
 			return s.GetDexBatches(true)
 		}
 		// return the locked batch
-		return s.GetDexBatch(fsm.KeyForLockedBatch(id))
+		return s.GetDexBatch(id, true)
 	})
 }
 
@@ -298,7 +298,7 @@ func (s *Server) NextDexBatch(w http.ResponseWriter, r *http.Request, _ httprout
 			return s.GetDexBatches(false)
 		}
 		// return the locked batch
-		return s.GetDexBatch(fsm.KeyForNextBatch(id))
+		return s.GetDexBatch(id, false)
 	})
 }
 

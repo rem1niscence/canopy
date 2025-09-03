@@ -470,7 +470,7 @@ func (s *StateMachine) HandleMessageDeleteOrder(msg *MessageDeleteOrder) (err li
 // HandleMessageDexLimitOrder() is the proper handler for a `DexLimitOrder` message
 func (s *StateMachine) HandleMessageDexLimitOrder(msg *MessageDexLimitOrder) (err lib.ErrorI) {
 	// get the next sell batch
-	batch, err := s.GetDexBatch(KeyForNextBatch(msg.ChainId))
+	batch, err := s.GetDexBatch(msg.ChainId, false)
 	if err != nil {
 		return err
 	}
@@ -499,7 +499,7 @@ func (s *StateMachine) HandleMessageDexLimitOrder(msg *MessageDexLimitOrder) (er
 // HandleMessageDexLiquidityDeposit() is the proper handler for a `DexLiquidityDeposit` message
 func (s *StateMachine) HandleMessageDexLiquidityDeposit(msg *MessageDexLiquidityDeposit) (err lib.ErrorI) {
 	// get the next sell batch
-	batch, err := s.GetDexBatch(KeyForNextBatch(msg.ChainId))
+	batch, err := s.GetDexBatch(msg.ChainId, false)
 	if err != nil {
 		return err
 	}
@@ -527,7 +527,7 @@ func (s *StateMachine) HandleMessageDexLiquidityDeposit(msg *MessageDexLiquidity
 // HandleMessageDexLiquidityWithdraw() is the proper handler for a `DexLiquidityWithdraw` message
 func (s *StateMachine) HandleMessageDexLiquidityWithdraw(msg *MessageDexLiquidityWithdraw) (err lib.ErrorI) {
 	// get the next sell batch
-	batch, err := s.GetDexBatch(KeyForNextBatch(msg.ChainId))
+	batch, err := s.GetDexBatch(msg.ChainId, false)
 	if err != nil {
 		return err
 	}
