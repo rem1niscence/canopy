@@ -406,12 +406,12 @@ func (s *Store) Evict() lib.ErrorI {
 	}
 	// reset discard timestamp after eviction
 	defer s.db.SetDiscardTs(0)
+	// ValueLogGC and Flatten temporarily disabled due to increased memory usage
+	// TODO: Re-enable ValueLogGC and Flatten after optimizing memory usage
 	// flatten the DB to optimize the storage layout
-	if err := s.db.Flatten(1); err != nil {
-		return ErrCommitDB(err)
-	}
-	// ValueLogGC temporarily disabled due to increased memory usage
-	// TODO: Re-enable ValueLogGC after optimizing memory usage
+	// if err := s.db.Flatten(1); err != nil {
+	// 	return ErrCommitDB(err)
+	// }
 	// run GC to clean up unused data
 	// if err := s.db.RunValueLogGC(valueLogGCDiscardRation); err != nil &&
 	// 	err != badger.ErrNoRewrite {
