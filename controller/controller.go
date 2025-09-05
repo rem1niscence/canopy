@@ -97,7 +97,7 @@ func (c *Controller) Start() {
 		// set a timer to go off once per second
 		t := time.NewTicker(time.Second)
 		// cold start the last validator set
-		valSet, err := c.FSM.LoadCommittee(rootChainId, c.ChainHeight()-1)
+		valSet, err := c.FSM.LoadCommittee(c.Config.ChainId, c.ChainHeight()-1)
 		if err != nil {
 			c.log.Fatal(err.Error())
 		}
