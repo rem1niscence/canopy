@@ -238,7 +238,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	// cast the store to ensure the proper store type to complete this operation
 	storeI := c.FSM.Store().(lib.StoreI)
 	// cache new last validator set for next height
-	valSet, err := c.FSM.GetCommitteeMembers(c.Config.ChainId)
 	if err != nil {
 		return err
 	}
@@ -293,9 +292,15 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return err
 	}
+	// retrieve the current validator set for next height
+	valSet, err := c.FSM.GetCommitteeMembers(c.Config.ChainId)
+	if err != nil {
+		return err
+	}
 	// add the cache validator set to the controller
-	c.LastValidatorSet[c.ChainHeight()] = make(map[uint64]*lib.ValidatorSet)
-	c.LastValidatorSet[c.ChainHeight()][c.Config.ChainId] = &valSet
+	c.LastValidatorSet[c.ChainHeight()] = map[uint64]*lib.ValidatorSet{
+		c.Config.ChainId: &valSet,
+	}
 	// set up the mempool with the actual new FSM for the next height
 	// this makes c.Mempool.FSM.Reset() is unnecessary
 	if c.Mempool.FSM, err = c.FSM.Copy(); err != nil {
@@ -333,8 +338,8 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// publish root chain information
 		go c.RCManager.Publish(id, info)
 	}
-	// remove previous validator set cache
-	delete(c.LastValidatorSet, c.ChainHeight()-1)
+	// remove older validator set cache
+	delete(c.LastValidatorSet, c.ChainHeight()-2)
 	// exit
 	return
 }
