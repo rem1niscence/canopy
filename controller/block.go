@@ -203,7 +203,7 @@ func (c *Controller) ValidateProposal(rcBuildHeight uint64, qc *lib.QuorumCertif
 		return
 	}
 	// play the block against the state machine to generate a block result
-	blockResult, err = c.ApplyAndValidateBlock(block, c.LastValidatorSet[c.FSM.Height()][c.Config.ChainId], false)
+	blockResult, err = c.ApplyAndValidateBlock(block, c.LastValidatorSet[c.ChainHeight()][c.Config.ChainId], false)
 	if err != nil {
 		// exit with error
 		return
@@ -237,12 +237,13 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	c.log.Debugf("TryCommit block %s", lib.BytesToString(qc.ResultsHash))
 	// cast the store to ensure the proper store type to complete this operation
 	storeI := c.FSM.Store().(lib.StoreI)
-	// cache new last validator set for next height
+	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
+	defer c.FSM.Reset()
+	// retrieve the current validator set for next height
+	valSet, err := c.FSM.GetCommitteeMembers(c.Config.ChainId)
 	if err != nil {
 		return err
 	}
-	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
-	defer c.FSM.Reset()
 	// if the block result isn't 'pre-calculated'
 	if blockResult == nil {
 		// reset the FSM to ensure stale proposal validations don't come into play
@@ -290,11 +291,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	c.FSM, err = fsm.New(c.Config, storeI, c.Metrics, c.log)
 	if err != nil {
 		// exit with error
-		return err
-	}
-	// retrieve the current validator set for next height
-	valSet, err := c.FSM.GetCommitteeMembers(c.Config.ChainId)
-	if err != nil {
 		return err
 	}
 	// add the cache validator set to the controller
