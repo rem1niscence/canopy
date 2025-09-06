@@ -63,9 +63,9 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 		FSM:              fsm,
 		Mempool:          mempool,
 		Consensus:        nil,
-		LastValidatorSet: make(map[uint64]map[uint64]*lib.ValidatorSet),
 		P2P:              p2p.New(valKey, maxMembersPerCommittee, metrics, c, l),
 		isSyncing:        &atomic.Bool{},
+		LastValidatorSet: make(map[uint64]map[uint64]*lib.ValidatorSet),
 		log:              l,
 		Mutex:            &sync.Mutex{},
 	}
@@ -73,6 +73,8 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, c.RunVDF, metrics, l)
 	// initialize the mempool controller
 	mempool.controller = controller
+	// add the last validator set reference to the FSM
+	fsm.LastValidatorSet = &controller.LastValidatorSet
 	// if an error occurred initializing the bft module
 	if err != nil {
 		// exit with error
