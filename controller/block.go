@@ -239,11 +239,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	storeI := c.FSM.Store().(lib.StoreI)
 	// reset the store once this code finishes; if code execution gets to `store.Commit()` - this will effectively be a noop
 	defer c.FSM.Reset()
-	// retrieve the current validator set for next height
-	valSet, err := c.FSM.GetCommitteeMembers(c.Config.ChainId)
-	if err != nil {
-		return err
-	}
 	// if the block result isn't 'pre-calculated'
 	if blockResult == nil {
 		// reset the FSM to ensure stale proposal validations don't come into play
@@ -293,10 +288,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// exit with error
 		return err
 	}
-	// add the cache validator set to the controller
-	c.LastValidatorSet[c.ChainHeight()] = map[uint64]*lib.ValidatorSet{
-		c.Config.ChainId: &valSet,
-	}
 	// set up the mempool with the actual new FSM for the next height
 	// this makes c.Mempool.FSM.Reset() is unnecessary
 	if c.Mempool.FSM, err = c.FSM.Copy(); err != nil {
@@ -322,19 +313,16 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		}
 		// set the timestamp
 		info.Timestamp = ts
-		// do not cache root chain info as it was already preloaded
-		if id != c.Config.ChainId {
-			// cache current validator set for the next height
-			valSet, _ := c.FSM.GetCommitteeMembers(id)
-			if _, found := c.LastValidatorSet[c.ChainHeight()+1]; !found {
-				c.LastValidatorSet[c.ChainHeight()+1] = make(map[uint64]*lib.ValidatorSet)
-			}
-			c.LastValidatorSet[c.ChainHeight()+1][id] = &valSet
+		// save current validator set for the next height
+		valSet, _ := c.FSM.GetCommitteeMembers(id)
+		if _, found := c.LastValidatorSet[c.ChainHeight()+1]; !found {
+			c.LastValidatorSet[c.ChainHeight()+1] = make(map[uint64]*lib.ValidatorSet)
 		}
+		c.LastValidatorSet[c.ChainHeight()+1][id] = &valSet
 		// publish root chain information
 		go c.RCManager.Publish(id, info)
 	}
-	// remove older validator set cache
+	// remove older validator set heights
 	delete(c.LastValidatorSet, c.ChainHeight()-2)
 	// exit
 	return

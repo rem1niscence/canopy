@@ -96,13 +96,21 @@ func (c *Controller) Start() {
 		c.log.Warnf("Attempting to connect to the root-chain")
 		// set a timer to go off once per second
 		t := time.NewTicker(time.Second)
-		// cold start the last validator set
-		valSet, err := c.FSM.LoadCommittee(c.Config.ChainId, c.ChainHeight()-1)
+		// pre save the validator sets from previous and current heights
+		lastValSet, err := c.FSM.LoadCommittee(c.Config.ChainId, c.ChainHeight()-1)
 		if err != nil {
 			c.log.Fatal(err.Error())
 		}
-		c.LastValidatorSet[c.ChainHeight()] = make(map[uint64]*lib.ValidatorSet)
-		c.LastValidatorSet[c.ChainHeight()][c.Config.ChainId] = &valSet
+		currValSet, err := c.FSM.LoadCommittee(c.Config.ChainId, c.ChainHeight())
+		if err != nil {
+			c.log.Fatal(err.Error())
+		}
+		c.LastValidatorSet[c.ChainHeight()] = map[uint64]*lib.ValidatorSet{
+			c.Config.ChainId: &lastValSet,
+		}
+		c.LastValidatorSet[c.ChainHeight()+1] = map[uint64]*lib.ValidatorSet{
+			c.Config.ChainId: &currValSet,
+		}
 		// once function completes, stop the timer
 		defer t.Stop()
 		// each time the timer fires
