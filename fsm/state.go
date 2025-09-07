@@ -21,17 +21,17 @@ const (
 type StateMachine struct {
 	store lib.RWStoreI
 
-	ProtocolVersion    uint64                                   // the version of the protocol this node is running
-	NetworkID          uint32                                   // the id of the network this node is configured to be on
-	height             uint64                                   // the 'version' of the state based on number of blocks currently on
-	totalVDFIterations uint64                                   // the number of 'verifiable delay iterations' in the blockchain up to this version
-	slashTracker       *SlashTracker                            // tracks total slashes across multiple blocks
-	proposeVoteConfig  GovProposalVoteConfig                    // the configuration of how the state machine behaves with governance proposals
-	Config             lib.Config                               // the main configuration as defined by the 'config.json' file
-	Metrics            *lib.Metrics                             // the telemetry module
-	log                lib.LoggerI                              // the logger for standard output and debugging
-	cache              *cache                                   // the state machine cache
-	LastValidatorSet   *map[uint64]map[uint64]*lib.ValidatorSet // reference to the last validator set saved in the controller
+	ProtocolVersion    uint64                                  // the version of the protocol this node is running
+	NetworkID          uint32                                  // the id of the network this node is configured to be on
+	height             uint64                                  // the 'version' of the state based on number of blocks currently on
+	totalVDFIterations uint64                                  // the number of 'verifiable delay iterations' in the blockchain up to this version
+	slashTracker       *SlashTracker                           // tracks total slashes across multiple blocks
+	proposeVoteConfig  GovProposalVoteConfig                   // the configuration of how the state machine behaves with governance proposals
+	Config             lib.Config                              // the main configuration as defined by the 'config.json' file
+	Metrics            *lib.Metrics                            // the telemetry module
+	log                lib.LoggerI                             // the logger for standard output and debugging
+	cache              *cache                                  // the state machine cache
+	LastValidatorSet   map[uint64]map[uint64]*lib.ValidatorSet // reference to the last validator set saved in the controller
 }
 
 // cache is the set of items to be cached used by the state machine

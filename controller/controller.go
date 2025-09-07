@@ -74,7 +74,7 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 	// initialize the mempool controller
 	mempool.controller = controller
 	// add the last validator set reference to the FSM
-	fsm.LastValidatorSet = &controller.LastValidatorSet
+	fsm.LastValidatorSet = controller.LastValidatorSet
 	// if an error occurred initializing the bft module
 	if err != nil {
 		// exit with error

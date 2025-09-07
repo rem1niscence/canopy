@@ -320,7 +320,10 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *MessageCertificateRe
 		return ErrNonSubsidizedCommittee()
 	}
 	// get committee for the QC from the cache
-	committee := (*s.LastValidatorSet)[msg.Qc.Header.RootHeight+1][chainId]
+	var committee *lib.ValidatorSet
+	if s.LastValidatorSet != nil {
+		committee = s.LastValidatorSet[msg.Qc.Header.RootHeight+1][chainId]
+	}
 	if committee == nil {
 		// otherwise, retrieve it from the store
 		valSet, err := s.LoadCommittee(chainId, msg.Qc.Header.RootHeight)
