@@ -302,8 +302,13 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	c.Mempool.FSM.Reset()
 	// update telemetry (using proper defer to ensure time.Since is evaluated at defer execution)
 	defer c.UpdateTelemetry(qc, block, time.Since(start))
-	// publish the root chain info to the nested chain subscribers
-	for _, id := range c.RCManager.ChainIds() {
+	// publish root chain information to all nested chain subscribers.
+	// Currently using hardcoded chain IDs (1, 2) instead of dynamically fetching IDs
+	// from RCManager since only these two chains exist. This will be updated to use
+	// dynamic chain discovery when additional chains are added.
+	// TODO: Optimize rcManager publishing for subchains (it should publish to themselves too by default)
+	// for _, id := range c.RCManager.ChainIds() {
+	for _, id := range []uint64{1, 2} {
 		// get the root chain info
 		info, e := c.FSM.LoadRootChainInfo(id, 0, c.LastValidatorSet[c.ChainHeight()][id])
 		if e != nil {
