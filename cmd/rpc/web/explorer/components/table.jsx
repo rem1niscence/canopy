@@ -14,10 +14,24 @@ import {
 } from "@/components/util";
 
 // convertValue() converts the value based on its key and handles different types
-function convertValue(k, v, openModal) {
+function convertValue(k, v, openModal, rowData) {
+  // Skip the _rawData field completely - it should never be rendered
+  if (k === "_rawData") return null;
+  
   if (k === "Id" || k === "Data") return v;
   if (k === "publicKey") return <Truncate text={v} />;
   if (k === "netAddress") return <span className="net-address">{v}</span>;
+  if (k === "BatchType" && rowData && rowData._rawData) {
+    // Make BatchType field clickable for DexBatch data
+    return (
+      <a href="#" onClick={() => openModal(rowData._rawData)} style={{ cursor: "pointer" }}>
+        {v}
+      </a>
+    );
+  }
+  if (k === "ReceiptHash" && v && v !== "null") {
+    return <Truncate text={v} />;
+  }
   if (isHex(v) || k === "height") {
     const content = isNumber(v) ? v : <Truncate text={v} />;
     return (
@@ -139,6 +153,24 @@ function convertOrder(v) {
   };
 }
 
+// convertDexBatch() transforms dex batch details into table-compatible format
+function convertDexBatch(v, nextBatch) {
+  const batchData = {
+    ReceiptHash: v.receiptHash || v.receipt_hash || "null",
+    Orders: v.orders?.length || 0,
+    Deposits: v.deposits?.length || 0,
+    Withdraws: v.withdraws?.length || 0,
+    PoolSize: toCNPY(v.pool_size || v.poolSize || 0),
+    TotalPoolPoints: formatLocaleNumber(v.total_pool_points || v.totalPoolPoints || 0, 0, 6),
+    LockedHeight: v.locked_height || v.lockedHeight || "null",
+    Receipts: v.receipts?.length || 0,
+  };
+  // Store the original batch data for modal display
+  batchData._rawData = v;
+  batchData._nextBatch = nextBatch;
+  return batchData;
+}
+
 // convertCommitteeSupply() calculates supply percentage for table display
 function convertCommitteeSupply(v, total) {
   const percent = 100 * (v.amount / total);
@@ -158,6 +190,7 @@ function getHeader(v) {
   if (v.type === "validators") return "Validators";
   if ("consensus" in v) return "Governance";
   if ("committeeStaked" in v) return "Committees";
+  if ("Committee" in v || "committee" in v) return "Dex Batches";
   return "Sell Orders";
 }
 
@@ -166,6 +199,31 @@ function getTableBody(v) {
   let empty = [{ Results: "null" }];
   if ("consensus" in v) return convertGovernanceParams(v);
   if ("committeeStaked" in v) return v.committeeStaked.map((item) => convertCommitteeSupply(item, v.staked));
+  if ("Committee" in v || "committee" in v) {
+    // Create two rows: one for locked batch and one for next batch
+    const lockedBatch = convertDexBatch(v, v.nextBatch);
+    const nextBatch = v.nextBatch ? {
+      ...convertDexBatch(v.nextBatch, null),
+      _isNextBatch: true,
+      _rawData: v.nextBatch
+    } : {
+      ReceiptHash: "No next batch",
+      Orders: 0,
+      Deposits: 0,
+      Withdraws: 0,
+      PoolSize: "0 CNPY",
+      TotalPoolPoints: "0",
+      LockedHeight: "null",
+      Receipts: 0,
+      _isNextBatch: true,
+      _rawData: null
+    };
+    
+    return [
+      { BatchType: "Locked", ...lockedBatch },
+      { BatchType: "Next", ...nextBatch }
+    ];
+  }
   if (!v.hasOwnProperty("type"))
     return v[0]?.orders?.filter((order) => order.sellersSendAddress).map(convertOrder) || empty;
   if (v.results === null) return empty;
@@ -197,6 +255,16 @@ export default function DTable(props) {
             className="chain-table mb-3"
           />
         )}
+        {category === 8 && (
+          <input
+            type="number"
+            value={committee}
+            min="1"
+            onChange={(e) => e.target.value && props.selectTable(8, 0, Number(e.target.value))}
+            className="chain-table mb-3"
+            placeholder="Committee ID"
+          />
+        )}
         <input
           type="text"
           value={filterText}
@@ -209,7 +277,7 @@ export default function DTable(props) {
       <Table responsive bordered hover size="sm" className="table" style={{ opacity: tableLoading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
         <thead>
           <tr>
-            {Object.keys(getTableBody(tableData)[0]).map((s, i) => (
+            {Object.keys(getTableBody(tableData)[0]).filter(k => !k.startsWith('_')).map((s, i) => (
               <th
                 key={i}
                 className="table-head"
@@ -230,9 +298,9 @@ export default function DTable(props) {
         <tbody>
           {sortedData.map((val, idx) => (
             <tr key={idx}>
-              {Object.keys(val).map((k, i) => (
+              {Object.keys(val).filter(k => !k.startsWith('_')).map((k, i) => (
                 <td key={i} className={k === 'Id' ? 'large-table-col' : k === 'netAddress' ? 'net-address-col' : 'table-col'}>
-                  {convertValue(k, val[k], props.openModal)}
+                  {convertValue(k, val[k], props.openModal, val)}
                 </td>
               ))}
             </tr>
