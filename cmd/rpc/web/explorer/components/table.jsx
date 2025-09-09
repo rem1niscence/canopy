@@ -11,6 +11,7 @@ import {
   convertTx,
   toCNPY,
   formatLocaleNumber,
+  defaultNetAddress,
 } from "@/components/util";
 
 // convertValue() converts the value based on its key and handles different types
@@ -20,7 +21,7 @@ function convertValue(k, v, openModal, rowData) {
   
   if (k === "Id" || k === "Data") return v;
   if (k === "publicKey") return <Truncate text={v} />;
-  if (k === "netAddress") return <span className="net-address">{v}</span>;
+  if (k === "netAddress") return <span className="net-address">{v || defaultNetAddress}</span>;
   if (k === "BatchType" && rowData && rowData._rawData) {
     // Make BatchType field clickable for DexBatch data
     return (
@@ -253,6 +254,7 @@ export default function DTable(props) {
             min="1"
             onChange={(e) => e.target.value && props.selectTable(6, 0, Number(e.target.value))}
             className="chain-table mb-3"
+            style={{ backgroundImage: 'url("./chain.png")' }}
           />
         )}
         {category === 8 && (
@@ -270,11 +272,19 @@ export default function DTable(props) {
           value={filterText}
           onChange={(e) => props.setState({ ...props.state, filterText: e.target.value })}
           className="search-table mb-3"
+          style={{ backgroundImage: 'url("./filter.png")' }}
         />
         <h5 className="data-table-head">{getHeader(tableData)}</h5>
       </div>
 
-      <Table responsive bordered hover size="sm" className="table" style={{ opacity: tableLoading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+      <Table
+        responsive
+        bordered
+        hover
+        size="sm"
+        className="table"
+        style={{ opacity: tableLoading ? 0.6 : 1, transition: "opacity 0.2s" }}
+      >
         <thead>
           <tr>
             {Object.keys(getTableBody(tableData)[0]).filter(k => !k.startsWith('_')).map((s, i) => (
@@ -299,7 +309,10 @@ export default function DTable(props) {
           {sortedData.map((val, idx) => (
             <tr key={idx}>
               {Object.keys(val).filter(k => !k.startsWith('_')).map((k, i) => (
-                <td key={i} className={k === 'Id' ? 'large-table-col' : k === 'netAddress' ? 'net-address-col' : 'table-col'}>
+                <td
+                  key={i}
+                  className={k === "Id" ? "large-table-col" : k === "netAddress" ? "net-address-col" : "table-col"}
+                >
                   {convertValue(k, val[k], props.openModal, val)}
                 </td>
               ))}
