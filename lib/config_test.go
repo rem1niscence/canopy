@@ -25,7 +25,7 @@ func TestDefaultConfig(t *testing.T) {
 	got := DefaultConfig()
 	// compare got vs expected, CleanupBlockInterval is randomized so it needs to be ignored
 	diff := cmp.Diff(expected, got, cmpopts.IgnoreFields(Config{}, "CleanupBlockInterval"))
-	require.Empty(t, diff, "Config mismatch: %s", diff)
+	require.Empty(t, diff, "config mismatch: %s", diff)
 }
 
 func TestFileConfig(t *testing.T) {
