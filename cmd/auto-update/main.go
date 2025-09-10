@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,29 +26,47 @@ import (
 	"github.com/canopy-network/canopy/lib"
 )
 
-// Constants defining the GitHub repository information
+// constants defining the GitHub repository information
 const (
-	repoName = "canopy"
+	repoName         = "canopy"
+	snapshotFilename = "snapshot.tar.gz"
 )
 
-// Global variable for the binary path
+var ()
+
+// global variables for managing the auto-update process
 var (
-	binPath   = os.Getenv("BIN_PATH")
-	repoOwner = os.Getenv("REPO_OWNER")
+	binPath   = envOrDefault("BIN_PATH", "./cli")
+	repoOwner = envOrDefault("REPO_OWNER", "canopy-network")
 
-	config         lib.Config
-	configFilePath string
+	config lib.Config
+
+	cmd *exec.Cmd // Pointer to the running CLI process, used to control and monitor the main application
+	err error     // Standard error variable for capturing and handling errors throughout the process
+
+	// Atomic flags for thread-safe state management
+	uploadingNewVersion    atomic.Bool // Indicates if a new version is currently being installed
+	newVersionAlreadyFound atomic.Bool // Prevents multiple goroutines from handling the same update
+	killedFromChild        atomic.Bool // Indicates if a kill signal was sent from the child process
+
+	downloadLock = new(sync.Mutex)     // Mutex to prevent concurrent binary downloads and replacements
+	curRelease   = rpc.SoftwareVersion // Current version of the software for comparison
+
+	// Channels for process coordination
+	notifyStartRun = make(chan struct{}, 1)  // Signals when to start the CLI process
+	notifyEndRun   = make(chan struct{}, 1)  // Signals when the CLI process has ended
+	stop           = make(chan os.Signal, 1) // Signals stop in auto update to do graceful shutdown
+
+	// snapshotURLs contains the snapshot map for existing chains
+	snapshotURLs = map[uint64]string{
+		1: "http://canopy-mainnet-latest-chain-id1.us.nodefleet.net",
+		2: "http://canopy-mainnet-latest-chain-id2.us.nodefleet.net",
+	}
+	// snapshotVersion dictates which versions should download a new snahpshot
+	snapshotVersion = map[string]struct{}{
+		"beta-0.1.12": {},
+	}
 )
-
-// init initializes the binary path if not set in environment variables
-func init() {
-	if binPath == "" {
-		binPath = "./cli"
-	}
-	if repoOwner == "" {
-		repoOwner = "canopy-network"
-	}
-}
 
 // Release represents a GitHub release with all its associated metadata
 type Release struct {
@@ -86,11 +105,11 @@ type Release struct {
 	CreatedAt       time.Time `json:"created_at"`
 	PublishedAt     time.Time `json:"published_at"`
 	Assets          []struct {
-		URL      string      `json:"url"`
-		ID       int         `json:"id"`
-		NodeID   string      `json:"node_id"`
-		Name     string      `json:"name"`
-		Label    interface{} `json:"label"`
+		URL      string `json:"url"`
+		ID       int    `json:"id"`
+		NodeID   string `json:"node_id"`
+		Name     string `json:"name"`
+		Label    any    `json:"label"`
 		Uploader struct {
 			Login             string `json:"login"`
 			ID                int    `json:"id"`
@@ -112,18 +131,204 @@ type Release struct {
 			UserViewType      string `json:"user_view_type"`
 			SiteAdmin         bool   `json:"site_admin"`
 		} `json:"uploader"`
-		ContentType        string      `json:"content_type"`
-		State              string      `json:"state"`
-		Size               int         `json:"size"`
-		Digest             interface{} `json:"digest"`
-		DownloadCount      int         `json:"download_count"`
-		CreatedAt          time.Time   `json:"created_at"`
-		UpdatedAt          time.Time   `json:"updated_at"`
-		BrowserDownloadURL string      `json:"browser_download_url"`
+		ContentType        string    `json:"content_type"`
+		State              string    `json:"state"`
+		Size               int       `json:"size"`
+		Digest             any       `json:"digest"`
+		DownloadCount      int       `json:"download_count"`
+		CreatedAt          time.Time `json:"created_at"`
+		UpdatedAt          time.Time `json:"updated_at"`
+		BrowserDownloadURL string    `json:"browser_download_url"`
 	} `json:"assets"`
 	TarballURL string `json:"tarball_url"`
 	ZipballURL string `json:"zipball_url"`
 	Body       string `json:"body"`
+}
+
+// HandleStart starts the CLI process every time a new version is available
+func HandleStart() {
+	for {
+		// Wait for a signal to start
+		<-notifyStartRun
+
+		downloadLock.Lock()
+		log.Printf("Starting version: %s in %s from %s...\n", curRelease, binPath, repoOwner)
+
+		// check whether the new version requires a snapshot update
+		if _, ok := snapshotVersion[curRelease]; ok {
+			log.Printf("New version %s requires snapshot update, installing...", curRelease)
+			// Perform snapshot update logic here
+			if err := HandleNewSnapshot(config); err != nil {
+				log.Printf("Failed to install snapshot: %v", err)
+			} else {
+				log.Printf("Successfully installed new snapshot at version %s", curRelease)
+			}
+		}
+		// run the new binary
+		cmd, err = runBinary()
+		if err != nil {
+			log.Printf("Failed to run binary: %v", err)
+		}
+		downloadLock.Unlock()
+
+		// Wait for the child process to exit
+		err = cmd.Wait()
+		log.Printf("Process exited: %v", err)
+		if !uploadingNewVersion.Load() {
+			killedFromChild.Store(true)
+			stop <- syscall.SIGINT
+		}
+
+		// Notify that the process has ended
+		notifyEndRun <- struct{}{}
+	}
+}
+
+// HandleUpdateCheck checks for updates and starts the update process if a new version is available
+func HandleUpdateCheck() {
+	for i := 0; ; i++ {
+		version, url, err := getLatestRelease()
+		if err != nil {
+			log.Printf("Failed get latest release from %s: %v", repoOwner, err)
+			log.Println("Checking for upgrade in 30m...")
+			time.Sleep(30 * time.Minute)
+			continue
+		}
+
+		if curRelease != version {
+			log.Println("NEW VERSION FOUND")
+			err := downloadRelease(url, downloadLock)
+			if err != nil {
+				log.Printf("Failed to download release from %s: %v", repoOwner, err)
+				log.Println("Checking for upgrade in 30m...")
+				time.Sleep(30 * time.Minute)
+				continue
+			}
+			curRelease = version
+
+			log.Println("NEW DOWNLOAD DONE")
+
+			if !newVersionAlreadyFound.Load() {
+				newVersionAlreadyFound.Store(true)
+				go func() {
+					defer newVersionAlreadyFound.Store(false)
+
+					if i != 0 {
+						// Add random delay between 1-30 minutes before updating
+						minutes := rand.Intn(30) + 1
+						duration := time.Duration(minutes) * time.Minute
+
+						log.Printf("Waiting for %v before uploading...\n", duration)
+						time.Sleep(duration)
+						log.Println("Done waiting.")
+					}
+
+					if cmd != nil {
+						uploadingNewVersion.Store(true)
+						defer uploadingNewVersion.Store(false)
+
+						// Gracefully terminate the current process
+						err = cmd.Process.Signal(syscall.SIGINT)
+						if err != nil {
+							log.Printf("Failed to send syscall to child process in routine of check updates: %v", err)
+							return // use of return instead of continue here is correct since this routine is short lived
+						}
+
+						log.Println("SENT KILL SIGNAL in routine of check updates")
+						<-notifyEndRun
+						log.Println("KILLED OLD PROCESS in routine of check updates")
+					}
+
+					notifyStartRun <- struct{}{}
+				}()
+			}
+		}
+
+		log.Println("Checking for upgrade in 30m...")
+		time.Sleep(30 * time.Minute)
+	}
+}
+
+// HandleKill gracefully waits and terminates the current process
+func HandleKill() {
+	for {
+		signal.Notify(stop, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGABRT)
+		// block until kill signal is received
+		s := <-stop
+		log.Printf("Exit command %s received in auto update\n", s)
+		if !killedFromChild.Load() {
+			// Gracefully terminate the current process
+			err = cmd.Process.Signal(syscall.SIGINT)
+			if err != nil {
+				killedFromChild.Store(false) // in case of error when a new kill signal comes it is not necessarily because of child process kill
+				log.Printf("Failed to send syscall to child process in routine wait for kill: %v", err)
+				continue
+			}
+			log.Println("SENT KILL SIGNAL in routine wait for kill")
+			<-notifyEndRun
+			log.Println("KILLED OLD PROCESS in routine wait for kill")
+
+		}
+		log.Println("Finished auto update setup for closure")
+		os.Exit(0)
+	}
+}
+
+func runAutoUpdate(config lib.Config) {
+	if binPath == "" {
+		binPath = "./cli"
+	}
+	if repoOwner == "" {
+		repoOwner = "canopy-network"
+	}
+
+	if !config.AutoUpdate {
+		cli.Start()
+	} else {
+		// goroutine to handle binary execution and restart
+		go HandleStart()
+		// goroutine to check for updates periodically
+		go HandleUpdateCheck()
+		// goroutine to wait for kill
+		go HandleKill()
+		// start the initial binary if it exists
+		_, err = os.Stat(binPath)
+		if err == nil {
+			notifyStartRun <- struct{}{}
+		}
+	}
+}
+
+// main is the entry point of the application
+// It handles both manual and auto-update modes based on configuration
+func main() {
+	// check if start was called or just waken up for setup
+	if len(os.Args) < 2 || os.Args[1] != "start" {
+		log.Println("Set up complete! Now you can start!")
+		return
+	}
+
+	// Initialize data directory and configuration
+	err := os.MkdirAll(cli.DataDir, os.ModePerm)
+	if err != nil {
+		log.Print(err.Error())
+	}
+	configFilePath := filepath.Join(cli.DataDir, lib.ConfigFilePath)
+	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
+		log.Printf("Creating %s file", lib.ConfigFilePath)
+		if err = lib.DefaultConfig().WriteToFile(configFilePath); err != nil {
+			log.Print(err.Error())
+		}
+	}
+	// Load configuration
+	config, err = lib.NewConfigFromFile(configFilePath)
+	if err != nil {
+		log.Print(err.Error())
+	}
+	// Run auto update
+	go runAutoUpdate(config)
+	// Block forever
+	select {}
 }
 
 // getLatestRelease fetches the latest release information from GitHub
@@ -219,180 +424,111 @@ func runBinary() (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-func runAutoUpdate() {
-	if !config.AutoUpdate {
-		cli.Start()
-	} else {
-		// Variables for managing the auto-update process
-		var cmd *exec.Cmd // Pointer to the running CLI process, used to control and monitor the main application
-		var err error     // Standard error variable for capturing and handling errors throughout the process
-
-		// Atomic flags for thread-safe state management
-		var uploadingNewVersion atomic.Bool    // Indicates if a new version is currently being installed
-		var newVersionAlreadyFound atomic.Bool // Prevents multiple goroutines from handling the same update
-		var killedFromChild atomic.Bool        // Indicates if a kill signal was sent from the child process
-
-		downloadLock := new(sync.Mutex)   // Mutex to prevent concurrent binary downloads and replacements
-		curRelease := rpc.SoftwareVersion // Current version of the software for comparison
-
-		// Channels for process coordination
-		notifyStartRun := make(chan struct{}, 1) // Signals when to start the CLI process
-		notifyEndRun := make(chan struct{}, 1)   // Signals when the CLI process has ended
-		stop := make(chan os.Signal, 1)          // Signals stop in auto update to do graceful shutdown
-
-		// Goroutine to handle binary execution and restart
-		go func() {
-			for {
-				// Wait for a signal to start
-				<-notifyStartRun
-
-				downloadLock.Lock()
-				log.Printf("Starting version: %s in %s from %s...\n", curRelease, binPath, repoOwner)
-				cmd, err = runBinary()
-				if err != nil {
-					log.Printf("Failed to run binary: %v", err)
-				}
-				downloadLock.Unlock()
-
-				// Wait for the child process to exit
-				err = cmd.Wait()
-				log.Printf("Process exited: %v", err)
-				if !uploadingNewVersion.Load() {
-					killedFromChild.Store(true)
-					stop <- syscall.SIGINT
-				}
-
-				// Notify that the process has ended
-				notifyEndRun <- struct{}{}
-			}
-		}()
-
-		// Goroutine to check for updates periodically
-		go func() {
-			for i := 0; ; i++ {
-				version, url, err := getLatestRelease()
-				if err != nil {
-					log.Printf("Failed get latest release from %s: %v", repoOwner, err)
-					log.Println("Checking for upgrade in 30m...")
-					time.Sleep(30 * time.Minute)
-					continue
-				}
-
-				if curRelease != version {
-					log.Println("NEW VERSION FOUND")
-					err := downloadRelease(url, downloadLock)
-					if err != nil {
-						log.Printf("Failed to download release from %s: %v", repoOwner, err)
-						log.Println("Checking for upgrade in 30m...")
-						time.Sleep(30 * time.Minute)
-						continue
-					}
-					curRelease = version
-
-					log.Println("NEW DOWNLOAD DONE")
-
-					if !newVersionAlreadyFound.Load() {
-						newVersionAlreadyFound.Store(true)
-						go func() {
-							defer newVersionAlreadyFound.Store(false)
-
-							if i != 0 {
-								// Add random delay between 1-30 minutes before updating
-								minutes := rand.Intn(30) + 1
-								duration := time.Duration(minutes) * time.Minute
-
-								log.Printf("Waiting for %v before uploading...\n", duration)
-								time.Sleep(duration)
-								log.Println("Done waiting.")
-							}
-
-							if cmd != nil {
-								uploadingNewVersion.Store(true)
-								defer uploadingNewVersion.Store(false)
-
-								// Gracefully terminate the current process
-								err = cmd.Process.Signal(syscall.SIGINT)
-								if err != nil {
-									log.Printf("Failed to send syscall to child process in routine of check updates: %v", err)
-									return // use of return instead of continue here is correct since this routine is short lived
-								}
-
-								log.Println("SENT KILL SIGNAL in routine of check updates")
-								<-notifyEndRun
-								log.Println("KILLED OLD PROCESS in routine of check updates")
-							}
-
-							notifyStartRun <- struct{}{}
-						}()
-					}
-				}
-
-				log.Println("Checking for upgrade in 30m...")
-				time.Sleep(30 * time.Minute)
-			}
-		}()
-
-		// routine to wait for kill
-		go func() {
-			for {
-				signal.Notify(stop, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGABRT)
-				// block until kill signal is received
-				s := <-stop
-				log.Printf("Exit command %s received in auto update\n", s)
-				if !killedFromChild.Load() {
-					// Gracefully terminate the current process
-					err = cmd.Process.Signal(syscall.SIGINT)
-					if err != nil {
-						killedFromChild.Store(false) // in case of error when a new kill signal comes it is not necessarily because of child process kill
-						log.Printf("Failed to send syscall to child process in routine wait for kill: %v", err)
-						continue
-					}
-					log.Println("SENT KILL SIGNAL in routine wait for kill")
-					<-notifyEndRun
-					log.Println("KILLED OLD PROCESS in routine wait for kill")
-
-				}
-				log.Println("Finished auto update setup for closure")
-				os.Exit(0)
-			}
-		}()
-
-		// Start the initial binary if it exists
-		_, err = os.Stat(binPath)
-		if err == nil {
-			notifyStartRun <- struct{}{}
-		}
+func HandleNewSnapshot(config lib.Config) error {
+	// check if a snapshot is available for the chain ID
+	url, ok := snapshotURLs[config.ChainId]
+	if !ok {
+		return fmt.Errorf("no snapshot available for chain ID %d", config.ChainId)
 	}
+	// create a temporary file to store the snapshot
+	path, file, err := createFile(filepath.Join(config.DataDirPath, config.DBName, snapshotFilename))
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	// download the snapshot file
+	if err := downloadToFile(file, url); err != nil {
+		return err
+	}
+	// decompress the snapshot file in the same directory
+	if err := decompressCMD(context.Background(), path, filepath.Dir(path)); err != nil {
+		return err
+	}
+	// delete the snapshot file
+	return os.Remove(path)
 }
 
-// main is the entry point of the application
-// It handles both manual and auto-update modes based on configuration
-func main() {
-	// check if start was called or just waken up for setup
-	if len(os.Args) < 2 || os.Args[1] != "start" {
-		log.Println("Set up complete! Now you can start!")
-		return
+func createFile(path string) (string, *os.File, error) {
+	out, err := os.Create(path)
+	if err != nil {
+		return "", nil, err
+	}
+	return path, out, nil
+}
+
+func downloadToFile(f *os.File, url string) error {
+	// download the file
+	resp, err := http.Get(url)
+	// check for error
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	// write the body to file
+	_, err = io.Copy(f, resp.Body)
+	return err
+}
+
+// envOrDefault returns the value of the environment variable with the given key,
+// or the default value if the variable is not set.
+func envOrDefault(key, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return value
+}
+
+// decompressCMD decompresses a tar.gz file using pigz + tar
+func decompressCMD(ctx context.Context, sourceFile, targetDir string) error {
+	// get absolute paths
+	absSource, err := filepath.Abs(sourceFile)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute source path: %w", err)
+	}
+	absTarget, err := filepath.Abs(targetDir)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute target path: %w", err)
 	}
 
-	// Initialize data directory and configuration
-	err := os.MkdirAll(cli.DataDir, os.ModePerm)
+	// ensure target directory exists
+	if err := os.MkdirAll(absTarget, 0755); err != nil {
+		return fmt.Errorf("failed to create target directory: %w", err)
+	}
+
+	// construct the commands: pigz -dc source | tar -C target -xv
+	pigzCmd := exec.CommandContext(ctx, "pigz", "-dc", absSource)
+	tarCmd := exec.CommandContext(ctx, "tar", "-C", absTarget, "-xv")
+
+	// create the pipeline
+	pipe, err := pigzCmd.StdoutPipe()
 	if err != nil {
-		log.Print(err.Error())
+		return fmt.Errorf("failed to create pipe: %w", err)
 	}
-	configFilePath = filepath.Join(cli.DataDir, lib.ConfigFilePath)
-	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
-		log.Printf("Creating %s file", lib.ConfigFilePath)
-		if err = lib.DefaultConfig().WriteToFile(configFilePath); err != nil {
-			log.Print(err.Error())
-		}
+
+	tarCmd.Stdin = pipe
+	pigzCmd.Stderr = os.Stderr
+	tarCmd.Stderr = os.Stderr
+
+	// start both commands
+	if err := tarCmd.Start(); err != nil {
+		return fmt.Errorf("failed to start tar: %w", err)
 	}
-	// Load configuration
-	config, err = lib.NewConfigFromFile(configFilePath)
-	if err != nil {
-		log.Print(err.Error())
+
+	if err := pigzCmd.Start(); err != nil {
+		return fmt.Errorf("failed to start pigz: %w", err)
 	}
-	// Run auto update
-	go runAutoUpdate()
-	// Block forever
-	select {}
+
+	// wait for completion
+	if err := pigzCmd.Wait(); err != nil {
+		return fmt.Errorf("pigz command failed: %w", err)
+	}
+
+	pipe.Close()
+
+	if err := tarCmd.Wait(); err != nil {
+		return fmt.Errorf("tar command failed: %w", err)
+	}
+
+	return nil
 }
