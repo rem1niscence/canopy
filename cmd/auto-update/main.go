@@ -430,6 +430,21 @@ func HandleNewSnapshot(config lib.Config) error {
 	if !ok {
 		return fmt.Errorf("no snapshot available for chain ID %d", config.ChainId)
 	}
+	// rename the current database directory as a backup
+	dbDir := filepath.Join(config.DataDirPath, config.DBName)
+	if err := os.Rename(dbDir, dbDir+".backup"); err != nil {
+		return err
+	}
+	defer func() {
+		// restore the backup if an error occurs
+		if err != nil {
+			os.Rename(dbDir+".backup", dbDir)
+			return
+		}
+		// otherwise, delete the backup
+		os.Remove(dbDir + ".backup")
+	}()
+	var err error
 	// create a temporary file to store the snapshot
 	path, file, err := createFile(filepath.Join(config.DataDirPath, config.DBName, snapshotFilename))
 	if err != nil {
@@ -449,6 +464,11 @@ func HandleNewSnapshot(config lib.Config) error {
 }
 
 func createFile(path string) (string, *os.File, error) {
+	// create all intermediate directories
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return "", nil, err
+	}
+	// create the file
 	out, err := os.Create(path)
 	if err != nil {
 		return "", nil, err
