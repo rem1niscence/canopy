@@ -1,6 +1,6 @@
 module github.com/canopy-network/canopy
 
-go 1.25.0
+go 1.23.9
 
 require (
 	filippo.io/edwards25519 v1.1.0
