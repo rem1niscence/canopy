@@ -30,6 +30,7 @@ import (
 const (
 	repoName         = "canopy"
 	snapshotFilename = "snapshot.tar.gz"
+	waitTime         = 30 * time.Minute
 )
 
 var ()
@@ -153,17 +154,6 @@ func HandleStart() {
 
 		downloadLock.Lock()
 		log.Printf("Starting version: %s in %s from %s...\n", curRelease, binPath, repoOwner)
-
-		// check whether the new version requires a snapshot update
-		if _, ok := snapshotVersion[curRelease]; ok {
-			log.Printf("New version %s requires snapshot update, installing...", curRelease)
-			// Perform snapshot update logic here
-			if err := HandleNewSnapshot(config); err != nil {
-				log.Printf("Failed to install snapshot: %v", err)
-			} else {
-				log.Printf("Successfully installed new snapshot at version %s", curRelease)
-			}
-		}
 		// run the new binary
 		cmd, err = runBinary()
 		if err != nil {
@@ -190,18 +180,17 @@ func HandleUpdateCheck() {
 		version, url, err := getLatestRelease()
 		if err != nil {
 			log.Printf("Failed get latest release from %s: %v", repoOwner, err)
-			log.Println("Checking for upgrade in 30m...")
-			time.Sleep(30 * time.Minute)
+			log.Println("Checking for upgrade in 30m... [1]")
+			time.Sleep(waitTime)
 			continue
 		}
-
 		if curRelease != version {
 			log.Println("NEW VERSION FOUND")
 			err := downloadRelease(url, downloadLock)
 			if err != nil {
 				log.Printf("Failed to download release from %s: %v", repoOwner, err)
-				log.Println("Checking for upgrade in 30m...")
-				time.Sleep(30 * time.Minute)
+				log.Println("Checking for upgrade in 30m... [2]")
+				time.Sleep(waitTime)
 				continue
 			}
 			curRelease = version
@@ -239,13 +228,24 @@ func HandleUpdateCheck() {
 						log.Println("KILLED OLD PROCESS in routine of check updates")
 					}
 
+					// check whether the new version requires a snapshot update
+					if _, ok := snapshotVersion[curRelease]; ok {
+						log.Printf("New version %s requires snapshot update, installing...", curRelease)
+						// Perform snapshot update logic here
+						if err := HandleNewSnapshot(config); err != nil {
+							log.Printf("Failed to install snapshot: %v", err)
+						} else {
+							log.Printf("Successfully installed new snapshot at version %s", curRelease)
+						}
+					}
+
 					notifyStartRun <- struct{}{}
 				}()
 			}
 		}
 
-		log.Println("Checking for upgrade in 30m...")
-		time.Sleep(30 * time.Minute)
+		log.Println("Checking for upgrade in 30m... [3]")
+		time.Sleep(waitTime)
 	}
 }
 
@@ -334,13 +334,12 @@ func main() {
 // getLatestRelease fetches the latest release information from GitHub
 // Returns the tag name, download URL for the current platform, and any error
 func getLatestRelease() (string, string, error) {
-	apiURL := "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", repoOwner, repoName)
 	resp, err := http.Get(apiURL)
 	if err != nil {
 		return "", "", err
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode == 200 {
 		var rel Release
 		if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
@@ -378,7 +377,7 @@ func downloadRelease(downloadURL string, downloadLock *sync.Mutex) error {
 		defer downloadLock.Unlock()
 
 		err = os.Remove(binPath)
-		if err != nil {
+		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
 
@@ -411,7 +410,7 @@ func downloadRelease(downloadURL string, downloadLock *sync.Mutex) error {
 // runBinary executes the CLI binary with the 'start' command
 // Returns the command and any error that occurred during startup
 func runBinary() (*exec.Cmd, error) {
-	cmd := exec.Command(binPath, "start")
+	cmd = exec.Command(binPath, "start")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
@@ -430,37 +429,53 @@ func HandleNewSnapshot(config lib.Config) error {
 	if !ok {
 		return fmt.Errorf("no snapshot available for chain ID %d", config.ChainId)
 	}
-	// rename the current database directory as a backup
-	dbDir := filepath.Join(config.DataDirPath, config.DBName)
-	if err := os.Rename(dbDir, dbDir+".backup"); err != nil {
+	// remove any previous dangling backup
+	dbDir := filepath.Join(cli.DataDir, config.DBName)
+	backupDBDir := dbDir + ".backup"
+	if err := os.RemoveAll(backupDBDir); err != nil {
 		return err
 	}
+	// rename the current database directory as a backup
+	if err := os.Rename(dbDir, backupDBDir); err != nil {
+		return err
+	}
+	log.Printf("backup canopy folder done")
 	defer func() {
 		// restore the backup if an error occurs
 		if err != nil {
-			os.Rename(dbDir+".backup", dbDir)
+			log.Printf("snapshot install failed, restoring backup")
+			os.Rename(dbDir, backupDBDir)
 			return
 		}
 		// otherwise, delete the backup
-		os.Remove(dbDir + ".backup")
+		os.RemoveAll(backupDBDir)
 	}()
 	var err error
 	// create a temporary file to store the snapshot
-	path, file, err := createFile(filepath.Join(config.DataDirPath, config.DBName, snapshotFilename))
+	path, file, err := createFile(filepath.Join(cli.DataDir, config.DBName, snapshotFilename))
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 	// download the snapshot file
+	log.Printf("downloading snapshot file...")
 	if err := downloadToFile(file, url); err != nil {
 		return err
 	}
+	defer func() {
+		// delete the snapshot file
+		if err := os.Remove(path); err != nil {
+			log.Printf("failed to remove snapshot file: %v", err)
+		}
+	}()
+	log.Printf("snapshot file downloaded")
 	// decompress the snapshot file in the same directory
+	log.Printf("decompressing snapshot file...")
 	if err := decompressCMD(context.Background(), path, filepath.Dir(path)); err != nil {
 		return err
 	}
-	// delete the snapshot file
-	return os.Remove(path)
+	log.Printf("decompressed snapshot file")
+	return nil
 }
 
 func createFile(path string) (string, *os.File, error) {
