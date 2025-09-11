@@ -79,7 +79,6 @@ var startCmd = &cobra.Command{
 
 // Start() is the entrypoint of the application
 func Start() {
-	panic("tu no ere duro de ninguna manera")
 	// allow sleep and wake up using config
 	wakeDate := time.Unix(int64(config.SleepUntil), 0)
 	if time.Now().Before(wakeDate) {
