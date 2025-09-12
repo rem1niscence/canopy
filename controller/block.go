@@ -413,7 +413,7 @@ func (c *Controller) CommitCertificateParallel(qc *lib.QuorumCertificate, block 
 			// get latest validator set
 			valSet, err := c.FSM.GetCommitteeMembers(id)
 			if err != nil {
-				panic(err)
+				return err
 			}
 			// TODO handle err
 			if _, found := c.LastValidatorSet[c.ChainHeight()+1]; !found {
