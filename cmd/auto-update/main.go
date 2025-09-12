@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -62,10 +63,6 @@ var (
 	snapshotURLs = map[uint64]string{
 		1: "http://canopy-mainnet-latest-chain-id1.us.nodefleet.net",
 		2: "http://canopy-mainnet-latest-chain-id2.us.nodefleet.net",
-	}
-	// snapshotVersion dictates which versions should download a new snahpshot
-	snapshotVersion = map[string]struct{}{
-		"beta-0.1.12": {},
 	}
 )
 
@@ -200,7 +197,7 @@ func HandleUpdateCheck() {
 			// check whether the new version requires a snapshot update
 			var snapshotPath string
 			var snapshotErr error
-			if _, ok := snapshotVersion[curRelease]; ok {
+			if applySnapshot := strings.Contains(version, "snapshot"); applySnapshot {
 				log.Printf("New version %s requires snapshot update, installing...", curRelease)
 				snapshotPath, snapshotErr = HandleNewSnapshot(config)
 				if snapshotErr != nil {
