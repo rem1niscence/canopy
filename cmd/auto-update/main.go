@@ -234,6 +234,8 @@ func HandleUpdateCheck() {
 						}
 
 						log.Println("SENT KILL SIGNAL in routine of check updates")
+						<-notifyEndRun
+						log.Println("KILLED OLD PROCESS in routine of check updates")
 
 						if snapshotPath != "" {
 							log.Printf("replacing current database with new snapshot")
@@ -243,9 +245,6 @@ func HandleUpdateCheck() {
 								log.Printf("replaced current database with new snapshot")
 							}
 						}
-
-						<-notifyEndRun
-						log.Println("KILLED OLD PROCESS in routine of check updates")
 					}
 
 					notifyStartRun <- struct{}{}
@@ -480,26 +479,33 @@ func HandleNewSnapshot(config lib.Config) (snapshotPath string, err error) {
 	return snapshotPath, nil
 }
 
-func replaceSnapshot(snapshotPath string, config lib.Config) (err error) {
+func replaceSnapshot(snapshotPath string, config lib.Config) (retErr error) {
 	dbPath := filepath.Join(cli.DataDir, config.DBName)
 	backupPath := dbPath + ".backup"
-	// rename the current database file to a backup
-	if err = os.Rename(dbPath, backupPath); err != nil && err != os.ErrNotExist {
-		return err
-	}
+	// always start from a clean backup state
+	_ = os.RemoveAll(backupPath)
 	defer func() {
-		if err != nil {
-			// restore backup directory
-			os.Rename(backupPath, dbPath)
-			// remove the snapshot directory
-			os.RemoveAll(snapshotPath)
+		if retErr != nil {
+			// rollback: try to restore DB and drop snapshot
+			_ = os.RemoveAll(dbPath)
+			_ = os.Rename(backupPath, dbPath)
+			_ = os.RemoveAll(snapshotPath)
+			return
 		}
-		// remove the backup directory
-		os.RemoveAll(backupPath)
+		// success: remove backup
+		if err := os.RemoveAll(backupPath); err != nil {
+			log.Printf("warning: failed to remove backup at %s: %v", backupPath, err)
+		}
 	}()
-	// rename the snapshot file to the database file
-	if err = os.Rename(snapshotPath, dbPath); err != nil {
-		return err
+	// move current DB to backup if it exists
+	if err := os.Rename(dbPath, backupPath); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("rename db->backup failed: %w", err)
+		}
+	}
+	// put snapshot in place as the new DB
+	if err := os.Rename(snapshotPath, dbPath); err != nil {
+		return fmt.Errorf("rename snapshot->db failed: %w", err)
 	}
 	return nil
 }
