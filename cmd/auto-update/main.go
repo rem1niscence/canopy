@@ -177,7 +177,7 @@ func HandleUpdateCheck() {
 		version, url, err := getLatestRelease()
 		if err != nil {
 			log.Printf("Failed get latest release from %s: %v", repoOwner, err)
-			log.Println("Checking for upgrade in 30m... [1]")
+			log.Println("Checking for upgrade in 30m...")
 			time.Sleep(waitTime)
 			continue
 		}
@@ -186,7 +186,7 @@ func HandleUpdateCheck() {
 			err := downloadRelease(url, downloadLock)
 			if err != nil {
 				log.Printf("Failed to download release from %s: %v", repoOwner, err)
-				log.Println("Checking for upgrade in 30m... [2]")
+				log.Println("Checking for upgrade in 30m...")
 				time.Sleep(waitTime)
 				continue
 			}
@@ -253,7 +253,7 @@ func HandleUpdateCheck() {
 			}
 		}
 
-		log.Println("Checking for upgrade in 30m... [3]")
+		log.Println("Checking for upgrade in 30m...")
 		time.Sleep(waitTime)
 	}
 }
@@ -489,11 +489,13 @@ func replaceSnapshot(snapshotPath string, config lib.Config) (err error) {
 	}
 	defer func() {
 		if err != nil {
-			// restore backup file
+			// restore backup directory
 			os.Rename(backupPath, dbPath)
+			// remove the snapshot directory
+			os.RemoveAll(snapshotPath)
 		}
-		// remove the snapshot file
-		os.RemoveAll(snapshotPath)
+		// remove the backup directory
+		os.RemoveAll(backupPath)
 	}()
 	// rename the snapshot file to the database file
 	if err = os.Rename(snapshotPath, dbPath); err != nil {
