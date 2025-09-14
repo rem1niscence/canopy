@@ -99,7 +99,7 @@ func (s *StateMachine) Initialize(store lib.StoreI) (genesis bool, err lib.Error
 // NOTES:
 // - this function may be used to validate 'additional' transactions outside the normal block size as if they were to be included
 // - a list of failed transactions are returned
-func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, allowOversize bool) (header *lib.BlockHeader, txResults, oversized []*lib.TxResult, failed []*lib.FailedTx, err lib.ErrorI) {
+func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, rcBuildHeight uint64, allowOversize bool) (header *lib.BlockHeader, txResults, oversized []*lib.TxResult, failed []*lib.FailedTx, err lib.ErrorI) {
 	// catch in case there's a panic
 	defer func() {
 		if r := recover(); r != nil {
@@ -126,7 +126,7 @@ func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, allowOversi
 	// sub-out transactions for those that succeeded (only useful for mempool application)
 	b.Transactions = blockTxs
 	// automated execution at the 'ending of a block'
-	if err = s.EndBlock(b.BlockHeader.ProposerAddress); err != nil {
+	if err = s.EndBlock(b.BlockHeader.ProposerAddress, rcBuildHeight); err != nil {
 		return nil, nil, nil, nil, err
 	}
 	// load the validator set for the previous height

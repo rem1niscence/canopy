@@ -47,7 +47,7 @@ func (s *StateMachine) BeginBlock() lib.ErrorI {
 }
 
 // EndBlock() is code that is executed at the end of `applying` the block
-func (s *StateMachine) EndBlock(proposerAddress []byte) (err lib.ErrorI) {
+func (s *StateMachine) EndBlock(proposerAddress []byte, rcBuildHeight uint64) (err lib.ErrorI) {
 	// update the list of addresses who proposed the last blocks
 	// this information is used for leader election
 	if err = s.UpdateLastProposers(proposerAddress); err != nil {
@@ -64,6 +64,25 @@ func (s *StateMachine) EndBlock(proposerAddress []byte) (err lib.ErrorI) {
 	// delete validators who are finishing unstaking
 	if err = s.DeleteFinishedUnstaking(); err != nil {
 		return
+	}
+	// handle last certificate results
+	qc, err := s.LoadCertificate(s.Height() - 1)
+	if err != nil {
+		return err
+	}
+	// ensure the certificate results are not nil
+	if qc == nil || qc.Results == nil {
+		s.log.Warn(lib.ErrNilCertResults().Error())
+		return nil
+	}
+	ownRoot, err := s.LoadIsOwnRoot()
+	if err != nil {
+		return err
+	}
+	if !ownRoot {
+		if err = s.HandleDexBatch(rcBuildHeight, qc.Header.ChainId, qc.Results.DexBatch); err != nil {
+			s.log.Error(err.Error()) // log error only - it's possible to have an issue here due to async issues
+		}
 	}
 	return
 }
@@ -118,7 +137,8 @@ func (s *StateMachine) HandleCertificateResults(qc *lib.QuorumCertificate, commi
 	results, chainId := qc.Results, qc.Header.ChainId
 	// handle dex action ordered by the quorum
 	// if handling a QC from another chain
-	if committee == nil || qc.Header.ChainId != s.Config.ChainId {
+	//if committee == nil || qc.Header.ChainId != s.Config.ChainId {
+	if qc.Header.ChainId != s.Config.ChainId {
 		if err = s.HandleDexBatch(qc.Header.RootHeight, qc.Header.ChainId, results.DexBatch); err != nil {
 			s.log.Error(err.Error()) // log error only - it's possible to have an issue here due to async issues
 		}

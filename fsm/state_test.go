@@ -264,7 +264,7 @@ func TestApplyBlock(t *testing.T) {
 				sm.ProtocolVersion = 1
 			}
 			// execute the function call
-			header, txResults, _, failed, e := sm.ApplyBlock(context.Background(), test.block, false)
+			header, txResults, _, failed, e := sm.ApplyBlock(context.Background(), test.block, 0, false)
 			// validate the expected error
 			require.Equal(t, test.error != "", e != nil || len(failed) != 0, e)
 			if len(failed) != 0 {
