@@ -29,12 +29,12 @@ func main() {
 	if len(os.Args) < 2 || os.Args[1] != "start" {
 		log.Fatalf("invalid input %v only `start` command is allowed", os.Args)
 	}
-	config, logger := getUpdaterConfig()
-	autoUpdater := NewUpdateManager(config, logger, rpc.SoftwareVersion)
-	autoUpdater.CheckForUpdate()
+	updaterConfig, snapshotConfig, logger := getConfigs()
+	_ = NewUpdateManager(updaterConfig, logger, rpc.SoftwareVersion)
+	_ = NewSnapshotManager(snapshotConfig)
 }
 
-func getUpdaterConfig() (*UpdaterConfig, lib.LoggerI) {
+func getConfigs() (*UpdaterConfig, *SnapshotConfig, lib.LoggerI) {
 	config, _ := cli.InitializeDataDirectory(cli.DataDir, lib.NewDefaultLogger())
 	l := lib.NewLogger(lib.LoggerConfig{
 		Level:      config.GetLogLevel(),
@@ -43,15 +43,20 @@ func getUpdaterConfig() (*UpdaterConfig, lib.LoggerI) {
 	})
 
 	updaterConfig := &UpdaterConfig{
-		canopyConfig: config,
-		RepoName:     envOrDefault("CANOPY_REPO_NAME", defaultRepoName),
-		RepoOwner:    envOrDefault("CANOPY_REPO_OWNER", defaultRepoOwner),
-		BinPath:      envOrDefault("CANOPY_BIN_PATH", defaultBinPath),
-		CheckTime:    defaultCheckTime,
-		WaitTime:     time.Duration(rand.Intn(30)+1) * time.Minute,
+		RepoName:  envOrDefault("CANOPY_REPO_NAME", defaultRepoName),
+		RepoOwner: envOrDefault("CANOPY_REPO_OWNER", defaultRepoOwner),
+		BinPath:   envOrDefault("CANOPY_BIN_PATH", defaultBinPath),
+		CheckTime: defaultCheckTime,
+		WaitTime:  time.Duration(rand.Intn(30)+1) * time.Minute,
 	}
 
-	return updaterConfig, l
+	snapshotConfig := &SnapshotConfig{
+		canopy: config,
+		URLs:   snapshotURLs,
+		Name:   snapshotFileName,
+	}
+
+	return updaterConfig, snapshotConfig, l
 }
 
 // envOrDefault returns the value of the environment variable with the given key,

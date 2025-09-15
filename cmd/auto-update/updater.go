@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -35,12 +38,11 @@ type Release struct {
 
 // UpdaterConfig contains configuration for the updater
 type UpdaterConfig struct {
-	canopyConfig lib.Config
-	RepoName     string
-	RepoOwner    string
-	BinPath      string
-	CheckTime    time.Duration
-	WaitTime     time.Duration
+	RepoName  string
+	RepoOwner string
+	BinPath   string
+	CheckTime time.Duration
+	WaitTime  time.Duration
 }
 
 // UpdateManager manages the update process for the current binary
@@ -61,8 +63,8 @@ func NewUpdateManager(config *UpdaterConfig, logger lib.LoggerI, version string)
 	}
 }
 
-// CheckForUpdate checks for updates of the current binary
-func (um *UpdateManager) CheckForUpdate() (*Release, error) {
+// Check checks for updates of the current binary
+func (um *UpdateManager) Check() (*Release, error) {
 	// Get the latest release
 	release, err := um.GetLatestRelease()
 	if err != nil {
@@ -141,31 +143,106 @@ func (um *UpdateManager) DownloadRelease(release *Release) error {
 	}
 	defer resp.Body.Close()
 	// save the response as an executable
-	return saveToFile(um.config.BinPath, resp.Body, 0755)
-}
-
-// saveToFile saves the response body to a file with the given path and permissions
-func saveToFile(path string, r io.Reader, perm fs.FileMode) (err error) {
-	// create and truncate the file if it exists
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+	f, err := saveToFile(um.config.BinPath, resp.Body, 0755)
 	if err != nil {
 		return err
 	}
+	return f.Close()
+}
+
+// saveToFile saves the response body to a file with the given path and permissions
+func saveToFile(path string, r io.Reader, perm fs.FileMode) (f *os.File, err error) {
+	// create and truncate the file if it exists
+	f, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+	if err != nil {
+		return nil, err
+	}
 	// ensure close + cleanup on any error.
 	defer func() {
-		closeErr := f.Close()
-		if err == nil {
-			err = closeErr
-		}
 		if err != nil {
-			// remove partially written file
+			// remove file
 			_ = os.Remove(path)
 		}
 	}()
 	// copy the response body to the file
 	if _, err = io.Copy(f, r); err != nil {
-		return err
+		return nil, err
 	}
 	// exit
+	return f, nil
+}
+
+type SnapshotConfig struct {
+	// canopy config
+	canopy lib.Config
+	// map[chain ID]URL to download the snapshot
+	URLs map[uint64]string
+	// file name
+	Name string
+}
+
+type SnapshotManager struct {
+	// snapshot config
+	config *SnapshotConfig
+	// httpClient
+	client *http.Client
+}
+
+func NewSnapshotManager(config *SnapshotConfig) *SnapshotManager {
+	return &SnapshotManager{
+		config: config,
+		client: &http.Client{Timeout: 10 * time.Minute},
+	}
+}
+
+func (sm *SnapshotManager) DownloadAndExtract(path string, chainID uint64) error {
+	// download the snapshot
+	snapshot, err := sm.Download(filepath.Join(path, sm.config.Name), chainID)
+	if err != nil {
+		return err
+	}
+	snapshot.Close()
+	// always remove the snapshot file after downloading
+	defer os.Remove(snapshot.Name())
+	// extract the snapshot
+	return Extract(context.Background(), snapshot.Name(), path)
+}
+
+func (sm *SnapshotManager) Download(path string, chainID uint64) (*os.File, error) {
+	url, ok := sm.config.URLs[chainID]
+	if !ok {
+		return nil, fmt.Errorf("no snapshot URL found for chain ID %d", chainID)
+	}
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return saveToFile(path, resp.Body, 0644)
+}
+
+// decompressCMD decompresses a tar.gz file using the `tar` command
+// requires `tar` to be installed and available in the system's PATH
+func Extract(ctx context.Context, sourceFile string, targetDir string) error {
+	// get absolute paths
+	absSource, err := filepath.Abs(sourceFile)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute source path: %w", err)
+	}
+	absTarget, err := filepath.Abs(targetDir)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute target path: %w", err)
+	}
+	// ensure target directory exists
+	if err := os.MkdirAll(absTarget, 0755); err != nil {
+		return fmt.Errorf("failed to create target directory: %w", err)
+	}
+	// use tar with built-in gzip decompression: tar -C target -xzvf source
+	tarCmd := exec.CommandContext(ctx, "tar", "-C", absTarget, "-xzvf", absSource)
+	tarCmd.Stderr = os.Stderr
+	// run the command
+	if err := tarCmd.Run(); err != nil {
+		return fmt.Errorf("tar command failed: %w", err)
+	}
 	return nil
 }
