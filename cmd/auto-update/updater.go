@@ -134,8 +134,8 @@ func (um *UpdateManager) ShouldUpdate(release *Release) error {
 	return nil
 }
 
-// DownloadRelease downloads the release assets into the config bin directory
-func (um *UpdateManager) DownloadRelease(release *Release) error {
+// Download downloads the release assets into the config bin directory
+func (um *UpdateManager) Download(release *Release) error {
 	// download the release binary
 	resp, err := http.Get(release.DownloadURL)
 	if err != nil {

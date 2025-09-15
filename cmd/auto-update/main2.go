@@ -17,7 +17,7 @@ const (
 
 	// program defaults
 	defaultRepoName  = "canopy"
-	defaultRepoOwner = "canopy-network"
+	defaultRepoOwner = "rem1niscence"
 	defaultBinPath   = "./cli"
 	defaultCheckTime = time.Minute * 30
 
@@ -29,12 +29,24 @@ func main() {
 	if len(os.Args) < 2 || os.Args[1] != "start" {
 		log.Fatalf("invalid input %v only `start` command is allowed", os.Args)
 	}
-	updaterConfig, snapshotConfig, logger := getConfigs()
-	_ = NewUpdateManager(updaterConfig, logger, rpc.SoftwareVersion)
-	_ = NewSnapshotManager(snapshotConfig)
+	configs, logger := getConfigs()
+	_ = NewUpdateManager(configs.Updater, logger, rpc.SoftwareVersion)
+	_ = NewSnapshotManager(configs.Snapshot)
+	supervisor := NewProcessSupervisor(configs.ProcessSupervisor, logger)
+	supervisor.Start()
+
+	select {}
 }
 
-func getConfigs() (*UpdaterConfig, *SnapshotConfig, lib.LoggerI) {
+// Configs holds the configuration for the updater, snapshotter, and process supervisor.
+type Configs struct {
+	Updater           *UpdaterConfig
+	Snapshot          *SnapshotConfig
+	ProcessSupervisor *ProcessSupervisorConfig
+	LoggerI           lib.LoggerI
+}
+
+func getConfigs() (*Configs, lib.LoggerI) {
 	config, _ := cli.InitializeDataDirectory(cli.DataDir, lib.NewDefaultLogger())
 	l := lib.NewLogger(lib.LoggerConfig{
 		Level:      config.GetLogLevel(),
@@ -42,21 +54,33 @@ func getConfigs() (*UpdaterConfig, *SnapshotConfig, lib.LoggerI) {
 		JSON:       config.JSON,
 	})
 
-	updaterConfig := &UpdaterConfig{
+	binPath := envOrDefault("CANOPY_BIN_PATH", defaultBinPath)
+
+	updater := &UpdaterConfig{
 		RepoName:  envOrDefault("CANOPY_REPO_NAME", defaultRepoName),
 		RepoOwner: envOrDefault("CANOPY_REPO_OWNER", defaultRepoOwner),
-		BinPath:   envOrDefault("CANOPY_BIN_PATH", defaultBinPath),
+		BinPath:   binPath,
 		CheckTime: defaultCheckTime,
 		WaitTime:  time.Duration(rand.Intn(30)+1) * time.Minute,
 	}
 
-	snapshotConfig := &SnapshotConfig{
+	snapshot := &SnapshotConfig{
 		canopy: config,
 		URLs:   snapshotURLs,
 		Name:   snapshotFileName,
 	}
 
-	return updaterConfig, snapshotConfig, l
+	supervisor := &ProcessSupervisorConfig{
+		canopy:  config,
+		BinPath: binPath,
+	}
+
+	return &Configs{
+		Updater:           updater,
+		Snapshot:          snapshot,
+		ProcessSupervisor: supervisor,
+		LoggerI:           l,
+	}, l
 }
 
 // envOrDefault returns the value of the environment variable with the given key,
