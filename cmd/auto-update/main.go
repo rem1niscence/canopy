@@ -70,79 +70,11 @@ var (
 
 // Release represents a GitHub release with all its associated metadata
 type Release struct {
-	URL       string `json:"url"`
-	AssetsURL string `json:"assets_url"`
-	UploadURL string `json:"upload_url"`
-	HTMLURL   string `json:"html_url"`
-	ID        int    `json:"id"`
-	Author    struct {
-		Login             string `json:"login"`
-		ID                int    `json:"id"`
-		NodeID            string `json:"node_id"`
-		AvatarURL         string `json:"avatar_url"`
-		GravatarID        string `json:"gravatar_id"`
-		URL               string `json:"url"`
-		HTMLURL           string `json:"html_url"`
-		FollowersURL      string `json:"followers_url"`
-		FollowingURL      string `json:"following_url"`
-		GistsURL          string `json:"gists_url"`
-		StarredURL        string `json:"starred_url"`
-		SubscriptionsURL  string `json:"subscriptions_url"`
-		OrganizationsURL  string `json:"organizations_url"`
-		ReposURL          string `json:"repos_url"`
-		EventsURL         string `json:"events_url"`
-		ReceivedEventsURL string `json:"received_events_url"`
-		Type              string `json:"type"`
-		UserViewType      string `json:"user_view_type"`
-		SiteAdmin         bool   `json:"site_admin"`
-	} `json:"author"`
-	NodeID          string    `json:"node_id"`
-	TagName         string    `json:"tag_name"`
-	TargetCommitish string    `json:"target_commitish"`
-	Name            string    `json:"name"`
-	Draft           bool      `json:"draft"`
-	Prerelease      bool      `json:"prerelease"`
-	CreatedAt       time.Time `json:"created_at"`
-	PublishedAt     time.Time `json:"published_at"`
-	Assets          []struct {
-		URL      string `json:"url"`
-		ID       int    `json:"id"`
-		NodeID   string `json:"node_id"`
-		Name     string `json:"name"`
-		Label    any    `json:"label"`
-		Uploader struct {
-			Login             string `json:"login"`
-			ID                int    `json:"id"`
-			NodeID            string `json:"node_id"`
-			AvatarURL         string `json:"avatar_url"`
-			GravatarID        string `json:"gravatar_id"`
-			URL               string `json:"url"`
-			HTMLURL           string `json:"html_url"`
-			FollowersURL      string `json:"followers_url"`
-			FollowingURL      string `json:"following_url"`
-			GistsURL          string `json:"gists_url"`
-			StarredURL        string `json:"starred_url"`
-			SubscriptionsURL  string `json:"subscriptions_url"`
-			OrganizationsURL  string `json:"organizations_url"`
-			ReposURL          string `json:"repos_url"`
-			EventsURL         string `json:"events_url"`
-			ReceivedEventsURL string `json:"received_events_url"`
-			Type              string `json:"type"`
-			UserViewType      string `json:"user_view_type"`
-			SiteAdmin         bool   `json:"site_admin"`
-		} `json:"uploader"`
-		ContentType        string    `json:"content_type"`
-		State              string    `json:"state"`
-		Size               int       `json:"size"`
-		Digest             any       `json:"digest"`
-		DownloadCount      int       `json:"download_count"`
-		CreatedAt          time.Time `json:"created_at"`
-		UpdatedAt          time.Time `json:"updated_at"`
-		BrowserDownloadURL string    `json:"browser_download_url"`
+	TagName string `json:"tag_name"`
+	Assets  []struct {
+		Name               string `json:"name"`
+		BrowserDownloadURL string `json:"browser_download_url"`
 	} `json:"assets"`
-	TarballURL string `json:"tarball_url"`
-	ZipballURL string `json:"zipball_url"`
-	Body       string `json:"body"`
 }
 
 // HandleStart starts the CLI process every time a new version is available
@@ -160,15 +92,15 @@ func HandleStart() {
 		}
 		downloadLock.Unlock()
 
-		// Wait for the child process to exit
+		// wait for the child process to exit
 		err = cmd.Wait()
 		log.Infof("Process exited: %v", err)
 		if !uploadingNewVersion.Load() {
 			killedFromChild.Store(true)
 			stop <- syscall.SIGINT
 		}
-
-		// Notify that the process has ended
+		log.Debug("notifying program exit")
+		// notify that the process has ended
 		notifyEndRun <- struct{}{}
 	}
 }
@@ -270,14 +202,13 @@ func HandleKill() {
 			// Gracefully terminate the current process
 			err = cmd.Process.Signal(syscall.SIGINT)
 			if err != nil {
-				killedFromChild.Store(false) // in case of error when a new kill signal comes it is not necessarily because of child process kill
+				killedFromChild.Store(false) // in case of error when a new kill signal comes it is not necessarily because of a child process kill
 				log.Errorf("Failed to send syscall to child process in routine wait for kill: %v", err)
 				continue
 			}
 			log.Infof("SENT KILL SIGNAL in routine wait for kill")
 			<-notifyEndRun
 			log.Infof("KILLED OLD PROCESS in routine wait for kill")
-
 		}
 		log.Infof("Finished auto update setup for closure")
 		os.Exit(0)
@@ -363,7 +294,7 @@ func getLatestRelease() (string, string, error) {
 				return rel.TagName, asset.BrowserDownloadURL, nil
 			}
 		}
-		return "", "", io.EOF
+		return "", "", fmt.Errorf("unsupported architecture: %s-%s", runtime.GOOS, runtime.GOARCH)
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
