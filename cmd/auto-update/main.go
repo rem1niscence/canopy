@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -64,6 +63,9 @@ var (
 		1: "http://canopy-mainnet-latest-chain-id1.us.nodefleet.net",
 		2: "http://canopy-mainnet-latest-chain-id2.us.nodefleet.net",
 	}
+
+	// log to persist on disk
+	log = lib.NewDefaultLogger()
 )
 
 // Release represents a GitHub release with all its associated metadata
@@ -150,17 +152,17 @@ func HandleStart() {
 		<-notifyStartRun
 
 		downloadLock.Lock()
-		log.Printf("Starting version: %s in %s from %s...\n", curRelease, binPath, repoOwner)
+		log.Infof("Starting version: %s in %s from %s...\n", curRelease, binPath, repoOwner)
 		// run the new binary
 		cmd, err = runBinary()
 		if err != nil {
-			log.Printf("Failed to run binary: %v", err)
+			log.Errorf("Failed to run binary: %v", err)
 		}
 		downloadLock.Unlock()
 
 		// Wait for the child process to exit
 		err = cmd.Wait()
-		log.Printf("Process exited: %v", err)
+		log.Infof("Process exited: %v", err)
 		if !uploadingNewVersion.Load() {
 			killedFromChild.Store(true)
 			stop <- syscall.SIGINT
@@ -176,34 +178,34 @@ func HandleUpdateCheck() {
 	for i := 0; ; i++ {
 		version, url, err := getLatestRelease()
 		if err != nil {
-			log.Printf("Failed get latest release from %s: %v", repoOwner, err)
-			log.Println("Checking for upgrade in 30m...")
+			log.Warnf("Failed to get latest release from %s: %v", repoOwner, err)
+			log.Infof("Checking for upgrade in %s...", waitTime)
 			time.Sleep(waitTime)
 			continue
 		}
 		if curRelease != version {
-			log.Println("NEW VERSION FOUND")
+			log.Infof("NEW VERSION FOUND")
 			err := downloadRelease(url, downloadLock)
 			if err != nil {
-				log.Printf("Failed to download release from %s: %v", repoOwner, err)
-				log.Println("Checking for upgrade in 30m...")
+				log.Errorf("Failed to download release from %s: %v", repoOwner, err)
+				log.Infof("Checking for upgrade in %s...", waitTime)
 				time.Sleep(waitTime)
 				continue
 			}
 			curRelease = version
 
-			log.Println("NEW DOWNLOAD DONE")
+			log.Infof("NEW DOWNLOAD DONE")
 
 			// check whether the new version requires a snapshot update
 			var snapshotPath string
 			var snapshotErr error
 			if applySnapshot := strings.Contains(version, "snapshot"); applySnapshot {
-				log.Printf("New version %s requires snapshot update, installing...", curRelease)
+				log.Infof("New version %s requires snapshot update, installing...", curRelease)
 				snapshotPath, snapshotErr = HandleNewSnapshot(config)
 				if snapshotErr != nil {
-					log.Printf("Failed to install snapshot: %v", snapshotErr)
+					log.Errorf("Failed to install snapshot: %v", snapshotErr)
 				} else {
-					log.Printf("snapshot successfully downloaded at: %s", snapshotPath)
+					log.Infof("snapshot successfully downloaded at: %s", snapshotPath)
 				}
 			}
 
@@ -217,9 +219,9 @@ func HandleUpdateCheck() {
 						minutes := rand.Intn(30) + 1
 						duration := time.Duration(minutes) * time.Minute
 
-						log.Printf("Waiting for %v before uploading...\n", duration)
+						log.Infof("Waiting for %v before uploading...\n", duration)
 						time.Sleep(duration)
-						log.Println("Done waiting.")
+						log.Infof("Done waiting.")
 					}
 
 					if cmd != nil {
@@ -229,20 +231,20 @@ func HandleUpdateCheck() {
 						// Gracefully terminate the current process
 						err = cmd.Process.Signal(syscall.SIGINT)
 						if err != nil {
-							log.Printf("Failed to send syscall to child process in routine of check updates: %v", err)
+							log.Errorf("Failed to send syscall to child process in routine of check updates: %v", err)
 							return // use of return instead of continue here is correct since this routine is short lived
 						}
 
-						log.Println("SENT KILL SIGNAL in routine of check updates")
+						log.Infof("SENT KILL SIGNAL in routine of check updates")
 						<-notifyEndRun
-						log.Println("KILLED OLD PROCESS in routine of check updates")
+						log.Infof("KILLED OLD PROCESS in routine of check updates")
 
 						if snapshotPath != "" {
-							log.Printf("replacing current database with new snapshot")
+							log.Infof("replacing current database with new snapshot")
 							if err := replaceSnapshot(snapshotPath, config); err != nil {
-								log.Printf("Failed to replace snapshot: %v", err)
+								log.Errorf("Failed to replace snapshot: %v", err)
 							} else {
-								log.Printf("replaced current database with new snapshot")
+								log.Infof("replaced current database with new snapshot")
 							}
 						}
 					}
@@ -252,7 +254,7 @@ func HandleUpdateCheck() {
 			}
 		}
 
-		log.Println("Checking for upgrade in 30m...")
+		log.Infof("Checking for upgrade in 30m...")
 		time.Sleep(waitTime)
 	}
 }
@@ -263,21 +265,21 @@ func HandleKill() {
 		signal.Notify(stop, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGABRT)
 		// block until kill signal is received
 		s := <-stop
-		log.Printf("Exit command %s received in auto update\n", s)
+		log.Warnf("Exit command %s received in auto update\n", s)
 		if !killedFromChild.Load() {
 			// Gracefully terminate the current process
 			err = cmd.Process.Signal(syscall.SIGINT)
 			if err != nil {
 				killedFromChild.Store(false) // in case of error when a new kill signal comes it is not necessarily because of child process kill
-				log.Printf("Failed to send syscall to child process in routine wait for kill: %v", err)
+				log.Errorf("Failed to send syscall to child process in routine wait for kill: %v", err)
 				continue
 			}
-			log.Println("SENT KILL SIGNAL in routine wait for kill")
+			log.Infof("SENT KILL SIGNAL in routine wait for kill")
 			<-notifyEndRun
-			log.Println("KILLED OLD PROCESS in routine wait for kill")
+			log.Infof("KILLED OLD PROCESS in routine wait for kill")
 
 		}
-		log.Println("Finished auto update setup for closure")
+		log.Infof("Finished auto update setup for closure")
 		os.Exit(0)
 	}
 }
@@ -312,26 +314,26 @@ func runAutoUpdate(config lib.Config) {
 func main() {
 	// check if start was called or just waken up for setup
 	if len(os.Args) < 2 || os.Args[1] != "start" {
-		log.Println("Set up complete! Now you can start!")
+		log.Infof("Set up complete! Now you can start!")
 		return
 	}
 
 	// Initialize data directory and configuration
 	err := os.MkdirAll(cli.DataDir, os.ModePerm)
 	if err != nil {
-		log.Print(err.Error())
+		log.Errorf(err.Error())
 	}
 	configFilePath := filepath.Join(cli.DataDir, lib.ConfigFilePath)
 	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) {
-		log.Printf("Creating %s file", lib.ConfigFilePath)
+		log.Infof("creating %s file", lib.ConfigFilePath)
 		if err = lib.DefaultConfig().WriteToFile(configFilePath); err != nil {
-			log.Print(err.Error())
+			log.Errorf(err.Error())
 		}
 	}
 	// Load configuration
 	config, err = lib.NewConfigFromFile(configFilePath)
 	if err != nil {
-		log.Print(err.Error())
+		log.Errorf(err.Error())
 	}
 	// Run auto update
 	go runAutoUpdate(config)
@@ -461,17 +463,17 @@ func HandleNewSnapshot(config lib.Config) (snapshotPath string, err error) {
 	}()
 	defer file.Close()
 	// download the snapshot file
-	log.Printf("downloading snapshot file...")
+	log.Infof("downloading snapshot file...")
 	if err = downloadToFile(file, url); err != nil {
 		return "", err
 	}
-	log.Printf("snapshot file downloaded")
+	log.Infof("snapshot file downloaded")
 	// decompress the snapshot file in the same directory
-	log.Printf("decompressing snapshot file...")
+	log.Infof("decompressing snapshot file...")
 	if err = decompressCMD(context.Background(), snapshotFile, snapshotPath); err != nil {
 		return "", err
 	}
-	log.Printf("decompressed snapshot file")
+	log.Infof("decompressed snapshot file")
 	// remove the temporary snapshot file
 	if err = os.Remove(snapshotFile); err != nil {
 		return "", err
@@ -494,7 +496,7 @@ func replaceSnapshot(snapshotPath string, config lib.Config) (retErr error) {
 		}
 		// success: remove backup
 		if err := os.RemoveAll(backupPath); err != nil {
-			log.Printf("warning: failed to remove backup at %s: %v", backupPath, err)
+			log.Warnf("failed to remove backup at %s: %v", backupPath, err)
 		}
 	}()
 	// move current DB to backup if it exists
