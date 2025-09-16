@@ -23,7 +23,7 @@ const (
 
 	// program defaults
 	defaultRepoName    = "canopy"
-	defaultRepoOwner   = "rem1niscence"
+	defaultRepoOwner   = "canopy-network"
 	defaultBinPath     = "./cli"
 	defaultCheckPeriod = time.Minute * 30 // default check period for updates
 	defaultGracePeriod = time.Second * 2  // default grace period for graceful shutdown
