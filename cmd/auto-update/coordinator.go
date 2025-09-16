@@ -38,7 +38,7 @@ func NewProcessSupervisor(config *SupervisorConfig, logger lib.LoggerI) *Supervi
 	return &Supervisor{
 		config:   config,
 		log:      logger,
-		exitChan: make(chan error),
+		exitChan: make(chan error, 1),
 	}
 }
 
@@ -116,6 +116,14 @@ func (s *Supervisor) IsRunning() bool {
 	return s.running.Load() == true
 }
 
+func (s *Supervisor) IsStopping() bool {
+	return s.stopping.Load() == true
+}
+
+func (s *Supervisor) ExitChan() <-chan error {
+	return s.exitChan
+}
+
 type CoordinatorConfig struct {
 	Canopy      lib.Config
 	CheckPeriod time.Duration
@@ -162,13 +170,24 @@ func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 	// update loop
 	for {
 		select {
+		// possible unexpected program error
+		case err := <-c.supervisor.ExitChan():
+			if c.supervisor.IsStopping() {
+				// intentionally stopped during update/shutdown
+				continue
+			}
+			// program ended unexpectedly, return error
+			return err
 		// externally closed the program (user input, container orchestrator, etc...)
 		case <-ctx.Done():
 			// create new context with 30s timeout
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			return c.GracefulShutdown(shutdownCtx)
-		// periodic check for updates
+			c.log.Info("received termination signal, starting graceful shutdown")
+			err := c.GracefulShutdown(shutdownCtx)
+			c.log.Info("completed graceful shutdown")
+			return err
+			// periodic check for updates
 		case <-ticker.C:
 			c.log.Infof("Checking for updates")
 			if err := c.CheckAndApplyUpdate(ctx); err != nil {
@@ -181,7 +200,6 @@ func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 }
 
 func (c *Coordinator) GracefulShutdown(ctx context.Context) error {
-	c.log.Info("starting graceful shutdown")
 	time.Sleep(100 * time.Millisecond)
 	// stop any ongoing updates
 	c.updateInProgress.Store(false)
@@ -192,13 +210,7 @@ func (c *Coordinator) GracefulShutdown(ctx context.Context) error {
 	// stop the supervised process
 	shutdownCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	err := c.supervisor.Stop(shutdownCtx)
-	if err != nil {
-		c.log.Errorf("canopy stopped with error: %v", err)
-		return err
-	}
-	c.log.Info("stopped canopy program successfully")
-	return nil
+	return c.supervisor.Stop(shutdownCtx)
 }
 
 // CheckAndApplyUpdate performs a single update check and applies if needed

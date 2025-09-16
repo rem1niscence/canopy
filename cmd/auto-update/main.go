@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
@@ -57,8 +58,15 @@ func main() {
 	supervisor := NewProcessSupervisor(configs.Supervisor, logger)
 	coordinator := NewCoordinator(configs.Coordinator, updater, supervisor, snapshot, logger)
 	// start the update loop
-	if err := coordinator.StartUpdateLoop(ctx); err != nil {
-		log.Fatalf("failed to stop update loop: %v", err)
+	err := coordinator.StartUpdateLoop(ctx)
+	if err != nil {
+		logger.Errorf("canopy stopped with error: %v", err)
+		// extract exit code from error if it's an exec.ExitError
+		if exitError, ok := err.(*exec.ExitError); ok {
+			os.Exit(exitError.ExitCode())
+		}
+		// default for 1 for unknown errors
+		os.Exit(1)
 	}
 }
 
