@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,19 +19,21 @@ import (
 // Supervisor manages the CLI process lifecycle, from start to stop,
 // and notifies listeners when the process exits
 type Supervisor struct {
-	cmd      *exec.Cmd    // canopy sub-process
-	mu       sync.RWMutex // mutex for concurrent access
-	running  atomic.Bool  // flag indicating if process is running
-	stopping atomic.Bool  // flag indicating if process is stopping
-	exitChan chan error   // channel to notify listeners when process exits
-	log      lib.LoggerI  // logger instance
+	cmd            *exec.Cmd    // canopy sub-process
+	mu             sync.RWMutex // mutex for concurrent access
+	running        atomic.Bool  // flag indicating if process is running
+	stopping       atomic.Bool  // flag indicating if process is stopping
+	exit           chan error   // channel to notify listeners when process exits
+	unexpectedExit chan error   // for unexpected exits (UpdateLoop)
+	log            lib.LoggerI  // logger instance
 }
 
 // NewSupervisor creates a new ProcessSupervisor instance
 func NewSupervisor(logger lib.LoggerI) *Supervisor {
 	return &Supervisor{
-		log:      logger,
-		exitChan: make(chan error, 1),
+		log:            logger,
+		exit:           make(chan error, 1),
+		unexpectedExit: make(chan error, 1),
 	}
 }
 
@@ -70,7 +72,12 @@ func (ps *Supervisor) Start(binPath string) error {
 func (ps *Supervisor) Monitor() {
 	err := ps.cmd.Wait()
 	ps.running.Store(false)
-	ps.exitChan <- err
+	// route exit to the appropriate consumer
+	if ps.stopping.Load() {
+		ps.exit <- err
+		return
+	}
+	ps.unexpectedExit <- err
 }
 
 // Stop gracefully terminates the CLI process
@@ -86,22 +93,22 @@ func (ps *Supervisor) Stop(ctx context.Context) error {
 	ps.stopping.Store(true)
 	defer ps.stopping.Store(false)
 	ps.log.Info("stopping CLI process gracefully")
-	// send stop signal to the process
-	if err := ps.cmd.Process.Signal(syscall.SIGINT); err != nil {
+	// Send SIGINT to the entire process group.
+	pgid, err := syscall.Getpgid(ps.cmd.Process.Pid)
+	if err != nil {
+		return fmt.Errorf("failed to get process group id: %w", err)
+	}
+	if err := syscall.Kill(-pgid, syscall.SIGINT); err != nil {
 		return fmt.Errorf("failed to send stop signal: %w", err)
 	}
 	// wait for the monitoring goroutine to report exit
 	select {
-	case err := <-ps.exitChan:
+	case err := <-ps.exit:
 		return err
 	case <-ctx.Done():
-		err := ctx.Err()
 		ps.log.Warn("graceful shutdown timed out, force killing")
-		if killErr := ps.cmd.Process.Kill(); killErr != nil {
-			err = errors.Join(err, killErr)
-			ps.log.Errorf("failed to force kill: %v", killErr)
-		}
-		return err
+		_ = syscall.Kill(-pgid, syscall.SIGKILL)
+		return ctx.Err()
 	}
 }
 
@@ -115,9 +122,9 @@ func (s *Supervisor) IsStopping() bool {
 	return s.stopping.Load() == true
 }
 
-// ExitChan notifies the caller when the Supervisor process has exited
-func (s *Supervisor) ExitChan() <-chan error {
-	return s.exitChan
+// UnexpectedExit notifies UpdateLoop when the process exits unexpectedly
+func (s *Supervisor) UnexpectedExit() <-chan error {
+	return s.unexpectedExit
 }
 
 // Coordinator code below
@@ -130,7 +137,7 @@ type CoordinatorConfig struct {
 }
 
 // Coordinator orchestrates the process of updating while managing CLI lifecycle
-// handles the the coordination between checking updates, stopping processes, and
+// handles the coordination between checking updates, stopping processes, and
 // restarting
 type Coordinator struct {
 	updater          *UpdateManager     // updater instance reference
@@ -162,23 +169,15 @@ func (c *Coordinator) UpdateLoop(ctx context.Context) error {
 	if err := c.supervisor.Start(c.config.BinPath); err != nil {
 		return err
 	}
-	// run an initial update check immediately
-	c.log.Info("initial update check")
-	if err := c.CheckAndApplyUpdate(ctx); err != nil {
-		c.log.Errorf("initial update check failed: %v", err)
-	}
-	// create the ticker to check for updates periodically
-	ticker := time.NewTicker(c.config.CheckPeriod)
+	// create the ticker to check for updates periodically, with a 0
+	// duration to start immediately
+	ticker := time.NewTicker(1)
 	defer ticker.Stop()
 	// update loop
 	for {
 		select {
 		// possible unexpected program error
-		case err := <-c.supervisor.ExitChan():
-			if c.supervisor.IsStopping() {
-				// intentionally stopped during update/shutdown
-				continue
-			}
+		case err := <-c.supervisor.UnexpectedExit():
 			// program ended unexpectedly, return error
 			return err
 		// externally closed the program (user input, container orchestrator, etc...)
@@ -198,6 +197,8 @@ func (c *Coordinator) UpdateLoop(ctx context.Context) error {
 			}
 			c.log.Infof("update check completed, performing next check in %s",
 				c.config.CheckPeriod)
+			// reset the ticker to start the next check
+			ticker.Reset(c.config.CheckPeriod)
 		}
 	}
 }
@@ -234,7 +235,7 @@ func (c *Coordinator) CheckAndApplyUpdate(ctx context.Context) error {
 		c.log.Debug("No update available")
 		return nil
 	}
-	c.log.Infof("New version found: %s", release.Version)
+	c.log.Infof("new version found: %s", release.Version)
 	// download the new version
 	if err := c.updater.Download(ctx, release); err != nil {
 		return fmt.Errorf("failed to download release: %w", err)
@@ -266,9 +267,16 @@ func (c *Coordinator) ApplyUpdate(ctx context.Context, release *Release) error {
 	}
 	// add random delay for staggered updates (1-30 minutes)
 	if c.supervisor.IsRunning() {
-		delay := time.Duration(rand.Intn(30)+1) * time.Minute
+		delay := time.Duration(rand.IntN(30)+1) * time.Minute
 		c.log.Infof("waiting %v before applying update", delay)
-		time.Sleep(delay)
+		timer := time.NewTimer(delay)
+		// allow cancellation of timer if context is done
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+		}
 	}
 	// stop current process if running
 	if c.supervisor.IsRunning() {
@@ -294,5 +302,7 @@ func (c *Coordinator) ApplyUpdate(ctx context.Context, release *Release) error {
 		return fmt.Errorf("failed to start updated process: %w", err)
 	}
 	c.log.Infof("update to version %s completed successfully", release.Version)
+	// update updateManager to have the new version
+	c.updater.Version = release.Version
 	return nil
 }

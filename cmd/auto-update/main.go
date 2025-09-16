@@ -49,8 +49,8 @@ func main() {
 		return
 	}
 	// handle external shutdown signals
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	defer stop()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer cancel()
 	// setup the dependencies
 	updater := NewUpdateManager(configs.Updater, logger, rpc.SoftwareVersion)
 	snapshot := NewSnapshotManager(configs.Snapshot)
@@ -88,10 +88,11 @@ func getConfigs() (*Configs, lib.LoggerI) {
 	binPath := envOrDefault("CANOPY_BIN_PATH", defaultBinPath)
 
 	updater := &UpdaterConfig{
-		RepoName:    envOrDefault("CANOPY_REPO_NAME", defaultRepoName),
-		RepoOwner:   envOrDefault("CANOPY_REPO_OWNER", defaultRepoOwner),
-		BinPath:     binPath,
-		SnapshotKey: snapshotMetadataKey,
+		RepoName:       envOrDefault("CANOPY_REPO_NAME", defaultRepoName),
+		RepoOwner:      envOrDefault("CANOPY_REPO_OWNER", defaultRepoOwner),
+		GithubApiToken: envOrDefault("CANOPY_GITHUB_API_TOKEN", ""),
+		BinPath:        binPath,
+		SnapshotKey:    snapshotMetadataKey,
 	}
 
 	snapshot := &SnapshotConfig{

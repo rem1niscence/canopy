@@ -37,10 +37,11 @@ type Release struct {
 
 // UpdaterConfig contains configuration for the updater
 type UpdaterConfig struct {
-	RepoName    string // name of the repository
-	RepoOwner   string // owner of the repository
-	BinPath     string // path to the binary to be updated
-	SnapshotKey string // version metadata key to know if a snapshot should be applied
+	RepoName       string // name of the repository
+	RepoOwner      string // owner of the repository
+	BinPath        string // path to the binary to be updated
+	SnapshotKey    string // version metadata key to know if a snapshot should be applied
+	GithubApiToken string // github api token for authenticated requests
 }
 
 // UpdateManager manages the update process for the current binary
@@ -79,13 +80,22 @@ func (um *UpdateManager) Check() (*Release, error) {
 // GetLatestRelease returns the latest valid release for the system from the GitHub API
 func (um *UpdateManager) GetLatestRelease() (release *Release, err error) {
 	// build the URL: https://api.github.com/repos/<owner>/<repo>/releases/latest
-	url, err := url.JoinPath("https://api.github.com", "repos",
+	apiURL, err := url.JoinPath("https://api.github.com", "repos",
 		um.config.RepoOwner, um.config.RepoName, "releases", "latest")
 	if err != nil {
 		return nil, err
 	}
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	// github recommends to add an user agent to any API request
+	req.Header.Set("User-Agent", "canopy-updater/1.0")
+	if token := um.config.GithubApiToken; token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	// make the request
-	resp, err := um.httpClient.Get(url)
+	resp, err := um.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -124,13 +134,20 @@ func (um *UpdateManager) ShouldUpdate(release *Release) error {
 	if release == nil {
 		return fmt.Errorf("release is nil")
 	}
-	// parses the version string, should be semver valid as per
-	// https://pkg.go.dev/golang.org/x/mod/semver
-	if !semver.IsValid(release.Version) {
+
+	candidate := semver.Canonical(release.Version)
+	current := semver.Canonical(um.Version)
+
+	if candidate == "" || !semver.IsValid(candidate) {
 		return fmt.Errorf("invalid release version: %s", release.Version)
 	}
-	release.ShouldUpdate = semver.Compare(release.Version, um.Version) >= 0
-	release.ApplySnapshot = strings.Contains(release.Version, um.config.SnapshotKey)
+	if current == "" || !semver.IsValid(current) {
+		return fmt.Errorf("invalid local version: %s", um.Version)
+	}
+
+	release.Version = candidate
+	release.ShouldUpdate = semver.Compare(candidate, current) > 0
+	release.ApplySnapshot = strings.Contains(candidate, um.config.SnapshotKey)
 	return nil
 }
 
@@ -141,11 +158,19 @@ func (um *UpdateManager) Download(ctx context.Context, release *Release) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	// github recommends to add an user agent to any API request
+	req.Header.Set("User-Agent", "canopy-updater/1.0")
+	if token := um.config.GithubApiToken; token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := um.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 	// save the response as an executable
 	f, err := SaveToFile(um.config.BinPath, resp.Body, 0755)
 	if err != nil {
@@ -168,14 +193,14 @@ type SnapshotManager struct {
 	// snapshot config
 	config *SnapshotConfig
 	// httpClient
-	client *http.Client
+	httpClient *http.Client
 }
 
 // NewSnapshotManager creates a new SnapshotManager
 func NewSnapshotManager(config *SnapshotConfig) *SnapshotManager {
 	return &SnapshotManager{
-		config: config,
-		client: &http.Client{Timeout: httpSnapshotClientTimeout},
+		config:     config,
+		httpClient: &http.Client{Timeout: httpSnapshotClientTimeout},
 	}
 }
 
@@ -215,12 +240,16 @@ func (sm *SnapshotManager) Download(ctx context.Context, path string, chainID ui
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	req.Header.Set("User-Agent", "canopy-updater/1.0")
+	resp, err := sm.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	// save the snapshot to a file
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	// save the snapshot to a file
 	return SaveToFile(path, resp.Body, 0644)
 }
 
@@ -271,7 +300,7 @@ func Extract(ctx context.Context, sourceFile string, targetDir string) error {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 	// use tar with built-in gzip decompression: tar -C target -xzvf source
-	tarCmd := exec.CommandContext(ctx, "tar", "-C", absTarget, "-xzvf", absSource)
+	tarCmd := exec.CommandContext(ctx, "tar", "-C", absTarget, "-xzf", absSource)
 	tarCmd.Stderr = os.Stderr
 	// run the command
 	if err := tarCmd.Run(); err != nil {
@@ -283,22 +312,44 @@ func Extract(ctx context.Context, sourceFile string, targetDir string) error {
 
 // SaveToFile saves the response body to a file with the given path and permissions
 func SaveToFile(path string, r io.Reader, perm fs.FileMode) (f *os.File, err error) {
-	// create and truncate the file if it exists
-	f, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+	// ensure destination directory exists
+	dir := filepath.Dir(path)
+	if err = os.MkdirAll(dir, 0755); err != nil {
+		return nil, err
+	}
+	// create a temporary file in the same directory to allow atomic rename
+	tmp, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {
 		return nil, err
 	}
-	// ensure close + cleanup on any error.
+	tmpPath := tmp.Name()
+	// cleanup on any error
 	defer func() {
 		if err != nil {
-			// remove file
-			_ = os.Remove(path)
+			_ = tmp.Close()
+			_ = os.Remove(tmpPath)
 		}
 	}()
-	// copy the response body to the file
-	if _, err = io.Copy(f, r); err != nil {
+	// copy data to temporary file
+	if _, err = io.Copy(tmp, r); err != nil {
 		return nil, err
 	}
-	// exit
+	// set permissions before rename so perms carry over
+	if err = tmp.Chmod(perm); err != nil {
+		return nil, err
+	}
+	// close temp file before rename
+	if err = tmp.Close(); err != nil {
+		return nil, err
+	}
+	// atomic replace (same directory ensures same filesystem)
+	if err = os.Rename(tmpPath, path); err != nil {
+		return nil, err
+	}
+	// reopen the final file to be able to return it
+	f, err = os.Open(path)
+	if err != nil {
+		return nil, err
+	}
 	return f, nil
 }
