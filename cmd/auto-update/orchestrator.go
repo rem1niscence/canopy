@@ -101,7 +101,7 @@ func (ps *Supervisor) Stop(ctx context.Context) error {
 		return err
 	case <-ctx.Done():
 		ps.log.Warn("Graceful shutdown timed out, force killing")
-		if killErr := cmd.Process.Kill(); killErr != nil {
+		if killErr := ps.cmd.Process.Kill(); killErr != nil {
 			ps.log.Errorf("Failed to force kill: %v", killErr)
 		}
 		// still wait for the monitoring goroutine to finish
