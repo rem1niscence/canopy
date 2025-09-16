@@ -38,63 +38,63 @@ func NewSupervisor(logger lib.LoggerI) *Supervisor {
 }
 
 // Start starts the process and runs it until it exits
-func (ps *Supervisor) Start(binPath string) error {
+func (s *Supervisor) Start(binPath string) error {
 	// hold the lock to prevent concurrent modifications
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// check if process is already running
-	if ps.running.Load() && ps.cmd != nil {
+	if s.running.Load() && s.cmd != nil {
 		return errors.New("process already running")
 	}
-	ps.log.Infof("starting CLI process: %s", binPath)
+	s.log.Infof("starting CLI process: %s", binPath)
 	// setup the process to start
-	ps.cmd = exec.Command(binPath, "start")
-	ps.cmd.Stdout = os.Stdout
-	ps.cmd.Stderr = os.Stderr
+	s.cmd = exec.Command(binPath, "start")
+	s.cmd.Stdout = os.Stdout
+	s.cmd.Stderr = os.Stderr
 	// make sure the process is in a new process group, this is important for
 	// ensuring that the process can be terminated by the coordinator
-	ps.cmd.SysProcAttr = &syscall.SysProcAttr{
+	s.cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
 	// start the process
-	if err := ps.cmd.Start(); err != nil {
+	if err := s.cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start canopy binary: %s", err)
 	}
 	// set variables for monitoring and exit processing
-	ps.running.Store(true)
-	ps.stopping.Store(false)
+	s.running.Store(true)
+	s.stopping.Store(false)
 	// start monitoring the process until it exits
-	go ps.Monitor()
+	go s.Monitor()
 	return nil
 }
 
 // Monitor runs the process while waiting for it to stop
-func (ps *Supervisor) Monitor() {
-	err := ps.cmd.Wait()
-	ps.running.Store(false)
+func (s *Supervisor) Monitor() {
+	err := s.cmd.Wait()
+	s.running.Store(false)
 	// route exit to the appropriate consumer
-	if ps.stopping.Load() {
-		ps.exit <- err
+	if s.stopping.Load() {
+		s.exit <- err
 		return
 	}
-	ps.unexpectedExit <- err
+	s.unexpectedExit <- err
 }
 
 // Stop gracefully terminates the CLI process
-func (ps *Supervisor) Stop(ctx context.Context) error {
+func (s *Supervisor) Stop(ctx context.Context) error {
 	// hold the lock to prevent concurrent modifications
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// check if process exist and is running
-	if !ps.IsRunning() || ps.cmd == nil {
+	if !s.IsRunning() || s.cmd == nil {
 		return nil
 	}
 	// store stopping status
-	ps.stopping.Store(true)
-	defer ps.stopping.Store(false)
-	ps.log.Info("stopping CLI process gracefully")
+	s.stopping.Store(true)
+	defer s.stopping.Store(false)
+	s.log.Info("stopping CLI process gracefully")
 	// Send SIGINT to the entire process group.
-	pgid, err := syscall.Getpgid(ps.cmd.Process.Pid)
+	pgid, err := syscall.Getpgid(s.cmd.Process.Pid)
 	if err != nil {
 		return fmt.Errorf("failed to get process group id: %w", err)
 	}
@@ -103,10 +103,10 @@ func (ps *Supervisor) Stop(ctx context.Context) error {
 	}
 	// wait for the monitoring goroutine to report exit
 	select {
-	case err := <-ps.exit:
+	case err := <-s.exit:
 		return err
 	case <-ctx.Done():
-		ps.log.Warn("graceful shutdown timed out, force killing")
+		s.log.Warn("graceful shutdown timed out, force killing")
 		_ = syscall.Kill(-pgid, syscall.SIGKILL)
 		return ctx.Err()
 	}
@@ -131,10 +131,11 @@ func (s *Supervisor) UnexpectedExit() <-chan error {
 
 // CoordinatorConfig holds the configuration for the Coordinator
 type CoordinatorConfig struct {
-	Canopy      lib.Config    // Configuration for the canopy service
-	BinPath     string        // Path to the binary file
-	CheckPeriod time.Duration // Period for checking updates
-	GracePeriod time.Duration // Grace period for tasks completion during shutdown
+	Canopy       lib.Config    // Configuration for the canopy service
+	BinPath      string        // Path to the binary file
+	MaxDelayTime int           // Max time for delaying the update process (minutes)
+	CheckPeriod  time.Duration // Period for checking updates
+	GracePeriod  time.Duration // Grace period for tasks completion during shutdown
 }
 
 // Coordinator orchestrates the process of updating while managing CLI lifecycle
@@ -180,15 +181,15 @@ func (c *Coordinator) UpdateLoop(ctx context.Context, cancel context.CancelFunc)
 		case err := <-c.supervisor.UnexpectedExit():
 			// program ended unexpectedly, cancel the context, to clean up resources
 			cancel()
-			// grace wait for graceful shutdown
-			grace := time.NewTimer(c.config.GracePeriod)
-			<-grace.C
-			grace.Stop()
+			// gracePeriodTimer wait for graceful shutdown
+			gracePeriodTimer := time.NewTimer(c.config.GracePeriod)
+			<-gracePeriodTimer.C
+			gracePeriodTimer.Stop()
 			// exit
 			return err
 		// externally closed the program (user input, container orchestrator, etc...)
 		case <-ctx.Done():
-			// create a new context with a 5s timeout
+			// create a new context with the grace period
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), c.config.GracePeriod)
 			defer cancel()
 			c.log.Info("received termination signal, starting graceful shutdown")
@@ -222,7 +223,7 @@ func (c *Coordinator) GracefulShutdown(ctx context.Context) error {
 		return nil
 	}
 	// stop the supervised process
-	shutdownCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(ctx, c.config.GracePeriod)
 	defer cancel()
 	return c.supervisor.Stop(shutdownCtx)
 }
@@ -276,7 +277,7 @@ func (c *Coordinator) ApplyUpdate(ctx context.Context, release *Release) error {
 	}
 	// add random delay for staggered updates (1-30 minutes)
 	if c.supervisor.IsRunning() {
-		delay := time.Duration(rand.IntN(30)+1) * time.Minute
+		delay := time.Duration(rand.IntN(c.config.MaxDelayTime)+1) * time.Minute
 		c.log.Infof("waiting %v before applying update", delay)
 		timer := time.NewTimer(delay)
 		// allow cancellation of timer if context is done
@@ -290,7 +291,7 @@ func (c *Coordinator) ApplyUpdate(ctx context.Context, release *Release) error {
 	// stop current process if running
 	if c.supervisor.IsRunning() {
 		c.log.Info("stopping current CLI process for update")
-		stopCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		stopCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		if err := c.supervisor.Stop(stopCtx); err != nil {
 			return fmt.Errorf("failed to stop process for update: %w", err)
@@ -301,7 +302,7 @@ func (c *Coordinator) ApplyUpdate(ctx context.Context, release *Release) error {
 		c.log.Info("installing snapshot")
 		dbPath := filepath.Join(canopy.DataDirPath, canopy.DBName)
 		if err := c.snapshot.Install(snapshotPath, dbPath); err != nil {
-			c.log.Errorf("Failed to install snapshot: %v", err)
+			c.log.Errorf("failed to install snapshot: %v", err)
 			// continue with update even if snapshot fails
 		}
 	}

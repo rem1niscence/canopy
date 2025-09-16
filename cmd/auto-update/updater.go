@@ -134,19 +134,20 @@ func (um *UpdateManager) ShouldUpdate(release *Release) error {
 	if release == nil {
 		return fmt.Errorf("release is nil")
 	}
-
+	// convert the versions to their canonical form
 	candidate := semver.Canonical(release.Version)
 	current := semver.Canonical(um.Version)
-
+	// check if the versions are valid
 	if candidate == "" || !semver.IsValid(candidate) {
 		return fmt.Errorf("invalid release version: %s", release.Version)
 	}
 	if current == "" || !semver.IsValid(current) {
 		return fmt.Errorf("invalid local version: %s", um.Version)
 	}
-
 	release.Version = candidate
+	// should update if the candidate version is greater than the current version
 	release.ShouldUpdate = semver.Compare(candidate, current) > 0
+	// should apply snapshot if the candidate version contains the snapshot key
 	release.ApplySnapshot = strings.Contains(candidate, um.config.SnapshotKey)
 	return nil
 }
@@ -172,11 +173,11 @@ func (um *UpdateManager) Download(ctx context.Context, release *Release) error {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	// save the response as an executable
-	f, err := SaveToFile(um.config.BinPath, resp.Body, 0755)
+	bin, err := SaveToFile(um.config.BinPath, resp.Body, 0755)
 	if err != nil {
 		return err
 	}
-	return f.Close()
+	return bin.Close()
 }
 
 type SnapshotConfig struct {
@@ -295,6 +296,10 @@ func Extract(ctx context.Context, sourceFile string, targetDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get absolute target path: %w", err)
 	}
+	// ensure source file exists
+	if _, err := os.Stat(absSource); err != nil {
+		return fmt.Errorf("source file does not exist: %w", err)
+	}
 	// ensure target directory exists
 	if err := os.MkdirAll(absTarget, 0755); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
@@ -311,7 +316,7 @@ func Extract(ctx context.Context, sourceFile string, targetDir string) error {
 }
 
 // SaveToFile saves the response body to a file with the given path and permissions
-func SaveToFile(path string, r io.Reader, perm fs.FileMode) (f *os.File, err error) {
+func SaveToFile(path string, r io.Reader, perm fs.FileMode) (file *os.File, err error) {
 	// ensure destination directory exists
 	dir := filepath.Dir(path)
 	if err = os.MkdirAll(dir, 0755); err != nil {
@@ -347,9 +352,9 @@ func SaveToFile(path string, r io.Reader, perm fs.FileMode) (f *os.File, err err
 		return nil, err
 	}
 	// reopen the final file to be able to return it
-	f, err = os.Open(path)
+	file, err = os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	return f, nil
+	return file, nil
 }

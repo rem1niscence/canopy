@@ -22,11 +22,12 @@ const (
 	httpSnapshotClientTimeout = 10 * time.Minute
 
 	// program defaults
-	defaultRepoName    = "canopy"
-	defaultRepoOwner   = "canopy-network"
-	defaultBinPath     = "./cli"
-	defaultCheckPeriod = time.Minute * 30 // default check period for updates
-	defaultGracePeriod = time.Second * 2  // default grace period for graceful shutdown
+	defaultRepoName     = "canopy"
+	defaultRepoOwner    = "canopy-network"
+	defaultBinPath      = "./cli"
+	defaultCheckPeriod  = time.Minute * 30 // default check period for updates
+	defaultGracePeriod  = time.Second * 2  // default grace period for graceful shutdown
+	defaultMaxDelayTime = 30               // default max delay time for staggered updates
 )
 
 var (
@@ -80,11 +81,11 @@ type Configs struct {
 
 // getConfigs returns the configuration for the updater, snapshotter, and process supervisor.
 func getConfigs() (*Configs, lib.LoggerI) {
-	config, _ := cli.InitializeDataDirectory(cli.DataDir, lib.NewDefaultLogger())
+	canopyConfig, _ := cli.InitializeDataDirectory(cli.DataDir, lib.NewDefaultLogger())
 	l := lib.NewLogger(lib.LoggerConfig{
-		Level:      config.GetLogLevel(),
-		Structured: config.Structured,
-		JSON:       config.JSON,
+		Level:      canopyConfig.GetLogLevel(),
+		Structured: canopyConfig.Structured,
+		JSON:       canopyConfig.JSON,
 	})
 
 	binPath := envOrDefault("CANOPY_BIN_PATH", defaultBinPath)
@@ -97,15 +98,16 @@ func getConfigs() (*Configs, lib.LoggerI) {
 		SnapshotKey:    snapshotMetadataKey,
 	}
 	snapshot := &SnapshotConfig{
-		canopy: config,
+		canopy: canopyConfig,
 		URLs:   snapshotURLs,
 		Name:   snapshotFileName,
 	}
 	coordinator := &CoordinatorConfig{
-		Canopy:      config,
-		BinPath:     binPath,
-		CheckPeriod: defaultCheckPeriod,
-		GracePeriod: defaultGracePeriod,
+		Canopy:       canopyConfig,
+		BinPath:      binPath,
+		MaxDelayTime: defaultMaxDelayTime,
+		CheckPeriod:  defaultCheckPeriod,
+		GracePeriod:  defaultGracePeriod,
 	}
 
 	return &Configs{
