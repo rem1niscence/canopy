@@ -134,6 +134,7 @@ type CoordinatorConfig struct {
 	Canopy      lib.Config    // Configuration for the canopy service
 	BinPath     string        // Path to the binary file
 	CheckPeriod time.Duration // Period for checking updates
+	GracePeriod time.Duration // Grace period for tasks completion during shutdown
 }
 
 // Coordinator orchestrates the process of updating while managing CLI lifecycle
@@ -164,41 +165,49 @@ func NewCoordinator(config *CoordinatorConfig, updater *UpdateManager,
 // UpdateLoop starts the update loop for the coordinator. This loop continuously checks
 // for updates and applies them if necessary while also providing graceful shutdown for any
 // termination signal received.
-func (c *Coordinator) UpdateLoop(ctx context.Context) error {
+func (c *Coordinator) UpdateLoop(ctx context.Context, cancel context.CancelFunc) error {
 	// start the program
 	if err := c.supervisor.Start(c.config.BinPath); err != nil {
 		return err
 	}
-	// create the ticker to check for updates periodically, with a 0
-	// duration to start immediately
-	ticker := time.NewTicker(1)
-	defer ticker.Stop()
+	// kick off an immediate check
+	timer := time.NewTimer(0)
+	defer timer.Stop()
 	// update loop
 	for {
 		select {
 		// possible unexpected program error
 		case err := <-c.supervisor.UnexpectedExit():
-			// program ended unexpectedly, return error
+			// program ended unexpectedly, cancel the context, to clean up resources
+			cancel()
+			// grace wait for graceful shutdown
+			grace := time.NewTimer(c.config.GracePeriod)
+			<-grace.C
+			grace.Stop()
+			// exit
 			return err
 		// externally closed the program (user input, container orchestrator, etc...)
 		case <-ctx.Done():
-			// create a new context with a 30s timeout
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			// create a new context with a 5s timeout
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), c.config.GracePeriod)
 			defer cancel()
 			c.log.Info("received termination signal, starting graceful shutdown")
 			err := c.GracefulShutdown(shutdownCtx)
 			c.log.Info("completed graceful shutdown")
 			return err
 		// periodic check for updates
-		case <-ticker.C:
-			c.log.Infof("checking for updates")
-			if err := c.CheckAndApplyUpdate(ctx); err != nil {
-				c.log.Errorf("update check failed: %v", err)
-			}
-			c.log.Infof("update check completed, performing next check in %s",
-				c.config.CheckPeriod)
-			// reset the ticker to start the next check
-			ticker.Reset(c.config.CheckPeriod)
+		case <-timer.C:
+			// wrap it on a goroutine so it doesn't block the main loop
+			go func() {
+				c.log.Infof("checking for updates")
+				if err := c.CheckAndApplyUpdate(ctx); err != nil {
+					c.log.Errorf("update check failed: %v", err)
+				}
+				c.log.Infof("update check completed, performing next check in %s",
+					c.config.CheckPeriod)
+				// reset the timer to start the next check
+				timer.Reset(c.config.CheckPeriod)
+			}()
 		}
 	}
 }

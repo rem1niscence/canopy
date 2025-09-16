@@ -23,9 +23,10 @@ const (
 
 	// program defaults
 	defaultRepoName    = "canopy"
-	defaultRepoOwner   = "canopy-network"
+	defaultRepoOwner   = "rem1niscence"
 	defaultBinPath     = "./cli"
 	defaultCheckPeriod = time.Minute * 30 // default check period for updates
+	defaultGracePeriod = time.Second * 2  // default grace period for graceful shutdown
 )
 
 var (
@@ -57,7 +58,7 @@ func main() {
 	supervisor := NewSupervisor(logger)
 	coordinator := NewCoordinator(configs.Coordinator, updater, supervisor, snapshot, logger)
 	// start the update loop
-	err := coordinator.UpdateLoop(ctx)
+	err := coordinator.UpdateLoop(ctx, cancel)
 	if err != nil {
 		logger.Errorf("canopy stopped with error: %v", err)
 		// extract exit code from error if it's an exec.ExitError
@@ -77,6 +78,7 @@ type Configs struct {
 	LoggerI     lib.LoggerI
 }
 
+// getConfigs returns the configuration for the updater, snapshotter, and process supervisor.
 func getConfigs() (*Configs, lib.LoggerI) {
 	config, _ := cli.InitializeDataDirectory(cli.DataDir, lib.NewDefaultLogger())
 	l := lib.NewLogger(lib.LoggerConfig{
@@ -94,17 +96,16 @@ func getConfigs() (*Configs, lib.LoggerI) {
 		BinPath:        binPath,
 		SnapshotKey:    snapshotMetadataKey,
 	}
-
 	snapshot := &SnapshotConfig{
 		canopy: config,
 		URLs:   snapshotURLs,
 		Name:   snapshotFileName,
 	}
-
 	coordinator := &CoordinatorConfig{
 		Canopy:      config,
-		CheckPeriod: defaultCheckPeriod,
 		BinPath:     binPath,
+		CheckPeriod: defaultCheckPeriod,
+		GracePeriod: defaultGracePeriod,
 	}
 
 	return &Configs{
