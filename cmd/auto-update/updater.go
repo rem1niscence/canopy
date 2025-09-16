@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/canopy-network/canopy/lib"
 	"golang.org/x/mod/semver"
@@ -30,19 +29,18 @@ type GithubRelease struct {
 
 // Release represents a release of the current binary with metadata on what to update
 type Release struct {
-	Version       string
-	DownloadURL   string
-	ShouldUpdate  bool
-	ApplySnapshot bool
+	Version       string // version of the release
+	DownloadURL   string // url to download the release
+	ShouldUpdate  bool   // whether the release should be updated
+	ApplySnapshot bool   // whether the release should apply a snapshot
 }
 
 // UpdaterConfig contains configuration for the updater
 type UpdaterConfig struct {
-	RepoName  string
-	RepoOwner string
-	BinPath   string
-	CheckTime time.Duration
-	WaitTime  time.Duration
+	RepoName    string // name of the repository
+	RepoOwner   string // owner of the repository
+	BinPath     string // path to the binary to be updated
+	SnapshotKey string // version metadata key to know if a snapshot should be applied
 }
 
 // UpdateManager manages the update process for the current binary
@@ -57,7 +55,7 @@ type UpdateManager struct {
 func NewUpdateManager(config *UpdaterConfig, logger lib.LoggerI, version string) *UpdateManager {
 	return &UpdateManager{
 		config:     config,
-		httpClient: &http.Client{Timeout: httpClientTimeout},
+		httpClient: &http.Client{Timeout: httpReleaseClientTimeout},
 		Version:    version,
 		log:        logger,
 	}
@@ -80,8 +78,8 @@ func (um *UpdateManager) Check() (*Release, error) {
 
 // GetLatestRelease returns the latest valid release for the system from the GitHub API
 func (um *UpdateManager) GetLatestRelease() (release *Release, err error) {
-	// build the URL
-	url, err := url.JoinPath(githubAPIBaseURL, "repos",
+	// build the URL: https://api.github.com/repos/<owner>/<repo>/releases/latest
+	url, err := url.JoinPath("https://api.github.com", "repos",
 		um.config.RepoOwner, um.config.RepoName, "releases", "latest")
 	if err != nil {
 		return nil, err
@@ -126,11 +124,13 @@ func (um *UpdateManager) ShouldUpdate(release *Release) error {
 	if release == nil {
 		return fmt.Errorf("release is nil")
 	}
+	// parses the version string, should be semver valid as per
+	// https://pkg.go.dev/golang.org/x/mod/semver
 	if !semver.IsValid(release.Version) {
 		return fmt.Errorf("invalid release version: %s", release.Version)
 	}
 	release.ShouldUpdate = semver.Compare(release.Version, um.Version) >= 0
-	release.ApplySnapshot = strings.Contains(release.Version, snapshotMetadataKey)
+	release.ApplySnapshot = strings.Contains(release.Version, um.config.SnapshotKey)
 	return nil
 }
 
@@ -147,33 +147,11 @@ func (um *UpdateManager) Download(ctx context.Context, release *Release) error {
 	}
 	defer resp.Body.Close()
 	// save the response as an executable
-	f, err := saveToFile(um.config.BinPath, resp.Body, 0755)
+	f, err := SaveToFile(um.config.BinPath, resp.Body, 0755)
 	if err != nil {
 		return err
 	}
 	return f.Close()
-}
-
-// saveToFile saves the response body to a file with the given path and permissions
-func saveToFile(path string, r io.Reader, perm fs.FileMode) (f *os.File, err error) {
-	// create and truncate the file if it exists
-	f, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
-	if err != nil {
-		return nil, err
-	}
-	// ensure close + cleanup on any error.
-	defer func() {
-		if err != nil {
-			// remove file
-			_ = os.Remove(path)
-		}
-	}()
-	// copy the response body to the file
-	if _, err = io.Copy(f, r); err != nil {
-		return nil, err
-	}
-	// exit
-	return f, nil
 }
 
 type SnapshotConfig struct {
@@ -197,7 +175,7 @@ type SnapshotManager struct {
 func NewSnapshotManager(config *SnapshotConfig) *SnapshotManager {
 	return &SnapshotManager{
 		config: config,
-		client: &http.Client{Timeout: 10 * time.Minute},
+		client: &http.Client{Timeout: httpSnapshotClientTimeout},
 	}
 }
 
@@ -222,7 +200,6 @@ func (sm *SnapshotManager) DownloadAndExtract(ctx context.Context, path string, 
 	// always remove the snapshot file after downloading
 	defer os.Remove(snapshot.Name())
 	// extract the snapshot
-	// TODO: remove context.Background to have a fixed extract timeout
 	return Extract(ctx, snapshot.Name(), path)
 }
 
@@ -244,7 +221,7 @@ func (sm *SnapshotManager) Download(ctx context.Context, path string, chainID ui
 	}
 	// save the snapshot to a file
 	defer resp.Body.Close()
-	return saveToFile(path, resp.Body, 0644)
+	return SaveToFile(path, resp.Body, 0644)
 }
 
 // Install installs the snapshot to the specified path, creating a backup
@@ -302,4 +279,26 @@ func Extract(ctx context.Context, sourceFile string, targetDir string) error {
 	}
 	// exit
 	return nil
+}
+
+// SaveToFile saves the response body to a file with the given path and permissions
+func SaveToFile(path string, r io.Reader, perm fs.FileMode) (f *os.File, err error) {
+	// create and truncate the file if it exists
+	f, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+	if err != nil {
+		return nil, err
+	}
+	// ensure close + cleanup on any error.
+	defer func() {
+		if err != nil {
+			// remove file
+			_ = os.Remove(path)
+		}
+	}()
+	// copy the response body to the file
+	if _, err = io.Copy(f, r); err != nil {
+		return nil, err
+	}
+	// exit
+	return f, nil
 }

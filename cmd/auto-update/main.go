@@ -17,19 +17,18 @@ import (
 const (
 	snapshotFileName    = "snapshot.tar.gz"
 	snapshotMetadataKey = "snapshot"
-	httpClientTimeout   = time.Second * 10
+
+	httpReleaseClientTimeout  = 30 * time.Second
+	httpSnapshotClientTimeout = 10 * time.Minute
 
 	// program defaults
-	defaultRepoName  = "canopy"
-	defaultRepoOwner = "rem1niscence"
-	defaultBinPath   = "./cli"
-
-	githubAPIBaseURL = "https://api.github.com"
+	defaultRepoName    = "canopy"
+	defaultRepoOwner   = "canopy-network"
+	defaultBinPath     = "./cli"
+	defaultCheckPeriod = time.Minute * 30 // default check period for updates
 )
 
 var (
-	defaultCheckPeriod = time.Minute * 30
-
 	// snapshotURLs contains the snapshot map for existing chains
 	snapshotURLs = map[uint64]string{
 		1: "http://canopy-mainnet-latest-chain-id1.us.nodefleet.net",
@@ -58,7 +57,7 @@ func main() {
 	supervisor := NewSupervisor(logger)
 	coordinator := NewCoordinator(configs.Coordinator, updater, supervisor, snapshot, logger)
 	// start the update loop
-	err := coordinator.StartUpdateLoop(ctx)
+	err := coordinator.UpdateLoop(ctx)
 	if err != nil {
 		logger.Errorf("canopy stopped with error: %v", err)
 		// extract exit code from error if it's an exec.ExitError
@@ -89,10 +88,10 @@ func getConfigs() (*Configs, lib.LoggerI) {
 	binPath := envOrDefault("CANOPY_BIN_PATH", defaultBinPath)
 
 	updater := &UpdaterConfig{
-		RepoName:  envOrDefault("CANOPY_REPO_NAME", defaultRepoName),
-		RepoOwner: envOrDefault("CANOPY_REPO_OWNER", defaultRepoOwner),
-		BinPath:   binPath,
-		CheckTime: defaultCheckPeriod,
+		RepoName:    envOrDefault("CANOPY_REPO_NAME", defaultRepoName),
+		RepoOwner:   envOrDefault("CANOPY_REPO_OWNER", defaultRepoOwner),
+		BinPath:     binPath,
+		SnapshotKey: snapshotMetadataKey,
 	}
 
 	snapshot := &SnapshotConfig{

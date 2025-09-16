@@ -16,14 +16,15 @@ import (
 	"github.com/canopy-network/canopy/lib"
 )
 
-// Supervisor manages the CLI process lifecycle, from start to stop while securing graceful shutdown
+// Supervisor manages the CLI process lifecycle, from start to stop,
+// and notifies listeners when the process exits
 type Supervisor struct {
-	cmd      *exec.Cmd
-	mu       sync.RWMutex
-	running  atomic.Bool
-	stopping atomic.Bool
-	exitChan chan error
-	log      lib.LoggerI
+	cmd      *exec.Cmd    // canopy sub-process
+	mu       sync.RWMutex // mutex for concurrent access
+	running  atomic.Bool  // flag indicating if process is running
+	stopping atomic.Bool  // flag indicating if process is stopping
+	exitChan chan error   // channel to notify listeners when process exits
+	log      lib.LoggerI  // logger instance
 }
 
 // NewSupervisor creates a new ProcessSupervisor instance
@@ -40,7 +41,7 @@ func (ps *Supervisor) Start(binPath string) error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	// check if process is already running
-	if ps.running.Load() {
+	if ps.running.Load() && ps.cmd != nil {
 		return errors.New("process already running")
 	}
 	ps.log.Infof("starting CLI process: %s", binPath)
@@ -48,7 +49,8 @@ func (ps *Supervisor) Start(binPath string) error {
 	ps.cmd = exec.Command(binPath, "start")
 	ps.cmd.Stdout = os.Stdout
 	ps.cmd.Stderr = os.Stderr
-	// make sure the process is in a new process group
+	// make sure the process is in a new process group, this is important for
+	// ensuring that the process can be terminated by the coordinator
 	ps.cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
@@ -93,13 +95,13 @@ func (ps *Supervisor) Stop(ctx context.Context) error {
 	case err := <-ps.exitChan:
 		return err
 	case <-ctx.Done():
+		err := ctx.Err()
 		ps.log.Warn("graceful shutdown timed out, force killing")
 		if killErr := ps.cmd.Process.Kill(); killErr != nil {
-			ps.log.Errorf("Failed to force kill: %v", killErr)
+			err = errors.Join(err, killErr)
+			ps.log.Errorf("failed to force kill: %v", killErr)
 		}
-		// still wait for the monitoring goroutine to finish
-		<-ps.exitChan
-		return ctx.Err()
+		return err
 	}
 }
 
@@ -108,30 +110,35 @@ func (s *Supervisor) IsRunning() bool {
 	return s.running.Load() == true
 }
 
+// IsStopping is a concurrent-safe method to check if the Supervisor process is stopping
 func (s *Supervisor) IsStopping() bool {
 	return s.stopping.Load() == true
 }
 
+// ExitChan notifies the caller when the Supervisor process has exited
 func (s *Supervisor) ExitChan() <-chan error {
 	return s.exitChan
 }
 
+// Coordinator code below
+
+// CoordinatorConfig holds the configuration for the Coordinator
 type CoordinatorConfig struct {
-	Canopy      lib.Config
-	BinPath     string
-	CheckPeriod time.Duration
+	Canopy      lib.Config    // Configuration for the canopy service
+	BinPath     string        // Path to the binary file
+	CheckPeriod time.Duration // Period for checking updates
 }
 
 // Coordinator orchestrates the process of updating while managing CLI lifecycle
 // handles the the coordination between checking updates, stopping processes, and
 // restarting
 type Coordinator struct {
-	updater          *UpdateManager
-	supervisor       *Supervisor
-	snapshot         *SnapshotManager
-	config           *CoordinatorConfig
-	updateInProgress atomic.Bool
-	log              lib.LoggerI
+	updater          *UpdateManager     // updater instance reference
+	supervisor       *Supervisor        // supervisor instance reference
+	snapshot         *SnapshotManager   // snapshot instance reference
+	config           *CoordinatorConfig // coordinator configuration
+	updateInProgress atomic.Bool        // flag indicating if an update is in progress
+	log              lib.LoggerI        // logger instance
 }
 
 // NewCoordinator creates a new Coordinator instance
@@ -147,7 +154,10 @@ func NewCoordinator(config *CoordinatorConfig, updater *UpdateManager,
 	}
 }
 
-func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
+// UpdateLoop starts the update loop for the coordinator. This loop continuously checks
+// for updates and applies them if necessary while also providing graceful shutdown for any
+// termination signal received.
+func (c *Coordinator) UpdateLoop(ctx context.Context) error {
 	// start the program
 	if err := c.supervisor.Start(c.config.BinPath); err != nil {
 		return err
@@ -180,7 +190,7 @@ func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 			err := c.GracefulShutdown(shutdownCtx)
 			c.log.Info("completed graceful shutdown")
 			return err
-			// periodic check for updates
+		// periodic check for updates
 		case <-ticker.C:
 			c.log.Infof("checking for updates")
 			if err := c.CheckAndApplyUpdate(ctx); err != nil {
@@ -192,6 +202,8 @@ func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 	}
 }
 
+// GracefulShutdown gracefully shuts down the coordinator while giving a grace period the the
+// canopy program to stop
 func (c *Coordinator) GracefulShutdown(ctx context.Context) error {
 	// stop any ongoing updates
 	c.updateInProgress.Store(false)
