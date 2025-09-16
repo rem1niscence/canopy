@@ -41,6 +41,11 @@ func main() {
 	}
 	// get configs and logger
 	configs, logger := getConfigs()
+	// do not run the auto-update process if its disabled
+	if !configs.Coordinator.Canopy.AutoUpdate {
+		cli.Start()
+		return
+	}
 	// setup the dependencies
 	updater := NewUpdateManager(configs.Updater, logger, rpc.SoftwareVersion)
 	snapshot := NewSnapshotManager(configs.Snapshot)

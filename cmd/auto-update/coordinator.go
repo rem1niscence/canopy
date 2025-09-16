@@ -56,7 +56,10 @@ func (ps *Supervisor) Start() error {
 	ps.cmd = exec.Command(ps.config.BinPath, "start")
 	ps.cmd.Stdout = os.Stdout
 	ps.cmd.Stderr = os.Stderr
-	ps.cmd.Stdin = os.Stdin
+	// make sure the process is in a new process group
+	ps.cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
 	// start the process
 	if err := ps.cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start canopy binary: %s", err)
@@ -75,7 +78,6 @@ func (ps *Supervisor) Monitor() {
 	err := ps.cmd.Wait()
 	ps.running.Store(false)
 	ps.exitChan <- err
-	ps.log.Infof("CLI process exited: %v", err)
 }
 
 // Stop gracefully terminates the CLI process
@@ -100,7 +102,7 @@ func (ps *Supervisor) Stop(ctx context.Context) error {
 	case err := <-ps.exitChan:
 		return err
 	case <-ctx.Done():
-		ps.log.Warn("Graceful shutdown timed out, force killing")
+		ps.log.Warn("graceful shutdown timed out, force killing")
 		if killErr := ps.cmd.Process.Kill(); killErr != nil {
 			ps.log.Errorf("Failed to force kill: %v", killErr)
 		}
@@ -133,7 +135,8 @@ type Coordinator struct {
 }
 
 // NewCoordinator creates a new Coordinator instance
-func NewCoordinator(config *CoordinatorConfig, updater *UpdateManager, supervisor *Supervisor, snapshot *SnapshotManager, logger lib.LoggerI) *Coordinator {
+func NewCoordinator(config *CoordinatorConfig, updater *UpdateManager,
+	supervisor *Supervisor, snapshot *SnapshotManager, logger lib.LoggerI) *Coordinator {
 	return &Coordinator{
 		updater:          updater,
 		supervisor:       supervisor,
@@ -146,9 +149,11 @@ func NewCoordinator(config *CoordinatorConfig, updater *UpdateManager, superviso
 
 func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 	// run once immediately
+	c.log.Info("initial update check")
 	if err := c.CheckAndApplyUpdate(ctx); err != nil {
 		c.log.Errorf("initial update check failed: %v", err)
 	}
+	// create the ticker to check for updates periodically
 	ticker := time.NewTicker(c.config.CheckPeriod)
 	defer ticker.Stop()
 	// handle external shutdown signals
@@ -159,6 +164,11 @@ func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		// exit from the supervisor (surely due to an error)
+		case <-c.supervisor.exitChan:
+			c.log.Info("supervisor exited, initiating shutdown")
+			return c.GracefulShutdown(ctx)
+		// externally closed the program (user input, container orchestrator, etc...)
 		case sig := <-sigChan:
 			c.log.Infof("Received signal %v, initiating shutdown", sig)
 			return c.GracefulShutdown(ctx)
@@ -167,13 +177,15 @@ func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 			if err := c.CheckAndApplyUpdate(ctx); err != nil {
 				c.log.Errorf("Update check failed: %v", err)
 			}
-			c.log.Infof("update check completed, performing next check in %s", c.config.CheckPeriod)
+			c.log.Infof("update check completed, performing next check in %s",
+				c.config.CheckPeriod)
 		}
 	}
 }
 
 func (c *Coordinator) GracefulShutdown(ctx context.Context) error {
-	c.log.Info("Starting graceful shutdown")
+	c.log.Info("starting graceful shutdown")
+	time.Sleep(100 * time.Millisecond)
 	// stop any ongoing updates
 	c.updateInProgress.Store(false)
 	// check if the supervisor is running
@@ -183,7 +195,13 @@ func (c *Coordinator) GracefulShutdown(ctx context.Context) error {
 	// stop the supervised process
 	shutdownCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	return c.supervisor.Stop(shutdownCtx)
+	err := c.supervisor.Stop(shutdownCtx)
+	if err != nil {
+		c.log.Errorf("canopy stopped with error: %v", err)
+		return err
+	}
+	c.log.Info("stopped canopy program successfully")
+	return nil
 }
 
 // CheckAndApplyUpdate performs a single update check and applies if needed
@@ -208,7 +226,6 @@ func (c *Coordinator) CheckAndApplyUpdate(ctx context.Context) error {
 	if err := c.updater.Download(release); err != nil {
 		return fmt.Errorf("failed to download release: %w", err)
 	}
-	release.ApplySnapshot = false
 	// apply the update with proper coordination
 	return c.ApplyUpdate(ctx, release)
 }
