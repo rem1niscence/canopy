@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -37,8 +36,9 @@ type Supervisor struct {
 // NewProcessSupervisor creates a new ProcessSupervisor instance
 func NewProcessSupervisor(config *SupervisorConfig, logger lib.LoggerI) *Supervisor {
 	return &Supervisor{
-		config: config,
-		log:    logger,
+		config:   config,
+		log:      logger,
+		exitChan: make(chan error),
 	}
 }
 
@@ -65,7 +65,6 @@ func (ps *Supervisor) Start() error {
 		return fmt.Errorf("failed to start canopy binary: %s", err)
 	}
 	// set variables for monitoring and exit processing
-	ps.exitChan = make(chan error)
 	ps.running.Store(true)
 	ps.stopping.Store(false)
 	// start monitoring the process until it exits
@@ -148,7 +147,11 @@ func NewCoordinator(config *CoordinatorConfig, updater *UpdateManager,
 }
 
 func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
-	// run once immediately
+	// start the program
+	if err := c.supervisor.Start(); err != nil {
+		return err
+	}
+	// run an initial update check immediately
 	c.log.Info("initial update check")
 	if err := c.CheckAndApplyUpdate(ctx); err != nil {
 		c.log.Errorf("initial update check failed: %v", err)
@@ -156,22 +159,16 @@ func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 	// create the ticker to check for updates periodically
 	ticker := time.NewTicker(c.config.CheckPeriod)
 	defer ticker.Stop()
-	// handle external shutdown signals
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	// update loop
 	for {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		// exit from the supervisor (surely due to an error)
-		case <-c.supervisor.exitChan:
-			c.log.Info("supervisor exited, initiating shutdown")
-			return c.GracefulShutdown(ctx)
 		// externally closed the program (user input, container orchestrator, etc...)
-		case sig := <-sigChan:
-			c.log.Infof("Received signal %v, initiating shutdown", sig)
-			return c.GracefulShutdown(ctx)
+		case <-ctx.Done():
+			// create new context with 30s timeout
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			return c.GracefulShutdown(shutdownCtx)
+		// periodic check for updates
 		case <-ticker.C:
 			c.log.Infof("Checking for updates")
 			if err := c.CheckAndApplyUpdate(ctx); err != nil {
@@ -223,7 +220,7 @@ func (c *Coordinator) CheckAndApplyUpdate(ctx context.Context) error {
 	}
 	c.log.Infof("New version found: %s", release.Version)
 	// download the new version
-	if err := c.updater.Download(release); err != nil {
+	if err := c.updater.Download(ctx, release); err != nil {
 		return fmt.Errorf("failed to download release: %w", err)
 	}
 	// apply the update with proper coordination
@@ -244,7 +241,7 @@ func (c *Coordinator) ApplyUpdate(ctx context.Context, release *Release) error {
 	if release.ApplySnapshot {
 		snapshotPath = filepath.Join(canopy.DataDirPath, "snapshot")
 		c.log.Info("downloading and extracting required snapshot")
-		err := c.snapshot.DownloadAndExtract(snapshotPath, c.config.Canopy.ChainId)
+		err := c.snapshot.DownloadAndExtract(ctx, snapshotPath, c.config.Canopy.ChainId)
 		if err != nil {
 			return fmt.Errorf("failed to download snapshot: %w", err)
 		}

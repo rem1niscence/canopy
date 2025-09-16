@@ -135,11 +135,15 @@ func (um *UpdateManager) ShouldUpdate(release *Release) error {
 }
 
 // Download downloads the release assets into the config bin directory
-func (um *UpdateManager) Download(release *Release) error {
+func (um *UpdateManager) Download(ctx context.Context, release *Release) error {
 	// download the release binary
-	resp, err := http.Get(release.DownloadURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, release.DownloadURL, nil)
 	if err != nil {
-		return nil
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
 	}
 	defer resp.Body.Close()
 	// save the response as an executable
@@ -198,7 +202,7 @@ func NewSnapshotManager(config *SnapshotConfig) *SnapshotManager {
 }
 
 // DownloadAndExtract downloads the snapshot to the specified path and extracts it
-func (sm *SnapshotManager) DownloadAndExtract(path string, chainID uint64) (err error) {
+func (sm *SnapshotManager) DownloadAndExtract(ctx context.Context, path string, chainID uint64) (err error) {
 	// create the snapshot directory
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return fmt.Errorf("failed to create snapshot directory: %w", err)
@@ -210,7 +214,7 @@ func (sm *SnapshotManager) DownloadAndExtract(path string, chainID uint64) (err 
 		}
 	}()
 	// download the snapshot
-	snapshot, err := sm.Download(filepath.Join(path, sm.config.Name), chainID)
+	snapshot, err := sm.Download(ctx, filepath.Join(path, sm.config.Name), chainID)
 	if err != nil {
 		return err
 	}
@@ -219,18 +223,22 @@ func (sm *SnapshotManager) DownloadAndExtract(path string, chainID uint64) (err 
 	defer os.Remove(snapshot.Name())
 	// extract the snapshot
 	// TODO: remove context.Background to have a fixed extract timeout
-	return Extract(context.Background(), snapshot.Name(), path)
+	return Extract(ctx, snapshot.Name(), path)
 }
 
 // Download downloads the snapshot to the specified path
-func (sm *SnapshotManager) Download(path string, chainID uint64) (*os.File, error) {
+func (sm *SnapshotManager) Download(ctx context.Context, path string, chainID uint64) (*os.File, error) {
 	// check if chain ID exists
 	url, ok := sm.config.URLs[chainID]
 	if !ok {
 		return nil, fmt.Errorf("no snapshot URL found for chain ID %d", chainID)
 	}
 	// download the snapshot
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

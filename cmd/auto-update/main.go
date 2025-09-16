@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/canopy-network/canopy/cmd/cli"
@@ -46,17 +48,16 @@ func main() {
 		cli.Start()
 		return
 	}
+	// handle external shutdown signals
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 	// setup the dependencies
 	updater := NewUpdateManager(configs.Updater, logger, rpc.SoftwareVersion)
 	snapshot := NewSnapshotManager(configs.Snapshot)
 	supervisor := NewProcessSupervisor(configs.Supervisor, logger)
 	coordinator := NewCoordinator(configs.Coordinator, updater, supervisor, snapshot, logger)
-	// start the program
-	if err := supervisor.Start(); err != nil {
-		log.Fatalf("failed to start supervisor: %v", err)
-	}
 	// start the update loop
-	if err := coordinator.StartUpdateLoop(context.Background()); err != nil {
+	if err := coordinator.StartUpdateLoop(ctx); err != nil {
 		log.Fatalf("failed to stop update loop: %v", err)
 	}
 }
