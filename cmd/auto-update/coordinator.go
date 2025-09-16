@@ -16,15 +16,8 @@ import (
 	"github.com/canopy-network/canopy/lib"
 )
 
-// SupervisorConfig is the configuration for the SupervisorConfig
-type SupervisorConfig struct {
-	canopy  lib.Config
-	BinPath string
-}
-
 // Supervisor manages the CLI process lifecycle, from start to stop while securing graceful shutdown
 type Supervisor struct {
-	config   *SupervisorConfig
 	cmd      *exec.Cmd
 	mu       sync.RWMutex
 	running  atomic.Bool
@@ -33,17 +26,16 @@ type Supervisor struct {
 	log      lib.LoggerI
 }
 
-// NewProcessSupervisor creates a new ProcessSupervisor instance
-func NewProcessSupervisor(config *SupervisorConfig, logger lib.LoggerI) *Supervisor {
+// NewSupervisor creates a new ProcessSupervisor instance
+func NewSupervisor(logger lib.LoggerI) *Supervisor {
 	return &Supervisor{
-		config:   config,
 		log:      logger,
 		exitChan: make(chan error, 1),
 	}
 }
 
 // Start starts the process and runs it until it exits
-func (ps *Supervisor) Start() error {
+func (ps *Supervisor) Start(binPath string) error {
 	// hold the lock to prevent concurrent modifications
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -51,9 +43,9 @@ func (ps *Supervisor) Start() error {
 	if ps.running.Load() {
 		return errors.New("process already running")
 	}
-	ps.log.Infof("starting CLI process: %s", ps.config.BinPath)
+	ps.log.Infof("starting CLI process: %s", binPath)
 	// setup the process to start
-	ps.cmd = exec.Command(ps.config.BinPath, "start")
+	ps.cmd = exec.Command(binPath, "start")
 	ps.cmd.Stdout = os.Stdout
 	ps.cmd.Stderr = os.Stderr
 	// make sure the process is in a new process group
@@ -126,6 +118,7 @@ func (s *Supervisor) ExitChan() <-chan error {
 
 type CoordinatorConfig struct {
 	Canopy      lib.Config
+	BinPath     string
 	CheckPeriod time.Duration
 }
 
@@ -156,7 +149,7 @@ func NewCoordinator(config *CoordinatorConfig, updater *UpdateManager,
 
 func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 	// start the program
-	if err := c.supervisor.Start(); err != nil {
+	if err := c.supervisor.Start(c.config.BinPath); err != nil {
 		return err
 	}
 	// run an initial update check immediately
@@ -180,7 +173,7 @@ func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 			return err
 		// externally closed the program (user input, container orchestrator, etc...)
 		case <-ctx.Done():
-			// create new context with 30s timeout
+			// create a new context with a 30s timeout
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			c.log.Info("received termination signal, starting graceful shutdown")
@@ -189,9 +182,9 @@ func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 			return err
 			// periodic check for updates
 		case <-ticker.C:
-			c.log.Infof("Checking for updates")
+			c.log.Infof("checking for updates")
 			if err := c.CheckAndApplyUpdate(ctx); err != nil {
-				c.log.Errorf("Update check failed: %v", err)
+				c.log.Errorf("update check failed: %v", err)
 			}
 			c.log.Infof("update check completed, performing next check in %s",
 				c.config.CheckPeriod)
@@ -200,7 +193,6 @@ func (c *Coordinator) StartUpdateLoop(ctx context.Context) error {
 }
 
 func (c *Coordinator) GracefulShutdown(ctx context.Context) error {
-	time.Sleep(100 * time.Millisecond)
 	// stop any ongoing updates
 	c.updateInProgress.Store(false)
 	// check if the supervisor is running
@@ -225,7 +217,7 @@ func (c *Coordinator) CheckAndApplyUpdate(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to check for update: %w", err)
 	}
-	// check if update is required
+	// check if an update is required
 	if !release.ShouldUpdate {
 		c.log.Debug("No update available")
 		return nil
@@ -235,11 +227,12 @@ func (c *Coordinator) CheckAndApplyUpdate(ctx context.Context) error {
 	if err := c.updater.Download(ctx, release); err != nil {
 		return fmt.Errorf("failed to download release: %w", err)
 	}
-	// apply the update with proper coordination
+	// apply the update
 	return c.ApplyUpdate(ctx, release)
 }
 
-// ApplyUpdate coordinates the complex update process
+// ApplyUpdate coordinates the update process, stopping the old process and starting the new one
+// while applying a snapshot if required
 func (c *Coordinator) ApplyUpdate(ctx context.Context, release *Release) error {
 	canopy := c.config.Canopy
 	// check if an update is already in progress
@@ -285,7 +278,7 @@ func (c *Coordinator) ApplyUpdate(ctx context.Context, release *Release) error {
 	}
 	// restart with new version
 	c.log.Infof("starting updated CLI process with version %s", release.Version)
-	if err := c.supervisor.Start(); err != nil {
+	if err := c.supervisor.Start(c.config.BinPath); err != nil {
 		return fmt.Errorf("failed to start updated process: %w", err)
 	}
 	c.log.Infof("update to version %s completed successfully", release.Version)

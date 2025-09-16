@@ -14,16 +14,6 @@ import (
 	"github.com/canopy-network/canopy/lib"
 )
 
-var (
-	defaultCheckPeriod = time.Minute * 30
-
-	// snapshotURLs contains the snapshot map for existing chains
-	snapshotURLs = map[uint64]string{
-		1: "http://canopy-mainnet-latest-chain-id1.us.nodefleet.net",
-		2: "http://canopy-mainnet-latest-chain-id2.us.nodefleet.net",
-	}
-)
-
 const (
 	snapshotFileName    = "snapshot.tar.gz"
 	snapshotMetadataKey = "snapshot"
@@ -35,6 +25,16 @@ const (
 	defaultBinPath   = "./cli"
 
 	githubAPIBaseURL = "https://api.github.com"
+)
+
+var (
+	defaultCheckPeriod = time.Minute * 30
+
+	// snapshotURLs contains the snapshot map for existing chains
+	snapshotURLs = map[uint64]string{
+		1: "http://canopy-mainnet-latest-chain-id1.us.nodefleet.net",
+		2: "http://canopy-mainnet-latest-chain-id2.us.nodefleet.net",
+	}
 )
 
 func main() {
@@ -55,7 +55,7 @@ func main() {
 	// setup the dependencies
 	updater := NewUpdateManager(configs.Updater, logger, rpc.SoftwareVersion)
 	snapshot := NewSnapshotManager(configs.Snapshot)
-	supervisor := NewProcessSupervisor(configs.Supervisor, logger)
+	supervisor := NewSupervisor(logger)
 	coordinator := NewCoordinator(configs.Coordinator, updater, supervisor, snapshot, logger)
 	// start the update loop
 	err := coordinator.StartUpdateLoop(ctx)
@@ -74,7 +74,6 @@ func main() {
 type Configs struct {
 	Updater     *UpdaterConfig
 	Snapshot    *SnapshotConfig
-	Supervisor  *SupervisorConfig
 	Coordinator *CoordinatorConfig
 	LoggerI     lib.LoggerI
 }
@@ -102,20 +101,15 @@ func getConfigs() (*Configs, lib.LoggerI) {
 		Name:   snapshotFileName,
 	}
 
-	supervisor := &SupervisorConfig{
-		canopy:  config,
-		BinPath: binPath,
-	}
-
 	coordinator := &CoordinatorConfig{
 		Canopy:      config,
 		CheckPeriod: defaultCheckPeriod,
+		BinPath:     binPath,
 	}
 
 	return &Configs{
 		Updater:     updater,
 		Snapshot:    snapshot,
-		Supervisor:  supervisor,
 		Coordinator: coordinator,
 		LoggerI:     l,
 	}, l
