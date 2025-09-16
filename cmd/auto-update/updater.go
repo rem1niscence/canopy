@@ -30,10 +30,10 @@ type GithubRelease struct {
 
 // Release represents a release of the current binary with metadata on what to update
 type Release struct {
-	TagName        string
-	DownloadURL    string
-	ShouldUpdate   bool
-	UpdateSnapshot bool
+	Version       string
+	DownloadURL   string
+	ShouldUpdate  bool
+	ApplySnapshot bool
 }
 
 // UpdaterConfig contains configuration for the updater
@@ -50,7 +50,7 @@ type UpdateManager struct {
 	config     *UpdaterConfig
 	httpClient *http.Client
 	Version    string
-	logger     lib.LoggerI
+	log        lib.LoggerI
 }
 
 // NewUpdateManager creates a new UpdateManager instance
@@ -59,7 +59,7 @@ func NewUpdateManager(config *UpdaterConfig, logger lib.LoggerI, version string)
 		config:     config,
 		httpClient: &http.Client{Timeout: httpClientTimeout},
 		Version:    version,
-		logger:     logger,
+		log:        logger,
 	}
 }
 
@@ -107,7 +107,7 @@ func (um *UpdateManager) GetLatestRelease() (release *Release, err error) {
 		if asset.Name == targetName {
 			// match found, stop
 			release = &Release{
-				TagName:     rel.TagName,
+				Version:     rel.TagName,
 				DownloadURL: asset.BrowserDownloadURL,
 			}
 			break
@@ -126,11 +126,11 @@ func (um *UpdateManager) ShouldUpdate(release *Release) error {
 	if release == nil {
 		return fmt.Errorf("release is nil")
 	}
-	if !semver.IsValid(release.TagName) {
-		return fmt.Errorf("invalid release version: %s", release.TagName)
+	if !semver.IsValid(release.Version) {
+		return fmt.Errorf("invalid release version: %s", release.Version)
 	}
-	release.ShouldUpdate = semver.Compare(release.TagName, um.Version) >= 0
-	release.UpdateSnapshot = strings.Contains(release.TagName, snapshotMetadataKey)
+	release.ShouldUpdate = semver.Compare(release.Version, um.Version) >= 0
+	release.ApplySnapshot = strings.Contains(release.Version, snapshotMetadataKey)
 	return nil
 }
 
@@ -181,6 +181,7 @@ type SnapshotConfig struct {
 	Name string
 }
 
+// SnapshotManager is the manager for downloading and installing snapshots
 type SnapshotManager struct {
 	// snapshot config
 	config *SnapshotConfig
@@ -188,6 +189,7 @@ type SnapshotManager struct {
 	client *http.Client
 }
 
+// NewSnapshotManager creates a new SnapshotManager
 func NewSnapshotManager(config *SnapshotConfig) *SnapshotManager {
 	return &SnapshotManager{
 		config: config,
@@ -195,7 +197,18 @@ func NewSnapshotManager(config *SnapshotConfig) *SnapshotManager {
 	}
 }
 
-func (sm *SnapshotManager) DownloadAndExtract(path string, chainID uint64) error {
+// DownloadAndExtract downloads the snapshot to the specified path and extracts it
+func (sm *SnapshotManager) DownloadAndExtract(path string, chainID uint64) (err error) {
+	// create the snapshot directory
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return fmt.Errorf("failed to create snapshot directory: %w", err)
+	}
+	defer func() {
+		// remove snapshot directory on error
+		if err != nil {
+			_ = os.RemoveAll(path)
+		}
+	}()
 	// download the snapshot
 	snapshot, err := sm.Download(filepath.Join(path, sm.config.Name), chainID)
 	if err != nil {
@@ -205,24 +218,59 @@ func (sm *SnapshotManager) DownloadAndExtract(path string, chainID uint64) error
 	// always remove the snapshot file after downloading
 	defer os.Remove(snapshot.Name())
 	// extract the snapshot
+	// TODO: remove context.Background to have a fixed extract timeout
 	return Extract(context.Background(), snapshot.Name(), path)
 }
 
+// Download downloads the snapshot to the specified path
 func (sm *SnapshotManager) Download(path string, chainID uint64) (*os.File, error) {
+	// check if chain ID exists
 	url, ok := sm.config.URLs[chainID]
 	if !ok {
 		return nil, fmt.Errorf("no snapshot URL found for chain ID %d", chainID)
 	}
+	// download the snapshot
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
+	// save the snapshot to a file
 	defer resp.Body.Close()
 	return saveToFile(path, resp.Body, 0644)
 }
 
-// decompressCMD decompresses a tar.gz file using the `tar` command
-// requires `tar` to be installed and available in the system's PATH
+// Install installs the snapshot to the specified path, creating a backup
+// of the existing files before overwriting them
+func (sm *SnapshotManager) Install(snapshotPath string, dbPath string) (err error) {
+	backupPath := dbPath + ".backup"
+	// always start from a clean backup state
+	_ = os.RemoveAll(backupPath)
+	defer func() {
+		if err != nil {
+			// rollback: try to restore DB and drop snapshot
+			_ = os.RemoveAll(dbPath)
+			_ = os.Rename(backupPath, dbPath)
+			_ = os.RemoveAll(snapshotPath)
+			return
+		}
+		// success: remove backup
+		os.RemoveAll(backupPath)
+	}()
+	// move current DB to backup if it exists
+	if err := os.Rename(dbPath, backupPath); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("rename db->backup failed: %w", err)
+		}
+	}
+	// put snapshot in place as the new DB
+	if err := os.Rename(snapshotPath, dbPath); err != nil {
+		return fmt.Errorf("rename snapshot->db failed: %w", err)
+	}
+	return nil
+}
+
+// Extract decompresses a tar.gz file using the `tar` command.
+// Requires `tar` to be installed and available in the system's PATH
 func Extract(ctx context.Context, sourceFile string, targetDir string) error {
 	// get absolute paths
 	absSource, err := filepath.Abs(sourceFile)
@@ -244,5 +292,6 @@ func Extract(ctx context.Context, sourceFile string, targetDir string) error {
 	if err := tarCmd.Run(); err != nil {
 		return fmt.Errorf("tar command failed: %w", err)
 	}
+	// exit
 	return nil
 }

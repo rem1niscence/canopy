@@ -1,13 +1,17 @@
 package main
 
 import (
-	"math/rand"
+	"context"
 	"os"
 	"time"
 
 	"github.com/canopy-network/canopy/cmd/cli"
 	"github.com/canopy-network/canopy/cmd/rpc"
 	"github.com/canopy-network/canopy/lib"
+)
+
+var (
+	defaultCheckPeriod = time.Minute * 30
 )
 
 const (
@@ -19,7 +23,6 @@ const (
 	defaultRepoName  = "canopy"
 	defaultRepoOwner = "rem1niscence"
 	defaultBinPath   = "./cli"
-	defaultCheckTime = time.Minute * 30
 
 	githubAPIBaseURL = "https://api.github.com"
 )
@@ -29,21 +32,30 @@ func main() {
 	if len(os.Args) < 2 || os.Args[1] != "start" {
 		log.Fatalf("invalid input %v only `start` command is allowed", os.Args)
 	}
+	// get configs and logger
 	configs, logger := getConfigs()
-	_ = NewUpdateManager(configs.Updater, logger, rpc.SoftwareVersion)
-	_ = NewSnapshotManager(configs.Snapshot)
-	supervisor := NewProcessSupervisor(configs.ProcessSupervisor, logger)
-	supervisor.Start()
-
-	select {}
+	// setup the dependencies
+	updater := NewUpdateManager(configs.Updater, logger, rpc.SoftwareVersion)
+	snapshot := NewSnapshotManager(configs.Snapshot)
+	supervisor := NewProcessSupervisor(configs.Supervisor, logger)
+	coordinator := NewCoordinator(configs.Coordinator, updater, supervisor, snapshot, logger)
+	// start the program
+	if err := supervisor.Start(); err != nil {
+		log.Fatalf("failed to start supervisor: %v", err)
+	}
+	// start the update loop
+	if err := coordinator.StartUpdateLoop(context.Background()); err != nil {
+		log.Fatalf("failed to stop update loop: %v", err)
+	}
 }
 
 // Configs holds the configuration for the updater, snapshotter, and process supervisor.
 type Configs struct {
-	Updater           *UpdaterConfig
-	Snapshot          *SnapshotConfig
-	ProcessSupervisor *ProcessSupervisorConfig
-	LoggerI           lib.LoggerI
+	Updater     *UpdaterConfig
+	Snapshot    *SnapshotConfig
+	Supervisor  *SupervisorConfig
+	Coordinator *CoordinatorConfig
+	LoggerI     lib.LoggerI
 }
 
 func getConfigs() (*Configs, lib.LoggerI) {
@@ -60,8 +72,7 @@ func getConfigs() (*Configs, lib.LoggerI) {
 		RepoName:  envOrDefault("CANOPY_REPO_NAME", defaultRepoName),
 		RepoOwner: envOrDefault("CANOPY_REPO_OWNER", defaultRepoOwner),
 		BinPath:   binPath,
-		CheckTime: defaultCheckTime,
-		WaitTime:  time.Duration(rand.Intn(30)+1) * time.Minute,
+		CheckTime: defaultCheckPeriod,
 	}
 
 	snapshot := &SnapshotConfig{
@@ -70,16 +81,22 @@ func getConfigs() (*Configs, lib.LoggerI) {
 		Name:   snapshotFileName,
 	}
 
-	supervisor := &ProcessSupervisorConfig{
+	supervisor := &SupervisorConfig{
 		canopy:  config,
 		BinPath: binPath,
 	}
 
+	coordinator := &CoordinatorConfig{
+		Canopy:      config,
+		CheckPeriod: defaultCheckPeriod,
+	}
+
 	return &Configs{
-		Updater:           updater,
-		Snapshot:          snapshot,
-		ProcessSupervisor: supervisor,
-		LoggerI:           l,
+		Updater:     updater,
+		Snapshot:    snapshot,
+		Supervisor:  supervisor,
+		Coordinator: coordinator,
+		LoggerI:     l,
 	}, l
 }
 
