@@ -242,13 +242,13 @@ const (
 	CodeInvalidQCCommitteeHeight  ErrorCode = 72
 	CodeZeroPointHolder           ErrorCode = 73
 	CodeOrderNotFound             ErrorCode = 74
-
-	CodeMinimumOrderSize     ErrorCode = 76
-	CodeOrderLocked          ErrorCode = 77
-	CodeInvalidLockOrder     ErrorCode = 78
-	CodeDuplicateLockOrder   ErrorCode = 79
-	CodeInvalidBuyerDeadline ErrorCode = 80
-	CodeInvalidCloseOrder    ErrorCode = 81
+	CodeEventTypeEmpty            ErrorCode = 75
+	CodeMinimumOrderSize          ErrorCode = 76
+	CodeOrderLocked               ErrorCode = 77
+	CodeInvalidLockOrder          ErrorCode = 78
+	CodeDuplicateLockOrder        ErrorCode = 79
+	CodeInvalidBuyerDeadline      ErrorCode = 80
+	CodeInvalidCloseOrder         ErrorCode = 81
 
 	CodeInvalidCheckpoint        ErrorCode = 83
 	CodeInvalidSellOrder         ErrorCode = 84
