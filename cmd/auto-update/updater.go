@@ -14,11 +14,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/canopy-network/canopy/lib"
 	"golang.org/x/mod/semver"
 )
 
-// GithubRelease represents a GitHub release with all its associated metadata
+// GithubRelease represents a GitHub release with the used metadata
 type GithubRelease struct {
 	TagName string `json:"tag_name"`
 	Assets  []struct {
@@ -46,19 +45,20 @@ type UpdaterConfig struct {
 
 // UpdateManager manages the update process for the current binary
 type UpdateManager struct {
-	config     *UpdaterConfig
+	// updater config
+	config *UpdaterConfig
+	// http client to download the release
 	httpClient *http.Client
-	Version    string
-	log        lib.LoggerI
+	// current version of the binary
+	Version string
 }
 
 // NewUpdateManager creates a new UpdateManager instance
-func NewUpdateManager(config *UpdaterConfig, logger lib.LoggerI, version string) *UpdateManager {
+func NewUpdateManager(config *UpdaterConfig, version string) *UpdateManager {
 	return &UpdateManager{
 		config:     config,
 		httpClient: &http.Client{Timeout: httpReleaseClientTimeout},
 		Version:    version,
-		log:        logger,
 	}
 }
 
@@ -180,9 +180,10 @@ func (um *UpdateManager) Download(ctx context.Context, release *Release) error {
 	return bin.Close()
 }
 
+// SnapshotManager code below
+
+// SnapshotConfig is the config for the snapshot manager
 type SnapshotConfig struct {
-	// canopy config
-	canopy lib.Config
 	// map[chain ID]URL to download the snapshot
 	URLs map[uint64]string
 	// file name
@@ -193,7 +194,7 @@ type SnapshotConfig struct {
 type SnapshotManager struct {
 	// snapshot config
 	config *SnapshotConfig
-	// httpClient
+	// http client for downloading snapshots
 	httpClient *http.Client
 }
 
@@ -254,9 +255,9 @@ func (sm *SnapshotManager) Download(ctx context.Context, path string, chainID ui
 	return SaveToFile(path, resp.Body, 0644)
 }
 
-// Install installs the snapshot to the specified path, creating a backup
+// Replace replaces the snapshot to the specified path, creating a backup
 // of the existing files before overwriting them
-func (sm *SnapshotManager) Install(snapshotPath string, dbPath string) (err error) {
+func (sm *SnapshotManager) Replace(snapshotPath string, dbPath string) (err error) {
 	backupPath := dbPath + ".backup"
 	// always start from a clean backup state
 	_ = os.RemoveAll(backupPath)

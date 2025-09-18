@@ -41,7 +41,7 @@ var (
 func main() {
 	// check if start was called
 	if len(os.Args) < 2 || os.Args[1] != "start" {
-		log.Fatalf("invalid input %v only `start` command is allowed", os.Args)
+		log.Fatalf("invalid input, only `start` command is allowed")
 	}
 	// get configs and logger
 	configs, logger := getConfigs()
@@ -54,7 +54,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer cancel()
 	// setup the dependencies
-	updater := NewUpdateManager(configs.Updater, logger, rpc.SoftwareVersion)
+	updater := NewUpdateManager(configs.Updater, rpc.SoftwareVersion)
 	snapshot := NewSnapshotManager(configs.Snapshot)
 	supervisor := NewSupervisor(logger)
 	coordinator := NewCoordinator(configs.Coordinator, updater, supervisor, snapshot, logger)
@@ -62,11 +62,11 @@ func main() {
 	err := coordinator.UpdateLoop(ctx, cancel)
 	if err != nil {
 		logger.Errorf("canopy stopped with error: %v", err)
-		// extract exit code from error if it's an exec.ExitError
+		// try to extract the exit code
 		if exitError, ok := err.(*exec.ExitError); ok {
 			os.Exit(exitError.ExitCode())
 		}
-		// default for 1 for unknown errors
+		// default of 1 for unknown errors
 		os.Exit(1)
 	}
 }
@@ -98,9 +98,8 @@ func getConfigs() (*Configs, lib.LoggerI) {
 		SnapshotKey:    snapshotMetadataKey,
 	}
 	snapshot := &SnapshotConfig{
-		canopy: canopyConfig,
-		URLs:   snapshotURLs,
-		Name:   snapshotFileName,
+		URLs: snapshotURLs,
+		Name: snapshotFileName,
 	}
 	coordinator := &CoordinatorConfig{
 		Canopy:       canopyConfig,

@@ -24,7 +24,7 @@ type Supervisor struct {
 	running        atomic.Bool  // flag indicating if process is running
 	stopping       atomic.Bool  // flag indicating if process is stopping
 	exit           chan error   // channel to notify listeners when process exits
-	unexpectedExit chan error   // for unexpected exits (UpdateLoop)
+	unexpectedExit chan error   // channel to notify listeners when process exits unexpectedly
 	log            lib.LoggerI  // logger instance
 }
 
@@ -93,7 +93,7 @@ func (s *Supervisor) Stop(ctx context.Context) error {
 	s.stopping.Store(true)
 	defer s.stopping.Store(false)
 	s.log.Info("stopping CLI process gracefully")
-	// Send SIGINT to the entire process group.
+	// send SIGINT to the entire process group.
 	pgid, err := syscall.Getpgid(s.cmd.Process.Pid)
 	if err != nil {
 		return fmt.Errorf("failed to get process group id: %w", err)
@@ -122,7 +122,7 @@ func (s *Supervisor) IsStopping() bool {
 	return s.stopping.Load() == true
 }
 
-// UnexpectedExit notifies UpdateLoop when the process exits unexpectedly
+// UnexpectedExit notifies when the process exits unexpectedly
 func (s *Supervisor) UnexpectedExit() <-chan error {
 	return s.unexpectedExit
 }
@@ -167,7 +167,7 @@ func NewCoordinator(config *CoordinatorConfig, updater *UpdateManager,
 // for updates and applies them if necessary while also providing graceful shutdown for any
 // termination signal received.
 func (c *Coordinator) UpdateLoop(ctx context.Context, cancel context.CancelFunc) error {
-	// start the program
+	// start the process
 	if err := c.supervisor.Start(c.config.BinPath); err != nil {
 		return err
 	}
@@ -177,23 +177,18 @@ func (c *Coordinator) UpdateLoop(ctx context.Context, cancel context.CancelFunc)
 	// update loop
 	for {
 		select {
-		// possible unexpected program error
+		// unexpected process error
 		case err := <-c.supervisor.UnexpectedExit():
-			// program ended unexpectedly, cancel the context, to clean up resources
+			// cancel the context to clean up resources
 			cancel()
-			// gracePeriodTimer wait for graceful shutdown
+			// wait for context to clean up
 			gracePeriodTimer := time.NewTimer(c.config.GracePeriod)
 			<-gracePeriodTimer.C
-			gracePeriodTimer.Stop()
-			// exit
 			return err
-		// externally closed the program (user input, container orchestrator, etc...)
+		// externally closed the process (user input, container orchestrator, etc...)
 		case <-ctx.Done():
-			// create a new context with the grace period
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), c.config.GracePeriod)
-			defer cancel()
 			c.log.Info("received termination signal, starting graceful shutdown")
-			err := c.GracefulShutdown(shutdownCtx)
+			err := c.GracefulShutdown(ctx)
 			c.log.Info("completed graceful shutdown")
 			return err
 		// periodic check for updates
@@ -213,12 +208,12 @@ func (c *Coordinator) UpdateLoop(ctx context.Context, cancel context.CancelFunc)
 	}
 }
 
-// GracefulShutdown gracefully shuts down the coordinator while giving a grace period the the
-// canopy program to stop
+// GracefulShutdown stops the coordinator while giving a grace period to the
+// canopy process to stop
 func (c *Coordinator) GracefulShutdown(ctx context.Context) error {
 	// stop any ongoing updates
 	c.updateInProgress.Store(false)
-	// check if the supervisor is running
+	// check if the supervisor process is running
 	if !c.supervisor.IsRunning() {
 		return nil
 	}
@@ -297,12 +292,12 @@ func (c *Coordinator) ApplyUpdate(ctx context.Context, release *Release) error {
 			return fmt.Errorf("failed to stop process for update: %w", err)
 		}
 	}
-	// install snapshot if needed
+	// replace current db with the snapshot if needed
 	if snapshotPath != "" {
-		c.log.Info("installing snapshot")
+		c.log.Info("replacing current db with snapshot")
 		dbPath := filepath.Join(canopy.DataDirPath, canopy.DBName)
-		if err := c.snapshot.Install(snapshotPath, dbPath); err != nil {
-			c.log.Errorf("failed to install snapshot: %v", err)
+		if err := c.snapshot.Replace(snapshotPath, dbPath); err != nil {
+			c.log.Errorf("failed to replace db with snapshot: %v", err)
 			// continue with update even if snapshot fails
 		}
 	}
