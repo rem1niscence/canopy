@@ -420,9 +420,7 @@ func (s *Store) Evict() lib.ErrorI {
 	// }
 	// log the results
 	total, deleted := s.keyCount(lssVersion, []byte(latestStatePrefix), true)
-	// total, deleted := 0, 0
 	s.log.Debugf("Eviction process finished. current deleted %d keys, %d total keys elapsed: %s", deleted, total, time.Since(now))
-	panic("forced")
 	return nil
 }
 
