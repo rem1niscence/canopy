@@ -188,7 +188,7 @@ func (c *Coordinator) UpdateLoop(ctx context.Context, cancel context.CancelFunc)
 		// externally closed the process (user input, container orchestrator, etc...)
 		case <-ctx.Done():
 			c.log.Info("received termination signal, starting graceful shutdown")
-			err := c.GracefulShutdown(ctx)
+			err := c.GracefulShutdown()
 			c.log.Info("completed graceful shutdown")
 			return err
 		// periodic check for updates
@@ -210,7 +210,7 @@ func (c *Coordinator) UpdateLoop(ctx context.Context, cancel context.CancelFunc)
 
 // GracefulShutdown stops the coordinator while giving a grace period to the
 // canopy process to stop
-func (c *Coordinator) GracefulShutdown(ctx context.Context) error {
+func (c *Coordinator) GracefulShutdown() error {
 	// stop any ongoing updates
 	c.updateInProgress.Store(false)
 	// check if the supervisor process is running
@@ -218,7 +218,7 @@ func (c *Coordinator) GracefulShutdown(ctx context.Context) error {
 		return nil
 	}
 	// stop the supervised process
-	shutdownCtx, cancel := context.WithTimeout(ctx, c.config.GracePeriod)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), c.config.GracePeriod)
 	defer cancel()
 	return c.supervisor.Stop(shutdownCtx)
 }
