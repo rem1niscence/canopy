@@ -182,6 +182,7 @@ func (c *Coordinator) UpdateLoop(cancelSignal chan os.Signal) error {
 		select {
 		// unexpected process error
 		case err := <-c.supervisor.UnexpectedExit():
+			c.log.Warn("unexpected process exit, stopping program")
 			// cancel the context to clean up resources
 			cancel()
 			// wait for context to clean up

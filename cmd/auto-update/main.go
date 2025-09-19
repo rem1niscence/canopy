@@ -92,8 +92,8 @@ func getConfigs() (*Configs, lib.LoggerI) {
 	binPath := envOrDefault("BIN_PATH", defaultBinPath)
 
 	updater := &UpdaterConfig{
-		RepoName:       envOrDefault("CANOPY_REPO_NAME", defaultRepoName),
-		RepoOwner:      envOrDefault("CANOPY_REPO_OWNER", defaultRepoOwner),
+		RepoName:       envOrDefault("REPO_NAME", defaultRepoName),
+		RepoOwner:      envOrDefault("REPO_OWNER", defaultRepoOwner),
 		GithubApiToken: envOrDefault("CANOPY_GITHUB_API_TOKEN", ""),
 		BinPath:        binPath,
 		SnapshotKey:    snapshotMetadataKey,
