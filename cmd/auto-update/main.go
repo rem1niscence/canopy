@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
 	"os/exec"
@@ -47,19 +46,21 @@ func main() {
 	configs, logger := getConfigs()
 	// do not run the auto-update process if its disabled
 	if !configs.Coordinator.Canopy.AutoUpdate {
+		logger.Info("auto-update disabled, starting CLI directly")
 		cli.Start()
 		return
 	}
+	logger.Info("auto-update enabled, starting coordinator")
 	// handle external shutdown signals
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	defer cancel()
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	// setup the dependencies
 	updater := NewUpdateManager(configs.Updater, rpc.SoftwareVersion)
 	snapshot := NewSnapshotManager(configs.Snapshot)
 	supervisor := NewSupervisor(logger)
 	coordinator := NewCoordinator(configs.Coordinator, updater, supervisor, snapshot, logger)
 	// start the update loop
-	err := coordinator.UpdateLoop(ctx, cancel)
+	err := coordinator.UpdateLoop(sigChan)
 	if err != nil {
 		logger.Errorf("canopy stopped with error: %v", err)
 		// try to extract the exit code

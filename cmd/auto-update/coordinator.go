@@ -166,11 +166,14 @@ func NewCoordinator(config *CoordinatorConfig, updater *UpdateManager,
 // UpdateLoop starts the update loop for the coordinator. This loop continuously checks
 // for updates and applies them if necessary while also providing graceful shutdown for any
 // termination signal received.
-func (c *Coordinator) UpdateLoop(ctx context.Context, cancel context.CancelFunc) error {
+func (c *Coordinator) UpdateLoop(cancelSignal chan os.Signal) error {
 	// start the process
 	if err := c.supervisor.Start(c.config.BinPath); err != nil {
 		return err
 	}
+	// create a cancellable context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// kick off an immediate check
 	timer := time.NewTimer(0)
 	defer timer.Stop()
@@ -183,11 +186,14 @@ func (c *Coordinator) UpdateLoop(ctx context.Context, cancel context.CancelFunc)
 			cancel()
 			// wait for context to clean up
 			gracePeriodTimer := time.NewTimer(c.config.GracePeriod)
+			defer gracePeriodTimer.Stop()
 			<-gracePeriodTimer.C
 			return err
 		// externally closed the process (user input, container orchestrator, etc...)
-		case <-ctx.Done():
-			c.log.Info("received termination signal, starting graceful shutdown")
+		case sig := <-cancelSignal:
+			c.log.Infof("received signal: %v, starting graceful shutdown", sig)
+			// cancel the context to clean up resources
+			cancel()
 			err := c.GracefulShutdown()
 			c.log.Info("completed graceful shutdown")
 			return err
