@@ -427,26 +427,15 @@ func (s *Store) Evict() lib.ErrorI {
 		defer s.db.SetDiscardTs(0)
 		// drop the entire LSS prefix to force eviction processing
 		start := time.Now()
-		fmt.Println("dropping prefix")
 		if err := s.db.DropPrefix([]byte(currentLSSPrefix)); err != nil {
 			s.log.Errorf("Failed to drop LSS prefix: %v", err)
 		}
-		fmt.Println("dropped prefix in", time.Since(start))
+		s.log.Debugf("dropped prefix, took", time.Since(start))
 	}()
-	// ValueLogGC and Flatten temporarily disabled due to increased memory usage
-	// TODO: Re-enable ValueLogGC and Flatten after optimizing memory usage
-	// flatten the DB to optimize the storage layout
-	// if err := s.db.Flatten(1); err != nil {
-	// 	return ErrCommitDB(err)
-	// }
-	// run GC to clean up unused data
-	// if err := s.db.RunValueLogGC(valueLogGCDiscardRation); err != nil &&
-	// 	err != badger.ErrNoRewrite {
-	// 	return ErrCommitDB(err)
-	// }
 	// log the results
 	total, deleted := s.keyCount(lssVersion, []byte(latestStatePrefix), true)
-	s.log.Debugf("Eviction process finished. current deleted %d keys, %d total keys elapsed: %s", deleted, total, time.Since(now))
+	s.log.Debugf("Eviction finished. current deleted %d keys, %d total keys elapsed: %s",
+		deleted, total, time.Since(now))
 	return nil
 }
 
