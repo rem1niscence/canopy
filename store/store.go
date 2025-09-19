@@ -386,28 +386,32 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 }
 
 // Evict deletes all entries marked for eviction.
-// It is done by backing up the LSS store, discarding all the entries with
-// that prefix and restoring again the backup with none of the deleted keys.
-// This is done to ensure that the LSS keys are consistently deleted
+// It is done by backing up the LSS store, creating a new LSS store with the deleted keys removed,
+// and then updating the latest state prefix to use that new one, while in the background all the keys
+// of the previous LSS store. This allows for efficient garbage collection of old data while not needing
+// to wait for the entire DropPrefix process to complete before proceeding with new operations.
 func (s *Store) Evict() lib.ErrorI {
 	now := time.Now()
-	s.log.Debugf("Eviction process started at height %d", s.Version())
+	s.log.Debugf("key eviction started at height %d", s.Version())
 	// backup the LSS store
 	lssBackup, err := s.GetItems(lssVersion, []byte(latestStatePrefix), true)
 	if err != nil {
 		return ErrCommitDB(err)
 	}
+	// save the current LSS prefix
 	currentLSSPrefix := latestStatePrefix
+	// create a new random LSS prefix
 	newLSSPrefix := hex.EncodeToString(fmt.Appendf(nil, "%s/", lib.RandSlice(32)))
-	// restore the LSS store without the deleted keys
+	// create the new LSS store without the deleted keys
 	writer := s.db.NewWriteBatchAt(lssVersion)
 	for _, entry := range lssBackup {
+		// replace the old LSS prefix with the new one
 		entry.Key = bytes.Replace(entry.Key, []byte(currentLSSPrefix), []byte(newLSSPrefix), 1)
 		if err := writer.SetEntryAt(entry, lssVersion); err != nil {
 			return ErrStoreSet(err)
 		}
 	}
-	// write the new LSS prefix
+	// write the new LSS prefix in the db for reboots
 	entry := &badger.Entry{
 		Key:   []byte(latestStateKeyPrefix),
 		Value: []byte(newLSSPrefix),
@@ -415,27 +419,31 @@ func (s *Store) Evict() lib.ErrorI {
 	if err := writer.SetEntryAt(entry, lssVersion); err != nil {
 		return ErrStoreSet(err)
 	}
-	// commit the LSS restore
+	// commit the new LSS restore
 	if err := writer.Flush(); err != nil {
 		return ErrFlushBatch(err)
 	}
+	// set the latest state prefix to the new one for next reads
 	latestStatePrefix = newLSSPrefix
 	go func() {
 		// set discard timestamp, before evicting entries
 		s.db.SetDiscardTs(lssVersion)
 		// reset discard timestamp after eviction
 		defer s.db.SetDiscardTs(0)
-		// drop the entire LSS prefix to force eviction processing
-		start := time.Now()
+		// drop the entire previous prefix to force eviction processing
+		now := time.Now()
 		if err := s.db.DropPrefix([]byte(currentLSSPrefix)); err != nil {
 			s.log.Errorf("Failed to drop LSS prefix: %v", err)
 		}
-		s.log.Debugf("dropped prefix, took", time.Since(start))
+		// log the results, deleted should always be 0 to make sure eviction is working correctly
+		_, deleted := s.keyCount(lssVersion, []byte(currentLSSPrefix), true)
+		s.log.Debugf("dropped previous LSS prefix, deleted keys: %d took: %s", deleted, time.Since(now))
 	}()
 	// log the results
-	total, deleted := s.keyCount(lssVersion, []byte(latestStatePrefix), true)
-	s.log.Debugf("Eviction finished. current deleted %d keys, %d total keys elapsed: %s",
-		deleted, total, time.Since(now))
+	total, _ := s.keyCount(lssVersion, []byte(latestStatePrefix), true)
+	s.log.Debugf("key eviction finished [%d], total keys: %d elapsed: %s",
+		s.Version(), total, time.Since(now))
+	// exit
 	return nil
 }
 
