@@ -1,12 +1,13 @@
 package store
 
 import (
+	"bytes"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"runtime"
-	"runtime/pprof"
 	"time"
 
 	"github.com/canopy-network/canopy/lib"
@@ -15,7 +16,6 @@ import (
 )
 
 const (
-	latestStatePrefix       = "s/"           // prefix designated for the LatestStateStore where the most recent blobs of state data are held
 	historicStatePrefix     = "h/"           // prefix designated for the HistoricalStateStore where the historical blobs of state data are held
 	stateCommitmentPrefix   = "c/"           // prefix designated for the StateCommitmentStore (immutable, tree DB) built of hashes of state store data
 	indexerPrefix           = "i/"           // prefix designated for indexer (transactions, blocks, and quorum certificates)
@@ -28,6 +28,11 @@ const (
 )
 
 var _ lib.StoreI = &Store{} // enforce the Store interface
+
+var (
+	latestStatePrefix    = "s/"       // prefix designated for the LatestStateStore where the most recent blobs of state data are held
+	latestStateKeyPrefix = "s_prefix" // key to obtain the current LSS prefix at it changes on each eviction
+)
 
 /*
 The Store struct is a high-level abstraction layer built on top of a single BadgerDB instance,
@@ -112,6 +117,8 @@ func NewStoreInMemory(log lib.LoggerI) (lib.StoreI, lib.ErrorI) {
 func NewStoreWithDB(config lib.Config, db *badger.DB, metrics *lib.Metrics, log lib.LoggerI) (*Store, lib.ErrorI) {
 	// get the latest CommitID (height and hash)
 	id := getLatestCommitID(db, log)
+	// get the current lss prefix
+	latestStatePrefix = getLSSPrefix(db, log)
 	// set the version
 	nextVersion, version := id.Height+1, id.Height
 	// make a reader from the current height and the latest height
@@ -383,15 +390,6 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 // that prefix and restoring again the backup with none of the deleted keys.
 // This is done to ensure that the LSS keys are consistently deleted
 func (s *Store) Evict() lib.ErrorI {
-	f, err := os.Create(fmt.Sprintf("%s_cpu.prof", "eviction"))
-	if err != nil {
-		return lib.NewError(0, lib.StorageModule, fmt.Errorf("could not create CPU profile: %v", err).Error())
-	}
-	defer f.Close()
-	if err := pprof.StartCPUProfile(f); err != nil {
-		return lib.NewError(0, lib.StorageModule, fmt.Errorf("could not start CPU profile: %v", err).Error())
-	}
-	defer pprof.StopCPUProfile()
 	now := time.Now()
 	s.log.Debugf("Eviction process started at height %d", s.Version())
 	// backup the LSS store
@@ -399,25 +397,38 @@ func (s *Store) Evict() lib.ErrorI {
 	if err != nil {
 		return ErrCommitDB(err)
 	}
+	// TODO: DISABLED UNTIL
 	// set discard timestamp, before evicting entries
-	s.db.SetDiscardTs(lssVersion)
+	// s.db.SetDiscardTs(lssVersion)
 	// reset discard timestamp after eviction
-	defer s.db.SetDiscardTs(0)
+	// defer s.db.SetDiscardTs(0)
 	// drop the entire LSS prefix to force eviction processing
-	if err := s.db.DropPrefix([]byte(latestStatePrefix)); err != nil {
-		return ErrCommitDB(err)
-	}
+	// if err := s.db.DropPrefix([]byte(latestStatePrefix)); err != nil {
+	// 	return ErrCommitDB(err)
+	// }
+	// get the new lss_prefix
+	newLSSPrefix := hex.EncodeToString(fmt.Appendf(nil, "%s/", lib.RandSlice(32)))
 	// restore the LSS store without the deleted keys
 	writer := s.db.NewWriteBatchAt(lssVersion)
 	for _, entry := range lssBackup {
+		entry.Key = bytes.Replace(entry.Key, []byte(latestStatePrefix), []byte(newLSSPrefix), 1)
 		if err := writer.SetEntryAt(entry, lssVersion); err != nil {
 			return ErrStoreSet(err)
 		}
+	}
+	// write the new LSS prefix
+	entry := &badger.Entry{
+		Key:   []byte(latestStateKeyPrefix),
+		Value: []byte(newLSSPrefix),
+	}
+	if err := writer.SetEntryAt(entry, lssVersion); err != nil {
+		return ErrStoreSet(err)
 	}
 	// commit the LSS restore
 	if err := writer.Flush(); err != nil {
 		return ErrFlushBatch(err)
 	}
+	latestStatePrefix = newLSSPrefix
 	// ValueLogGC and Flatten temporarily disabled due to increased memory usage
 	// TODO: Re-enable ValueLogGC and Flatten after optimizing memory usage
 	// flatten the DB to optimize the storage layout
@@ -516,4 +527,22 @@ func getLatestCommitID(db *badger.DB, log lib.LoggerI) (id *lib.CommitID) {
 		log.Fatalf("unmarshalCommitID() failed with err: %s", err.Error())
 	}
 	return
+}
+
+// getLSSPrefix() retrieves the current LSS prefix from the database
+func getLSSPrefix(db *badger.DB, log lib.LoggerI) string {
+	reader := db.NewTransactionAt(lssVersion, false)
+	defer reader.Discard()
+	item, err := reader.Get([]byte(latestStateKeyPrefix))
+	if err != nil {
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			return latestStatePrefix
+		}
+		log.Fatalf("getLSSPrefix() failed with err: %s", err.Error())
+	}
+	val, err := item.ValueCopy(nil)
+	if err != nil {
+		log.Fatalf("getLSSPrefix() failed with err: %s", err.Error())
+	}
+	return string(val)
 }
