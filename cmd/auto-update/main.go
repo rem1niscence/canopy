@@ -88,7 +88,7 @@ func getConfigs() (*Configs, lib.LoggerI) {
 		JSON:       canopyConfig.JSON,
 	})
 
-	binPath := envOrDefault("CANOPY_BIN_PATH", defaultBinPath)
+	binPath := envOrDefault("BIN_PATH", defaultBinPath)
 
 	updater := &UpdaterConfig{
 		RepoName:       envOrDefault("CANOPY_REPO_NAME", defaultRepoName),
