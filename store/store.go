@@ -397,21 +397,12 @@ func (s *Store) Evict() lib.ErrorI {
 	if err != nil {
 		return ErrCommitDB(err)
 	}
-	// TODO: DISABLED UNTIL
-	// set discard timestamp, before evicting entries
-	// s.db.SetDiscardTs(lssVersion)
-	// reset discard timestamp after eviction
-	// defer s.db.SetDiscardTs(0)
-	// drop the entire LSS prefix to force eviction processing
-	// if err := s.db.DropPrefix([]byte(latestStatePrefix)); err != nil {
-	// 	return ErrCommitDB(err)
-	// }
-	// get the new lss_prefix
+	currentLSSPrefix := latestStatePrefix
 	newLSSPrefix := hex.EncodeToString(fmt.Appendf(nil, "%s/", lib.RandSlice(32)))
 	// restore the LSS store without the deleted keys
 	writer := s.db.NewWriteBatchAt(lssVersion)
 	for _, entry := range lssBackup {
-		entry.Key = bytes.Replace(entry.Key, []byte(latestStatePrefix), []byte(newLSSPrefix), 1)
+		entry.Key = bytes.Replace(entry.Key, []byte(currentLSSPrefix), []byte(newLSSPrefix), 1)
 		if err := writer.SetEntryAt(entry, lssVersion); err != nil {
 			return ErrStoreSet(err)
 		}
@@ -429,6 +420,19 @@ func (s *Store) Evict() lib.ErrorI {
 		return ErrFlushBatch(err)
 	}
 	latestStatePrefix = newLSSPrefix
+	go func() {
+		// set discard timestamp, before evicting entries
+		s.db.SetDiscardTs(lssVersion)
+		// reset discard timestamp after eviction
+		defer s.db.SetDiscardTs(0)
+		// drop the entire LSS prefix to force eviction processing
+		start := time.Now()
+		fmt.Println("dropping prefix")
+		if err := s.db.DropPrefix([]byte(currentLSSPrefix)); err != nil {
+			s.log.Errorf("Failed to drop LSS prefix: %v", err)
+		}
+		fmt.Println("dropped prefix in", time.Since(start))
+	}()
 	// ValueLogGC and Flatten temporarily disabled due to increased memory usage
 	// TODO: Re-enable ValueLogGC and Flatten after optimizing memory usage
 	// flatten the DB to optimize the storage layout
