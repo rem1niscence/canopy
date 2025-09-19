@@ -3,8 +3,10 @@ package store
 import (
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/pprof"
 	"time"
 
 	"github.com/canopy-network/canopy/lib"
@@ -381,6 +383,15 @@ func (s *Store) setCommitID(version uint64, root []byte) lib.ErrorI {
 // that prefix and restoring again the backup with none of the deleted keys.
 // This is done to ensure that the LSS keys are consistently deleted
 func (s *Store) Evict() lib.ErrorI {
+	f, err := os.Create(fmt.Sprintf("%s_cpu.prof", "eviction"))
+	if err != nil {
+		return lib.NewError(0, lib.StorageModule, fmt.Errorf("could not create CPU profile: %v", err).Error())
+	}
+	defer f.Close()
+	if err := pprof.StartCPUProfile(f); err != nil {
+		return lib.NewError(0, lib.StorageModule, fmt.Errorf("could not start CPU profile: %v", err).Error())
+	}
+	defer pprof.StopCPUProfile()
 	now := time.Now()
 	s.log.Debugf("Eviction process started at height %d", s.Version())
 	// backup the LSS store
