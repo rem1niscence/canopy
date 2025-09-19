@@ -242,11 +242,11 @@ func DefaultDataDirPath() string {
 // DefaultStoreConfig() returns the developer recommended store configuration
 func DefaultStoreConfig() StoreConfig {
 	return StoreConfig{
-		DataDirPath:          DefaultDataDirPath(),         // use the default data dir path
-		DBName:               "canopy",                     // 'canopy' database name
-		IndexByAccount:       true,                         // index transactions by account
-		InMemory:             false,                        // persist to disk, not memory
-		CleanupBlockInterval: uint64(rand.Int32N(26) + 25), // clean every 25-50 blocks (random)
+		DataDirPath:          DefaultDataDirPath(),           // use the default data dir path
+		DBName:               "canopy",                       // 'canopy' database name
+		IndexByAccount:       true,                           // index transactions by account
+		InMemory:             false,                          // persist to disk, not memory
+		CleanupBlockInterval: uint64(rand.Int32N(101) + 100), // clean every 25-50 blocks (random)
 	}
 }
 
