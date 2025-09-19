@@ -30,8 +30,10 @@ const (
 var _ lib.StoreI = &Store{} // enforce the Store interface
 
 var (
-	latestStatePrefix    = "s/"       // prefix designated for the LatestStateStore where the most recent blobs of state data are held
-	latestStateKeyPrefix = "s_prefix" // key to obtain the current LSS prefix at it changes on each eviction
+	// prefix designated for the LatestStateStore where the most recent blobs of state data are held
+	latestStatePrefix = "s/"
+	// key to obtain the current LSS prefix as it changes on each eviction
+	latestStateKeyPrefix = "s_prefix"
 )
 
 /*
