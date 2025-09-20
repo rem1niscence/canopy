@@ -82,9 +82,6 @@ type Store struct {
 
 // New() creates a new instance of a StoreI either in memory or an actual disk DB
 func New(config lib.Config, metrics *lib.Metrics, l lib.LoggerI) (lib.StoreI, lib.ErrorI) {
-	if config.StoreConfig.CleanupBlockInterval == 0 {
-		config.StoreConfig.CleanupBlockInterval = 1
-	}
 	if config.StoreConfig.InMemory {
 		return NewStoreInMemory(l)
 	}
@@ -211,7 +208,8 @@ func (s *Store) Commit() (root []byte, err lib.ErrorI) {
 		return nil, ErrCommitDB(e)
 	}
 	// check if the current version is a multiple of the cleanup block interval
-	if s.Version()%s.config.StoreConfig.CleanupBlockInterval == 0 {
+	cleanupInterval := s.config.StoreConfig.CleanupBlockInterval
+	if cleanupInterval > 0 && s.Version()%cleanupInterval == 0 {
 		// trigger eviction of LSS deleted keys
 		if err := s.Evict(); err != nil {
 			s.log.Errorf("failed to evict LSS deleted keys: %s", err)
@@ -437,9 +435,9 @@ func (s *Store) Evict() lib.ErrorI {
 		if err := s.db.DropPrefix([]byte(currentLSSPrefix)); err != nil {
 			s.log.Errorf("Failed to drop LSS prefix: %v", err)
 		}
-		// log the results, deleted should always be 0 to make sure eviction is working correctly
-		_, deleted := s.keyCount(lssVersion, []byte(currentLSSPrefix), true)
-		s.log.Debugf("dropped previous LSS prefix, deleted keys: %d took: %s", deleted, time.Since(now))
+		// log the results, total should always be 0 to make sure eviction is working correctly
+		total, _ := s.keyCount(lssVersion, []byte(currentLSSPrefix), true)
+		s.log.Debugf("dropped previous LSS prefix, total keys: %d took: %s", total, time.Since(now))
 	}()
 	// log the results
 	total, _ := s.keyCount(lssVersion, []byte(latestStatePrefix), true)
