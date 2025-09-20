@@ -123,7 +123,8 @@ func TestBeginBlock(t *testing.T) {
 				sm.height = 1
 			}
 			// ensure expected error on function call
-			require.Equal(t, test.error, sm.BeginBlock())
+			_, err = sm.BeginBlock()
+			require.Equal(t, test.error, err)
 			if test.error != nil {
 				return
 			}
@@ -279,7 +280,8 @@ func TestEndBlock(t *testing.T) {
 			}()
 
 			// STEP 1) run function call and check for expected error
-			func() { require.Equal(t, test.error, sm.EndBlock(proposerAddress, 0)) }()
+			_, err := sm.EndBlock(proposerAddress, 0)
+			func() { require.Equal(t, test.error, err) }()
 
 			// STEP 2) validate the update of addresses who proposed the block
 			func() {

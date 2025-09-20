@@ -315,15 +315,6 @@ func (s *StateMachine) HandleMessageCertificateResults(msg *MessageCertificateRe
 	s.log.Debugf("Handling certificate results msg with height %d:%d", msg.Qc.Header.Height, msg.Qc.Header.RootHeight)
 	// define convenience variables
 	chainId := msg.Qc.Header.ChainId
-	// get the proper reward Pool
-	poolBalance, err := s.GetPoolBalance(chainId)
-	if err != nil {
-		return err
-	}
-	// ensure subsidized
-	if poolBalance == 0 {
-		return ErrNonSubsidizedCommittee()
-	}
 	// get committee for the QC
 	committee, err := s.LoadCommittee(chainId, msg.Qc.Header.RootHeight)
 	if err != nil {

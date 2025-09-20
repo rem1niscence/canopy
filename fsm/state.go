@@ -30,6 +30,7 @@ type StateMachine struct {
 	RCManager          lib.RCManagerI        // access to the root chain info
 	Config             lib.Config            // the main configuration as defined by the 'config.json' file
 	Metrics            *lib.Metrics          // the telemetry module
+	events             *lib.EventsTracker    // a simple event tracker for 'per-transaction' events
 	log                lib.LoggerI           // the logger for standard output and debugging
 	cache              *cache                // the state machine cache
 }
@@ -54,6 +55,7 @@ func New(c lib.Config, store lib.StoreI, metrics *lib.Metrics, rcManager lib.RCM
 		Metrics:           metrics,
 		RCManager:         rcManager,
 		log:               log,
+		events:            &lib.EventsTracker{},
 		cache: &cache{
 			accounts: make(map[uint64]*Account),
 		},
@@ -99,59 +101,71 @@ func (s *StateMachine) Initialize(store lib.StoreI) (genesis bool, err lib.Error
 // NOTES:
 // - this function may be used to validate 'additional' transactions outside the normal block size as if they were to be included
 // - a list of failed transactions are returned
-func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, rcBuildHeight uint64, allowOversize bool) (header *lib.BlockHeader, txResults, oversized []*lib.TxResult, failed []*lib.FailedTx, err lib.ErrorI) {
+func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, rcBuildHeight uint64, allowOversize bool) (header *lib.BlockHeader, r *lib.ApplyBlockResults, err lib.ErrorI) {
 	// catch in case there's a panic
 	defer func() {
-		if r := recover(); r != nil {
-			s.log.Errorf("panic recovered, err: %s, stack: %s", r, string(debug.Stack()))
+		if rec := recover(); rec != nil {
+			s.log.Errorf("panic recovered, err: %s, stack: %s", rec, string(debug.Stack()))
 			// handle the panic and set the error
 			err = lib.ErrPanic()
 		}
 	}()
+	// define vars to track the bytes of the transaction results and the size of a block
+	r = new(lib.ApplyBlockResults)
 	// cast the store to a StoreI, as only the writable store main 'apply blocks'
 	store, ok := s.Store().(lib.StoreI)
 	// casting fails, exit with error
 	if !ok {
-		return nil, nil, nil, nil, ErrWrongStoreType()
+		return nil, nil, ErrWrongStoreType()
 	}
 	// automated execution at the 'beginning of a block'
-	if err = s.BeginBlock(); err != nil {
-		return nil, nil, nil, nil, err
-	}
-	// apply all Transactions in the block
-	txResults, oversized, txRoot, blockTxs, failed, numTxs, err := s.ApplyTransactions(ctx, b.Transactions, allowOversize)
+	events, err := s.BeginBlock()
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, err
+	}
+	// add the events from begin block
+	r.AddEvent(events...)
+	// apply all Transactions in the block
+	if err = s.ApplyTransactions(ctx, b.Transactions, r, allowOversize); err != nil {
+		return nil, nil, err
 	}
 	// sub-out transactions for those that succeeded (only useful for mempool application)
-	b.Transactions = blockTxs
+	b.Transactions = r.Txs
 	// automated execution at the 'ending of a block'
-	if err = s.EndBlock(b.BlockHeader.ProposerAddress, rcBuildHeight); err != nil {
-		return nil, nil, nil, nil, err
+	events, err = s.EndBlock(b.BlockHeader.ProposerAddress, rcBuildHeight)
+	if err != nil {
+		return nil, nil, err
 	}
+	// add the events from end block
+	r.AddEvent(events...)
 	// load the validator set for the previous height
 	lastValidatorSet, _ := s.LoadCommittee(s.Config.ChainId, s.Height()-1)
 	// calculate the merkle root of the last validators to maintain validator continuity between blocks (if root)
 	lastValidatorRoot, err := lastValidatorSet.ValidatorSet.Root()
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, err
 	}
 	// load the 'next validator set' from the state
 	nextValidatorSet, _ := s.LoadCommittee(s.Config.ChainId, s.Height())
 	// calculate the merkle root of the next validators to maintain validator continuity between blocks (if root)
 	nextValidatorRoot, err := nextValidatorSet.ValidatorSet.Root()
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, err
 	}
 	// calculate the merkle root of the state database to enable consensus on the result of the state after applying the block
 	stateRoot, err := store.Root()
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, err
 	}
 	// load the last block from the indexer
 	lastBlock, err := s.LoadBlock(s.height - 1)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, err
+	}
+	// get the transaction root
+	transactionRoot, err := r.TransactionRoot()
+	if err != nil {
+		return nil, nil, err
 	}
 	// generate the block header
 	header = &lib.BlockHeader{
@@ -159,12 +173,12 @@ func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, rcBuildHeig
 		Hash:                  nil,                                                                          // set hash after
 		NetworkId:             s.NetworkID,                                                                  // ensure only applicable for the proper network
 		Time:                  b.BlockHeader.Time,                                                           // use the pre-set block time
-		NumTxs:                uint64(numTxs),                                                               // set the number of transactions
-		TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(numTxs),                              // set the total count of transactions
+		NumTxs:                uint64(r.Count),                                                              // set the number of transactions
+		TotalTxs:              lastBlock.BlockHeader.TotalTxs + uint64(r.Count),                             // set the total count of transactions
 		TotalVdfIterations:    lastBlock.BlockHeader.TotalVdfIterations + b.BlockHeader.Vdf.GetIterations(), // add last total iterations to current iterations
 		StateRoot:             stateRoot,                                                                    // set the state root generated from the resulting state of the VDF
 		LastBlockHash:         nonEmptyHash(lastBlock.BlockHeader.Hash),                                     // set the last block hash to chain the blocks together
-		TransactionRoot:       nonEmptyHash(txRoot),                                                         // set the transaction root to easily merkle the transactions in a block
+		TransactionRoot:       nonEmptyHash(transactionRoot),                                                // set the transaction root to easily merkle the transactions in a block
 		ValidatorRoot:         nonEmptyHash(lastValidatorRoot),                                              // set the last validator root to easily prove the validators who voted on this block
 		NextValidatorRoot:     nonEmptyHash(nextValidatorRoot),                                              // set the next validator root to have continuity between validator sets
 		ProposerAddress:       b.BlockHeader.ProposerAddress,                                                // set the proposer address
@@ -173,7 +187,7 @@ func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, rcBuildHeig
 	}
 	// create and set the block hash in the header
 	if _, err = header.SetHash(); err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, err
 	}
 	// exit
 	return
@@ -185,14 +199,7 @@ func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, rcBuildHeig
 // 3. Allows ephemeral 'oversize' transaction processing without applying 'oversize txn' changes to the state
 // 4. Returns the following for successful transactions within a block: <results, tx-list, root, count>
 // 5. Returns all transactions that failed during processing
-func (s *StateMachine) ApplyTransactions(
-	ctx context.Context, txs [][]byte, allowOversize bool) (results, oversized []*lib.TxResult, root []byte, blockTxs [][]byte, failed []*lib.FailedTx, n int, er lib.ErrorI) {
-	// define vars to track the bytes of the transaction results and the size of a block
-	var (
-		txResultsBytes [][]byte
-		largestTxSize  uint64
-		blockSize      uint64
-	)
+func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, r *lib.ApplyBlockResults, allowOversize bool) lib.ErrorI {
 	// use a map to check for 'same-block' duplicate transactions
 	deDuplicator := lib.NewDeDuplicator[string]()
 	// use a batch verifier for signatures
@@ -200,7 +207,7 @@ func (s *StateMachine) ApplyTransactions(
 	// get the governance parameter for max block size
 	maxBlockSize, err := s.GetMaxBlockSize()
 	if err != nil {
-		return nil, nil, nil, nil, nil, 0, err
+		return err
 	}
 	// keep a map to track transactions that failed 'check'
 	failedCheckTxs := map[int]error{}
@@ -223,32 +230,32 @@ func (s *StateMachine) ApplyTransactions(
 	for i, tx := range txs {
 		// if interrupt signal
 		if ctx.Err() != nil {
-			return nil, nil, nil, nil, nil, 0, lib.ErrMempoolStopSignal()
+			return lib.ErrMempoolStopSignal()
 		}
 		// if already failed check tx or signature
 		if e, found := failedCheckTxs[i]; found {
-			failed = append(failed, lib.NewFailedTx(tx, e))
+			r.AddFailed(lib.NewFailedTx(tx, e))
 			continue
 		}
 		// calculate the hash of the transaction and convert it to a hex string
 		hashString := crypto.HashString(tx)
 		// check if the transaction is a 'same block' duplicate
 		if found := deDuplicator.Found(hashString); found {
-			return nil, nil, nil, nil, nil, 0, lib.ErrDuplicateTx(hashString)
+			return lib.ErrDuplicateTx(hashString)
 		}
 		// get the tx size
 		txSize := uint64(len(tx))
 		// if the max block size is exceeded and we're not yet marked as 'oversize'
-		if txSize+blockSize > maxBlockSize && !oversize {
+		if txSize+r.BlockSize > maxBlockSize && !oversize {
 			// if validating a block - oversize shouldn't happen
 			if !allowOversize {
-				return nil, nil, nil, nil, nil, 0, ErrMaxBlockSize()
+				return ErrMaxBlockSize()
 			}
 			// set oversize to 'true'
 			oversize = true
 			// wrap the store in a 'database transaction' to rollback all the 'oversize transactions'
 			if _, e := s.TxnWrap(); e != nil {
-				return nil, nil, nil, nil, nil, 0, e
+				return e
 			}
 		}
 		// get the store from the state machine, it may be the original or a wrapped 'txn' if processing oversize transactions
@@ -256,13 +263,13 @@ func (s *StateMachine) ApplyTransactions(
 		// wrap the store in a 'database transaction' in case a rollback to the previous valid transaction is needed
 		txn, e := s.TxnWrap()
 		if e != nil {
-			return nil, nil, nil, nil, nil, 0, e
+			return e
 		}
 		// apply the tx to the state machine, generating a transaction result
-		result, e := s.ApplyTransaction(uint64(n), tx, hashString, crypto.NewBatchVerifier(true))
+		result, events, e := s.ApplyTransaction(uint64(r.Count), tx, hashString, crypto.NewBatchVerifier(true))
 		if e != nil {
 			// add to the failed list
-			failed = append(failed, lib.NewFailedTx(tx, e))
+			r.AddFailed(lib.NewFailedTx(tx, e))
 			// discard the FSM cache
 			s.ResetCaches()
 			//txn.Discard()
@@ -271,43 +278,21 @@ func (s *StateMachine) ApplyTransactions(
 		} else {
 			// write the transaction to the underlying store
 			if err = txn.Flush(); err != nil {
-				return nil, nil, nil, nil, nil, 0, err
+				return err
 			}
 			s.SetStore(currentStore)
-		}
-		// don't do any additional processing if oversize
-		if oversize {
-			// add to the oversized results
-			oversized = append(oversized, result)
-			continue
 		}
 		// encode the result to bytes
 		txResultBz, e := lib.Marshal(result)
 		if e != nil {
-			return nil, nil, nil, nil, nil, 0, e
+			return e
 		}
-		// add to the 'block transactions' list
-		blockTxs = append(blockTxs, tx)
-		// add the result to a list of transaction results
-		results = append(results, result)
-		// add the bytes to the list of transactions results
-		txResultsBytes = append(txResultsBytes, txResultBz)
-		// add to the size of the block
-		blockSize += txSize
-		// see if the size is the largest
-		if txSize > largestTxSize {
-			// set as largest
-			largestTxSize = txSize
-		}
-		// update the transaction count
-		n++
+		r.Add(tx, txResultBz, result, events, oversize)
 	}
-	// create a transaction root for the block header
-	root, _, err = lib.MerkleTree(txResultsBytes)
 	// update metrics
-	s.Metrics.UpdateLargestTxSize(largestTxSize)
+	s.Metrics.UpdateLargestTxSize(r.LargestTx)
 	// return and exit
-	return results, oversized, root, blockTxs, failed, n, err
+	return err
 }
 
 // TimeMachine() creates a new StateMachine instance representing the blockchain state at a specified block height, allowing for a read-only view of the past state
@@ -518,6 +503,7 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 		slashTracker:       NewSlashTracker(),
 		proposeVoteConfig:  s.proposeVoteConfig,
 		RCManager:          s.RCManager,
+		events:             &lib.EventsTracker{},
 		Config:             s.Config,
 		Metrics:            nil,
 		log:                s.log,
@@ -525,16 +511,6 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 			accounts: make(map[uint64]*Account),
 		},
 	}, nil
-}
-
-// ResetToBeginBlock() resets the store and executes 'begin-block'
-func (s *StateMachine) ResetToBeginBlock() {
-	// reset the state machine (store)
-	s.Reset()
-	// run the 'begin block' code
-	if err := s.BeginBlock(); err != nil {
-		s.log.Errorf("BEGIN_BLOCK FAILURE: %s", err.Error())
-	}
 }
 
 // Set() upserts a key-value pair under a key

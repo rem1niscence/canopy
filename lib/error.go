@@ -249,18 +249,18 @@ const (
 	CodeDuplicateLockOrder        ErrorCode = 79
 	CodeInvalidBuyerDeadline      ErrorCode = 80
 	CodeInvalidCloseOrder         ErrorCode = 81
-
-	CodeInvalidCheckpoint        ErrorCode = 83
-	CodeInvalidSellOrder         ErrorCode = 84
-	CodeStartPollHeight          ErrorCode = 85
-	CodeEmptyChainId             ErrorCode = 86
-	CodeMismatchCertResults      ErrorCode = 87
-	CodeInvalidQCRootChainHeight ErrorCode = 88
-	CodeEmptyCertificateResults  ErrorCode = 89
-	CodeSlashNonValidator        ErrorCode = 90
-	CodeEmptyOrderBook           ErrorCode = 91
-	CodeNoSubsidizedCommittees   ErrorCode = 92
-	CodeEmptyLotteryWinner       ErrorCode = 93
+	CodeEmptyEventsTracker        ErrorCode = 82
+	CodeInvalidCheckpoint         ErrorCode = 83
+	CodeInvalidSellOrder          ErrorCode = 84
+	CodeStartPollHeight           ErrorCode = 85
+	CodeEmptyChainId              ErrorCode = 86
+	CodeMismatchCertResults       ErrorCode = 87
+	CodeInvalidQCRootChainHeight  ErrorCode = 88
+	CodeEmptyCertificateResults   ErrorCode = 89
+	CodeSlashNonValidator         ErrorCode = 90
+	CodeEmptyOrderBook            ErrorCode = 91
+	CodeNoSubsidizedCommittees    ErrorCode = 92
+	CodeEmptyLotteryWinner        ErrorCode = 93
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -817,4 +817,8 @@ func ErrPointHolderNotFound() ErrorI {
 
 func ErrZeroLiquidityPool() ErrorI {
 	return NewError(CodeZeroPointHolder, StateMachineModule, "pool cannot have zero points after allocated")
+}
+
+func ErrEmptyEventsTracker() ErrorI {
+	return NewError(CodeEmptyEventsTracker, StateMachineModule, "events tracker nil")
 }

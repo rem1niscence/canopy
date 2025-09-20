@@ -14,19 +14,20 @@ import (
 const BlockAcceptanceRange = 4320
 
 // ApplyTransaction() processes the transaction within the state machine, returning the corresponding TxResult.
-func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash string, batchVerifier *crypto.BatchVerifier) (*lib.TxResult, lib.ErrorI) {
+func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash string, batchVerifier *crypto.BatchVerifier) (*lib.TxResult, []*lib.Event, lib.ErrorI) {
+	s.events.Refer(txHash)
 	// validate the transaction and get the check result
 	result, err := s.CheckTx(transaction, txHash, batchVerifier)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// deduct fees for the transaction
 	if err = s.AccountDeductFees(result.sender, result.tx.Fee); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// handle the message (payload)
 	if err = s.HandleMessage(result.msg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// return the tx result
 	return &lib.TxResult{
@@ -37,7 +38,7 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 		Index:       index,
 		Transaction: result.tx,
 		TxHash:      txHash,
-	}, nil
+	}, s.events.Reset(), nil
 }
 
 // CheckTx() validates the transaction object
