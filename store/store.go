@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/canopy-network/canopy/lib"
@@ -94,7 +93,7 @@ func NewStore(config lib.Config, path string, metrics *lib.Metrics, log lib.Logg
 	db, err := badger.OpenManaged(badger.DefaultOptions(path).WithNumVersionsToKeep(math.MaxInt64).WithLoggingLevel(badger.ERROR).
 		WithValueThreshold(1024).WithCompression(options.None).WithNumMemtables(16).WithMemTableSize(256 << 20).
 		WithNumLevelZeroTables(10).WithNumLevelZeroTablesStall(20).WithBaseTableSize(128 << 20).WithBaseLevelSize(512 << 20).
-		WithNumCompactors(runtime.NumCPU()).WithCompactL0OnClose(true).WithBypassLockGuard(true).WithDetectConflicts(false).WithSyncWrites(true),
+		WithNumCompactors(0).WithCompactL0OnClose(true).WithBypassLockGuard(true).WithDetectConflicts(false),
 	)
 	if err != nil {
 		return nil, ErrOpenDB(err)
