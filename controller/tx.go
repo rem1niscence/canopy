@@ -3,11 +3,12 @@ package controller
 import (
 	"context"
 	"fmt"
-	"github.com/canopy-network/canopy/bft"
 	"math"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/canopy-network/canopy/bft"
 
 	"github.com/canopy-network/canopy/fsm"
 	"github.com/canopy-network/canopy/lib"
@@ -228,7 +229,8 @@ func (m *Mempool) CheckMempool() {
 	// get RC build height
 	rcBuildHeight := m.controller.RootChainHeight()
 	// apply the block against the state machine and populate the resulting merkle `roots` in the block header
-	block.BlockHeader, result, err = m.FSM.ApplyBlock(ctx, block, rcBuildHeight, true)
+	lastVs := m.controller.LastValidatorSet[m.FSM.Height()][m.controller.Config.ChainId]
+	block.BlockHeader, result, err = m.FSM.ApplyBlock(ctx, block, lastVs, rcBuildHeight, true)
 	if err != nil {
 		m.log.Warnf("Check Mempool error: %s", err.Error())
 		return
