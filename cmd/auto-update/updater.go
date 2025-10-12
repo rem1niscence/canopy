@@ -305,7 +305,7 @@ func Extract(ctx context.Context, sourceFile string, targetDir string) error {
 	if err := os.MkdirAll(absTarget, 0755); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
-	// use tar with built-in gzip decompression: tar -C target -xzvf source
+	// use tar with built-in gzip decompression: tar -C target -xzf source
 	tarCmd := exec.CommandContext(ctx, "tar", "-C", absTarget, "-xzf", absSource)
 	tarCmd.Stderr = os.Stderr
 	// run the command

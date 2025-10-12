@@ -403,7 +403,10 @@ func (s *Store) Evict() lib.ErrorI {
 	newLSSPrefix := hex.EncodeToString(fmt.Appendf(nil, "%s/", lib.RandSlice(32)))
 	// create the new LSS store without the deleted keys
 	writer := s.db.NewWriteBatchAt(lssVersion)
+	backupKeys := make([][]byte, 0, len(lssBackup))
 	for _, entry := range lssBackup {
+		// add the current key to the backup list
+		backupKeys = append(backupKeys, bytes.Clone(entry.Key))
 		// replace the old LSS prefix with the new one
 		entry.Key = bytes.Replace(entry.Key, []byte(currentLSSPrefix), []byte(newLSSPrefix), 1)
 		if err := writer.SetEntryAt(entry, lssVersion); err != nil {
@@ -425,18 +428,24 @@ func (s *Store) Evict() lib.ErrorI {
 	// set the latest state prefix to the new one for next reads
 	latestStatePrefix = newLSSPrefix
 	go func() {
+		now := time.Now()
+		// create a new writeBatch for the given version
+		deleteWriter := s.db.NewWriteBatchAt(lssVersion)
 		// set discard timestamp, before evicting entries
 		s.db.SetDiscardTs(lssVersion)
 		// reset discard timestamp after eviction
 		defer s.db.SetDiscardTs(0)
-		// drop the entire previous prefix to force eviction processing
-		now := time.Now()
-		if err := s.db.DropPrefix([]byte(currentLSSPrefix)); err != nil {
-			s.log.Errorf("Failed to drop LSS prefix: %v", err)
+		// set all the previous keys to be deleted
+		for _, key := range backupKeys {
+			if err := deleteWriter.DeleteAt(key, lssVersion); err != nil {
+				s.log.Errorf("failed to delete key: %v", err)
+			}
 		}
-		// log the results, total should always be 0 to make sure eviction is working correctly
-		total, _ := s.keyCount(lssVersion, []byte(currentLSSPrefix), true)
-		s.log.Debugf("dropped previous LSS prefix, total keys: %d took: %s", total, time.Since(now))
+		// flush the writeBatch
+		if err := deleteWriter.Flush(); err != nil {
+			s.log.Errorf("eviction: failed to flush writeBatch: %v", err)
+		}
+		s.log.Debugf("deleted previous LSS keys took: %s", time.Since(now))
 	}()
 	// log the results
 	total, _ := s.keyCount(lssVersion, []byte(latestStatePrefix), true)

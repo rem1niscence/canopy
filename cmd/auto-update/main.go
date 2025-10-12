@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -62,13 +63,16 @@ func main() {
 	// start the update loop
 	err := coordinator.UpdateLoop(sigChan)
 	if err != nil {
-		logger.Errorf("canopy stopped with error: %v", err)
-		// try to extract the exit code
+		exitCode, exitCodeStr := 1, "unknown"
+		// try to extract the exit code from the error
 		if exitError, ok := err.(*exec.ExitError); ok {
-			os.Exit(exitError.ExitCode())
+			exitCode = exitError.ExitCode()
+			exitCodeStr = fmt.Sprintf("%d", exitCode)
 		}
-		// default of 1 for unknown errors
-		os.Exit(1)
+		// log the error
+		logger.Errorf("canopy stopped with error: %v, exit code: %s", err, exitCodeStr)
+		// exit
+		os.Exit(exitCode)
 	}
 }
 

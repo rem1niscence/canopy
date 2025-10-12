@@ -234,7 +234,7 @@ func (c *Coordinator) GracefulShutdown() error {
 func (c *Coordinator) CheckAndApplyUpdate(ctx context.Context) error {
 	// check if an update is already in progress
 	if c.updateInProgress.Load() {
-		c.log.Debug("Update already in progress, skipping check")
+		c.log.Debug("update already in progress, skipping check")
 		return nil
 	}
 	// check for new version
@@ -244,7 +244,7 @@ func (c *Coordinator) CheckAndApplyUpdate(ctx context.Context) error {
 	}
 	// check if an update is required
 	if !release.ShouldUpdate {
-		c.log.Debug("No update available")
+		c.log.Debug("no update available")
 		return nil
 	}
 	c.log.Infof("new version found: %s", release.Version)
@@ -277,7 +277,7 @@ func (c *Coordinator) ApplyUpdate(ctx context.Context, release *Release) error {
 		}
 		c.log.Info("snapshot downloaded and extracted")
 	}
-	// add random delay for staggered updates (1-30 minutes)
+	// add random delay for staggered updates
 	if c.supervisor.IsRunning() {
 		delay := time.Duration(rand.IntN(c.config.MaxDelayTime)+1) * time.Minute
 		c.log.Infof("waiting %v before applying update", delay)
@@ -314,7 +314,7 @@ func (c *Coordinator) ApplyUpdate(ctx context.Context, release *Release) error {
 		return fmt.Errorf("failed to start updated process: %w", err)
 	}
 	c.log.Infof("update to version %s completed successfully", release.Version)
-	// update updateManager to have the new version
+	// update UpdateManager to have the new version
 	c.updater.Version = release.Version
 	return nil
 }
