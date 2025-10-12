@@ -75,13 +75,11 @@ func New(c lib.Config, store lib.StoreI, metrics *lib.Metrics, log lib.LoggerI) 
 func (s *StateMachine) Initialize(store lib.StoreI) (genesis bool, err lib.ErrorI) {
 	// set height to the latest version and store to the passed store
 	s.height, s.store = store.Version(), store
-
 	// if height is genesis
 	if s.height == 0 {
 		// then initialize from a genesis file
 		return true, s.NewFromGenesisFile()
 	}
-
 	// load the previous block
 	blk, e := s.LoadBlock(s.Height() - 1)
 	if e != nil {
