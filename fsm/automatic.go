@@ -61,15 +61,6 @@ func (s *StateMachine) EndBlock(proposerAddress []byte) (err lib.ErrorI) {
 	if err = s.DeleteFinishedUnstaking(); err != nil {
 		return
 	}
-	// If a parameter was updated during this block, enforce the new minimums now
-	// that all transactions have been committed and we have full state visibility
-	if s.pendingParamUpdate != nil {
-		if err = s.ConformStateToParamUpdate(s.pendingParamUpdate); err != nil {
-			return err
-		}
-		// clear the pending update after processing
-		s.pendingParamUpdate = nil
-	}
 	return
 }
 
