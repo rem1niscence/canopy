@@ -56,7 +56,7 @@ func New(c lib.Config, store lib.StoreI, metrics *lib.Metrics, rcManager lib.RCM
 		Metrics:           metrics,
 		RCManager:         rcManager,
 		log:               log,
-		events:            &lib.EventsTracker{},
+		events:            new(lib.EventsTracker),
 		cache: &cache{
 			accounts: make(map[uint64]*Account),
 		},
@@ -102,7 +102,7 @@ func (s *StateMachine) Initialize(store lib.StoreI) (genesis bool, err lib.Error
 // NOTES:
 // - this function may be used to validate 'additional' transactions outside the normal block size as if they were to be included
 // - a list of failed transactions are returned
-func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, lastValidatorSet *lib.ValidatorSet, rcBuildHeight uint64, allowOversize bool) (header *lib.BlockHeader, r *lib.ApplyBlockResults, err lib.ErrorI) {
+func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, lastValidatorSet *lib.ValidatorSet, allowOversize bool) (header *lib.BlockHeader, r *lib.ApplyBlockResults, err lib.ErrorI) {
 	// catch in case there's a panic
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -133,7 +133,7 @@ func (s *StateMachine) ApplyBlock(ctx context.Context, b *lib.Block, lastValidat
 	// sub-out transactions for those that succeeded (only useful for mempool application)
 	b.Transactions = r.Txs
 	// automated execution at the 'ending of a block'
-	events, err = s.EndBlock(b.BlockHeader.ProposerAddress, rcBuildHeight)
+	events, err = s.EndBlock(b.BlockHeader.ProposerAddress)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -508,7 +508,7 @@ func (s *StateMachine) Copy() (*StateMachine, lib.ErrorI) {
 		slashTracker:       NewSlashTracker(),
 		proposeVoteConfig:  s.proposeVoteConfig,
 		RCManager:          s.RCManager,
-		events:             &lib.EventsTracker{},
+		events:             new(lib.EventsTracker),
 		Config:             s.Config,
 		Metrics:            nil,
 		log:                s.log,

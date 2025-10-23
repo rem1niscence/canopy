@@ -266,7 +266,7 @@ func TestApplyBlock(t *testing.T) {
 			// load the last block validator set
 			valSet, _ := sm.LoadCommittee(lib.CanopyChainId, sm.Height()-1)
 			// execute the function call
-			header, result, e := sm.ApplyBlock(context.Background(), test.block, &valSet, 0, false)
+			header, result, e := sm.ApplyBlock(context.Background(), test.block, &valSet, false)
 			// validate the expected error
 			require.Equal(t, test.error != "", e != nil || len(result.Failed) != 0, e)
 			if result != nil && len(result.Failed) != 0 {

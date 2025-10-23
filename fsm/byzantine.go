@@ -1,10 +1,9 @@
 package fsm
 
 import (
-	"slices"
-
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
+	"slices"
 )
 
 /* This file contains logic regarding byzantine actor handling and bond slashes */
@@ -253,8 +252,7 @@ func (s *StateMachine) ForceUnstakeValidator(address crypto.AddressI) lib.ErrorI
 	// calculate the future unstaking height
 	unstakingHeight := s.Height() + unstakingBlocks
 	// set the validator as unstaking
-	err = s.SetValidatorUnstaking(address, validator, unstakingHeight)
-	if err != nil {
+	if err = s.SetValidatorUnstaking(address, validator, unstakingHeight); err != nil {
 		return err
 	}
 	// add begin unstaking event
@@ -340,8 +338,7 @@ func (s *StateMachine) SlashValidator(validator *Validator, chainId, percent uin
 	// update the stake amount and set the validator
 	validator.StakedAmount = stakeAfterSlash
 	// update the validator
-	err = s.SetValidator(validator)
-	if err != nil {
+	if err = s.SetValidator(validator); err != nil {
 		return err
 	}
 	// add slash event

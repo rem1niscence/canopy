@@ -203,7 +203,7 @@ func (c *Controller) ValidateProposal(rcBuildHeight uint64, qc *lib.QuorumCertif
 		return
 	}
 	// play the block against the state machine to generate a block result
-	blockResult, err = c.ApplyAndValidateBlock(block, rcBuildHeight, c.LastValidatorSet[c.ChainHeight()][c.Config.ChainId], false)
+	blockResult, err = c.ApplyAndValidateBlock(block, c.LastValidatorSet[c.ChainHeight()][c.Config.ChainId], false)
 	if err != nil {
 		// exit with error
 		return
@@ -244,7 +244,7 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 		// reset the FSM to ensure stale proposal validations don't come into play
 		c.FSM.Reset()
 		// apply the block against the state machine
-		blockResult, err = c.ApplyAndValidateBlock(block, qc.Header.RootHeight, c.LastValidatorSet[c.ChainHeight()][c.Config.ChainId], true)
+		blockResult, err = c.ApplyAndValidateBlock(block, c.LastValidatorSet[c.ChainHeight()][c.Config.ChainId], true)
 		if err != nil {
 			// exit with error
 			return
@@ -354,7 +354,7 @@ func (c *Controller) CommitCertificateParallel(qc *lib.QuorumCertificate, block 
 		// reset the FSM to ensure stale proposal validations don't come into play
 		c.FSM.Reset()
 		// apply the block against the state machine
-		blockResult, err = c.ApplyAndValidateBlock(block, qc.Header.RootHeight, c.LastValidatorSet[c.ChainHeight()][c.Config.ChainId], true)
+		blockResult, err = c.ApplyAndValidateBlock(block, c.LastValidatorSet[c.ChainHeight()][c.Config.ChainId], true)
 		if err != nil {
 			// exit with error
 			return
@@ -470,7 +470,7 @@ func (c *Controller) CommitCertificateParallel(qc *lib.QuorumCertificate, block 
 // INTERNAL HELPERS BELOW
 
 // ApplyAndValidateBlock() plays the block against the state machine which returns a result that is compared against the candidate block header
-func (c *Controller) ApplyAndValidateBlock(block *lib.Block, rcBuildHeight uint64, lastValidatorSet *lib.ValidatorSet, commit bool) (b *lib.BlockResult, err lib.ErrorI) {
+func (c *Controller) ApplyAndValidateBlock(block *lib.Block, lastValidatorSet *lib.ValidatorSet, commit bool) (b *lib.BlockResult, err lib.ErrorI) {
 	// define convenience variables for the block header, hash, and height
 	candidate, candidateHash, candidateHeight := block.BlockHeader, lib.BytesToString(block.BlockHeader.Hash), block.BlockHeader.Height
 	// check the last qc in the candidate and set it in the ephemeral indexer to prepare for block application
@@ -481,7 +481,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, rcBuildHeight uint6
 	// log the start of 'apply block'
 	c.log.Debugf("Applying block %s for height %d", candidateHash[:20], candidateHeight)
 	// apply the block against the state machine
-	compare, results, err := c.FSM.ApplyBlock(context.Background(), block, lastValidatorSet, rcBuildHeight, false)
+	compare, results, err := c.FSM.ApplyBlock(context.Background(), block, lastValidatorSet, false)
 	if err != nil {
 		// exit with error
 		return
