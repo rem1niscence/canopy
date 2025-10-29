@@ -284,12 +284,12 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToTruncatedString(qc.BlockHash), block.BlockHeader.Height)
 	// set up the finite state machine for the next height
 	c.FSM, err = fsm.New(c.Config, storeI, c.Metrics, c.log)
-	// set the reference to lastCertificate on the new FSM
-	c.FSM.LastValidatorSet = c.LastValidatorSet
 	if err != nil {
 		// exit with error
 		return err
 	}
+	// set the reference to lastCertificate on the new FSM
+	c.FSM.LastValidatorSet = c.LastValidatorSet
 	// reset the current mempool store to prepare for the next height
 	c.Mempool.FSM.Discard()
 	// set up the mempool with the actual new FSM for the next height
@@ -410,8 +410,15 @@ func (c *Controller) CommitCertificateParallel(qc *lib.QuorumCertificate, block 
 			// exit with error
 			return err
 		}
+		// set the reference to lastCertificate on the new FSM
+		c.FSM.LastValidatorSet = c.LastValidatorSet
+		// Currently using hardcoded chain IDs (1, 2) instead of dynamically fetching IDs
+		// from RCManager since only these two chains exist. This will be updated to use
+		// dynamic chain discovery when additional chains are added.
+		// TODO: Optimize rcManager publishing for subchains (it should publish to themselves too by default)
 		// publish the root chain info to the nested chain subscribers
-		for _, id := range c.RCManager.ChainIds() {
+		// for _, id := range c.RCManager.ChainIds() {
+		for _, id := range []uint64{1, 2} {
 			// get latest validator set
 			valSet, err := c.FSM.GetCommitteeMembers(id)
 			if err != nil {
@@ -465,6 +472,8 @@ func (c *Controller) CommitCertificateParallel(qc *lib.QuorumCertificate, block 
 		// exit with error
 		return err
 	}
+	// remove older validator set heights
+	delete(c.LastValidatorSet, c.ChainHeight()-2)
 	// update telemetry (using proper defer to ensure time.Since is evaluated at defer execution)
 	defer c.UpdateTelemetry(qc, block, time.Since(start))
 	// exit
