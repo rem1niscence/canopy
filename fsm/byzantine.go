@@ -322,6 +322,10 @@ func (s *StateMachine) SlashValidator(validator *Validator, chainId, percent uin
 	}
 	// if stake after slash is 0, remove the validator
 	if stakeAfterSlash == 0 {
+		// add slash event
+		if err = s.EventSlash(validator.Address, slashAmount); err != nil {
+			return err
+		}
 		// DeleteValidator subtracts from staked supply
 		return s.DeleteValidator(validator)
 	}
