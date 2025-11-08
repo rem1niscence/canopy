@@ -277,6 +277,35 @@ func (s *StateMachine) SetValidatorUnstaking(address crypto.AddressI, validator 
 	return s.SetValidator(validator)
 }
 
+// SetValidatorUnstakingIfBelowMinimum() updates a validator as 'unstaking' and removes it from its respective committees
+// if it is below the minimum stake according to saved params
+func (s *StateMachine) SetValidatorUnstakingIfBelowMinimum(validator *Validator, params *ValidatorParams) (bool, lib.ErrorI) {
+	var belowMinimum, unstakingBlocks = false, uint64(0)
+	// skip if already unstaking
+	if validator.UnstakingHeight != 0 {
+		return false, nil
+	}
+	// validate stake is above minimums
+	if validator.Delegate {
+		if validator.StakedAmount < params.MinimumStakeForDelegates {
+			unstakingBlocks, belowMinimum = params.DelegateUnstakingBlocks, true
+		}
+	} else {
+		if validator.StakedAmount < params.MinimumStakeForValidators {
+			unstakingBlocks, belowMinimum = params.UnstakingBlocks, true
+		}
+	}
+	// if below minimum, force unstake
+	if belowMinimum {
+		// calculate the future unstaking height
+		unstakingHeight := s.Height() + unstakingBlocks
+		// set the validator/delegate as unstaking
+		return true, s.SetValidatorUnstaking(crypto.NewAddress(validator.Address), validator, unstakingHeight)
+	}
+	// if not, nothing happen
+	return false, nil
+}
+
 // DeleteFinishedUnstaking() deletes the Validator structure and unstaking keys for those who have finished unstaking
 func (s *StateMachine) DeleteFinishedUnstaking() lib.ErrorI {
 	// create a variable to maintain a list of the unstaking keys 'to delete'
