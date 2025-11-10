@@ -608,7 +608,7 @@ type EventOrderBookSwap struct {
 	// sellers_receive_address: the address of the seller where the 'counter asset' will be received
 	SellerReceiveAddress []byte `protobuf:"bytes,4,opt,name=SellerReceiveAddress,proto3" json:"sellerReceiveAddress"` // @gotags: json:"sellerReceiveAddress"
 	// buyer_send_address: the address of the buyer where the 'counter asset' will be sent from
-	BuyerSendAddress []byte `protobuf:"bytes,5,opt,name=BuyerSendAddress,proto3" json:"sellerReceiveAddress"` // @gotags: json:"sellerReceiveAddress"
+	BuyerSendAddress []byte `protobuf:"bytes,5,opt,name=BuyerSendAddress,proto3" json:"buyerSendAddress"` // @gotags: json:"buyerSendAddress"
 	// sellers_send_address: the Canopy address the seller is selling and signing from
 	SellersSendAddress []byte `protobuf:"bytes,6,opt,name=SellersSendAddress,proto3" json:"sellersSendAddress"` // @gotags: json:"sellersSendAddress"
 	// OrderId: auto-populated by the state machine to assign the unique bytes to the order

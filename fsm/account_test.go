@@ -2,7 +2,6 @@ package fsm
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"testing"
 
@@ -296,7 +295,6 @@ func TestAccountDeductFees(t *testing.T) {
 			// check account balance
 			balance, err := sm.GetAccountBalance(address)
 			require.NoError(t, err)
-			fmt.Println("EXPECTED", expectedAmount, balance)
 			require.Equal(t, expectedAmount, balance)
 			// check pool balance
 			balance, err = sm.GetPoolBalance(lib.CanopyChainId)

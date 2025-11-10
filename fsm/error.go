@@ -282,3 +282,7 @@ func ErrInvalidLiquidityPool() lib.ErrorI {
 func ErrMaxDexBatchSize() lib.ErrorI {
 	return lib.NewError(lib.CodeMaxDexBatchSize, lib.StateMachineModule, "the dex batch size exceeds the global max")
 }
+
+func ErrStakeBelowMininum() lib.ErrorI {
+	return lib.NewError(lib.CodeStakeBelowMinimum, lib.StateMachineModule, "stake below minimum")
+}
