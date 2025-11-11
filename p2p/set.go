@@ -3,6 +3,7 @@ package p2p
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"slices"
 	"sync"
 
@@ -124,9 +125,6 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 	defer ps.Unlock()
 	ps.mustConnect = mustConnect
 	for _, peer := range ps.m {
-		if peer.IsMustConnect {
-			ps.changeIOCount(true, peer.IsOutbound)
-		}
 		peer.IsMustConnect = false
 	}
 	// for each must connect
@@ -137,9 +135,8 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 		}
 		publicKey := lib.BytesToString(peer.PublicKey)
 		// if has peer, just update metadata
-		if p, found := ps.m[publicKey]; found {
+		if _, found := ps.m[publicKey]; found {
 			ps.m[publicKey].IsMustConnect = true
-			ps.changeIOCount(false, p.IsOutbound)
 		} else { // else add to 'ToDial' list
 			toDial = append(toDial, peer)
 		}
@@ -205,9 +202,12 @@ func (ps *PeerSet) IsMustConnect(publicKey []byte) bool {
 
 // GetAllInfos() returns the information on connected peers and the total inbound / outbound counts
 func (ps *PeerSet) GetAllInfos() (res []*lib.PeerInfo, numInbound, numOutbound int) {
+	// copy the current set to avoid race conditions
 	ps.RLock()
-	defer ps.RUnlock()
-	for _, p := range ps.m {
+	set := maps.Clone(ps.m)
+	ps.RUnlock()
+	// iterate over the copied set
+	for _, p := range set {
 		if p.IsOutbound {
 			numOutbound++
 		} else {
@@ -323,7 +323,6 @@ func (ps *PeerSet) changeIOCount(increment, outbound bool) {
 
 // updateMetrics is a helper to update peer metrics
 func (ps *PeerSet) updateMetrics() {
-	//ps.logger.Debugf("METRICS Inbound: %d, Outbound: %d", ps.inbound, ps.outbound)
 	ps.metrics.UpdatePeerMetrics(ps.inbound+ps.outbound, ps.inbound, ps.outbound)
 }
 
