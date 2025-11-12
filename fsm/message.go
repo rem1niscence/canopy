@@ -494,7 +494,7 @@ func (s *StateMachine) HandleMessageDexLimitOrder(msg *MessageDexLimitOrder) (er
 		return ErrInvalidLiquidityPool()
 	}
 	// hard limit orders to 10K per batch to prevent unchecked state growth
-	if len(batch.Orders) >= 10_000 {
+	if len(batch.Orders) >= lib.MaxOrdersPerDexBatch {
 		return ErrMaxDexBatchSize()
 	}
 	// move funds from user
@@ -528,7 +528,7 @@ func (s *StateMachine) HandleMessageDexLiquidityDeposit(msg *MessageDexLiquidity
 		return ErrInvalidLiquidityPool()
 	}
 	// hard limit ops to 5K per batch to prevent unchecked state growth
-	if len(batch.Deposits) >= 5_000 {
+	if len(batch.Deposits) >= lib.MaxDepositsPerDexBatch {
 		return ErrMaxDexBatchSize()
 	}
 	// move funds from user
@@ -561,7 +561,7 @@ func (s *StateMachine) HandleMessageDexLiquidityWithdraw(msg *MessageDexLiquidit
 		return ErrInvalidLiquidityPool()
 	}
 	// hard limit ops to 5K per batch to prevent unchecked state growth
-	if len(batch.Withdrawals) >= 5_000 {
+	if len(batch.Withdrawals) >= lib.MaxWithdrawsPerDexBatch {
 		return ErrMaxDexBatchSize()
 	}
 	// get the liquidity pool
