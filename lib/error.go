@@ -268,6 +268,7 @@ const (
 	CodeTooManyDexOrdersError    ErrorCode = 97
 	CodeTooManyDexReceiptsError  ErrorCode = 98
 	CodeNonNilPoolPointsError    ErrorCode = 99
+	CodeRemotePoolSizeDebit      ErrorCode = 100
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"

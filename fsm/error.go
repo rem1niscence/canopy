@@ -286,3 +286,7 @@ func ErrMaxDexBatchSize() lib.ErrorI {
 func ErrStakeBelowMininum() lib.ErrorI {
 	return lib.NewError(lib.CodeStakeBelowMinimum, lib.StateMachineModule, "stake below minimum")
 }
+
+func ErrRemotePoolSizeDebit() lib.ErrorI {
+	return lib.NewError(lib.CodeRemotePoolSizeDebit, lib.StateMachineModule, "remote pool size debit")
+}
