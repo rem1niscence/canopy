@@ -494,14 +494,14 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, lastValidatorSet *l
 	// log the start of 'apply block'
 	c.log.Debugf("Applying block %s for height %d", candidateHash[:20], candidateHeight)
 	// apply the block against the state machine
-	compare, txResults, _, failed, err := c.FSM.ApplyBlock(context.Background(), block, lastValidatorSet, false)
+	compare, results, err := c.FSM.ApplyBlock(context.Background(), block, lastValidatorSet, false)
 	if err != nil {
 		// exit with error
 		return
 	}
 	// if any transactions failed
-	if len(failed) != 0 {
-		for _, f := range failed {
+	if len(results.Failed) != 0 {
+		for _, f := range results.Failed {
 			c.log.Errorf("From: %s\nType:%s\nErr:%s", f.Address, f.Transaction.MessageType, f.Error.Error())
 		}
 		return nil, lib.ErrFailedTransactions()
@@ -531,7 +531,7 @@ func (c *Controller) ApplyAndValidateBlock(block *lib.Block, lastValidatorSet *l
 	// log that the proposal is valid
 	c.log.Infof("Block %s with %d txs is valid for height %d ✅ ", candidateHash[:20], len(block.Transactions), candidateHeight)
 	// exit with the valid results
-	return &lib.BlockResult{BlockHeader: candidate, Transactions: txResults}, nil
+	return &lib.BlockResult{BlockHeader: candidate, Transactions: results.Results, Events: results.Events}, nil
 }
 
 // HandlePeerBlock() validates and handles an inbound certificate (with a block) from a remote peer
