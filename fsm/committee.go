@@ -55,9 +55,9 @@ func (s *StateMachine) GetBlockMintStats(chainId uint64) (daoCut uint64, totalMi
 		subsidizedChainIds = append(subsidizedChainIds, chainId)
 	}
 	// calculate the number of halvenings
-	halvenings := s.height / uint64(BlocksPerHalvening)
+	halvenings := s.height / s.Config.BlocksPerHalvening
 	// each halving, the reward is divided by 2
-	totalMintAmount := uint64(InitialTokensPerBlock >> halvenings)
+	totalMintAmount := s.Config.InitialTokensPerBlock >> halvenings
 	// define a convenience variable for the number of subsidized committees
 	subsidizedCount := uint64(len(subsidizedChainIds))
 	// if there are no subsidized committees or no mint amount
