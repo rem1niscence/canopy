@@ -7,7 +7,7 @@ import (
 /* This file handles 'automatic' (non-transaction-induced) state changes that occur ath the beginning and ending of a block */
 
 // BeginBlock() is code that is executed at the start of `applying` the block
-func (s *StateMachine) BeginBlock(lastValidatorSet *lib.ValidatorSet) (lib.Events, lib.ErrorI) {
+func (s *StateMachine) BeginBlock() (lib.Events, lib.ErrorI) {
 	s.events.Refer(lib.EventStageBeginBlock)
 	// prevent attempting to load the certificate for height 0
 	if s.Height() <= 1 {
@@ -38,9 +38,14 @@ func (s *StateMachine) BeginBlock(lastValidatorSet *lib.ValidatorSet) (lib.Event
 	if s.Config.ChainId != rootChainId {
 		return s.events.Reset(), s.HandleCertificateResults(lastCertificate, nil)
 	}
+	// load the validator set for the previous height
+	lastValidatorSet, err := s.LoadCommittee(s.Config.ChainId, s.Height()-1)
+	if err != nil {
+		return nil, err
+	}
 	// if is root-chain: load the committee from state as the certificate result
 	// will match the evidence and there's no Transaction to HandleMessageCertificateResults
-	return s.events.Reset(), s.HandleCertificateResults(lastCertificate, lastValidatorSet)
+	return s.events.Reset(), s.HandleCertificateResults(lastCertificate, &lastValidatorSet)
 }
 
 // EndBlock() is code that is executed at the end of `applying` the block

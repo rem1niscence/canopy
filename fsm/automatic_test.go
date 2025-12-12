@@ -125,8 +125,7 @@ func TestBeginBlock(t *testing.T) {
 			}
 			// get last validator set for begin block
 			// ensure expected error on function call
-			valSet, _ := sm.LoadCommittee(lib.CanopyChainId, sm.Height()-1)
-			_, err = sm.BeginBlock(&valSet)
+			_, err = sm.BeginBlock()
 			if test.error != nil {
 				return
 			}
