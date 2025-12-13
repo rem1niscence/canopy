@@ -1,6 +1,10 @@
 package controller
 
 import (
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,10 +34,11 @@ type Controller struct {
 	Consensus *bft.BFT          // the async consensus process between the committee members for the chain
 	P2P       *p2p.P2P          // the P2P module the node uses to connect to the network
 
-	RCManager   lib.RCManagerI // the data manager for the 'root chain'
-	isSyncing   *atomic.Bool   // is the chain currently being downloaded from peers
-	log         lib.LoggerI    // object for logging
-	*sync.Mutex                // mutex for thread safety
+	RCManager   lib.RCManagerI                     // the data manager for the 'root chain'
+	checkpoints map[uint64]map[uint64]lib.HexBytes // cached checkpoints loaded from file
+	isSyncing   *atomic.Bool                       // is the chain currently being downloaded from peers
+	log         lib.LoggerI                        // object for logging
+	*sync.Mutex                                    // mutex for thread safety
 }
 
 // New() creates a new instance of a Controller, this is the entry point when initializing an instance of a Canopy application
@@ -68,6 +73,8 @@ func New(fsm *fsm.StateMachine, c lib.Config, valKey crypto.PrivateKeyI, metrics
 		log:        l,
 		Mutex:      &sync.Mutex{},
 	}
+	// load checkpoints from file (if provided)
+	controller.loadCheckpointsFile()
 	// initialize the consensus in the controller, passing a reference to itself
 	controller.Consensus, err = bft.New(c, valKey, fsm.Height(), fsm.Height()-1, controller, c.RunVDF, metrics, l)
 	// initialize the mempool controller
@@ -332,6 +339,39 @@ func (c *Controller) emptyInbox(topic lib.Topic) {
 		// discard the message
 		<-c.P2P.Inbox(topic)
 	}
+}
+
+const checkpointsFileName = "checkpoints.json"
+
+// loadCheckpointsFile reads checkpoints.json (if present) into the controller cache.
+func (c *Controller) loadCheckpointsFile() {
+	path := filepath.Join(c.Config.DataDirPath, checkpointsFileName)
+	fileBytes, err := os.ReadFile(path)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			c.log.Warnf("failed to read checkpoints file: %s", err)
+		}
+		return
+	}
+	checkpoints := make(map[uint64]map[uint64]lib.HexBytes)
+	if err = json.Unmarshal(fileBytes, &checkpoints); err != nil {
+		c.log.Warnf("failed to parse checkpoints file: %s", err)
+		return
+	}
+	c.checkpoints = checkpoints
+}
+
+// checkpointFromFile returns a cached checkpoint for a given chain and height, or nil if not found.
+func (c *Controller) checkpointFromFile(height, chainId uint64) lib.HexBytes {
+	if c.checkpoints == nil {
+		return nil
+	}
+	if chainCheckpoints, ok := c.checkpoints[chainId]; ok {
+		if checkpoint, ok := chainCheckpoints[height]; ok {
+			return checkpoint
+		}
+	}
+	return nil
 }
 
 // convenience aliases that reference the library package
