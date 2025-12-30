@@ -3,6 +3,7 @@ package lib
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"runtime"
 )
 
@@ -268,7 +269,15 @@ const (
 	CodeTooManyDexOrdersError    ErrorCode = 97
 	CodeTooManyDexReceiptsError  ErrorCode = 98
 	CodeNonNilPoolPointsError    ErrorCode = 99
-	CodeRemotePoolSizeDebit      ErrorCode = 100
+	CodeRemotePoolSizeDebit       ErrorCode = 100
+	CodeFailedPluginWrite         ErrorCode = 102
+	CodeFailedPluginRead          ErrorCode = 103
+	CodeInvalidPluginToFSMMessage ErrorCode = 104
+	CodeInvalidFSMToPluginmessage ErrorCode = 105
+	CodeInvalidPluginConfig       ErrorCode = 106
+	CodeInvalidPluginRespId       ErrorCode = 107
+	CodeUnexpectedPluginToFSM     ErrorCode = 108
+	CodePluginTimeout             ErrorCode = 109
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -853,4 +862,36 @@ func ErrTooManyDexReceipts() ErrorI {
 
 func ErrNonNilPoolPoints() ErrorI {
 	return NewError(CodeNonNilPoolPointsError, StateMachineModule, "non nil pool points")
+}
+
+func ErrFailedPluginWrite(err error) ErrorI {
+	return NewError(CodeFailedPluginWrite, StateMachineModule, fmt.Sprintf("a plugin write failed with error: %s", err.Error()))
+}
+
+func ErrFailedPluginRead(err error) ErrorI {
+	return NewError(CodeFailedPluginRead, StateMachineModule, fmt.Sprintf("a plugin read failed with error: %s", err.Error()))
+}
+
+func ErrInvalidPluginToFSMMessage(t reflect.Type) ErrorI {
+	return NewError(CodeInvalidPluginToFSMMessage, StateMachineModule, fmt.Sprintf("unrecognized plugin_to_fsm message: %v", t))
+}
+
+func ErrInvalidPluginConfig() ErrorI {
+	return NewError(CodeInvalidPluginConfig, StateMachineModule, "invalid plugin config")
+}
+
+func ErrInvalidPluginRespId() ErrorI {
+	return NewError(CodeInvalidPluginRespId, StateMachineModule, "plugin response id is invalid")
+}
+
+func ErrUnexpectedPluginToFSM(t reflect.Type) ErrorI {
+	return NewError(CodeUnexpectedPluginToFSM, StateMachineModule, fmt.Sprintf("unexpected plugin_to_fsm message: %v", t))
+}
+
+func ErrPluginTimeout() ErrorI {
+	return NewError(CodePluginTimeout, StateMachineModule, "a plugin timeout occurred")
+}
+
+func ErrInvalidFSMToPluginMessage(t reflect.Type) ErrorI {
+	return NewError(CodeInvalidFSMToPluginmessage, StateMachineModule, fmt.Sprintf("unrecognized fsm_to_plugin message: %v", t))
 }

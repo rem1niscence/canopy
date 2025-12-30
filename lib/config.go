@@ -67,6 +67,7 @@ type MainConfig struct {
 	RunVDF     bool        `json:"runVDF"`     // whether the node should run a Verifiable Delay Function to help secure the network against Long-Range-Attacks
 	Headless   bool        `json:"headless"`   // turn off the web wallet and block explorer 'web' front ends
 	AutoUpdate bool        `json:"autoUpdate"` // check for new versions of software each X time
+	Plugin     string      `json:"plugin"`     // the configured plugin to use
 }
 
 // DefaultMainConfig() sets log level to 'info'
