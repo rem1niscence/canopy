@@ -22,6 +22,24 @@ func (s *StateMachine) NewFromGenesisFile() (err lib.ErrorI) {
 	if err = s.NewStateFromGenesis(genesis); err != nil {
 		return
 	}
+	// execute plugin genesis
+	if s.Plugin != nil {
+		genesisJson, err := lib.MarshalJSON(genesis)
+		if err != nil {
+			return err
+		}
+		resp, e := s.Plugin.Genesis(s, &lib.PluginGenesisRequest{
+			GenesisJson: genesisJson,
+		})
+		// handle error
+		if e != nil {
+			return e
+		}
+		// handle plugin error
+		if err = resp.Error.E(); err != nil {
+			return err
+		}
+	}
 	// commit the genesis state to persistence (database)
 	if _, err = s.store.(lib.StoreI).Commit(); err != nil {
 		return

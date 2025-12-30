@@ -20,19 +20,33 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 	if err != nil {
 		return nil, nil, err
 	}
-	// deduct fees for the transaction
-	if err = s.AccountDeductFees(result.sender, result.tx.Fee); err != nil {
-		return nil, nil, err
-	}
-	// handle the message (payload)
-	if err = s.HandleMessage(result.msg); err != nil {
-		return nil, nil, err
+	// if the transaction is meant for the plugin
+	if result.plugin && s.Plugin != nil {
+		// route to plugin
+		resp, e := s.Plugin.DeliverTx(s, &lib.PluginDeliverRequest{Tx: result.tx})
+		// handle error
+		if err = e; err != nil {
+			return nil, nil, err
+		}
+		// if the response contains an error
+		if err = resp.Error.E(); err != nil {
+			return nil, nil, err
+		}
+	} else {
+		// deduct fees for the transaction
+		if err = s.AccountDeductFees(result.sender, result.tx.Fee); err != nil {
+			return nil, nil, err
+		}
+		// handle the message (payload)
+		if err = s.HandleMessage(result.msg); err != nil {
+			return nil, nil, err
+		}
 	}
 	// return the tx result
 	return &lib.TxResult{
 		Sender:      result.sender.Bytes(),
-		Recipient:   result.msg.Recipient(),
-		MessageType: result.msg.Name(),
+		Recipient:   result.recipient,
+		MessageType: result.tx.MessageType,
 		Height:      s.Height(),
 		Index:       index,
 		Transaction: result.tx,
@@ -56,6 +70,31 @@ func (s *StateMachine) CheckTx(transaction []byte, txHash string, batchVerifier 
 	if err = s.CheckReplay(tx, txHash); err != nil {
 		return
 	}
+	// if the transaction is meant for the plugin
+	if s.Plugin != nil && s.Plugin.SupportsTransaction(tx.MessageType) {
+		// execute check tx on the plugin
+		resp, e := s.Plugin.CheckTx(s, &lib.PluginCheckRequest{Tx: tx})
+		if err = e; err != nil {
+			return
+		}
+		// check if response errored
+		if err = resp.Error.E(); err != nil {
+			return
+		}
+		// validate the signature of the transaction
+		sender, err := s.CheckSignatureWithSigners(tx, resp.AuthorizedSigners, batchVerifier)
+		if err != nil {
+			return nil, err
+		}
+		// return the result
+		return &CheckTxResult{
+			tx:        tx,
+			msg:       nil,
+			sender:    sender,
+			recipient: resp.Recipient,
+			plugin:    true,
+		}, nil
+	}
 	// perform basic validations against the message payload
 	msg, err := s.CheckMessage(tx.Msg)
 	if err != nil {
@@ -72,17 +111,21 @@ func (s *StateMachine) CheckTx(transaction []byte, txHash string, batchVerifier 
 	}
 	// return the result
 	return &CheckTxResult{
-		tx:     tx,
-		msg:    msg,
-		sender: sender,
+		tx:        tx,
+		msg:       msg,
+		sender:    sender,
+		recipient: msg.Recipient(),
+		plugin:    false,
 	}, nil
 }
 
 // CheckTxResult is the result object from CheckTx()
 type CheckTxResult struct {
-	tx     *lib.Transaction // the transaction object
-	msg    lib.MessageI     // the payload message in the transaction
-	sender crypto.AddressI  // the sender address of the transaction
+	tx        *lib.Transaction // the transaction object
+	msg       lib.MessageI     // the payload message in the transaction
+	sender    crypto.AddressI  // the sender address of the transaction
+	recipient []byte           // the recipient of the transaction (if applicable)
+	plugin    bool             // if the transaction is handled by the plugin
 }
 
 // CheckSignature() validates the signer and the digital signature associated with the transaction object
@@ -163,6 +206,54 @@ func (s *StateMachine) CheckSignature(msg lib.MessageI, tx *lib.Transaction, bat
 				hash, _ := tx.GetHash()
 				x.OrderId = hash[:20] // first 20 bytes of the transaction hash
 			}
+			// return the signer address
+			return address, nil
+		}
+	}
+	// if no authorized signer matched the signer address, it's unauthorized
+	return nil, ErrUnauthorizedTx()
+}
+
+// CheckSignatureWithSigners() validates the signature with pre-provided authorized signers (used by plugins)
+func (s *StateMachine) CheckSignatureWithSigners(tx *lib.Transaction, authorizedSigners [][]byte, batchSigVerifier *crypto.BatchVerifier) (crypto.AddressI, lib.ErrorI) {
+	// validate the actual signature bytes
+	if tx.Signature == nil || len(tx.Signature.Signature) == 0 {
+		return nil, ErrEmptySignature()
+	}
+	// get the canonical byte representation of the transaction
+	signBytes, err := tx.GetSignBytes()
+	if err != nil {
+		return nil, ErrTxSignBytes(err)
+	}
+	// convert signature bytes to public key object
+	publicKey, e := crypto.NewPublicKeyFromBytes(tx.Signature.PublicKey)
+	if e != nil {
+		return nil, ErrInvalidPublicKey(e)
+	}
+	// special case: check for a special RLP transaction
+	if _, hasEthPubKey := publicKey.(*crypto.ETHSECP256K1PublicKey); hasEthPubKey && tx.Memo == RLPIndicator {
+		if err = s.VerifyRLPBytes(tx); err != nil {
+			return nil, err
+		}
+	} else {
+		// if using a batch verifier
+		if batchSigVerifier != nil {
+			if e = batchSigVerifier.Add(publicKey, tx.Signature.PublicKey, signBytes, tx.Signature.Signature); e != nil {
+				return nil, ErrInvalidPublicKey(e)
+			}
+		} else {
+			// if verifying 1 by 1
+			if !publicKey.VerifyBytes(signBytes, tx.Signature.Signature) {
+				return nil, ErrInvalidSignature()
+			}
+		}
+	}
+	// calculate the corresponding address from the public key
+	address := publicKey.Address()
+	// for each authorized signer
+	for _, authorized := range authorizedSigners {
+		// if the address that signed the transaction matches one of the authorized signers
+		if address.Equals(crypto.NewAddressFromBytes(authorized)) {
 			// return the signer address
 			return address, nil
 		}
