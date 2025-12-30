@@ -312,13 +312,15 @@ func TestCheckSignature(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			// create a state machine instance with default parameters
-			sm := newTestStateMachine(t)
-			// execute the function call
-			signer, err := sm.CheckSignature(test.msg, test.transaction, nil)
-			// validate the expected error
-			require.Equal(t, test.error != "", err != nil, err)
+			t.Run(test.name, func(t *testing.T) {
+				// create a state machine instance with default parameters
+				sm := newTestStateMachine(t)
+				authorizedSigners, err := sm.GetAuthorizedSignersFor(test.msg)
+				require.NoError(t, err)
+				// execute the function call
+				signer, err := sm.CheckSignature(test.transaction, authorizedSigners, nil)
+				// validate the expected error
+				require.Equal(t, test.error != "", err != nil, err)
 			if err != nil {
 				require.ErrorContains(t, err, test.error)
 				return

@@ -24,7 +24,7 @@ COPY --from=canopy-builder /canopy .
 COPY --from=plugin-builder /plugin .
 
 # Set plugin type for Canopy to start
-ENV CANOPY_PLUGIN=go
+RUN printf '{"plugin":"go"}\n' > /root/.canopy/config.json
 
 # Default: run canopy (start plugin separately with: ./plugin)
 # Mount config at runtime: -v ~/.canopy:/root/.canopy

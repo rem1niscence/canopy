@@ -4,14 +4,14 @@ import (
 	"github.com/canopy-network/canopy/lib"
 )
 
-/* This file handles 'automatic' (non-transaction-induced) state changes that occur ath the beginning and ending of a block */
+/* This file handles 'automatic' (non-transaction-induced) state changes that occur at the beginning and ending of a block */
 
 // BeginBlock() is code that is executed at the start of `applying` the block
 func (s *StateMachine) BeginBlock() (lib.Events, lib.ErrorI) {
 	s.events.Refer(lib.EventStageBeginBlock)
 	// execute plugin begin block if enabled
 	if s.Plugin != nil {
-		if _, err := s.Plugin.BeginBlock(s, &lib.PluginBeginRequest{}); err != nil {
+		if _, err := s.Plugin.BeginBlock(s, &lib.PluginBeginRequest{Height: s.height}); err != nil {
 			return nil, err
 		}
 	}
@@ -78,7 +78,10 @@ func (s *StateMachine) EndBlock(proposerAddress []byte) (events lib.Events, err 
 	}
 	// execute plugin end block if enabled
 	if s.Plugin != nil {
-		if _, err = s.Plugin.EndBlock(s, &lib.PluginEndRequest{}); err != nil {
+		if _, err = s.Plugin.EndBlock(s, &lib.PluginEndRequest{
+			Height:          s.height,
+			ProposerAddress: proposerAddress,
+		}); err != nil {
 			return nil, err
 		}
 	}

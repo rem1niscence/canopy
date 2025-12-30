@@ -21,7 +21,7 @@ COPY plugin/python/ ./plugin/
 RUN if [ -f plugin/requirements.txt ]; then pip install --no-cache-dir -r plugin/requirements.txt; fi
 
 # Set plugin type for Canopy to start
-ENV CANOPY_PLUGIN=python
+RUN printf '{"plugin":"python"}\n' > /root/.canopy/config.json
 
 # Default: run canopy (start plugin separately with: python plugin/main.py)
 # Mount config at runtime: -v ~/.canopy:/root/.canopy

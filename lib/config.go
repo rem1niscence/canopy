@@ -350,10 +350,6 @@ func NewConfigFromFile(filepath string) (Config, error) {
 		// exit with error
 		return Config{}, err
 	}
-	// allow environment variable override for plugin (useful for Docker containers)
-	if plugin := os.Getenv("CANOPY_PLUGIN"); plugin != "" {
-		c.Plugin = plugin
-	}
 	// exit
 	return c, nil
 }

@@ -22,14 +22,11 @@ func (s *StateMachine) NewFromGenesisFile() (err lib.ErrorI) {
 	if err = s.NewStateFromGenesis(genesis); err != nil {
 		return
 	}
-	// execute plugin genesis
+	// if plugin isn't nil
 	if s.Plugin != nil {
-		genesisJson, err := lib.MarshalJSON(genesis)
-		if err != nil {
-			return err
-		}
+		// execute plugin genesis
 		resp, e := s.Plugin.Genesis(s, &lib.PluginGenesisRequest{
-			GenesisJson: genesisJson,
+			GenesisJson: lib.MustMarshalJSON(genesis),
 		})
 		// handle error
 		if e != nil {

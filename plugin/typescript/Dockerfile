@@ -26,7 +26,7 @@ COPY --from=typescript-builder /app/node_modules ./plugin/node_modules/
 COPY --from=typescript-builder /app/package.json ./plugin/
 
 # Set plugin type for Canopy to start
-ENV CANOPY_PLUGIN=typescript
+RUN printf '{"plugin":"typescript"}\n' > /root/.canopy/config.json
 
 # Default: run canopy (start plugin separately with: node plugin/main.js)
 # Mount config at runtime: -v ~/.canopy:/root/.canopy

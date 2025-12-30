@@ -24,7 +24,7 @@ COPY --from=canopy-builder /canopy .
 COPY --from=kotlin-builder /app/build/libs/*-all.jar plugin.jar
 
 # Set plugin type for Canopy to start
-ENV CANOPY_PLUGIN=kotlin
+RUN printf '{"plugin":"kotlin"}\n' > /root/.canopy/config.json
 
 # Default: run canopy (start plugin separately with: java -jar plugin.jar)
 # Mount config at runtime: -v ~/.canopy:/root/.canopy

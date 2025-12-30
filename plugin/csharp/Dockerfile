@@ -24,7 +24,7 @@ COPY --from=canopy-builder /canopy .
 COPY --from=csharp-builder /out ./plugin/
 
 # Set plugin type for Canopy to start
-ENV CANOPY_PLUGIN=csharp
+RUN printf '{"plugin":"csharp"}\n' > /root/.canopy/config.json
 
 # Default: run canopy (start plugin separately with: dotnet plugin/CanopyPlugin.dll)
 # Mount config at runtime: -v ~/.canopy:/root/.canopy
