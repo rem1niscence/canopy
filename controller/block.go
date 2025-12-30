@@ -284,8 +284,6 @@ func (c *Controller) CommitCertificate(qc *lib.QuorumCertificate, block *lib.Blo
 	c.log.Infof("Committed block %s at H:%d 🔒", lib.BytesToTruncatedString(qc.BlockHash), block.BlockHeader.Height)
 	// set up the finite state machine for the next height
 	c.FSM, err = fsm.New(c.Config, storeI, c.Plugin, c.Metrics, c.log)
-	// set the reference to lastCertificate on the new FSM
-	c.FSM.LastValidatorSet = c.LastValidatorSet
 	if err != nil {
 		// exit with error
 		return err
