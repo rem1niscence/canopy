@@ -390,7 +390,7 @@ func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 		streams[i] = &Stream{
 			topic:        i,
 			msgAssembler: make([]byte, 0),
-			sendQueue:    make(chan *Packet, maxStreamSendQueueSize),
+			sendQueue:    make(chan *PacketWithTiming, maxStreamSendQueueSize),
 			inbox:        p.Inbox(i),
 			logger:       p.log,
 		}
@@ -399,7 +399,7 @@ func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 	streams[lib.Topic_HEARTBEAT] = &Stream{
 		topic:        lib.Topic_HEARTBEAT,
 		msgAssembler: make([]byte, 0),
-		sendQueue:    make(chan *Packet, maxStreamSendQueueSize),
+		sendQueue:    make(chan *PacketWithTiming, maxStreamSendQueueSize),
 		inbox:        nil,
 		logger:       p.log,
 	}
