@@ -1,6 +1,7 @@
 syntax = "proto3";
 package types;
 option go_package = "github.com/canopy-network/go-plugin/contract";
+import "event.proto";
 import "tx.proto";
 
 // FSMToPlugin is the outbound message to the plugin from the main FSM (fsm -> plugin)
@@ -82,7 +83,10 @@ message PluginGenesisResponse {PluginError error = 99;}
 message PluginBeginRequest {uint64 height = 1; }
 
 // PluginBeginResponse acknowledges begin block execution
-message PluginBeginResponse {PluginError error = 99;}
+message PluginBeginResponse {
+  repeated Event events = 1;
+  PluginError error = 99;
+}
 
 // PluginCheckRequest carries a transaction to be checked
 message PluginCheckRequest {Transaction tx = 1;}
@@ -101,7 +105,10 @@ message PluginCheckResponse {
 message PluginDeliverRequest {Transaction tx = 1;}
 
 // PluginDeliverResponse acknowledges transaction delivery
-message PluginDeliverResponse {PluginError error = 99;}
+message PluginDeliverResponse {
+  repeated Event events = 1;
+  PluginError error = 99;
+}
 
 // PluginEndRequest signals end of the current block
 message PluginEndRequest {
@@ -110,7 +117,10 @@ message PluginEndRequest {
 }
 
 // PluginEndResponse acknowledges end block execution
-message PluginEndResponse {PluginError error = 99;}
+message PluginEndResponse {
+  repeated Event events = 1;
+  PluginError error = 99;
+}
 
 // PluginError carries error details from plugin or FSM
 message PluginError {

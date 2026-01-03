@@ -209,6 +209,251 @@ export namespace types {
         public static getTypeUrl(typeUrlPrefix?: string): string;
     }
 
+    /** Properties of an Event. */
+    interface IEvent {
+
+        /** Event eventType */
+        eventType?: (string|null);
+
+        /** Event custom */
+        custom?: (types.IEventCustom|null);
+
+        /** Event height */
+        height?: (number|Long|null);
+
+        /** Event reference */
+        reference?: (string|null);
+
+        /** Event chainId */
+        chainId?: (number|Long|null);
+
+        /** Event blockHeight */
+        blockHeight?: (number|Long|null);
+
+        /** Event blockHash */
+        blockHash?: (Uint8Array|null);
+
+        /** Event address */
+        address?: (Uint8Array|null);
+    }
+
+    /** Represents an Event. */
+    class Event implements IEvent {
+
+        /**
+         * Constructs a new Event.
+         * @param [properties] Properties to set
+         */
+        constructor(properties?: types.IEvent);
+
+        /** Event eventType. */
+        public eventType: string;
+
+        /** Event custom. */
+        public custom?: (types.IEventCustom|null);
+
+        /** Event height. */
+        public height: (number|Long);
+
+        /** Event reference. */
+        public reference: string;
+
+        /** Event chainId. */
+        public chainId: (number|Long);
+
+        /** Event blockHeight. */
+        public blockHeight: (number|Long);
+
+        /** Event blockHash. */
+        public blockHash: Uint8Array;
+
+        /** Event address. */
+        public address: Uint8Array;
+
+        /** Event msg. */
+        public msg?: ("custom");
+
+        /**
+         * Creates a new Event instance using the specified properties.
+         * @param [properties] Properties to set
+         * @returns Event instance
+         */
+        public static create(properties?: types.IEvent): types.Event;
+
+        /**
+         * Encodes the specified Event message. Does not implicitly {@link types.Event.verify|verify} messages.
+         * @param message Event message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encode(message: types.IEvent, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Encodes the specified Event message, length delimited. Does not implicitly {@link types.Event.verify|verify} messages.
+         * @param message Event message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encodeDelimited(message: types.IEvent, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Decodes an Event message from the specified reader or buffer.
+         * @param reader Reader or buffer to decode from
+         * @param [length] Message length if known beforehand
+         * @returns Event
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): types.Event;
+
+        /**
+         * Decodes an Event message from the specified reader or buffer, length delimited.
+         * @param reader Reader or buffer to decode from
+         * @returns Event
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): types.Event;
+
+        /**
+         * Verifies an Event message.
+         * @param message Plain object to verify
+         * @returns `null` if valid, otherwise the reason why it is not
+         */
+        public static verify(message: { [k: string]: any }): (string|null);
+
+        /**
+         * Creates an Event message from a plain object. Also converts values to their respective internal types.
+         * @param object Plain object
+         * @returns Event
+         */
+        public static fromObject(object: { [k: string]: any }): types.Event;
+
+        /**
+         * Creates a plain object from an Event message. Also converts values to other types if specified.
+         * @param message Event
+         * @param [options] Conversion options
+         * @returns Plain object
+         */
+        public static toObject(message: types.Event, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+        /**
+         * Converts this Event to JSON.
+         * @returns JSON object
+         */
+        public toJSON(): { [k: string]: any };
+
+        /**
+         * Gets the default type url for Event
+         * @param [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns The default type url
+         */
+        public static getTypeUrl(typeUrlPrefix?: string): string;
+    }
+
+    /** Properties of an EventCustom. */
+    interface IEventCustom {
+
+        /** EventCustom msgTypeUrl */
+        msgTypeUrl?: (string|null);
+
+        /** EventCustom msgBytes */
+        msgBytes?: (Uint8Array|null);
+    }
+
+    /** Represents an EventCustom. */
+    class EventCustom implements IEventCustom {
+
+        /**
+         * Constructs a new EventCustom.
+         * @param [properties] Properties to set
+         */
+        constructor(properties?: types.IEventCustom);
+
+        /** EventCustom msgTypeUrl. */
+        public msgTypeUrl: string;
+
+        /** EventCustom msgBytes. */
+        public msgBytes: Uint8Array;
+
+        /**
+         * Creates a new EventCustom instance using the specified properties.
+         * @param [properties] Properties to set
+         * @returns EventCustom instance
+         */
+        public static create(properties?: types.IEventCustom): types.EventCustom;
+
+        /**
+         * Encodes the specified EventCustom message. Does not implicitly {@link types.EventCustom.verify|verify} messages.
+         * @param message EventCustom message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encode(message: types.IEventCustom, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Encodes the specified EventCustom message, length delimited. Does not implicitly {@link types.EventCustom.verify|verify} messages.
+         * @param message EventCustom message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encodeDelimited(message: types.IEventCustom, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Decodes an EventCustom message from the specified reader or buffer.
+         * @param reader Reader or buffer to decode from
+         * @param [length] Message length if known beforehand
+         * @returns EventCustom
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): types.EventCustom;
+
+        /**
+         * Decodes an EventCustom message from the specified reader or buffer, length delimited.
+         * @param reader Reader or buffer to decode from
+         * @returns EventCustom
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): types.EventCustom;
+
+        /**
+         * Verifies an EventCustom message.
+         * @param message Plain object to verify
+         * @returns `null` if valid, otherwise the reason why it is not
+         */
+        public static verify(message: { [k: string]: any }): (string|null);
+
+        /**
+         * Creates an EventCustom message from a plain object. Also converts values to their respective internal types.
+         * @param object Plain object
+         * @returns EventCustom
+         */
+        public static fromObject(object: { [k: string]: any }): types.EventCustom;
+
+        /**
+         * Creates a plain object from an EventCustom message. Also converts values to other types if specified.
+         * @param message EventCustom
+         * @param [options] Conversion options
+         * @returns Plain object
+         */
+        public static toObject(message: types.EventCustom, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+        /**
+         * Converts this EventCustom to JSON.
+         * @returns JSON object
+         */
+        public toJSON(): { [k: string]: any };
+
+        /**
+         * Gets the default type url for EventCustom
+         * @param [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns The default type url
+         */
+        public static getTypeUrl(typeUrlPrefix?: string): string;
+    }
+
     /** Properties of a FSMToPlugin. */
     interface IFSMToPlugin {
 
@@ -1017,6 +1262,9 @@ export namespace types {
     /** Properties of a PluginBeginResponse. */
     interface IPluginBeginResponse {
 
+        /** PluginBeginResponse events */
+        events?: (types.IEvent[]|null);
+
         /** PluginBeginResponse error */
         error?: (types.IPluginError|null);
     }
@@ -1029,6 +1277,9 @@ export namespace types {
          * @param [properties] Properties to set
          */
         constructor(properties?: types.IPluginBeginResponse);
+
+        /** PluginBeginResponse events. */
+        public events: types.IEvent[];
 
         /** PluginBeginResponse error. */
         public error?: (types.IPluginError|null);
@@ -1417,6 +1668,9 @@ export namespace types {
     /** Properties of a PluginDeliverResponse. */
     interface IPluginDeliverResponse {
 
+        /** PluginDeliverResponse events */
+        events?: (types.IEvent[]|null);
+
         /** PluginDeliverResponse error */
         error?: (types.IPluginError|null);
     }
@@ -1429,6 +1683,9 @@ export namespace types {
          * @param [properties] Properties to set
          */
         constructor(properties?: types.IPluginDeliverResponse);
+
+        /** PluginDeliverResponse events. */
+        public events: types.IEvent[];
 
         /** PluginDeliverResponse error. */
         public error?: (types.IPluginError|null);
@@ -1617,6 +1874,9 @@ export namespace types {
     /** Properties of a PluginEndResponse. */
     interface IPluginEndResponse {
 
+        /** PluginEndResponse events */
+        events?: (types.IEvent[]|null);
+
         /** PluginEndResponse error */
         error?: (types.IPluginError|null);
     }
@@ -1629,6 +1889,9 @@ export namespace types {
          * @param [properties] Properties to set
          */
         constructor(properties?: types.IPluginEndResponse);
+
+        /** PluginEndResponse events. */
+        public events: types.IEvent[];
 
         /** PluginEndResponse error. */
         public error?: (types.IPluginError|null);

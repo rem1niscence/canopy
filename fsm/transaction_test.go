@@ -104,26 +104,34 @@ func TestCheckTx(t *testing.T) {
 	// predefine a send-transaction to insert into the block
 	sendTx, e := NewSendTransaction(kg.PrivateKey, newTestAddress(t), amount-1, 1, 1, 1, 1, "")
 	require.NoError(t, e)
+	cloneTx := func(t *testing.T, tx lib.TransactionI) *lib.Transaction {
+		t.Helper()
+		txBytes, err := lib.Marshal(tx)
+		require.NoError(t, err)
+		out := new(lib.Transaction)
+		require.NoError(t, lib.Unmarshal(txBytes, out))
+		return out
+	}
 	// convert the object to bytes
 	tx, e := lib.Marshal(sendTx)
 	require.NoError(t, e)
 	// define a version with a bad height
-	sendTxBadHeight := sendTx.(*lib.Transaction)
+	sendTxBadHeight := cloneTx(t, sendTx)
 	sendTxBadHeight.CreatedHeight = 4320 + 3
 	require.NoError(t, sendTxBadHeight.Sign(kg.PrivateKey))
 	// convert the object to bytes
 	txBadHeight, e := lib.Marshal(sendTxBadHeight)
 	require.NoError(t, e)
 	// define a version with a bad fee (below state limit)
-	sendTxBadFee := sendTx.(*lib.Transaction)
-	sendTxBadHeight.CreatedHeight = 4320
+	sendTxBadFee := cloneTx(t, sendTx)
+	sendTxBadFee.CreatedHeight = 4320
 	sendTxBadFee.Fee = 0
 	require.NoError(t, sendTxBadFee.Sign(kg.PrivateKey))
 	// convert the object to bytes
 	txBadFee, e := lib.Marshal(sendTxBadFee)
 	require.NoError(t, e)
 	// define a version without a bad signature
-	sendTxBadSig := sendTx.(*lib.Transaction)
+	sendTxBadSig := cloneTx(t, sendTx)
 	sendTxBadSig.Signature.Signature = []byte("bad sig")
 	// convert the object to bytes
 	txBadSig, e := lib.Marshal(sendTxBadSig)

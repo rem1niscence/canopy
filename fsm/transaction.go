@@ -32,6 +32,9 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 		if err = resp.Error.E(); err != nil {
 			return nil, nil, err
 		}
+		if err = s.addPluginEvents(resp.Events); err != nil {
+			return nil, nil, err
+		}
 	} else {
 		// deduct fees for the transaction
 		if err = s.AccountDeductFees(result.sender, result.tx.Fee); err != nil {

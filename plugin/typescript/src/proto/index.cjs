@@ -527,6 +527,697 @@ $root.types = (function() {
         return Pool;
     })();
 
+    types.Event = (function() {
+
+        /**
+         * Properties of an Event.
+         * @memberof types
+         * @interface IEvent
+         * @property {string|null} [eventType] Event eventType
+         * @property {types.IEventCustom|null} [custom] Event custom
+         * @property {number|Long|null} [height] Event height
+         * @property {string|null} [reference] Event reference
+         * @property {number|Long|null} [chainId] Event chainId
+         * @property {number|Long|null} [blockHeight] Event blockHeight
+         * @property {Uint8Array|null} [blockHash] Event blockHash
+         * @property {Uint8Array|null} [address] Event address
+         */
+
+        /**
+         * Constructs a new Event.
+         * @memberof types
+         * @classdesc Represents an Event.
+         * @implements IEvent
+         * @constructor
+         * @param {types.IEvent=} [properties] Properties to set
+         */
+        function Event(properties) {
+            if (properties)
+                for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null)
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * Event eventType.
+         * @member {string} eventType
+         * @memberof types.Event
+         * @instance
+         */
+        Event.prototype.eventType = "";
+
+        /**
+         * Event custom.
+         * @member {types.IEventCustom|null|undefined} custom
+         * @memberof types.Event
+         * @instance
+         */
+        Event.prototype.custom = null;
+
+        /**
+         * Event height.
+         * @member {number|Long} height
+         * @memberof types.Event
+         * @instance
+         */
+        Event.prototype.height = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+
+        /**
+         * Event reference.
+         * @member {string} reference
+         * @memberof types.Event
+         * @instance
+         */
+        Event.prototype.reference = "";
+
+        /**
+         * Event chainId.
+         * @member {number|Long} chainId
+         * @memberof types.Event
+         * @instance
+         */
+        Event.prototype.chainId = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+
+        /**
+         * Event blockHeight.
+         * @member {number|Long} blockHeight
+         * @memberof types.Event
+         * @instance
+         */
+        Event.prototype.blockHeight = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+
+        /**
+         * Event blockHash.
+         * @member {Uint8Array} blockHash
+         * @memberof types.Event
+         * @instance
+         */
+        Event.prototype.blockHash = $util.newBuffer([]);
+
+        /**
+         * Event address.
+         * @member {Uint8Array} address
+         * @memberof types.Event
+         * @instance
+         */
+        Event.prototype.address = $util.newBuffer([]);
+
+        // OneOf field names bound to virtual getters and setters
+        var $oneOfFields;
+
+        /**
+         * Event msg.
+         * @member {"custom"|undefined} msg
+         * @memberof types.Event
+         * @instance
+         */
+        Object.defineProperty(Event.prototype, "msg", {
+            get: $util.oneOfGetter($oneOfFields = ["custom"]),
+            set: $util.oneOfSetter($oneOfFields)
+        });
+
+        /**
+         * Creates a new Event instance using the specified properties.
+         * @function create
+         * @memberof types.Event
+         * @static
+         * @param {types.IEvent=} [properties] Properties to set
+         * @returns {types.Event} Event instance
+         */
+        Event.create = function create(properties) {
+            return new Event(properties);
+        };
+
+        /**
+         * Encodes the specified Event message. Does not implicitly {@link types.Event.verify|verify} messages.
+         * @function encode
+         * @memberof types.Event
+         * @static
+         * @param {types.IEvent} message Event message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        Event.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.eventType != null && Object.hasOwnProperty.call(message, "eventType"))
+                writer.uint32(/* id 1, wireType 2 =*/10).string(message.eventType);
+            if (message.custom != null && Object.hasOwnProperty.call(message, "custom"))
+                $root.types.EventCustom.encode(message.custom, writer.uint32(/* id 11, wireType 2 =*/90).fork()).ldelim();
+            if (message.height != null && Object.hasOwnProperty.call(message, "height"))
+                writer.uint32(/* id 91, wireType 0 =*/728).uint64(message.height);
+            if (message.reference != null && Object.hasOwnProperty.call(message, "reference"))
+                writer.uint32(/* id 92, wireType 2 =*/738).string(message.reference);
+            if (message.chainId != null && Object.hasOwnProperty.call(message, "chainId"))
+                writer.uint32(/* id 93, wireType 0 =*/744).uint64(message.chainId);
+            if (message.blockHeight != null && Object.hasOwnProperty.call(message, "blockHeight"))
+                writer.uint32(/* id 94, wireType 0 =*/752).uint64(message.blockHeight);
+            if (message.blockHash != null && Object.hasOwnProperty.call(message, "blockHash"))
+                writer.uint32(/* id 95, wireType 2 =*/762).bytes(message.blockHash);
+            if (message.address != null && Object.hasOwnProperty.call(message, "address"))
+                writer.uint32(/* id 96, wireType 2 =*/770).bytes(message.address);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified Event message, length delimited. Does not implicitly {@link types.Event.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof types.Event
+         * @static
+         * @param {types.IEvent} message Event message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        Event.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes an Event message from the specified reader or buffer.
+         * @function decode
+         * @memberof types.Event
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {types.Event} Event
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        Event.decode = function decode(reader, length, error) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            var end = length === undefined ? reader.len : reader.pos + length, message = new $root.types.Event();
+            while (reader.pos < end) {
+                var tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.eventType = reader.string();
+                        break;
+                    }
+                case 11: {
+                        message.custom = $root.types.EventCustom.decode(reader, reader.uint32());
+                        break;
+                    }
+                case 91: {
+                        message.height = reader.uint64();
+                        break;
+                    }
+                case 92: {
+                        message.reference = reader.string();
+                        break;
+                    }
+                case 93: {
+                        message.chainId = reader.uint64();
+                        break;
+                    }
+                case 94: {
+                        message.blockHeight = reader.uint64();
+                        break;
+                    }
+                case 95: {
+                        message.blockHash = reader.bytes();
+                        break;
+                    }
+                case 96: {
+                        message.address = reader.bytes();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes an Event message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof types.Event
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {types.Event} Event
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        Event.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies an Event message.
+         * @function verify
+         * @memberof types.Event
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        Event.verify = function verify(message) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            var properties = {};
+            if (message.eventType != null && message.hasOwnProperty("eventType"))
+                if (!$util.isString(message.eventType))
+                    return "eventType: string expected";
+            if (message.custom != null && message.hasOwnProperty("custom")) {
+                properties.msg = 1;
+                {
+                    var error = $root.types.EventCustom.verify(message.custom);
+                    if (error)
+                        return "custom." + error;
+                }
+            }
+            if (message.height != null && message.hasOwnProperty("height"))
+                if (!$util.isInteger(message.height) && !(message.height && $util.isInteger(message.height.low) && $util.isInteger(message.height.high)))
+                    return "height: integer|Long expected";
+            if (message.reference != null && message.hasOwnProperty("reference"))
+                if (!$util.isString(message.reference))
+                    return "reference: string expected";
+            if (message.chainId != null && message.hasOwnProperty("chainId"))
+                if (!$util.isInteger(message.chainId) && !(message.chainId && $util.isInteger(message.chainId.low) && $util.isInteger(message.chainId.high)))
+                    return "chainId: integer|Long expected";
+            if (message.blockHeight != null && message.hasOwnProperty("blockHeight"))
+                if (!$util.isInteger(message.blockHeight) && !(message.blockHeight && $util.isInteger(message.blockHeight.low) && $util.isInteger(message.blockHeight.high)))
+                    return "blockHeight: integer|Long expected";
+            if (message.blockHash != null && message.hasOwnProperty("blockHash"))
+                if (!(message.blockHash && typeof message.blockHash.length === "number" || $util.isString(message.blockHash)))
+                    return "blockHash: buffer expected";
+            if (message.address != null && message.hasOwnProperty("address"))
+                if (!(message.address && typeof message.address.length === "number" || $util.isString(message.address)))
+                    return "address: buffer expected";
+            return null;
+        };
+
+        /**
+         * Creates an Event message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof types.Event
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {types.Event} Event
+         */
+        Event.fromObject = function fromObject(object) {
+            if (object instanceof $root.types.Event)
+                return object;
+            var message = new $root.types.Event();
+            if (object.eventType != null)
+                message.eventType = String(object.eventType);
+            if (object.custom != null) {
+                if (typeof object.custom !== "object")
+                    throw TypeError(".types.Event.custom: object expected");
+                message.custom = $root.types.EventCustom.fromObject(object.custom);
+            }
+            if (object.height != null)
+                if ($util.Long)
+                    (message.height = $util.Long.fromValue(object.height)).unsigned = true;
+                else if (typeof object.height === "string")
+                    message.height = parseInt(object.height, 10);
+                else if (typeof object.height === "number")
+                    message.height = object.height;
+                else if (typeof object.height === "object")
+                    message.height = new $util.LongBits(object.height.low >>> 0, object.height.high >>> 0).toNumber(true);
+            if (object.reference != null)
+                message.reference = String(object.reference);
+            if (object.chainId != null)
+                if ($util.Long)
+                    (message.chainId = $util.Long.fromValue(object.chainId)).unsigned = true;
+                else if (typeof object.chainId === "string")
+                    message.chainId = parseInt(object.chainId, 10);
+                else if (typeof object.chainId === "number")
+                    message.chainId = object.chainId;
+                else if (typeof object.chainId === "object")
+                    message.chainId = new $util.LongBits(object.chainId.low >>> 0, object.chainId.high >>> 0).toNumber(true);
+            if (object.blockHeight != null)
+                if ($util.Long)
+                    (message.blockHeight = $util.Long.fromValue(object.blockHeight)).unsigned = true;
+                else if (typeof object.blockHeight === "string")
+                    message.blockHeight = parseInt(object.blockHeight, 10);
+                else if (typeof object.blockHeight === "number")
+                    message.blockHeight = object.blockHeight;
+                else if (typeof object.blockHeight === "object")
+                    message.blockHeight = new $util.LongBits(object.blockHeight.low >>> 0, object.blockHeight.high >>> 0).toNumber(true);
+            if (object.blockHash != null)
+                if (typeof object.blockHash === "string")
+                    $util.base64.decode(object.blockHash, message.blockHash = $util.newBuffer($util.base64.length(object.blockHash)), 0);
+                else if (object.blockHash.length >= 0)
+                    message.blockHash = object.blockHash;
+            if (object.address != null)
+                if (typeof object.address === "string")
+                    $util.base64.decode(object.address, message.address = $util.newBuffer($util.base64.length(object.address)), 0);
+                else if (object.address.length >= 0)
+                    message.address = object.address;
+            return message;
+        };
+
+        /**
+         * Creates a plain object from an Event message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof types.Event
+         * @static
+         * @param {types.Event} message Event
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        Event.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            var object = {};
+            if (options.defaults) {
+                object.eventType = "";
+                object.custom = null;
+                if ($util.Long) {
+                    var long = new $util.Long(0, 0, true);
+                    object.height = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.height = options.longs === String ? "0" : 0;
+                object.reference = "";
+                if ($util.Long) {
+                    var long = new $util.Long(0, 0, true);
+                    object.chainId = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.chainId = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    var long = new $util.Long(0, 0, true);
+                    object.blockHeight = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.blockHeight = options.longs === String ? "0" : 0;
+                if (options.bytes === String)
+                    object.blockHash = "";
+                else {
+                    object.blockHash = [];
+                    if (options.bytes !== Array)
+                        object.blockHash = $util.newBuffer(object.blockHash);
+                }
+                if (options.bytes === String)
+                    object.address = "";
+                else {
+                    object.address = [];
+                    if (options.bytes !== Array)
+                        object.address = $util.newBuffer(object.address);
+                }
+            }
+            if (message.eventType != null && message.hasOwnProperty("eventType"))
+                object.eventType = message.eventType;
+            if (message.custom != null && message.hasOwnProperty("custom")) {
+                object.custom = $root.types.EventCustom.toObject(message.custom, options);
+                if (options.oneofs)
+                    object.msg = "custom";
+            }
+            if (message.height != null && message.hasOwnProperty("height"))
+                if (typeof message.height === "number")
+                    object.height = options.longs === String ? String(message.height) : message.height;
+                else
+                    object.height = options.longs === String ? $util.Long.prototype.toString.call(message.height) : options.longs === Number ? new $util.LongBits(message.height.low >>> 0, message.height.high >>> 0).toNumber(true) : message.height;
+            if (message.reference != null && message.hasOwnProperty("reference"))
+                object.reference = message.reference;
+            if (message.chainId != null && message.hasOwnProperty("chainId"))
+                if (typeof message.chainId === "number")
+                    object.chainId = options.longs === String ? String(message.chainId) : message.chainId;
+                else
+                    object.chainId = options.longs === String ? $util.Long.prototype.toString.call(message.chainId) : options.longs === Number ? new $util.LongBits(message.chainId.low >>> 0, message.chainId.high >>> 0).toNumber(true) : message.chainId;
+            if (message.blockHeight != null && message.hasOwnProperty("blockHeight"))
+                if (typeof message.blockHeight === "number")
+                    object.blockHeight = options.longs === String ? String(message.blockHeight) : message.blockHeight;
+                else
+                    object.blockHeight = options.longs === String ? $util.Long.prototype.toString.call(message.blockHeight) : options.longs === Number ? new $util.LongBits(message.blockHeight.low >>> 0, message.blockHeight.high >>> 0).toNumber(true) : message.blockHeight;
+            if (message.blockHash != null && message.hasOwnProperty("blockHash"))
+                object.blockHash = options.bytes === String ? $util.base64.encode(message.blockHash, 0, message.blockHash.length) : options.bytes === Array ? Array.prototype.slice.call(message.blockHash) : message.blockHash;
+            if (message.address != null && message.hasOwnProperty("address"))
+                object.address = options.bytes === String ? $util.base64.encode(message.address, 0, message.address.length) : options.bytes === Array ? Array.prototype.slice.call(message.address) : message.address;
+            return object;
+        };
+
+        /**
+         * Converts this Event to JSON.
+         * @function toJSON
+         * @memberof types.Event
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        Event.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for Event
+         * @function getTypeUrl
+         * @memberof types.Event
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        Event.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/types.Event";
+        };
+
+        return Event;
+    })();
+
+    types.EventCustom = (function() {
+
+        /**
+         * Properties of an EventCustom.
+         * @memberof types
+         * @interface IEventCustom
+         * @property {string|null} [msgTypeUrl] EventCustom msgTypeUrl
+         * @property {Uint8Array|null} [msgBytes] EventCustom msgBytes
+         */
+
+        /**
+         * Constructs a new EventCustom.
+         * @memberof types
+         * @classdesc Represents an EventCustom.
+         * @implements IEventCustom
+         * @constructor
+         * @param {types.IEventCustom=} [properties] Properties to set
+         */
+        function EventCustom(properties) {
+            if (properties)
+                for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null)
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * EventCustom msgTypeUrl.
+         * @member {string} msgTypeUrl
+         * @memberof types.EventCustom
+         * @instance
+         */
+        EventCustom.prototype.msgTypeUrl = "";
+
+        /**
+         * EventCustom msgBytes.
+         * @member {Uint8Array} msgBytes
+         * @memberof types.EventCustom
+         * @instance
+         */
+        EventCustom.prototype.msgBytes = $util.newBuffer([]);
+
+        /**
+         * Creates a new EventCustom instance using the specified properties.
+         * @function create
+         * @memberof types.EventCustom
+         * @static
+         * @param {types.IEventCustom=} [properties] Properties to set
+         * @returns {types.EventCustom} EventCustom instance
+         */
+        EventCustom.create = function create(properties) {
+            return new EventCustom(properties);
+        };
+
+        /**
+         * Encodes the specified EventCustom message. Does not implicitly {@link types.EventCustom.verify|verify} messages.
+         * @function encode
+         * @memberof types.EventCustom
+         * @static
+         * @param {types.IEventCustom} message EventCustom message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        EventCustom.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.msgTypeUrl != null && Object.hasOwnProperty.call(message, "msgTypeUrl"))
+                writer.uint32(/* id 1, wireType 2 =*/10).string(message.msgTypeUrl);
+            if (message.msgBytes != null && Object.hasOwnProperty.call(message, "msgBytes"))
+                writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.msgBytes);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified EventCustom message, length delimited. Does not implicitly {@link types.EventCustom.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof types.EventCustom
+         * @static
+         * @param {types.IEventCustom} message EventCustom message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        EventCustom.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes an EventCustom message from the specified reader or buffer.
+         * @function decode
+         * @memberof types.EventCustom
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {types.EventCustom} EventCustom
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        EventCustom.decode = function decode(reader, length, error) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            var end = length === undefined ? reader.len : reader.pos + length, message = new $root.types.EventCustom();
+            while (reader.pos < end) {
+                var tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.msgTypeUrl = reader.string();
+                        break;
+                    }
+                case 2: {
+                        message.msgBytes = reader.bytes();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes an EventCustom message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof types.EventCustom
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {types.EventCustom} EventCustom
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        EventCustom.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies an EventCustom message.
+         * @function verify
+         * @memberof types.EventCustom
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        EventCustom.verify = function verify(message) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (message.msgTypeUrl != null && message.hasOwnProperty("msgTypeUrl"))
+                if (!$util.isString(message.msgTypeUrl))
+                    return "msgTypeUrl: string expected";
+            if (message.msgBytes != null && message.hasOwnProperty("msgBytes"))
+                if (!(message.msgBytes && typeof message.msgBytes.length === "number" || $util.isString(message.msgBytes)))
+                    return "msgBytes: buffer expected";
+            return null;
+        };
+
+        /**
+         * Creates an EventCustom message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof types.EventCustom
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {types.EventCustom} EventCustom
+         */
+        EventCustom.fromObject = function fromObject(object) {
+            if (object instanceof $root.types.EventCustom)
+                return object;
+            var message = new $root.types.EventCustom();
+            if (object.msgTypeUrl != null)
+                message.msgTypeUrl = String(object.msgTypeUrl);
+            if (object.msgBytes != null)
+                if (typeof object.msgBytes === "string")
+                    $util.base64.decode(object.msgBytes, message.msgBytes = $util.newBuffer($util.base64.length(object.msgBytes)), 0);
+                else if (object.msgBytes.length >= 0)
+                    message.msgBytes = object.msgBytes;
+            return message;
+        };
+
+        /**
+         * Creates a plain object from an EventCustom message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof types.EventCustom
+         * @static
+         * @param {types.EventCustom} message EventCustom
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        EventCustom.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            var object = {};
+            if (options.defaults) {
+                object.msgTypeUrl = "";
+                if (options.bytes === String)
+                    object.msgBytes = "";
+                else {
+                    object.msgBytes = [];
+                    if (options.bytes !== Array)
+                        object.msgBytes = $util.newBuffer(object.msgBytes);
+                }
+            }
+            if (message.msgTypeUrl != null && message.hasOwnProperty("msgTypeUrl"))
+                object.msgTypeUrl = message.msgTypeUrl;
+            if (message.msgBytes != null && message.hasOwnProperty("msgBytes"))
+                object.msgBytes = options.bytes === String ? $util.base64.encode(message.msgBytes, 0, message.msgBytes.length) : options.bytes === Array ? Array.prototype.slice.call(message.msgBytes) : message.msgBytes;
+            return object;
+        };
+
+        /**
+         * Converts this EventCustom to JSON.
+         * @function toJSON
+         * @memberof types.EventCustom
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        EventCustom.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for EventCustom
+         * @function getTypeUrl
+         * @memberof types.EventCustom
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        EventCustom.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/types.EventCustom";
+        };
+
+        return EventCustom;
+    })();
+
     types.FSMToPlugin = (function() {
 
         /**
@@ -2424,6 +3115,12 @@ $root.types = (function() {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
+                case 1: {
+                        if (!(message.events && message.events.length))
+                            message.events = [];
+                        message.events.push($root.types.Event.decode(reader, reader.uint32()));
+                        break;
+                    }
                 case 99: {
                         message.error = $root.types.PluginError.decode(reader, reader.uint32());
                         break;
@@ -2777,11 +3474,20 @@ $root.types = (function() {
          * @param {types.IPluginBeginResponse=} [properties] Properties to set
          */
         function PluginBeginResponse(properties) {
+            this.events = [];
             if (properties)
                 for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
                     if (properties[keys[i]] != null)
                         this[keys[i]] = properties[keys[i]];
         }
+
+        /**
+         * PluginBeginResponse events.
+         * @member {Array.<types.IEvent>} events
+         * @memberof types.PluginBeginResponse
+         * @instance
+         */
+        PluginBeginResponse.prototype.events = $util.emptyArray;
 
         /**
          * PluginBeginResponse error.
@@ -2815,6 +3521,9 @@ $root.types = (function() {
         PluginBeginResponse.encode = function encode(message, writer) {
             if (!writer)
                 writer = $Writer.create();
+            if (message.events != null && message.events.length)
+                for (var i = 0; i < message.events.length; ++i)
+                    $root.types.Event.encode(message.events[i], writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
             if (message.error != null && Object.hasOwnProperty.call(message, "error"))
                 $root.types.PluginError.encode(message.error, writer.uint32(/* id 99, wireType 2 =*/794).fork()).ldelim();
             return writer;
@@ -2892,6 +3601,15 @@ $root.types = (function() {
         PluginBeginResponse.verify = function verify(message) {
             if (typeof message !== "object" || message === null)
                 return "object expected";
+            if (message.events != null && message.hasOwnProperty("events")) {
+                if (!Array.isArray(message.events))
+                    return "events: array expected";
+                for (var i = 0; i < message.events.length; ++i) {
+                    var error = $root.types.Event.verify(message.events[i]);
+                    if (error)
+                        return "events." + error;
+                }
+            }
             if (message.error != null && message.hasOwnProperty("error")) {
                 var error = $root.types.PluginError.verify(message.error);
                 if (error)
@@ -2912,6 +3630,16 @@ $root.types = (function() {
             if (object instanceof $root.types.PluginBeginResponse)
                 return object;
             var message = new $root.types.PluginBeginResponse();
+            if (object.events) {
+                if (!Array.isArray(object.events))
+                    throw TypeError(".types.PluginBeginResponse.events: array expected");
+                message.events = [];
+                for (var i = 0; i < object.events.length; ++i) {
+                    if (typeof object.events[i] !== "object")
+                        throw TypeError(".types.PluginBeginResponse.events: object expected");
+                    message.events[i] = $root.types.Event.fromObject(object.events[i]);
+                }
+            }
             if (object.error != null) {
                 if (typeof object.error !== "object")
                     throw TypeError(".types.PluginBeginResponse.error: object expected");
@@ -2933,8 +3661,15 @@ $root.types = (function() {
             if (!options)
                 options = {};
             var object = {};
-            if (options.defaults)
+            if (options.defaults) {
+                object.events = [];
                 object.error = null;
+            }
+            if (message.events && message.events.length) {
+                object.events = [];
+                for (var j = 0; j < message.events.length; ++j)
+                    object.events[j] = $root.types.Event.toObject(message.events[j], options);
+            }
             if (message.error != null && message.hasOwnProperty("error"))
                 object.error = $root.types.PluginError.toObject(message.error, options);
             return object;
@@ -3693,11 +4428,20 @@ $root.types = (function() {
          * @param {types.IPluginDeliverResponse=} [properties] Properties to set
          */
         function PluginDeliverResponse(properties) {
+            this.events = [];
             if (properties)
                 for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
                     if (properties[keys[i]] != null)
                         this[keys[i]] = properties[keys[i]];
         }
+
+        /**
+         * PluginDeliverResponse events.
+         * @member {Array.<types.IEvent>} events
+         * @memberof types.PluginDeliverResponse
+         * @instance
+         */
+        PluginDeliverResponse.prototype.events = $util.emptyArray;
 
         /**
          * PluginDeliverResponse error.
@@ -3731,6 +4475,9 @@ $root.types = (function() {
         PluginDeliverResponse.encode = function encode(message, writer) {
             if (!writer)
                 writer = $Writer.create();
+            if (message.events != null && message.events.length)
+                for (var i = 0; i < message.events.length; ++i)
+                    $root.types.Event.encode(message.events[i], writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
             if (message.error != null && Object.hasOwnProperty.call(message, "error"))
                 $root.types.PluginError.encode(message.error, writer.uint32(/* id 99, wireType 2 =*/794).fork()).ldelim();
             return writer;
@@ -3769,6 +4516,12 @@ $root.types = (function() {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
+                case 1: {
+                        if (!(message.events && message.events.length))
+                            message.events = [];
+                        message.events.push($root.types.Event.decode(reader, reader.uint32()));
+                        break;
+                    }
                 case 99: {
                         message.error = $root.types.PluginError.decode(reader, reader.uint32());
                         break;
@@ -3808,6 +4561,15 @@ $root.types = (function() {
         PluginDeliverResponse.verify = function verify(message) {
             if (typeof message !== "object" || message === null)
                 return "object expected";
+            if (message.events != null && message.hasOwnProperty("events")) {
+                if (!Array.isArray(message.events))
+                    return "events: array expected";
+                for (var i = 0; i < message.events.length; ++i) {
+                    var error = $root.types.Event.verify(message.events[i]);
+                    if (error)
+                        return "events." + error;
+                }
+            }
             if (message.error != null && message.hasOwnProperty("error")) {
                 var error = $root.types.PluginError.verify(message.error);
                 if (error)
@@ -3828,6 +4590,16 @@ $root.types = (function() {
             if (object instanceof $root.types.PluginDeliverResponse)
                 return object;
             var message = new $root.types.PluginDeliverResponse();
+            if (object.events) {
+                if (!Array.isArray(object.events))
+                    throw TypeError(".types.PluginDeliverResponse.events: array expected");
+                message.events = [];
+                for (var i = 0; i < object.events.length; ++i) {
+                    if (typeof object.events[i] !== "object")
+                        throw TypeError(".types.PluginDeliverResponse.events: object expected");
+                    message.events[i] = $root.types.Event.fromObject(object.events[i]);
+                }
+            }
             if (object.error != null) {
                 if (typeof object.error !== "object")
                     throw TypeError(".types.PluginDeliverResponse.error: object expected");
@@ -3849,8 +4621,15 @@ $root.types = (function() {
             if (!options)
                 options = {};
             var object = {};
-            if (options.defaults)
+            if (options.defaults) {
+                object.events = [];
                 object.error = null;
+            }
+            if (message.events && message.events.length) {
+                object.events = [];
+                for (var j = 0; j < message.events.length; ++j)
+                    object.events[j] = $root.types.Event.toObject(message.events[j], options);
+            }
             if (message.error != null && message.hasOwnProperty("error"))
                 object.error = $root.types.PluginError.toObject(message.error, options);
             return object;
@@ -4155,11 +4934,20 @@ $root.types = (function() {
          * @param {types.IPluginEndResponse=} [properties] Properties to set
          */
         function PluginEndResponse(properties) {
+            this.events = [];
             if (properties)
                 for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
                     if (properties[keys[i]] != null)
                         this[keys[i]] = properties[keys[i]];
         }
+
+        /**
+         * PluginEndResponse events.
+         * @member {Array.<types.IEvent>} events
+         * @memberof types.PluginEndResponse
+         * @instance
+         */
+        PluginEndResponse.prototype.events = $util.emptyArray;
 
         /**
          * PluginEndResponse error.
@@ -4193,6 +4981,9 @@ $root.types = (function() {
         PluginEndResponse.encode = function encode(message, writer) {
             if (!writer)
                 writer = $Writer.create();
+            if (message.events != null && message.events.length)
+                for (var i = 0; i < message.events.length; ++i)
+                    $root.types.Event.encode(message.events[i], writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
             if (message.error != null && Object.hasOwnProperty.call(message, "error"))
                 $root.types.PluginError.encode(message.error, writer.uint32(/* id 99, wireType 2 =*/794).fork()).ldelim();
             return writer;
@@ -4231,6 +5022,12 @@ $root.types = (function() {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
+                case 1: {
+                        if (!(message.events && message.events.length))
+                            message.events = [];
+                        message.events.push($root.types.Event.decode(reader, reader.uint32()));
+                        break;
+                    }
                 case 99: {
                         message.error = $root.types.PluginError.decode(reader, reader.uint32());
                         break;
@@ -4270,6 +5067,15 @@ $root.types = (function() {
         PluginEndResponse.verify = function verify(message) {
             if (typeof message !== "object" || message === null)
                 return "object expected";
+            if (message.events != null && message.hasOwnProperty("events")) {
+                if (!Array.isArray(message.events))
+                    return "events: array expected";
+                for (var i = 0; i < message.events.length; ++i) {
+                    var error = $root.types.Event.verify(message.events[i]);
+                    if (error)
+                        return "events." + error;
+                }
+            }
             if (message.error != null && message.hasOwnProperty("error")) {
                 var error = $root.types.PluginError.verify(message.error);
                 if (error)
@@ -4290,6 +5096,16 @@ $root.types = (function() {
             if (object instanceof $root.types.PluginEndResponse)
                 return object;
             var message = new $root.types.PluginEndResponse();
+            if (object.events) {
+                if (!Array.isArray(object.events))
+                    throw TypeError(".types.PluginEndResponse.events: array expected");
+                message.events = [];
+                for (var i = 0; i < object.events.length; ++i) {
+                    if (typeof object.events[i] !== "object")
+                        throw TypeError(".types.PluginEndResponse.events: object expected");
+                    message.events[i] = $root.types.Event.fromObject(object.events[i]);
+                }
+            }
             if (object.error != null) {
                 if (typeof object.error !== "object")
                     throw TypeError(".types.PluginEndResponse.error: object expected");
@@ -4311,8 +5127,15 @@ $root.types = (function() {
             if (!options)
                 options = {};
             var object = {};
-            if (options.defaults)
+            if (options.defaults) {
+                object.events = [];
                 object.error = null;
+            }
+            if (message.events && message.events.length) {
+                object.events = [];
+                for (var j = 0; j < message.events.length; ++j)
+                    object.events[j] = $root.types.Event.toObject(message.events[j], options);
+            }
             if (message.error != null && message.hasOwnProperty("error"))
                 object.error = $root.types.PluginError.toObject(message.error, options);
             return object;

@@ -510,6 +510,7 @@ func (x *PluginConfig) GetSupportedTransactions() []string {
 // PluginFSMConfig is the identity information of the plugin that is communicated from the fsm to the plugin
 type PluginFSMConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Config        *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -542,6 +543,13 @@ func (x *PluginFSMConfig) ProtoReflect() protoreflect.Message {
 // Deprecated: Use PluginFSMConfig.ProtoReflect.Descriptor instead.
 func (*PluginFSMConfig) Descriptor() ([]byte, []int) {
 	return file_plugin_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PluginFSMConfig) GetConfig() *PluginConfig {
+	if x != nil {
+		return x.Config
+	}
+	return nil
 }
 
 // PluginGenesisRequest carries genesis JSON data for initialization
@@ -637,6 +645,7 @@ func (x *PluginGenesisResponse) GetError() *PluginError {
 // PluginBeginRequest signals start of a new block
 type PluginBeginRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Height        uint64                 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -671,9 +680,17 @@ func (*PluginBeginRequest) Descriptor() ([]byte, []int) {
 	return file_plugin_proto_rawDescGZIP(), []int{6}
 }
 
+func (x *PluginBeginRequest) GetHeight() uint64 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
 // PluginBeginResponse acknowledges begin block execution
 type PluginBeginResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Events        []*Event               `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
 	Error         *PluginError           `protobuf:"bytes,99,opt,name=error,proto3" json:"error,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -707,6 +724,13 @@ func (x *PluginBeginResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use PluginBeginResponse.ProtoReflect.Descriptor instead.
 func (*PluginBeginResponse) Descriptor() ([]byte, []int) {
 	return file_plugin_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *PluginBeginResponse) GetEvents() []*Event {
+	if x != nil {
+		return x.Events
+	}
+	return nil
 }
 
 func (x *PluginBeginResponse) GetError() *PluginError {
@@ -873,6 +897,7 @@ func (x *PluginDeliverRequest) GetTx() *Transaction {
 // PluginDeliverResponse acknowledges transaction delivery
 type PluginDeliverResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Events        []*Event               `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
 	Error         *PluginError           `protobuf:"bytes,99,opt,name=error,proto3" json:"error,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -908,6 +933,13 @@ func (*PluginDeliverResponse) Descriptor() ([]byte, []int) {
 	return file_plugin_proto_rawDescGZIP(), []int{11}
 }
 
+func (x *PluginDeliverResponse) GetEvents() []*Event {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
 func (x *PluginDeliverResponse) GetError() *PluginError {
 	if x != nil {
 		return x.Error
@@ -918,7 +950,8 @@ func (x *PluginDeliverResponse) GetError() *PluginError {
 // PluginEndRequest signals end of the current block
 type PluginEndRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	ProposerAddress []byte                 `protobuf:"bytes,1,opt,name=proposer_address,json=proposerAddress,proto3" json:"proposer_address,omitempty"`
+	Height          uint64                 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
+	ProposerAddress []byte                 `protobuf:"bytes,2,opt,name=proposer_address,json=proposerAddress,proto3" json:"proposer_address,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -953,6 +986,13 @@ func (*PluginEndRequest) Descriptor() ([]byte, []int) {
 	return file_plugin_proto_rawDescGZIP(), []int{12}
 }
 
+func (x *PluginEndRequest) GetHeight() uint64 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
 func (x *PluginEndRequest) GetProposerAddress() []byte {
 	if x != nil {
 		return x.ProposerAddress
@@ -963,6 +1003,7 @@ func (x *PluginEndRequest) GetProposerAddress() []byte {
 // PluginEndResponse acknowledges end block execution
 type PluginEndResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Events        []*Event               `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
 	Error         *PluginError           `protobuf:"bytes,99,opt,name=error,proto3" json:"error,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -996,6 +1037,13 @@ func (x *PluginEndResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use PluginEndResponse.ProtoReflect.Descriptor instead.
 func (*PluginEndResponse) Descriptor() ([]byte, []int) {
 	return file_plugin_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PluginEndResponse) GetEvents() []*Event {
+	if x != nil {
+		return x.Events
+	}
+	return nil
 }
 
 func (x *PluginEndResponse) GetError() *PluginError {
@@ -1620,7 +1668,7 @@ var File_plugin_proto protoreflect.FileDescriptor
 
 const file_plugin_proto_rawDesc = "" +
 	"\n" +
-	"\fplugin.proto\x12\x05types\x1a\btx.proto\"\x90\x04\n" +
+	"\fplugin.proto\x12\x05types\x1a\vevent.proto\x1a\btx.proto\"\x90\x04\n" +
 	"\vFSMToPlugin\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x120\n" +
 	"\x06config\x18\x02 \x01(\v2\x16.types.PluginFSMConfigH\x00R\x06config\x127\n" +
@@ -1652,14 +1700,17 @@ const file_plugin_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\x04R\x02id\x12\x18\n" +
 	"\aversion\x18\x03 \x01(\x04R\aversion\x125\n" +
-	"\x16supported_transactions\x18\x04 \x03(\tR\x15supportedTransactions\"\x11\n" +
-	"\x0fPluginFSMConfig\"9\n" +
+	"\x16supported_transactions\x18\x04 \x03(\tR\x15supportedTransactions\">\n" +
+	"\x0fPluginFSMConfig\x12+\n" +
+	"\x06config\x18\x01 \x01(\v2\x13.types.PluginConfigR\x06config\"9\n" +
 	"\x14PluginGenesisRequest\x12!\n" +
 	"\fgenesis_json\x18\x01 \x01(\fR\vgenesisJson\"A\n" +
 	"\x15PluginGenesisResponse\x12(\n" +
-	"\x05error\x18c \x01(\v2\x12.types.PluginErrorR\x05error\"\x14\n" +
-	"\x12PluginBeginRequest\"?\n" +
-	"\x13PluginBeginResponse\x12(\n" +
+	"\x05error\x18c \x01(\v2\x12.types.PluginErrorR\x05error\",\n" +
+	"\x12PluginBeginRequest\x12\x16\n" +
+	"\x06height\x18\x01 \x01(\x04R\x06height\"e\n" +
+	"\x13PluginBeginResponse\x12$\n" +
+	"\x06events\x18\x01 \x03(\v2\f.types.EventR\x06events\x12(\n" +
 	"\x05error\x18c \x01(\v2\x12.types.PluginErrorR\x05error\"8\n" +
 	"\x12PluginCheckRequest\x12\"\n" +
 	"\x02tx\x18\x01 \x01(\v2\x12.types.TransactionR\x02tx\"\x8c\x01\n" +
@@ -1668,12 +1719,15 @@ const file_plugin_proto_rawDesc = "" +
 	"\trecipient\x18\x02 \x01(\fR\trecipient\x12(\n" +
 	"\x05error\x18c \x01(\v2\x12.types.PluginErrorR\x05error\":\n" +
 	"\x14PluginDeliverRequest\x12\"\n" +
-	"\x02tx\x18\x01 \x01(\v2\x12.types.TransactionR\x02tx\"A\n" +
-	"\x15PluginDeliverResponse\x12(\n" +
-	"\x05error\x18c \x01(\v2\x12.types.PluginErrorR\x05error\"=\n" +
-	"\x10PluginEndRequest\x12)\n" +
-	"\x10proposer_address\x18\x01 \x01(\fR\x0fproposerAddress\"=\n" +
-	"\x11PluginEndResponse\x12(\n" +
+	"\x02tx\x18\x01 \x01(\v2\x12.types.TransactionR\x02tx\"g\n" +
+	"\x15PluginDeliverResponse\x12$\n" +
+	"\x06events\x18\x01 \x03(\v2\f.types.EventR\x06events\x12(\n" +
+	"\x05error\x18c \x01(\v2\x12.types.PluginErrorR\x05error\"U\n" +
+	"\x10PluginEndRequest\x12\x16\n" +
+	"\x06height\x18\x01 \x01(\x04R\x06height\x12)\n" +
+	"\x10proposer_address\x18\x02 \x01(\fR\x0fproposerAddress\"c\n" +
+	"\x11PluginEndResponse\x12$\n" +
+	"\x06events\x18\x01 \x03(\v2\f.types.EventR\x06events\x12(\n" +
 	"\x05error\x18c \x01(\v2\x12.types.PluginErrorR\x05error\"K\n" +
 	"\vPluginError\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x04R\x04code\x12\x16\n" +
@@ -1749,7 +1803,8 @@ var file_plugin_proto_goTypes = []any{
 	(*PluginSetOp)(nil),              // 22: types.PluginSetOp
 	(*PluginDeleteOp)(nil),           // 23: types.PluginDeleteOp
 	(*PluginStateEntry)(nil),         // 24: types.PluginStateEntry
-	(*Transaction)(nil),              // 25: types.Transaction
+	(*Event)(nil),                    // 25: types.Event
+	(*Transaction)(nil),              // 26: types.Transaction
 }
 var file_plugin_proto_depIdxs = []int32{
 	3,  // 0: types.FSMToPlugin.config:type_name -> types.PluginFSMConfig
@@ -1769,26 +1824,30 @@ var file_plugin_proto_depIdxs = []int32{
 	13, // 14: types.PluginToFSM.end:type_name -> types.PluginEndResponse
 	15, // 15: types.PluginToFSM.state_read:type_name -> types.PluginStateReadRequest
 	20, // 16: types.PluginToFSM.state_write:type_name -> types.PluginStateWriteRequest
-	14, // 17: types.PluginGenesisResponse.error:type_name -> types.PluginError
-	14, // 18: types.PluginBeginResponse.error:type_name -> types.PluginError
-	25, // 19: types.PluginCheckRequest.tx:type_name -> types.Transaction
-	14, // 20: types.PluginCheckResponse.error:type_name -> types.PluginError
-	25, // 21: types.PluginDeliverRequest.tx:type_name -> types.Transaction
-	14, // 22: types.PluginDeliverResponse.error:type_name -> types.PluginError
-	14, // 23: types.PluginEndResponse.error:type_name -> types.PluginError
-	16, // 24: types.PluginStateReadRequest.keys:type_name -> types.PluginKeyRead
-	17, // 25: types.PluginStateReadRequest.ranges:type_name -> types.PluginRangeRead
-	19, // 26: types.PluginStateReadResponse.results:type_name -> types.PluginReadResult
-	14, // 27: types.PluginStateReadResponse.error:type_name -> types.PluginError
-	24, // 28: types.PluginReadResult.entries:type_name -> types.PluginStateEntry
-	22, // 29: types.PluginStateWriteRequest.sets:type_name -> types.PluginSetOp
-	23, // 30: types.PluginStateWriteRequest.deletes:type_name -> types.PluginDeleteOp
-	14, // 31: types.PluginStateWriteResponse.error:type_name -> types.PluginError
-	32, // [32:32] is the sub-list for method output_type
-	32, // [32:32] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	2,  // 17: types.PluginFSMConfig.config:type_name -> types.PluginConfig
+	14, // 18: types.PluginGenesisResponse.error:type_name -> types.PluginError
+	25, // 19: types.PluginBeginResponse.events:type_name -> types.Event
+	14, // 20: types.PluginBeginResponse.error:type_name -> types.PluginError
+	26, // 21: types.PluginCheckRequest.tx:type_name -> types.Transaction
+	14, // 22: types.PluginCheckResponse.error:type_name -> types.PluginError
+	26, // 23: types.PluginDeliverRequest.tx:type_name -> types.Transaction
+	25, // 24: types.PluginDeliverResponse.events:type_name -> types.Event
+	14, // 25: types.PluginDeliverResponse.error:type_name -> types.PluginError
+	25, // 26: types.PluginEndResponse.events:type_name -> types.Event
+	14, // 27: types.PluginEndResponse.error:type_name -> types.PluginError
+	16, // 28: types.PluginStateReadRequest.keys:type_name -> types.PluginKeyRead
+	17, // 29: types.PluginStateReadRequest.ranges:type_name -> types.PluginRangeRead
+	19, // 30: types.PluginStateReadResponse.results:type_name -> types.PluginReadResult
+	14, // 31: types.PluginStateReadResponse.error:type_name -> types.PluginError
+	24, // 32: types.PluginReadResult.entries:type_name -> types.PluginStateEntry
+	22, // 33: types.PluginStateWriteRequest.sets:type_name -> types.PluginSetOp
+	23, // 34: types.PluginStateWriteRequest.deletes:type_name -> types.PluginDeleteOp
+	14, // 35: types.PluginStateWriteResponse.error:type_name -> types.PluginError
+	36, // [36:36] is the sub-list for method output_type
+	36, // [36:36] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_plugin_proto_init() }
@@ -1796,6 +1855,7 @@ func file_plugin_proto_init() {
 	if File_plugin_proto != nil {
 		return
 	}
+	file_event_proto_init()
 	file_tx_proto_init()
 	file_plugin_proto_msgTypes[0].OneofWrappers = []any{
 		(*FSMToPlugin_Config)(nil),

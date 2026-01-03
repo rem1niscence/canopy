@@ -11,8 +11,17 @@ func (s *StateMachine) BeginBlock() (lib.Events, lib.ErrorI) {
 	s.events.Refer(lib.EventStageBeginBlock)
 	// execute plugin begin block if enabled
 	if s.Plugin != nil {
-		if _, err := s.Plugin.BeginBlock(s, &lib.PluginBeginRequest{Height: s.height}); err != nil {
+		resp, err := s.Plugin.BeginBlock(s, &lib.PluginBeginRequest{Height: s.height})
+		if err != nil {
 			return nil, err
+		}
+		if resp != nil {
+			if err = resp.Error.E(); err != nil {
+				return nil, err
+			}
+			if err = s.addPluginEvents(resp.Events); err != nil {
+				return nil, err
+			}
 		}
 	}
 	// prevent attempting to load the certificate for height 0
@@ -78,11 +87,20 @@ func (s *StateMachine) EndBlock(proposerAddress []byte) (events lib.Events, err 
 	}
 	// execute plugin end block if enabled
 	if s.Plugin != nil {
-		if _, err = s.Plugin.EndBlock(s, &lib.PluginEndRequest{
+		resp, e := s.Plugin.EndBlock(s, &lib.PluginEndRequest{
 			Height:          s.height,
 			ProposerAddress: proposerAddress,
-		}); err != nil {
-			return nil, err
+		})
+		if e != nil {
+			return nil, e
+		}
+		if resp != nil {
+			if err = resp.Error.E(); err != nil {
+				return nil, err
+			}
+			if err = s.addPluginEvents(resp.Events); err != nil {
+				return nil, err
+			}
 		}
 	}
 	// return the events
