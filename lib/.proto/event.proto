@@ -17,6 +17,7 @@ message Event {
     EventAutoPause auto_pause = 8;
     EventAutoBeginUnstaking auto_begin_unstaking = 9;
     EventFinishUnstaking finish_unstaking = 10;
+    EventCustom custom = 11;
   }
   // height: the block height of the event
   uint64 height = 91;
@@ -101,3 +102,11 @@ message EventAutoPause {}
 message EventAutoBeginUnstaking {}
 
 message EventFinishUnstaking {}
+
+// EventCustom carries a plugin-defined event payload.
+message EventCustom {
+  // msg_type_url: type URL for the custom payload (optional for raw bytes).
+  string msg_type_url = 1; // @gotags: json:"msgTypeUrl"
+  // msg_bytes: custom payload bytes.
+  bytes msg_bytes = 2; // @gotags: json:"msgBytes"
+}

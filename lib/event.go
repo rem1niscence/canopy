@@ -73,6 +73,8 @@ func (e *Events) New() Pageable { return &Events{} }
 type eventJSON struct {
 	EventType   string          `json:"eventType"`
 	Msg         json.RawMessage `json:"msg,omitempty"`
+	MsgTypeURL  string          `json:"msgTypeUrl,omitempty"`
+	MsgBytes    HexBytes        `json:"msgBytes,omitempty"`
 	Height      uint64          `json:"height"`
 	Reference   string          `json:"reference"`
 	ChainId     uint64          `json:"chainId"`
@@ -89,6 +91,8 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 
 	// Marshal the Msg field separately
 	var msgBytes []byte
+	var msgTypeURL string
+	var msgHex HexBytes
 	var err error
 	if e.Msg != nil {
 		switch msg := e.Msg.(type) {
@@ -110,6 +114,11 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 			msgBytes, err = json.Marshal(msg.AutoBeginUnstaking)
 		case *Event_FinishUnstaking:
 			msgBytes, err = json.Marshal(msg.FinishUnstaking)
+		case *Event_Custom:
+			if msg.Custom != nil {
+				msgTypeURL = msg.Custom.MsgTypeUrl
+				msgHex = HexBytes(msg.Custom.MsgBytes)
+			}
 		}
 		if err != nil {
 			return nil, err
@@ -119,6 +128,8 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 	temp := eventJSON{
 		EventType:   e.EventType,
 		Msg:         msgBytes,
+		MsgTypeURL:  msgTypeURL,
+		MsgBytes:    msgHex,
 		Height:      e.Height,
 		Reference:   e.Reference,
 		ChainId:     e.ChainId,
@@ -148,6 +159,13 @@ func (e *Event) UnmarshalJSON(data []byte) error {
 	e.Address = temp.Address
 
 	// Handle the Msg field based on EventType
+	if temp.MsgTypeURL != "" || len(temp.MsgBytes) > 0 {
+		e.Msg = &Event_Custom{Custom: &EventCustom{
+			MsgTypeUrl: temp.MsgTypeURL,
+			MsgBytes:   []byte(temp.MsgBytes),
+		}}
+		return nil
+	}
 	if len(temp.Msg) > 0 {
 		switch temp.EventType {
 		case string(EventTypeReward):
