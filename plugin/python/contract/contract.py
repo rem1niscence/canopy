@@ -35,6 +35,7 @@ from .proto import (
     Account,
     Pool,
 )
+from .proto import account_pb2, event_pb2, plugin_pb2, tx_pb2
 
 from .error import (
     PluginError,
@@ -53,6 +54,14 @@ CONTRACT_CONFIG = {
     "id": 1,
     "version": 1,
     "supported_transactions": ["send"],
+    "transaction_type_urls": ["type.googleapis.com/types.MessageSend"],
+    "event_type_urls": [],
+    "file_descriptor_protos": [
+        account_pb2.DESCRIPTOR.serialized_pb,
+        event_pb2.DESCRIPTOR.serialized_pb,
+        plugin_pb2.DESCRIPTOR.serialized_pb,
+        tx_pb2.DESCRIPTOR.serialized_pb,
+    ],
 }
 
 

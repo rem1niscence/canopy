@@ -3,6 +3,8 @@ package types;
 
 option go_package = "github.com/canopy-network/go-plugin/contract";
 
+import "google/protobuf/any.proto";
+
 message Event {
   // event_type: The type of the transaction like 'slash' or 'unstake'
   string event_type = 1; // @gotags: json:"eventType"
@@ -28,8 +30,6 @@ message Event {
 
 // EventCustom carries a plugin-defined event payload.
 message EventCustom {
-  // msg_type_url: type URL for the custom payload (optional for raw bytes).
-  string msg_type_url = 1; // @gotags: json:"msgTypeUrl"
-  // msg_bytes: custom payload bytes.
-  bytes msg_bytes = 2; // @gotags: json:"msgBytes"
+  // msg: custom payload.
+  google.protobuf.Any msg = 1;
 }

@@ -205,24 +205,9 @@ func (x Transaction) MarshalJSON() (jsonBytes []byte, err error) {
 		msgTypeURL     string
 		msgBytes       string
 	)
-	// convert the payload from a proto.Any to a proto.Message
-	payload, err := FromAny(x.Msg)
-	if err == nil {
-		// cast the payload to a Message interface type
-		msg, castSucceeded := payload.(MessageI)
-		if castSucceeded {
-			// convert the message to json bytes
-			messageRawJSON, err = MarshalJSON(msg)
-			// if an error occurred during the conversion
-			if err != nil {
-				// exit with error
-				return nil, err
-			}
-		} else {
-			msgTypeURL = x.Msg.TypeUrl
-			msgBytes = BytesToString(x.Msg.Value)
-		}
-	} else {
+	// convert the payload from a proto.Any to a JSON object when possible
+	messageRawJSON, err = MarshalAnypbJSON(x.Msg)
+	if err != nil {
 		msgTypeURL = x.Msg.TypeUrl
 		msgBytes = BytesToString(x.Msg.Value)
 	}
@@ -249,6 +234,26 @@ func (x *Transaction) UnmarshalJSON(jsonBytes []byte) (err error) {
 	// populate the json object with json bytes
 	if err = json.Unmarshal(jsonBytes, j); err != nil {
 		return err
+	}
+	// first try unmarshalling using the global plugin registration
+	if len(j.Msg) > 0 {
+		anyMsg, e := AnyFromJSONForMessageType(j.Type, j.Msg)
+		if e == nil {
+			*x = Transaction{
+				MessageType:   j.Type,
+				Msg:           anyMsg,
+				Signature:     j.Signature,
+				CreatedHeight: j.CreatedHeight,
+				Time:          j.Time,
+				Fee:           j.Fee,
+				Memo:          j.Memo,
+				NetworkId:     j.NetworkId,
+				ChainId:       j.ChainId,
+			}
+			return nil
+		} else if e.Code() != CodeUnknownMsgName {
+			return e
+		}
 	}
 	// get the type of the message payload based on the 'message types' that were globally registered upon app start
 	m, found := RegisteredMessages[j.Type]

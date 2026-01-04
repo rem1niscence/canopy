@@ -12,6 +12,10 @@ var ContractConfig = &PluginConfig{
     Id:                    1,
     Version:               1,
     SupportedTransactions: []string{"send", "reward"},  // Add "reward"
+    TransactionTypeUrls: []string{
+        "type.googleapis.com/types.MessageSend",
+        "type.googleapis.com/types.MessageReward", // Add "reward"
+    },
 }
 ```
 

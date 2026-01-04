@@ -11,13 +11,18 @@ object ContractConfig {
     const val NAME = "send"
     const val ID = 1L
     const val VERSION = 1L
-    val SUPPORTED_TRANSACTIONS = listOf("send", "reward")  // Add "reward"
+    val SUPPORTED_TRANSACTIONS = listOf("send", "reward") // Add "reward"
+    val TRANSACTION_TYPE_URLS = listOf(
+        "type.googleapis.com/types.MessageSend",
+        "type.googleapis.com/types.MessageReward", // Add "reward"
+    )
 
     fun toPluginConfig(): PluginConfig = PluginConfig.newBuilder()
         .setName(NAME)
         .setId(ID)
         .setVersion(VERSION)
         .addAllSupportedTransactions(SUPPORTED_TRANSACTIONS)
+        .addAllTransactionTypeUrls(TRANSACTION_TYPE_URLS)
         .build()
 }
 ```

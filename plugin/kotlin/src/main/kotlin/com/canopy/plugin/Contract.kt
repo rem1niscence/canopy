@@ -5,6 +5,7 @@ import com.google.protobuf.ByteString
 import mu.KotlinLogging
 import types.AccountOuterClass.Account
 import types.AccountOuterClass.Pool
+import types.EventOuterClass
 import types.Plugin.*
 import types.Tx.FeeParams
 import types.Tx.MessageSend
@@ -22,12 +23,23 @@ object ContractConfig {
     const val ID = 1L
     const val VERSION = 1L
     val SUPPORTED_TRANSACTIONS = listOf("send")
+    val TRANSACTION_TYPE_URLS = listOf("type.googleapis.com/types.MessageSend")
+    val EVENT_TYPE_URLS = emptyList<String>()
+    val FILE_DESCRIPTOR_PROTOS = listOf(
+        AccountOuterClass.getDescriptor().toProto().toByteString(),
+        EventOuterClass.getDescriptor().toProto().toByteString(),
+        Plugin.getDescriptor().toProto().toByteString(),
+        Tx.getDescriptor().toProto().toByteString(),
+    )
 
     fun toPluginConfig(): PluginConfig = PluginConfig.newBuilder()
         .setName(NAME)
         .setId(ID)
         .setVersion(VERSION)
         .addAllSupportedTransactions(SUPPORTED_TRANSACTIONS)
+        .addAllTransactionTypeUrls(TRANSACTION_TYPE_URLS)
+        .addAllEventTypeUrls(EVENT_TYPE_URLS)
+        .addAllFileDescriptorProtos(FILE_DESCRIPTOR_PROTOS)
         .build()
 }
 

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -252,6 +253,10 @@ const socketFile = "plugin.sock"
 
 // PluginExecute() executes the plugin control script to start the plugin process
 func (c *Controller) PluginExecute(plugin string) {
+	if plugin == "" || strings.Contains(plugin, "..") || strings.ContainsRune(plugin, os.PathSeparator) {
+		c.log.Errorf("Invalid plugin name %q", plugin)
+		return
+	}
 	// construct the shell command path: plugin/<plugin>/pluginctl.sh start
 	cmdPath := filepath.Join("plugin", plugin, "pluginctl.sh")
 	// create the command to execute the plugin control script with 'start' argument
@@ -292,7 +297,7 @@ func (c *Controller) PluginConnectSync() {
 		c.log.Fatalf("Failed to accept plugin connection: %v", e)
 	}
 	// create plugin object
-	c.Plugin = lib.NewPlugin(conn, c.log)
+	c.Plugin = lib.NewPlugin(conn, c.log, time.Duration(c.Config.PluginTimeoutMS)*time.Millisecond)
 	// set plugin in FSM and mempool FSM
 	c.FSM.Plugin, c.Mempool.FSM.Plugin = c.Plugin, c.Plugin
 }

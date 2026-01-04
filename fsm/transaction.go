@@ -46,10 +46,14 @@ func (s *StateMachine) ApplyTransaction(index uint64, transaction []byte, txHash
 		}
 	}
 	// return the tx result
+	messageType := result.tx.MessageType
+	if result.msg != nil {
+		messageType = result.msg.Name()
+	}
 	return &lib.TxResult{
 		Sender:      result.sender.Bytes(),
 		Recipient:   result.recipient,
-		MessageType: result.tx.MessageType,
+		MessageType: messageType,
 		Height:      s.Height(),
 		Index:       index,
 		Transaction: result.tx,

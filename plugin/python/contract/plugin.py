@@ -97,6 +97,12 @@ class Plugin:
         self.plugin_config.version = CONTRACT_CONFIG["version"]
         for tx_type in CONTRACT_CONFIG["supported_transactions"]:
             self.plugin_config.supported_transactions.append(tx_type)
+        for url in CONTRACT_CONFIG.get("transaction_type_urls", []):
+            self.plugin_config.transaction_type_urls.append(url)
+        for url in CONTRACT_CONFIG.get("event_type_urls", []):
+            self.plugin_config.event_type_urls.append(url)
+        for fd in CONTRACT_CONFIG.get("file_descriptor_protos", []):
+            self.plugin_config.file_descriptor_protos.append(fd)
 
     async def start(self) -> None:
         """Start the plugin - connect to socket and begin listening."""

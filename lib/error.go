@@ -278,6 +278,7 @@ const (
 	CodeInvalidPluginRespId       ErrorCode = 107
 	CodeUnexpectedPluginToFSM     ErrorCode = 108
 	CodePluginTimeout             ErrorCode = 109
+	CodeInvalidPluginSchema       ErrorCode = 110
 
 	// P2P Module
 	P2PModule ErrorModule = "p2p"
@@ -878,6 +879,10 @@ func ErrInvalidPluginToFSMMessage(t reflect.Type) ErrorI {
 
 func ErrInvalidPluginConfig() ErrorI {
 	return NewError(CodeInvalidPluginConfig, StateMachineModule, "invalid plugin config")
+}
+
+func ErrInvalidPluginSchema(err error) ErrorI {
+	return NewError(CodeInvalidPluginSchema, StateMachineModule, fmt.Sprintf("invalid plugin schema: %s", err.Error()))
 }
 
 func ErrInvalidPluginRespId() ErrorI {

@@ -13,6 +13,10 @@ public static class ContractConfig
     public const int Id = 1;
     public const int Version = 1;
     public static readonly string[] SupportedTransactions = { "send", "reward" };  // Add "reward"
+    public static readonly string[] TransactionTypeUrls = {
+        "type.googleapis.com/types.MessageSend",
+        "type.googleapis.com/types.MessageReward" // Add "reward"
+    };
 }
 ```
 

@@ -3,6 +3,9 @@ package contract
 import (
 	"bytes"
 	"encoding/binary"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"math/rand"
 )
 
@@ -10,10 +13,21 @@ import (
 
 // PluginConfig: the configuration of the contract
 var ContractConfig = &PluginConfig{
-	Name:                  "send",
-	Id:                    1,
-	Version:               1,
+	Name:    "go_plugin_contract",
+	Id:      1,
+	Version: 1,
+	FileDescriptorProtos: func() (fds [][]byte) {
+		for _, file := range []protoreflect.FileDescriptor{
+			File_account_proto, File_event_proto, File_plugin_proto, File_tx_proto,
+		} {
+			fd, _ := proto.Marshal(protodesc.ToFileDescriptorProto(file))
+			fds = append(fds, fd)
+		}
+		return
+	}(),
 	SupportedTransactions: []string{"send"},
+	TransactionTypeUrls:   []string{"type.googleapis.com/types.MessageSend"},
+	EventTypeUrls:         nil,
 }
 
 // Contract() defines the smart contract that implements the extended logic of the nested chain
@@ -133,7 +147,7 @@ func (c *Contract) DeliverMessageSend(msg *MessageSend, fee uint64) *PluginDeliv
 	}
 	// ensure no error fsm error
 	if response.Error != nil {
-		return &PluginDeliverResponse{Error: err}
+		return &PluginDeliverResponse{Error: response.Error}
 	}
 	// get the from bytes and to bytes
 	for _, resp := range response.Results {

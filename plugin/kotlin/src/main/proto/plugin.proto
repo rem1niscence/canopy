@@ -64,8 +64,14 @@ message PluginConfig {
   uint64 id = 2;
   // version: the version of the plugin
   uint64 version = 3;
-  // supported_transactions: a list of custom transaction names that are supported
+  // supported_transactions: a list of custom transaction names that are supported (order must match transaction_type_urls)
   repeated string supported_transactions = 4;
+  // file_descriptor_protos: serialized FileDescriptorProto bytes
+  repeated bytes file_descriptor_protos = 5; // @gotags: json:"fileDescriptorProtos"
+  // transaction_type_urls: protobuf type URLs for transaction messages (aligned by index with supported_transactions)
+  repeated string transaction_type_urls = 6; // @gotags: json:"transactionTypeUrls"
+  // event_type_urls: protobuf type URLs for event messages
+  repeated string event_type_urls = 7; // @gotags: json:"eventTypeUrls"
 }
 
 // PluginFSMConfig is the identity information of the plugin that is communicated from the fsm to the plugin

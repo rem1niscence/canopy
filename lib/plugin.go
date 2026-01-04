@@ -33,10 +33,14 @@ type Plugin struct {
 	requestFSMs map[uint64]PluginCompatibleFSM        // maps request IDs to their FSM context for concurrent operations
 	l           sync.Mutex                            // thread safety
 	log         LoggerI                               // the logger associated with the plugin
+	timeout     time.Duration                         // plugin request timeout
 }
 
 // NewPlugin() creates and starts a plguin
-func NewPlugin(conn net.Conn, log LoggerI) (p *Plugin) {
+func NewPlugin(conn net.Conn, log LoggerI, timeout time.Duration) (p *Plugin) {
+	if timeout <= 0 {
+		timeout = time.Second
+	}
 	// constructs the new plugin
 	p = &Plugin{
 		conn:        conn,
@@ -44,6 +48,7 @@ func NewPlugin(conn net.Conn, log LoggerI) (p *Plugin) {
 		requestFSMs: map[uint64]PluginCompatibleFSM{},
 		l:           sync.Mutex{},
 		log:         log,
+		timeout:     timeout,
 	}
 	// debug log plugin creation
 	log.Debugf("Creating new plugin with connection: %s", conn.RemoteAddr())
@@ -208,7 +213,7 @@ func (p *Plugin) SupportsTransaction(name string) bool {
 	// debug log supported transactions
 	p.log.Debugf("SupportsTransaction() checking against supported transactions: %+v", p.config.SupportedTransactions)
 	// return if the plugin supports the transaction
-	supported := slices.Contains(p.config.SupportedTransactions, name)
+	supported := slices.Contains(p.config.SupportedTransactions, name) || slices.Contains(p.config.TransactionTypeUrls, name)
 	// debug log result
 	p.log.Debugf("SupportsTransaction() result for %s: %t", name, supported)
 	return supported
@@ -283,6 +288,11 @@ func (p *Plugin) handleConfigMessage(msg *PluginToFSM) ErrorI {
 	p.config = m.Config
 	// debug log config set
 	p.log.Debug("handleConfigMessage() plugin config updated successfully")
+	// Register plugin schema for dynamic JSON decoding
+	if err := globalPluginSchemaRegistry.Register(m.Config); err != nil {
+		p.log.Debugf("handleConfigMessage() failed to Register plugin schema: %v", err)
+		return err
+	}
 	// ack the config - send FSMToPlugin config response
 	response := &FSMToPlugin{
 		Id:      msg.Id,
@@ -486,7 +496,7 @@ func (p *Plugin) waitForResponse(ch chan isPluginToFSM_Payload, requestId uint64
 		p.log.Debugf("waitForResponse() received response for request ID %d: %T", requestId, response)
 		return response, nil
 	// timeout
-	case <-time.After(time.Second):
+	case <-time.After(p.timeout):
 		p.log.Debugf("waitForResponse() timeout waiting for response to request ID %d", requestId)
 		// safely remove the request and FSM context
 		p.l.Lock()

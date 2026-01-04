@@ -12,6 +12,10 @@ CONTRACT_CONFIG = {
     "id": 1,
     "version": 1,
     "supported_transactions": ["send", "reward"],  # Add "reward"
+    "transaction_type_urls": [
+        "type.googleapis.com/types.MessageSend",
+        "type.googleapis.com/types.MessageReward",  # Add "reward"
+    ],
 }
 ```
 

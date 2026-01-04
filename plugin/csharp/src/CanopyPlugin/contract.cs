@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Google.Protobuf;
+using Google.Protobuf.Reflection;
 using Types;
 
 namespace CanopyPlugin
@@ -14,6 +15,15 @@ namespace CanopyPlugin
         public const int Id = 1;
         public const int Version = 1;
         public static readonly string[] SupportedTransactions = { "send" };
+        public static readonly string[] TransactionTypeUrls = { "type.googleapis.com/types.MessageSend" };
+        public static readonly string[] EventTypeUrls = Array.Empty<string>();
+        public static readonly ByteString[] FileDescriptorProtos =
+        {
+            ByteString.CopyFrom(AccountReflection.Descriptor.ToProto().ToByteArray()),
+            ByteString.CopyFrom(EventReflection.Descriptor.ToProto().ToByteArray()),
+            ByteString.CopyFrom(PluginReflection.Descriptor.ToProto().ToByteArray()),
+            ByteString.CopyFrom(TxReflection.Descriptor.ToProto().ToByteArray()),
+        };
     }
 
     // Contract defines the smart contract that implements the extended logic of the nested chain

@@ -9,6 +9,7 @@ package contract
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	anypb "google.golang.org/protobuf/types/known/anypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -157,10 +158,8 @@ func (*Event_Custom) isEvent_Msg() {}
 // EventCustom carries a plugin-defined event payload.
 type EventCustom struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// msg_type_url: type URL for the custom payload (optional for raw bytes).
-	MsgTypeUrl string `protobuf:"bytes,1,opt,name=msg_type_url,json=msgTypeUrl,proto3" json:"msgTypeUrl"` // @gotags: json:"msgTypeUrl"
-	// msg_bytes: custom payload bytes.
-	MsgBytes      []byte `protobuf:"bytes,2,opt,name=msg_bytes,json=msgBytes,proto3" json:"msgBytes"` // @gotags: json:"msgBytes"
+	// msg: custom payload.
+	Msg           *anypb.Any `protobuf:"bytes,1,opt,name=msg,proto3" json:"msg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -195,16 +194,9 @@ func (*EventCustom) Descriptor() ([]byte, []int) {
 	return file_event_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *EventCustom) GetMsgTypeUrl() string {
+func (x *EventCustom) GetMsg() *anypb.Any {
 	if x != nil {
-		return x.MsgTypeUrl
-	}
-	return ""
-}
-
-func (x *EventCustom) GetMsgBytes() []byte {
-	if x != nil {
-		return x.MsgBytes
+		return x.Msg
 	}
 	return nil
 }
@@ -213,7 +205,7 @@ var File_event_proto protoreflect.FileDescriptor
 
 const file_event_proto_rawDesc = "" +
 	"\n" +
-	"\vevent.proto\x12\x05types\"\x87\x02\n" +
+	"\vevent.proto\x12\x05types\x1a\x19google/protobuf/any.proto\"\x87\x02\n" +
 	"\x05Event\x12\x1d\n" +
 	"\n" +
 	"event_type\x18\x01 \x01(\tR\teventType\x12,\n" +
@@ -225,11 +217,9 @@ const file_event_proto_rawDesc = "" +
 	"\n" +
 	"block_hash\x18_ \x01(\fR\tblockHash\x12\x18\n" +
 	"\aaddress\x18` \x01(\fR\aaddressB\x05\n" +
-	"\x03msg\"L\n" +
-	"\vEventCustom\x12 \n" +
-	"\fmsg_type_url\x18\x01 \x01(\tR\n" +
-	"msgTypeUrl\x12\x1b\n" +
-	"\tmsg_bytes\x18\x02 \x01(\fR\bmsgBytesB.Z,github.com/canopy-network/go-plugin/contractb\x06proto3"
+	"\x03msg\"5\n" +
+	"\vEventCustom\x12&\n" +
+	"\x03msg\x18\x01 \x01(\v2\x14.google.protobuf.AnyR\x03msgB.Z,github.com/canopy-network/go-plugin/contractb\x06proto3"
 
 var (
 	file_event_proto_rawDescOnce sync.Once
@@ -247,14 +237,16 @@ var file_event_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_event_proto_goTypes = []any{
 	(*Event)(nil),       // 0: types.Event
 	(*EventCustom)(nil), // 1: types.EventCustom
+	(*anypb.Any)(nil),   // 2: google.protobuf.Any
 }
 var file_event_proto_depIdxs = []int32{
 	1, // 0: types.Event.custom:type_name -> types.EventCustom
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2, // 1: types.EventCustom.msg:type_name -> google.protobuf.Any
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_event_proto_init() }

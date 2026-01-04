@@ -2,6 +2,8 @@ package lib
 
 import (
 	"encoding/json"
+
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type EventType string
@@ -115,9 +117,14 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 		case *Event_FinishUnstaking:
 			msgBytes, err = json.Marshal(msg.FinishUnstaking)
 		case *Event_Custom:
-			if msg.Custom != nil {
-				msgTypeURL = msg.Custom.MsgTypeUrl
-				msgHex = HexBytes(msg.Custom.MsgBytes)
+			if msg.Custom != nil && msg.Custom.Msg != nil {
+				msgBytes, err = MarshalAnypbJSON(msg.Custom.Msg)
+				if err != nil {
+					msgTypeURL = msg.Custom.Msg.TypeUrl
+					msgHex = HexBytes(msg.Custom.Msg.Value)
+					msgBytes = nil
+					err = nil
+				}
 			}
 		}
 		if err != nil {
@@ -161,8 +168,7 @@ func (e *Event) UnmarshalJSON(data []byte) error {
 	// Handle the Msg field based on EventType
 	if temp.MsgTypeURL != "" || len(temp.MsgBytes) > 0 {
 		e.Msg = &Event_Custom{Custom: &EventCustom{
-			MsgTypeUrl: temp.MsgTypeURL,
-			MsgBytes:   []byte(temp.MsgBytes),
+			Msg: &anypb.Any{TypeUrl: temp.MsgTypeURL, Value: []byte(temp.MsgBytes)},
 		}}
 		return nil
 	}
@@ -223,6 +229,13 @@ func (e *Event) UnmarshalJSON(data []byte) error {
 			}
 			e.Msg = &Event_OrderBookSwap{OrderBookSwap: &orderBookSwap}
 		}
+	}
+	if e.Msg == nil && len(temp.Msg) > 0 {
+		anyMsg, err := AnyFromProtoJSON(temp.Msg)
+		if err != nil {
+			return err
+		}
+		e.Msg = &Event_Custom{Custom: &EventCustom{Msg: anyMsg}}
 	}
 
 	return nil

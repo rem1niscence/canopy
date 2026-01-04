@@ -660,9 +660,9 @@ func (s *StateMachine) StateRead(request *lib.PluginStateReadRequest) (response 
 		var it lib.IteratorI
 		// execute the 'iteration'
 		if r.Reverse {
-			it, err = s.Iterator(r.Prefix)
-		} else {
 			it, err = s.RevIterator(r.Prefix)
+		} else {
+			it, err = s.Iterator(r.Prefix)
 		}
 		// handle error
 		if err != nil {
@@ -675,12 +675,14 @@ func (s *StateMachine) StateRead(request *lib.PluginStateReadRequest) (response 
 			r.Limit = math.MaxUint64
 		}
 		// while the iterator is valid and the limit is not reached
-		for i := uint64(0); i < r.Limit && it.Valid(); it.Next() {
+		for i := uint64(0); i < r.Limit && it.Valid(); i++ {
 			entries = append(entries, &lib.PluginStateEntry{
 				Key:   it.Key(),
 				Value: it.Value(),
 			})
+			it.Next()
 		}
+		it.Close()
 		// add to the response
 		response.Results = append(response.Results, &lib.PluginReadResult{
 			QueryId: r.QueryId,

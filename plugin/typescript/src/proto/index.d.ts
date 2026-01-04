@@ -271,7 +271,7 @@ export namespace types {
         public address: Uint8Array;
 
         /** Event msg. */
-        public msg?: ("custom");
+        public msg?: "custom";
 
         /**
          * Creates a new Event instance using the specified properties.
@@ -354,11 +354,8 @@ export namespace types {
     /** Properties of an EventCustom. */
     interface IEventCustom {
 
-        /** EventCustom msgTypeUrl */
-        msgTypeUrl?: (string|null);
-
-        /** EventCustom msgBytes */
-        msgBytes?: (Uint8Array|null);
+        /** EventCustom msg */
+        msg?: (google.protobuf.IAny|null);
     }
 
     /** Represents an EventCustom. */
@@ -370,11 +367,8 @@ export namespace types {
          */
         constructor(properties?: types.IEventCustom);
 
-        /** EventCustom msgTypeUrl. */
-        public msgTypeUrl: string;
-
-        /** EventCustom msgBytes. */
-        public msgBytes: Uint8Array;
+        /** EventCustom msg. */
+        public msg?: (google.protobuf.IAny|null);
 
         /**
          * Creates a new EventCustom instance using the specified properties.
@@ -770,6 +764,15 @@ export namespace types {
 
         /** PluginConfig supportedTransactions */
         supportedTransactions?: (string[]|null);
+
+        /** PluginConfig fileDescriptorProtos */
+        fileDescriptorProtos?: (Uint8Array[]|null);
+
+        /** PluginConfig transactionTypeUrls */
+        transactionTypeUrls?: (string[]|null);
+
+        /** PluginConfig eventTypeUrls */
+        eventTypeUrls?: (string[]|null);
     }
 
     /** Represents a PluginConfig. */
@@ -792,6 +795,15 @@ export namespace types {
 
         /** PluginConfig supportedTransactions. */
         public supportedTransactions: string[];
+
+        /** PluginConfig fileDescriptorProtos. */
+        public fileDescriptorProtos: Uint8Array[];
+
+        /** PluginConfig transactionTypeUrls. */
+        public transactionTypeUrls: string[];
+
+        /** PluginConfig eventTypeUrls. */
+        public eventTypeUrls: string[];
 
         /**
          * Creates a new PluginConfig instance using the specified properties.

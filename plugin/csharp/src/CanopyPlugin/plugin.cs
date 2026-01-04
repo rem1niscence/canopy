@@ -70,6 +70,12 @@ namespace CanopyPlugin
             };
             foreach (var tx in ContractConfig.SupportedTransactions)
                 pluginConfig.SupportedTransactions.Add(tx);
+            foreach (var url in ContractConfig.TransactionTypeUrls)
+                pluginConfig.TransactionTypeUrls.Add(url);
+            foreach (var url in ContractConfig.EventTypeUrls)
+                pluginConfig.EventTypeUrls.Add(url);
+            foreach (var fd in ContractConfig.FileDescriptorProtos)
+                pluginConfig.FileDescriptorProtos.Add(fd);
 
             var response = await SendToPluginSyncAsync(0, new PluginToFSM { Config = pluginConfig });
 
