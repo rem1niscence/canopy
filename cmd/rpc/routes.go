@@ -11,6 +11,7 @@ const (
 	VersionRoutePath               = "/v1/"
 	TxRoutePath                    = "/v1/tx"
 	HeightRoutePath                = "/v1/query/height"
+	IndexerBlobsRoutePath          = "/v1/query/indexer-blobs"
 	AccountRoutePath               = "/v1/query/account"
 	AccountsRoutePath              = "/v1/query/accounts"
 	PoolRoutePath                  = "/v1/query/pool"
@@ -109,6 +110,7 @@ const (
 	VersionRouteName               = "version"
 	TxRouteName                    = "tx"
 	HeightRouteName                = "height"
+	IndexerBlobsRouteName          = "indexer-blobs"
 	AccountRouteName               = "account"
 	AccountsRouteName              = "accounts"
 	PoolRouteName                  = "pool"
@@ -214,6 +216,7 @@ var routePaths = routes{
 	VersionRouteName:               {Method: http.MethodGet, Path: VersionRoutePath},
 	TxRouteName:                    {Method: http.MethodPost, Path: TxRoutePath},
 	HeightRouteName:                {Method: http.MethodPost, Path: HeightRoutePath},
+	IndexerBlobsRouteName:          {Method: http.MethodPost, Path: IndexerBlobsRoutePath},
 	AccountRouteName:               {Method: http.MethodPost, Path: AccountRoutePath},
 	AccountsRouteName:              {Method: http.MethodPost, Path: AccountsRoutePath},
 	PoolRouteName:                  {Method: http.MethodPost, Path: PoolRoutePath},
@@ -317,6 +320,7 @@ func createRouter(s *Server) *httprouter.Router {
 		VersionRouteName:               s.Version,
 		TxRouteName:                    s.Transaction,
 		HeightRouteName:                s.Height,
+		IndexerBlobsRouteName:          s.IndexerBlobs,
 		AccountRouteName:               s.Account,
 		AccountsRouteName:              s.Accounts,
 		PoolRouteName:                  s.Pool,

@@ -538,6 +538,22 @@ func (s *StateMachine) Iterator(key []byte) (lib.IteratorI, lib.ErrorI) {
 	return s.Store().Iterator(key)
 }
 
+// IteratorAndAppend() aggregates an array of raw bytes from an iterator
+func (s *StateMachine) IterateAndAppend(prefix []byte) (result [][]byte, err lib.ErrorI) {
+	// iterate through the account prefix
+	it, err := s.Iterator(prefix)
+	if err != nil {
+		return nil, err
+	}
+	defer it.Close()
+	// for each item of the iterator
+	for ; it.Valid(); it.Next() {
+		result = append(result, it.Value())
+	}
+	// return the result
+	return result, nil
+}
+
 // RevIterator() creates and returns an iterator for the state machine's underlying store
 // starting at the end-prefix of the specified key and iterating reverse lexicographically
 func (s *StateMachine) RevIterator(key []byte) (lib.IteratorI, lib.ErrorI) {

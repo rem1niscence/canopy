@@ -46,6 +46,30 @@ func (s *Server) Height(w http.ResponseWriter, _ *http.Request, _ httprouter.Par
 	})
 }
 
+// IndexerBlobs returns the current and previous indexer blobs as protobuf bytes
+func (s *Server) IndexerBlobs(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	req := new(heightRequest)
+	if ok := unmarshal(w, r, req); !ok {
+		return
+	}
+	blobs, err := s.controller.FSM.IndexerBlobs(req.Height)
+	if err != nil {
+		write(w, err, http.StatusBadRequest)
+		return
+	}
+	bz, err := lib.Marshal(blobs)
+	if err != nil {
+		write(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-protobuf")
+	w.Header().Set(ContentType, "application/x-protobuf")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(bz); err != nil {
+		s.logger.Error(err.Error())
+	}
+}
+
 // Account responds with an account for the specified address
 func (s *Server) Account(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	// Invoke helper with the HTTP request, response writer and an inline callback
