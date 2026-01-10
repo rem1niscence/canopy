@@ -33,6 +33,7 @@ const (
 // RCManager handles a group of root-chain sock clients
 type RCManager struct {
 	c             lib.Config                    // the global node config
+	controller    *controller.Controller        // reference to controller for state access
 	subscriptions map[uint64]*RCSubscription    // chainId -> subscription
 	subscribers   map[uint64][]*RCSubscriber    // chainId -> subscribers
 	l             *sync.Mutex                   // thread safety
@@ -47,6 +48,10 @@ type RCManager struct {
 	maxRCSubscribers           int
 	maxRCSubscribersPerChain   int
 	subscriberCount            int
+	// indexer blob subscribers
+	indexerBlobSubscribers     []*IndexerBlobSubscriber
+	indexerBlobSubscriberCount int
+	maxIndexerBlobSubscribers  int
 }
 
 // NewRCManager() constructs a new instance of a RCManager
@@ -78,6 +83,7 @@ func NewRCManager(controller *controller.Controller, config lib.Config, logger l
 	// create the manager
 	manager = &RCManager{
 		c:                          config,
+		controller:                 controller,
 		subscriptions:              make(map[uint64]*RCSubscription),
 		subscribers:                make(map[uint64][]*RCSubscriber),
 		l:                          controller.Mutex,
@@ -90,6 +96,8 @@ func NewRCManager(controller *controller.Controller, config lib.Config, logger l
 		rcSubscriberPingPeriod:     pingPeriod,
 		maxRCSubscribers:           maxSubscribers,
 		maxRCSubscribersPerChain:   maxSubscribersPerChain,
+		indexerBlobSubscribers:     make([]*IndexerBlobSubscriber, 0),
+		maxIndexerBlobSubscribers:  maxSubscribers, // reuse same limit
 	}
 	// set the manager in the controller
 	controller.RCManager = manager
@@ -617,4 +625,160 @@ func (r *RCSubscriber) Stop(err error) {
 	}
 	// remove from the manager
 	r.manager.RemoveSubscriber(r.chainId, r)
+}
+
+// INDEXER BLOB SUBSCRIBER CODE BELOW
+
+// IndexerBlobSubscriber represents a WebSocket client subscribed to indexer blob updates
+type IndexerBlobSubscriber struct {
+	conn    *websocket.Conn // the underlying ws connection
+	manager *RCManager      // reference to manager
+	log     lib.LoggerI     // stdout log
+	writeMu sync.Mutex      // protects concurrent writes
+}
+
+// IndexerBlobWebSocket upgrades a http request to a websockets connection for indexer blob data
+func (s *Server) IndexerBlobWebSocket(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	_ = w.(http.Hijacker)
+	// upgrade the connection to websockets
+	conn, err := s.rcManager.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		write(w, err, http.StatusInternalServerError)
+		s.logger.Error(err.Error())
+		return
+	}
+	// create a new indexer blob subscriber
+	subscriber := &IndexerBlobSubscriber{
+		conn:    conn,
+		manager: s.rcManager,
+		log:     s.logger,
+	}
+	// add the subscriber to the manager
+	if err := s.rcManager.AddIndexerBlobSubscriber(subscriber); err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		if closeErr := conn.Close(); closeErr != nil {
+			s.logger.Error(closeErr.Error())
+		}
+		return
+	}
+	// send initial snapshot at current height
+	go subscriber.sendInitialSnapshot()
+	// start the subscriber lifecycle
+	subscriber.Start()
+}
+
+// sendInitialSnapshot sends the current indexer blob snapshot when a client first connects
+func (b *IndexerBlobSubscriber) sendInitialSnapshot() {
+	blobs, err := b.manager.controller.FSM.IndexerBlobs(0) // 0 means latest height
+	if err != nil {
+		b.log.Warnf("IndexerBlobSubscriber: failed to build initial snapshot: %s", err.Error())
+		return
+	}
+	protoBytes, err := lib.Marshal(blobs)
+	if err != nil {
+		b.log.Warnf("IndexerBlobSubscriber: failed to marshal initial snapshot: %s", err.Error())
+		return
+	}
+	if err := b.writeMessage(websocket.BinaryMessage, protoBytes); err != nil {
+		b.Stop(err)
+	}
+}
+
+// AddIndexerBlobSubscriber adds an indexer blob subscriber to the manager
+func (r *RCManager) AddIndexerBlobSubscriber(subscriber *IndexerBlobSubscriber) error {
+	r.l.Lock()
+	defer r.l.Unlock()
+	if r.maxIndexerBlobSubscribers > 0 && r.indexerBlobSubscriberCount >= r.maxIndexerBlobSubscribers {
+		return fmt.Errorf("indexer blob subscriber limit reached")
+	}
+	r.indexerBlobSubscribers = append(r.indexerBlobSubscribers, subscriber)
+	r.indexerBlobSubscriberCount++
+	return nil
+}
+
+// RemoveIndexerBlobSubscriber removes an indexer blob subscriber from the manager
+func (r *RCManager) RemoveIndexerBlobSubscriber(subscriber *IndexerBlobSubscriber) {
+	r.l.Lock()
+	defer r.l.Unlock()
+	before := len(r.indexerBlobSubscribers)
+	r.indexerBlobSubscribers = slices.DeleteFunc(r.indexerBlobSubscribers, func(sub *IndexerBlobSubscriber) bool {
+		return sub == subscriber
+	})
+	if len(r.indexerBlobSubscribers) < before {
+		r.indexerBlobSubscriberCount--
+	}
+}
+
+// PublishIndexerBlob sends the IndexerBlobs to all indexer blob subscribers
+func (r *RCManager) PublishIndexerBlob(height uint64) {
+	// build the blobs
+	blobs, err := r.controller.FSM.IndexerBlobs(height)
+	if err != nil {
+		r.log.Warnf("PublishIndexerBlob: failed to build blobs for height %d: %s", height, err.Error())
+		return
+	}
+	// marshal to proto bytes
+	protoBytes, err := lib.Marshal(blobs)
+	if err != nil {
+		r.log.Warnf("PublishIndexerBlob: failed to marshal blobs for height %d: %s", height, err.Error())
+		return
+	}
+	// copy subscribers under lock to avoid iteration races
+	r.l.Lock()
+	subscribers := append([]*IndexerBlobSubscriber(nil), r.indexerBlobSubscribers...)
+	r.l.Unlock()
+	// publish to each subscriber
+	for _, subscriber := range subscribers {
+		if e := subscriber.writeMessage(websocket.BinaryMessage, protoBytes); e != nil {
+			subscriber.Stop(e)
+		}
+	}
+}
+
+// Start configures and starts indexer blob subscriber lifecycle goroutines
+func (b *IndexerBlobSubscriber) Start() {
+	b.conn.SetReadLimit(b.manager.rcSubscriberReadLimitBytes)
+	_ = b.conn.SetReadDeadline(time.Now().Add(b.manager.rcSubscriberPongWait))
+	b.conn.SetPongHandler(func(string) error {
+		_ = b.conn.SetReadDeadline(time.Now().Add(b.manager.rcSubscriberPongWait))
+		return nil
+	})
+	go b.readLoop()
+	go b.pingLoop()
+}
+
+func (b *IndexerBlobSubscriber) readLoop() {
+	for {
+		if _, _, err := b.conn.ReadMessage(); err != nil {
+			b.Stop(err)
+			return
+		}
+	}
+}
+
+func (b *IndexerBlobSubscriber) pingLoop() {
+	ticker := time.NewTicker(b.manager.rcSubscriberPingPeriod)
+	defer ticker.Stop()
+	for range ticker.C {
+		if err := b.writeMessage(websocket.PingMessage, nil); err != nil {
+			b.Stop(err)
+			return
+		}
+	}
+}
+
+func (b *IndexerBlobSubscriber) writeMessage(messageType int, data []byte) error {
+	b.writeMu.Lock()
+	defer b.writeMu.Unlock()
+	_ = b.conn.SetWriteDeadline(time.Now().Add(b.manager.rcSubscriberWriteTimeout))
+	return b.conn.WriteMessage(messageType, data)
+}
+
+// Stop stops the indexer blob subscriber
+func (b *IndexerBlobSubscriber) Stop(err error) {
+	b.log.Errorf("IndexerBlob WS Failed with err: %s", err.Error())
+	if err = b.conn.Close(); err != nil {
+		b.log.Error(err.Error())
+	}
+	b.manager.RemoveIndexerBlobSubscriber(b)
 }
