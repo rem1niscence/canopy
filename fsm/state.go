@@ -212,8 +212,8 @@ func (s *StateMachine) ApplyTransactions(ctx context.Context, txs [][]byte, r *l
 	failedCheckTxs := map[int]error{}
 	// first batch validate signatures over the entire set
 	for i, tx := range txs {
-		if _, err = s.CheckTx(tx, "", batchVerifier); err != nil {
-			failedCheckTxs[i] = err
+		if _, checkErr := s.CheckTx(tx, "", batchVerifier); checkErr != nil {
+			failedCheckTxs[i] = checkErr
 		}
 	}
 	// execute batch verification of the signatures in the block
