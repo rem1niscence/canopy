@@ -29,6 +29,8 @@
   "dialPeers": [],
   "bannedPeerIDs": null,
   "bannedIPs": null,
+  "gossipThreshold": 0,
+  "gossipPeerSize": 0,
   "minimumPeersToStart": 0,
   "newHeightTimeoutMS": 4500,
   "electionTimeoutMS": 1500,

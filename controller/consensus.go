@@ -292,12 +292,19 @@ func (c *Controller) verifyResponse(msg *lib.MessageAndMetadata, queue map[uint6
 
 // ListenForConsensus() listens and internally routes inbound consensus messages
 func (c *Controller) ListenForConsensus() {
+	// create a new message cache to filter out duplicate transaction messages
+	cache := lib.NewMessageCache()
 	// wait and execute for each consensus message received
 	for msg := range c.P2P.Inbox(Cons) {
 		// if the node is syncing
 		if c.isSyncing.Load() {
 			// disregard the consensus message
 			continue
+		}
+		// check and add the message to the cache to prevent duplicates
+		if ok := cache.Add(msg); !ok {
+			// if duplicate, exit
+			return
 		}
 		// execute in a sub-function to unify error handling and enable 'defer' functionality
 		if err := func() (err lib.ErrorI) {
@@ -313,6 +320,8 @@ func (c *Controller) ListenForConsensus() {
 				// exit with error
 				return
 			}
+			// propagate the message to the network
+			c.GossipConsensus(bftMsg, msg.Sender.Address.PublicKey)
 			// exit
 			return
 		}(); err != nil {
@@ -321,6 +330,22 @@ func (c *Controller) ListenForConsensus() {
 			// slash the reputation of the peer
 			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidMsgRep)
 		}
+	}
+}
+
+// GossipConsensus() gossips a consensus message through the P2P network for a specific chainId
+func (c *Controller) GossipConsensus(message *bft.Message, senderPubToExclude []byte) {
+	// only gossip when is enabled
+	validatorSet := c.Consensus.ValidatorSet.ValidatorSet.ValidatorSet
+	if c.Config.GossipThreshold > 0 &&
+		len(validatorSet) <= int(c.Config.GossipThreshold) {
+		return
+	}
+	// log the start of the gossip consensus message function
+	c.log.Debugf("Gossiping consensus message: %s", message.Signature)
+	// send the block message to all peers excluding the sender (gossip)
+	if err := c.P2P.SendToPeers(Cons, message, lib.BytesToString(senderPubToExclude)); err != nil {
+		c.log.Errorf("unable to gossip consensus message with err: %s", err.Error())
 	}
 }
 
@@ -426,6 +451,8 @@ func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 			// if not self, send directly to peer using P2P
 			if err := c.P2P.SendTo(replica.PublicKey, Cons, msg); err != nil {
 				// log the error (warning is used in case 'some' replicas are not reachable)
+				// for the case of gossiping, it is guaranteed that this warning will
+				// happen as not all peers will be reachable
 				c.log.Warn(err.Error())
 			}
 		}

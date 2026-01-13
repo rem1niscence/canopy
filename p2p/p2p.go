@@ -383,7 +383,7 @@ func (p *P2P) OnPeerError(err error, publicKey []byte, remoteAddr string, uuid u
 // NewStreams() creates map of streams for the multiplexing architecture
 func (p *P2P) NewStreams() (streams map[lib.Topic]*Stream) {
 	streams = make(map[lib.Topic]*Stream, lib.Topic_INVALID+1)
-	for i := lib.Topic(0); i < lib.Topic_INVALID; i++ {
+	for i := range lib.Topic_INVALID {
 		if i == lib.Topic_HEARTBEAT {
 			continue
 		}
@@ -473,6 +473,15 @@ func (p *P2P) Inbox(topic lib.Topic) chan *lib.MessageAndMetadata { return p.cha
 // ListenForMustConnects() is an internal listener that receives 'must connect peers' updates from the controller
 func (p *P2P) ListenForMustConnects() {
 	for mustConnect := range p.MustConnectsReceiver {
+		// randomize for better distribution on gossip
+		rand.Shuffle(len(mustConnect), func(i, j int) {
+			mustConnect[i], mustConnect[j] = mustConnect[j], mustConnect[i]
+		})
+		// when set, only try to connect to max gossip peers
+		gThreshold, gPeerSize := p.config.GossipThreshold, int(p.config.GossipPeerSize)
+		if gThreshold > 0 {
+			mustConnect = mustConnect[:min(len(mustConnect), gPeerSize)]
+		}
 		// UpdateMustConnects() removes connections that are already established
 		for _, val := range p.UpdateMustConnects(mustConnect) {
 			go p.DialWithBackoff(val, false)
