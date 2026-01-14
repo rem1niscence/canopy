@@ -315,13 +315,20 @@ func (c *Controller) ListenForConsensus() {
 				// exit with error
 				return
 			}
+			// check whether the message should be gossiped
+			gossip, exit := c.ShouldGossip(bftMsg)
+			if gossip {
+				c.GossipConsensus(bftMsg, msg.Sender.Address.PublicKey)
+			}
+			// invalid gossipped messages shouldn't be propagated
+			if exit {
+				return
+			}
 			// route the message to the consensus module
 			if err = c.Consensus.HandleMessage(bftMsg); err != nil {
 				// exit with error
 				return
 			}
-			// propagate the message to the network
-			c.GossipConsensus(bftMsg, msg.Sender.Address.PublicKey)
 			// exit
 			return
 		}(); err != nil {
@@ -331,6 +338,26 @@ func (c *Controller) ListenForConsensus() {
 			c.P2P.ChangeReputation(msg.Sender.Address.PublicKey, p2p.InvalidMsgRep)
 		}
 	}
+}
+
+// ShouldGossip() Gossips a consensus message if the proposer is not the current node
+func (c *Controller) ShouldGossip(msg *bft.Message) (gossip bool, exit bool) {
+	if msg == nil || msg.Qc == nil {
+		fmt.Printf("nil msg %+v\n", msg)
+		// invalid message, discard
+		return false, true
+	}
+	switch {
+	case msg.IsReplicaMessage() || msg.IsPacemakerMessage():
+		// replica message, always gossip, continue if self is the proposer
+		return true, !bytes.Equal(msg.Qc.ProposerKey, c.PublicKey)
+	case msg.IsProposerMessage():
+		// proposer message, always gossip, always continue
+		return true, false
+	}
+	// invalid message, discard
+	// TODO: Should the peer reputation be slashed?
+	return false, true
 }
 
 // GossipConsensus() gossips a consensus message through the P2P network for a specific chainId
