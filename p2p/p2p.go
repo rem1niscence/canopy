@@ -478,8 +478,8 @@ func (p *P2P) ListenForMustConnects() {
 			mustConnect[i], mustConnect[j] = mustConnect[j], mustConnect[i]
 		})
 		// when set, only try to connect to max gossip peers
-		gThreshold, gPeerSize := p.config.GossipThreshold, int(p.config.GossipPeerSize)
-		if gThreshold > 0 {
+		gThreshold, gPeerSize := int(p.config.GossipThreshold), int(p.config.GossipPeerSize)
+		if gThreshold > 0 && len(mustConnect) >= gThreshold {
 			mustConnect = mustConnect[:min(len(mustConnect), gPeerSize)]
 		}
 		// UpdateMustConnects() removes connections that are already established
