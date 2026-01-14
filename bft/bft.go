@@ -196,7 +196,6 @@ func (b *BFT) HandlePhase() {
 	}
 	// after each phase, set the timers for the next phase
 	b.SetTimerForNextPhase(time.Since(startTime))
-	return
 }
 
 // StartElectionPhase() begins the ElectionPhase after the CommitProcess (normal) or Pacemaker (previous Round failure) timeouts

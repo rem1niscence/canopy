@@ -340,7 +340,7 @@ func (c *Controller) ListenForConsensus() {
 	}
 }
 
-// ShouldGossip() Gossips a consensus message if the proposer is not the current node
+// ShouldGossip() controls whether a consensus message should be gossiped
 func (c *Controller) ShouldGossip(msg *bft.Message) (gossip bool, exit bool) {
 	// only gossip when is enabled and threshold is met
 	validatorSet := c.Consensus.ValidatorSet.ValidatorSet.ValidatorSet
@@ -591,7 +591,8 @@ func (c *Controller) UpdateP2PMustConnect(v *lib.ConsensusValidators) {
 	if selfIsValidator {
 		// log the must connect update
 		c.log.Info("Self IS a validator 👍")
-		c.log.Infof("Updating must connects with %d validators", len(mustConnects))
+		gossip := c.Config.GossipThreshold > 0 && len(mustConnects) >= int(c.Config.GossipThreshold)
+		c.log.Infof("Updating must connects with %d validators, gossip: %t", len(mustConnects), gossip)
 		// send the list to the p2p module
 		c.P2P.MustConnectsReceiver <- mustConnects
 	} else {
