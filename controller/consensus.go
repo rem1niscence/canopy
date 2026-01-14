@@ -342,18 +342,19 @@ func (c *Controller) ListenForConsensus() {
 
 // ShouldGossip() Gossips a consensus message if the proposer is not the current node
 func (c *Controller) ShouldGossip(msg *bft.Message) (gossip bool, exit bool) {
-	if msg == nil || msg.Qc == nil {
-		fmt.Printf("nil msg %+v\n", msg)
-		// invalid message, discard
-		return false, true
+	// only gossip when is enabled and threshold is met
+	validatorSet := c.Consensus.ValidatorSet.ValidatorSet.ValidatorSet
+	if c.Config.GossipThreshold == 0 || len(validatorSet) <= int(c.Config.GossipThreshold) {
+		return false, false
 	}
+	// gossip cases
 	switch {
-	case msg.IsReplicaMessage() || msg.IsPacemakerMessage():
-		// replica message, always gossip, continue if self is the proposer
-		return true, !bytes.Equal(msg.Qc.ProposerKey, c.PublicKey)
 	case msg.IsProposerMessage():
 		// proposer message, always gossip, always continue
 		return true, false
+	case msg.IsReplicaMessage() || msg.IsPacemakerMessage():
+		// replica message, always gossip, continue if self is the proposer
+		return true, !bytes.Equal(msg.Qc.ProposerKey, c.PublicKey)
 	}
 	// invalid message, discard
 	// TODO: Should the peer reputation be slashed?
@@ -362,14 +363,8 @@ func (c *Controller) ShouldGossip(msg *bft.Message) (gossip bool, exit bool) {
 
 // GossipConsensus() gossips a consensus message through the P2P network for a specific chainId
 func (c *Controller) GossipConsensus(message *bft.Message, senderPubToExclude []byte) {
-	// only gossip when is enabled
-	validatorSet := c.Consensus.ValidatorSet.ValidatorSet.ValidatorSet
-	if c.Config.GossipThreshold > 0 &&
-		len(validatorSet) <= int(c.Config.GossipThreshold) {
-		return
-	}
 	// log the start of the gossip consensus message function
-	c.log.Debugf("Gossiping consensus message: %s", lib.BytesToString(message.SignBytes()))
+	c.log.Debugf("Gossiping consensus message: %s", crypto.HashString([]byte(message.String())))
 	// send the block message to all peers excluding the sender (gossip)
 	if err := c.P2P.SendToPeers(Cons, message, lib.BytesToString(senderPubToExclude)); err != nil {
 		c.log.Errorf("unable to gossip consensus message with err: %s", err.Error())
