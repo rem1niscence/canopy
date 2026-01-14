@@ -342,10 +342,9 @@ func (c *Controller) ListenForConsensus() {
 
 // ShouldGossip() controls whether a consensus message should be gossiped
 func (c *Controller) ShouldGossip(msg *bft.Message) (gossip bool, exit bool) {
-	// only gossip when is enabled and threshold is met
-	validatorSet := c.Consensus.ValidatorSet.ValidatorSet.ValidatorSet
-	if c.Config.GossipThreshold == 0 || len(validatorSet) <= int(c.Config.GossipThreshold) {
-		return false, false
+	// only gossip when enabled
+	if !c.P2P.GossipMode() {
+		return
 	}
 	// gossip cases
 	switch {
@@ -503,7 +502,7 @@ func (c *Controller) SendToProposer(msg lib.Signable) {
 		return
 	}
 	// check if sending to 'self' or peer
-	if c.Consensus.SelfIsProposer() {
+	if c.Consensus.SelfIsProposer() || c.P2P.GossipMode() {
 		// send using internal routing
 		if err := c.P2P.SelfSend(c.PublicKey, Cons, msg); err != nil {
 			// log the error
