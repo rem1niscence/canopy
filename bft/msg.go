@@ -2,6 +2,7 @@ package bft
 
 import (
 	"bytes"
+
 	"github.com/canopy-network/canopy/lib"
 	"github.com/canopy-network/canopy/lib/crypto"
 	"google.golang.org/protobuf/proto"
@@ -35,8 +36,9 @@ func (b *BFT) HandleMessage(message proto.Message) lib.ErrorI {
 			// validate the Leader message
 			partialQC, err := b.CheckProposerMessage(msg, params)
 			if err != nil {
-				b.log.Errorf("Received invalid proposal from %s", lib.BytesToString(msg.Signature.PublicKey))
-				return err
+				// could be a gossip message
+				b.log.Warnf("Received invalid proposal from %s", lib.BytesToString(msg.Signature.PublicKey))
+				return nil
 			}
 			b.log.Debugf("Received %s message from proposer: %s", msg.Header.ToString(), lib.BytesToTruncatedString(msg.Signature.PublicKey))
 			// store partial QCs as they may be indicative of byzantine behavior

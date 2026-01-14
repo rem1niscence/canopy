@@ -301,13 +301,13 @@ func (c *Controller) ListenForConsensus() {
 			// disregard the consensus message
 			continue
 		}
-		// check and add the message to the cache to prevent duplicates
-		if ok := cache.Add(msg); !ok {
-			// if duplicate, exit
-			return
-		}
 		// execute in a sub-function to unify error handling and enable 'defer' functionality
 		if err := func() (err lib.ErrorI) {
+			// check and add the message to the cache to prevent duplicates
+			if ok := cache.Add(msg); !ok {
+				// if duplicate, exit
+				return
+			}
 			// create a new 'consensus message' to unmarshal the bytes to
 			bftMsg := new(bft.Message)
 			// try to unmarshal into a consensus message
@@ -342,7 +342,7 @@ func (c *Controller) GossipConsensus(message *bft.Message, senderPubToExclude []
 		return
 	}
 	// log the start of the gossip consensus message function
-	c.log.Debugf("Gossiping consensus message: %s", message.Signature)
+	c.log.Debugf("Gossiping consensus message: %s", lib.BytesToString(message.SignBytes()))
 	// send the block message to all peers excluding the sender (gossip)
 	if err := c.P2P.SendToPeers(Cons, message, lib.BytesToString(senderPubToExclude)); err != nil {
 		c.log.Errorf("unable to gossip consensus message with err: %s", err.Error())
