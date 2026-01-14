@@ -109,7 +109,7 @@ func TestSendToPeers(t *testing.T) {
 	n2 := newTestP2PNode(t)
 	n2.meta.ChainId = 1
 	startTestP2PNode(t, n2)
-	n1.UpdateMustConnects([]*lib.PeerAddress{n2.ID()})
+	n1.UpdateMustConnects([]*lib.PeerAddress{n2.ID()}, false)
 	n3 := newTestP2PNode(t)
 	n3.meta.ChainId = 2
 	startTestP2PNode(t, n3)
@@ -148,7 +148,7 @@ func TestSendToPeersChunkedPacket(t *testing.T) {
 	n2 := newTestP2PNode(t)
 	n2.meta.ChainId = 1
 	startTestP2PNode(t, n2)
-	n1.UpdateMustConnects([]*lib.PeerAddress{n2.ID()})
+	n1.UpdateMustConnects([]*lib.PeerAddress{n2.ID()}, false)
 	n3 := newTestP2PNode(t)
 	n3.meta.ChainId = 2
 	startTestP2PNode(t, n3)
@@ -183,7 +183,7 @@ func TestSendToPeersMultipleMessages(t *testing.T) {
 	n2 := newTestP2PNode(t)
 	n2.meta.ChainId = 1
 	startTestP2PNode(t, n2)
-	n1.UpdateMustConnects([]*lib.PeerAddress{n2.ID()})
+	n1.UpdateMustConnects([]*lib.PeerAddress{n2.ID()}, false)
 	n3 := newTestP2PNode(t)
 	n3.meta.ChainId = 2
 	startTestP2PNode(t, n3)

@@ -364,7 +364,14 @@ func (c *Controller) ShouldGossip(msg *bft.Message) (gossip bool, exit bool) {
 // GossipConsensus() gossips a consensus message through the P2P network for a specific chainId
 func (c *Controller) GossipConsensus(message *bft.Message, senderPubToExclude []byte) {
 	// log the start of the gossip consensus message function
-	c.log.Debugf("Gossiping consensus message: %s", crypto.HashString([]byte(message.String())))
+	var phase lib.Phase
+	if message.Qc == nil {
+		phase = message.Header.Phase
+	} else {
+		phase = message.Qc.Header.Phase
+	}
+	c.log.Debugf("Gossiping consensus message: P: %s %s", phase,
+		crypto.HashString([]byte(message.String())))
 	// send the block message to all peers excluding the sender (gossip)
 	if err := c.P2P.SendToPeers(Cons, message, lib.BytesToString(senderPubToExclude)); err != nil {
 		c.log.Errorf("unable to gossip consensus message with err: %s", err.Error())
@@ -460,15 +467,20 @@ func (c *Controller) SendToReplicas(replicas lib.ValidatorSet, msg lib.Signable)
 		// exit
 		return
 	}
+	// send the message to self right away using internal routing
+	if err := c.P2P.SelfSend(c.PublicKey, Cons, msg); err != nil {
+		// log the error
+		c.log.Error(err.Error())
+	}
+	// if gossip mode is set, no need to send to replicas, the SelfSend will propagate to all the peers
+	if c.P2P.GossipMode() {
+		return
+	}
 	// for each replica (validator) in the set
 	for _, replica := range replicas.ValidatorSet.ValidatorSet {
-		// check if replica is self
+		// skip self
 		if bytes.Equal(replica.PublicKey, c.PublicKey) {
-			// send the message to self using internal routing
-			if err := c.P2P.SelfSend(c.PublicKey, Cons, msg); err != nil {
-				// log the error
-				c.log.Error(err.Error())
-			}
+			continue
 		} else {
 			// if not self, send directly to peer using P2P
 			if err := c.P2P.SendTo(replica.PublicKey, Cons, msg); err != nil {
@@ -592,6 +604,7 @@ func (c *Controller) UpdateP2PMustConnect(v *lib.ConsensusValidators) {
 		// log the must connect update
 		c.log.Info("Self IS a validator 👍")
 		gossip := c.Config.GossipThreshold > 0 && len(mustConnects) >= int(c.Config.GossipThreshold)
+		c.P2P.SetGossipMode(gossip)
 		c.log.Infof("Updating must connects with %d validators, gossip: %t", len(mustConnects), gossip)
 		// send the list to the p2p module
 		c.P2P.MustConnectsReceiver <- mustConnects

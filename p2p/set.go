@@ -120,9 +120,10 @@ func (ps *PeerSet) Remove(publicKey []byte, uuid uint64) (err lib.ErrorI) {
 
 // UpdateMustConnects() updates the list of peers that 'must be connected to'
 // Ex. the peers needed to complete committee consensus
-func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []*lib.PeerAddress) {
+func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress, remove bool) (toDial []*lib.PeerAddress) {
 	unlock := lockWithTrace("peerset", &ps.mux, ps.logger)
 	defer unlock()
+	currentMustConnects := ps.mustConnect
 	ps.mustConnect = mustConnect
 	for _, peer := range ps.m {
 		peer.IsMustConnect = false
@@ -139,6 +140,26 @@ func (ps *PeerSet) UpdateMustConnects(mustConnect []*lib.PeerAddress) (toDial []
 			ps.m[publicKey].IsMustConnect = true
 		} else { // else add to 'ToDial' list
 			toDial = append(toDial, peer)
+		}
+	}
+	// if remove is true, remove peers from currentMustConnects that are not in mustConnect
+	if remove {
+		for _, currPeer := range currentMustConnects {
+			// check whether is in the current peer list
+			peer, found := ps.m[lib.BytesToString(currPeer.PublicKey)]
+			if !found {
+				continue
+			}
+			// if so, check whether is in the new must connect list
+			isOnMustConnect := slices.ContainsFunc(mustConnect, func(p *lib.PeerAddress) bool {
+				return bytes.Equal(p.PublicKey, currPeer.PublicKey)
+			})
+			// if so, do nothing
+			if isOnMustConnect {
+				continue
+			}
+			// remove from current must connect list
+			ps.Remove(currPeer.PublicKey, peer.conn.uuid)
 		}
 	}
 	return

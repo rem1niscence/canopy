@@ -53,6 +53,7 @@ type P2P struct {
 	config                 lib.Config
 	metrics                *lib.Metrics
 	log                    lib.LoggerI
+	gossip                 bool // whether gossip mode is active
 }
 
 // New() creates an initialized pointer instance of a P2P object
@@ -478,12 +479,11 @@ func (p *P2P) ListenForMustConnects() {
 			mustConnect[i], mustConnect[j] = mustConnect[j], mustConnect[i]
 		})
 		// when set, only try to connect to max gossip peers
-		gThreshold, gPeerSize := int(p.config.GossipThreshold), int(p.config.GossipPeerSize)
-		if gThreshold > 0 && len(mustConnect) >= gThreshold {
-			mustConnect = mustConnect[:min(len(mustConnect), gPeerSize)]
+		if p.gossip {
+			mustConnect = mustConnect[:min(len(mustConnect), int(p.config.GossipPeerSize))]
 		}
 		// UpdateMustConnects() removes connections that are already established
-		for _, val := range p.UpdateMustConnects(mustConnect) {
+		for _, val := range p.UpdateMustConnects(mustConnect, p.gossip) {
 			go p.DialWithBackoff(val, false)
 		}
 	}
@@ -669,4 +669,14 @@ func (p *P2P) UpdateQueueDepthMetrics() {
 	for topic, ch := range p.channels {
 		p.metrics.InboxQueueDepth.WithLabelValues(lib.Topic_name[int32(topic)]).Set(float64(len(ch)))
 	}
+}
+
+// SetGossipMode sets the gossip mode for the P2P instance
+func (p *P2P) SetGossipMode(gossip bool) {
+	p.gossip = gossip
+}
+
+// GossipMode returns the current gossip mode for the P2P instance
+func (p *P2P) GossipMode() bool {
+	return p.gossip
 }
