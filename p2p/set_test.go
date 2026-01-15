@@ -51,7 +51,7 @@ func TestUpdateMustConnects(t *testing.T) {
 	toDial := n1.UpdateMustConnects([]*lib.PeerAddress{
 		n2.ID(),
 		n3.ID(),
-	}, false)
+	})
 	require.True(t, len(toDial) == 1)
 	require.Equal(t, toDial[0].PublicKey, n3.pub)
 	peerInfo, err := n1.PeerSet.GetPeerInfo(n2.pub)

@@ -230,7 +230,6 @@ type P2PConfig struct {
 	MinimumPeersToStart int               `json:"minimumPeersToStart"` // the minimum connections required to start consensus
 	ValidatorTCPProxy   map[uint64]string `json:"validator_tcp_proxy"` // tcp proxy config mapping listen port to target address
 	GossipThreshold     uint              `json:"gossipThreshold"`     // number of must connects needed to switch to full gossip
-	GossipPeerSize      uint              `json:"gossipPeerSize"`      // number of peers to keep in the gossip-mode peer list
 }
 
 func DefaultP2PConfig() P2PConfig {
