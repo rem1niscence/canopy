@@ -943,6 +943,8 @@ type (
 		CommitCertificate(qc *lib.QuorumCertificate, block *lib.Block, blockResult *lib.BlockResult, ts uint64) (err lib.ErrorI)
 		// GossipBlock() is a P2P call to gossip a completed Quorum Certificate with a Proposal
 		GossipBlock(certificate *lib.QuorumCertificate, sender []byte, timestamp uint64)
+		// GossipConsensus() is a P2P call to gossip a completed Quorum Certificate with a Proposal
+		GossipConsensus(message *Message, senderPubExclude []byte)
 		// SendToSelf() is a P2P call to directly send  a completed Quorum Certificate to self
 		SelfSendBlock(qc *lib.QuorumCertificate, timestamp uint64)
 		// SendToReplicas() is a P2P call to directly send a Consensus message to all Replicas

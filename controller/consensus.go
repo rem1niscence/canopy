@@ -305,7 +305,7 @@ func (c *Controller) ListenForConsensus() {
 		if err := func() (err lib.ErrorI) {
 			// check and add the message to the cache to prevent duplicates
 			if ok := cache.Add(msg); !ok {
-				// if duplicate, exit
+				// duplicate, exit
 				return
 			}
 			// create a new 'consensus message' to unmarshal the bytes to
@@ -320,7 +320,7 @@ func (c *Controller) ListenForConsensus() {
 			if gossip {
 				c.GossipConsensus(bftMsg, msg.Sender.Address.PublicKey)
 			}
-			// invalid gossipped messages shouldn't be propagated
+			// some messages should only be gossiped
 			if exit {
 				return
 			}
@@ -371,7 +371,7 @@ func (c *Controller) GossipConsensus(message *bft.Message, senderPubToExclude []
 	}
 	c.log.Debugf("Gossiping consensus message: P: %s %s", phase,
 		crypto.HashString([]byte(message.String())))
-	// send the block message to all peers excluding the sender (gossip)
+	// send the consensus message to all peers excluding the sender (gossip)
 	if err := c.P2P.SendToPeers(Cons, message, lib.BytesToString(senderPubToExclude)); err != nil {
 		c.log.Errorf("unable to gossip consensus message with err: %s", err.Error())
 	}
