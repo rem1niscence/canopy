@@ -474,10 +474,6 @@ func (p *P2P) Inbox(topic lib.Topic) chan *lib.MessageAndMetadata { return p.cha
 // ListenForMustConnects() is an internal listener that receives 'must connect peers' updates from the controller
 func (p *P2P) ListenForMustConnects() {
 	for mustConnect := range p.MustConnectsReceiver {
-		// explicitly rely on the dial peers for new peer connections
-		if p.gossip {
-			return
-		}
 		// UpdateMustConnects() removes connections that are already established
 		for _, val := range p.UpdateMustConnects(mustConnect) {
 			go p.DialWithBackoff(val, false)

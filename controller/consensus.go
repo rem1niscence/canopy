@@ -604,6 +604,11 @@ func (c *Controller) UpdateP2PMustConnect(v *lib.ConsensusValidators) {
 		c.log.Info("Self IS a validator 👍")
 		gossip := c.Config.GossipThreshold > 0 && len(mustConnects) >= int(c.Config.GossipThreshold)
 		c.P2P.SetGossipMode(gossip)
+		// on gossip, explicitly rely on the dial peers for new peer connections
+		if gossip {
+			c.log.Infof("consensus gossip on, using dialPeers for connections")
+			return
+		}
 		c.log.Infof("Updating must connects with %d validators, gossip: %t", len(mustConnects), gossip)
 		// send the list to the p2p module
 		c.P2P.MustConnectsReceiver <- mustConnects
