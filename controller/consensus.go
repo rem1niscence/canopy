@@ -598,18 +598,21 @@ func (c *Controller) UpdateP2PMustConnect(v *lib.ConsensusValidators) {
 			PeerMeta:   &lib.PeerMeta{NetworkId: c.Config.NetworkID, ChainId: c.Config.ChainId},
 		})
 	}
+	// update the validator count metric
+	lenMustConnects := len(mustConnects)
+	c.Metrics.UpdateValidatorCount(lenMustConnects)
 	// if this node 'is validator'
 	if selfIsValidator {
 		// log the must connect update
 		c.log.Info("Self IS a validator 👍")
-		gossip := c.Config.GossipThreshold > 0 && len(mustConnects) >= int(c.Config.GossipThreshold)
+		gossip := c.Config.GossipThreshold > 0 && lenMustConnects >= int(c.Config.GossipThreshold)
 		c.P2P.SetGossipMode(gossip)
 		// on gossip, explicitly rely on the dial peers for new peer connections
 		if gossip {
-			c.log.Infof("consensus gossip on, using dialPeers for connections")
+			c.log.Infof("consensus gossip on, using dialPeers for connections, validators: %d", lenMustConnects)
 			return
 		}
-		c.log.Infof("Updating must connects with %d validators, gossip: %t", len(mustConnects), gossip)
+		c.log.Infof("Updating must connects with %d validators, gossip: %t", lenMustConnects, gossip)
 		// send the list to the p2p module
 		c.P2P.MustConnectsReceiver <- mustConnects
 	} else {
