@@ -52,6 +52,7 @@ type RCManager struct {
 	indexerBlobSubscribers     []*IndexerBlobSubscriber
 	indexerBlobSubscriberCount int
 	maxIndexerBlobSubscribers  int
+	indexerBlobCache           *indexerBlobCache
 }
 
 // NewRCManager() constructs a new instance of a RCManager
@@ -98,6 +99,7 @@ func NewRCManager(controller *controller.Controller, config lib.Config, logger l
 		maxRCSubscribersPerChain:   maxSubscribersPerChain,
 		indexerBlobSubscribers:     make([]*IndexerBlobSubscriber, 0),
 		maxIndexerBlobSubscribers:  maxSubscribers, // reuse same limit
+		indexerBlobCache:           newIndexerBlobCache(defaultIndexerBlobCacheEntries),
 	}
 	// set the manager in the controller
 	controller.RCManager = manager
@@ -669,14 +671,9 @@ func (s *Server) IndexerBlobWebSocket(w http.ResponseWriter, r *http.Request, _ 
 
 // sendInitialSnapshot sends the current indexer blob snapshot when a client first connects
 func (b *IndexerBlobSubscriber) sendInitialSnapshot() {
-	blobs, err := b.manager.controller.FSM.IndexerBlobs(0) // 0 means latest height
+	_, protoBytes, err := b.manager.IndexerBlobsCached(0) // 0 means latest height
 	if err != nil {
 		b.log.Warnf("IndexerBlobSubscriber: failed to build initial snapshot: %s", err.Error())
-		return
-	}
-	protoBytes, err := lib.Marshal(blobs)
-	if err != nil {
-		b.log.Warnf("IndexerBlobSubscriber: failed to marshal initial snapshot: %s", err.Error())
 		return
 	}
 	if err := b.writeMessage(websocket.BinaryMessage, protoBytes); err != nil {
@@ -711,16 +708,9 @@ func (r *RCManager) RemoveIndexerBlobSubscriber(subscriber *IndexerBlobSubscribe
 
 // PublishIndexerBlob sends the IndexerBlobs to all indexer blob subscribers
 func (r *RCManager) PublishIndexerBlob(height uint64) {
-	// build the blobs
-	blobs, err := r.controller.FSM.IndexerBlobs(height)
+	_, protoBytes, err := r.IndexerBlobsCached(height)
 	if err != nil {
 		r.log.Warnf("PublishIndexerBlob: failed to build blobs for height %d: %s", height, err.Error())
-		return
-	}
-	// marshal to proto bytes
-	protoBytes, err := lib.Marshal(blobs)
-	if err != nil {
-		r.log.Warnf("PublishIndexerBlob: failed to marshal blobs for height %d: %s", height, err.Error())
 		return
 	}
 	// copy subscribers under lock to avoid iteration races

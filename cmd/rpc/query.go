@@ -52,14 +52,13 @@ func (s *Server) IndexerBlobs(w http.ResponseWriter, r *http.Request, _ httprout
 	if ok := unmarshal(w, r, req); !ok {
 		return
 	}
-	blobs, err := s.controller.FSM.IndexerBlobs(req.Height)
+	_, bz, err := s.rcManager.IndexerBlobsCached(req.Height)
 	if err != nil {
-		write(w, err, http.StatusBadRequest)
-		return
-	}
-	bz, err := lib.Marshal(blobs)
-	if err != nil {
-		write(w, err, http.StatusInternalServerError)
+		status := http.StatusBadRequest
+		if err.Code() == lib.CodeMarshal {
+			status = http.StatusInternalServerError
+		}
+		write(w, err, status)
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-protobuf")
