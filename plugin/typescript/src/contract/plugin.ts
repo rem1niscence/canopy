@@ -396,12 +396,7 @@ export function FromAny(any: any): [any | null, string | null, IPluginError | nu
         if (typeUrl.includes("MessageSend")) {
             return [types.MessageSend.decode(any.value), "MessageSend", null];
         }
-        if (typeUrl.includes("MessageReward")) {
-            return [types.MessageReward.decode(any.value), "MessageReward", null];
-        }
-        if (typeUrl.includes("MessageFaucet")) {
-            return [types.MessageFaucet.decode(any.value), "MessageFaucet", null];
-        }
+        // NOTE: To add new message types, see TUTORIAL.md
         return [null, null, ErrInvalidMessageCast()];
     } catch (err) {
         return [null, null, ErrFromAny(err as Error)];

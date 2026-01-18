@@ -23,11 +23,9 @@ export const ContractConfig: any = {
     name: "go_plugin_contract",
     id: 1,
     version: 1,
-    supportedTransactions: ["send", "reward", "faucet"],
+    supportedTransactions: ["send"],
     transactionTypeUrls: [
         "type.googleapis.com/types.MessageSend",
-        "type.googleapis.com/types.MessageReward",
-        "type.googleapis.com/types.MessageFaucet",
     ],
     eventTypeUrls: [],
     fileDescriptorProtos,
@@ -89,52 +87,6 @@ export class Contract {
             authorizedSigners: [msg.fromAddress],
         };
     }
-
-    // CheckMessageReward() statelessly validates a 'reward' message
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    CheckMessageReward(msg: any): any {
-        // check admin address (must be 20 bytes)
-        if (!msg.adminAddress || msg.adminAddress.length !== 20) {
-            return { error: ErrInvalidAddress() };
-        }
-        // check recipient address
-        if (!msg.recipientAddress || msg.recipientAddress.length !== 20) {
-            return { error: ErrInvalidAddress() };
-        }
-        // check amount
-        const amount = msg.amount as Long | number | undefined;
-        if (!amount || (Long.isLong(amount) ? amount.isZero() : amount === 0)) {
-            return { error: ErrInvalidAmount() };
-        }
-        // return the authorized signers (admin must sign this tx)
-        return {
-            recipient: msg.recipientAddress,
-            authorizedSigners: [msg.adminAddress],
-        };
-    }
-
-    // CheckMessageFaucet() statelessly validates a 'faucet' message
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    CheckMessageFaucet(msg: any): any {
-        // check signer address (must be 20 bytes)
-        if (!msg.signerAddress || msg.signerAddress.length !== 20) {
-            return { error: ErrInvalidAddress() };
-        }
-        // check recipient address
-        if (!msg.recipientAddress || msg.recipientAddress.length !== 20) {
-            return { error: ErrInvalidAddress() };
-        }
-        // check amount
-        const amount = msg.amount as Long | number | undefined;
-        if (!amount || (Long.isLong(amount) ? amount.isZero() : amount === 0)) {
-            return { error: ErrInvalidAmount() };
-        }
-        // return the authorized signers (signer must sign this tx)
-        return {
-            recipient: msg.recipientAddress,
-            authorizedSigners: [msg.signerAddress],
-        };
-    }
 }
 
 // Async versions of contract methods for proper state handling
@@ -186,10 +138,6 @@ export class ContractAsync {
             switch (msgType) {
                 case 'MessageSend':
                     return contract.CheckMessageSend(msg);
-                case 'MessageReward':
-                    return contract.CheckMessageReward(msg);
-                case 'MessageFaucet':
-                    return contract.CheckMessageFaucet(msg);
                 default:
                     return { error: ErrInvalidMessageCast() };
             }
@@ -210,10 +158,6 @@ export class ContractAsync {
             switch (msgType) {
                 case 'MessageSend':
                     return ContractAsync.DeliverMessageSend(contract, msg, request.tx?.fee as Long);
-                case 'MessageReward':
-                    return ContractAsync.DeliverMessageReward(contract, msg, request.tx?.fee as Long);
-                case 'MessageFaucet':
-                    return ContractAsync.DeliverMessageFaucet(contract, msg);
                 default:
                     return { error: ErrInvalidMessageCast() };
             }
@@ -346,200 +290,6 @@ export class ContractAsync {
                 ],
             });
         }
-
-        if (writeErr) {
-            return { error: writeErr };
-        }
-        if (writeResp?.error) {
-            return { error: writeResp.error };
-        }
-
-        return {};
-    }
-
-    // DeliverMessageReward() handles a 'reward' message (mints tokens to recipient, admin pays fee)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    static async DeliverMessageReward(contract: Contract, msg: any, fee: Long | number | undefined): Promise<any> {
-        const adminQueryId = Long.fromNumber(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
-        const recipientQueryId = Long.fromNumber(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
-        const feeQueryId = Long.fromNumber(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
-
-        // calculate keys
-        const adminKey = KeyForAccount(msg.adminAddress!);
-        const recipientKey = KeyForAccount(msg.recipientAddress!);
-        const feePoolKey = KeyForFeePool(Long.fromNumber(contract.Config.ChainId));
-
-        // read current state
-        const [response, readErr] = await contract.plugin.StateRead(contract, {
-            keys: [
-                { queryId: feeQueryId, key: feePoolKey },
-                { queryId: adminQueryId, key: adminKey },
-                { queryId: recipientQueryId, key: recipientKey },
-            ],
-        });
-
-        if (readErr) {
-            return { error: readErr };
-        }
-        if (response?.error) {
-            return { error: response.error };
-        }
-
-        // get bytes from response
-        let adminBytes: Uint8Array | null = null;
-        let recipientBytes: Uint8Array | null = null;
-        let feePoolBytes: Uint8Array | null = null;
-
-        for (const resp of response?.results || []) {
-            const qid = resp.queryId as Long;
-            if (qid.equals(adminQueryId)) {
-                adminBytes = resp.entries?.[0]?.value || null;
-            } else if (qid.equals(recipientQueryId)) {
-                recipientBytes = resp.entries?.[0]?.value || null;
-            } else if (qid.equals(feeQueryId)) {
-                feePoolBytes = resp.entries?.[0]?.value || null;
-            }
-        }
-
-        // unmarshal accounts
-        const [adminRaw, adminErr] = Unmarshal(adminBytes || new Uint8Array(), types.Account);
-        if (adminErr) {
-            return { error: adminErr };
-        }
-        const [recipientRaw, recipientErr] = Unmarshal(recipientBytes || new Uint8Array(), types.Account);
-        if (recipientErr) {
-            return { error: recipientErr };
-        }
-        const [feePoolRaw, feePoolErr] = Unmarshal(feePoolBytes || new Uint8Array(), types.Pool);
-        if (feePoolErr) {
-            return { error: feePoolErr };
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const admin = adminRaw as any;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const recipient = recipientRaw as any;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const feePool = feePoolRaw as any;
-
-        const feeAmount = Long.isLong(fee) ? fee : Long.fromNumber(fee as number || 0);
-        const adminAmount = Long.isLong(admin?.amount) ? admin.amount : Long.fromNumber(admin?.amount as number || 0);
-
-        // admin must have enough to pay the fee
-        if (adminAmount.lessThan(feeAmount)) {
-            return { error: ErrInsufficientFunds() };
-        }
-
-        // apply state changes
-        const msgAmount = Long.isLong(msg.amount) ? msg.amount : Long.fromNumber(msg.amount as number || 0);
-        const newAdminAmount = adminAmount.subtract(feeAmount); // admin pays fee
-        const recipientAmount = Long.isLong(recipient?.amount) ? recipient.amount : Long.fromNumber(recipient?.amount as number || 0);
-        const newRecipientAmount = recipientAmount.add(msgAmount); // mint tokens to recipient
-        const poolAmount = Long.isLong(feePool?.amount) ? feePool.amount : Long.fromNumber(feePool?.amount as number || 0);
-        const newPoolAmount = poolAmount.add(feeAmount);
-
-        // update accounts
-        const updatedAdmin = types.Account.create({ address: admin?.address, amount: newAdminAmount });
-        const updatedRecipient = types.Account.create({ address: recipient?.address || msg.recipientAddress, amount: newRecipientAmount });
-        const updatedPool = types.Pool.create({ id: feePool?.id, amount: newPoolAmount });
-
-        // marshal
-        const newAdminBytes = types.Account.encode(updatedAdmin).finish();
-        const newRecipientBytes = types.Account.encode(updatedRecipient).finish();
-        const newFeePoolBytes = types.Pool.encode(updatedPool).finish();
-
-        // write state changes
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let writeResp: any;
-        let writeErr: IPluginError | null;
-
-        if (newAdminAmount.isZero()) {
-            // delete drained admin account
-            [writeResp, writeErr] = await contract.plugin.StateWrite(contract, {
-                sets: [
-                    { key: feePoolKey, value: newFeePoolBytes },
-                    { key: recipientKey, value: newRecipientBytes },
-                ],
-                deletes: [{ key: adminKey }],
-            });
-        } else {
-            [writeResp, writeErr] = await contract.plugin.StateWrite(contract, {
-                sets: [
-                    { key: feePoolKey, value: newFeePoolBytes },
-                    { key: adminKey, value: newAdminBytes },
-                    { key: recipientKey, value: newRecipientBytes },
-                ],
-            });
-        }
-
-        if (writeErr) {
-            return { error: writeErr };
-        }
-        if (writeResp?.error) {
-            return { error: writeResp.error };
-        }
-
-        return {};
-    }
-
-    // DeliverMessageFaucet() handles a 'faucet' message (mints tokens to recipient - no fee, no balance check)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    static async DeliverMessageFaucet(contract: Contract, msg: any): Promise<any> {
-        const recipientQueryId = Long.fromNumber(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
-
-        const recipientKey = KeyForAccount(msg.recipientAddress!);
-
-        // read current recipient state
-        const [response, readErr] = await contract.plugin.StateRead(contract, {
-            keys: [
-                { queryId: recipientQueryId, key: recipientKey },
-            ],
-        });
-
-        if (readErr) {
-            return { error: readErr };
-        }
-        if (response?.error) {
-            return { error: response.error };
-        }
-
-        // get recipient bytes
-        let recipientBytes: Uint8Array | null = null;
-        for (const resp of response?.results || []) {
-            const qid = resp.queryId as Long;
-            if (qid.equals(recipientQueryId)) {
-                recipientBytes = resp.entries?.[0]?.value || null;
-            }
-        }
-
-        // unmarshal recipient account (or create new if doesn't exist)
-        const [recipientRaw, recipientErr] = Unmarshal(recipientBytes || new Uint8Array(), types.Account);
-        if (recipientErr) {
-            return { error: recipientErr };
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const recipient = recipientRaw as any;
-
-        // mint tokens to recipient
-        const msgAmount = Long.isLong(msg.amount) ? msg.amount : Long.fromNumber(msg.amount as number || 0);
-        const recipientAmount = Long.isLong(recipient?.amount) ? recipient.amount : Long.fromNumber(recipient?.amount as number || 0);
-        const newRecipientAmount = recipientAmount.add(msgAmount);
-
-        // update recipient
-        const updatedRecipient = types.Account.create({ 
-            address: recipient?.address || msg.recipientAddress, 
-            amount: newRecipientAmount 
-        });
-
-        const newRecipientBytes = types.Account.encode(updatedRecipient).finish();
-
-        // write state changes
-        const [writeResp, writeErr] = await contract.plugin.StateWrite(contract, {
-            sets: [
-                { key: recipientKey, value: newRecipientBytes },
-            ],
-        });
 
         if (writeErr) {
             return { error: writeErr };
