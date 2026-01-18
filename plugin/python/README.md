@@ -16,7 +16,7 @@ Key features:
 
 ```bash
 # Install Python dependencies
-pip install -r requirements.txt
+pip install -e ".[dev]"
 
 # Generate protobuf bindings from .proto files
 make proto

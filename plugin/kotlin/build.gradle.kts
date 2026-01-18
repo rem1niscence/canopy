@@ -13,6 +13,14 @@ version = "1.0.0"
 
 repositories {
     mavenCentral()
+    // Consensys/Teku Cloudsmith repository for BLS library
+    maven {
+        url = uri("https://dl.cloudsmith.io/public/consensys/teku/maven/")
+    }
+    // Consensys Maven for jblst native library
+    maven {
+        url = uri("https://artifacts.consensys.net/public/maven/maven/")
+    }
 }
 
 // Use Java toolchain to ensure compatible JDK version
@@ -37,6 +45,12 @@ dependencies {
 
     // Unix domain socket support
     implementation("com.kohlschutter.junixsocket:junixsocket-core:2.9.0")
+
+    // HTTP client for RPC calls
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // BLS12-381 cryptography (for transaction signing) - using jblst directly with custom DST
+    implementation("tech.pegasys:jblst:0.3.12")
 
     // Testing
     testImplementation(kotlin("test"))
@@ -69,6 +83,11 @@ tasks.withType<KotlinCompile> {
 
 tasks.test {
     useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed", "standardOut", "standardError")
+        showStandardStreams = true
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
 }
 
 tasks.register<JavaExec>("dev") {

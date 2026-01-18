@@ -109,7 +109,7 @@ else ifeq ($(PLUGIN),go)
 else ifeq ($(PLUGIN),typescript)
 	cd plugin/typescript && npm ci && npm run build
 else ifeq ($(PLUGIN),python)
-	cd plugin/python && pip install -r requirements.txt 2>/dev/null || true
+	cd plugin/python && pip install -e ".[dev]" 2>/dev/null || true
 else ifeq ($(PLUGIN),csharp)
 	cd plugin/csharp && dotnet publish -c Release -o out
 else ifeq ($(PLUGIN),all)

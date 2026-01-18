@@ -8082,7 +8082,13 @@ $root.types = (function() {
          * @interface ITransaction
          * @property {string|null} [messageType] Transaction messageType
          * @property {google.protobuf.IAny|null} [msg] Transaction msg
+         * @property {types.ISignature|null} [signature] Transaction signature
+         * @property {number|Long|null} [createdHeight] Transaction createdHeight
+         * @property {number|Long|null} [time] Transaction time
          * @property {number|Long|null} [fee] Transaction fee
+         * @property {string|null} [memo] Transaction memo
+         * @property {number|Long|null} [networkId] Transaction networkId
+         * @property {number|Long|null} [chainId] Transaction chainId
          */
 
         /**
@@ -8117,12 +8123,60 @@ $root.types = (function() {
         Transaction.prototype.msg = null;
 
         /**
+         * Transaction signature.
+         * @member {types.ISignature|null|undefined} signature
+         * @memberof types.Transaction
+         * @instance
+         */
+        Transaction.prototype.signature = null;
+
+        /**
+         * Transaction createdHeight.
+         * @member {number|Long} createdHeight
+         * @memberof types.Transaction
+         * @instance
+         */
+        Transaction.prototype.createdHeight = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+
+        /**
+         * Transaction time.
+         * @member {number|Long} time
+         * @memberof types.Transaction
+         * @instance
+         */
+        Transaction.prototype.time = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+
+        /**
          * Transaction fee.
          * @member {number|Long} fee
          * @memberof types.Transaction
          * @instance
          */
         Transaction.prototype.fee = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+
+        /**
+         * Transaction memo.
+         * @member {string} memo
+         * @memberof types.Transaction
+         * @instance
+         */
+        Transaction.prototype.memo = "";
+
+        /**
+         * Transaction networkId.
+         * @member {number|Long} networkId
+         * @memberof types.Transaction
+         * @instance
+         */
+        Transaction.prototype.networkId = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+
+        /**
+         * Transaction chainId.
+         * @member {number|Long} chainId
+         * @memberof types.Transaction
+         * @instance
+         */
+        Transaction.prototype.chainId = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
 
         /**
          * Creates a new Transaction instance using the specified properties.
@@ -8152,8 +8206,20 @@ $root.types = (function() {
                 writer.uint32(/* id 1, wireType 2 =*/10).string(message.messageType);
             if (message.msg != null && Object.hasOwnProperty.call(message, "msg"))
                 $root.google.protobuf.Any.encode(message.msg, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
+            if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
+                $root.types.Signature.encode(message.signature, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
+            if (message.createdHeight != null && Object.hasOwnProperty.call(message, "createdHeight"))
+                writer.uint32(/* id 4, wireType 0 =*/32).uint64(message.createdHeight);
+            if (message.time != null && Object.hasOwnProperty.call(message, "time"))
+                writer.uint32(/* id 5, wireType 0 =*/40).uint64(message.time);
             if (message.fee != null && Object.hasOwnProperty.call(message, "fee"))
                 writer.uint32(/* id 6, wireType 0 =*/48).uint64(message.fee);
+            if (message.memo != null && Object.hasOwnProperty.call(message, "memo"))
+                writer.uint32(/* id 7, wireType 2 =*/58).string(message.memo);
+            if (message.networkId != null && Object.hasOwnProperty.call(message, "networkId"))
+                writer.uint32(/* id 8, wireType 0 =*/64).uint64(message.networkId);
+            if (message.chainId != null && Object.hasOwnProperty.call(message, "chainId"))
+                writer.uint32(/* id 9, wireType 0 =*/72).uint64(message.chainId);
             return writer;
         };
 
@@ -8198,8 +8264,32 @@ $root.types = (function() {
                         message.msg = $root.google.protobuf.Any.decode(reader, reader.uint32());
                         break;
                     }
+                case 3: {
+                        message.signature = $root.types.Signature.decode(reader, reader.uint32());
+                        break;
+                    }
+                case 4: {
+                        message.createdHeight = reader.uint64();
+                        break;
+                    }
+                case 5: {
+                        message.time = reader.uint64();
+                        break;
+                    }
                 case 6: {
                         message.fee = reader.uint64();
+                        break;
+                    }
+                case 7: {
+                        message.memo = reader.string();
+                        break;
+                    }
+                case 8: {
+                        message.networkId = reader.uint64();
+                        break;
+                    }
+                case 9: {
+                        message.chainId = reader.uint64();
                         break;
                     }
                 default:
@@ -8245,9 +8335,29 @@ $root.types = (function() {
                 if (error)
                     return "msg." + error;
             }
+            if (message.signature != null && message.hasOwnProperty("signature")) {
+                var error = $root.types.Signature.verify(message.signature);
+                if (error)
+                    return "signature." + error;
+            }
+            if (message.createdHeight != null && message.hasOwnProperty("createdHeight"))
+                if (!$util.isInteger(message.createdHeight) && !(message.createdHeight && $util.isInteger(message.createdHeight.low) && $util.isInteger(message.createdHeight.high)))
+                    return "createdHeight: integer|Long expected";
+            if (message.time != null && message.hasOwnProperty("time"))
+                if (!$util.isInteger(message.time) && !(message.time && $util.isInteger(message.time.low) && $util.isInteger(message.time.high)))
+                    return "time: integer|Long expected";
             if (message.fee != null && message.hasOwnProperty("fee"))
                 if (!$util.isInteger(message.fee) && !(message.fee && $util.isInteger(message.fee.low) && $util.isInteger(message.fee.high)))
                     return "fee: integer|Long expected";
+            if (message.memo != null && message.hasOwnProperty("memo"))
+                if (!$util.isString(message.memo))
+                    return "memo: string expected";
+            if (message.networkId != null && message.hasOwnProperty("networkId"))
+                if (!$util.isInteger(message.networkId) && !(message.networkId && $util.isInteger(message.networkId.low) && $util.isInteger(message.networkId.high)))
+                    return "networkId: integer|Long expected";
+            if (message.chainId != null && message.hasOwnProperty("chainId"))
+                if (!$util.isInteger(message.chainId) && !(message.chainId && $util.isInteger(message.chainId.low) && $util.isInteger(message.chainId.high)))
+                    return "chainId: integer|Long expected";
             return null;
         };
 
@@ -8270,6 +8380,29 @@ $root.types = (function() {
                     throw TypeError(".types.Transaction.msg: object expected");
                 message.msg = $root.google.protobuf.Any.fromObject(object.msg);
             }
+            if (object.signature != null) {
+                if (typeof object.signature !== "object")
+                    throw TypeError(".types.Transaction.signature: object expected");
+                message.signature = $root.types.Signature.fromObject(object.signature);
+            }
+            if (object.createdHeight != null)
+                if ($util.Long)
+                    (message.createdHeight = $util.Long.fromValue(object.createdHeight)).unsigned = true;
+                else if (typeof object.createdHeight === "string")
+                    message.createdHeight = parseInt(object.createdHeight, 10);
+                else if (typeof object.createdHeight === "number")
+                    message.createdHeight = object.createdHeight;
+                else if (typeof object.createdHeight === "object")
+                    message.createdHeight = new $util.LongBits(object.createdHeight.low >>> 0, object.createdHeight.high >>> 0).toNumber(true);
+            if (object.time != null)
+                if ($util.Long)
+                    (message.time = $util.Long.fromValue(object.time)).unsigned = true;
+                else if (typeof object.time === "string")
+                    message.time = parseInt(object.time, 10);
+                else if (typeof object.time === "number")
+                    message.time = object.time;
+                else if (typeof object.time === "object")
+                    message.time = new $util.LongBits(object.time.low >>> 0, object.time.high >>> 0).toNumber(true);
             if (object.fee != null)
                 if ($util.Long)
                     (message.fee = $util.Long.fromValue(object.fee)).unsigned = true;
@@ -8279,6 +8412,26 @@ $root.types = (function() {
                     message.fee = object.fee;
                 else if (typeof object.fee === "object")
                     message.fee = new $util.LongBits(object.fee.low >>> 0, object.fee.high >>> 0).toNumber(true);
+            if (object.memo != null)
+                message.memo = String(object.memo);
+            if (object.networkId != null)
+                if ($util.Long)
+                    (message.networkId = $util.Long.fromValue(object.networkId)).unsigned = true;
+                else if (typeof object.networkId === "string")
+                    message.networkId = parseInt(object.networkId, 10);
+                else if (typeof object.networkId === "number")
+                    message.networkId = object.networkId;
+                else if (typeof object.networkId === "object")
+                    message.networkId = new $util.LongBits(object.networkId.low >>> 0, object.networkId.high >>> 0).toNumber(true);
+            if (object.chainId != null)
+                if ($util.Long)
+                    (message.chainId = $util.Long.fromValue(object.chainId)).unsigned = true;
+                else if (typeof object.chainId === "string")
+                    message.chainId = parseInt(object.chainId, 10);
+                else if (typeof object.chainId === "number")
+                    message.chainId = object.chainId;
+                else if (typeof object.chainId === "object")
+                    message.chainId = new $util.LongBits(object.chainId.low >>> 0, object.chainId.high >>> 0).toNumber(true);
             return message;
         };
 
@@ -8298,21 +8451,67 @@ $root.types = (function() {
             if (options.defaults) {
                 object.messageType = "";
                 object.msg = null;
+                object.signature = null;
+                if ($util.Long) {
+                    var long = new $util.Long(0, 0, true);
+                    object.createdHeight = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.createdHeight = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    var long = new $util.Long(0, 0, true);
+                    object.time = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.time = options.longs === String ? "0" : 0;
                 if ($util.Long) {
                     var long = new $util.Long(0, 0, true);
                     object.fee = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
                 } else
                     object.fee = options.longs === String ? "0" : 0;
+                object.memo = "";
+                if ($util.Long) {
+                    var long = new $util.Long(0, 0, true);
+                    object.networkId = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.networkId = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    var long = new $util.Long(0, 0, true);
+                    object.chainId = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.chainId = options.longs === String ? "0" : 0;
             }
             if (message.messageType != null && message.hasOwnProperty("messageType"))
                 object.messageType = message.messageType;
             if (message.msg != null && message.hasOwnProperty("msg"))
                 object.msg = $root.google.protobuf.Any.toObject(message.msg, options);
+            if (message.signature != null && message.hasOwnProperty("signature"))
+                object.signature = $root.types.Signature.toObject(message.signature, options);
+            if (message.createdHeight != null && message.hasOwnProperty("createdHeight"))
+                if (typeof message.createdHeight === "number")
+                    object.createdHeight = options.longs === String ? String(message.createdHeight) : message.createdHeight;
+                else
+                    object.createdHeight = options.longs === String ? $util.Long.prototype.toString.call(message.createdHeight) : options.longs === Number ? new $util.LongBits(message.createdHeight.low >>> 0, message.createdHeight.high >>> 0).toNumber(true) : message.createdHeight;
+            if (message.time != null && message.hasOwnProperty("time"))
+                if (typeof message.time === "number")
+                    object.time = options.longs === String ? String(message.time) : message.time;
+                else
+                    object.time = options.longs === String ? $util.Long.prototype.toString.call(message.time) : options.longs === Number ? new $util.LongBits(message.time.low >>> 0, message.time.high >>> 0).toNumber(true) : message.time;
             if (message.fee != null && message.hasOwnProperty("fee"))
                 if (typeof message.fee === "number")
                     object.fee = options.longs === String ? String(message.fee) : message.fee;
                 else
                     object.fee = options.longs === String ? $util.Long.prototype.toString.call(message.fee) : options.longs === Number ? new $util.LongBits(message.fee.low >>> 0, message.fee.high >>> 0).toNumber(true) : message.fee;
+            if (message.memo != null && message.hasOwnProperty("memo"))
+                object.memo = message.memo;
+            if (message.networkId != null && message.hasOwnProperty("networkId"))
+                if (typeof message.networkId === "number")
+                    object.networkId = options.longs === String ? String(message.networkId) : message.networkId;
+                else
+                    object.networkId = options.longs === String ? $util.Long.prototype.toString.call(message.networkId) : options.longs === Number ? new $util.LongBits(message.networkId.low >>> 0, message.networkId.high >>> 0).toNumber(true) : message.networkId;
+            if (message.chainId != null && message.hasOwnProperty("chainId"))
+                if (typeof message.chainId === "number")
+                    object.chainId = options.longs === String ? String(message.chainId) : message.chainId;
+                else
+                    object.chainId = options.longs === String ? $util.Long.prototype.toString.call(message.chainId) : options.longs === Number ? new $util.LongBits(message.chainId.low >>> 0, message.chainId.high >>> 0).toNumber(true) : message.chainId;
             return object;
         };
 
@@ -9093,6 +9292,574 @@ $root.types = (function() {
         };
 
         return Signature;
+    })();
+
+    types.MessageReward = (function() {
+
+        /**
+         * Properties of a MessageReward.
+         * @memberof types
+         * @interface IMessageReward
+         * @property {Uint8Array|null} [adminAddress] MessageReward adminAddress
+         * @property {Uint8Array|null} [recipientAddress] MessageReward recipientAddress
+         * @property {number|Long|null} [amount] MessageReward amount
+         */
+
+        /**
+         * Constructs a new MessageReward.
+         * @memberof types
+         * @classdesc Represents a MessageReward.
+         * @implements IMessageReward
+         * @constructor
+         * @param {types.IMessageReward=} [properties] Properties to set
+         */
+        function MessageReward(properties) {
+            if (properties)
+                for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null)
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * MessageReward adminAddress.
+         * @member {Uint8Array} adminAddress
+         * @memberof types.MessageReward
+         * @instance
+         */
+        MessageReward.prototype.adminAddress = $util.newBuffer([]);
+
+        /**
+         * MessageReward recipientAddress.
+         * @member {Uint8Array} recipientAddress
+         * @memberof types.MessageReward
+         * @instance
+         */
+        MessageReward.prototype.recipientAddress = $util.newBuffer([]);
+
+        /**
+         * MessageReward amount.
+         * @member {number|Long} amount
+         * @memberof types.MessageReward
+         * @instance
+         */
+        MessageReward.prototype.amount = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+
+        /**
+         * Creates a new MessageReward instance using the specified properties.
+         * @function create
+         * @memberof types.MessageReward
+         * @static
+         * @param {types.IMessageReward=} [properties] Properties to set
+         * @returns {types.MessageReward} MessageReward instance
+         */
+        MessageReward.create = function create(properties) {
+            return new MessageReward(properties);
+        };
+
+        /**
+         * Encodes the specified MessageReward message. Does not implicitly {@link types.MessageReward.verify|verify} messages.
+         * @function encode
+         * @memberof types.MessageReward
+         * @static
+         * @param {types.IMessageReward} message MessageReward message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        MessageReward.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.adminAddress != null && Object.hasOwnProperty.call(message, "adminAddress"))
+                writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.adminAddress);
+            if (message.recipientAddress != null && Object.hasOwnProperty.call(message, "recipientAddress"))
+                writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.recipientAddress);
+            if (message.amount != null && Object.hasOwnProperty.call(message, "amount"))
+                writer.uint32(/* id 3, wireType 0 =*/24).uint64(message.amount);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified MessageReward message, length delimited. Does not implicitly {@link types.MessageReward.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof types.MessageReward
+         * @static
+         * @param {types.IMessageReward} message MessageReward message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        MessageReward.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a MessageReward message from the specified reader or buffer.
+         * @function decode
+         * @memberof types.MessageReward
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {types.MessageReward} MessageReward
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        MessageReward.decode = function decode(reader, length, error) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            var end = length === undefined ? reader.len : reader.pos + length, message = new $root.types.MessageReward();
+            while (reader.pos < end) {
+                var tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.adminAddress = reader.bytes();
+                        break;
+                    }
+                case 2: {
+                        message.recipientAddress = reader.bytes();
+                        break;
+                    }
+                case 3: {
+                        message.amount = reader.uint64();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a MessageReward message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof types.MessageReward
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {types.MessageReward} MessageReward
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        MessageReward.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a MessageReward message.
+         * @function verify
+         * @memberof types.MessageReward
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        MessageReward.verify = function verify(message) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (message.adminAddress != null && message.hasOwnProperty("adminAddress"))
+                if (!(message.adminAddress && typeof message.adminAddress.length === "number" || $util.isString(message.adminAddress)))
+                    return "adminAddress: buffer expected";
+            if (message.recipientAddress != null && message.hasOwnProperty("recipientAddress"))
+                if (!(message.recipientAddress && typeof message.recipientAddress.length === "number" || $util.isString(message.recipientAddress)))
+                    return "recipientAddress: buffer expected";
+            if (message.amount != null && message.hasOwnProperty("amount"))
+                if (!$util.isInteger(message.amount) && !(message.amount && $util.isInteger(message.amount.low) && $util.isInteger(message.amount.high)))
+                    return "amount: integer|Long expected";
+            return null;
+        };
+
+        /**
+         * Creates a MessageReward message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof types.MessageReward
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {types.MessageReward} MessageReward
+         */
+        MessageReward.fromObject = function fromObject(object) {
+            if (object instanceof $root.types.MessageReward)
+                return object;
+            var message = new $root.types.MessageReward();
+            if (object.adminAddress != null)
+                if (typeof object.adminAddress === "string")
+                    $util.base64.decode(object.adminAddress, message.adminAddress = $util.newBuffer($util.base64.length(object.adminAddress)), 0);
+                else if (object.adminAddress.length >= 0)
+                    message.adminAddress = object.adminAddress;
+            if (object.recipientAddress != null)
+                if (typeof object.recipientAddress === "string")
+                    $util.base64.decode(object.recipientAddress, message.recipientAddress = $util.newBuffer($util.base64.length(object.recipientAddress)), 0);
+                else if (object.recipientAddress.length >= 0)
+                    message.recipientAddress = object.recipientAddress;
+            if (object.amount != null)
+                if ($util.Long)
+                    (message.amount = $util.Long.fromValue(object.amount)).unsigned = true;
+                else if (typeof object.amount === "string")
+                    message.amount = parseInt(object.amount, 10);
+                else if (typeof object.amount === "number")
+                    message.amount = object.amount;
+                else if (typeof object.amount === "object")
+                    message.amount = new $util.LongBits(object.amount.low >>> 0, object.amount.high >>> 0).toNumber(true);
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a MessageReward message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof types.MessageReward
+         * @static
+         * @param {types.MessageReward} message MessageReward
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        MessageReward.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            var object = {};
+            if (options.defaults) {
+                if (options.bytes === String)
+                    object.adminAddress = "";
+                else {
+                    object.adminAddress = [];
+                    if (options.bytes !== Array)
+                        object.adminAddress = $util.newBuffer(object.adminAddress);
+                }
+                if (options.bytes === String)
+                    object.recipientAddress = "";
+                else {
+                    object.recipientAddress = [];
+                    if (options.bytes !== Array)
+                        object.recipientAddress = $util.newBuffer(object.recipientAddress);
+                }
+                if ($util.Long) {
+                    var long = new $util.Long(0, 0, true);
+                    object.amount = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.amount = options.longs === String ? "0" : 0;
+            }
+            if (message.adminAddress != null && message.hasOwnProperty("adminAddress"))
+                object.adminAddress = options.bytes === String ? $util.base64.encode(message.adminAddress, 0, message.adminAddress.length) : options.bytes === Array ? Array.prototype.slice.call(message.adminAddress) : message.adminAddress;
+            if (message.recipientAddress != null && message.hasOwnProperty("recipientAddress"))
+                object.recipientAddress = options.bytes === String ? $util.base64.encode(message.recipientAddress, 0, message.recipientAddress.length) : options.bytes === Array ? Array.prototype.slice.call(message.recipientAddress) : message.recipientAddress;
+            if (message.amount != null && message.hasOwnProperty("amount"))
+                if (typeof message.amount === "number")
+                    object.amount = options.longs === String ? String(message.amount) : message.amount;
+                else
+                    object.amount = options.longs === String ? $util.Long.prototype.toString.call(message.amount) : options.longs === Number ? new $util.LongBits(message.amount.low >>> 0, message.amount.high >>> 0).toNumber(true) : message.amount;
+            return object;
+        };
+
+        /**
+         * Converts this MessageReward to JSON.
+         * @function toJSON
+         * @memberof types.MessageReward
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        MessageReward.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for MessageReward
+         * @function getTypeUrl
+         * @memberof types.MessageReward
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        MessageReward.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/types.MessageReward";
+        };
+
+        return MessageReward;
+    })();
+
+    types.MessageFaucet = (function() {
+
+        /**
+         * Properties of a MessageFaucet.
+         * @memberof types
+         * @interface IMessageFaucet
+         * @property {Uint8Array|null} [signerAddress] MessageFaucet signerAddress
+         * @property {Uint8Array|null} [recipientAddress] MessageFaucet recipientAddress
+         * @property {number|Long|null} [amount] MessageFaucet amount
+         */
+
+        /**
+         * Constructs a new MessageFaucet.
+         * @memberof types
+         * @classdesc Represents a MessageFaucet.
+         * @implements IMessageFaucet
+         * @constructor
+         * @param {types.IMessageFaucet=} [properties] Properties to set
+         */
+        function MessageFaucet(properties) {
+            if (properties)
+                for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null)
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * MessageFaucet signerAddress.
+         * @member {Uint8Array} signerAddress
+         * @memberof types.MessageFaucet
+         * @instance
+         */
+        MessageFaucet.prototype.signerAddress = $util.newBuffer([]);
+
+        /**
+         * MessageFaucet recipientAddress.
+         * @member {Uint8Array} recipientAddress
+         * @memberof types.MessageFaucet
+         * @instance
+         */
+        MessageFaucet.prototype.recipientAddress = $util.newBuffer([]);
+
+        /**
+         * MessageFaucet amount.
+         * @member {number|Long} amount
+         * @memberof types.MessageFaucet
+         * @instance
+         */
+        MessageFaucet.prototype.amount = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+
+        /**
+         * Creates a new MessageFaucet instance using the specified properties.
+         * @function create
+         * @memberof types.MessageFaucet
+         * @static
+         * @param {types.IMessageFaucet=} [properties] Properties to set
+         * @returns {types.MessageFaucet} MessageFaucet instance
+         */
+        MessageFaucet.create = function create(properties) {
+            return new MessageFaucet(properties);
+        };
+
+        /**
+         * Encodes the specified MessageFaucet message. Does not implicitly {@link types.MessageFaucet.verify|verify} messages.
+         * @function encode
+         * @memberof types.MessageFaucet
+         * @static
+         * @param {types.IMessageFaucet} message MessageFaucet message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        MessageFaucet.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.signerAddress != null && Object.hasOwnProperty.call(message, "signerAddress"))
+                writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.signerAddress);
+            if (message.recipientAddress != null && Object.hasOwnProperty.call(message, "recipientAddress"))
+                writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.recipientAddress);
+            if (message.amount != null && Object.hasOwnProperty.call(message, "amount"))
+                writer.uint32(/* id 3, wireType 0 =*/24).uint64(message.amount);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified MessageFaucet message, length delimited. Does not implicitly {@link types.MessageFaucet.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof types.MessageFaucet
+         * @static
+         * @param {types.IMessageFaucet} message MessageFaucet message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        MessageFaucet.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a MessageFaucet message from the specified reader or buffer.
+         * @function decode
+         * @memberof types.MessageFaucet
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {types.MessageFaucet} MessageFaucet
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        MessageFaucet.decode = function decode(reader, length, error) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            var end = length === undefined ? reader.len : reader.pos + length, message = new $root.types.MessageFaucet();
+            while (reader.pos < end) {
+                var tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.signerAddress = reader.bytes();
+                        break;
+                    }
+                case 2: {
+                        message.recipientAddress = reader.bytes();
+                        break;
+                    }
+                case 3: {
+                        message.amount = reader.uint64();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a MessageFaucet message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof types.MessageFaucet
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {types.MessageFaucet} MessageFaucet
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        MessageFaucet.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a MessageFaucet message.
+         * @function verify
+         * @memberof types.MessageFaucet
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        MessageFaucet.verify = function verify(message) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (message.signerAddress != null && message.hasOwnProperty("signerAddress"))
+                if (!(message.signerAddress && typeof message.signerAddress.length === "number" || $util.isString(message.signerAddress)))
+                    return "signerAddress: buffer expected";
+            if (message.recipientAddress != null && message.hasOwnProperty("recipientAddress"))
+                if (!(message.recipientAddress && typeof message.recipientAddress.length === "number" || $util.isString(message.recipientAddress)))
+                    return "recipientAddress: buffer expected";
+            if (message.amount != null && message.hasOwnProperty("amount"))
+                if (!$util.isInteger(message.amount) && !(message.amount && $util.isInteger(message.amount.low) && $util.isInteger(message.amount.high)))
+                    return "amount: integer|Long expected";
+            return null;
+        };
+
+        /**
+         * Creates a MessageFaucet message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof types.MessageFaucet
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {types.MessageFaucet} MessageFaucet
+         */
+        MessageFaucet.fromObject = function fromObject(object) {
+            if (object instanceof $root.types.MessageFaucet)
+                return object;
+            var message = new $root.types.MessageFaucet();
+            if (object.signerAddress != null)
+                if (typeof object.signerAddress === "string")
+                    $util.base64.decode(object.signerAddress, message.signerAddress = $util.newBuffer($util.base64.length(object.signerAddress)), 0);
+                else if (object.signerAddress.length >= 0)
+                    message.signerAddress = object.signerAddress;
+            if (object.recipientAddress != null)
+                if (typeof object.recipientAddress === "string")
+                    $util.base64.decode(object.recipientAddress, message.recipientAddress = $util.newBuffer($util.base64.length(object.recipientAddress)), 0);
+                else if (object.recipientAddress.length >= 0)
+                    message.recipientAddress = object.recipientAddress;
+            if (object.amount != null)
+                if ($util.Long)
+                    (message.amount = $util.Long.fromValue(object.amount)).unsigned = true;
+                else if (typeof object.amount === "string")
+                    message.amount = parseInt(object.amount, 10);
+                else if (typeof object.amount === "number")
+                    message.amount = object.amount;
+                else if (typeof object.amount === "object")
+                    message.amount = new $util.LongBits(object.amount.low >>> 0, object.amount.high >>> 0).toNumber(true);
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a MessageFaucet message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof types.MessageFaucet
+         * @static
+         * @param {types.MessageFaucet} message MessageFaucet
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        MessageFaucet.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            var object = {};
+            if (options.defaults) {
+                if (options.bytes === String)
+                    object.signerAddress = "";
+                else {
+                    object.signerAddress = [];
+                    if (options.bytes !== Array)
+                        object.signerAddress = $util.newBuffer(object.signerAddress);
+                }
+                if (options.bytes === String)
+                    object.recipientAddress = "";
+                else {
+                    object.recipientAddress = [];
+                    if (options.bytes !== Array)
+                        object.recipientAddress = $util.newBuffer(object.recipientAddress);
+                }
+                if ($util.Long) {
+                    var long = new $util.Long(0, 0, true);
+                    object.amount = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.amount = options.longs === String ? "0" : 0;
+            }
+            if (message.signerAddress != null && message.hasOwnProperty("signerAddress"))
+                object.signerAddress = options.bytes === String ? $util.base64.encode(message.signerAddress, 0, message.signerAddress.length) : options.bytes === Array ? Array.prototype.slice.call(message.signerAddress) : message.signerAddress;
+            if (message.recipientAddress != null && message.hasOwnProperty("recipientAddress"))
+                object.recipientAddress = options.bytes === String ? $util.base64.encode(message.recipientAddress, 0, message.recipientAddress.length) : options.bytes === Array ? Array.prototype.slice.call(message.recipientAddress) : message.recipientAddress;
+            if (message.amount != null && message.hasOwnProperty("amount"))
+                if (typeof message.amount === "number")
+                    object.amount = options.longs === String ? String(message.amount) : message.amount;
+                else
+                    object.amount = options.longs === String ? $util.Long.prototype.toString.call(message.amount) : options.longs === Number ? new $util.LongBits(message.amount.low >>> 0, message.amount.high >>> 0).toNumber(true) : message.amount;
+            return object;
+        };
+
+        /**
+         * Converts this MessageFaucet to JSON.
+         * @function toJSON
+         * @memberof types.MessageFaucet
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        MessageFaucet.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for MessageFaucet
+         * @function getTypeUrl
+         * @memberof types.MessageFaucet
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        MessageFaucet.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/types.MessageFaucet";
+        };
+
+        return MessageFaucet;
     })();
 
     return types;

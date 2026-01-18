@@ -23,15 +23,27 @@ const (
 )
 
 // Transaction represents a request or action submitted to the network like transfer assets or perform other operations
-// within the blockchain system
+// within the blockchain system - THIS MUST MATCH lib.Transaction EXACTLY for signing
 type Transaction struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// message_type: The type of the transaction like 'send' or 'stake'
 	MessageType string `protobuf:"bytes,1,opt,name=message_type,json=messageType,proto3" json:"messageType"` // @gotags: json:"messageType"
 	// msg: The actual transaction message payload, which is encapsulated in a generic message format
 	Msg *anypb.Any `protobuf:"bytes,2,opt,name=msg,proto3" json:"msg,omitempty"`
+	// signature: The cryptographic signature used to verify the authenticity of the transaction
+	Signature *Signature `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
+	// created_height: The height when the transaction was created - allows 'safe pruning'
+	CreatedHeight uint64 `protobuf:"varint,4,opt,name=created_height,json=createdHeight,proto3" json:"createdHeight"` // @gotags: json:"createdHeight"
+	// time: The timestamp when the transaction was created - used as temporal entropy to prevent hash collisions in txs
+	Time uint64 `protobuf:"varint,5,opt,name=time,proto3" json:"time,omitempty"`
 	// fee: The fee associated with processing the transaction
-	Fee           uint64 `protobuf:"varint,6,opt,name=fee,proto3" json:"fee,omitempty"`
+	Fee uint64 `protobuf:"varint,6,opt,name=fee,proto3" json:"fee,omitempty"`
+	// memo: An optional message or note attached to the transaction
+	Memo string `protobuf:"bytes,7,opt,name=memo,proto3" json:"memo,omitempty"`
+	// network_id: The identity of the network the transaction is intended for
+	NetworkId uint64 `protobuf:"varint,8,opt,name=network_id,json=networkId,proto3" json:"networkID"` // @gotags: json:"networkID"
+	// chain_id: The identity of the committee the transaction is intended for
+	ChainId       uint64 `protobuf:"varint,9,opt,name=chain_id,json=chainId,proto3" json:"chainID"` // @gotags: json:"chainID"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -80,9 +92,51 @@ func (x *Transaction) GetMsg() *anypb.Any {
 	return nil
 }
 
+func (x *Transaction) GetSignature() *Signature {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
+func (x *Transaction) GetCreatedHeight() uint64 {
+	if x != nil {
+		return x.CreatedHeight
+	}
+	return 0
+}
+
+func (x *Transaction) GetTime() uint64 {
+	if x != nil {
+		return x.Time
+	}
+	return 0
+}
+
 func (x *Transaction) GetFee() uint64 {
 	if x != nil {
 		return x.Fee
+	}
+	return 0
+}
+
+func (x *Transaction) GetMemo() string {
+	if x != nil {
+		return x.Memo
+	}
+	return ""
+}
+
+func (x *Transaction) GetNetworkId() uint64 {
+	if x != nil {
+		return x.NetworkId
+	}
+	return 0
+}
+
+func (x *Transaction) GetChainId() uint64 {
+	if x != nil {
+		return x.ChainId
 	}
 	return 0
 }
@@ -254,15 +308,151 @@ func (x *Signature) GetSignature() []byte {
 	return nil
 }
 
+// Example: MessageReward mints tokens to a recipient
+type MessageReward struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// admin_address: the admin authorizing the reward
+	AdminAddress []byte `protobuf:"bytes,1,opt,name=admin_address,json=adminAddress,proto3" json:"adminAddress"` // @gotags: json:"adminAddress"
+	// recipient_address: who receives the reward
+	RecipientAddress []byte `protobuf:"bytes,2,opt,name=recipient_address,json=recipientAddress,proto3" json:"recipientAddress"` // @gotags: json:"recipientAddress"
+	// amount: tokens to mint
+	Amount        uint64 `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MessageReward) Reset() {
+	*x = MessageReward{}
+	mi := &file_tx_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MessageReward) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MessageReward) ProtoMessage() {}
+
+func (x *MessageReward) ProtoReflect() protoreflect.Message {
+	mi := &file_tx_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MessageReward.ProtoReflect.Descriptor instead.
+func (*MessageReward) Descriptor() ([]byte, []int) {
+	return file_tx_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *MessageReward) GetAdminAddress() []byte {
+	if x != nil {
+		return x.AdminAddress
+	}
+	return nil
+}
+
+func (x *MessageReward) GetRecipientAddress() []byte {
+	if x != nil {
+		return x.RecipientAddress
+	}
+	return nil
+}
+
+func (x *MessageReward) GetAmount() uint64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+// MessageFaucet is a test-only transaction that mints tokens to any address
+// No balance check required - just mints tokens for testing purposes
+type MessageFaucet struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// signer_address: the address signing this transaction (for auth)
+	SignerAddress []byte `protobuf:"bytes,1,opt,name=signer_address,json=signerAddress,proto3" json:"signerAddress"` // @gotags: json:"signerAddress"
+	// recipient_address: who receives the tokens
+	RecipientAddress []byte `protobuf:"bytes,2,opt,name=recipient_address,json=recipientAddress,proto3" json:"recipientAddress"` // @gotags: json:"recipientAddress"
+	// amount: tokens to mint
+	Amount        uint64 `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MessageFaucet) Reset() {
+	*x = MessageFaucet{}
+	mi := &file_tx_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MessageFaucet) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MessageFaucet) ProtoMessage() {}
+
+func (x *MessageFaucet) ProtoReflect() protoreflect.Message {
+	mi := &file_tx_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MessageFaucet.ProtoReflect.Descriptor instead.
+func (*MessageFaucet) Descriptor() ([]byte, []int) {
+	return file_tx_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *MessageFaucet) GetSignerAddress() []byte {
+	if x != nil {
+		return x.SignerAddress
+	}
+	return nil
+}
+
+func (x *MessageFaucet) GetRecipientAddress() []byte {
+	if x != nil {
+		return x.RecipientAddress
+	}
+	return nil
+}
+
+func (x *MessageFaucet) GetAmount() uint64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
 var File_tx_proto protoreflect.FileDescriptor
 
 const file_tx_proto_rawDesc = "" +
 	"\n" +
-	"\btx.proto\x12\x05types\x1a\x19google/protobuf/any.proto\"j\n" +
+	"\btx.proto\x12\x05types\x1a\x19google/protobuf/any.proto\"\xa3\x02\n" +
 	"\vTransaction\x12!\n" +
 	"\fmessage_type\x18\x01 \x01(\tR\vmessageType\x12&\n" +
-	"\x03msg\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\x03msg\x12\x10\n" +
-	"\x03fee\x18\x06 \x01(\x04R\x03fee\"g\n" +
+	"\x03msg\x18\x02 \x01(\v2\x14.google.protobuf.AnyR\x03msg\x12.\n" +
+	"\tsignature\x18\x03 \x01(\v2\x10.types.SignatureR\tsignature\x12%\n" +
+	"\x0ecreated_height\x18\x04 \x01(\x04R\rcreatedHeight\x12\x12\n" +
+	"\x04time\x18\x05 \x01(\x04R\x04time\x12\x10\n" +
+	"\x03fee\x18\x06 \x01(\x04R\x03fee\x12\x12\n" +
+	"\x04memo\x18\a \x01(\tR\x04memo\x12\x1d\n" +
+	"\n" +
+	"network_id\x18\b \x01(\x04R\tnetworkId\x12\x19\n" +
+	"\bchain_id\x18\t \x01(\x04R\achainId\"g\n" +
 	"\vMessageSend\x12!\n" +
 	"\ffrom_address\x18\x01 \x01(\fR\vfromAddress\x12\x1d\n" +
 	"\n" +
@@ -273,7 +463,15 @@ const file_tx_proto_rawDesc = "" +
 	"\tSignature\x12\x1d\n" +
 	"\n" +
 	"public_key\x18\x01 \x01(\fR\tpublicKey\x12\x1c\n" +
-	"\tsignature\x18\x02 \x01(\fR\tsignatureB.Z,github.com/canopy-network/go-plugin/contractb\x06proto3"
+	"\tsignature\x18\x02 \x01(\fR\tsignature\"y\n" +
+	"\rMessageReward\x12#\n" +
+	"\radmin_address\x18\x01 \x01(\fR\fadminAddress\x12+\n" +
+	"\x11recipient_address\x18\x02 \x01(\fR\x10recipientAddress\x12\x16\n" +
+	"\x06amount\x18\x03 \x01(\x04R\x06amount\"{\n" +
+	"\rMessageFaucet\x12%\n" +
+	"\x0esigner_address\x18\x01 \x01(\fR\rsignerAddress\x12+\n" +
+	"\x11recipient_address\x18\x02 \x01(\fR\x10recipientAddress\x12\x16\n" +
+	"\x06amount\x18\x03 \x01(\x04R\x06amountB.Z,github.com/canopy-network/go-plugin/contractb\x06proto3"
 
 var (
 	file_tx_proto_rawDescOnce sync.Once
@@ -287,21 +485,24 @@ func file_tx_proto_rawDescGZIP() []byte {
 	return file_tx_proto_rawDescData
 }
 
-var file_tx_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_tx_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_tx_proto_goTypes = []any{
-	(*Transaction)(nil), // 0: types.Transaction
-	(*MessageSend)(nil), // 1: types.MessageSend
-	(*FeeParams)(nil),   // 2: types.FeeParams
-	(*Signature)(nil),   // 3: types.Signature
-	(*anypb.Any)(nil),   // 4: google.protobuf.Any
+	(*Transaction)(nil),   // 0: types.Transaction
+	(*MessageSend)(nil),   // 1: types.MessageSend
+	(*FeeParams)(nil),     // 2: types.FeeParams
+	(*Signature)(nil),     // 3: types.Signature
+	(*MessageReward)(nil), // 4: types.MessageReward
+	(*MessageFaucet)(nil), // 5: types.MessageFaucet
+	(*anypb.Any)(nil),     // 6: google.protobuf.Any
 }
 var file_tx_proto_depIdxs = []int32{
-	4, // 0: types.Transaction.msg:type_name -> google.protobuf.Any
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	6, // 0: types.Transaction.msg:type_name -> google.protobuf.Any
+	3, // 1: types.Transaction.signature:type_name -> types.Signature
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_tx_proto_init() }
@@ -315,7 +516,7 @@ func file_tx_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_tx_proto_rawDesc), len(file_tx_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -1,4 +1,4 @@
-.PHONY: install dev test lint format type-check clean proto build docs
+.PHONY: install dev test test-rpc lint format type-check clean proto build docs
 
 # Development setup
 install:
@@ -17,6 +17,10 @@ test-cov:
 test-verbose:
 	pytest -v
 
+# RPC integration test (requires running Canopy node)
+test-rpc:
+	python3 rpc_test.py
+
 # Code quality
 lint:
 	flake8 plugin/ tests/
@@ -30,13 +34,13 @@ type-check:
 
 # Protobuf generation
 proto:
-	cd plugin/proto && python -m grpc_tools.protoc --python_out=. --proto_path=. *.proto
+	cd contract/proto && python3 -m grpc_tools.protoc --python_out=. --proto_path=. *.proto
 	# Fix relative imports in generated files
-	sed -i 's/^import \([^.]\)/from . import \1/' plugin/proto/*_pb2.py
+	sed -i 's/^import \([^.]\)/from . import \1/' contract/proto/*_pb2.py
 
 # Build and distribution
 build:
-	python -m build
+	python3 -m build
 
 clean:
 	rm -rf build/
@@ -56,7 +60,7 @@ serve-dev:
 
 # Plugin execution
 run-plugin:
-	python main.py
+	python3 main.py
 
 # Full validation
 validate: lint type-check test

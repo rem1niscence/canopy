@@ -15,22 +15,22 @@ import {
 
 import type { Plugin, Config } from './plugin.js';
 import { JoinLenPrefix, FromAny, Unmarshal } from './plugin.js';
+import { fileDescriptorProtos } from '../proto/descriptors.js';
 
 // ContractConfig: the configuration of the contract
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const ContractConfig: any = {
-    name: "send",
+    name: "go_plugin_contract",
     id: 1,
     version: 1,
-    supportedTransactions: ["send"],
-    transactionTypeUrls: ["type.googleapis.com/types.MessageSend"],
-    eventTypeUrls: [],
-    fileDescriptorProtos: [
-        Buffer.from("Cg1hY2NvdW50LnByb3RvEgV0eXBlcyI7CgdBY2NvdW50EhgKB2FkZHJlc3MYASABKAxSB2FkZHJlc3MSFgoGYW1vdW50GAIgASgEUgZhbW91bnQiLgoEUG9vbBIOCgJpZBgBIAEoBFICaWQSFgoGYW1vdW50GAIgASgEUgZhbW91bnRCLlosZ2l0aHViLmNvbS9jYW5vcHktbmV0d29yay9nby1wbHVnaW4vY29udHJhY3RiBnByb3RvMw==", "base64"),
-        Buffer.from("CgtldmVudC5wcm90bxIFdHlwZXMaGWdvb2dsZS9wcm90b2J1Zi9hbnkucHJvdG8ihwIKBUV2ZW50Eh0KCmV2ZW50X3R5cGUYASABKAlSCWV2ZW50VHlwZRIsCgZjdXN0b20YCyABKAsyEi50eXBlcy5FdmVudEN1c3RvbUgAUgZjdXN0b20SFgoGaGVpZ2h0GFsgASgEUgZoZWlnaHQSHAoJcmVmZXJlbmNlGFwgASgJUglyZWZlcmVuY2USGAoHY2hhaW5JZBhdIAEoBFIHY2hhaW5JZBIhCgxibG9ja19oZWlnaHQYXiABKARSC2Jsb2NrSGVpZ2h0Eh0KCmJsb2NrX2hhc2gYXyABKAxSCWJsb2NrSGFzaBIYCgdhZGRyZXNzGGAgASgMUgdhZGRyZXNzQgUKA21zZyI1CgtFdmVudEN1c3RvbRImCgNtc2cYASABKAsyFC5nb29nbGUucHJvdG9idWYuQW55UgNtc2dCLlosZ2l0aHViLmNvbS9jYW5vcHktbmV0d29yay9nby1wbHVnaW4vY29udHJhY3RiBnByb3RvMw==", "base64"),
-        Buffer.from("Cgh0eC5wcm90bxIFdHlwZXMaGWdvb2dsZS9wcm90b2J1Zi9hbnkucHJvdG8iagoLVHJhbnNhY3Rpb24SIQoMbWVzc2FnZV90eXBlGAEgASgJUgttZXNzYWdlVHlwZRImCgNtc2cYAiABKAsyFC5nb29nbGUucHJvdG9idWYuQW55UgNtc2cSEAoDZmVlGAYgASgEUgNmZWUiZwoLTWVzc2FnZVNlbmQSIQoMZnJvbV9hZGRyZXNzGAEgASgMUgtmcm9tQWRkcmVzcxIdCgp0b19hZGRyZXNzGAIgASgMUgl0b0FkZHJlc3MSFgoGYW1vdW50GAMgASgEUgZhbW91bnQiJgoJRmVlUGFyYW1zEhkKCHNlbmRfZmVlGAEgASgEUgdzZW5kRmVlIkgKCVNpZ25hdHVyZRIdCgpwdWJsaWNfa2V5GAEgASgMUglwdWJsaWNLZXkSHAoJc2lnbmF0dXJlGAIgASgMUglzaWduYXR1cmVCLlosZ2l0aHViLmNvbS9jYW5vcHktbmV0d29yay9nby1wbHVnaW4vY29udHJhY3RiBnByb3RvMw==", "base64"),
-        Buffer.from("CgxwbHVnaW4ucHJvdG8SBXR5cGVzGgtldmVudC5wcm90bxoIdHgucHJvdG8ikAQKC0ZTTVRvUGx1Z2luEg4KAmlkGAEgASgEUgJpZBIwCgZjb25maWcYAiABKAsyFi50eXBlcy5QbHVnaW5GU01Db25maWdIAFIGY29uZmlnEjcKB2dlbmVzaXMYAyABKAsyGy50eXBlcy5QbHVnaW5HZW5lc2lzUmVxdWVzdEgAUgdnZW5lc2lzEjEKBWJlZ2luGAQgASgLMhkudHlwZXMuUGx1Z2luQmVnaW5SZXF1ZXN0SABSBWJlZ2luEjEKBWNoZWNrGAUgASgLMhkudHlwZXMuUGx1Z2luQ2hlY2tSZXF1ZXN0SABSBWNoZWNrEjcKB2RlbGl2ZXIYBiABKAsyGy50eXBlcy5QbHVnaW5EZWxpdmVyUmVxdWVzdEgAUgdkZWxpdmVyEisKA2VuZBgHIAEoCzIXLnR5cGVzLlBsdWdpbkVuZFJlcXVlc3RIAFIDZW5kEj8KCnN0YXRlX3JlYWQYCCABKAsyHi50eXBlcy5QbHVnaW5TdGF0ZVJlYWRSZXNwb25zZUgAUglzdGF0ZVJlYWQSQgoLc3RhdGVfd3JpdGUYCSABKAsyHy50eXBlcy5QbHVnaW5TdGF0ZVdyaXRlUmVzcG9uc2VIAFIKc3RhdGVXcml0ZRIqCgVlcnJvchhjIAEoCzISLnR5cGVzLlBsdWdpbkVycm9ySABSBWVycm9yQgkKB3BheWxvYWQi5AMKC1BsdWdpblRvRlNNEg4KAmlkGAEgASgEUgJpZBItCgZjb25maWcYAiABKAsyEy50eXBlcy5QbHVnaW5Db25maWdIAFIGY29uZmlnEjgKB2dlbmVzaXMYAyABKAsyHC50eXBlcy5QbHVnaW5HZW5lc2lzUmVzcG9uc2VIAFIHZ2VuZXNpcxIyCgViZWdpbhgEIAEoCzIaLnR5cGVzLlBsdWdpbkJlZ2luUmVzcG9uc2VIAFIFYmVnaW4SMgoFY2hlY2sYBSABKAsyGi50eXBlcy5QbHVnaW5DaGVja1Jlc3BvbnNlSABSBWNoZWNrEjgKB2RlbGl2ZXIYBiABKAsyHC50eXBlcy5QbHVnaW5EZWxpdmVyUmVzcG9uc2VIAFIHZGVsaXZlchIsCgNlbmQYByABKAsyGC50eXBlcy5QbHVnaW5FbmRSZXNwb25zZUgAUgNlbmQSPgoKc3RhdGVfcmVhZBgIIAEoCzIdLnR5cGVzLlBsdWdpblN0YXRlUmVhZFJlcXVlc3RIAFIJc3RhdGVSZWFkEkEKC3N0YXRlX3dyaXRlGAkgASgLMh4udHlwZXMuUGx1Z2luU3RhdGVXcml0ZVJlcXVlc3RIAFIKc3RhdGVXcml0ZUIJCgdwYXlsb2FkIpUCCgxQbHVnaW5Db25maWcSEgoEbmFtZRgBIAEoCVIEbmFtZRIOCgJpZBgCIAEoBFICaWQSGAoHdmVyc2lvbhgDIAEoBFIHdmVyc2lvbhI1ChZzdXBwb3J0ZWRfdHJhbnNhY3Rpb25zGAQgAygJUhVzdXBwb3J0ZWRUcmFuc2FjdGlvbnMSNAoWZmlsZV9kZXNjcmlwdG9yX3Byb3RvcxgFIAMoDFIUZmlsZURlc2NyaXB0b3JQcm90b3MSMgoVdHJhbnNhY3Rpb25fdHlwZV91cmxzGAYgAygJUhN0cmFuc2FjdGlvblR5cGVVcmxzEiYKD2V2ZW50X3R5cGVfdXJscxgHIAMoCVINZXZlbnRUeXBlVXJscyI+Cg9QbHVnaW5GU01Db25maWcSKwoGY29uZmlnGAEgASgLMhMudHlwZXMuUGx1Z2luQ29uZmlnUgZjb25maWciOQoUUGx1Z2luR2VuZXNpc1JlcXVlc3QSIQoMZ2VuZXNpc19qc29uGAEgASgMUgtnZW5lc2lzSnNvbiJBChVQbHVnaW5HZW5lc2lzUmVzcG9uc2USKAoFZXJyb3IYYyABKAsyEi50eXBlcy5QbHVnaW5FcnJvclIFZXJyb3IiLAoSUGx1Z2luQmVnaW5SZXF1ZXN0EhYKBmhlaWdodBgBIAEoBFIGaGVpZ2h0ImUKE1BsdWdpbkJlZ2luUmVzcG9uc2USJAoGZXZlbnRzGAEgAygLMgwudHlwZXMuRXZlbnRSBmV2ZW50cxIoCgVlcnJvchhjIAEoCzISLnR5cGVzLlBsdWdpbkVycm9yUgVlcnJvciI4ChJQbHVnaW5DaGVja1JlcXVlc3QSIgoCdHgYASABKAsyEi50eXBlcy5UcmFuc2FjdGlvblICdHgijAEKE1BsdWdpbkNoZWNrUmVzcG9uc2USLQoSYXV0aG9yaXplZF9zaWduZXJzGAEgAygMUhFhdXRob3JpemVkU2lnbmVycxIcCglyZWNpcGllbnQYAiABKAxSCXJlY2lwaWVudBIoCgVlcnJvchhjIAEoCzISLnR5cGVzLlBsdWdpbkVycm9yUgVlcnJvciI6ChRQbHVnaW5EZWxpdmVyUmVxdWVzdBIiCgJ0eBgBIAEoCzISLnR5cGVzLlRyYW5zYWN0aW9uUgJ0eCJnChVQbHVnaW5EZWxpdmVyUmVzcG9uc2USJAoGZXZlbnRzGAEgAygLMgwudHlwZXMuRXZlbnRSBmV2ZW50cxIoCgVlcnJvchhjIAEoCzISLnR5cGVzLlBsdWdpbkVycm9yUgVlcnJvciJVChBQbHVnaW5FbmRSZXF1ZXN0EhYKBmhlaWdodBgBIAEoBFIGaGVpZ2h0EikKEHByb3Bvc2VyX2FkZHJlc3MYAiABKAxSD3Byb3Bvc2VyQWRkcmVzcyJjChFQbHVnaW5FbmRSZXNwb25zZRIkCgZldmVudHMYASADKAsyDC50eXBlcy5FdmVudFIGZXZlbnRzEigKBWVycm9yGGMgASgLMhIudHlwZXMuUGx1Z2luRXJyb3JSBWVycm9yIksKC1BsdWdpbkVycm9yEhIKBGNvZGUYASABKARSBGNvZGUSFgoGbW9kdWxlGAIgASgJUgZtb2R1bGUSEAoDbXNnGAMgASgJUgNtc2cicgoWUGx1Z2luU3RhdGVSZWFkUmVxdWVzdBIoCgRrZXlzGAEgAygLMhQudHlwZXMuUGx1Z2luS2V5UmVhZFIEa2V5cxIuCgZyYW5nZXMYAiADKAsyFi50eXBlcy5QbHVnaW5SYW5nZVJlYWRSBnJhbmdlcyI8Cg1QbHVnaW5LZXlSZWFkEhkKCHF1ZXJ5X2lkGAEgASgEUgdxdWVyeUlkEhAKA2tleRgCIAEoDFIDa2V5InQKD1BsdWdpblJhbmdlUmVhZBIZCghxdWVyeV9pZBgBIAEoBFIHcXVlcnlJZBIWCgZwcmVmaXgYAiABKAxSBnByZWZpeBIUCgVsaW1pdBgDIAEoBFIFbGltaXQSGAoHcmV2ZXJzZRgEIAEoCFIHcmV2ZXJzZSJ2ChdQbHVnaW5TdGF0ZVJlYWRSZXNwb25zZRIxCgdyZXN1bHRzGAEgAygLMhcudHlwZXMuUGx1Z2luUmVhZFJlc3VsdFIHcmVzdWx0cxIoCgVlcnJvchhjIAEoCzISLnR5cGVzLlBsdWdpbkVycm9yUgVlcnJvciJgChBQbHVnaW5SZWFkUmVzdWx0EhkKCHF1ZXJ5X2lkGAEgASgEUgdxdWVyeUlkEjEKB2VudHJpZXMYAiADKAsyFy50eXBlcy5QbHVnaW5TdGF0ZUVudHJ5UgdlbnRyaWVzInIKF1BsdWdpblN0YXRlV3JpdGVSZXF1ZXN0EiYKBHNldHMYASADKAsyEi50eXBlcy5QbHVnaW5TZXRPcFIEc2V0cxIvCgdkZWxldGVzGAIgAygLMhUudHlwZXMuUGx1Z2luRGVsZXRlT3BSB2RlbGV0ZXMiRAoYUGx1Z2luU3RhdGVXcml0ZVJlc3BvbnNlEigKBWVycm9yGGMgASgLMhIudHlwZXMuUGx1Z2luRXJyb3JSBWVycm9yIjUKC1BsdWdpblNldE9wEhAKA2tleRgBIAEoDFIDa2V5EhQKBXZhbHVlGAIgASgMUgV2YWx1ZSIiCg5QbHVnaW5EZWxldGVPcBIQCgNrZXkYASABKAxSA2tleSI6ChBQbHVnaW5TdGF0ZUVudHJ5EhAKA2tleRgBIAEoDFIDa2V5EhQKBXZhbHVlGAIgASgMUgV2YWx1ZUImWiRnaXRodWIuY29tL2Nhbm9weS1uZXR3b3JrL2Nhbm9weS9saWJiBnByb3RvMw==", "base64"),
+    supportedTransactions: ["send", "reward", "faucet"],
+    transactionTypeUrls: [
+        "type.googleapis.com/types.MessageSend",
+        "type.googleapis.com/types.MessageReward",
+        "type.googleapis.com/types.MessageFaucet",
     ],
+    eventTypeUrls: [],
+    fileDescriptorProtos,
 };
 
 // Contract() defines the smart contract that implements the extended logic of the nested chain
@@ -89,6 +89,52 @@ export class Contract {
             authorizedSigners: [msg.fromAddress],
         };
     }
+
+    // CheckMessageReward() statelessly validates a 'reward' message
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    CheckMessageReward(msg: any): any {
+        // check admin address (must be 20 bytes)
+        if (!msg.adminAddress || msg.adminAddress.length !== 20) {
+            return { error: ErrInvalidAddress() };
+        }
+        // check recipient address
+        if (!msg.recipientAddress || msg.recipientAddress.length !== 20) {
+            return { error: ErrInvalidAddress() };
+        }
+        // check amount
+        const amount = msg.amount as Long | number | undefined;
+        if (!amount || (Long.isLong(amount) ? amount.isZero() : amount === 0)) {
+            return { error: ErrInvalidAmount() };
+        }
+        // return the authorized signers (admin must sign this tx)
+        return {
+            recipient: msg.recipientAddress,
+            authorizedSigners: [msg.adminAddress],
+        };
+    }
+
+    // CheckMessageFaucet() statelessly validates a 'faucet' message
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    CheckMessageFaucet(msg: any): any {
+        // check signer address (must be 20 bytes)
+        if (!msg.signerAddress || msg.signerAddress.length !== 20) {
+            return { error: ErrInvalidAddress() };
+        }
+        // check recipient address
+        if (!msg.recipientAddress || msg.recipientAddress.length !== 20) {
+            return { error: ErrInvalidAddress() };
+        }
+        // check amount
+        const amount = msg.amount as Long | number | undefined;
+        if (!amount || (Long.isLong(amount) ? amount.isZero() : amount === 0)) {
+            return { error: ErrInvalidAmount() };
+        }
+        // return the authorized signers (signer must sign this tx)
+        return {
+            recipient: msg.recipientAddress,
+            authorizedSigners: [msg.signerAddress],
+        };
+    }
 }
 
 // Async versions of contract methods for proper state handling
@@ -130,14 +176,23 @@ export class ContractAsync {
             }
         }
 
-        // get the message
-        const [msg, msgErr] = FromAny(request.tx?.msg);
+        // get the message and its type
+        const [msg, msgType, msgErr] = FromAny(request.tx?.msg);
         if (msgErr) {
             return { error: msgErr };
         }
-        // handle the message
+        // handle the message based on type
         if (msg) {
-            return contract.CheckMessageSend(msg);
+            switch (msgType) {
+                case 'MessageSend':
+                    return contract.CheckMessageSend(msg);
+                case 'MessageReward':
+                    return contract.CheckMessageReward(msg);
+                case 'MessageFaucet':
+                    return contract.CheckMessageFaucet(msg);
+                default:
+                    return { error: ErrInvalidMessageCast() };
+            }
         }
         return { error: ErrInvalidMessageCast() };
     }
@@ -145,14 +200,23 @@ export class ContractAsync {
     // DeliverTx() is code that is executed to apply a transaction
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     static async DeliverTx(contract: Contract, request: any): Promise<any> {
-        // get the message
-        const [msg, err] = FromAny(request.tx?.msg);
+        // get the message and its type
+        const [msg, msgType, err] = FromAny(request.tx?.msg);
         if (err) {
             return { error: err };
         }
-        // handle the message
+        // handle the message based on type
         if (msg) {
-            return ContractAsync.DeliverMessageSend(contract, msg, request.tx?.fee as Long);
+            switch (msgType) {
+                case 'MessageSend':
+                    return ContractAsync.DeliverMessageSend(contract, msg, request.tx?.fee as Long);
+                case 'MessageReward':
+                    return ContractAsync.DeliverMessageReward(contract, msg, request.tx?.fee as Long);
+                case 'MessageFaucet':
+                    return ContractAsync.DeliverMessageFaucet(contract, msg);
+                default:
+                    return { error: ErrInvalidMessageCast() };
+            }
         }
         return { error: ErrInvalidMessageCast() };
     }
@@ -282,6 +346,200 @@ export class ContractAsync {
                 ],
             });
         }
+
+        if (writeErr) {
+            return { error: writeErr };
+        }
+        if (writeResp?.error) {
+            return { error: writeResp.error };
+        }
+
+        return {};
+    }
+
+    // DeliverMessageReward() handles a 'reward' message (mints tokens to recipient, admin pays fee)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    static async DeliverMessageReward(contract: Contract, msg: any, fee: Long | number | undefined): Promise<any> {
+        const adminQueryId = Long.fromNumber(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
+        const recipientQueryId = Long.fromNumber(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
+        const feeQueryId = Long.fromNumber(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
+
+        // calculate keys
+        const adminKey = KeyForAccount(msg.adminAddress!);
+        const recipientKey = KeyForAccount(msg.recipientAddress!);
+        const feePoolKey = KeyForFeePool(Long.fromNumber(contract.Config.ChainId));
+
+        // read current state
+        const [response, readErr] = await contract.plugin.StateRead(contract, {
+            keys: [
+                { queryId: feeQueryId, key: feePoolKey },
+                { queryId: adminQueryId, key: adminKey },
+                { queryId: recipientQueryId, key: recipientKey },
+            ],
+        });
+
+        if (readErr) {
+            return { error: readErr };
+        }
+        if (response?.error) {
+            return { error: response.error };
+        }
+
+        // get bytes from response
+        let adminBytes: Uint8Array | null = null;
+        let recipientBytes: Uint8Array | null = null;
+        let feePoolBytes: Uint8Array | null = null;
+
+        for (const resp of response?.results || []) {
+            const qid = resp.queryId as Long;
+            if (qid.equals(adminQueryId)) {
+                adminBytes = resp.entries?.[0]?.value || null;
+            } else if (qid.equals(recipientQueryId)) {
+                recipientBytes = resp.entries?.[0]?.value || null;
+            } else if (qid.equals(feeQueryId)) {
+                feePoolBytes = resp.entries?.[0]?.value || null;
+            }
+        }
+
+        // unmarshal accounts
+        const [adminRaw, adminErr] = Unmarshal(adminBytes || new Uint8Array(), types.Account);
+        if (adminErr) {
+            return { error: adminErr };
+        }
+        const [recipientRaw, recipientErr] = Unmarshal(recipientBytes || new Uint8Array(), types.Account);
+        if (recipientErr) {
+            return { error: recipientErr };
+        }
+        const [feePoolRaw, feePoolErr] = Unmarshal(feePoolBytes || new Uint8Array(), types.Pool);
+        if (feePoolErr) {
+            return { error: feePoolErr };
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const admin = adminRaw as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const recipient = recipientRaw as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const feePool = feePoolRaw as any;
+
+        const feeAmount = Long.isLong(fee) ? fee : Long.fromNumber(fee as number || 0);
+        const adminAmount = Long.isLong(admin?.amount) ? admin.amount : Long.fromNumber(admin?.amount as number || 0);
+
+        // admin must have enough to pay the fee
+        if (adminAmount.lessThan(feeAmount)) {
+            return { error: ErrInsufficientFunds() };
+        }
+
+        // apply state changes
+        const msgAmount = Long.isLong(msg.amount) ? msg.amount : Long.fromNumber(msg.amount as number || 0);
+        const newAdminAmount = adminAmount.subtract(feeAmount); // admin pays fee
+        const recipientAmount = Long.isLong(recipient?.amount) ? recipient.amount : Long.fromNumber(recipient?.amount as number || 0);
+        const newRecipientAmount = recipientAmount.add(msgAmount); // mint tokens to recipient
+        const poolAmount = Long.isLong(feePool?.amount) ? feePool.amount : Long.fromNumber(feePool?.amount as number || 0);
+        const newPoolAmount = poolAmount.add(feeAmount);
+
+        // update accounts
+        const updatedAdmin = types.Account.create({ address: admin?.address, amount: newAdminAmount });
+        const updatedRecipient = types.Account.create({ address: recipient?.address || msg.recipientAddress, amount: newRecipientAmount });
+        const updatedPool = types.Pool.create({ id: feePool?.id, amount: newPoolAmount });
+
+        // marshal
+        const newAdminBytes = types.Account.encode(updatedAdmin).finish();
+        const newRecipientBytes = types.Account.encode(updatedRecipient).finish();
+        const newFeePoolBytes = types.Pool.encode(updatedPool).finish();
+
+        // write state changes
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let writeResp: any;
+        let writeErr: IPluginError | null;
+
+        if (newAdminAmount.isZero()) {
+            // delete drained admin account
+            [writeResp, writeErr] = await contract.plugin.StateWrite(contract, {
+                sets: [
+                    { key: feePoolKey, value: newFeePoolBytes },
+                    { key: recipientKey, value: newRecipientBytes },
+                ],
+                deletes: [{ key: adminKey }],
+            });
+        } else {
+            [writeResp, writeErr] = await contract.plugin.StateWrite(contract, {
+                sets: [
+                    { key: feePoolKey, value: newFeePoolBytes },
+                    { key: adminKey, value: newAdminBytes },
+                    { key: recipientKey, value: newRecipientBytes },
+                ],
+            });
+        }
+
+        if (writeErr) {
+            return { error: writeErr };
+        }
+        if (writeResp?.error) {
+            return { error: writeResp.error };
+        }
+
+        return {};
+    }
+
+    // DeliverMessageFaucet() handles a 'faucet' message (mints tokens to recipient - no fee, no balance check)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    static async DeliverMessageFaucet(contract: Contract, msg: any): Promise<any> {
+        const recipientQueryId = Long.fromNumber(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
+
+        const recipientKey = KeyForAccount(msg.recipientAddress!);
+
+        // read current recipient state
+        const [response, readErr] = await contract.plugin.StateRead(contract, {
+            keys: [
+                { queryId: recipientQueryId, key: recipientKey },
+            ],
+        });
+
+        if (readErr) {
+            return { error: readErr };
+        }
+        if (response?.error) {
+            return { error: response.error };
+        }
+
+        // get recipient bytes
+        let recipientBytes: Uint8Array | null = null;
+        for (const resp of response?.results || []) {
+            const qid = resp.queryId as Long;
+            if (qid.equals(recipientQueryId)) {
+                recipientBytes = resp.entries?.[0]?.value || null;
+            }
+        }
+
+        // unmarshal recipient account (or create new if doesn't exist)
+        const [recipientRaw, recipientErr] = Unmarshal(recipientBytes || new Uint8Array(), types.Account);
+        if (recipientErr) {
+            return { error: recipientErr };
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const recipient = recipientRaw as any;
+
+        // mint tokens to recipient
+        const msgAmount = Long.isLong(msg.amount) ? msg.amount : Long.fromNumber(msg.amount as number || 0);
+        const recipientAmount = Long.isLong(recipient?.amount) ? recipient.amount : Long.fromNumber(recipient?.amount as number || 0);
+        const newRecipientAmount = recipientAmount.add(msgAmount);
+
+        // update recipient
+        const updatedRecipient = types.Account.create({ 
+            address: recipient?.address || msg.recipientAddress, 
+            amount: newRecipientAmount 
+        });
+
+        const newRecipientBytes = types.Account.encode(updatedRecipient).finish();
+
+        // write state changes
+        const [writeResp, writeErr] = await contract.plugin.StateWrite(contract, {
+            sets: [
+                { key: recipientKey, value: newRecipientBytes },
+            ],
+        });
 
         if (writeErr) {
             return { error: writeErr };

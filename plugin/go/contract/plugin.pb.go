@@ -443,11 +443,11 @@ type PluginConfig struct {
 	Id uint64 `protobuf:"varint,2,opt,name=id,proto3" json:"id,omitempty"`
 	// version: the version of the plugin
 	Version uint64 `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
-	// supported_transactions: a list of custom transaction names that are supported
+	// supported_transactions: a list of custom transaction names that are supported (order must match transaction_type_urls)
 	SupportedTransactions []string `protobuf:"bytes,4,rep,name=supported_transactions,json=supportedTransactions,proto3" json:"supported_transactions,omitempty"`
 	// file_descriptor_protos: serialized FileDescriptorProto bytes
 	FileDescriptorProtos [][]byte `protobuf:"bytes,5,rep,name=file_descriptor_protos,json=fileDescriptorProtos,proto3" json:"fileDescriptorProtos"` // @gotags: json:"fileDescriptorProtos"
-	// transaction_type_urls: protobuf type URLs for transaction messages
+	// transaction_type_urls: protobuf type URLs for transaction messages (aligned by index with supported_transactions)
 	TransactionTypeUrls []string `protobuf:"bytes,6,rep,name=transaction_type_urls,json=transactionTypeUrls,proto3" json:"transactionTypeUrls"` // @gotags: json:"transactionTypeUrls"
 	// event_type_urls: protobuf type URLs for event messages
 	EventTypeUrls []string `protobuf:"bytes,7,rep,name=event_type_urls,json=eventTypeUrls,proto3" json:"eventTypeUrls"` // @gotags: json:"eventTypeUrls"
@@ -1722,14 +1722,14 @@ const file_plugin_proto_rawDesc = "" +
 	"state_read\x18\b \x01(\v2\x1d.types.PluginStateReadRequestH\x00R\tstateRead\x12A\n" +
 	"\vstate_write\x18\t \x01(\v2\x1e.types.PluginStateWriteRequestH\x00R\n" +
 	"stateWriteB\t\n" +
-	"\apayload\"\xa5\x02\n" +
+	"\apayload\"\x95\x02\n" +
 	"\fPluginConfig\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\x04R\x02id\x12\x18\n" +
 	"\aversion\x18\x03 \x01(\x04R\aversion\x125\n" +
 	"\x16supported_transactions\x18\x04 \x03(\tR\x15supportedTransactions\x124\n" +
-	"\x16file_descriptor_protos\x18\x05 \x03(\fR\x14fileDescriptorProtos\x12<\n" +
-	"\x15transaction_type_urls\x18\x06 \x03(\tR\x13transactionTypeUrls\x12.\n" +
+	"\x16file_descriptor_protos\x18\x05 \x03(\fR\x14fileDescriptorProtos\x122\n" +
+	"\x15transaction_type_urls\x18\x06 \x03(\tR\x13transactionTypeUrls\x12&\n" +
 	"\x0fevent_type_urls\x18\a \x03(\tR\reventTypeUrls\">\n" +
 	"\x0fPluginFSMConfig\x12+\n" +
 	"\x06config\x18\x01 \x01(\v2\x13.types.PluginConfigR\x06config\"9\n" +

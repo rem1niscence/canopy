@@ -1,14 +1,20 @@
 package com.canopy.plugin
 
 import com.google.protobuf.Any
+import com.google.protobuf.AnyProto
 import com.google.protobuf.ByteString
 import mu.KotlinLogging
+import types.AccountOuterClass
 import types.AccountOuterClass.Account
 import types.AccountOuterClass.Pool
 import types.EventOuterClass
+import types.Plugin
 import types.Plugin.*
+import types.Tx
 import types.Tx.FeeParams
 import types.Tx.MessageSend
+import types.Tx.MessageReward
+import types.Tx.MessageFaucet
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.random.Random
@@ -19,13 +25,19 @@ private val logger = KotlinLogging.logger {}
  * Contract configuration matching Go's ContractConfig
  */
 object ContractConfig {
-    const val NAME = "send"
+    const val NAME = "kotlin_plugin_contract"
     const val ID = 1L
     const val VERSION = 1L
-    val SUPPORTED_TRANSACTIONS = listOf("send")
-    val TRANSACTION_TYPE_URLS = listOf("type.googleapis.com/types.MessageSend")
+    val SUPPORTED_TRANSACTIONS = listOf("send", "reward", "faucet")
+    val TRANSACTION_TYPE_URLS = listOf(
+        "type.googleapis.com/types.MessageSend",
+        "type.googleapis.com/types.MessageReward",
+        "type.googleapis.com/types.MessageFaucet"
+    )
     val EVENT_TYPE_URLS = emptyList<String>()
     val FILE_DESCRIPTOR_PROTOS = listOf(
+        // Include google/protobuf/any.proto first as it's a dependency of event.proto and tx.proto
+        AnyProto.getDescriptor().toProto().toByteString(),
         AccountOuterClass.getDescriptor().toProto().toByteString(),
         EventOuterClass.getDescriptor().toProto().toByteString(),
         Plugin.getDescriptor().toProto().toByteString(),
@@ -117,6 +129,8 @@ class Contract(
 
         return when (msg) {
             is MessageSend -> checkMessageSend(msg)
+            is MessageReward -> checkMessageReward(msg)
+            is MessageFaucet -> checkMessageFaucet(msg)
             else -> PluginCheckResponse.newBuilder()
                 .setError(ErrInvalidMessageCast().toProto())
                 .build()
@@ -136,6 +150,8 @@ class Contract(
 
         return when (msg) {
             is MessageSend -> deliverMessageSend(msg, request.tx.fee)
+            is MessageReward -> deliverMessageReward(msg, request.tx.fee)
+            is MessageFaucet -> deliverMessageFaucet(msg)
             else -> PluginDeliverResponse.newBuilder()
                 .setError(ErrInvalidMessageCast().toProto())
                 .build()
@@ -178,6 +194,80 @@ class Contract(
         return PluginCheckResponse.newBuilder()
             .setRecipient(msg.toAddress)
             .addAuthorizedSigners(msg.fromAddress)
+            .build()
+    }
+
+    /**
+     * CheckMessageReward validates a reward message statelessly
+     */
+    private fun checkMessageReward(msg: MessageReward): PluginCheckResponse {
+        logger.debug { "CheckMessageReward called: admin=${msg.adminAddress.toByteArray().toHexString()} recipient=${msg.recipientAddress.toByteArray().toHexString()} amount=${msg.amount}" }
+
+        // Check admin address (must be 20 bytes)
+        if (msg.adminAddress.size() != 20) {
+            logger.debug { "CheckMessageReward: invalid admin address length ${msg.adminAddress.size()}" }
+            return PluginCheckResponse.newBuilder()
+                .setError(ErrInvalidAddress().toProto())
+                .build()
+        }
+
+        // Check recipient address (must be 20 bytes)
+        if (msg.recipientAddress.size() != 20) {
+            logger.debug { "CheckMessageReward: invalid recipient address length ${msg.recipientAddress.size()}" }
+            return PluginCheckResponse.newBuilder()
+                .setError(ErrInvalidAddress().toProto())
+                .build()
+        }
+
+        // Check amount
+        if (msg.amount == 0L) {
+            logger.debug { "CheckMessageReward: invalid amount 0" }
+            return PluginCheckResponse.newBuilder()
+                .setError(ErrInvalidAmount().toProto())
+                .build()
+        }
+
+        logger.debug { "CheckMessageReward: returning authorizedSigners=${msg.adminAddress.toByteArray().toHexString()}" }
+        return PluginCheckResponse.newBuilder()
+            .setRecipient(msg.recipientAddress)
+            .addAuthorizedSigners(msg.adminAddress)
+            .build()
+    }
+
+    /**
+     * CheckMessageFaucet validates a faucet message statelessly
+     */
+    private fun checkMessageFaucet(msg: MessageFaucet): PluginCheckResponse {
+        logger.debug { "CheckMessageFaucet called: signer=${msg.signerAddress.toByteArray().toHexString()} recipient=${msg.recipientAddress.toByteArray().toHexString()} amount=${msg.amount}" }
+
+        // Check signer address (must be 20 bytes)
+        if (msg.signerAddress.size() != 20) {
+            logger.debug { "CheckMessageFaucet: invalid signer address length ${msg.signerAddress.size()}" }
+            return PluginCheckResponse.newBuilder()
+                .setError(ErrInvalidAddress().toProto())
+                .build()
+        }
+
+        // Check recipient address (must be 20 bytes)
+        if (msg.recipientAddress.size() != 20) {
+            logger.debug { "CheckMessageFaucet: invalid recipient address length ${msg.recipientAddress.size()}" }
+            return PluginCheckResponse.newBuilder()
+                .setError(ErrInvalidAddress().toProto())
+                .build()
+        }
+
+        // Check amount
+        if (msg.amount == 0L) {
+            logger.debug { "CheckMessageFaucet: invalid amount 0" }
+            return PluginCheckResponse.newBuilder()
+                .setError(ErrInvalidAmount().toProto())
+                .build()
+        }
+
+        logger.debug { "CheckMessageFaucet: returning authorizedSigners=${msg.signerAddress.toByteArray().toHexString()}" }
+        return PluginCheckResponse.newBuilder()
+            .setRecipient(msg.recipientAddress)
+            .addAuthorizedSigners(msg.signerAddress)
             .build()
     }
 
@@ -269,6 +359,140 @@ class Contract(
             PluginDeliverResponse.getDefaultInstance()
         }
     }
+
+    /**
+     * DeliverMessageReward handles a reward message (mints tokens to recipient)
+     */
+    private fun deliverMessageReward(msg: MessageReward, fee: Long): PluginDeliverResponse {
+        logger.debug { "DeliverMessageReward called: admin=${msg.adminAddress.toByteArray().toHexString()} recipient=${msg.recipientAddress.toByteArray().toHexString()} amount=${msg.amount}" }
+
+        val adminKey = keyForAccount(msg.adminAddress.toByteArray())
+        val recipientKey = keyForAccount(msg.recipientAddress.toByteArray())
+        val feePoolKey = keyForFeePool(config.chainId)
+
+        val adminQueryId = Random.nextLong()
+        val recipientQueryId = Random.nextLong()
+        val feeQueryId = Random.nextLong()
+
+        // Read admin, recipient, and fee pool state
+        val readRequest = PluginStateReadRequest.newBuilder()
+            .addKeys(PluginKeyRead.newBuilder().setQueryId(feeQueryId).setKey(ByteString.copyFrom(feePoolKey)).build())
+            .addKeys(PluginKeyRead.newBuilder().setQueryId(adminQueryId).setKey(ByteString.copyFrom(adminKey)).build())
+            .addKeys(PluginKeyRead.newBuilder().setQueryId(recipientQueryId).setKey(ByteString.copyFrom(recipientKey)).build())
+            .build()
+
+        val readResponse = plugin.stateRead(this, readRequest)
+
+        if (readResponse.hasError() && readResponse.error.code != 0L) {
+            return PluginDeliverResponse.newBuilder()
+                .setError(readResponse.error)
+                .build()
+        }
+
+        // Parse results
+        var adminBytes: ByteArray = byteArrayOf()
+        var recipientBytes: ByteArray = byteArrayOf()
+        var feePoolBytes: ByteArray = byteArrayOf()
+
+        for (result in readResponse.resultsList) {
+            when (result.queryId) {
+                adminQueryId -> if (result.entriesCount > 0) adminBytes = result.getEntries(0).value.toByteArray()
+                recipientQueryId -> if (result.entriesCount > 0) recipientBytes = result.getEntries(0).value.toByteArray()
+                feeQueryId -> if (result.entriesCount > 0) feePoolBytes = result.getEntries(0).value.toByteArray()
+            }
+        }
+
+        // Parse accounts
+        val admin = if (adminBytes.isNotEmpty()) Account.parseFrom(adminBytes) else Account.getDefaultInstance()
+        val recipient = if (recipientBytes.isNotEmpty()) Account.parseFrom(recipientBytes) else Account.getDefaultInstance()
+        val feePool = if (feePoolBytes.isNotEmpty()) Pool.parseFrom(feePoolBytes) else Pool.getDefaultInstance()
+
+        // Admin must have enough to pay the fee
+        if (admin.amount < fee) {
+            return PluginDeliverResponse.newBuilder()
+                .setError(ErrInsufficientFunds().toProto())
+                .build()
+        }
+
+        // Apply state changes
+        val newAdmin = admin.toBuilder().setAmount(admin.amount - fee).build()
+        val newRecipient = recipient.toBuilder().setAmount(recipient.amount + msg.amount).build()
+        val newFeePool = feePool.toBuilder().setAmount(feePool.amount + fee).build()
+
+        // Write state
+        val writeRequest = if (newAdmin.amount == 0L) {
+            // Delete drained admin account
+            PluginStateWriteRequest.newBuilder()
+                .addSets(PluginSetOp.newBuilder().setKey(ByteString.copyFrom(feePoolKey)).setValue(ByteString.copyFrom(newFeePool.toByteArray())).build())
+                .addSets(PluginSetOp.newBuilder().setKey(ByteString.copyFrom(recipientKey)).setValue(ByteString.copyFrom(newRecipient.toByteArray())).build())
+                .addDeletes(PluginDeleteOp.newBuilder().setKey(ByteString.copyFrom(adminKey)).build())
+                .build()
+        } else {
+            PluginStateWriteRequest.newBuilder()
+                .addSets(PluginSetOp.newBuilder().setKey(ByteString.copyFrom(feePoolKey)).setValue(ByteString.copyFrom(newFeePool.toByteArray())).build())
+                .addSets(PluginSetOp.newBuilder().setKey(ByteString.copyFrom(adminKey)).setValue(ByteString.copyFrom(newAdmin.toByteArray())).build())
+                .addSets(PluginSetOp.newBuilder().setKey(ByteString.copyFrom(recipientKey)).setValue(ByteString.copyFrom(newRecipient.toByteArray())).build())
+                .build()
+        }
+
+        val writeResponse = plugin.stateWrite(this, writeRequest)
+
+        return if (writeResponse.hasError() && writeResponse.error.code != 0L) {
+            PluginDeliverResponse.newBuilder().setError(writeResponse.error).build()
+        } else {
+            PluginDeliverResponse.getDefaultInstance()
+        }
+    }
+
+    /**
+     * DeliverMessageFaucet handles a faucet message (mints tokens to recipient - no fee, no balance check)
+     */
+    private fun deliverMessageFaucet(msg: MessageFaucet): PluginDeliverResponse {
+        logger.debug { "DeliverMessageFaucet called: signer=${msg.signerAddress.toByteArray().toHexString()} recipient=${msg.recipientAddress.toByteArray().toHexString()} amount=${msg.amount}" }
+
+        val recipientKey = keyForAccount(msg.recipientAddress.toByteArray())
+        val recipientQueryId = Random.nextLong()
+
+        // Read current recipient state
+        val readRequest = PluginStateReadRequest.newBuilder()
+            .addKeys(PluginKeyRead.newBuilder().setQueryId(recipientQueryId).setKey(ByteString.copyFrom(recipientKey)).build())
+            .build()
+
+        val readResponse = plugin.stateRead(this, readRequest)
+
+        if (readResponse.hasError() && readResponse.error.code != 0L) {
+            return PluginDeliverResponse.newBuilder()
+                .setError(readResponse.error)
+                .build()
+        }
+
+        // Get recipient bytes
+        var recipientBytes: ByteArray = byteArrayOf()
+        for (result in readResponse.resultsList) {
+            if (result.queryId == recipientQueryId && result.entriesCount > 0) {
+                recipientBytes = result.getEntries(0).value.toByteArray()
+            }
+        }
+
+        // Parse recipient account (or create new if doesn't exist)
+        val recipient = if (recipientBytes.isNotEmpty()) Account.parseFrom(recipientBytes) else Account.getDefaultInstance()
+
+        // Mint tokens to recipient
+        val newRecipient = recipient.toBuilder().setAmount(recipient.amount + msg.amount).build()
+
+        // Write state changes
+        val writeRequest = PluginStateWriteRequest.newBuilder()
+            .addSets(PluginSetOp.newBuilder().setKey(ByteString.copyFrom(recipientKey)).setValue(ByteString.copyFrom(newRecipient.toByteArray())).build())
+            .build()
+
+        val writeResponse = plugin.stateWrite(this, writeRequest)
+
+        return if (writeResponse.hasError() && writeResponse.error.code != 0L) {
+            PluginDeliverResponse.newBuilder().setError(writeResponse.error).build()
+        } else {
+            PluginDeliverResponse.getDefaultInstance()
+        }
+    }
 }
 
 /**
@@ -289,6 +513,8 @@ fun fromAny(any: Any?): com.google.protobuf.Message? {
     return try {
         when {
             any.typeUrl.endsWith("MessageSend") -> MessageSend.parseFrom(any.value)
+            any.typeUrl.endsWith("MessageReward") -> MessageReward.parseFrom(any.value)
+            any.typeUrl.endsWith("MessageFaucet") -> MessageFaucet.parseFrom(any.value)
             else -> null
         }
     } catch (e: Exception) {
@@ -296,6 +522,12 @@ fun fromAny(any: Any?): com.google.protobuf.Message? {
         null
     }
 }
+
+/**
+ * Extension function to convert ByteArray to hex string for logging
+ */
+@OptIn(ExperimentalStdlibApi::class)
+private fun ByteArray.toHexString(): String = this.toHexString(HexFormat.Default)
 
 /**
  * Key generation functions matching Go implementation

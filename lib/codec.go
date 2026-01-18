@@ -88,7 +88,7 @@ func AnyFromJSONForMessageType(messageType string, msg json.RawMessage) (*anypb.
 	if err := protojson.Unmarshal(msg, dynamic); err != nil {
 		return nil, ErrJSONUnmarshal(err)
 	}
-	bz, err := proto.Marshal(dynamic)
+	bz, err := proto.MarshalOptions{Deterministic: true}.Marshal(dynamic)
 	if err != nil {
 		return nil, ErrToAny(err)
 	}

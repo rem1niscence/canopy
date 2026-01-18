@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Google.Protobuf;
 using Google.Protobuf.Reflection;
+using Google.Protobuf.WellKnownTypes;
 using Types;
 
 namespace CanopyPlugin
@@ -11,14 +12,21 @@ namespace CanopyPlugin
     // ContractConfig: the configuration of the contract
     public static class ContractConfig
     {
-        public const string Name = "send";
+        public const string Name = "csharp_plugin_contract";
         public const int Id = 1;
         public const int Version = 1;
-        public static readonly string[] SupportedTransactions = { "send" };
-        public static readonly string[] TransactionTypeUrls = { "type.googleapis.com/types.MessageSend" };
+        public static readonly string[] SupportedTransactions = { "send", "reward", "faucet" };
+        public static readonly string[] TransactionTypeUrls = 
+        { 
+            "type.googleapis.com/types.MessageSend",
+            "type.googleapis.com/types.MessageReward",
+            "type.googleapis.com/types.MessageFaucet"
+        };
         public static readonly string[] EventTypeUrls = Array.Empty<string>();
+        // Include google/protobuf/any.proto first as it's a dependency of event.proto and tx.proto
         public static readonly ByteString[] FileDescriptorProtos =
         {
+            ByteString.CopyFrom(Any.Descriptor.File.ToProto().ToByteArray()),
             ByteString.CopyFrom(AccountReflection.Descriptor.ToProto().ToByteArray()),
             ByteString.CopyFrom(EventReflection.Descriptor.ToProto().ToByteArray()),
             ByteString.CopyFrom(PluginReflection.Descriptor.ToProto().ToByteArray()),
@@ -83,31 +91,61 @@ namespace CanopyPlugin
                 return new PluginCheckResponse { Error = ErrTxFeeBelowStateLimit() };
             }
 
-            // get the message
-            if (!request.Tx.Msg.TypeUrl.EndsWith("/types.MessageSend"))
+            // handle the message based on type
+            var typeUrl = request.Tx.Msg.TypeUrl;
+            
+            if (typeUrl.EndsWith("/types.MessageSend"))
+            {
+                var msg = new MessageSend();
+                msg.MergeFrom(request.Tx.Msg.Value);
+                return CheckMessageSend(msg);
+            }
+            else if (typeUrl.EndsWith("/types.MessageReward"))
+            {
+                var msg = new MessageReward();
+                msg.MergeFrom(request.Tx.Msg.Value);
+                return CheckMessageReward(msg);
+            }
+            else if (typeUrl.EndsWith("/types.MessageFaucet"))
+            {
+                var msg = new MessageFaucet();
+                msg.MergeFrom(request.Tx.Msg.Value);
+                return CheckMessageFaucet(msg);
+            }
+            else
             {
                 return new PluginCheckResponse { Error = ErrInvalidMessageCast() };
             }
-
-            var msg = new MessageSend();
-            msg.MergeFrom(request.Tx.Msg.Value);
-
-            return CheckMessageSend(msg);
         }
 
         // DeliverTx is code that is executed to apply a transaction
         public async Task<PluginDeliverResponse> DeliverTxAsync(PluginDeliverRequest request)
         {
-            // get the message
-            if (!request.Tx.Msg.TypeUrl.EndsWith("/types.MessageSend"))
+            // handle the message based on type
+            var typeUrl = request.Tx.Msg.TypeUrl;
+            
+            if (typeUrl.EndsWith("/types.MessageSend"))
+            {
+                var msg = new MessageSend();
+                msg.MergeFrom(request.Tx.Msg.Value);
+                return await DeliverMessageSendAsync(msg, request.Tx.Fee);
+            }
+            else if (typeUrl.EndsWith("/types.MessageReward"))
+            {
+                var msg = new MessageReward();
+                msg.MergeFrom(request.Tx.Msg.Value);
+                return await DeliverMessageRewardAsync(msg, request.Tx.Fee);
+            }
+            else if (typeUrl.EndsWith("/types.MessageFaucet"))
+            {
+                var msg = new MessageFaucet();
+                msg.MergeFrom(request.Tx.Msg.Value);
+                return await DeliverMessageFaucetAsync(msg);
+            }
+            else
             {
                 return new PluginDeliverResponse { Error = ErrInvalidMessageCast() };
             }
-
-            var msg = new MessageSend();
-            msg.MergeFrom(request.Tx.Msg.Value);
-
-            return await DeliverMessageSendAsync(msg, request.Tx.Fee);
         }
 
         // EndBlock is code that is executed at the end of applying a block
@@ -142,6 +180,64 @@ namespace CanopyPlugin
             {
                 Recipient = msg.ToAddress,
                 AuthorizedSigners = { msg.FromAddress }
+            };
+        }
+
+        // CheckMessageReward statelessly validates a 'reward' message
+        private PluginCheckResponse CheckMessageReward(MessageReward msg)
+        {
+            // validate admin address (must be 20 bytes)
+            if (msg.AdminAddress.Length != 20)
+            {
+                return new PluginCheckResponse { Error = ErrInvalidAddress() };
+            }
+
+            // validate recipient address
+            if (msg.RecipientAddress.Length != 20)
+            {
+                return new PluginCheckResponse { Error = ErrInvalidAddress() };
+            }
+
+            // validate amount
+            if (msg.Amount == 0)
+            {
+                return new PluginCheckResponse { Error = ErrInvalidAmount() };
+            }
+
+            // return authorized signers (admin must sign this tx)
+            return new PluginCheckResponse
+            {
+                Recipient = msg.RecipientAddress,
+                AuthorizedSigners = { msg.AdminAddress }
+            };
+        }
+
+        // CheckMessageFaucet statelessly validates a 'faucet' message
+        private PluginCheckResponse CheckMessageFaucet(MessageFaucet msg)
+        {
+            // validate signer address (must be 20 bytes)
+            if (msg.SignerAddress.Length != 20)
+            {
+                return new PluginCheckResponse { Error = ErrInvalidAddress() };
+            }
+
+            // validate recipient address
+            if (msg.RecipientAddress.Length != 20)
+            {
+                return new PluginCheckResponse { Error = ErrInvalidAddress() };
+            }
+
+            // validate amount
+            if (msg.Amount == 0)
+            {
+                return new PluginCheckResponse { Error = ErrInvalidAmount() };
+            }
+
+            // return authorized signers (signer must sign this tx)
+            return new PluginCheckResponse
+            {
+                Recipient = msg.RecipientAddress,
+                AuthorizedSigners = { msg.SignerAddress }
             };
         }
 
@@ -262,6 +358,160 @@ namespace CanopyPlugin
                     Value = ByteString.CopyFrom(to.ToByteArray())
                 });
             }
+
+            var writeResp = await Plugin.StateWriteAsync(this, writeRequest);
+            return new PluginDeliverResponse { Error = writeResp.Error };
+        }
+
+        // DeliverMessageReward handles a 'reward' message (mints tokens to recipient)
+        private async Task<PluginDeliverResponse> DeliverMessageRewardAsync(MessageReward msg, ulong fee)
+        {
+            var adminQueryId = (ulong)Random.NextInt64();
+            var recipientQueryId = (ulong)Random.NextInt64();
+            var feeQueryId = (ulong)Random.NextInt64();
+
+            // calculate state keys
+            var adminKey = KeyForAccount(msg.AdminAddress.ToByteArray());
+            var recipientKey = KeyForAccount(msg.RecipientAddress.ToByteArray());
+            var feePoolKey = KeyForFeePool((ulong)Config.ChainId);
+
+            // read current state
+            var response = await Plugin.StateReadAsync(this, new PluginStateReadRequest
+            {
+                Keys =
+                {
+                    new PluginKeyRead { QueryId = feeQueryId, Key = ByteString.CopyFrom(feePoolKey) },
+                    new PluginKeyRead { QueryId = adminQueryId, Key = ByteString.CopyFrom(adminKey) },
+                    new PluginKeyRead { QueryId = recipientQueryId, Key = ByteString.CopyFrom(recipientKey) }
+                }
+            });
+
+            // check for internal error
+            if (response.Error != null)
+            {
+                return new PluginDeliverResponse { Error = response.Error };
+            }
+
+            // parse results by QueryId
+            byte[]? adminBytes = null, recipientBytes = null, feePoolBytes = null;
+            foreach (var result in response.Results)
+            {
+                if (result.QueryId == adminQueryId)
+                    adminBytes = result.Entries.FirstOrDefault()?.Value?.ToByteArray();
+                else if (result.QueryId == recipientQueryId)
+                    recipientBytes = result.Entries.FirstOrDefault()?.Value?.ToByteArray();
+                else if (result.QueryId == feeQueryId)
+                    feePoolBytes = result.Entries.FirstOrDefault()?.Value?.ToByteArray();
+            }
+
+            // unmarshal accounts
+            var admin = new Account();
+            var recipient = new Account();
+            var feePool = new Pool();
+
+            if (adminBytes != null && adminBytes.Length > 0)
+                admin.MergeFrom(adminBytes);
+            if (recipientBytes != null && recipientBytes.Length > 0)
+                recipient.MergeFrom(recipientBytes);
+            if (feePoolBytes != null && feePoolBytes.Length > 0)
+                feePool.MergeFrom(feePoolBytes);
+
+            // admin must have enough to pay the fee
+            if (admin.Amount < fee)
+            {
+                return new PluginDeliverResponse { Error = ErrInsufficientFunds() };
+            }
+
+            // apply state changes
+            admin.Amount -= fee;           // admin pays fee
+            recipient.Amount += msg.Amount; // mint tokens to recipient
+            feePool.Amount += fee;
+
+            // execute writes to the database
+            var writeRequest = new PluginStateWriteRequest();
+
+            // always write fee pool
+            writeRequest.Sets.Add(new PluginSetOp
+            {
+                Key = ByteString.CopyFrom(feePoolKey),
+                Value = ByteString.CopyFrom(feePool.ToByteArray())
+            });
+
+            // if the admin account is drained - delete the admin account
+            if (admin.Amount == 0)
+            {
+                writeRequest.Deletes.Add(new PluginDeleteOp { Key = ByteString.CopyFrom(adminKey) });
+            }
+            else
+            {
+                writeRequest.Sets.Add(new PluginSetOp
+                {
+                    Key = ByteString.CopyFrom(adminKey),
+                    Value = ByteString.CopyFrom(admin.ToByteArray())
+                });
+            }
+
+            // write recipient account
+            writeRequest.Sets.Add(new PluginSetOp
+            {
+                Key = ByteString.CopyFrom(recipientKey),
+                Value = ByteString.CopyFrom(recipient.ToByteArray())
+            });
+
+            var writeResp = await Plugin.StateWriteAsync(this, writeRequest);
+            return new PluginDeliverResponse { Error = writeResp.Error };
+        }
+
+        // DeliverMessageFaucet handles a 'faucet' message (mints tokens to recipient - no fee, no balance check)
+        private async Task<PluginDeliverResponse> DeliverMessageFaucetAsync(MessageFaucet msg)
+        {
+            var recipientQueryId = (ulong)Random.NextInt64();
+
+            // calculate state key for recipient
+            var recipientKey = KeyForAccount(msg.RecipientAddress.ToByteArray());
+
+            // read current recipient state
+            var response = await Plugin.StateReadAsync(this, new PluginStateReadRequest
+            {
+                Keys =
+                {
+                    new PluginKeyRead { QueryId = recipientQueryId, Key = ByteString.CopyFrom(recipientKey) }
+                }
+            });
+
+            // check for internal error
+            if (response.Error != null)
+            {
+                return new PluginDeliverResponse { Error = response.Error };
+            }
+
+            // get recipient bytes
+            byte[]? recipientBytes = null;
+            foreach (var result in response.Results)
+            {
+                if (result.QueryId == recipientQueryId && result.Entries.Count > 0)
+                {
+                    recipientBytes = result.Entries[0].Value?.ToByteArray();
+                }
+            }
+
+            // unmarshal recipient account (or create new if doesn't exist)
+            var recipient = new Account();
+            if (recipientBytes != null && recipientBytes.Length > 0)
+            {
+                recipient.MergeFrom(recipientBytes);
+            }
+
+            // mint tokens to recipient
+            recipient.Amount += msg.Amount;
+
+            // write state changes
+            var writeRequest = new PluginStateWriteRequest();
+            writeRequest.Sets.Add(new PluginSetOp
+            {
+                Key = ByteString.CopyFrom(recipientKey),
+                Value = ByteString.CopyFrom(recipient.ToByteArray())
+            });
 
             var writeResp = await Plugin.StateWriteAsync(this, writeRequest);
             return new PluginDeliverResponse { Error = writeResp.Error };

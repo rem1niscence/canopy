@@ -384,17 +384,27 @@ export function Unmarshal<T>(protoBytes: Uint8Array | Buffer, MessageType: any):
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function FromAny(any: any): [any | null, IPluginError | null] {
+export function FromAny(any: any): [any | null, string | null, IPluginError | null] {
     if (!any || !any.value) {
-        return [null, ErrFromAny(new Error("any is null or has no value"))];
+        return [null, null, ErrFromAny(new Error("any is null or has no value"))];
     }
+    
+    // Check both typeUrl and type_url (protobuf field name variations)
+    const typeUrl = any.typeUrl || any.type_url || "";
+    
     try {
-        if (any.typeUrl?.includes("MessageSend")) {
-            return [types.MessageSend.decode(any.value), null];
+        if (typeUrl.includes("MessageSend")) {
+            return [types.MessageSend.decode(any.value), "MessageSend", null];
         }
-        return [null, ErrInvalidMessageCast()];
+        if (typeUrl.includes("MessageReward")) {
+            return [types.MessageReward.decode(any.value), "MessageReward", null];
+        }
+        if (typeUrl.includes("MessageFaucet")) {
+            return [types.MessageFaucet.decode(any.value), "MessageFaucet", null];
+        }
+        return [null, null, ErrInvalidMessageCast()];
     } catch (err) {
-        return [null, ErrFromAny(err as Error)];
+        return [null, null, ErrFromAny(err as Error)];
     }
 }
 
