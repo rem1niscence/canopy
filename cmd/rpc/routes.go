@@ -11,6 +11,7 @@ const (
 	VersionRoutePath               = "/v1/"
 	TxRoutePath                    = "/v1/tx"
 	HeightRoutePath                = "/v1/query/height"
+	IndexerBlobsRoutePath          = "/v1/query/indexer-blobs"
 	AccountRoutePath               = "/v1/query/account"
 	AccountsRoutePath              = "/v1/query/accounts"
 	PoolRoutePath                  = "/v1/query/pool"
@@ -62,6 +63,7 @@ const (
 	ValidatorSetRoutePath          = "/v1/query/validator-set"
 	CheckpointRoutePath            = "/v1/query/checkpoint"
 	SubscribeRCInfoPath            = "/v1/subscribe-rc-info"
+	SubscribeIndexerBlobPath       = "/v1/subscribe-indexer-blob"
 	// debug
 	DebugBlockedRoutePath   = "/debug/blocked"
 	DebugHeapRoutePath      = "/debug/heap"
@@ -109,6 +111,7 @@ const (
 	VersionRouteName               = "version"
 	TxRouteName                    = "tx"
 	HeightRouteName                = "height"
+	IndexerBlobsRouteName          = "indexer-blobs"
 	AccountRouteName               = "account"
 	AccountsRouteName              = "accounts"
 	PoolRouteName                  = "pool"
@@ -201,6 +204,7 @@ const (
 	AddVoteRouteName                = "add-vote"
 	DelVoteRouteName                = "del-vote"
 	SubscribeRCInfoName             = "subscribe-rc-info"
+	SubscribeIndexerBlobName        = "subscribe-indexer-blob"
 )
 
 // routes contains the method and path for a canopy command
@@ -214,6 +218,7 @@ var routePaths = routes{
 	VersionRouteName:               {Method: http.MethodGet, Path: VersionRoutePath},
 	TxRouteName:                    {Method: http.MethodPost, Path: TxRoutePath},
 	HeightRouteName:                {Method: http.MethodPost, Path: HeightRoutePath},
+	IndexerBlobsRouteName:          {Method: http.MethodPost, Path: IndexerBlobsRoutePath},
 	AccountRouteName:               {Method: http.MethodPost, Path: AccountRoutePath},
 	AccountsRouteName:              {Method: http.MethodPost, Path: AccountsRoutePath},
 	PoolRouteName:                  {Method: http.MethodPost, Path: PoolRoutePath},
@@ -306,6 +311,7 @@ var routePaths = routes{
 	AddVoteRouteName:                {Method: http.MethodPost, Path: AddVoteRoutePath},
 	DelVoteRouteName:                {Method: http.MethodPost, Path: DelVoteRoutePath},
 	SubscribeRCInfoName:             {Method: http.MethodGet, Path: SubscribeRCInfoPath},
+	SubscribeIndexerBlobName:        {Method: http.MethodGet, Path: SubscribeIndexerBlobPath},
 }
 
 // httpRouteHandlers is a custom type that maps strings to httprouter handle functions
@@ -317,6 +323,7 @@ func createRouter(s *Server) *httprouter.Router {
 		VersionRouteName:               s.Version,
 		TxRouteName:                    s.Transaction,
 		HeightRouteName:                s.Height,
+		IndexerBlobsRouteName:          s.IndexerBlobs,
 		AccountRouteName:               s.Account,
 		AccountsRouteName:              s.Accounts,
 		PoolRouteName:                  s.Pool,
@@ -369,6 +376,7 @@ func createRouter(s *Server) *httprouter.Router {
 		CheckpointRouteName:            s.Checkpoint,
 		EthereumRouteName:              s.EthereumHandler,
 		SubscribeRCInfoName:            s.WebSocket,
+		SubscribeIndexerBlobName:       s.IndexerBlobWebSocket,
 	}
 
 	// Initialize a new router using the httprouter package.

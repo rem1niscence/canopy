@@ -435,9 +435,13 @@ func (s *StateMachine) LoadRootChainInfo(id, height uint64) (*lib.RootChainInfo,
 	lastHeight := uint64(1)
 	// update the metrics once complete
 	defer s.Metrics.UpdateGetRootChainInfo(time.Now())
-	// if height is 0; use the latest height
+	// if height is 0; use the latest committed height
 	if height == 0 {
-		height = s.height
+		if s.height > 1 {
+			height = s.height - 1
+		} else {
+			height = 1
+		}
 	}
 	// ensure lastHeight is not < 0
 	if height != 1 {
@@ -536,6 +540,22 @@ func (s *StateMachine) Delete(key []byte) lib.ErrorI { return s.Store().Delete(k
 // starting at the specified key and iterating lexicographically
 func (s *StateMachine) Iterator(key []byte) (lib.IteratorI, lib.ErrorI) {
 	return s.Store().Iterator(key)
+}
+
+// IteratorAndAppend() aggregates an array of raw bytes from an iterator
+func (s *StateMachine) IterateAndAppend(prefix []byte) (result [][]byte, err lib.ErrorI) {
+	// iterate through the account prefix
+	it, err := s.Iterator(prefix)
+	if err != nil {
+		return nil, err
+	}
+	defer it.Close()
+	// for each item of the iterator
+	for ; it.Valid(); it.Next() {
+		result = append(result, it.Value())
+	}
+	// return the result
+	return result, nil
 }
 
 // RevIterator() creates and returns an iterator for the state machine's underlying store
