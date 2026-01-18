@@ -1,14 +1,11 @@
-package com.canopy.plugin
+package com.canopy.tutorial
 
-import com.canopy.plugin.crypto.BLSCrypto
-import com.canopy.plugin.crypto.hexToBytes
-import com.canopy.plugin.crypto.toHexString
+import com.canopy.tutorial.crypto.BLSCrypto
+import com.canopy.tutorial.crypto.hexToBytes
+import com.canopy.tutorial.crypto.toHexString
 import com.google.protobuf.Any
 import com.google.protobuf.ByteString
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -29,7 +26,7 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /**
- * RPC Test for Kotlin Plugin
+ * RPC Test for Kotlin Plugin Tutorial
  *
  * Tests the full flow of plugin transactions via RPC:
  * 1. Adds two accounts to the keystore
@@ -37,7 +34,12 @@ import kotlin.test.fail
  * 3. Does a send transaction from the fauceted account to the other account
  * 4. Sends a reward from that account back to the original account
  *
- * Run with: ./gradlew test --tests "com.canopy.plugin.RpcTest"
+ * Prerequisites:
+ * - Canopy node must be running with the Kotlin plugin enabled
+ * - The plugin must have faucet and reward transaction types registered
+ *
+ * Run with: ./gradlew test --tests "com.canopy.tutorial.RpcTest"
+ * Or: make test-rpc
  */
 class RpcTest {
     

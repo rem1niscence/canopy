@@ -21,11 +21,6 @@ test:
 	@echo "Running tests..."
 	./gradlew test
 
-# Run RPC integration test (requires running Canopy node)
-test-rpc:
-	@echo "Running RPC integration test..."
-	./gradlew test --tests "com.canopy.plugin.RpcTest" --rerun-tasks
-
 # Run the application
 run:
 	@echo "Running plugin..."
@@ -79,7 +74,6 @@ help:
 	@echo "  make build      - Build the project"
 	@echo "  make clean      - Clean build artifacts"
 	@echo "  make test       - Run tests"
-	@echo "  make test-rpc   - Run RPC integration test (requires running Canopy node)"
 	@echo "  make run        - Run the application"
 	@echo "  make dev        - Run in development mode"
 	@echo "  make lint       - Run linter"

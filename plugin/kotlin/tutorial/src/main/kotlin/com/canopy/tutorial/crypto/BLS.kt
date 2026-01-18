@@ -1,4 +1,4 @@
-package com.canopy.plugin.crypto
+package com.canopy.tutorial.crypto
 
 import com.google.protobuf.Any
 import supranational.blst.P2
