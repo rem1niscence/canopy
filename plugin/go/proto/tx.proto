@@ -54,24 +54,3 @@ message Signature {
   // signature: the bytes of the signature output from a private key which may be verified with the message and public
   bytes signature = 2;
 }
-
-// Example: MessageReward mints tokens to a recipient
-message MessageReward {
-  // admin_address: the admin authorizing the reward
-  bytes admin_address = 1; // @gotags: json:"adminAddress"
-  // recipient_address: who receives the reward
-  bytes recipient_address = 2; // @gotags: json:"recipientAddress"
-  // amount: tokens to mint
-  uint64 amount = 3;
-}
-
-// MessageFaucet is a test-only transaction that mints tokens to any address
-// No balance check required - just mints tokens for testing purposes
-message MessageFaucet {
-  // signer_address: the address signing this transaction (for auth)
-  bytes signer_address = 1; // @gotags: json:"signerAddress"
-  // recipient_address: who receives the tokens
-  bytes recipient_address = 2; // @gotags: json:"recipientAddress"
-  // amount: tokens to mint
-  uint64 amount = 3;
-}

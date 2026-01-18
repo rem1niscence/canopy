@@ -308,135 +308,6 @@ func (x *Signature) GetSignature() []byte {
 	return nil
 }
 
-// Example: MessageReward mints tokens to a recipient
-type MessageReward struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// admin_address: the admin authorizing the reward
-	AdminAddress []byte `protobuf:"bytes,1,opt,name=admin_address,json=adminAddress,proto3" json:"adminAddress"` // @gotags: json:"adminAddress"
-	// recipient_address: who receives the reward
-	RecipientAddress []byte `protobuf:"bytes,2,opt,name=recipient_address,json=recipientAddress,proto3" json:"recipientAddress"` // @gotags: json:"recipientAddress"
-	// amount: tokens to mint
-	Amount        uint64 `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *MessageReward) Reset() {
-	*x = MessageReward{}
-	mi := &file_tx_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *MessageReward) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MessageReward) ProtoMessage() {}
-
-func (x *MessageReward) ProtoReflect() protoreflect.Message {
-	mi := &file_tx_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MessageReward.ProtoReflect.Descriptor instead.
-func (*MessageReward) Descriptor() ([]byte, []int) {
-	return file_tx_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *MessageReward) GetAdminAddress() []byte {
-	if x != nil {
-		return x.AdminAddress
-	}
-	return nil
-}
-
-func (x *MessageReward) GetRecipientAddress() []byte {
-	if x != nil {
-		return x.RecipientAddress
-	}
-	return nil
-}
-
-func (x *MessageReward) GetAmount() uint64 {
-	if x != nil {
-		return x.Amount
-	}
-	return 0
-}
-
-// MessageFaucet is a test-only transaction that mints tokens to any address
-// No balance check required - just mints tokens for testing purposes
-type MessageFaucet struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// signer_address: the address signing this transaction (for auth)
-	SignerAddress []byte `protobuf:"bytes,1,opt,name=signer_address,json=signerAddress,proto3" json:"signerAddress"` // @gotags: json:"signerAddress"
-	// recipient_address: who receives the tokens
-	RecipientAddress []byte `protobuf:"bytes,2,opt,name=recipient_address,json=recipientAddress,proto3" json:"recipientAddress"` // @gotags: json:"recipientAddress"
-	// amount: tokens to mint
-	Amount        uint64 `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *MessageFaucet) Reset() {
-	*x = MessageFaucet{}
-	mi := &file_tx_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *MessageFaucet) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MessageFaucet) ProtoMessage() {}
-
-func (x *MessageFaucet) ProtoReflect() protoreflect.Message {
-	mi := &file_tx_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MessageFaucet.ProtoReflect.Descriptor instead.
-func (*MessageFaucet) Descriptor() ([]byte, []int) {
-	return file_tx_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *MessageFaucet) GetSignerAddress() []byte {
-	if x != nil {
-		return x.SignerAddress
-	}
-	return nil
-}
-
-func (x *MessageFaucet) GetRecipientAddress() []byte {
-	if x != nil {
-		return x.RecipientAddress
-	}
-	return nil
-}
-
-func (x *MessageFaucet) GetAmount() uint64 {
-	if x != nil {
-		return x.Amount
-	}
-	return 0
-}
-
 var File_tx_proto protoreflect.FileDescriptor
 
 const file_tx_proto_rawDesc = "" +
@@ -463,15 +334,7 @@ const file_tx_proto_rawDesc = "" +
 	"\tSignature\x12\x1d\n" +
 	"\n" +
 	"public_key\x18\x01 \x01(\fR\tpublicKey\x12\x1c\n" +
-	"\tsignature\x18\x02 \x01(\fR\tsignature\"y\n" +
-	"\rMessageReward\x12#\n" +
-	"\radmin_address\x18\x01 \x01(\fR\fadminAddress\x12+\n" +
-	"\x11recipient_address\x18\x02 \x01(\fR\x10recipientAddress\x12\x16\n" +
-	"\x06amount\x18\x03 \x01(\x04R\x06amount\"{\n" +
-	"\rMessageFaucet\x12%\n" +
-	"\x0esigner_address\x18\x01 \x01(\fR\rsignerAddress\x12+\n" +
-	"\x11recipient_address\x18\x02 \x01(\fR\x10recipientAddress\x12\x16\n" +
-	"\x06amount\x18\x03 \x01(\x04R\x06amountB.Z,github.com/canopy-network/go-plugin/contractb\x06proto3"
+	"\tsignature\x18\x02 \x01(\fR\tsignatureB.Z,github.com/canopy-network/go-plugin/contractb\x06proto3"
 
 var (
 	file_tx_proto_rawDescOnce sync.Once
@@ -485,18 +348,16 @@ func file_tx_proto_rawDescGZIP() []byte {
 	return file_tx_proto_rawDescData
 }
 
-var file_tx_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_tx_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_tx_proto_goTypes = []any{
-	(*Transaction)(nil),   // 0: types.Transaction
-	(*MessageSend)(nil),   // 1: types.MessageSend
-	(*FeeParams)(nil),     // 2: types.FeeParams
-	(*Signature)(nil),     // 3: types.Signature
-	(*MessageReward)(nil), // 4: types.MessageReward
-	(*MessageFaucet)(nil), // 5: types.MessageFaucet
-	(*anypb.Any)(nil),     // 6: google.protobuf.Any
+	(*Transaction)(nil), // 0: types.Transaction
+	(*MessageSend)(nil), // 1: types.MessageSend
+	(*FeeParams)(nil),   // 2: types.FeeParams
+	(*Signature)(nil),   // 3: types.Signature
+	(*anypb.Any)(nil),   // 4: google.protobuf.Any
 }
 var file_tx_proto_depIdxs = []int32{
-	6, // 0: types.Transaction.msg:type_name -> google.protobuf.Any
+	4, // 0: types.Transaction.msg:type_name -> google.protobuf.Any
 	3, // 1: types.Transaction.signature:type_name -> types.Signature
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
@@ -516,7 +377,7 @@ func file_tx_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_tx_proto_rawDesc), len(file_tx_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

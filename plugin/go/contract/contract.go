@@ -16,14 +16,12 @@ import (
 
 // PluginConfig: the configuration of the contract
 var ContractConfig = &PluginConfig{
-	Name:    "go_plugin_contract",
-	Id:      1,
-	Version: 1,
-	SupportedTransactions: []string{"send", "reward", "faucet"},
+	Name:                  "go_plugin_contract",
+	Id:                    1,
+	Version:               1,
+	SupportedTransactions: []string{"send"},
 	TransactionTypeUrls: []string{
 		"type.googleapis.com/types.MessageSend",
-		"type.googleapis.com/types.MessageReward",
-		"type.googleapis.com/types.MessageFaucet",
 	},
 	EventTypeUrls: nil,
 }
@@ -98,66 +96,8 @@ func (c *Contract) CheckTx(request *PluginCheckRequest) *PluginCheckResponse {
 	switch x := msg.(type) {
 	case *MessageSend:
 		return c.CheckMessageSend(x)
-	case *MessageReward:
-		return c.CheckMessageReward(x)
-	case *MessageFaucet:
-		return c.CheckMessageFaucet(x)
 	default:
 		return &PluginCheckResponse{Error: ErrInvalidMessageCast()}
-	}
-}
-
-// CheckMessageFaucet statelessly validates a 'faucet' message
-func (c *Contract) CheckMessageFaucet(msg *MessageFaucet) *PluginCheckResponse {
-	log.Printf("CheckMessageFaucet called: signer=%x recipient=%x amount=%d",
-		msg.SignerAddress, msg.RecipientAddress, msg.Amount)
-	// Validate signer address (must be 20 bytes)
-	if len(msg.SignerAddress) != 20 {
-		log.Printf("CheckMessageFaucet: invalid signer address length %d", len(msg.SignerAddress))
-		return &PluginCheckResponse{Error: ErrInvalidAddress()}
-	}
-	// Validate recipient address
-	if len(msg.RecipientAddress) != 20 {
-		log.Printf("CheckMessageFaucet: invalid recipient address length %d", len(msg.RecipientAddress))
-		return &PluginCheckResponse{Error: ErrInvalidAddress()}
-	}
-	// Validate amount
-	if msg.Amount == 0 {
-		log.Printf("CheckMessageFaucet: invalid amount 0")
-		return &PluginCheckResponse{Error: ErrInvalidAmount()}
-	}
-	log.Printf("CheckMessageFaucet: returning authorizedSigners=%x", msg.SignerAddress)
-	// Return authorized signers (signer must sign this tx)
-	return &PluginCheckResponse{
-		Recipient:         msg.RecipientAddress,
-		AuthorizedSigners: [][]byte{msg.SignerAddress},
-	}
-}
-
-// CheckMessageReward statelessly validates a 'reward' message
-func (c *Contract) CheckMessageReward(msg *MessageReward) *PluginCheckResponse {
-	log.Printf("CheckMessageReward called: admin=%x recipient=%x amount=%d",
-		msg.AdminAddress, msg.RecipientAddress, msg.Amount)
-	// Validate admin address (must be 20 bytes)
-	if len(msg.AdminAddress) != 20 {
-		log.Printf("CheckMessageReward: invalid admin address length %d", len(msg.AdminAddress))
-		return &PluginCheckResponse{Error: ErrInvalidAddress()}
-	}
-	// Validate recipient address
-	if len(msg.RecipientAddress) != 20 {
-		log.Printf("CheckMessageReward: invalid recipient address length %d", len(msg.RecipientAddress))
-		return &PluginCheckResponse{Error: ErrInvalidAddress()}
-	}
-	// Validate amount
-	if msg.Amount == 0 {
-		log.Printf("CheckMessageReward: invalid amount 0")
-		return &PluginCheckResponse{Error: ErrInvalidAmount()}
-	}
-	log.Printf("CheckMessageReward: returning authorizedSigners=%x", msg.AdminAddress)
-	// Return authorized signers (admin must sign this tx)
-	return &PluginCheckResponse{
-		Recipient:         msg.RecipientAddress,
-		AuthorizedSigners: [][]byte{msg.AdminAddress},
 	}
 }
 
@@ -172,172 +112,9 @@ func (c *Contract) DeliverTx(request *PluginDeliverRequest) *PluginDeliverRespon
 	switch x := msg.(type) {
 	case *MessageSend:
 		return c.DeliverMessageSend(x, request.Tx.Fee)
-	case *MessageReward:
-		return c.DeliverMessageReward(x, request.Tx.Fee)
-	case *MessageFaucet:
-		return c.DeliverMessageFaucet(x)
 	default:
 		return &PluginDeliverResponse{Error: ErrInvalidMessageCast()}
 	}
-}
-
-// DeliverMessageFaucet handles a 'faucet' message (mints tokens to recipient - no fee, no balance check)
-func (c *Contract) DeliverMessageFaucet(msg *MessageFaucet) *PluginDeliverResponse {
-	log.Printf("DeliverMessageFaucet called: signer=%x recipient=%x amount=%d",
-		msg.SignerAddress, msg.RecipientAddress, msg.Amount)
-	recipientKey := KeyForAccount(msg.RecipientAddress)
-	recipientQueryId := rand.Uint64()
-
-	// Read current recipient state
-	response, err := c.plugin.StateRead(c, &PluginStateReadRequest{
-		Keys: []*PluginKeyRead{
-			{QueryId: recipientQueryId, Key: recipientKey},
-		},
-	})
-	if err != nil {
-		return &PluginDeliverResponse{Error: err}
-	}
-	if response.Error != nil {
-		return &PluginDeliverResponse{Error: response.Error}
-	}
-
-	// Get recipient bytes
-	var recipientBytes []byte
-	for _, resp := range response.Results {
-		if resp.QueryId == recipientQueryId && len(resp.Entries) > 0 {
-			recipientBytes = resp.Entries[0].Value
-		}
-	}
-
-	// Unmarshal recipient account (or create new if doesn't exist)
-	recipient := new(Account)
-	if len(recipientBytes) > 0 {
-		if err = Unmarshal(recipientBytes, recipient); err != nil {
-			return &PluginDeliverResponse{Error: err}
-		}
-	}
-
-	// Mint tokens to recipient
-	recipient.Amount += msg.Amount
-
-	// Marshal updated state
-	recipientBytes, err = Marshal(recipient)
-	if err != nil {
-		return &PluginDeliverResponse{Error: err}
-	}
-
-	// Write state changes
-	resp, err := c.plugin.StateWrite(c, &PluginStateWriteRequest{
-		Sets: []*PluginSetOp{
-			{Key: recipientKey, Value: recipientBytes},
-		},
-	})
-	if err == nil {
-		err = resp.Error
-	}
-	return &PluginDeliverResponse{Error: err}
-}
-
-// DeliverMessageReward handles a 'reward' message (mints tokens to recipient)
-func (c *Contract) DeliverMessageReward(msg *MessageReward, fee uint64) *PluginDeliverResponse {
-	var (
-		adminKey, recipientKey, feePoolKey         []byte
-		adminBytes, recipientBytes, feePoolBytes   []byte
-		adminQueryId, recipientQueryId, feeQueryId = rand.Uint64(), rand.Uint64(), rand.Uint64()
-		admin, recipient, feePool                  = new(Account), new(Account), new(Pool)
-	)
-
-	// Calculate state keys
-	adminKey = KeyForAccount(msg.AdminAddress)
-	recipientKey = KeyForAccount(msg.RecipientAddress)
-	feePoolKey = KeyForFeePool(c.Config.ChainId)
-
-	// Read current state
-	response, err := c.plugin.StateRead(c, &PluginStateReadRequest{
-		Keys: []*PluginKeyRead{
-			{QueryId: feeQueryId, Key: feePoolKey},
-			{QueryId: adminQueryId, Key: adminKey},
-			{QueryId: recipientQueryId, Key: recipientKey},
-		},
-	})
-	if err != nil {
-		return &PluginDeliverResponse{Error: err}
-	}
-	if response.Error != nil {
-		return &PluginDeliverResponse{Error: response.Error}
-	}
-
-	// Parse results by QueryId
-	for _, resp := range response.Results {
-		switch resp.QueryId {
-		case adminQueryId:
-			adminBytes = resp.Entries[0].Value
-		case recipientQueryId:
-			recipientBytes = resp.Entries[0].Value
-		case feeQueryId:
-			feePoolBytes = resp.Entries[0].Value
-		}
-	}
-
-	// Unmarshal accounts
-	if err = Unmarshal(adminBytes, admin); err != nil {
-		return &PluginDeliverResponse{Error: err}
-	}
-	if err = Unmarshal(recipientBytes, recipient); err != nil {
-		return &PluginDeliverResponse{Error: err}
-	}
-	if err = Unmarshal(feePoolBytes, feePool); err != nil {
-		return &PluginDeliverResponse{Error: err}
-	}
-
-	// Admin must have enough to pay the fee
-	if admin.Amount < fee {
-		return &PluginDeliverResponse{Error: ErrInsufficientFunds()}
-	}
-
-	// Apply state changes
-	admin.Amount -= fee            // Admin pays fee
-	recipient.Amount += msg.Amount // Mint tokens to recipient
-	feePool.Amount += fee
-
-	// Marshal updated state
-	adminBytes, err = Marshal(admin)
-	if err != nil {
-		return &PluginDeliverResponse{Error: err}
-	}
-	recipientBytes, err = Marshal(recipient)
-	if err != nil {
-		return &PluginDeliverResponse{Error: err}
-	}
-	feePoolBytes, err = Marshal(feePool)
-	if err != nil {
-		return &PluginDeliverResponse{Error: err}
-	}
-
-	// Write state changes
-	var resp *PluginStateWriteResponse
-	if admin.Amount == 0 {
-		// Delete drained admin account
-		resp, err = c.plugin.StateWrite(c, &PluginStateWriteRequest{
-			Sets: []*PluginSetOp{
-				{Key: feePoolKey, Value: feePoolBytes},
-				{Key: recipientKey, Value: recipientBytes},
-			},
-			Deletes: []*PluginDeleteOp{{Key: adminKey}},
-		})
-	} else {
-		resp, err = c.plugin.StateWrite(c, &PluginStateWriteRequest{
-			Sets: []*PluginSetOp{
-				{Key: feePoolKey, Value: feePoolBytes},
-				{Key: adminKey, Value: adminBytes},
-				{Key: recipientKey, Value: recipientBytes},
-			},
-		})
-	}
-	if err == nil {
-		err = resp.Error
-	}
-	return &PluginDeliverResponse{Error: err}
 }
 
 // EndBlock() is code that is executed at the end of 'applying' a block
