@@ -81,6 +81,10 @@ func NewRCManager(controller *controller.Controller, config lib.Config, logger l
 	if maxSubscribersPerChain <= 0 {
 		maxSubscribersPerChain = defaultMaxRCSubscribersPerChain
 	}
+	blobCacheEntries := config.IndexerBlobCacheEntries
+	if blobCacheEntries <= 0 {
+		blobCacheEntries = defaultIndexerBlobCacheEntries
+	}
 	// create the manager
 	manager = &RCManager{
 		c:                          config,
@@ -99,7 +103,7 @@ func NewRCManager(controller *controller.Controller, config lib.Config, logger l
 		maxRCSubscribersPerChain:   maxSubscribersPerChain,
 		indexerBlobSubscribers:     make([]*IndexerBlobSubscriber, 0),
 		maxIndexerBlobSubscribers:  maxSubscribers, // reuse same limit
-		indexerBlobCache:           newIndexerBlobCache(defaultIndexerBlobCacheEntries),
+		indexerBlobCache:           newIndexerBlobCache(blobCacheEntries),
 	}
 	// set the manager in the controller
 	controller.RCManager = manager

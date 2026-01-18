@@ -7,7 +7,7 @@ import (
 	"github.com/canopy-network/canopy/lib"
 )
 
-const defaultIndexerBlobCacheEntries = 2
+const defaultIndexerBlobCacheEntries = 64
 
 type indexerBlobCacheEntry struct {
 	height     uint64
