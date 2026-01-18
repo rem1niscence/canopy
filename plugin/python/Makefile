@@ -1,4 +1,4 @@
-.PHONY: install dev test test-rpc lint format type-check clean proto build docs
+.PHONY: install dev test lint format type-check clean proto build docs
 
 # Development setup
 install:
@@ -16,10 +16,6 @@ test-cov:
 
 test-verbose:
 	pytest -v
-
-# RPC integration test (requires running Canopy node)
-test-rpc:
-	python3 rpc_test.py
 
 # Code quality
 lint:

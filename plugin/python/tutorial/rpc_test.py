@@ -1,5 +1,5 @@
 """
-RPC Test for Python Plugin
+RPC Test for Python Plugin Tutorial
 
 Tests the full flow of plugin transactions via RPC:
 1. Adds two accounts to the keystore
@@ -17,12 +17,11 @@ import json
 import secrets
 import base64
 from dataclasses import dataclass
-from typing import Optional
 import urllib.request
 import urllib.error
 
-# Add the contract/proto directory to the path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'contract', 'proto'))
+# Add the proto directory to the path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'proto'))
 
 from google.protobuf import any_pb2
 import tx_pb2
