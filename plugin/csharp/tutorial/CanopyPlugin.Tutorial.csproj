@@ -28,8 +28,9 @@
     <PackageReference Include="Nethermind.Crypto.Bls" Version="1.0.5" />
   </ItemGroup>
 
+  <!-- Protobuf compilation - uses proto files with faucet/reward messages -->
   <ItemGroup>
-    <ProjectReference Include="../../CanopyPlugin.csproj" />
+    <Protobuf Include="../proto/**/*.proto" GrpcServices="None" ProtoRoot="../" />
   </ItemGroup>
 
 </Project>

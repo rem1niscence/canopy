@@ -20,10 +20,12 @@
     <PackageTags>blockchain;canopy;plugin;csharp;server</PackageTags>
   </PropertyGroup>
 
-  <!-- Exclude test project files -->
+  <!-- Exclude test and tutorial project files -->
   <ItemGroup>
     <Compile Remove="test/**/*.cs" />
+    <Compile Remove="tutorial/**/*.cs" />
     <None Remove="test/**/*" />
+    <None Remove="tutorial/**/*" />
   </ItemGroup>
 
   <ItemGroup>

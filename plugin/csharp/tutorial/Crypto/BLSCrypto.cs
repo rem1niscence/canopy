@@ -4,7 +4,7 @@ using System.Text;
 using Google.Protobuf;
 using Types;
 
-namespace CanopyPlugin.Tests.Crypto
+namespace CanopyPlugin.Tutorial.Crypto
 {
     /// <summary>
     /// BLS12-381 cryptographic utilities for transaction signing.

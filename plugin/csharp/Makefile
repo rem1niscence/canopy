@@ -1,4 +1,4 @@
-.PHONY: restore build test test-rpc lint format clean proto run serve serve-dev validate docs
+.PHONY: restore build test test-tutorial lint format clean proto run serve serve-dev validate docs
 
 # Development setup
 restore:
@@ -18,8 +18,8 @@ test:
 test-verbose:
 	dotnet test --verbosity normal
 
-test-rpc:
-	dotnet test --filter "FullyQualifiedName~RpcTest" --logger "console;verbosity=detailed"
+test-tutorial:
+	dotnet test tutorial/CanopyPlugin.Tutorial.csproj --logger "console;verbosity=detailed"
 
 test-cov:
 	dotnet test --collect:"XPlat Code Coverage" --results-directory:./TestResults

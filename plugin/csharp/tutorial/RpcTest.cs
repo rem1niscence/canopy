@@ -6,15 +6,15 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using CanopyPlugin.Tests.Crypto;
+using CanopyPlugin.Tutorial.Crypto;
 using Google.Protobuf;
 using Types;
 using Xunit;
 
-namespace CanopyPlugin.Tests
+namespace CanopyPlugin.Tutorial
 {
     /// <summary>
-    /// RPC Test for C# Plugin
+    /// RPC Test for C# Plugin Tutorial
     /// 
     /// Tests the full flow of plugin transactions via RPC:
     /// 1. Adds two accounts to the keystore
@@ -22,7 +22,7 @@ namespace CanopyPlugin.Tests
     /// 3. Does a send transaction from the fauceted account to the other account
     /// 4. Sends a reward from that account back to the original account
     /// 
-    /// Run with: dotnet test --filter "FullyQualifiedName~RpcTest"
+    /// Run with: dotnet test --filter "FullyQualifiedName~RpcTest" --logger "console;verbosity=detailed"
     /// </summary>
     public class RpcTest
     {
@@ -54,7 +54,7 @@ namespace CanopyPlugin.Tests
         [Fact]
         public async Task TestPluginTransactions()
         {
-            Console.WriteLine("=== C# Plugin RPC Test ===\n");
+            Console.WriteLine("=== C# Plugin Tutorial RPC Test ===\n");
 
             // Step 1: Create two new accounts in the keystore
             Console.WriteLine("Step 1: Creating two accounts in keystore...");
