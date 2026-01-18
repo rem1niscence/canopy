@@ -31,13 +31,6 @@ func (s *StateMachine) IndexerBlob(height uint64) (b *IndexerBlob, err lib.Error
 	if height == 0 || height > s.height {
 		height = s.height
 	}
-	st := s.store.(lib.StoreI)
-	// retrieve the block, transactions, and events
-	block, err := st.GetBlockByHeight(height)
-	if err != nil {
-		return nil, err
-	}
-	// get the state machine for n
 	sm, err := s.TimeMachine(height)
 	if err != nil {
 		return nil, err
@@ -45,6 +38,19 @@ func (s *StateMachine) IndexerBlob(height uint64) (b *IndexerBlob, err lib.Error
 	if sm != s {
 		defer sm.Discard()
 	}
+	st := sm.store.(lib.StoreI)
+	// retrieve the block, transactions, and events
+	block, err := st.GetBlockByHeight(height)
+	if err != nil {
+		return nil, err
+	}
+	if block == nil || block.BlockHeader == nil {
+		return nil, lib.ErrNilBlockHeader()
+	}
+	if block.BlockHeader.Height == 0 || block.BlockHeader.Height != height {
+		return nil, lib.ErrWrongBlockHeight(block.BlockHeader.Height, height)
+	}
+	// use sm for consistent snapshot reads at the requested height
 	// retrieve the accounts
 	accounts, err := sm.IterateAndAppend(AccountPrefix())
 	if err != nil {
