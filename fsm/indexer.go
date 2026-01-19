@@ -38,7 +38,7 @@ func (s *StateMachine) IndexerBlob(height uint64) (b *IndexerBlob, err lib.Error
 	if sm != s {
 		defer sm.Discard()
 	}
-	st := sm.store.(lib.StoreI)
+	st := s.store.(lib.StoreI)
 	// retrieve the block, transactions, and events
 	block, err := st.GetBlockByHeight(height)
 	if err != nil {
