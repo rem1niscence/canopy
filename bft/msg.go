@@ -92,7 +92,7 @@ func (b *BFT) CheckProposerMessage(x *Message, p *validateMessageParams) (isPart
 		}
 	}
 	// validate the Quorum Certificate
-	isPartialQC, err = x.Qc.Check(vals, lib.GlobalMaxBlockSize, p.view, false)
+	isPartialQC, err = x.Qc.Check(vals, b.LoadMaxBlockSize(), p.view, false)
 	if err != nil {
 		return
 	}

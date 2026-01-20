@@ -574,6 +574,9 @@ func (t *testController) RootChainHeight() uint64 { return 0 }
 func (t *testController) LoadLastProposers(_ uint64) (*lib.Proposers, lib.ErrorI) {
 	return t.proposers, nil
 }
+func (t *testController) LoadMaxBlockSize() int {
+	return lib.GlobalMaxBlockSize
+}
 func (t *testController) ResetFSM() {}
 func (t *testController) GossipBlock(certificate *lib.QuorumCertificate, sender []byte, timestamp uint64) {
 	t.gossipCertChan <- certificate

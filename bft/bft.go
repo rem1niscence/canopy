@@ -974,6 +974,8 @@ type (
 		LoadMinimumEvidenceHeight(rootChainId, rootHeight uint64) (*uint64, lib.ErrorI)
 		// IsValidDoubleSigner() checks to see if the double signer is valid for this specific height
 		IsValidDoubleSigner(rootChainId, rootHeight uint64, address []byte) bool
+		// LoadMaxBlockSize() loads the chain enforced maximum block size for valid blocks
+		LoadMaxBlockSize() int
 	}
 )
 
