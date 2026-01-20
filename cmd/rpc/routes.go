@@ -62,8 +62,7 @@ const (
 	RootChainInfoRoutePath         = "/v1/query/root-chain-info"
 	ValidatorSetRoutePath          = "/v1/query/validator-set"
 	CheckpointRoutePath            = "/v1/query/checkpoint"
-	SubscribeRCInfoPath            = "/v1/subscribe-rc-info"
-	SubscribeIndexerBlobPath       = "/v1/subscribe-indexer-blob"
+	SubscribeRCInfoPath = "/v1/subscribe-rc-info"
 	// debug
 	DebugBlockedRoutePath   = "/debug/blocked"
 	DebugHeapRoutePath      = "/debug/heap"
@@ -201,10 +200,9 @@ const (
 	PeerBookRouteName               = "peer-book"
 	ConfigRouteName                 = "config"
 	LogsRouteName                   = "logs"
-	AddVoteRouteName                = "add-vote"
-	DelVoteRouteName                = "del-vote"
-	SubscribeRCInfoName             = "subscribe-rc-info"
-	SubscribeIndexerBlobName        = "subscribe-indexer-blob"
+	AddVoteRouteName    = "add-vote"
+	DelVoteRouteName    = "del-vote"
+	SubscribeRCInfoName = "subscribe-rc-info"
 )
 
 // routes contains the method and path for a canopy command
@@ -308,10 +306,9 @@ var routePaths = routes{
 	PeerBookRouteName:               {Method: http.MethodGet, Path: PeerBookRoutePath},
 	ConfigRouteName:                 {Method: http.MethodGet, Path: ConfigRoutePath},
 	LogsRouteName:                   {Method: http.MethodGet, Path: LogsRoutePath},
-	AddVoteRouteName:                {Method: http.MethodPost, Path: AddVoteRoutePath},
-	DelVoteRouteName:                {Method: http.MethodPost, Path: DelVoteRoutePath},
-	SubscribeRCInfoName:             {Method: http.MethodGet, Path: SubscribeRCInfoPath},
-	SubscribeIndexerBlobName:        {Method: http.MethodGet, Path: SubscribeIndexerBlobPath},
+	AddVoteRouteName:    {Method: http.MethodPost, Path: AddVoteRoutePath},
+	DelVoteRouteName:    {Method: http.MethodPost, Path: DelVoteRoutePath},
+	SubscribeRCInfoName: {Method: http.MethodGet, Path: SubscribeRCInfoPath},
 }
 
 // httpRouteHandlers is a custom type that maps strings to httprouter handle functions
@@ -372,11 +369,10 @@ func createRouter(s *Server) *httprouter.Router {
 		FailedTxRouteName:              s.FailedTxs,
 		ProposalsRouteName:             s.Proposals,
 		PollRouteName:                  s.Poll,
-		RootChainInfoRouteName:         s.RootChainInfo,
-		CheckpointRouteName:            s.Checkpoint,
-		EthereumRouteName:              s.EthereumHandler,
-		SubscribeRCInfoName:            s.WebSocket,
-		SubscribeIndexerBlobName:       s.IndexerBlobWebSocket,
+		RootChainInfoRouteName: s.RootChainInfo,
+		CheckpointRouteName:    s.Checkpoint,
+		EthereumRouteName:      s.EthereumHandler,
+		SubscribeRCInfoName:    s.WebSocket,
 	}
 
 	// Initialize a new router using the httprouter package.

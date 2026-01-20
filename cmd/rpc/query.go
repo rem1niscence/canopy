@@ -46,29 +46,6 @@ func (s *Server) Height(w http.ResponseWriter, _ *http.Request, _ httprouter.Par
 	})
 }
 
-// IndexerBlobs returns the current and previous indexer blobs as protobuf bytes
-func (s *Server) IndexerBlobs(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	req := new(heightRequest)
-	if ok := unmarshal(w, r, req); !ok {
-		return
-	}
-	_, bz, err := s.rcManager.IndexerBlobsCached(req.Height)
-	if err != nil {
-		status := http.StatusBadRequest
-		if err.Code() == lib.CodeMarshal {
-			status = http.StatusInternalServerError
-		}
-		write(w, err, status)
-		return
-	}
-	w.Header().Set("Content-Type", "application/x-protobuf")
-	w.Header().Set(ContentType, "application/x-protobuf")
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(bz); err != nil {
-		s.logger.Error(err.Error())
-	}
-}
-
 // Account responds with an account for the specified address
 func (s *Server) Account(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	// Invoke helper with the HTTP request, response writer and an inline callback
@@ -577,6 +554,76 @@ func (s *Server) Poll(w http.ResponseWriter, _ *http.Request, _ httprouter.Param
 	if _, err := w.Write(bz); err != nil {
 		s.logger.Error(err.Error())
 	}
+}
+
+// IndexerBlobs returns the current and previous indexer blobs as protobuf bytes
+func (s *Server) IndexerBlobs(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	req := new(heightRequest)
+	if ok := unmarshal(w, r, req); !ok {
+		return
+	}
+	_, bz, err := s.IndexerBlobsCached(req.Height)
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Code() == lib.CodeMarshal {
+			status = http.StatusInternalServerError
+		}
+		write(w, err, status)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-protobuf")
+	w.Header().Set(ContentType, "application/x-protobuf")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(bz); err != nil {
+		s.logger.Error(err.Error())
+	}
+}
+
+// IndexerBlobsCached() is a helper function for the indexer blobs implementation
+func (s *Server) IndexerBlobsCached(height uint64) (*fsm.IndexerBlobs, []byte, lib.ErrorI) {
+	currentHeight := s.controller.FSM.Height()
+	if height == 0 || height > currentHeight {
+		height = currentHeight
+	}
+
+	if entry, ok := s.indexerBlobCache.get(height); ok && entry != nil && entry.blobs != nil && entry.protoBytes != nil {
+		return entry.blobs, entry.protoBytes, nil
+	}
+
+	current, err := s.controller.FSM.IndexerBlob(height)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var previous *fsm.IndexerBlob
+	if height > 1 {
+		if cachedPrev, ok := s.indexerBlobCache.getCurrent(height - 1); ok {
+			previous = cachedPrev
+		} else {
+			prev, prevErr := s.controller.FSM.IndexerBlob(height - 1)
+			if prevErr != nil {
+				return nil, nil, prevErr
+			}
+			previous = prev
+		}
+	}
+
+	blobs := &fsm.IndexerBlobs{
+		Current:  current,
+		Previous: previous,
+	}
+	protoBytes, err := lib.Marshal(blobs)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	s.indexerBlobCache.put(height, &indexerBlobCacheEntry{
+		height:     height,
+		blobs:      blobs,
+		protoBytes: protoBytes,
+	})
+
+	return blobs, protoBytes, nil
 }
 
 // orderParams is a helper function to abstract common workflows around a callback requiring a state machine and order request

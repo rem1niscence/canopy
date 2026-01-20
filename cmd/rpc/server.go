@@ -58,18 +58,22 @@ type Server struct {
 	// handles interactions with the root chain rpc
 	rcManager *RCManager
 
+	// handles the indexer blob caching
+	indexerBlobCache *indexerBlobCache
+
 	logger lib.LoggerI
 }
 
 // NewServer constructs and returns a new Canopy RPC server
 func NewServer(controller *controller.Controller, config lib.Config, logger lib.LoggerI) *Server {
 	return &Server{
-		controller: controller,
-		config:     config,
-		logger:     logger,
-		rcManager:  NewRCManager(controller, config, logger),
-		poll:       make(fsm.Poll),
-		pollMux:    &sync.RWMutex{},
+		controller:       controller,
+		config:           config,
+		logger:           logger,
+		rcManager:        NewRCManager(controller, config, logger),
+		poll:             make(fsm.Poll),
+		pollMux:          &sync.RWMutex{},
+		indexerBlobCache: newIndexerBlobCache(100),
 	}
 }
 
