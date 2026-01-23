@@ -115,6 +115,7 @@ type RPCConfig struct {
 	RPCUrl                     string `json:"rpcURL"`                     // the url where the rpc server is hosted
 	AdminRPCUrl                string `json:"adminRPCUrl"`                // the url where the admin rpc server is hosted
 	TimeoutS                   int    `json:"timeoutS"`                   // the rpc request timeout in seconds
+	IndexerBlobCacheEntries    int    `json:"indexerBlobCacheEntries"`    // number of cached indexer blobs to keep in memory
 	MaxRCSubscribers           int    `json:"maxRCSubscribers"`           // max total root-chain subscribers
 	MaxRCSubscribersPerChain   int    `json:"maxRCSubscribersPerChain"`   // max root-chain subscribers per chain id
 	RCSubscriberReadLimitBytes int64  `json:"rcSubscriberReadLimitBytes"` // max bytes allowed in a single ws message from a subscriber
@@ -139,6 +140,7 @@ func DefaultRPCConfig() RPCConfig {
 		RPCUrl:                     "http://localhost:50002",   // use a local rpc by default
 		AdminRPCUrl:                "http://localhost:50003",   // use a local admin rpc by default
 		TimeoutS:                   3,                          // the rpc timeout is 3 seconds
+		IndexerBlobCacheEntries:    64,                         // cache the most recent indexer blobs
 		MaxRCSubscribers:           512,                        // limit total root-chain subscribers
 		MaxRCSubscribersPerChain:   128,                        // limit subscribers per chain id
 		RCSubscriberReadLimitBytes: int64(64 * units.Kilobyte), // cap inbound ws message sizes
@@ -232,6 +234,7 @@ type P2PConfig struct {
 	BannedIPs           []string          `json:"bannedIPs"`           // banned IPs
 	MinimumPeersToStart int               `json:"minimumPeersToStart"` // the minimum connections required to start consensus
 	ValidatorTCPProxy   map[uint64]string `json:"validator_tcp_proxy"` // tcp proxy config mapping listen port to target address
+	GossipThreshold     uint              `json:"gossipThreshold"`     // number of must connects needed to switch to full gossip
 }
 
 func DefaultP2PConfig() P2PConfig {
@@ -311,15 +314,19 @@ func DefaultMempoolConfig() MempoolConfig {
 
 // MetricsConfig represents the configuration for the metrics server
 type MetricsConfig struct {
-	MetricsEnabled    bool   `json:"metricsEnabled"`    // if the metrics are enabled
-	PrometheusAddress string `json:"prometheusAddress"` // the address of the server
+	MetricsEnabled         bool   `json:"metricsEnabled"`         // if the metrics are enabled
+	PrometheusAddress      string `json:"prometheusAddress"`      // the address of the server
+	HeapProfilingEnabled   bool   `json:"heapProfilingEnabled"`   // enable periodic heap profiling (warning: causes GC pauses)
+	HeapProfilingIntervalS int    `json:"heapProfilingIntervalS"` // interval in seconds between heap profile snapshots
 }
 
 // DefaultMetricsConfig() returns the default metrics configuration
 func DefaultMetricsConfig() MetricsConfig {
 	return MetricsConfig{
-		MetricsEnabled:    true,           // enabled by default
-		PrometheusAddress: "0.0.0.0:9090", // the default prometheus address
+		MetricsEnabled:         true,           // enabled by default
+		PrometheusAddress:      "0.0.0.0:9090", // the default prometheus address
+		HeapProfilingEnabled:   false,          // disabled by default (causes GC pauses)
+		HeapProfilingIntervalS: 10,             // 10 second interval when enabled
 	}
 }
 
