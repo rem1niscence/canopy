@@ -24,9 +24,9 @@ const (
 	defaultRepoName     = "canopy"
 	defaultRepoOwner    = "canopy-network"
 	defaultBinPath      = "./cli"
-	defaultCheckPeriod  = time.Minute * 30 // default check period for updates
-	defaultGracePeriod  = time.Second * 2  // default grace period for graceful shutdown
-	defaultMaxDelayTime = 30               // default max delay time for staggered updates
+	defaultCheckPeriod  = time.Minute * 1 // default check period for updates
+	defaultGracePeriod  = time.Second * 2 // default grace period for graceful shutdown
+	defaultMaxDelayTime = 1               // default max delay time for staggered updates
 )
 
 var (
